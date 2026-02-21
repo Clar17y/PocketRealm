@@ -35,7 +35,7 @@ function broadcastPresence(io: Server): void {
   io.to('chat:world').emit('chat:presence', event);
 }
 
-const VALID_CHANNEL_TYPES = new Set<ChatChannelType>(['world', 'zone']);
+const VALID_CHANNEL_TYPES = new Set<ChatChannelType>(['world', 'zone', 'guild']);
 
 export function registerChatHandlers(io: Server, socket: Socket): void {
   const { playerId, username, role } = socket.data;
@@ -47,16 +47,21 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
     socket.emit('chat:pinned', worldPin);
   }
 
-  // Look up player's current zone and join it
-  prisma.player
-    .findUnique({ where: { id: playerId }, select: { currentZoneId: true } })
-    .then((player) => {
+  // Look up player's current zone and guild, join their rooms
+  Promise.all([
+    prisma.player.findUnique({ where: { id: playerId }, select: { currentZoneId: true } }),
+    prisma.guildMember.findUnique({ where: { playerId }, select: { guildId: true } }),
+  ])
+    .then(([player, guildMember]) => {
       if (player?.currentZoneId) {
         socket.join(`chat:zone:${player.currentZoneId}`);
         const zonePin = pinnedMessages.get(`zone:${player.currentZoneId}`);
         if (zonePin) {
           socket.emit('chat:pinned', zonePin);
         }
+      }
+      if (guildMember?.guildId) {
+        socket.join(`chat:guild:${guildMember.guildId}`);
       }
       schedulePresenceBroadcast(io);
     })
@@ -81,6 +86,15 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
 
     const trimmed = message.trim();
     if (!trimmed || trimmed.length > CHAT_CONSTANTS.MAX_MESSAGE_LENGTH) return;
+
+    // Guild chat: verify membership
+    if (channelType === 'guild') {
+      const membership = await prisma.guildMember.findUnique({ where: { playerId }, select: { guildId: true } });
+      if (!membership || `guild:${membership.guildId}` !== channelId) {
+        socket.emit('chat:error', { code: 'NOT_IN_GUILD', message: 'You are not in this guild.' });
+        return;
+      }
+    }
 
     if (!checkRateLimit(playerId, channelType as ChatChannelType)) {
       socket.emit('chat:error', { code: 'RATE_LIMITED', message: 'Sending too fast, slow down.' });
