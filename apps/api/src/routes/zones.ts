@@ -15,6 +15,7 @@ import type { Combatant, MobTemplate, SkillType } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
+import { applyGuildTax } from '../services/guildTaxService';
 import { getHpState, enterRecoveringState, setHp } from '../services/hpService';
 import { getEquipmentStats } from '../services/equipmentService';
 import { getPlayerProgressionState } from '../services/attributesService';
@@ -249,7 +250,8 @@ zonesRouter.post('/travel', async (req, res, next) => {
     const isTownDeparture = currentZone.zoneType === 'town';
     const travelCost: number = isTownDeparture ? destinationZone.travelCost : currentZone.travelCost;
 
-    // 9. Spend turns
+    // 9. Spend turns (guild tax applied as side-effect)
+    await applyGuildTax(playerId, travelCost);
     await spendPlayerTurns(playerId, travelCost);
 
     const events: TravelEvent[] = [];

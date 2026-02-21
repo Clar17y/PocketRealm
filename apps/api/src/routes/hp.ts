@@ -4,6 +4,7 @@ import { Prisma, prisma } from '@adventure/database';
 import { authenticate } from '../middleware/auth';
 import { getHpState, rest, recover } from '../services/hpService';
 import { getTurnState } from '../services/turnBankService';
+import { applyGuildTax } from '../services/guildTaxService';
 import { calculateHealPerTurn, calculateRecoveryExitHp } from '@adventure/game-engine';
 import { getPlayerProgressionState } from '../services/attributesService';
 
@@ -38,6 +39,7 @@ hpRouter.post('/rest', async (req, res, next) => {
     const playerId = req.player!.playerId;
     const body = restSchema.parse(req.body);
 
+    await applyGuildTax(playerId, body.turns);
     const result = await rest(playerId, body.turns);
     const turns = await getTurnState(playerId);
 
