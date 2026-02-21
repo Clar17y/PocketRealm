@@ -513,3 +513,56 @@ export const LEADERBOARD_CONSTANTS = {
   PAGE_SIZE: 25,
   TOP_N: 25,
 } as const;
+
+// =============================================================================
+// GUILD
+// =============================================================================
+
+export const GUILD_CONSTANTS = {
+  /** Turn cost to create a guild */
+  CREATION_TURN_COST: 50_000,
+  /** Minimum character level to create a guild */
+  CREATION_MIN_LEVEL: 20,
+  /** Minimum character level to join a guild */
+  JOIN_MIN_LEVEL: 10,
+  /** Base max members at guild level 1 */
+  BASE_MAX_MEMBERS: 10,
+  /** Additional member slots per 2 guild levels */
+  MEMBERS_PER_TWO_LEVELS: 1,
+  /** Maximum tax rate (percentage) */
+  MAX_TAX_RATE: 20,
+  /** Base treasury capacity */
+  TREASURY_BASE_CAP: 100_000,
+  /** Additional treasury capacity per guild level */
+  TREASURY_CAP_PER_LEVEL: 10_000,
+  /** Guild level required to unlock specialization */
+  SPECIALIZATION_UNLOCK_LEVEL: 10,
+  /** Treasury cost to respec specialization */
+  SPECIALIZATION_RESPEC_COST: 2_000_000,
+  /** Hours of XP activity required to be considered "active" for boost eligibility */
+  BOOST_ELIGIBILITY_WINDOW_HOURS: 48,
+  /** Active member thresholds for boost scaling: <5 = 50%, 5-9 = 75%, 10+ = 100% */
+  BOOST_SCALING_MIN_FULL: 10,
+  BOOST_SCALING_MIN_MEDIUM: 5,
+  BOOST_SCALING_FULL: 1.0,
+  BOOST_SCALING_MEDIUM: 0.75,
+  BOOST_SCALING_LOW: 0.5,
+  /** XP required per guild level: floor(BASE * level^EXPONENT) */
+  XP_PER_LEVEL_BASE: 100,
+  XP_PER_LEVEL_EXPONENT: 1.8,
+  /** Guild XP earned per member action */
+  XP_PER_MOB_KILL: 1,
+  XP_PER_CRAFT: 2,
+  XP_PER_BOSS_ROUND: 10,
+  XP_PER_MEMBER_JOIN: 50,
+  /** Guild log page size */
+  LOG_PAGE_SIZE: 50,
+  /** Max description length */
+  MAX_DESCRIPTION_LENGTH: 200,
+  /** Guild name constraints */
+  MIN_NAME_LENGTH: 3,
+  MAX_NAME_LENGTH: 32,
+  /** Guild tag constraints */
+  MIN_TAG_LENGTH: 2,
+  MAX_TAG_LENGTH: 4,
+} as const;

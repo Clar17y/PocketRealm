@@ -8,6 +8,7 @@ export * from './types/mobPrefix.types';
 export * from './types/chat.types';
 export * from './types/worldEvent.types';
 export * from './types/achievement.types';
+export * from './types/guild.types';
 
 // Constants
 export * from './constants/gameConstants';
