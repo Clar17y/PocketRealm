@@ -369,9 +369,6 @@ export async function demoteMember(leaderId: string, targetId: string): Promise<
   if (target.role !== 'officer') {
     throw new AppError(400, 'Can only demote officers to member', 'NOT_OFFICER');
   }
-  if (target.role === 'leader') {
-    throw new AppError(400, 'Cannot demote the leader', 'CANNOT_DEMOTE_LEADER');
-  }
 
   await prisma.$transaction(async (tx: any) => {
     await tx.guildMember.update({
