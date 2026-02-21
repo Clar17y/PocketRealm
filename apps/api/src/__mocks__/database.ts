@@ -48,6 +48,13 @@ export const prisma = {
   mobFamily: mockModel(),
   activityLog: mockModel(),
   pvpRating: mockModel(),
+  guild: mockModel(),
+  guildMember: mockModel(),
+  guildUpgrade: mockModel(),
+  guildProject: mockModel(),
+  guildProjectContribution: mockModel(),
+  guildContract: mockModel(),
+  guildLog: mockModel(),
   $transaction: vi.fn((fn: (tx: any) => Promise<any>) => fn(prisma)),
   $queryRaw: vi.fn(),
 };
