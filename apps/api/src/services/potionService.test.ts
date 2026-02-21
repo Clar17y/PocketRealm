@@ -103,8 +103,8 @@ describe('potionService', () => {
       });
 
       await deductConsumedPotions('player-1', [
-        { templateId: 'tmpl-1', name: 'Potion', round: 1 },
-        { templateId: 'tmpl-1', name: 'Potion', round: 5 },
+        { templateId: 'tmpl-1', name: 'Potion', round: 1, healAmount: 50 },
+        { templateId: 'tmpl-1', name: 'Potion', round: 5, healAmount: 50 },
       ]);
 
       expect(mockPrisma.item.delete).toHaveBeenCalledWith({
@@ -119,7 +119,7 @@ describe('potionService', () => {
       });
 
       await deductConsumedPotions('player-1', [
-        { templateId: 'tmpl-1', name: 'Potion', round: 1 },
+        { templateId: 'tmpl-1', name: 'Potion', round: 1, healAmount: 50 },
       ]);
 
       expect(mockPrisma.item.update).toHaveBeenCalledWith({
@@ -135,9 +135,9 @@ describe('potionService', () => {
       });
 
       await deductConsumedPotions('player-1', [
-        { templateId: 'tmpl-1', name: 'Potion', round: 1 },
-        { templateId: 'tmpl-1', name: 'Potion', round: 3 },
-        { templateId: 'tmpl-1', name: 'Potion', round: 7 },
+        { templateId: 'tmpl-1', name: 'Potion', round: 1, healAmount: 50 },
+        { templateId: 'tmpl-1', name: 'Potion', round: 3, healAmount: 50 },
+        { templateId: 'tmpl-1', name: 'Potion', round: 7, healAmount: 50 },
       ]);
 
       // Should only do one findFirst call for the single template
@@ -152,7 +152,7 @@ describe('potionService', () => {
       mockPrisma.item.findFirst.mockResolvedValue(null);
 
       await deductConsumedPotions('player-1', [
-        { templateId: 'tmpl-missing', name: 'Ghost Potion', round: 1 },
+        { templateId: 'tmpl-missing', name: 'Ghost Potion', round: 1, healAmount: 50 },
       ]);
 
       expect(mockPrisma.item.delete).not.toHaveBeenCalled();
@@ -167,7 +167,7 @@ describe('potionService', () => {
 
       await deductConsumedPotions(
         'player-1',
-        [{ templateId: 'tmpl-1', name: 'Potion', round: 1 }],
+        [{ templateId: 'tmpl-1', name: 'Potion', round: 1, healAmount: 50 }],
         fakeTx as any,
       );
 
