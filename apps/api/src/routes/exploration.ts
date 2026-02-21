@@ -29,6 +29,7 @@ import {
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurns } from '../services/turnBankService';
+import { applyGuildTax } from '../services/guildTaxService';
 import { enterRecoveringState, getHpState, setHp } from '../services/hpService';
 import { rollAndGrantLoot } from '../services/lootService';
 import { grantSkillXp } from '../services/xpService';
@@ -444,9 +445,11 @@ explorationRouter.post('/start', async (req, res, next) => {
     // Fetch zone modifiers from active world events
     const zoneModifiers = await getActiveZoneModifiers(body.zoneId);
 
+    // Apply guild tax: player pays full cost, but effective exploration uses post-tax turns
+    const { postTaxAmount } = await applyGuildTax(playerId, body.turns);
     const turnSpend = await spendPlayerTurns(playerId, body.turns);
 
-    const outcomes = simulateExploration(body.turns, effectiveExitChance);
+    const outcomes = simulateExploration(postTaxAmount, effectiveExitChance);
 
     const pendingResources: PendingResourceDiscovery[] = [];
     const pendingSites: PendingEncounterSiteDiscovery[] = [];

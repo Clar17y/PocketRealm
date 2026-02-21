@@ -55,6 +55,9 @@ export const prisma = {
   guildProjectContribution: mockModel(),
   guildContract: mockModel(),
   guildLog: mockModel(),
-  $transaction: vi.fn((fn: (tx: any) => Promise<any>) => fn(prisma)),
+  $transaction: vi.fn((fnOrArray: ((tx: any) => Promise<any>) | any[]) => {
+    if (typeof fnOrArray === 'function') return fnOrArray(prisma);
+    return Promise.all(fnOrArray);
+  }),
   $queryRaw: vi.fn(),
 };

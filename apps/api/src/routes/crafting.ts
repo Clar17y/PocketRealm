@@ -34,6 +34,8 @@ import {
 } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { getHpState } from '../services/hpService';
+import { addGuildXp, getPlayerGuildId } from '../services/guildService';
+import { GUILD_CONSTANTS } from '@adventure/shared';
 
 export const craftingRouter = Router();
 
@@ -536,6 +538,10 @@ craftingRouter.post('/craft', async (req, res, next) => {
     }
 
     const xpGrant = await grantSkillXp(playerId, recipe.skillType, recipe.xpReward * quantity);
+
+    // Guild XP for crafting
+    const guildId = await getPlayerGuildId(playerId);
+    if (guildId) await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_CRAFT * quantity);
 
     // --- Achievement tracking (counters + derived checks) ---
     const isRealCraft = recipe.resultTemplate.itemType !== 'resource';

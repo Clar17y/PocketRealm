@@ -15,6 +15,7 @@ import {
 import {
   COMBAT_CONSTANTS,
   EXPLORATION_CONSTANTS,
+  GUILD_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
   getMobPrefixDefinition,
   type Combatant,
@@ -45,6 +46,7 @@ import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../serv
 import { getExplorationPercent } from '../services/zoneExplorationService';
 import { incrementStats } from '../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
+import { addGuildXp, getPlayerGuildId } from '../services/guildService';
 
 export const combatRouter = Router();
 
@@ -727,6 +729,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
           update: { kills: { increment: 1 } },
         });
       }
+
+      // Guild XP for mob kill
+      const guildId = await getPlayerGuildId(playerId);
+      if (guildId) await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
     }
 
     fightResults.push({
@@ -1238,6 +1244,10 @@ combatRouter.post('/start', async (req, res, next) => {
       await setHp(playerId, combatResult.combatantAHpRemaining);
       loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
       xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded);
+
+      // Guild XP for mob kill
+      const guildId = await getPlayerGuildId(playerId);
+      if (guildId) await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
     } else if (combatResult.outcome === 'defeat') {
       fleeResult = calculateFleeResult({
         evasionLevel: progression.attributes.evasion,
