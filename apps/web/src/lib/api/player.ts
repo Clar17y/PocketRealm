@@ -1,4 +1,4 @@
-import { fetchApi } from './core';
+import { fetchApi, type TurnStateResponse } from './core';
 
 export async function getPlayer() {
   return fetchApi<{
@@ -196,7 +196,7 @@ export async function rest(turns: number) {
     currentHp: number;
     maxHp: number;
     turnsSpent: number;
-    turns: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+    turns: TurnStateResponse;
   }>('/api/v1/hp/rest', {
     method: 'POST',
     body: JSON.stringify({ turns }),
@@ -209,7 +209,7 @@ export async function recoverFromKnockout() {
     currentHp: number;
     maxHp: number;
     turnsSpent: number;
-    turns: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+    turns: TurnStateResponse;
   }>('/api/v1/hp/recover', {
     method: 'POST',
   });

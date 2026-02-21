@@ -5,6 +5,7 @@ import type { PotionConsumed } from '@adventure/shared';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { grantSkillXp } from '../../services/xpService';
 import type { LootDropWithName } from '../../services/lootService';
+import { paginationSchema } from '../../utils/routeHelpers.js';
 
 export const prismaAny = prisma as unknown as any;
 
@@ -32,8 +33,7 @@ export const listEncounterSitesQuerySchema = z.object({
   zoneId: z.string().uuid().optional(),
   mobFamilyId: z.string().uuid().optional(),
   sort: z.enum(['recent', 'danger']).default('danger'),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(10),
+  ...paginationSchema,
 });
 
 export function pickWeighted<T extends { encounterWeight: number }>(items: T[]): T | null {

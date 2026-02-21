@@ -27,6 +27,7 @@ import { enterRecoveringState, getHpState, setHp } from '../../services/hpServic
 import { rollAndGrantLoot } from '../../services/lootService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
+import { serializeXpGrant } from '../../utils/routeHelpers.js';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
@@ -283,18 +284,7 @@ startRouter.post('/start', async (req, res, next) => {
           }
 
           const skillXpReward = xpGrant
-            ? {
-                skillType: xpGrant.skillType,
-                ...xpGrant.xpResult,
-                newTotalXp: xpGrant.newTotalXp,
-                newDailyXpGained: xpGrant.newDailyXpGained,
-                characterXpGain: xpGrant.characterXpGain,
-                characterXpAfter: xpGrant.characterXpAfter,
-                characterLevelBefore: xpGrant.characterLevelBefore,
-                characterLevelAfter: xpGrant.characterLevelAfter,
-                attributePointsAfter: xpGrant.attributePointsAfter,
-                characterLeveledUp: xpGrant.characterLeveledUp,
-              }
+            ? serializeXpGrant(xpGrant)
             : null;
 
           pendingCombatLogs.push({

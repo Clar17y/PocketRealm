@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@adventure/database';
 import { getMobPrefixDefinition } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
+import { buildPagination } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
   listEncounterSitesQuerySchema,
@@ -132,7 +133,6 @@ export function registerSiteRoutes(router: Router): void {
       });
 
       const total = activeSites.length;
-      const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
       const offset = (query.page - 1) * query.pageSize;
       const pageItems = activeSites.slice(offset, offset + query.pageSize);
       const zones = Array.from(new Map(activeSites.map((site) => [site.zoneId, site.zoneName])).entries())
@@ -173,14 +173,7 @@ export function registerSiteRoutes(router: Router): void {
             roomMobCounts: site.roomMobCounts,
           };
         }),
-        pagination: {
-          page: query.page,
-          pageSize: query.pageSize,
-          total,
-          totalPages,
-          hasNext: query.page < totalPages,
-          hasPrevious: query.page > 1,
-        },
+        pagination: buildPagination(query.page, query.pageSize, total),
         filters: {
           zones,
           mobFamilies,

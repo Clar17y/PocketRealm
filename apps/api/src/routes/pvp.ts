@@ -13,6 +13,7 @@ import {
   markNotificationsRead,
 } from '../services/pvpService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
+import { paginationSchema } from '../utils/routeHelpers.js';
 
 export const pvpRouter = Router();
 pvpRouter.use(authenticate);
@@ -30,8 +31,7 @@ const matchIdSchema = z.object({
 });
 
 const historyQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(10),
+  ...paginationSchema,
 });
 
 const markReadSchema = z.object({

@@ -19,6 +19,7 @@ import { checkAchievements, emitAchievementNotifications } from '../../services/
 import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from '../../services/inventoryService';
 import { grantSkillXp } from '../../services/xpService';
 import { getHpState } from '../../services/hpService';
+import { serializeXpGrant } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
   isSkillType,
@@ -258,18 +259,7 @@ craftRouter.post('/', async (req, res, next) => {
           durability: needsDurability
             ? { baseMax, durabilityBonusPct, craftedMax }
             : null,
-          xp: {
-            skillType: xpGrant.skillType,
-            ...xpGrant.xpResult,
-            newTotalXp: xpGrant.newTotalXp,
-            newDailyXpGained: xpGrant.newDailyXpGained,
-            characterXpGain: xpGrant.characterXpGain,
-            characterXpAfter: xpGrant.characterXpAfter,
-            characterLevelBefore: xpGrant.characterLevelBefore,
-            characterLevelAfter: xpGrant.characterLevelAfter,
-            attributePointsAfter: xpGrant.attributePointsAfter,
-            characterLeveledUp: xpGrant.characterLeveledUp,
-          },
+          xp: serializeXpGrant(xpGrant),
         } as unknown as Prisma.InputJsonValue,
       },
     });
@@ -284,18 +274,7 @@ craftRouter.post('/', async (req, res, next) => {
         craftedItemIds,
       },
       craftedItemDetails,
-      xp: {
-        skillType: xpGrant.skillType,
-        ...xpGrant.xpResult,
-        newTotalXp: xpGrant.newTotalXp,
-        newDailyXpGained: xpGrant.newDailyXpGained,
-        characterXpGain: xpGrant.characterXpGain,
-        characterXpAfter: xpGrant.characterXpAfter,
-        characterLevelBefore: xpGrant.characterLevelBefore,
-        characterLevelAfter: xpGrant.characterLevelAfter,
-        attributePointsAfter: xpGrant.attributePointsAfter,
-        characterLeveledUp: xpGrant.characterLeveledUp,
-      },
+      xp: serializeXpGrant(xpGrant),
     });
   } catch (err) {
     next(err);

@@ -1,4 +1,4 @@
-import { fetchApi } from './core';
+import { fetchApi, type TurnStateResponse } from './core';
 
 // Inventory
 
@@ -56,7 +56,7 @@ export async function useItem(itemId: string) {
 export async function repairItem(itemId: string) {
   return fetchApi<{
     repaired: boolean;
-    turns?: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+    turns?: TurnStateResponse;
     itemId: string;
     currentDurability: number | null;
     maxDurability: number | null;
@@ -139,7 +139,7 @@ export async function getGatheringNodes(query: GatheringNodesQuery = {}) {
 export async function mine(playerNodeId: string, turns: number, currentZoneId: string) {
   return fetchApi<{
     logId: string;
-    turns: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+    turns: TurnStateResponse;
     node: {
       id: string;
       templateId: string;
@@ -214,7 +214,7 @@ export async function getCraftingRecipes() {
 export async function craft(recipeId: string, quantity: number = 1) {
   return fetchApi<{
     logId: string;
-    turns: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+    turns: TurnStateResponse;
     crafted: { recipeId: string; resultTemplateId: string; quantity: number; craftedItemIds: string[] };
     craftedItemDetails: Array<{
       id: string;
@@ -247,7 +247,7 @@ export async function craft(recipeId: string, quantity: number = 1) {
 export async function salvage(itemId: string) {
   return fetchApi<{
     logId: string;
-    turns: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+    turns: TurnStateResponse;
     salvage: {
       salvagedItemId: string;
       salvagedTemplateId: string;
@@ -262,7 +262,7 @@ export async function salvage(itemId: string) {
 export async function forgeUpgrade(itemId: string, sacrificialItemId: string) {
   return fetchApi<{
     logId: string;
-    turns: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+    turns: TurnStateResponse;
     forge: {
       action: 'upgrade';
       success: boolean;
@@ -284,7 +284,7 @@ export async function forgeUpgrade(itemId: string, sacrificialItemId: string) {
 export async function forgeReroll(itemId: string, sacrificialItemId: string) {
   return fetchApi<{
     logId: string;
-    turns: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+    turns: TurnStateResponse;
     forge: {
       action: 'reroll';
       success: true;

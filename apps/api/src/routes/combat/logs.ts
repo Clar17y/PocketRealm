@@ -4,14 +4,14 @@ import { Prisma, prisma } from '@adventure/database';
 import { AppError } from '../../middleware/errorHandler';
 import { enrichLootWithNames } from '../../services/lootService';
 import { lootDropWithNameSchema } from './helpers';
+import { paginationSchema, buildPagination } from '../../utils/routeHelpers.js';
 
 const logParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
 const listLogsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(10),
+  ...paginationSchema,
   outcome: z.enum(['victory', 'defeat', 'fled']).optional(),
   zoneId: z.string().uuid().optional(),
   mobTemplateId: z.string().uuid().optional(),
@@ -195,7 +195,6 @@ export function registerLogRoutes(router: Router): void {
       ]);
 
       const total = Number(countRows[0]?.total ?? 0n);
-      const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
 
       res.json({
         logs: listRows.map((row) => ({
@@ -211,14 +210,7 @@ export function registerLogRoutes(router: Router): void {
           roundCount: row.roundCount,
           xpGained: row.xpGained,
         })),
-        pagination: {
-          page: query.page,
-          pageSize: query.pageSize,
-          total,
-          totalPages,
-          hasNext: query.page < totalPages,
-          hasPrevious: query.page > 1,
-        },
+        pagination: buildPagination(query.page, query.pageSize, total),
         filters: {
           zones: zoneRows.filter((row) => row.id && row.name).map((row) => ({ id: row.id!, name: row.name! })),
           mobs: mobRows.filter((row) => row.id && row.name).map((row) => ({ id: row.id!, name: row.name! })),

@@ -7,6 +7,12 @@ export interface ApiResponse<T> {
   error?: { message: string; code: string };
 }
 
+export interface TurnStateResponse {
+  currentTurns: number;
+  timeToCapMs: number | null;
+  lastRegenAt: string;
+}
+
 type RefreshOutcome =
   | { ok: true; accessToken: string; refreshToken: string }
   | { ok: false; reason: 'missing' | 'invalid' | 'network' | 'bad_response' };

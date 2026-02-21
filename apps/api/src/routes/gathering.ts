@@ -8,6 +8,7 @@ import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { addStackableItemTx } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { getHpState } from '../services/hpService';
+import { serializeXpGrant, paginationSchema, buildPagination } from '../utils/routeHelpers.js';
 import { incrementStats } from '../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
@@ -23,8 +24,7 @@ const nodesQuerySchema = z.object({
   skillRequired: z.string().trim().toLowerCase().refine((value) => GATHERING_SKILLS.includes(value as SkillType), {
     message: 'Invalid gathering skill',
   }).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(10),
+  ...paginationSchema,
 });
 
 function calculateNodeDecay(
@@ -146,8 +146,8 @@ gatheringRouter.get('/nodes', async (req, res, next) => {
       .sort((a, b) => a.name.localeCompare(b.name));
     const resourceTypes = Array.from(resourceTypeSet).sort((a, b) => a.localeCompare(b));
     const total = activeNodes.length;
-    const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
-    const page = Math.min(query.page, totalPages);
+    const pagination = buildPagination(query.page, query.pageSize, total);
+    const page = Math.min(query.page, pagination.totalPages);
     const offset = (page - 1) * query.pageSize;
     const pageNodes = activeNodes.slice(offset, offset + query.pageSize);
 
@@ -171,14 +171,7 @@ gatheringRouter.get('/nodes', async (req, res, next) => {
           weathered: pn.decayedCapacity > 0,
         };
       }),
-      pagination: {
-        page,
-        pageSize: query.pageSize,
-        total,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrevious: page > 1,
-      },
+      pagination: { ...pagination, page },
       filters: {
         zones,
         resourceTypes,
@@ -379,18 +372,7 @@ gatheringRouter.post('/mine', async (req, res, next) => {
           nodeDepleted,
           itemTemplateId: resourceTemplateId,
           itemId: stack.itemId,
-          xp: {
-            skillType: xpGrant.skillType,
-            ...xpGrant.xpResult,
-            newTotalXp: xpGrant.newTotalXp,
-            newDailyXpGained: xpGrant.newDailyXpGained,
-            characterXpGain: xpGrant.characterXpGain,
-            characterXpAfter: xpGrant.characterXpAfter,
-            characterLevelBefore: xpGrant.characterLevelBefore,
-            characterLevelAfter: xpGrant.characterLevelAfter,
-            attributePointsAfter: xpGrant.attributePointsAfter,
-            characterLeveledUp: xpGrant.characterLeveledUp,
-          },
+          xp: serializeXpGrant(xpGrant),
         } as unknown as Prisma.InputJsonValue,
       },
     });
@@ -416,18 +398,7 @@ gatheringRouter.post('/mine', async (req, res, next) => {
         itemTemplateId: resourceTemplateId,
         itemId: stack.itemId,
       },
-      xp: {
-        skillType: xpGrant.skillType,
-        ...xpGrant.xpResult,
-        newTotalXp: xpGrant.newTotalXp,
-        newDailyXpGained: xpGrant.newDailyXpGained,
-        characterXpGain: xpGrant.characterXpGain,
-        characterXpAfter: xpGrant.characterXpAfter,
-        characterLevelBefore: xpGrant.characterLevelBefore,
-        characterLevelAfter: xpGrant.characterLevelAfter,
-        attributePointsAfter: xpGrant.attributePointsAfter,
-        characterLeveledUp: xpGrant.characterLeveledUp,
-      },
+      xp: serializeXpGrant(xpGrant),
       activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
     });
   } catch (err) {

@@ -20,6 +20,7 @@ import { getEquipmentStats } from '../services/equipmentService';
 import { getPlayerProgressionState } from '../services/attributesService';
 import { grantSkillXp } from '../services/xpService';
 import { rollAndGrantLoot } from '../services/lootService';
+import { serializeXpGrant } from '../utils/routeHelpers.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
 import {
   ensureStarterDiscoveries,
@@ -390,18 +391,7 @@ zonesRouter.post('/travel', async (req, res, next) => {
                     baseXp: prefixedMob.xpReward,
                     loot,
                     durabilityLost,
-                    skillXp: {
-                      skillType: xpGrant.skillType,
-                      ...xpGrant.xpResult,
-                      newTotalXp: xpGrant.newTotalXp,
-                      newDailyXpGained: xpGrant.newDailyXpGained,
-                      characterXpGain: xpGrant.characterXpGain,
-                      characterXpAfter: xpGrant.characterXpAfter,
-                      characterLevelBefore: xpGrant.characterLevelBefore,
-                      characterLevelAfter: xpGrant.characterLevelAfter,
-                      attributePointsAfter: xpGrant.attributePointsAfter,
-                      characterLeveledUp: xpGrant.characterLeveledUp,
-                    },
+                    skillXp: serializeXpGrant(xpGrant),
                   },
                 } as unknown as Prisma.InputJsonValue,
               },

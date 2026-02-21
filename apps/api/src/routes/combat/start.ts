@@ -41,6 +41,7 @@ import { buildPotionPool, deductConsumedPotions } from '../../services/potionSer
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
+import { serializeXpGrant } from '../../utils/routeHelpers.js';
 import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
 import {
   prismaAny,
@@ -464,18 +465,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
           siteCompletion: siteCompletionWithNames,
           durabilityLost: aggregatedDurabilityLost,
           skillXp: lastVictoryXpGrant
-            ? {
-                skillType: lastVictoryXpGrant.skillType,
-                ...lastVictoryXpGrant.xpResult,
-                newTotalXp: lastVictoryXpGrant.newTotalXp,
-                newDailyXpGained: lastVictoryXpGrant.newDailyXpGained,
-                characterXpGain: lastVictoryXpGrant.characterXpGain,
-                characterXpAfter: lastVictoryXpGrant.characterXpAfter,
-                characterLevelBefore: lastVictoryXpGrant.characterLevelBefore,
-                characterLevelAfter: lastVictoryXpGrant.characterLevelAfter,
-                attributePointsAfter: lastVictoryXpGrant.attributePointsAfter,
-                characterLeveledUp: lastVictoryXpGrant.characterLeveledUp,
-              }
+            ? serializeXpGrant(lastVictoryXpGrant)
             : null,
         },
       } as unknown as Prisma.InputJsonValue,
@@ -533,18 +523,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         loot: f.loot,
         durabilityLost: f.durabilityLost,
         skillXp: f.skillXp
-          ? {
-              skillType: f.skillXp.skillType,
-              ...f.skillXp.xpResult,
-              newTotalXp: f.skillXp.newTotalXp,
-              newDailyXpGained: f.skillXp.newDailyXpGained,
-              characterXpGain: f.skillXp.characterXpGain,
-              characterXpAfter: f.skillXp.characterXpAfter,
-              characterLevelBefore: f.skillXp.characterLevelBefore,
-              characterLevelAfter: f.skillXp.characterLevelAfter,
-              attributePointsAfter: f.skillXp.attributePointsAfter,
-              characterLeveledUp: f.skillXp.characterLeveledUp,
-            }
+          ? serializeXpGrant(f.skillXp)
           : null,
       })),
     },
@@ -554,18 +533,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       siteCompletion: siteCompletionWithNames,
       durabilityLost: aggregatedDurabilityLost,
       skillXp: lastVictoryXpGrant
-        ? {
-            skillType: lastVictoryXpGrant.skillType,
-            ...lastVictoryXpGrant.xpResult,
-            newTotalXp: lastVictoryXpGrant.newTotalXp,
-            newDailyXpGained: lastVictoryXpGrant.newDailyXpGained,
-            characterXpGain: lastVictoryXpGrant.characterXpGain,
-            characterXpAfter: lastVictoryXpGrant.characterXpAfter,
-            characterLevelBefore: lastVictoryXpGrant.characterLevelBefore,
-            characterLevelAfter: lastVictoryXpGrant.characterLevelAfter,
-            attributePointsAfter: lastVictoryXpGrant.attributePointsAfter,
-            characterLeveledUp: lastVictoryXpGrant.characterLeveledUp,
-          }
+        ? serializeXpGrant(lastVictoryXpGrant)
         : null,
     },
     explorationProgress: {
@@ -837,18 +805,7 @@ export function registerStartRoutes(router: Router): void {
               siteCompletion: null,
               durabilityLost,
               skillXp: xpGrant
-                ? {
-                    skillType: xpGrant.skillType,
-                    ...xpGrant.xpResult,
-                    newTotalXp: xpGrant.newTotalXp,
-                    newDailyXpGained: xpGrant.newDailyXpGained,
-                    characterXpGain: xpGrant.characterXpGain,
-                    characterXpAfter: xpGrant.characterXpAfter,
-                    characterLevelBefore: xpGrant.characterLevelBefore,
-                    characterLevelAfter: xpGrant.characterLevelAfter,
-                    attributePointsAfter: xpGrant.attributePointsAfter,
-                    characterLeveledUp: xpGrant.characterLeveledUp,
-                  }
+                ? serializeXpGrant(xpGrant)
                 : null,
             },
           } as unknown as Prisma.InputJsonValue,
@@ -890,18 +847,7 @@ export function registerStartRoutes(router: Router): void {
           siteCompletion: null,
           durabilityLost,
           skillXp: xpGrant
-            ? {
-                skillType: xpGrant.skillType,
-                ...xpGrant.xpResult,
-                newTotalXp: xpGrant.newTotalXp,
-                newDailyXpGained: xpGrant.newDailyXpGained,
-                characterXpGain: xpGrant.characterXpGain,
-                characterXpAfter: xpGrant.characterXpAfter,
-                characterLevelBefore: xpGrant.characterLevelBefore,
-                characterLevelAfter: xpGrant.characterLevelAfter,
-                attributePointsAfter: xpGrant.attributePointsAfter,
-                characterLeveledUp: xpGrant.characterLeveledUp,
-              }
+            ? serializeXpGrant(xpGrant)
             : null,
         },
         explorationProgress: {

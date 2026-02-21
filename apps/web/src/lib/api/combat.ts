@@ -1,4 +1,4 @@
-import { fetchApi } from './core';
+import { fetchApi, type TurnStateResponse } from './core';
 
 // Zones
 
@@ -30,7 +30,7 @@ export async function getZones() {
 export async function travelToZone(zoneId: string) {
   return fetchApi<{
     zone: { id: string; name: string; zoneType: string };
-    turns: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+    turns: TurnStateResponse;
     travelCost: number;
     breadcrumbReturn: boolean;
     events: Array<{
@@ -69,7 +69,7 @@ export async function startExploration(zoneId: string, turns: number) {
   return fetchApi<{
     logId: string;
     zone: { id: string; name: string; difficulty: number };
-    turns: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+    turns: TurnStateResponse;
     aborted: boolean;
     refundedTurns: number;
     events: Array<{
@@ -235,7 +235,7 @@ export interface CombatFightResult {
 
 export interface CombatResponse {
   logId: string;
-  turns: { currentTurns: number; timeToCapMs: number | null; lastRegenAt: string };
+  turns: TurnStateResponse;
   combat: {
     zoneId: string;
     mobTemplateId: string;

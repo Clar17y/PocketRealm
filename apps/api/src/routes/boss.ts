@@ -12,6 +12,7 @@ import {
 } from '../services/bossEncounterService';
 import { getHpState } from '../services/hpService';
 import { getIo } from '../socket';
+import { paginationSchema, buildPagination } from '../utils/routeHelpers.js';
 
 export const bossRouter = Router();
 
@@ -67,8 +68,7 @@ bossRouter.get('/active', async (_req, res, next) => {
 });
 
 const historyQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(10),
+  ...paginationSchema,
 });
 
 /**
@@ -87,12 +87,7 @@ bossRouter.get('/history', async (req, res, next) => {
     });
     res.json({
       entries,
-      pagination: {
-        page,
-        pageSize,
-        total: result.total,
-        totalPages: Math.ceil(result.total / pageSize),
-      },
+      pagination: buildPagination(page, pageSize, result.total),
     });
   } catch (err) {
     next(err);
