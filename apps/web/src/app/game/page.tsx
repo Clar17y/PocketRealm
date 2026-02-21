@@ -30,6 +30,7 @@ import { TURN_CONSTANTS, type SkillType } from '@adventure/shared';
 import { calculateEfficiency, xpForLevel } from '@adventure/game-engine';
 import { Sword, Shield, Crosshair, Sparkles, Pickaxe, Hammer, Leaf, FlaskConical, Axe, Scissors, Anvil } from 'lucide-react';
 import { ArenaScreen } from './screens/ArenaScreen';
+import { GuildScreen } from '@/components/screens/GuildScreen';
 import { CombatScreen } from './screens/CombatScreen';
 import { useGameController, type Screen } from './useGameController';
 import { useChat } from '@/hooks/useChat';
@@ -836,6 +837,14 @@ export default function GamePage() {
         );
       case 'leaderboard':
         return <Leaderboard playerId={player?.id ?? null} />;
+      case 'guild':
+        return (
+          <GuildScreen
+            playerId={player?.id ?? null}
+            characterLevel={characterProgression.characterLevel}
+            onTurnsChanged={() => void loadTurnsAndHp()}
+          />
+        );
       default:
         return null;
     }
@@ -864,6 +873,7 @@ export default function GamePage() {
               { id: 'worldEvents', label: 'Events', badge: 0 },
               { id: 'achievements', label: 'Achievements', badge: achievementUnclaimedCount },
               { id: 'leaderboard', label: 'Rankings', badge: 0 },
+              { id: 'guild', label: 'Guild', badge: 0 },
               { id: 'bestiary', label: 'Bestiary', badge: 0 },
               { id: 'skills', label: 'Skills', badge: 0 },
             ].map((tab) => (

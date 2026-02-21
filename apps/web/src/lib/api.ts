@@ -1622,39 +1622,39 @@ export async function joinGuild(guildId: string) {
 }
 
 export async function leaveGuild(guildId: string) {
-  await fetchApi(`/api/v1/guild/${guildId}/leave`, { method: 'POST' });
+  return fetchApi(`/api/v1/guild/${guildId}/leave`, { method: 'POST' });
 }
 
 export async function kickGuildMember(guildId: string, targetId: string) {
-  await fetchApi(`/api/v1/guild/${guildId}/kick`, {
+  return fetchApi(`/api/v1/guild/${guildId}/kick`, {
     method: 'POST',
     body: JSON.stringify({ targetId }),
   });
 }
 
 export async function promoteGuildMember(guildId: string, targetId: string) {
-  await fetchApi(`/api/v1/guild/${guildId}/promote`, {
+  return fetchApi(`/api/v1/guild/${guildId}/promote`, {
     method: 'POST',
     body: JSON.stringify({ targetId }),
   });
 }
 
 export async function demoteGuildMember(guildId: string, targetId: string) {
-  await fetchApi(`/api/v1/guild/${guildId}/demote`, {
+  return fetchApi(`/api/v1/guild/${guildId}/demote`, {
     method: 'POST',
     body: JSON.stringify({ targetId }),
   });
 }
 
 export async function transferGuildLeadership(guildId: string, targetId: string) {
-  await fetchApi(`/api/v1/guild/${guildId}/transfer`, {
+  return fetchApi(`/api/v1/guild/${guildId}/transfer`, {
     method: 'POST',
     body: JSON.stringify({ targetId }),
   });
 }
 
 export async function disbandGuild(guildId: string) {
-  await fetchApi(`/api/v1/guild/${guildId}`, { method: 'DELETE' });
+  return fetchApi(`/api/v1/guild/${guildId}`, { method: 'DELETE' });
 }
 
 export async function updateGuildSettings(guildId: string, settings: Record<string, unknown>) {
