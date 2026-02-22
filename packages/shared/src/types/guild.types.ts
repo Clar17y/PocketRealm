@@ -84,3 +84,76 @@ export interface GuildContractData {
   weekStartedAt: string;
   expiresAt: string;
 }
+
+// --- Guild Projects ---
+
+export type GuildProjectStatus = 'active' | 'completed';
+
+export interface GuildProjectPerk {
+  effectType: string;
+  value: number;
+}
+
+export interface GuildProjectMaterialCost {
+  category: string;
+  quantity: number;
+}
+
+export interface GuildProjectDefinition {
+  key: string;
+  name: string;
+  description: string;
+  level: number;
+  prerequisites: string[];
+  treasuryCost: number;
+  materialCosts: GuildProjectMaterialCost[];
+  memberTurnGoal: number;
+  perks: GuildProjectPerk[];
+  guildXpReward: number;
+}
+
+export interface GuildProjectData {
+  id: string;
+  projectKey: string;
+  name: string;
+  description: string;
+  level: number;
+  status: GuildProjectStatus;
+  treasuryCost: number;
+  materialCosts: GuildProjectMaterialCost[];
+  materialsProgress: Record<string, number>;
+  memberTurnGoal: number;
+  turnsContributed: number;
+  perks: GuildProjectPerk[];
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export interface GuildProjectContributionData {
+  playerId: string;
+  username: string;
+  turnsContributed: number;
+  materialsContributed: Record<string, number>;
+}
+
+// --- Guild Specialization ---
+
+export type GuildSpecializationPath = 'warfare' | 'industry' | 'discovery';
+
+export interface SpecializationTierBonus {
+  effectType: string;
+  value: number;
+}
+
+export interface SpecializationTier {
+  tier: number;
+  guildLevelGate: number;
+  bonuses: SpecializationTierBonus[];
+}
+
+export interface GuildSpecializationDefinition {
+  path: GuildSpecializationPath;
+  name: string;
+  description: string;
+  tiers: SpecializationTier[];
+}

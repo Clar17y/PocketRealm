@@ -3,6 +3,11 @@
  * Change these to adjust game balance without touching logic.
  */
 
+import type {
+  GuildProjectDefinition,
+  GuildSpecializationDefinition,
+} from '../types/guild.types';
+
 // =============================================================================
 // TURN ECONOMY
 // =============================================================================
@@ -689,3 +694,252 @@ export const GUILD_CONTRACT_CONSTANTS = {
   REWARD_TREASURY_MIN: 500,
   REWARD_TREASURY_MAX: 2_000,
 } as const;
+
+// =============================================================================
+// GUILD PROJECTS
+// =============================================================================
+
+export const GUILD_MATERIAL_CATEGORIES: Record<string, readonly string[]> = {
+  ore: ['Copper Ore', 'Tin Ore', 'Iron Ore', 'Sandstone', 'Dark Iron Ore', 'Mithril Ore', 'Ancient Ore'],
+  ingot: ['Copper Ingot', 'Tin Ingot', 'Iron Ingot', 'Cut Stone', 'Dark Iron Ingot', 'Mithril Ingot', 'Ancient Ingot'],
+  log: ['Oak Log', 'Maple Log', 'Fungal Wood', 'Elderwood Log', 'Willow Log', 'Bogwood Log', 'Crystal Wood', 'Petrified Wood'],
+  plank: ['Oak Plank', 'Maple Plank', 'Fungal Plank', 'Elderwood Plank', 'Willow Plank', 'Bogwood Plank', 'Crystal Plank', 'Petrified Plank'],
+  herb: ['Forest Sage', 'Moonpetal', 'Cave Moss', 'Starbloom', 'Glowcap Mushroom', 'Windbloom', 'Gravemoss', 'Shimmer Fern', 'Abyssal Kelp'],
+  leather: ['Rat Leather', 'Boar Leather', 'Wolf Leather', 'Bat Leather', 'Warg Leather', 'Croc Leather', 'Naga Leather'],
+  cloth: ['Silk Cloth', 'Woven Cloth', 'Fae Fabric', 'Cursed Fabric', 'Ethereal Cloth', 'Spectral Fabric'],
+} as const;
+
+export const GUILD_PROJECT_CONSTANTS = {
+  DAILY_MATERIAL_CAP: 200,
+  DAILY_TURN_CAP: 10_000,
+  MAX_ACTIVE_PROJECTS: 1,
+} as const;
+
+export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
+  // --- Level 1: No prerequisites ---
+  {
+    key: 'guild_forge',
+    name: 'Guild Forge',
+    description: 'A communal forge that improves crafting outcomes for all members.',
+    level: 1,
+    prerequisites: [],
+    treasuryCost: 500_000,
+    materialCosts: [
+      { category: 'ore', quantity: 2_000 },
+      { category: 'ingot', quantity: 1_000 },
+    ],
+    memberTurnGoal: 100_000,
+    perks: [{ effectType: 'craftingCrit', value: 0.05 }],
+    guildXpReward: 500,
+  },
+  {
+    key: 'war_room',
+    name: 'War Room',
+    description: 'A strategic planning center that sharpens combat skills.',
+    level: 1,
+    prerequisites: [],
+    treasuryCost: 500_000,
+    materialCosts: [
+      { category: 'leather', quantity: 1_500 },
+      { category: 'plank', quantity: 1_000 },
+    ],
+    memberTurnGoal: 100_000,
+    perks: [{ effectType: 'xpBoost', value: 0.05 }],
+    guildXpReward: 500,
+  },
+  {
+    key: 'scout_network',
+    name: 'Scout Network',
+    description: 'A network of scouts that reduces travel time across zones.',
+    level: 1,
+    prerequisites: [],
+    treasuryCost: 500_000,
+    materialCosts: [
+      { category: 'herb', quantity: 1_000 },
+      { category: 'plank', quantity: 1_500 },
+    ],
+    memberTurnGoal: 100_000,
+    perks: [{ effectType: 'travelCostReduction', value: 0.10 }],
+    guildXpReward: 500,
+  },
+  // --- Level 2: Require one Level 1 ---
+  {
+    key: 'advanced_forge',
+    name: 'Advanced Forge',
+    description: 'An upgraded forge with superior tools and techniques.',
+    level: 2,
+    prerequisites: ['guild_forge'],
+    treasuryCost: 2_000_000,
+    materialCosts: [
+      { category: 'ore', quantity: 5_000 },
+      { category: 'ingot', quantity: 2_000 },
+    ],
+    memberTurnGoal: 400_000,
+    perks: [{ effectType: 'craftingCrit', value: 0.10 }],
+    guildXpReward: 1_000,
+  },
+  {
+    key: 'barracks',
+    name: 'Barracks',
+    description: 'Training grounds that hone combat expertise.',
+    level: 2,
+    prerequisites: ['war_room'],
+    treasuryCost: 2_000_000,
+    materialCosts: [
+      { category: 'leather', quantity: 3_000 },
+      { category: 'ingot', quantity: 2_000 },
+    ],
+    memberTurnGoal: 400_000,
+    perks: [{ effectType: 'xpBoost', value: 0.10 }],
+    guildXpReward: 1_000,
+  },
+  {
+    key: 'cartographers_lodge',
+    name: "Cartographer's Lodge",
+    description: 'Expert mapmakers chart safer and faster travel routes.',
+    level: 2,
+    prerequisites: ['scout_network'],
+    treasuryCost: 2_000_000,
+    materialCosts: [
+      { category: 'plank', quantity: 2_500 },
+      { category: 'herb', quantity: 2_000 },
+    ],
+    memberTurnGoal: 400_000,
+    perks: [{ effectType: 'travelCostReduction', value: 0.20 }],
+    guildXpReward: 1_000,
+  },
+  {
+    key: 'apothecary',
+    name: 'Apothecary',
+    description: 'An alchemical lab that reduces repair costs guild-wide.',
+    level: 2,
+    prerequisites: [], // requires ANY one L1 project (checked in service)
+    treasuryCost: 1_500_000,
+    materialCosts: [
+      { category: 'herb', quantity: 2_000 },
+      { category: 'cloth', quantity: 1_500 },
+    ],
+    memberTurnGoal: 300_000,
+    perks: [{ effectType: 'repairCostReduction', value: 0.10 }],
+    guildXpReward: 800,
+  },
+  // --- Level 3: Require two Level 2 ---
+  {
+    key: 'master_workshop',
+    name: 'Master Workshop',
+    description: 'The pinnacle of guild craftsmanship.',
+    level: 3,
+    prerequisites: ['advanced_forge', 'apothecary'],
+    treasuryCost: 5_000_000,
+    materialCosts: [
+      { category: 'ore', quantity: 10_000 },
+      { category: 'ingot', quantity: 5_000 },
+      { category: 'herb', quantity: 3_000 },
+    ],
+    memberTurnGoal: 1_000_000,
+    perks: [{ effectType: 'craftingCrit', value: 0.15 }],
+    guildXpReward: 2_000,
+  },
+  {
+    key: 'raid_hall',
+    name: 'Raid Hall',
+    description: 'A war council chamber for elite combat coordination.',
+    level: 3,
+    prerequisites: ['barracks', 'apothecary'],
+    treasuryCost: 5_000_000,
+    materialCosts: [
+      { category: 'leather', quantity: 5_000 },
+      { category: 'ingot', quantity: 4_000 },
+      { category: 'plank', quantity: 3_000 },
+    ],
+    memberTurnGoal: 1_000_000,
+    perks: [{ effectType: 'xpBoost', value: 0.15 }],
+    guildXpReward: 2_000,
+  },
+  {
+    key: 'explorers_guild',
+    name: "Explorer's Guild",
+    description: 'Master explorers that command unmatched knowledge of the land.',
+    level: 3,
+    prerequisites: ['cartographers_lodge', 'apothecary'],
+    treasuryCost: 5_000_000,
+    materialCosts: [
+      { category: 'plank', quantity: 5_000 },
+      { category: 'herb', quantity: 4_000 },
+      { category: 'cloth', quantity: 3_000 },
+    ],
+    memberTurnGoal: 1_000_000,
+    perks: [
+      { effectType: 'travelCostReduction', value: 0.30 },
+      { effectType: 'gatheringYield', value: 0.15 },
+    ],
+    guildXpReward: 2_000,
+  },
+] as const;
+
+// =============================================================================
+// GUILD SPECIALIZATION
+// =============================================================================
+
+export const GUILD_SPECIALIZATION_DEFINITIONS: readonly GuildSpecializationDefinition[] = [
+  {
+    path: 'warfare',
+    name: 'Warfare',
+    description: 'Focused on combat prowess and boss encounters.',
+    tiers: [
+      { tier: 1, guildLevelGate: 10, bonuses: [
+        { effectType: 'xpBoost', value: 0.05 },
+        { effectType: 'combatDamage', value: 0.05 },
+      ]},
+      { tier: 2, guildLevelGate: 25, bonuses: [
+        { effectType: 'xpBoost', value: 0.10 },
+        { effectType: 'combatDamage', value: 0.10 },
+      ]},
+      { tier: 3, guildLevelGate: 40, bonuses: [
+        { effectType: 'xpBoost', value: 0.15 },
+        { effectType: 'combatDamage', value: 0.15 },
+        { effectType: 'defenseBoost', value: 0.05 },
+      ]},
+    ],
+  },
+  {
+    path: 'industry',
+    name: 'Industry',
+    description: 'Focused on crafting excellence and gathering efficiency.',
+    tiers: [
+      { tier: 1, guildLevelGate: 10, bonuses: [
+        { effectType: 'craftingCrit', value: 0.05 },
+        { effectType: 'gatheringYield', value: 0.10 },
+      ]},
+      { tier: 2, guildLevelGate: 25, bonuses: [
+        { effectType: 'craftingCrit', value: 0.10 },
+        { effectType: 'gatheringYield', value: 0.20 },
+        { effectType: 'repairCostReduction', value: 0.10 },
+      ]},
+      { tier: 3, guildLevelGate: 40, bonuses: [
+        { effectType: 'craftingCrit', value: 0.15 },
+        { effectType: 'gatheringYield', value: 0.30 },
+        { effectType: 'repairCostReduction', value: 0.20 },
+      ]},
+    ],
+  },
+  {
+    path: 'discovery',
+    name: 'Discovery',
+    description: 'Focused on exploration and resource acquisition.',
+    tiers: [
+      { tier: 1, guildLevelGate: 10, bonuses: [
+        { effectType: 'travelCostReduction', value: 0.10 },
+        { effectType: 'gatheringYield', value: 0.15 },
+      ]},
+      { tier: 2, guildLevelGate: 25, bonuses: [
+        { effectType: 'travelCostReduction', value: 0.20 },
+        { effectType: 'gatheringYield', value: 0.30 },
+      ]},
+      { tier: 3, guildLevelGate: 40, bonuses: [
+        { effectType: 'travelCostReduction', value: 0.30 },
+        { effectType: 'gatheringYield', value: 0.50 },
+      ]},
+    ],
+  },
+] as const;
