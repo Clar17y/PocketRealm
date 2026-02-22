@@ -59,7 +59,7 @@ export function CombatPlayback({
     setRevealedCount(log.length);
     if (outcome === 'victory') {
       setPhase('finished-auto');
-      completeTimer.current = setTimeout(onComplete, 500);
+      completeTimer.current = setTimeout(onComplete, 0);
     } else {
       setPhase('finished-manual');
     }
@@ -137,6 +137,9 @@ export function CombatPlayback({
       if (completeTimer.current) clearTimeout(completeTimer.current);
     };
   }, []);
+
+  // Don't render anything when auto-skipping victories — prevents a flash of HP bars
+  if (autoSkip && phase === 'finished-auto') return null;
 
   // Derive current HP from the last revealed entry
   const currentPlayerHp = revealedCount === 0
