@@ -231,6 +231,7 @@ export default function GamePage() {
     combatPlaybackData,
     combatPlaybackQueue,
     combatPlaybackIndex,
+    roomTransition,
     explorationPlaybackData,
     travelPlaybackData,
     currentZone,
@@ -816,9 +817,14 @@ export default function GamePage() {
             autoSkipCombat={!!shouldAutoSkipCombat}
             onCombatPlaybackComplete={handleCombatPlaybackComplete}
             fightProgress={combatPlaybackQueue && combatPlaybackQueue.length > 1
-              ? { current: combatPlaybackIndex + 1, total: combatPlaybackQueue.length }
+              ? {
+                  current: combatPlaybackIndex + 1,
+                  total: combatPlaybackQueue.length,
+                  room: combatPlaybackQueue[combatPlaybackIndex]?.room,
+                }
               : null
             }
+            roomTransition={roomTransition}
           />
         );
       }

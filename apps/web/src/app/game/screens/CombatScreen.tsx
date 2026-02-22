@@ -58,7 +58,8 @@ interface CombatScreenProps {
   combatSpeedMs?: number;
   autoSkipCombat?: boolean;
   onCombatPlaybackComplete?: () => void;
-  fightProgress?: { current: number; total: number } | null;
+  fightProgress?: { current: number; total: number; room?: number } | null;
+  roomTransition?: { entering: number } | null;
 }
 
 export function CombatScreen({
@@ -88,6 +89,7 @@ export function CombatScreen({
   autoSkipCombat,
   onCombatPlaybackComplete,
   fightProgress,
+  roomTransition,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
@@ -381,12 +383,27 @@ export function CombatScreen({
             )}
           </div>
 
+          {/* Room transition interstitial */}
+          {roomTransition && (
+            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)]/30 rounded-lg p-6 text-center">
+              <div className="text-lg font-bold text-[var(--rpg-gold)] mb-1">
+                Entering Room {roomTransition.entering}
+              </div>
+              <div className="text-sm text-[var(--rpg-text-secondary)]">
+                Prepare for the next fight...
+              </div>
+            </div>
+          )}
+
           {/* Combat Playback (animated) */}
-          {combatPlaybackData && (
+          {combatPlaybackData && !roomTransition && (
             <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3">
               {fightProgress && fightProgress.total > 1 && (
                 <div className="text-sm text-[var(--rpg-gold)] font-semibold mb-2">
-                  Fight {fightProgress.current}/{fightProgress.total}
+                  {fightProgress.room
+                    ? `Room ${fightProgress.room} — Fight ${fightProgress.current}/${fightProgress.total}`
+                    : `Fight ${fightProgress.current}/${fightProgress.total}`
+                  }
                 </div>
               )}
               <CombatPlayback
