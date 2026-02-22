@@ -19,6 +19,7 @@ interface ExplorationPlaybackProps {
   onCombatStart: (event: ExplorationPlaybackEvent) => void;
   onComplete: () => void;
   onSkip: () => void;
+  speedMs?: number;
   resumeFromCombat?: boolean;
 }
 
@@ -50,6 +51,7 @@ export function ExplorationPlayback({
   onCombatStart,
   onComplete,
   onSkip,
+  speedMs = 800,
   resumeFromCombat,
 }: ExplorationPlaybackProps) {
   const [currentTurn, setCurrentTurn] = useState(0);
@@ -115,8 +117,8 @@ export function ExplorationPlayback({
         addTimer(() => {
           setActiveEventLabel(null);
           setPhase('running');
-        }, 2500);
-      }, 800);
+        }, Math.round(speedMs * 2500 / 800));
+      }, speedMs);
 
       return () => clearTimeout(barTimer);
     }
@@ -126,10 +128,10 @@ export function ExplorationPlayback({
     const completeTimer = addTimer(() => {
       setPhase('complete');
       onComplete();
-    }, 2000);
+    }, Math.round(speedMs * 2000 / 800));
 
     return () => clearTimeout(completeTimer);
-  }, [phase, revealedEventCount, sortedEvents, totalTurns, onEventRevealed, onCombatStart, onComplete, addTimer]);
+  }, [phase, revealedEventCount, sortedEvents, totalTurns, onEventRevealed, onCombatStart, onComplete, addTimer, speedMs]);
 
   const progressPercent = totalTurns > 0 ? (currentTurn / totalTurns) * 100 : 0;
 

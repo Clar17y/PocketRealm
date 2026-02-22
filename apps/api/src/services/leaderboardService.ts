@@ -75,6 +75,7 @@ export interface LeaderboardEntry {
   characterLevel: number;
   score: number;
   isBot: boolean;
+  isAdmin: boolean;
   title?: string;
   titleTier?: number;
 }
@@ -128,7 +129,7 @@ export async function getLeaderboard(
   }
 
   // Batch-fetch all metadata in one HMGET call
-  const DEFAULT_META = { username: 'Unknown', characterLevel: 1, isBot: false };
+  const DEFAULT_META = { username: 'Unknown', characterLevel: 1, isBot: false, isAdmin: false };
   const metaValues = playerIds.length > 0 ? await redis.hmget(metaKey, ...playerIds) : [];
 
   const entries: LeaderboardEntry[] = playerIds.map((pid, idx) => {
@@ -140,6 +141,7 @@ export async function getLeaderboard(
       characterLevel: meta.characterLevel,
       score: scores[idx],
       isBot: meta.isBot,
+      isAdmin: !!meta.isAdmin,
       title: meta.title,
       titleTier: meta.titleTier,
     };
@@ -158,6 +160,7 @@ export async function getLeaderboard(
       characterLevel: meta.characterLevel,
       score: Number(myScore),
       isBot: meta.isBot,
+      isAdmin: !!meta.isAdmin,
       title: meta.title,
       titleTier: meta.titleTier,
     };
@@ -177,7 +180,7 @@ function resolveTitle(activeTitle: string | null | undefined): { title?: string;
 
 async function writeToZset(
   category: string,
-  rows: { playerId: string; score: number; username: string; characterLevel: number; isBot: boolean; title?: string; titleTier?: number }[],
+  rows: { playerId: string; score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }[],
 ) {
   const key = `leaderboard:${category}`;
   const metaKey = `leaderboard:meta:${category}`;
@@ -197,6 +200,7 @@ async function writeToZset(
       username: row.username,
       characterLevel: row.characterLevel,
       isBot: row.isBot,
+      isAdmin: row.isAdmin,
       title: row.title,
       titleTier: row.titleTier,
     }));
@@ -210,7 +214,7 @@ async function writeToZset(
 
 async function refreshPvp() {
   const ratings = await prisma.pvpRating.findMany({
-    include: { player: { select: { username: true, characterLevel: true, isBot: true, activeTitle: true } } },
+    include: { player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
   });
 
   const fields: { slug: string; field: 'rating' | 'wins' | 'bestRating' | 'winStreak' }[] = [
@@ -229,6 +233,7 @@ async function refreshPvp() {
         username: r.player.username,
         characterLevel: r.player.characterLevel,
         isBot: r.player.isBot,
+        isAdmin: r.player.role === 'admin',
         ...resolveTitle(r.player.activeTitle),
       })),
     );
@@ -237,7 +242,7 @@ async function refreshPvp() {
 
 async function refreshProgression() {
   const players = await prisma.player.findMany({
-    select: { id: true, username: true, characterLevel: true, characterXp: true, isBot: true, activeTitle: true },
+    select: { id: true, username: true, characterLevel: true, characterXp: true, isBot: true, role: true, activeTitle: true },
   });
 
   await writeToZset(
@@ -248,6 +253,7 @@ async function refreshProgression() {
       username: p.username,
       characterLevel: p.characterLevel,
       isBot: p.isBot,
+      isAdmin: p.role === 'admin',
       ...resolveTitle(p.activeTitle),
     })),
   );
@@ -260,6 +266,7 @@ async function refreshProgression() {
       username: p.username,
       characterLevel: p.characterLevel,
       isBot: p.isBot,
+      isAdmin: p.role === 'admin',
       ...resolveTitle(p.activeTitle),
     })),
   );
@@ -267,7 +274,7 @@ async function refreshProgression() {
 
 async function refreshSkills() {
   const skills = await prisma.playerSkill.findMany({
-    include: { player: { select: { username: true, characterLevel: true, isBot: true, activeTitle: true } } },
+    include: { player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
   });
 
   // Individual skill leaderboards
@@ -281,13 +288,14 @@ async function refreshSkills() {
         username: s.player.username,
         characterLevel: s.player.characterLevel,
         isBot: s.player.isBot,
+        isAdmin: s.player.role === 'admin',
         ...resolveTitle(s.player.activeTitle),
       })),
     );
   }
 
   // Total skill level — aggregate per player
-  const totals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; title?: string; titleTier?: number }>();
+  const totals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }>();
   for (const s of skills) {
     const existing = totals.get(s.playerId);
     if (existing) {
@@ -298,6 +306,7 @@ async function refreshSkills() {
         username: s.player.username,
         characterLevel: s.player.characterLevel,
         isBot: s.player.isBot,
+        isAdmin: s.player.role === 'admin',
         ...resolveTitle(s.player.activeTitle),
       });
     }
@@ -312,10 +321,10 @@ async function refreshSkills() {
 async function refreshCombat() {
   // Total kills from bestiary
   const bestiaryRaw = await prisma.playerBestiary.findMany({
-    select: { playerId: true, kills: true, player: { select: { username: true, characterLevel: true, isBot: true, activeTitle: true } } },
+    select: { playerId: true, kills: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
   });
 
-  const killTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; title?: string; titleTier?: number }>();
+  const killTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }>();
   for (const b of bestiaryRaw) {
     const existing = killTotals.get(b.playerId);
     if (existing) {
@@ -326,6 +335,7 @@ async function refreshCombat() {
         username: b.player.username,
         characterLevel: b.player.characterLevel,
         isBot: b.player.isBot,
+        isAdmin: b.player.role === 'admin',
         ...resolveTitle(b.player.activeTitle),
       });
     }
@@ -339,10 +349,10 @@ async function refreshCombat() {
   // Boss damage
   try {
     const bossRaw = await prisma.bossParticipant.findMany({
-      select: { playerId: true, totalDamage: true, player: { select: { username: true, characterLevel: true, isBot: true, activeTitle: true } } },
+      select: { playerId: true, totalDamage: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
     });
 
-    const dmgTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; title?: string; titleTier?: number }>();
+    const dmgTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }>();
     for (const b of bossRaw) {
       const existing = dmgTotals.get(b.playerId);
       if (existing) {
@@ -353,6 +363,7 @@ async function refreshCombat() {
           username: b.player.username,
           characterLevel: b.player.characterLevel,
           isBot: b.player.isBot,
+          isAdmin: b.player.role === 'admin',
           ...resolveTitle(b.player.activeTitle),
         });
       }

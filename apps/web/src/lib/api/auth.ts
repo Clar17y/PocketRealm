@@ -2,7 +2,7 @@ import { fetchApi } from './core';
 
 export async function register(username: string, email: string, password: string) {
   return fetchApi<{
-    player: { id: string; username: string; email: string };
+    player: { id: string; username: string; email: string; role: string };
     accessToken: string;
     refreshToken: string;
   }>('/api/v1/auth/register', {
@@ -13,7 +13,7 @@ export async function register(username: string, email: string, password: string
 
 export async function login(email: string, password: string) {
   return fetchApi<{
-    player: { id: string; username: string; email: string };
+    player: { id: string; username: string; email: string; role: string };
     accessToken: string;
     refreshToken: string;
   }>('/api/v1/auth/login', {

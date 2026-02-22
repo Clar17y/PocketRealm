@@ -7,6 +7,7 @@ interface Player {
   id: string;
   username: string;
   email: string;
+  role: string;
 }
 
 interface AuthState {

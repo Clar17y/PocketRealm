@@ -1,4 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { updateTutorialStep } from '@/lib/api';
+import {
+  TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_EXPLORE,
+  TUTORIAL_STEP_COMBAT,
+  TUTORIAL_STEP_GATHER,
+  TUTORIAL_STEP_TRAVEL,
+  TUTORIAL_STEP_REFINE,
+  TUTORIAL_STEP_CRAFT,
+  TUTORIAL_STEP_EQUIP,
+  TUTORIAL_STEP_DONE,
+  TUTORIAL_COMPLETED,
+  TUTORIAL_SKIPPED,
+  isTutorialActive,
+  TUTORIAL_STEPS,
+  type BottomTab,
+} from '@/lib/tutorial';
 import {
   allocatePlayerAttribute,
   craft,
@@ -26,6 +43,8 @@ import {
   getZoneEvents,
   mine,
   repairItem,
+  rest,
+  restEstimate,
   salvage,
   selectSiteStrategy,
   useItem,
@@ -35,6 +54,7 @@ import {
   travelToZone,
   unequip,
   type AchievementsResponse,
+  type PlayerSettings,
   type WorldEventResponse,
 } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
@@ -44,7 +64,7 @@ export type Screen =
   | 'explore'
   | 'inventory'
   | 'combat'
-  | 'profile'
+  | 'settings'
   | 'skills'
   | 'equipment'
   | 'zones'
@@ -56,7 +76,8 @@ export type Screen =
   | 'arena'
   | 'worldEvents'
   | 'achievements'
-  | 'leaderboard';
+  | 'leaderboard'
+  | 'admin';
 
 export interface PendingEncounter {
   encounterSiteId: string;
@@ -401,6 +422,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
   const [autoPotionThreshold, setAutoPotionThreshold] = useState(0);
+  const [tutorialStep, setTutorialStep] = useState<number>(TUTORIAL_COMPLETED);
+  const [combatLogSpeedMs, setCombatLogSpeedMs] = useState(800);
+  const [explorationSpeedMs, setExplorationSpeedMs] = useState(800);
+  const [autoSkipKnownCombat, setAutoSkipKnownCombat] = useState(false);
+  const [defaultExploreTurns, setDefaultExploreTurns] = useState(100);
+  const [quickRestHealPercent, setQuickRestHealPercent] = useState(100);
+  const [defaultRefiningMax, setDefaultRefiningMax] = useState(false);
   const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
   const [achievementUnclaimedCount, setAchievementUnclaimedCount] = useState(0);
   const [activeTitle, setActiveTitleState] = useState<string | null>(null);
@@ -408,6 +436,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [combatPlaybackQueue, setCombatPlaybackQueue] = useState<Array<{
     mobName: string;
     mobDisplayName: string;
+    mobTemplateId: string;
+    mobPrefix: string | null;
     outcome: string;
     combatantAMaxHp: number;
     playerStartHp: number;
@@ -417,6 +447,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }> | null>(null);
   const [combatPlaybackIndex, setCombatPlaybackIndex] = useState(0);
   const pendingCombatRewardsRef = useRef<LastCombat['rewards'] | null>(null);
+  const siteJustClearedRef = useRef(false);
+  const arrivedInTownRef = useRef(false);
   const combatPlaybackData = combatPlaybackQueue?.[combatPlaybackIndex] ?? null;
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<{
     totalTurns: number;
@@ -487,6 +519,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         attributes: playerRes.data.player.attributes,
       });
       setAutoPotionThreshold(playerRes.data.player.autoPotionThreshold ?? 0);
+      setTutorialStep(playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED);
+      setCombatLogSpeedMs(playerRes.data.player.combatLogSpeedMs ?? 800);
+      setExplorationSpeedMs(playerRes.data.player.explorationSpeedMs ?? 800);
+      setAutoSkipKnownCombat(playerRes.data.player.autoSkipKnownCombat ?? false);
+      setDefaultExploreTurns(playerRes.data.player.defaultExploreTurns ?? 100);
+      setQuickRestHealPercent(playerRes.data.player.quickRestHealPercent ?? 100);
+      setDefaultRefiningMax(playerRes.data.player.defaultRefiningMax ?? false);
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
     if (hpRes.data) setHpState(hpRes.data);
@@ -525,6 +564,29 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setZoneCraftingName(recipesRes.data.zoneName);
     }
   }, []);
+
+  const advanceTutorial = useCallback(async (fromStep: number) => {
+    if (tutorialStep !== fromStep) return;
+    const nextStep = fromStep + 1;
+    const res = await updateTutorialStep(nextStep);
+    if (res.data) setTutorialStep(res.data.tutorialStep);
+  }, [tutorialStep]);
+
+  const skipTutorial = useCallback(async () => {
+    const res = await updateTutorialStep(TUTORIAL_SKIPPED);
+    if (res.data) setTutorialStep(res.data.tutorialStep);
+  }, []);
+
+  // Default tabs during tutorial steps so the player sees the right content
+  useEffect(() => {
+    if (tutorialStep === TUTORIAL_STEP_GATHER) {
+      setActiveGatheringSkill('woodcutting');
+    } else if (tutorialStep === TUTORIAL_STEP_REFINE) {
+      setActiveCraftingSkill('refining');
+    } else if (tutorialStep === TUTORIAL_STEP_CRAFT) {
+      setActiveCraftingSkill('weaponsmithing');
+    }
+  }, [tutorialStep]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -741,11 +803,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, []);
 
   const getActiveTab = () => {
-    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard'].includes(activeScreen)) return 'home';
+    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'admin'].includes(activeScreen)) return 'home';
     if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
     if (['combat', 'arena'].includes(activeScreen)) return 'combat';
-    return 'profile';
+    return 'settings';
   };
 
   const nowStamp = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -881,6 +943,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     setExplorationPlaybackData(null);
     setPlaybackActive(false);
+    advanceTutorial(TUTORIAL_STEP_EXPLORE);
     await loadAll();
   };
 
@@ -917,6 +980,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     setExplorationPlaybackData(null);
     setPlaybackActive(false);
+    advanceTutorial(TUTORIAL_STEP_EXPLORE);
     await loadAll();
   };
 
@@ -969,6 +1033,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         const queue = data.combat.fights.map((fight) => ({
           mobName: fight.mobName ?? data.combat.mobName,
           mobDisplayName: fight.mobDisplayName,
+          mobTemplateId: fight.mobTemplateId,
+          mobPrefix: fight.mobPrefix,
           outcome: fight.outcome,
           combatantAMaxHp: fight.playerMaxHp,
           playerStartHp: fight.playerStartHp,
@@ -1003,6 +1069,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         setCombatPlaybackQueue([{
           mobName: data.combat.mobName,
           mobDisplayName: data.combat.mobDisplayName,
+          mobTemplateId: data.combat.mobTemplateId,
+          mobPrefix: data.combat.mobPrefix,
           outcome: data.combat.outcome,
           combatantAMaxHp: data.combat.playerMaxHp,
           playerStartHp: hpBefore,
@@ -1014,6 +1082,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         pendingCombatRewardsRef.current = rewards;
       }
       setPlaybackActive(true);
+
+      if (data.rewards.siteCompletion) {
+        siteJustClearedRef.current = true;
+      }
 
       if (data.activeEvents?.length) {
         for (const evt of data.activeEvents) {
@@ -1089,8 +1161,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (lastFight) {
       const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
       setLastCombat({
-        mobTemplateId: '',
-        mobPrefix: null,
+        mobTemplateId: lastFight.mobTemplateId,
+        mobPrefix: lastFight.mobPrefix,
         mobName: lastFight.mobName,
         mobDisplayName: lastFight.mobDisplayName,
         outcome: lastFight.outcome,
@@ -1104,6 +1176,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setCombatPlaybackIndex(0);
     pendingCombatRewardsRef.current = null;
     setPlaybackActive(false);
+
+    if (siteJustClearedRef.current) {
+      siteJustClearedRef.current = false;
+      advanceTutorial(TUTORIAL_STEP_COMBAT);
+    }
   };
 
   const handleNavigate = (screen: string) => {
@@ -1189,6 +1266,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       pushLog(...newLogs);
       await Promise.all([loadAll(), loadGatheringNodes()]);
+      advanceTutorial(TUTORIAL_STEP_GATHER);
     });
   };
 
@@ -1266,6 +1344,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       pushLog(...newLogs);
       await loadAll();
+      advanceTutorial(TUTORIAL_STEP_REFINE);
+      advanceTutorial(TUTORIAL_STEP_CRAFT);
     });
   };
 
@@ -1387,6 +1467,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         return;
       }
       await loadAll();
+      advanceTutorial(TUTORIAL_STEP_EQUIP);
     });
   };
 
@@ -1413,12 +1494,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
+      const arrivedInTown = data.zone.zoneType === 'town';
 
       // Breadcrumb return — instant, no playback
       if (data.breadcrumbReturn) {
         setActiveZoneId(data.zone.id);
         pushLog({ timestamp: nowStamp(), type: 'success', message: `Returned to ${data.zone.name}.` });
         await loadAll();
+        if (arrivedInTown) advanceTutorial(TUTORIAL_STEP_TRAVEL);
         return;
       }
 
@@ -1433,6 +1516,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           message: `Travelling to ${data.zone.name}...`,
         });
 
+        if (arrivedInTown) arrivedInTownRef.current = true;
         setTravelPlaybackData({
           totalTurns: travelCost,
           destinationName: data.zone.name,
@@ -1449,6 +1533,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         setActiveZoneId(data.zone.id);
         pushLog({ timestamp: nowStamp(), type: 'success', message: `Arrived at ${data.zone.name}.` });
         await loadAll();
+        if (arrivedInTown) advanceTutorial(TUTORIAL_STEP_TRAVEL);
       }
     });
   };
@@ -1482,6 +1567,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setTravelPlaybackData(null);
     setPlaybackActive(false);
     await loadAll();
+
+    if (arrivedInTownRef.current) {
+      arrivedInTownRef.current = false;
+      advanceTutorial(TUTORIAL_STEP_TRAVEL);
+    }
   };
 
   const handleTravelPlaybackSkip = async () => {
@@ -1519,6 +1609,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setTravelPlaybackData(null);
     setPlaybackActive(false);
     await loadAll();
+
+    if (arrivedInTownRef.current) {
+      arrivedInTownRef.current = false;
+      advanceTutorial(TUTORIAL_STEP_TRAVEL);
+    }
   };
 
   const handleAllocateAttribute = async (attribute: AttributeType, points = 1) => {
@@ -1536,11 +1631,46 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
-  const handleSetAutoPotionThreshold = async (value: number) => {
-    const prev = autoPotionThreshold;
-    setAutoPotionThreshold(value);
-    const res = await updatePlayerSettings({ autoPotionThreshold: value });
-    if (!res.data) setAutoPotionThreshold(prev);
+  const handleSetSetting = async <T>(key: keyof PlayerSettings, value: T, setter: (v: T) => void, prev: T) => {
+    setter(value);
+    const res = await updatePlayerSettings({ [key]: value });
+    if (!res.data) setter(prev);
+  };
+
+  const handleSetAutoPotionThreshold = (value: number) =>
+    handleSetSetting('autoPotionThreshold', value, setAutoPotionThreshold, autoPotionThreshold);
+  const handleSetCombatLogSpeed = (value: number) =>
+    handleSetSetting('combatLogSpeedMs', value, setCombatLogSpeedMs, combatLogSpeedMs);
+  const handleSetExplorationSpeed = (value: number) =>
+    handleSetSetting('explorationSpeedMs', value, setExplorationSpeedMs, explorationSpeedMs);
+  const handleSetAutoSkipKnownCombat = (value: boolean) =>
+    handleSetSetting('autoSkipKnownCombat', value, setAutoSkipKnownCombat, autoSkipKnownCombat);
+  const handleSetDefaultExploreTurns = (value: number) =>
+    handleSetSetting('defaultExploreTurns', value, setDefaultExploreTurns, defaultExploreTurns);
+  const handleSetQuickRestHealPercent = (value: number) =>
+    handleSetSetting('quickRestHealPercent', value, setQuickRestHealPercent, quickRestHealPercent);
+  const handleSetDefaultRefiningMax = (value: boolean) =>
+    handleSetSetting('defaultRefiningMax', value, setDefaultRefiningMax, defaultRefiningMax);
+
+  const handleQuickRest = async () => {
+    if (!hpState || hpState.currentHp >= hpState.maxHp || hpState.isRecovering || turns <= 0) return;
+
+    await runAction('quick_rest', async () => {
+      const estimate = await restEstimate(10);
+      if (!estimate.data?.healPerTurn) return;
+      const missingHp = hpState.maxHp - hpState.currentHp;
+      const targetHeal = missingHp * (quickRestHealPercent / 100);
+      const rawTurns = Math.ceil(targetHeal / estimate.data.healPerTurn);
+      const turnsToSpend = Math.max(10, Math.ceil(rawTurns / 10) * 10);
+      const actualTurns = Math.min(turnsToSpend, turns);
+      const result = await rest(actualTurns);
+      if (result.data) {
+        const healed = result.data.currentHp - hpState.currentHp;
+        setTurns(result.data.turns.currentTurns);
+        setHpState(prev => ({ ...prev, currentHp: result.data!.currentHp, maxHp: result.data!.maxHp }));
+        pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${actualTurns.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
+      }
+    });
   };
 
   const handleClaimAchievement = async (achievementId: string) => {
@@ -1616,6 +1746,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     pvpNotificationCount,
     autoPotionThreshold,
     setAutoPotionThreshold,
+    combatLogSpeedMs,
+    setCombatLogSpeedMs,
+    explorationSpeedMs,
+    setExplorationSpeedMs,
+    autoSkipKnownCombat,
+    defaultExploreTurns,
+    setDefaultExploreTurns,
+    quickRestHealPercent,
+    defaultRefiningMax,
     playbackActive,
     combatPlaybackData,
     combatPlaybackQueue,
@@ -1630,6 +1769,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleClaimAchievement,
     handleSetActiveTitle,
     loadAchievements,
+
+    // Tutorial
+    tutorialStep, skipTutorial, advanceTutorial,
 
     // World Events
     activeEvents,
@@ -1665,9 +1807,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleEquipItem,
     handleUnequipSlot,
     handleAllocateAttribute,
+    loadAll,
     loadTurnsAndHp,
     loadPvpNotificationCount,
     handleSetAutoPotionThreshold,
+    handleSetCombatLogSpeed,
+    handleSetExplorationSpeed,
+    handleSetAutoSkipKnownCombat,
+    handleSetDefaultExploreTurns,
+    handleSetQuickRestHealPercent,
+    handleSetDefaultRefiningMax,
+    handleQuickRest,
   };
 }
 

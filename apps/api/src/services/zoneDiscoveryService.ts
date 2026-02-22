@@ -31,6 +31,98 @@ export async function ensureStarterDiscoveries(playerId: string): Promise<void> 
   });
 }
 
+/** Seed starter resource nodes and an encounter site for a new player in the first wild zone. */
+export async function ensureStarterEncounterAndNodes(playerId: string): Promise<void> {
+  // Find the starter town and its first connected wild zone
+  const starterTown = await db.zone.findFirst({ where: { isStarter: true }, select: { id: true } });
+  if (!starterTown) return;
+
+  const connections = await db.zoneConnection.findMany({
+    where: { fromId: starterTown.id },
+    select: { toId: true },
+  });
+  if (connections.length === 0) return;
+
+  const wildZone = await db.zone.findFirst({
+    where: {
+      id: { in: connections.map((c: { toId: string }) => c.toId) },
+      zoneType: 'wild',
+    },
+    select: { id: true },
+  });
+  if (!wildZone) return;
+
+  // --- Resource nodes ---
+  const oreNode = await db.resourceNode.findFirst({
+    where: { zoneId: wildZone.id, resourceType: 'Copper Ore' },
+    select: { id: true },
+  });
+  const logNode = await db.resourceNode.findFirst({
+    where: { zoneId: wildZone.id, resourceType: 'Oak Log' },
+    select: { id: true },
+  });
+
+  const nodeData: Array<{ playerId: string; resourceNodeId: string; remainingCapacity: number; decayedCapacity: number }> = [];
+  if (oreNode) nodeData.push({ playerId, resourceNodeId: oreNode.id, remainingCapacity: 6, decayedCapacity: 0 });
+  if (logNode) nodeData.push({ playerId, resourceNodeId: logNode.id, remainingCapacity: 6, decayedCapacity: 0 });
+
+  if (nodeData.length > 0) {
+    // Guard: only create if player doesn't already have these nodes
+    const existing = await db.playerResourceNode.findMany({
+      where: {
+        playerId,
+        resourceNodeId: { in: nodeData.map((n: { resourceNodeId: string }) => n.resourceNodeId) },
+      },
+      select: { resourceNodeId: true },
+    });
+    const existingIds = new Set(existing.map((e: { resourceNodeId: string }) => e.resourceNodeId));
+    const toCreate = nodeData.filter((n) => !existingIds.has(n.resourceNodeId));
+    if (toCreate.length > 0) {
+      await db.playerResourceNode.createMany({ data: toCreate });
+    }
+  }
+
+  // --- Encounter site ---
+  // Only create if player has no encounter sites in this zone yet
+  const existingSite = await db.encounterSite.findFirst({
+    where: { playerId, zoneId: wildZone.id },
+    select: { id: true },
+  });
+  if (existingSite) return;
+
+  const zoneMobFamily = await db.zoneMobFamily.findFirst({
+    where: { zoneId: wildZone.id },
+    orderBy: { discoveryWeight: 'desc' },
+    select: { mobFamilyId: true, mobFamily: { select: { name: true, siteNounSmall: true } } },
+  });
+  if (!zoneMobFamily) return;
+
+  // Use Field Mouse specifically for tutorial — easy guaranteed win
+  const fieldMouse = await db.mobTemplate.findFirst({
+    where: { zoneId: wildZone.id, name: 'Field Mouse' },
+    select: { id: true },
+  });
+  if (!fieldMouse) return;
+
+  const mobs = [
+    { slot: 0, mobTemplateId: fieldMouse.id, role: 'trash', prefix: null, status: 'alive', room: 1 },
+    { slot: 1, mobTemplateId: fieldMouse.id, role: 'trash', prefix: null, status: 'alive', room: 1 },
+  ];
+
+  const siteName = `Small ${zoneMobFamily.mobFamily.name} ${zoneMobFamily.mobFamily.siteNounSmall}`;
+
+  await db.encounterSite.create({
+    data: {
+      playerId,
+      zoneId: wildZone.id,
+      mobFamilyId: zoneMobFamily.mobFamilyId,
+      name: siteName,
+      size: 'small',
+      mobs: { mobs },
+    },
+  });
+}
+
 /** Auto-discover all zones connected to a town when arriving. Returns discovered zone IDs. */
 export async function discoverZonesFromTown(
   playerId: string,

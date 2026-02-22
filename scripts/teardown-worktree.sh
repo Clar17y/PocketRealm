@@ -4,7 +4,7 @@ set -euo pipefail
 # Remove a worktree and its database.
 #
 # Usage:
-#   ./scripts/teardown-worktree.sh <branch-name> [--keep-branch]
+#   ./scripts/teardown-worktree.sh <branch-name> [--keep-branch] [-y|--yes]
 #
 # Removes:
 #   .worktrees/adventure-<name>/   — git worktree
@@ -16,14 +16,16 @@ CONTAINER="adventure-postgres"
 PG_USER="postgres"
 
 usage() {
-  echo "Usage: $0 <branch-name> [--keep-branch]"
+  echo "Usage: $0 <branch-name> [--keep-branch] [-y|--yes]"
   echo ""
   echo "Options:"
   echo "  --keep-branch   Don't delete the git branch (default: deletes it)"
+  echo "  -y, --yes       Skip confirmation prompt (for CI/agent use)"
   echo ""
   echo "Examples:"
   echo "  $0 feature-leaderboard"
   echo "  $0 fix-combat-bug --keep-branch"
+  echo "  $0 feature-leaderboard -y"
   exit 1
 }
 
@@ -35,7 +37,15 @@ err()   { echo "[ERR ] $1" >&2; }
 [[ $# -lt 1 ]] && usage
 BRANCH="$1"
 KEEP_BRANCH=false
-[[ "${2:-}" == "--keep-branch" ]] && KEEP_BRANCH=true
+AUTO_YES=false
+shift
+for arg in "$@"; do
+  case "$arg" in
+    --keep-branch) KEEP_BRANCH=true ;;
+    -y|--yes)      AUTO_YES=true ;;
+    *)             err "Unknown option: $arg"; usage ;;
+  esac
+done
 
 SAFE_NAME=$(echo "$BRANCH" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:upper:]' '[:lower:]')
 DB_NAME="adventure_${SAFE_NAME}"
@@ -49,20 +59,35 @@ info "Worktree:  $WORKTREE_PATH"
 info "Database:  $DB_NAME"
 
 # --- Confirm ---
-read -rp "Remove worktree and drop database? [y/N] " confirm
-if [[ "$confirm" != [yY] ]]; then
-  info "Aborted."
-  exit 0
+if [[ "$AUTO_YES" == false ]]; then
+  read -rp "Remove worktree and drop database? [y/N] " confirm
+  if [[ "$confirm" != [yY] ]]; then
+    info "Aborted."
+    exit 0
+  fi
 fi
 
 # --- Remove worktree ---
-if [[ -d "$WORKTREE_PATH" ]]; then
-  info "Removing worktree..."
-  git worktree remove "$WORKTREE_PATH" --force
-  info "Worktree removed"
-else
-  warn "Worktree not found at $WORKTREE_PATH (already removed?)"
+if git worktree list --porcelain | grep -q "$WORKTREE_PATH"; then
+  info "Removing worktree from git..."
+  git worktree remove "$WORKTREE_PATH" --force 2>/dev/null || {
+    warn "git worktree remove failed, pruning stale entry..."
+    git worktree prune
+  }
 fi
+
+# Remove directory if it still exists (handles locked-file leftovers on Windows)
+if [[ -d "$WORKTREE_PATH" ]]; then
+  info "Removing worktree directory..."
+  rm -rf "$WORKTREE_PATH" 2>/dev/null || {
+    warn "Could not fully remove $WORKTREE_PATH (files may be locked by another process)"
+    warn "Kill any processes using the directory, then run: rm -rf \"$WORKTREE_PATH\""
+  }
+fi
+
+# Prune any stale worktree references
+git worktree prune 2>/dev/null || true
+info "Worktree removed"
 
 # --- Drop database ---
 info "Dropping database '$DB_NAME'..."

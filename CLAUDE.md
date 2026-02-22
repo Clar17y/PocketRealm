@@ -33,6 +33,9 @@ git worktree list
 
 # Remove worktree + DB but keep the branch
 ./scripts/teardown-worktree.sh feature-branch-name --keep-branch
+
+# Non-interactive teardown (skip confirmation — use from CI/agents)
+./scripts/teardown-worktree.sh feature-branch-name -y
 ```
 
 Each worktree gets its own PostgreSQL database (`adventure_<branch_name>`), so multiple worktrees with different migrations can run concurrently without conflicts.

@@ -1,7 +1,7 @@
 'use client';
 
 import type { LeaderboardEntry } from '@/lib/api';
-import { Bot, Medal } from 'lucide-react';
+import { Bot, Medal, Shield } from 'lucide-react';
 import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
 
 interface LeaderboardTableProps {
@@ -98,6 +98,7 @@ export function LeaderboardTable({
                       </span>
                     )}
                     {entry.isBot && <Bot className="w-3.5 h-3.5 text-[var(--rpg-text-secondary)] shrink-0" />}
+                    {entry.isAdmin && <Shield className="w-3.5 h-3.5 text-[var(--rpg-gold)] shrink-0" />}
                   </div>
                   <span className="text-xs text-[var(--rpg-text-secondary)]">Lv.{entry.characterLevel}</span>
                 </div>

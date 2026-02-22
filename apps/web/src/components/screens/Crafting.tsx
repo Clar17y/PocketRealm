@@ -45,6 +45,7 @@ interface CraftingProps {
   recoveryCost?: number | null;
   zoneCraftingLevel: number | null;
   zoneName: string | null;
+  defaultMaxQuantity?: boolean;
 }
 
 const PERCENT_STATS = new Set(['critChance', 'critDamage']);
@@ -79,7 +80,7 @@ function statEntries(stats: Record<string, unknown> | undefined): Array<[string,
     });
 }
 
-export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName }: CraftingProps) {
+export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
@@ -116,8 +117,12 @@ export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog,
 
   // Reset quantity when recipe changes or when max changes
   useEffect(() => {
-    setQuantity((prev) => Math.max(1, Math.min(prev, selectedMax || 1)));
-  }, [selectedRecipeId, selectedMax]);
+    if (defaultMaxQuantity && selectedMax > 0) {
+      setQuantity(selectedMax);
+    } else {
+      setQuantity((prev) => Math.max(1, Math.min(prev, selectedMax || 1)));
+    }
+  }, [selectedRecipeId, selectedMax, defaultMaxQuantity]);
 
   const canCraft = (recipe: Recipe) => {
     if (noFacility) return false;

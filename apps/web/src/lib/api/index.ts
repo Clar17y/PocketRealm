@@ -6,6 +6,7 @@ export { register, login, refreshToken } from './auth';
 export {
   getPlayer,
   updatePlayerSettings,
+  updateTutorialStep,
   getPlayerAttributes,
   allocatePlayerAttribute,
   getSkills,
@@ -18,6 +19,7 @@ export {
   rest,
   recoverFromKnockout,
 } from './player';
+export type { PlayerSettings } from './player';
 
 export {
   getZones,
@@ -115,3 +117,34 @@ export type {
   LeaderboardCategoryGroup,
   LeaderboardCategoriesResponse,
 } from './social';
+
+export {
+  adminGrantTurns,
+  adminSetLevel,
+  adminGrantXp,
+  adminSetAttributes,
+  adminGetItemTemplates,
+  adminGrantItem,
+  adminGetEventTemplates,
+  adminGetActiveEvents,
+  adminSpawnEvent,
+  adminCancelEvent,
+  adminGetMobs,
+  adminGetMobFamilies,
+  adminSpawnBoss,
+  adminGetZones,
+  adminDiscoverAllZones,
+  adminTeleport,
+  adminSpawnEncounter,
+  adminGetResourceNodes,
+  adminSpawnResourceNode,
+} from './admin';
+export type {
+  AdminItemTemplate,
+  AdminZone,
+  AdminMobTemplate,
+  AdminMobFamily,
+  AdminEventTemplate,
+  AdminActiveEvent,
+  AdminResourceNode,
+} from './admin';

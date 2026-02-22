@@ -6,11 +6,19 @@ export async function getPlayer() {
       id: string;
       username: string;
       email: string;
+      role: string;
       createdAt: string;
       characterXp: number;
       characterLevel: number;
       attributePoints: number;
       autoPotionThreshold: number;
+      tutorialStep: number;
+      combatLogSpeedMs: number;
+      explorationSpeedMs: number;
+      autoSkipKnownCombat: boolean;
+      defaultExploreTurns: number;
+      quickRestHealPercent: number;
+      defaultRefiningMax: boolean;
       attributes: {
         vitality: number;
         strength: number;
@@ -23,10 +31,27 @@ export async function getPlayer() {
   }>('/api/v1/player');
 }
 
-export async function updatePlayerSettings(settings: { autoPotionThreshold: number }) {
-  return fetchApi<{ autoPotionThreshold: number }>('/api/v1/player/settings', {
+export interface PlayerSettings {
+  autoPotionThreshold?: number;
+  combatLogSpeedMs?: number;
+  explorationSpeedMs?: number;
+  autoSkipKnownCombat?: boolean;
+  defaultExploreTurns?: number;
+  quickRestHealPercent?: number;
+  defaultRefiningMax?: boolean;
+}
+
+export async function updatePlayerSettings(settings: PlayerSettings) {
+  return fetchApi<PlayerSettings>('/api/v1/player/settings', {
     method: 'PATCH',
     body: JSON.stringify(settings),
+  });
+}
+
+export async function updateTutorialStep(step: number) {
+  return fetchApi<{ tutorialStep: number }>('/api/v1/player/tutorial', {
+    method: 'PATCH',
+    body: JSON.stringify({ step }),
   });
 }
 
