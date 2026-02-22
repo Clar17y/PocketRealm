@@ -47,6 +47,7 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       defaultExploreTurns: true,
       quickRestHealPercent: true,
       defaultRefiningMax: true,
+      lowHpWarning: true,
       activeTitle: true,
     },
   });
@@ -125,6 +126,7 @@ playerRouter.post('/attributes', asyncHandler(async (req, res) => {
 const SETTINGS_FIELDS = [
   'autoPotionThreshold', 'combatLogSpeedMs', 'explorationSpeedMs',
   'autoSkipKnownCombat', 'defaultExploreTurns', 'quickRestHealPercent', 'defaultRefiningMax',
+  'lowHpWarning',
 ] as const;
 
 const settingsSchema = z.object({
@@ -135,6 +137,7 @@ const settingsSchema = z.object({
   defaultExploreTurns: z.number().int().min(10).max(10000).refine(v => v % 10 === 0, { message: 'Must be a multiple of 10' }).optional(),
   quickRestHealPercent: z.number().int().min(25).max(100).refine(v => v % 25 === 0, { message: 'Must be a multiple of 25' }).optional(),
   defaultRefiningMax: z.boolean().optional(),
+  lowHpWarning: z.boolean().optional(),
 }).refine(data => Object.values(data).some(v => v !== undefined), { message: 'At least one setting required' });
 
 /**
