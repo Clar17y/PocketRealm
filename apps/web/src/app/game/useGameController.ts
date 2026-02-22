@@ -931,7 +931,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     setExplorationPlaybackData(null);
     setPlaybackActive(false);
-    advanceTutorial(TUTORIAL_STEP_EXPLORE);
+    await advanceTutorial(TUTORIAL_STEP_EXPLORE);
     await loadAll();
   };
 
@@ -968,7 +968,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     setExplorationPlaybackData(null);
     setPlaybackActive(false);
-    advanceTutorial(TUTORIAL_STEP_EXPLORE);
+    await advanceTutorial(TUTORIAL_STEP_EXPLORE);
     await loadAll();
   };
 
