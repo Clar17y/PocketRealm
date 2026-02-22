@@ -41,7 +41,7 @@ import { buildPotionPool, deductConsumedPotions } from '../../services/potionSer
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
-import { serializeXpGrant, toMobTemplate, assertNotRecovering } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill } from '../../utils/routeHelpers.js';
 import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
 import {
   prismaAny,
@@ -212,18 +212,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded);
 
       // Bestiary
-      await prisma.playerBestiary.upsert({
-        where: { playerId_mobTemplateId: { playerId, mobTemplateId: prefixedMob.id } },
-        create: { playerId, mobTemplateId: prefixedMob.id, kills: 1 },
-        update: { kills: { increment: 1 } },
-      });
-      if (prefixedMob.mobPrefix) {
-        await prismaAny.playerBestiaryPrefix.upsert({
-          where: { playerId_mobTemplateId_prefix: { playerId, mobTemplateId: prefixedMob.id, prefix: prefixedMob.mobPrefix } },
-          create: { playerId, mobTemplateId: prefixedMob.id, prefix: prefixedMob.mobPrefix, kills: 1 },
-          update: { kills: { increment: 1 } },
-        });
-      }
+      await recordBestiaryKill(playerId, prefixedMob.id, prefixedMob.mobPrefix);
     }
 
     fightResults.push({

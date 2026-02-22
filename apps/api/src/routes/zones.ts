@@ -20,7 +20,7 @@ import { getEquipmentStats } from '../services/equipmentService';
 import { getPlayerProgressionState } from '../services/attributesService';
 import { grantSkillXp } from '../services/xpService';
 import { rollAndGrantLoot } from '../services/lootService';
-import { serializeXpGrant, toMobTemplate } from '../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, recordBestiaryKill } from '../utils/routeHelpers.js';
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
@@ -331,22 +331,7 @@ zonesRouter.post('/travel', async (req, res, next) => {
             await setHp(playerId, currentHp);
 
             // Update bestiary
-            await prisma.playerBestiary.upsert({
-              where: { playerId_mobTemplateId: { playerId, mobTemplateId: prefixedMob.id } },
-              create: { playerId, mobTemplateId: prefixedMob.id, kills: 1 },
-              update: { kills: { increment: 1 } },
-            });
-            if (prefixedMob.mobPrefix) {
-              await prismaAny.playerBestiaryPrefix.upsert({
-                where: {
-                  playerId_mobTemplateId_prefix: {
-                    playerId, mobTemplateId: prefixedMob.id, prefix: prefixedMob.mobPrefix,
-                  },
-                },
-                create: { playerId, mobTemplateId: prefixedMob.id, prefix: prefixedMob.mobPrefix, kills: 1 },
-                update: { kills: { increment: 1 } },
-              });
-            }
+            await recordBestiaryKill(playerId, prefixedMob.id, prefixedMob.mobPrefix);
 
             // Track ambush kill for achievement checks
             ambushKillCount++;

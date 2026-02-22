@@ -28,7 +28,7 @@ import { enterRecoveringState, setHp } from '../../services/hpService';
 import { rollAndGrantLoot } from '../../services/lootService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { serializeXpGrant, toMobTemplate, assertNotRecovering } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill } from '../../utils/routeHelpers.js';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
@@ -263,34 +263,7 @@ startRouter.post('/start', async (req, res, next) => {
           xpGrant = await grantSkillXp(playerId, attackSkill, prefixedMob.xpReward);
           xpGain = xpGrant.xpResult.xpAfterEfficiency;
 
-          await prisma.playerBestiary.upsert({
-            where: { playerId_mobTemplateId: { playerId, mobTemplateId: prefixedMob.id } },
-            create: {
-              playerId,
-              mobTemplateId: prefixedMob.id,
-              kills: 1,
-            },
-            update: { kills: { increment: 1 } },
-          });
-
-          if (prefixedMob.mobPrefix) {
-            await prismaAny.playerBestiaryPrefix.upsert({
-              where: {
-                playerId_mobTemplateId_prefix: {
-                  playerId,
-                  mobTemplateId: prefixedMob.id,
-                  prefix: prefixedMob.mobPrefix,
-                },
-              },
-              create: {
-                playerId,
-                mobTemplateId: prefixedMob.id,
-                prefix: prefixedMob.mobPrefix,
-                kills: 1,
-              },
-              update: { kills: { increment: 1 } },
-            });
-          }
+          await recordBestiaryKill(playerId, prefixedMob.id, prefixedMob.mobPrefix);
 
           const skillXpReward = xpGrant
             ? serializeXpGrant(xpGrant)
