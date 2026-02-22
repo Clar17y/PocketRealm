@@ -63,3 +63,8 @@ packages/database/prisma/*.db-journal
 # Assets
 docs/assets/
 docs/design/
+
+# Playwright
+tests/e2e/playwright-report/
+tests/e2e/test-results/
+tests/e2e/dist/
