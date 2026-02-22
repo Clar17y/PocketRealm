@@ -19,6 +19,7 @@ export async function getPlayer() {
       defaultExploreTurns: number;
       quickRestHealPercent: number;
       defaultRefiningMax: boolean;
+      lowHpWarning: boolean;
       attributes: {
         vitality: number;
         strength: number;
@@ -39,6 +40,7 @@ export interface PlayerSettings {
   defaultExploreTurns?: number;
   quickRestHealPercent?: number;
   defaultRefiningMax?: boolean;
+  lowHpWarning?: boolean;
 }
 
 export async function updatePlayerSettings(settings: PlayerSettings) {
