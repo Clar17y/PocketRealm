@@ -8,13 +8,14 @@ import {
   getPlayerGuild, createGuild, searchGuilds, joinGuild, leaveGuild,
   kickGuildMember, promoteGuildMember, demoteGuildMember,
   transferGuildLeadership, disbandGuild, updateGuildSettings, getGuildLog,
+  getGuildUpgrades, activateGuildUpgrade, getGuildContracts,
   type PlayerGuildResponse, type GuildResponse, type GuildMemberResponse,
-  type GuildLogResponse,
+  type GuildLogResponse, type GuildUpgradesResponse, type GuildContractsResponse,
 } from '@/lib/api';
 import { GUILD_CONSTANTS } from '@adventure/shared';
 const formatNumber = (n: number) => n.toLocaleString();
 
-type GuildTab = 'overview' | 'members' | 'log' | 'settings';
+type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'log' | 'settings';
 
 interface GuildScreenProps {
   playerId: string | null;
@@ -79,7 +80,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
       )}
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {(['overview', 'members', 'log', ...(guildData.role === 'leader' || guildData.role === 'officer' ? ['settings'] : [])] as GuildTab[]).map((tab) => (
+        {(['overview', 'members', 'upgrades', 'contracts', 'log', ...(guildData.role === 'leader' || guildData.role === 'officer' ? ['settings'] : [])] as GuildTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -104,6 +105,12 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
           onRefresh={loadGuild}
           setError={setError}
         />
+      )}
+      {activeTab === 'upgrades' && (
+        <GuildUpgradesTab guildId={guildData.guild.id} myRole={guildData.role} setError={setError} />
+      )}
+      {activeTab === 'contracts' && (
+        <GuildContractsTab guildId={guildData.guild.id} />
       )}
       {activeTab === 'log' && <GuildActivityLog guildId={guildData.guild.id} />}
       {activeTab === 'settings' && (
@@ -599,6 +606,187 @@ function GuildActivityLog({ guildId }: { guildId: string }) {
       {logData?.entries.length === 0 && (
         <PixelCard><p className="text-sm text-[var(--rpg-text-secondary)]">No activity yet.</p></PixelCard>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Upgrades Tab
+// ---------------------------------------------------------------------------
+
+function formatDuration(ms: number): string {
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${mins}m`;
+}
+
+function formatTimeRemaining(expiresAt: string): string {
+  const remaining = new Date(expiresAt).getTime() - Date.now();
+  if (remaining <= 0) return 'Expired';
+  return formatDuration(remaining);
+}
+
+const EFFECT_LABELS: Record<string, string> = {
+  xp_boost: 'Skill XP',
+  gathering_yield: 'Gathering Yield',
+  crafting_crit: 'Crafting Crit',
+  combat_damage: 'Combat Damage',
+  defense_boost: 'Defense',
+};
+
+function GuildUpgradesTab({
+  guildId,
+  myRole,
+  setError,
+}: {
+  guildId: string;
+  myRole: string;
+  setError: (err: string | null) => void;
+}) {
+  const [data, setData] = useState<GuildUpgradesResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activating, setActivating] = useState(false);
+
+  const isOfficer = myRole === 'leader' || myRole === 'officer';
+
+  const loadUpgrades = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getGuildUpgrades(guildId);
+      if (res.data) setData(res.data);
+    } catch { /* */ } finally {
+      setLoading(false);
+    }
+  }, [guildId]);
+
+  useEffect(() => { void loadUpgrades(); }, [loadUpgrades]);
+
+  const handleActivate = async (upgradeKey: string, tier: number) => {
+    setActivating(true);
+    setError(null);
+    try {
+      const res = await activateGuildUpgrade(guildId, upgradeKey, tier);
+      if (res.error) { setError(res.error.message); return; }
+      void loadUpgrades();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to activate');
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  if (loading && !data) return <PixelCard><p className="text-sm opacity-60">Loading...</p></PixelCard>;
+
+  return (
+    <div className="space-y-3">
+      {data?.available.map((upgrade) => (
+        <PixelCard key={upgrade.key}>
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <p className="text-sm font-bold text-[var(--rpg-text-primary)]">{upgrade.name}</p>
+              <p className="text-xs text-[var(--rpg-text-secondary)]">{EFFECT_LABELS[upgrade.effectType] ?? upgrade.effectType}</p>
+            </div>
+            {upgrade.activeUpgrade && (
+              <span className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-green-light)]/20 text-[var(--rpg-green-light)]">
+                Active &middot; {formatTimeRemaining(upgrade.activeUpgrade.expiresAt)}
+              </span>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            {upgrade.tiers.map((tier) => (
+              <div key={tier.level} className="flex items-center justify-between text-xs p-2 bg-[var(--rpg-background)] rounded">
+                <div>
+                  <span className="text-[var(--rpg-text-secondary)]">Tier {tier.level}</span>
+                  <span className="ml-2 text-[var(--rpg-gold)]">+{Math.round(tier.effectValue * 100)}%</span>
+                  <span className="ml-2 text-[var(--rpg-text-secondary)]">{formatDuration(tier.durationMs)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--rpg-text-secondary)]">{formatNumber(tier.cost)} turns</span>
+                  {isOfficer && (
+                    <button
+                      onClick={() => handleActivate(upgrade.key, tier.level)}
+                      disabled={activating || !tier.available}
+                      className={`px-2 py-0.5 rounded text-xs ${
+                        tier.available
+                          ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]'
+                          : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] opacity-50'
+                      }`}
+                      title={tier.reason}
+                    >
+                      Activate
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </PixelCard>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Contracts Tab
+// ---------------------------------------------------------------------------
+
+function GuildContractsTab({ guildId }: { guildId: string }) {
+  const [data, setData] = useState<GuildContractsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadContracts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getGuildContracts(guildId);
+      if (res.data) setData(res.data);
+    } catch { /* */ } finally {
+      setLoading(false);
+    }
+  }, [guildId]);
+
+  useEffect(() => { void loadContracts(); }, [loadContracts]);
+
+  if (loading && !data) return <PixelCard><p className="text-sm opacity-60">Loading...</p></PixelCard>;
+
+  if (!data?.contracts.length) {
+    return <PixelCard><p className="text-sm text-[var(--rpg-text-secondary)]">No active contracts this week.</p></PixelCard>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {data.contracts.map((contract) => {
+        const progress = Math.min(100, Math.floor((contract.currentValue / contract.targetValue) * 100));
+        const isComplete = contract.status === 'completed';
+        return (
+          <PixelCard key={contract.id}>
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <p className="text-sm font-bold text-[var(--rpg-text-primary)]">{contract.name}</p>
+                <p className="text-xs text-[var(--rpg-text-secondary)]">
+                  {formatNumber(contract.currentValue)} / {formatNumber(contract.targetValue)}
+                </p>
+              </div>
+              {isComplete ? (
+                <span className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-green-light)]/20 text-[var(--rpg-green-light)]">Complete</span>
+              ) : (
+                <span className="text-xs text-[var(--rpg-text-secondary)]">{formatTimeRemaining(contract.expiresAt)}</span>
+              )}
+            </div>
+            <div className="w-full h-2 bg-[var(--rpg-background)] rounded-full overflow-hidden mb-1.5">
+              <div
+                className={`h-full transition-all ${isComplete ? 'bg-[var(--rpg-green-light)]' : 'bg-[var(--rpg-gold)]'}`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="flex gap-3 text-xs text-[var(--rpg-text-secondary)]">
+              <span>+{contract.rewardGuildXp} Guild XP</span>
+              <span>+{formatNumber(contract.rewardTreasuryTurns)} Treasury</span>
+            </div>
+          </PixelCard>
+        );
+      })}
     </div>
   );
 }

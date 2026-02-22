@@ -7,6 +7,7 @@ import {
   demoteMember, transferLeadership, disbandGuild,
   updateSettings, getGuildLog,
 } from '../services/guildService';
+import { activateUpgrade, getActiveUpgrades, getAvailableUpgrades } from '../services/guildUpgradeService';
 
 export const guildRouter = Router();
 guildRouter.use(authenticate);
@@ -170,5 +171,36 @@ guildRouter.get('/:id/log', async (req, res, next) => {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const result = await getGuildLog(req.params.id, page);
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+// --- Upgrades ---
+
+const activateUpgradeSchema = z.object({
+  upgradeKey: z.string().min(1),
+  tier: z.number().int().positive(),
+});
+
+// POST /:id/upgrades/activate
+guildRouter.post('/:id/upgrades/activate', async (req, res, next) => {
+  try {
+    const parsed = activateUpgradeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: 'Invalid input', code: 'VALIDATION_ERROR' } });
+      return;
+    }
+    const result = await activateUpgrade(req.player!.playerId, req.params.id, parsed.data.upgradeKey, parsed.data.tier);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// GET /:id/upgrades
+guildRouter.get('/:id/upgrades', async (req, res, next) => {
+  try {
+    const [active, available] = await Promise.all([
+      getActiveUpgrades(req.params.id),
+      getAvailableUpgrades(req.params.id),
+    ]);
+    res.json({ active, available });
   } catch (err) { next(err); }
 });

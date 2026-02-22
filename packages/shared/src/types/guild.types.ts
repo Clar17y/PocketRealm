@@ -60,3 +60,27 @@ export interface GuildSearchResult {
   taxRate: number;
   specialization: GuildSpecialization | null;
 }
+
+export interface GuildUpgradeData {
+  id: string;
+  upgradeKey: string;
+  tier: number;
+  effectType: string;
+  effectValue: number;
+  activatedAt: string;
+  expiresAt: string;
+  activatedBy: string;
+}
+
+export interface GuildContractData {
+  id: string;
+  contractKey: string;
+  name: string;
+  targetValue: number;
+  currentValue: number;
+  status: 'active' | 'completed' | 'expired';
+  rewardGuildXp: number;
+  rewardTreasuryTurns: number;
+  weekStartedAt: string;
+  expiresAt: string;
+}

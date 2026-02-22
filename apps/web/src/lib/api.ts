@@ -1668,3 +1668,72 @@ export async function getGuildLog(guildId: string, page?: number) {
   const params = page ? `?page=${page}` : '';
   return fetchApi<GuildLogResponse>(`/api/v1/guild/${guildId}/log${params}`);
 }
+
+// Guild Upgrades
+
+export interface GuildUpgradeResponse {
+  id: string;
+  upgradeKey: string;
+  tier: number;
+  effectType: string;
+  effectValue: number;
+  activatedAt: string;
+  expiresAt: string;
+  activatedBy: string;
+}
+
+export interface GuildUpgradeTierResponse {
+  level: number;
+  effectValue: number;
+  cost: number;
+  durationMs: number;
+  available: boolean;
+  reason?: string;
+}
+
+export interface GuildAvailableUpgradeResponse {
+  key: string;
+  name: string;
+  effectType: string;
+  tiers: GuildUpgradeTierResponse[];
+  activeUpgrade: GuildUpgradeResponse | null;
+}
+
+export interface GuildUpgradesResponse {
+  active: GuildUpgradeResponse[];
+  available: GuildAvailableUpgradeResponse[];
+}
+
+export async function getGuildUpgrades(guildId: string) {
+  return fetchApi<GuildUpgradesResponse>(`/api/v1/guild/${guildId}/upgrades`);
+}
+
+export async function activateGuildUpgrade(guildId: string, upgradeKey: string, tier: number) {
+  return fetchApi<GuildUpgradeResponse>(`/api/v1/guild/${guildId}/upgrades/activate`, {
+    method: 'POST',
+    body: JSON.stringify({ upgradeKey, tier }),
+  });
+}
+
+// Guild Contracts
+
+export interface GuildContractResponse {
+  id: string;
+  contractKey: string;
+  name: string;
+  targetValue: number;
+  currentValue: number;
+  status: string;
+  rewardGuildXp: number;
+  rewardTreasuryTurns: number;
+  weekStartedAt: string;
+  expiresAt: string;
+}
+
+export interface GuildContractsResponse {
+  contracts: GuildContractResponse[];
+}
+
+export async function getGuildContracts(guildId: string) {
+  return fetchApi<GuildContractsResponse>(`/api/v1/guild/${guildId}/contracts`);
+}

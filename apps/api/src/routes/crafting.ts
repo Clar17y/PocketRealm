@@ -36,6 +36,7 @@ import { grantSkillXp } from '../services/xpService';
 import { getHpState } from '../services/hpService';
 import { addGuildXp, getPlayerGuildId } from '../services/guildService';
 import { applyGuildTaxTx } from '../services/guildTaxService';
+import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { GUILD_CONSTANTS } from '@adventure/shared';
 
 export const craftingRouter = Router();
@@ -488,14 +489,20 @@ craftingRouter.post('/craft', async (req, res, next) => {
         ? recipe.resultTemplate.itemType
         : 'resource';
       const equipStats = await getEquipmentStats(playerId);
+      const guildMods = await getPlayerGuildModifiers(playerId);
       const templateBaseStats = recipe.resultTemplate.baseStats as ItemStats | null | undefined;
+
+      // Add guild crafting crit bonus as equivalent virtual luck
+      const effectiveLuck = guildMods.craftingCrit > 0
+        ? equipStats.luck + Math.floor(guildMods.craftingCrit / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
+        : equipStats.luck;
 
       const templateSlot = (recipe.resultTemplate.slot as EquipmentSlot | null) ?? undefined;
       for (let i = 0; i < quantity; i++) {
         const critResult = calculateCraftingCrit({
           skillLevel,
           requiredLevel: recipe.requiredLevel,
-          luckStat: equipStats.luck,
+          luckStat: effectiveLuck,
           itemType,
           baseStats: templateBaseStats,
           slot: templateSlot,

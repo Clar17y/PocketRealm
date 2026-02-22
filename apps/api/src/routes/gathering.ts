@@ -6,6 +6,7 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { applyGuildTaxTx } from '../services/guildTaxService';
+import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { addStackableItemTx } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { getHpState } from '../services/hpService';
@@ -288,10 +289,14 @@ gatheringRouter.post('/mine', async (req, res, next) => {
     const baseYield = Math.max(template.baseYield, GATHERING_CONSTANTS.BASE_YIELD);
     const baseYieldPerAction = Math.floor(baseYield * yieldMultiplier);
 
-    // Apply world event resource modifiers
+    // Apply world event resource modifiers + guild gathering yield
     const zoneModifiers = await getActiveZoneModifiers(template.zoneId);
     const activeEventEffects = await getActiveEventSummaries(template.zoneId);
-    const yieldPerAction = applyResourceEventModifiers(baseYieldPerAction, zoneModifiers);
+    const guildMods = await getPlayerGuildModifiers(playerId);
+    const eventYield = applyResourceEventModifiers(baseYieldPerAction, zoneModifiers);
+    const yieldPerAction = guildMods.gatheringYield > 0
+      ? Math.floor(eventYield * (1 + guildMods.gatheringYield))
+      : eventYield;
 
     // Cap actions by remaining capacity
     const maxActionsByCapacity = Math.ceil(effectiveCapacity / yieldPerAction);

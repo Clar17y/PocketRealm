@@ -48,6 +48,7 @@ import { incrementStats } from '../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 import { addGuildXp, getPlayerGuildId } from '../services/guildService';
 import { applyGuildTaxTx } from '../services/guildTaxService';
+import { getPlayerGuildModifiers, type PlayerGuildModifiers } from '../services/guildUpgradeService';
 
 export const combatRouter = Router();
 
@@ -293,6 +294,23 @@ async function applyEncounterSiteDecayAndPersist(
     mobs: decayed.mobs,
     state,
     nextMob: getNextEncounterMob(decayed.mobs),
+  };
+}
+
+function applyGuildCombatModifiers(
+  stats: ReturnType<typeof buildPlayerCombatStats>,
+  guildMods: PlayerGuildModifiers,
+): ReturnType<typeof buildPlayerCombatStats> {
+  if (guildMods.combatDamage <= 0 && guildMods.defenseBoost <= 0) return stats;
+  const dmgMul = 1 + guildMods.combatDamage;
+  const defMul = 1 + guildMods.defenseBoost;
+  return {
+    ...stats,
+    attack: Math.floor(stats.attack * dmgMul),
+    damageMin: Math.floor(stats.damageMin * dmgMul),
+    damageMax: Math.floor(stats.damageMax * dmgMul),
+    defence: Math.floor(stats.defence * defMul),
+    magicDefence: Math.floor(stats.magicDefence * defMul),
   };
 }
 
@@ -649,9 +667,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const potionPool = autoPotionThreshold > 0 ? await buildPotionPool(playerId, hpState.maxHp) : [];
   const allPotionsConsumed: PotionConsumed[] = [];
 
-  // Zone modifiers
+  // Zone modifiers + guild modifiers
   const zoneModifiers = await getActiveZoneModifiers(zoneId);
   const activeEventEffects = await getActiveEventSummaries(zoneId);
+  const guildMods = await getPlayerGuildModifiers(playerId);
 
   // Fight loop
   const fightResults: FightResult[] = [];
@@ -673,12 +692,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     const prefixedMob = applyMobPrefix(modifiedMob, roomMob.prefix ?? null);
 
     const playerStartHp = currentPlayerHp;
-    const playerStats = buildPlayerCombatStats(
+    const rawPlayerStats = buildPlayerCombatStats(
       currentPlayerHp,
       hpState.maxHp,
       { attackStyle: attackSkill, skillLevel: attackLevel, attributes: progression.attributes },
       equipmentStats
     );
+    const playerStats = applyGuildCombatModifiers(rawPlayerStats, guildMods);
 
     let combatOptions: CombatOptions | undefined;
     if (autoPotionThreshold > 0 && potionPool.length > 0) {
@@ -1175,7 +1195,7 @@ combatRouter.post('/start', async (req, res, next) => {
     ]);
 
     const equipmentStats = await getEquipmentStats(playerId);
-    const playerStats = buildPlayerCombatStats(
+    const rawPlayerStats = buildPlayerCombatStats(
       hpState.currentHp,
       hpState.maxHp,
       {
@@ -1185,6 +1205,8 @@ combatRouter.post('/start', async (req, res, next) => {
       },
       equipmentStats
     );
+    const guildMods = await getPlayerGuildModifiers(playerId);
+    const playerStats = applyGuildCombatModifiers(rawPlayerStats, guildMods);
 
     const baseMob: MobTemplate = {
       ...mob,

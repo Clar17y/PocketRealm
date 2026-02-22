@@ -566,3 +566,126 @@ export const GUILD_CONSTANTS = {
   MIN_TAG_LENGTH: 2,
   MAX_TAG_LENGTH: 4,
 } as const;
+
+// =============================================================================
+// GUILD UPGRADES
+// =============================================================================
+
+export type GuildUpgradeEffectType =
+  | 'xp_boost'
+  | 'gathering_yield'
+  | 'crafting_crit'
+  | 'combat_damage'
+  | 'defense_boost';
+
+export interface GuildUpgradeTier {
+  level: number;
+  effectValue: number;
+  cost: number;
+  durationMs: number;
+}
+
+export interface GuildUpgradeDefinition {
+  key: string;
+  name: string;
+  effectType: GuildUpgradeEffectType;
+  tiers: readonly GuildUpgradeTier[];
+}
+
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+
+export const GUILD_UPGRADE_DEFINITIONS: readonly GuildUpgradeDefinition[] = [
+  {
+    key: 'xp_boost',
+    name: 'XP Boost',
+    effectType: 'xp_boost',
+    tiers: [
+      { level: 1, effectValue: 0.05, cost: 5_000, durationMs: TWO_HOURS_MS },
+      { level: 10, effectValue: 0.10, cost: 10_000, durationMs: TWO_HOURS_MS },
+      { level: 25, effectValue: 0.15, cost: 20_000, durationMs: TWO_HOURS_MS },
+    ],
+  },
+  {
+    key: 'gathering_yield',
+    name: 'Gathering Yield',
+    effectType: 'gathering_yield',
+    tiers: [
+      { level: 1, effectValue: 0.10, cost: 5_000, durationMs: TWO_HOURS_MS },
+      { level: 10, effectValue: 0.20, cost: 10_000, durationMs: TWO_HOURS_MS },
+      { level: 25, effectValue: 0.30, cost: 20_000, durationMs: TWO_HOURS_MS },
+    ],
+  },
+  {
+    key: 'crafting_fortune',
+    name: 'Crafting Fortune',
+    effectType: 'crafting_crit',
+    tiers: [
+      { level: 1, effectValue: 0.05, cost: 8_000, durationMs: TWO_HOURS_MS },
+      { level: 10, effectValue: 0.10, cost: 15_000, durationMs: TWO_HOURS_MS },
+      { level: 25, effectValue: 0.15, cost: 25_000, durationMs: TWO_HOURS_MS },
+    ],
+  },
+  {
+    key: 'warriors_might',
+    name: "Warrior's Might",
+    effectType: 'combat_damage',
+    tiers: [
+      { level: 1, effectValue: 0.05, cost: 8_000, durationMs: TWO_HOURS_MS },
+      { level: 10, effectValue: 0.10, cost: 15_000, durationMs: TWO_HOURS_MS },
+      { level: 25, effectValue: 0.15, cost: 25_000, durationMs: TWO_HOURS_MS },
+    ],
+  },
+  {
+    key: 'iron_skin',
+    name: 'Iron Skin',
+    effectType: 'defense_boost',
+    tiers: [
+      { level: 1, effectValue: 0.05, cost: 5_000, durationMs: TWO_HOURS_MS },
+      { level: 10, effectValue: 0.10, cost: 10_000, durationMs: TWO_HOURS_MS },
+      { level: 25, effectValue: 0.15, cost: 20_000, durationMs: TWO_HOURS_MS },
+    ],
+  },
+] as const;
+
+// =============================================================================
+// GUILD CONTRACTS
+// =============================================================================
+
+export type GuildContractType =
+  | 'kill_count'
+  | 'kill_family'
+  | 'boss_rounds'
+  | 'craft_items'
+  | 'craft_rare'
+  | 'gather_actions'
+  | 'exploration_turns'
+  | 'pvp_wins';
+
+export type GuildContractCategory = 'combat' | 'crafting' | 'gathering' | 'exploration' | 'pvp';
+
+export interface GuildContractDefinition {
+  key: GuildContractType;
+  name: string;
+  category: GuildContractCategory;
+  targets: { low: number; mid: number; high: number };
+}
+
+export const GUILD_CONTRACT_DEFINITIONS: readonly GuildContractDefinition[] = [
+  { key: 'kill_count', name: 'Mob Slayer', category: 'combat', targets: { low: 2_000, mid: 5_000, high: 15_000 } },
+  { key: 'kill_family', name: 'Family Hunter', category: 'combat', targets: { low: 5_000, mid: 15_000, high: 40_000 } },
+  { key: 'boss_rounds', name: 'Boss Challenger', category: 'combat', targets: { low: 500, mid: 1_500, high: 3_750 } },
+  { key: 'craft_items', name: 'Master Crafter', category: 'crafting', targets: { low: 5_000, mid: 20_000, high: 50_000 } },
+  { key: 'craft_rare', name: 'Rare Artisan', category: 'crafting', targets: { low: 50, mid: 150, high: 500 } },
+  { key: 'gather_actions', name: 'Resource Gatherer', category: 'gathering', targets: { low: 10_000, mid: 40_000, high: 100_000 } },
+  { key: 'exploration_turns', name: 'Pathfinder', category: 'exploration', targets: { low: 500_000, mid: 2_000_000, high: 5_000_000 } },
+  { key: 'pvp_wins', name: 'Arena Champion', category: 'pvp', targets: { low: 1_000, mid: 3_000, high: 10_000 } },
+] as const;
+
+export const GUILD_CONTRACT_CONSTANTS = {
+  CONTRACTS_PER_WEEK: 3,
+  MIN_CATEGORIES: 2,
+  REWARD_GUILD_XP_MIN: 200,
+  REWARD_GUILD_XP_MAX: 800,
+  REWARD_TREASURY_MIN: 500,
+  REWARD_TREASURY_MAX: 2_000,
+} as const;

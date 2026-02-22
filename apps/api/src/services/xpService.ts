@@ -1,6 +1,7 @@
 import { prisma } from '@adventure/database';
 import type { SkillType, SkillXpResult } from '@adventure/shared';
 import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, shouldResetDailyCap } from '@adventure/game-engine';
+import { getPlayerGuildModifiers } from './guildUpgradeService';
 
 export interface GrantXpResult {
   skillType: SkillType;
@@ -22,6 +23,12 @@ export async function grantSkillXp(
   rawXpGain: number,
   now: Date = new Date()
 ): Promise<GrantXpResult> {
+  // Apply guild XP boost if active
+  const guildMods = await getPlayerGuildModifiers(playerId);
+  const boostedXpGain = guildMods.xpBoost > 0
+    ? Math.floor(rawXpGain * (1 + guildMods.xpBoost))
+    : rawXpGain;
+
   return prisma.$transaction(async (tx) => {
     const txAny = tx as unknown as any;
     const [skill, player] = await Promise.all([
@@ -55,7 +62,7 @@ export async function grantSkillXp(
       currentXp,
       skill.level,
       currentWindowXpGained,
-      rawXpGain,
+      boostedXpGain,
       skillType
     );
 
