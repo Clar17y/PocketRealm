@@ -7,6 +7,7 @@ import { getOwnedItem } from '../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { DURABILITY_CONSTANTS } from '@adventure/shared';
 import { useConsumable } from '../services/consumableService';
+import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const inventoryRouter = Router();
@@ -89,6 +90,7 @@ const repairSchema = z.object({
 inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = repairSchema.parse(req.body);
+  const guildMods = await getPlayerGuildModifiers(playerId);
   const result = await prisma.$transaction(async (tx) => {
     const item = await tx.item.findUnique({
       where: { id: body.itemId },
@@ -115,9 +117,12 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
       };
     }
 
-    const turnCost = current <= 0
+    const baseRepairCost = current <= 0
       ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST
       : DURABILITY_CONSTANTS.REPAIR_TURN_COST;
+    const turnCost = guildMods.repairCostReduction > 0
+      ? Math.max(1, Math.round(baseRepairCost * (1 - guildMods.repairCostReduction)))
+      : baseRepairCost;
     const turnSpend = await spendPlayerTurnsTx(tx, playerId, turnCost);
     const decay = Math.min(
       DURABILITY_CONSTANTS.REPAIR_MAX_DECAY,
