@@ -1150,7 +1150,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         setRoomTransition({ entering: nextFight.room });
         setTimeout(() => {
           setRoomTransition(null);
-          setCombatPlaybackIndex(combatPlaybackIndex + 1);
+          setCombatPlaybackIndex(prev => prev + 1);
         }, 1500);
         return;
       }
@@ -1178,6 +1178,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     setCombatPlaybackQueue(null);
     setCombatPlaybackIndex(0);
+    setRoomTransition(null);
     pendingCombatRewardsRef.current = null;
     setPlaybackActive(false);
 
@@ -1212,6 +1213,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         }
         setCombatPlaybackQueue(null);
         setCombatPlaybackIndex(0);
+        setRoomTransition(null);
         pendingCombatRewardsRef.current = null;
       }
       if (travelPlaybackData) {
