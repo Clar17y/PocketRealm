@@ -435,6 +435,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [activeTitle, setActiveTitleState] = useState<string | null>(null);
   const [playbackActive, setPlaybackActive] = useState(false);
   const [combatPlaybackQueue, setCombatPlaybackQueue] = useState<Array<{
+    room?: number;
     mobName: string;
     mobDisplayName: string;
     mobTemplateId: string;
@@ -1019,6 +1020,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       // Build playback queue from fights[] or single-element queue for zone combat
       if (data.combat.fights && data.combat.fights.length > 0) {
         const queue = data.combat.fights.map((fight) => ({
+          room: fight.room,
           mobName: fight.mobName ?? data.combat.mobName,
           mobDisplayName: fight.mobDisplayName,
           mobTemplateId: fight.mobTemplateId,
