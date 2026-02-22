@@ -28,8 +28,8 @@ import {
 } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
-import { refundPlayerTurns, spendPlayerTurns } from '../services/turnBankService';
-import { applyGuildTax } from '../services/guildTaxService';
+import { refundPlayerTurns, spendPlayerTurns, spendPlayerTurnsTx } from '../services/turnBankService';
+import { applyGuildTaxTx } from '../services/guildTaxService';
 import { enterRecoveringState, getHpState, setHp } from '../services/hpService';
 import { rollAndGrantLoot } from '../services/lootService';
 import { grantSkillXp } from '../services/xpService';
@@ -445,9 +445,12 @@ explorationRouter.post('/start', async (req, res, next) => {
     // Fetch zone modifiers from active world events
     const zoneModifiers = await getActiveZoneModifiers(body.zoneId);
 
-    // Apply guild tax: player pays full cost, but effective exploration uses post-tax turns
-    const { postTaxAmount } = await applyGuildTax(playerId, body.turns);
-    const turnSpend = await spendPlayerTurns(playerId, body.turns);
+    // Spend turns + guild tax atomically; effective exploration uses post-tax turns
+    const { turnSpend, postTaxAmount } = await prisma.$transaction(async (tx) => {
+      const spent = await spendPlayerTurnsTx(tx, playerId, body.turns);
+      const tax = await applyGuildTaxTx(tx, playerId, body.turns);
+      return { turnSpend: spent, postTaxAmount: tax.postTaxAmount };
+    });
 
     const outcomes = simulateExploration(postTaxAmount, effectiveExitChance);
 

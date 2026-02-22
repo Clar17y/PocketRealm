@@ -39,8 +39,8 @@ hpRouter.post('/rest', async (req, res, next) => {
     const playerId = req.player!.playerId;
     const body = restSchema.parse(req.body);
 
-    await applyGuildTax(playerId, body.turns);
     const result = await rest(playerId, body.turns);
+    await applyGuildTax(playerId, result.turnsSpent);
     const turns = await getTurnState(playerId);
 
     // Log the activity

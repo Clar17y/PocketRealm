@@ -47,7 +47,7 @@ import { getExplorationPercent } from '../services/zoneExplorationService';
 import { incrementStats } from '../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 import { addGuildXp, getPlayerGuildId } from '../services/guildService';
-import { applyGuildTax } from '../services/guildTaxService';
+import { applyGuildTaxTx } from '../services/guildTaxService';
 
 export const combatRouter = Router();
 
@@ -766,10 +766,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   let encounterSiteCleared = false;
   let roomCleared = false;
 
-  await applyGuildTax(playerId, totalTurnCost);
   const txResult = await prisma.$transaction(async (tx) => {
     const txAny = tx as unknown as any;
     const spent = await spendPlayerTurnsTx(tx, playerId, totalTurnCost);
+    await applyGuildTaxTx(tx, playerId, totalTurnCost);
 
     const freshSite = await txAny.encounterSite.findFirst({
       where: { id: encounterSiteId, playerId },
@@ -1227,9 +1227,9 @@ combatRouter.post('/start', async (req, res, next) => {
     };
     const combatResult = runCombat(combatantA, combatantB, combatOptions);
 
-    await applyGuildTax(playerId, COMBAT_CONSTANTS.ENCOUNTER_TURN_COST);
     const turnSpend = await prisma.$transaction(async (tx) => {
       const spent = await spendPlayerTurnsTx(tx, playerId, COMBAT_CONSTANTS.ENCOUNTER_TURN_COST);
+      await applyGuildTaxTx(tx, playerId, COMBAT_CONSTANTS.ENCOUNTER_TURN_COST);
       await deductConsumedPotions(playerId, combatResult.potionsConsumed, tx);
       return spent;
     });

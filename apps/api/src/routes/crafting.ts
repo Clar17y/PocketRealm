@@ -35,7 +35,7 @@ import {
 import { grantSkillXp } from '../services/xpService';
 import { getHpState } from '../services/hpService';
 import { addGuildXp, getPlayerGuildId } from '../services/guildService';
-import { applyGuildTax } from '../services/guildTaxService';
+import { applyGuildTaxTx } from '../services/guildTaxService';
 import { GUILD_CONSTANTS } from '@adventure/shared';
 
 export const craftingRouter = Router();
@@ -431,9 +431,9 @@ craftingRouter.post('/craft', async (req, res, next) => {
     }
 
     const totalTurnCost = recipe.turnCost * quantity;
-    await applyGuildTax(playerId, totalTurnCost);
     const turnSpend = await prisma.$transaction(async (tx) => {
       const spent = await spendPlayerTurnsTx(tx, playerId, totalTurnCost);
+      await applyGuildTaxTx(tx, playerId, totalTurnCost);
 
       for (const mat of materials) {
         await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * quantity);
@@ -688,9 +688,9 @@ craftingRouter.post('/forge/upgrade', async (req, res, next) => {
       action: 'upgrade',
     });
 
-    await applyGuildTax(playerId, upgradeCost);
     const turnSpend = await prisma.$transaction(async (tx) => {
       const spent = await spendPlayerTurnsTx(tx, playerId, upgradeCost);
+      await applyGuildTaxTx(tx, playerId, upgradeCost);
       const consumed = await tx.item.deleteMany({
         where: {
           id: sacrificial.id,
@@ -917,9 +917,9 @@ craftingRouter.post('/forge/reroll', async (req, res, next) => {
     }
     const templateBaseStats = item.template.baseStats as ItemStats | null | undefined;
 
-    await applyGuildTax(playerId, rerollCost);
     const turnSpend = await prisma.$transaction(async (tx) => {
       const spent = await spendPlayerTurnsTx(tx, playerId, rerollCost);
+      await applyGuildTaxTx(tx, playerId, rerollCost);
       const consumed = await tx.item.deleteMany({
         where: {
           id: sacrificial.id,
@@ -1043,9 +1043,9 @@ craftingRouter.post('/salvage', async (req, res, next) => {
     });
     const templateById = new Map(materialTemplates.map((template) => [template.id, template]));
 
-    await applyGuildTax(playerId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
     const { turnSpend, returned } = await prisma.$transaction(async (tx) => {
       const spent = await spendPlayerTurnsTx(tx, playerId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
+      await applyGuildTaxTx(tx, playerId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
 
       const consumed = await tx.item.deleteMany({
         where: {

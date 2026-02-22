@@ -1,5 +1,8 @@
 import { prisma } from '@adventure/database';
-import { GUILD_CONSTANTS, GuildData, GuildMemberData, GuildLogEntry, GuildSearchResult } from '@adventure/shared';
+import {
+  GUILD_CONSTANTS, GuildData, GuildMemberData, GuildLogEntry, GuildSearchResult,
+  type GuildRecruitmentMode, type GuildRole, type GuildSpecialization,
+} from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns } from './turnBankService';
 
@@ -24,7 +27,38 @@ function isActiveWithinWindow(lastActiveAt: Date): boolean {
   return lastActiveAt.getTime() > cutoff;
 }
 
-function toGuildData(guild: any): GuildData {
+interface GuildRow {
+  id: string;
+  name: string;
+  tag: string;
+  description: string | null;
+  leaderId: string;
+  leaderUsername?: string;
+  level: number;
+  xp: bigint;
+  memberCount?: number;
+  recruitmentMode: string;
+  minLevelRequirement: number;
+  taxRate: number;
+  specialization: string | null;
+  renown: number;
+  seasonalRenown: number;
+  treasuryTurns: number;
+  createdAt: Date | string;
+  _count?: { members: number };
+}
+
+interface MemberRow {
+  playerId: string;
+  role: string;
+  joinedAt: Date | string;
+  totalTurnsContributed: number;
+  weeklyTurnsContributed: number;
+  lastActiveAt: Date | string;
+  player?: { username: string; characterLevel: number };
+}
+
+function toGuildData(guild: GuildRow): GuildData {
   return {
     id: guild.id,
     name: guild.name,
@@ -36,10 +70,10 @@ function toGuildData(guild: any): GuildData {
     xp: guild.xp.toString(),
     memberCount: guild._count?.members ?? guild.memberCount ?? 0,
     maxMembers: calculateMaxMembers(guild.level),
-    recruitmentMode: guild.recruitmentMode,
+    recruitmentMode: guild.recruitmentMode as GuildRecruitmentMode,
     minLevelRequirement: guild.minLevelRequirement,
     taxRate: guild.taxRate,
-    specialization: guild.specialization,
+    specialization: guild.specialization as GuildSpecialization | null,
     renown: guild.renown,
     seasonalRenown: guild.seasonalRenown,
     treasuryTurns: guild.treasuryTurns,
@@ -48,12 +82,12 @@ function toGuildData(guild: any): GuildData {
   };
 }
 
-function toMemberData(m: any): GuildMemberData {
+function toMemberData(m: MemberRow): GuildMemberData {
   return {
     playerId: m.playerId,
     username: m.player?.username ?? '',
     characterLevel: m.player?.characterLevel ?? 0,
-    role: m.role,
+    role: m.role as GuildRole,
     joinedAt: m.joinedAt instanceof Date ? m.joinedAt.toISOString() : m.joinedAt,
     totalTurnsContributed: m.totalTurnsContributed,
     weeklyTurnsContributed: m.weeklyTurnsContributed,
@@ -245,6 +279,10 @@ export async function joinGuild(playerId: string, guildId: string): Promise<Guil
   });
   if (!guild) throw new AppError(404, 'Guild not found', 'NOT_FOUND');
 
+  if (player.characterLevel < GUILD_CONSTANTS.JOIN_MIN_LEVEL) {
+    throw new AppError(400, `Character level ${GUILD_CONSTANTS.JOIN_MIN_LEVEL} required to join a guild`, 'LEVEL_TOO_LOW');
+  }
+
   if (guild.recruitmentMode === 'closed' || guild.recruitmentMode === 'invite_only') {
     throw new AppError(400, 'Guild is not open for recruitment', 'RECRUITMENT_CLOSED');
   }
@@ -256,10 +294,6 @@ export async function joinGuild(playerId: string, guildId: string): Promise<Guil
   const maxMembers = calculateMaxMembers(guild.level);
   if (guild._count.members >= maxMembers) {
     throw new AppError(400, 'Guild is full', 'GUILD_FULL');
-  }
-
-  if (player.characterLevel < GUILD_CONSTANTS.JOIN_MIN_LEVEL) {
-    throw new AppError(400, `Character level ${GUILD_CONSTANTS.JOIN_MIN_LEVEL} required to join a guild`, 'LEVEL_TOO_LOW');
   }
 
   await prisma.$transaction(async (tx: any) => {
@@ -410,10 +444,11 @@ export async function transferLeadership(leaderId: string, targetId: string): Pr
 // Disband
 // ---------------------------------------------------------------------------
 
-export async function disbandGuild(leaderId: string): Promise<void> {
+export async function disbandGuild(leaderId: string, guildId: string): Promise<void> {
   const leader = await requireRole(leaderId, 'leader');
+  if (leader.guildId !== guildId) throw new AppError(403, 'Not your guild', 'WRONG_GUILD');
 
-  await prisma.guild.delete({ where: { id: leader.guildId } });
+  await prisma.guild.delete({ where: { id: guildId } });
 }
 
 // ---------------------------------------------------------------------------
@@ -433,24 +468,43 @@ export async function updateSettings(
   const requester = await requireRole(requesterId, 'officer');
   if (requester.guildId !== guildId) throw new AppError(403, 'Not your guild', 'WRONG_GUILD');
 
-  if (settings.taxRate !== undefined && settings.taxRate > GUILD_CONSTANTS.MAX_TAX_RATE) {
-    throw new AppError(400, `Tax rate cannot exceed ${GUILD_CONSTANTS.MAX_TAX_RATE}%`, 'INVALID_TAX_RATE');
+  if (settings.taxRate !== undefined && (settings.taxRate < 0 || settings.taxRate > GUILD_CONSTANTS.MAX_TAX_RATE)) {
+    throw new AppError(400, `Tax rate must be 0-${GUILD_CONSTANTS.MAX_TAX_RATE}%`, 'INVALID_TAX_RATE');
   }
   if (settings.description !== undefined && settings.description !== null && settings.description.length > GUILD_CONSTANTS.MAX_DESCRIPTION_LENGTH) {
     throw new AppError(400, `Description too long (max ${GUILD_CONSTANTS.MAX_DESCRIPTION_LENGTH})`, 'INVALID_DESCRIPTION');
   }
 
-  const data: any = {};
-  if (settings.recruitmentMode !== undefined) data.recruitmentMode = settings.recruitmentMode;
-  if (settings.minLevelRequirement !== undefined) data.minLevelRequirement = settings.minLevelRequirement;
-  if (settings.taxRate !== undefined) data.taxRate = settings.taxRate;
-  if (settings.description !== undefined) data.description = settings.description;
+  const data: Record<string, unknown> = {};
+  const changes: string[] = [];
+  if (settings.recruitmentMode !== undefined) {
+    data.recruitmentMode = settings.recruitmentMode;
+    changes.push(`recruitment → ${settings.recruitmentMode}`);
+  }
+  if (settings.minLevelRequirement !== undefined) {
+    data.minLevelRequirement = settings.minLevelRequirement;
+    changes.push(`min level → ${settings.minLevelRequirement}`);
+  }
+  if (settings.taxRate !== undefined) {
+    data.taxRate = settings.taxRate;
+    changes.push(`tax rate → ${settings.taxRate}%`);
+  }
+  if (settings.description !== undefined) {
+    data.description = settings.description;
+    changes.push('description updated');
+  }
+
+  if (Object.keys(data).length === 0) {
+    return getGuild(guildId);
+  }
 
   const updated = await prisma.guild.update({
     where: { id: guildId },
     data,
     include: { _count: { select: { members: true } } },
   });
+
+  await addGuildLog(guildId, 'settings_changed', `Settings updated: ${changes.join(', ')}`);
 
   return toGuildData(updated);
 }

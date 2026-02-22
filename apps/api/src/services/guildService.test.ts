@@ -246,8 +246,16 @@ describe('joinGuild', () => {
     await expect(joinGuild('p1', 'g1')).rejects.toThrow('Guild is full');
   });
 
-  it('rejects if level too low', async () => {
+  it('rejects if below global join level', async () => {
     mockPrisma.player.findUnique.mockResolvedValue({ id: 'p1', characterLevel: 5, username: 'X' });
+    mockPrisma.guildMember.findUnique.mockResolvedValue(null);
+
+    await expect(joinGuild('p1', 'g1'))
+      .rejects.toThrow(`Character level ${GUILD_CONSTANTS.JOIN_MIN_LEVEL} required to join a guild`);
+  });
+
+  it('rejects if below guild-specific level requirement', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ id: 'p1', characterLevel: 12, username: 'X' });
     mockPrisma.guildMember.findUnique.mockResolvedValue(null);
     mockPrisma.guild.findUnique.mockResolvedValue({
       id: 'g1', recruitmentMode: 'open', minLevelRequirement: 20,
@@ -409,7 +417,7 @@ describe('disbandGuild', () => {
     });
     mockPrisma.guild.delete.mockResolvedValue({});
 
-    await expect(disbandGuild('leader1')).resolves.toBeUndefined();
+    await expect(disbandGuild('leader1', 'g1')).resolves.toBeUndefined();
   });
 
   it('rejects if not leader', async () => {
@@ -417,7 +425,15 @@ describe('disbandGuild', () => {
       guildId: 'g1', playerId: 'p1', role: 'member', guild: { id: 'g1' },
     });
 
-    await expect(disbandGuild('p1')).rejects.toThrow('Only the leader');
+    await expect(disbandGuild('p1', 'g1')).rejects.toThrow('Only the leader');
+  });
+
+  it('rejects if guild ID does not match', async () => {
+    mockPrisma.guildMember.findUnique.mockResolvedValue({
+      guildId: 'g1', playerId: 'leader1', role: 'leader', guild: { id: 'g1' },
+    });
+
+    await expect(disbandGuild('leader1', 'g999')).rejects.toThrow('Not your guild');
   });
 });
 
@@ -449,7 +465,7 @@ describe('updateSettings', () => {
     });
 
     await expect(updateSettings('officer1', 'g1', { taxRate: 50 }))
-      .rejects.toThrow(`Tax rate cannot exceed ${GUILD_CONSTANTS.MAX_TAX_RATE}%`);
+      .rejects.toThrow(`Tax rate must be 0-${GUILD_CONSTANTS.MAX_TAX_RATE}%`);
   });
 });
 

@@ -91,7 +91,7 @@ guildRouter.patch('/:id', async (req, res, next) => {
 // DELETE /:id — disband guild
 guildRouter.delete('/:id', async (req, res, next) => {
   try {
-    await disbandGuild(req.player!.playerId);
+    await disbandGuild(req.player!.playerId, req.params.id);
     res.json({ success: true });
   } catch (err) { next(err); }
 });

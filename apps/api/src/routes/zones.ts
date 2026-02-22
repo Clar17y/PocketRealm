@@ -14,8 +14,8 @@ import {
 import type { Combatant, MobTemplate, SkillType } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
-import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
-import { applyGuildTax } from '../services/guildTaxService';
+import { spendPlayerTurns, spendPlayerTurnsTx, refundPlayerTurns } from '../services/turnBankService';
+import { applyGuildTaxTx } from '../services/guildTaxService';
 import { getHpState, enterRecoveringState, setHp } from '../services/hpService';
 import { getEquipmentStats } from '../services/equipmentService';
 import { getPlayerProgressionState } from '../services/attributesService';
@@ -250,9 +250,11 @@ zonesRouter.post('/travel', async (req, res, next) => {
     const isTownDeparture = currentZone.zoneType === 'town';
     const travelCost: number = isTownDeparture ? destinationZone.travelCost : currentZone.travelCost;
 
-    // 9. Spend turns (guild tax applied as side-effect)
-    await applyGuildTax(playerId, travelCost);
-    await spendPlayerTurns(playerId, travelCost);
+    // 9. Spend turns + guild tax atomically
+    await prisma.$transaction(async (tx) => {
+      await spendPlayerTurnsTx(tx, playerId, travelCost);
+      await applyGuildTaxTx(tx, playerId, travelCost);
+    });
 
     const events: TravelEvent[] = [];
 

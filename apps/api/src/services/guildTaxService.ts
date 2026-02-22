@@ -1,5 +1,4 @@
-import { prisma } from '@adventure/database';
-import { GUILD_CONSTANTS } from '@adventure/shared';
+import { Prisma, prisma } from '@adventure/database';
 import { calculateTreasuryCap } from './guildService';
 
 export interface TaxResult {
@@ -9,21 +8,27 @@ export interface TaxResult {
   guildId: string | null;
 }
 
+const NO_TAX = (turnAmount: number): TaxResult => ({
+  preTaxAmount: turnAmount, taxAmount: 0, postTaxAmount: turnAmount, guildId: null,
+});
+
 /**
- * Calculate and apply guild tax to a turn spend.
- * Tax goes to the guild treasury; returns post-tax amount.
+ * Apply guild tax within an existing Prisma transaction.
+ * Use this inside routes that already have a $transaction block
+ * to keep tax and turn-spend atomic.
  */
-export async function applyGuildTax(
+export async function applyGuildTaxTx(
+  tx: Prisma.TransactionClient,
   playerId: string,
   turnAmount: number,
 ): Promise<TaxResult> {
-  const membership = await prisma.guildMember.findUnique({
+  const membership = await tx.guildMember.findUnique({
     where: { playerId },
     include: { guild: { select: { id: true, taxRate: true, treasuryTurns: true, level: true } } },
   });
 
   if (!membership || membership.guild.taxRate === 0) {
-    return { preTaxAmount: turnAmount, taxAmount: 0, postTaxAmount: turnAmount, guildId: null };
+    return NO_TAX(turnAmount);
   }
 
   const taxRate = membership.guild.taxRate / 100;
@@ -35,20 +40,18 @@ export async function applyGuildTax(
     const actualTax = Math.min(taxAmount, cap - membership.guild.treasuryTurns);
 
     if (actualTax > 0) {
-      await prisma.$transaction([
-        prisma.guild.update({
-          where: { id: membership.guild.id },
-          data: { treasuryTurns: { increment: actualTax } },
-        }),
-        prisma.guildMember.update({
-          where: { guildId_playerId: { guildId: membership.guild.id, playerId } },
-          data: {
-            totalTurnsContributed: { increment: actualTax },
-            weeklyTurnsContributed: { increment: actualTax },
-            lastActiveAt: new Date(),
-          },
-        }),
-      ]);
+      await tx.guild.update({
+        where: { id: membership.guild.id },
+        data: { treasuryTurns: { increment: actualTax } },
+      });
+      await tx.guildMember.update({
+        where: { guildId_playerId: { guildId: membership.guild.id, playerId } },
+        data: {
+          totalTurnsContributed: { increment: actualTax },
+          weeklyTurnsContributed: { increment: actualTax },
+          lastActiveAt: new Date(),
+        },
+      });
     }
   }
 
@@ -58,4 +61,18 @@ export async function applyGuildTax(
     postTaxAmount,
     guildId: membership.guild.id,
   };
+}
+
+/**
+ * Standalone guild tax — wraps applyGuildTaxTx in its own transaction.
+ * Only use in routes that cannot use the Tx variant (e.g., where the
+ * turn spend is inside a service function that owns its own transaction).
+ */
+export async function applyGuildTax(
+  playerId: string,
+  turnAmount: number,
+): Promise<TaxResult> {
+  return prisma.$transaction(async (tx) => {
+    return applyGuildTaxTx(tx, playerId, turnAmount);
+  });
 }

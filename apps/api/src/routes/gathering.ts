@@ -5,7 +5,7 @@ import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, type Skil
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
-import { applyGuildTax } from '../services/guildTaxService';
+import { applyGuildTaxTx } from '../services/guildTaxService';
 import { addStackableItemTx } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { getHpState } from '../services/hpService';
@@ -308,9 +308,9 @@ gatheringRouter.post('/mine', async (req, res, next) => {
     const nodeDepleted = newCapacity <= 0;
 
     const resourceTemplateId = await getResourceTemplateId(template.resourceType);
-    await applyGuildTax(playerId, turnsSpent);
     const { turnSpend, stack } = await prisma.$transaction(async (tx) => {
       const spent = await spendPlayerTurnsTx(tx, playerId, turnsSpent);
+      await applyGuildTaxTx(tx, playerId, turnsSpent);
 
       if (nodeDepleted) {
         const depleted = await tx.playerResourceNode.deleteMany({
