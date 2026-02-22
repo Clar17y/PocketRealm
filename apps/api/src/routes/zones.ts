@@ -20,7 +20,7 @@ import { getEquipmentStats } from '../services/equipmentService';
 import { getPlayerProgressionState } from '../services/attributesService';
 import { grantSkillXp } from '../services/xpService';
 import { rollAndGrantLoot } from '../services/lootService';
-import { serializeXpGrant, toMobTemplate, recordBestiaryKill } from '../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, recordBestiaryKill, trackAchievements } from '../utils/routeHelpers.js';
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
@@ -32,8 +32,6 @@ import {
 } from '../services/zoneDiscoveryService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../services/combatStatsService';
 import { calculateExplorationPercent, getExplorationPercent } from '../services/zoneExplorationService';
-import { incrementStats } from '../services/statsService';
-import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 
 
 export const zonesRouter = Router();
@@ -465,17 +463,11 @@ zonesRouter.post('/travel', async (req, res, next) => {
               const koCounters: Record<string, number> = { totalDeaths: 1 };
               const netTurnsKo = ambush.turnOccurred;
               if (netTurnsKo > 0) koCounters.totalTurnsSpent = netTurnsKo;
-              await incrementStats(playerId, koCounters);
 
               const koAchievementKeys = ['totalDeaths', 'totalTurnsSpent'];
               if (ambushKillCount > 0) koAchievementKeys.push('totalKills', 'totalUniqueMonsterKills', 'totalBestiaryCompleted');
               if (discoveredZones.length > 0) koAchievementKeys.push('totalZonesDiscovered');
-              const koNewAch: Awaited<ReturnType<typeof checkAchievements>> = [];
-              for (const fid of ambushMobFamilyIds) {
-                koNewAch.push(...await checkAchievements(playerId, { familyId: fid }));
-              }
-              koNewAch.push(...await checkAchievements(playerId, { statKeys: koAchievementKeys }));
-              await emitAchievementNotifications(playerId, koNewAch);
+              await trackAchievements(playerId, koCounters, { statKeys: koAchievementKeys, familyIds: ambushMobFamilyIds });
 
               return res.json({
                 zone: { id: respawn.townId, name: respawn.townName, zoneType: 'town' },
@@ -550,21 +542,13 @@ zonesRouter.post('/travel', async (req, res, next) => {
               const fleeCounters: Record<string, number> = {};
               const netTurnsFlee = ambush.turnOccurred;
               if (netTurnsFlee > 0) fleeCounters.totalTurnsSpent = netTurnsFlee;
-              if (Object.keys(fleeCounters).length > 0) {
-                await incrementStats(playerId, fleeCounters);
-              }
 
               const fleeAchKeys: string[] = [];
               if (netTurnsFlee > 0) fleeAchKeys.push('totalTurnsSpent');
               if (ambushKillCount > 0) fleeAchKeys.push('totalKills', 'totalUniqueMonsterKills', 'totalBestiaryCompleted');
-              const fleeNewAch: Awaited<ReturnType<typeof checkAchievements>> = [];
-              for (const fid of ambushMobFamilyIds) {
-                fleeNewAch.push(...await checkAchievements(playerId, { familyId: fid }));
+              if (Object.keys(fleeCounters).length > 0 || fleeAchKeys.length > 0 || ambushMobFamilyIds.length > 0) {
+                await trackAchievements(playerId, fleeCounters, { statKeys: fleeAchKeys, familyIds: ambushMobFamilyIds });
               }
-              if (fleeAchKeys.length > 0) {
-                fleeNewAch.push(...await checkAchievements(playerId, { statKeys: fleeAchKeys }));
-              }
-              await emitAchievementNotifications(playerId, fleeNewAch);
 
               return res.json({
                 zone: { id: currentZoneId, name: currentZone.name, zoneType: currentZone.zoneType },
@@ -608,22 +592,14 @@ zonesRouter.post('/travel', async (req, res, next) => {
     // --- Achievement tracking (counters + derived checks) ---
     const travelCounters: Record<string, number> = {};
     if (travelCost > 0) travelCounters.totalTurnsSpent = travelCost;
-    if (Object.keys(travelCounters).length > 0) {
-      await incrementStats(playerId, travelCounters);
-    }
 
     const travelAchKeys: string[] = [];
     if (travelCost > 0) travelAchKeys.push('totalTurnsSpent');
     if (ambushKillCount > 0) travelAchKeys.push('totalKills', 'totalUniqueMonsterKills', 'totalBestiaryCompleted');
     if (newDiscoveries.length > 0) travelAchKeys.push('totalZonesDiscovered');
-    const travelNewAch: Awaited<ReturnType<typeof checkAchievements>> = [];
-    for (const fid of ambushMobFamilyIds) {
-      travelNewAch.push(...await checkAchievements(playerId, { familyId: fid }));
+    if (Object.keys(travelCounters).length > 0 || travelAchKeys.length > 0 || ambushMobFamilyIds.length > 0) {
+      await trackAchievements(playerId, travelCounters, { statKeys: travelAchKeys, familyIds: ambushMobFamilyIds });
     }
-    if (travelAchKeys.length > 0) {
-      travelNewAch.push(...await checkAchievements(playerId, { statKeys: travelAchKeys }));
-    }
-    await emitAchievementNotifications(playerId, travelNewAch);
 
     return res.json({
       zone: { id: destinationZone.id, name: destinationZone.name, zoneType: destinationZone.zoneType },

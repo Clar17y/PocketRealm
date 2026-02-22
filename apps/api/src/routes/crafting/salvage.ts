@@ -2,10 +2,8 @@ import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
 import { CRAFTING_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
-import { getOwnedItem } from '../../utils/routeHelpers.js';
+import { getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
-import { incrementStats } from '../../services/statsService';
-import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
 import { addStackableItemTx } from '../../services/inventoryService';
 import {
   getZoneCraftingLevel,
@@ -124,9 +122,7 @@ salvageRouter.post('/', async (req, res, next) => {
     });
 
     // --- Achievement stat tracking ---
-    await incrementStats(playerId, { totalSalvages: 1 });
-    const salvageAchievements = await checkAchievements(playerId, { statKeys: ['totalSalvages'] });
-    await emitAchievementNotifications(playerId, salvageAchievements);
+    await trackAchievements(playerId, { totalSalvages: 1 });
 
     const log = await prisma.activityLog.create({
       data: {

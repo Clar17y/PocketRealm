@@ -10,8 +10,7 @@ import {
   getPlayerProgressionState,
   normalizePlayerAttributes,
 } from '../services/attributesService';
-import { incrementStats } from '../services/statsService';
-import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
+import { trackAchievements } from '../utils/routeHelpers.js';
 
 import { prismaAny } from '../utils/prismaAny.js';
 
@@ -214,9 +213,7 @@ playerRouter.patch('/tutorial', async (req, res, next) => {
 
     // Grant achievement for completing the tutorial (not skipping)
     if (body.step === 9 && !isSkip) {
-      await incrementStats(playerId, { tutorialCompleted: 1 });
-      const newAchievements = await checkAchievements(playerId, { statKeys: ['tutorialCompleted'] });
-      await emitAchievementNotifications(playerId, newAchievements);
+      await trackAchievements(playerId, { tutorialCompleted: 1 });
     }
 
     res.json({ tutorialStep: body.step });

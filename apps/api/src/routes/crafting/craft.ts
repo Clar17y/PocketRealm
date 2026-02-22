@@ -14,11 +14,9 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
-import { incrementStats } from '../../services/statsService';
-import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
 import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from '../../services/inventoryService';
 import { grantSkillXp } from '../../services/xpService';
-import { serializeXpGrant, assertNotRecovering } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, assertNotRecovering, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
   isSkillType,
@@ -225,8 +223,6 @@ craftRouter.post('/', async (req, res, next) => {
         if (item.rarity === 'legendary') craftCounters.totalLegendariesCrafted = (craftCounters.totalLegendariesCrafted ?? 0) + 1;
       }
     }
-    await incrementStats(playerId, craftCounters);
-
     const craftAchKeys: string[] = [];
     if (isRealCraft) craftAchKeys.push('totalCrafts');
     if (craftCounters.totalRaresCrafted) craftAchKeys.push('totalRaresCrafted');
@@ -234,8 +230,7 @@ craftRouter.post('/', async (req, res, next) => {
     if (craftCounters.totalLegendariesCrafted) craftAchKeys.push('totalLegendariesCrafted');
     if (xpGrant.newLevel) craftAchKeys.push('highestSkillLevel');
     if (xpGrant.characterLevelAfter && xpGrant.characterLevelAfter > (xpGrant.characterLevelBefore ?? 0)) craftAchKeys.push('highestCharacterLevel');
-    const craftAchievements = await checkAchievements(playerId, { statKeys: craftAchKeys });
-    await emitAchievementNotifications(playerId, craftAchievements);
+    await trackAchievements(playerId, craftCounters, { statKeys: craftAchKeys });
 
     const log = await prisma.activityLog.create({
       data: {

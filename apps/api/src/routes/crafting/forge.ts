@@ -13,9 +13,7 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
-import { incrementStats } from '../../services/statsService';
-import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
-import { assertNotRecovering, getOwnedItem } from '../../utils/routeHelpers.js';
+import { assertNotRecovering, getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   isItemType,
   parseItemRarity,
@@ -88,9 +86,7 @@ forgeRouter.post('/upgrade', async (req, res, next) => {
     const success = roll < successChance;
 
     // --- Achievement stat tracking ---
-    await incrementStats(playerId, { totalForgeUpgrades: 1 });
-    const forgeAchievements = await checkAchievements(playerId, { statKeys: ['totalForgeUpgrades'] });
-    await emitAchievementNotifications(playerId, forgeAchievements);
+    await trackAchievements(playerId, { totalForgeUpgrades: 1 });
 
     const itemType = isItemType(item.template.itemType) ? item.template.itemType : null;
     if (!itemType) {

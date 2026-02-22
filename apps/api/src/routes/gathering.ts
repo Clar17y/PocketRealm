@@ -7,10 +7,8 @@ import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { addStackableItemTx } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
-import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering } from '../utils/routeHelpers.js';
+import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
-import { incrementStats } from '../services/statsService';
-import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
 import { applyResourceEventModifiers } from '@adventure/game-engine';
 
@@ -330,16 +328,13 @@ gatheringRouter.post('/mine', async (req, res, next) => {
     const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp);
 
     // --- Achievement tracking (counters + derived checks) ---
-    await incrementStats(playerId, {
-      totalGatheringActions: actions,
-      totalTurnsSpent: turnsSpent,
-    });
-
     const gatherAchKeys = ['totalGatheringActions'];
     if (xpGrant.newLevel) gatherAchKeys.push('highestSkillLevel');
     if (xpGrant.characterLevelAfter && xpGrant.characterLevelAfter > (xpGrant.characterLevelBefore ?? 0)) gatherAchKeys.push('highestCharacterLevel');
-    const gatherAchievements = await checkAchievements(playerId, { statKeys: gatherAchKeys });
-    await emitAchievementNotifications(playerId, gatherAchievements);
+    await trackAchievements(playerId, {
+      totalGatheringActions: actions,
+      totalTurnsSpent: turnsSpent,
+    }, { statKeys: gatherAchKeys });
 
     const log = await prisma.activityLog.create({
       data: {

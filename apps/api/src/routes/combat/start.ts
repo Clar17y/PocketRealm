@@ -41,8 +41,7 @@ import { buildPotionPool, deductConsumedPotions } from '../../services/potionSer
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
-import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill } from '../../utils/routeHelpers.js';
-import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
+import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
   startSchema,
@@ -332,9 +331,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     if (fleeResult.outcome === 'knockout') {
       await enterRecoveringState(playerId, hpState.maxHp);
       respawnedTo = await respawnToHomeTown(playerId);
-      await incrementStats(playerId, { totalDeaths: 1 });
-      const deathAchievements = await checkAchievements(playerId, { statKeys: ['totalDeaths'] });
-      await emitAchievementNotifications(playerId, deathAchievements);
+      await trackAchievements(playerId, { totalDeaths: 1 });
     } else {
       await setHp(playerId, fleeResult.remainingHp);
     }
@@ -379,20 +376,18 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
     // Resolve mob family
     const firstMobTemplateId = fightResults[0]?.mobTemplateId;
-    let mobFamilyIdForAchievement: string | undefined;
+    const familyIds: string[] = [];
     if (firstMobTemplateId) {
       const familyMember = await prismaAny.mobFamilyMember.findFirst({
         where: { mobTemplateId: firstMobTemplateId },
         select: { mobFamilyId: true },
       });
-      if (familyMember?.mobFamilyId) mobFamilyIdForAchievement = familyMember.mobFamilyId;
+      if (familyMember?.mobFamilyId) familyIds.push(familyMember.mobFamilyId);
     }
 
-    const newAchievements = await checkAchievements(playerId, { statKeys: achievementKeys, familyId: mobFamilyIdForAchievement });
-    await emitAchievementNotifications(playerId, newAchievements);
+    await trackAchievements(playerId, {}, { statKeys: achievementKeys, familyIds });
   } else {
-    const defeatAchievements = await checkAchievements(playerId, { statKeys: ['totalTurnsSpent'] });
-    await emitAchievementNotifications(playerId, defeatAchievements);
+    await trackAchievements(playerId, {}, { statKeys: ['totalTurnsSpent'] });
   }
 
   // --- Build aggregated rewards ---
@@ -697,9 +692,7 @@ export function registerStartRoutes(router: Router): void {
         if (fleeResult.outcome === 'knockout') {
           await enterRecoveringState(playerId, hpState.maxHp);
           respawnedTo = await respawnToHomeTown(playerId);
-          await incrementStats(playerId, { totalDeaths: 1 });
-          const deathAchievements = await checkAchievements(playerId, { statKeys: ['totalDeaths'] });
-          await emitAchievementNotifications(playerId, deathAchievements);
+          await trackAchievements(playerId, { totalDeaths: 1 });
         } else {
           await setHp(playerId, fleeResult.remainingHp);
         }
@@ -734,22 +727,20 @@ export function registerStartRoutes(router: Router): void {
       }
 
       if (combatResult.outcome === 'victory') {
-        let mobFamilyIdForAchievement: string | undefined;
+        const familyIds: string[] = [];
         const familyMember = await prismaAny.mobFamilyMember.findFirst({
           where: { mobTemplateId: prefixedMob.id },
           select: { mobFamilyId: true },
         });
-        if (familyMember?.mobFamilyId) mobFamilyIdForAchievement = familyMember.mobFamilyId;
+        if (familyMember?.mobFamilyId) familyIds.push(familyMember.mobFamilyId);
 
         const achievementKeys = ['totalKills', 'totalUniqueMonsterKills', 'totalTurnsSpent', 'totalBestiaryCompleted'];
         if (xpGrant?.newLevel) achievementKeys.push('highestSkillLevel');
         if (xpGrant?.characterLevelAfter && xpGrant.characterLevelAfter > (xpGrant.characterLevelBefore ?? 0)) achievementKeys.push('highestCharacterLevel');
 
-        const newAchievements = await checkAchievements(playerId, { statKeys: achievementKeys, familyId: mobFamilyIdForAchievement });
-        await emitAchievementNotifications(playerId, newAchievements);
+        await trackAchievements(playerId, {}, { statKeys: achievementKeys, familyIds });
       } else {
-        const defeatAchievements = await checkAchievements(playerId, { statKeys: ['totalTurnsSpent'] });
-        await emitAchievementNotifications(playerId, defeatAchievements);
+        await trackAchievements(playerId, {}, { statKeys: ['totalTurnsSpent'] });
       }
 
       const combatLog = await prisma.activityLog.create({

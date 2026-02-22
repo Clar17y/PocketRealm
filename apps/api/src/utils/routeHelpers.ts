@@ -82,10 +82,12 @@ export async function trackAchievements(
 ): Promise<void> {
   await incrementStats(playerId, counters);
   const statKeys = opts?.statKeys ?? Object.keys(counters);
-  const achievements = await checkAchievements(playerId, {
-    statKeys,
-    ...(opts?.familyIds ? { familyIds: opts.familyIds } : {}),
-  });
+  const achievements = await checkAchievements(playerId, { statKeys });
+  if (opts?.familyIds) {
+    for (const familyId of opts.familyIds) {
+      achievements.push(...await checkAchievements(playerId, { familyId }));
+    }
+  }
   if (achievements.length > 0) {
     await emitAchievementNotifications(playerId, achievements);
   }

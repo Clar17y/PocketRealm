@@ -28,7 +28,7 @@ import { enterRecoveringState, setHp } from '../../services/hpService';
 import { rollAndGrantLoot } from '../../services/lootService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements } from '../../utils/routeHelpers.js';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
@@ -37,13 +37,10 @@ import { getActiveZoneModifiers, spawnWorldEvent } from '../../services/worldEve
 import { createBossEncounter } from '../../services/bossEncounterService';
 import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { getIo } from '../../socket';
-import { emitAchievementNotifications } from '../../services/achievementService';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
 import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
-import { incrementStats } from '../../services/statsService';
-import { checkAchievements } from '../../services/achievementService';
 import {
   startSchema,
   pickWeighted,
@@ -730,12 +727,9 @@ startRouter.post('/start', async (req, res, next) => {
     });
 
     // --- Achievement tracking (counter-only + derived checks) ---
-    if (spentTurns > 0) {
-      await incrementStats(playerId, { totalTurnsSpent: spentTurns });
-    }
-    if (wasKnockedOut) {
-      await incrementStats(playerId, { totalDeaths: 1 });
-    }
+    const explorationCounters: Record<string, number> = {};
+    if (spentTurns > 0) explorationCounters.totalTurnsSpent = spentTurns;
+    if (wasKnockedOut) explorationCounters.totalDeaths = 1;
 
     // Build family IDs from ambush victories for family achievement checks
     const mobTemplateToFamilyId = new Map<string, string>();
@@ -744,7 +738,7 @@ startRouter.post('/start', async (req, res, next) => {
         mobTemplateToFamilyId.set(member.mobTemplate.id, zf.mobFamilyId);
       }
     }
-    const familyIds = new Set<string>();
+    const familyIdSet = new Set<string>();
     let ambushKillCount = 0;
     for (const ev of events) {
       if (ev.type === 'ambush_victory') {
@@ -752,7 +746,7 @@ startRouter.post('/start', async (req, res, next) => {
         const mobTemplateId = (ev.details as Record<string, unknown>)?.mobTemplateId as string | undefined;
         if (mobTemplateId) {
           const familyId = mobTemplateToFamilyId.get(mobTemplateId);
-          if (familyId) familyIds.add(familyId);
+          if (familyId) familyIdSet.add(familyId);
         }
       }
     }
@@ -763,16 +757,10 @@ startRouter.post('/start', async (req, res, next) => {
     if (zoneJustFullyExplored) explorationAchievementKeys.push('totalZonesFullyExplored');
     if (wasKnockedOut) explorationAchievementKeys.push('totalDeaths');
 
-    const newAchievements: Awaited<ReturnType<typeof checkAchievements>> = [];
-    if (explorationAchievementKeys.length > 0) {
-      const statAchievements = await checkAchievements(playerId, { statKeys: explorationAchievementKeys });
-      newAchievements.push(...statAchievements);
-    }
-    for (const familyId of familyIds) {
-      const familyAchievements = await checkAchievements(playerId, { familyId });
-      newAchievements.push(...familyAchievements);
-    }
-    await emitAchievementNotifications(playerId, newAchievements);
+    await trackAchievements(playerId, explorationCounters, {
+      statKeys: explorationAchievementKeys,
+      familyIds: [...familyIdSet],
+    });
 
     if (events.length === 0) {
       events.push({
