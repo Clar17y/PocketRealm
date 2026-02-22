@@ -7,6 +7,7 @@ import { getOwnedItem } from '../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { DURABILITY_CONSTANTS } from '@adventure/shared';
 import { useConsumable } from '../services/consumableService';
+import { repairAllEquipped } from '../services/repairService';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const inventoryRouter = Router();
@@ -152,6 +153,18 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
     };
   });
 
+  res.json(result);
+}));
+
+/**
+ * POST /api/v1/inventory/repair-equipped
+ * Batch-repair all equipped items that have durability below max.
+ */
+inventoryRouter.post('/repair-equipped', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const result = await prisma.$transaction(async (tx) => {
+    return repairAllEquipped(tx, playerId);
+  });
   res.json(result);
 }));
 
