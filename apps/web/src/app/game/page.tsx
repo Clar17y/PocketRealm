@@ -281,6 +281,7 @@ export default function GamePage() {
     handleSetQuickRestHealPercent,
     defaultRefiningMax,
     handleSetDefaultRefiningMax,
+    lowHpWarning,
     handleQuickRest,
     zoneCraftingLevel,
     zoneCraftingName,
@@ -427,6 +428,7 @@ export default function GamePage() {
             explorationSpeedMs={explorationSpeedMs}
             defaultTurns={defaultExploreTurns}
             tutorialLocked={tutorialStep === TUTORIAL_STEP_EXPLORE}
+            lowHpWarning={lowHpWarning}
           />
         );
       case 'inventory':
