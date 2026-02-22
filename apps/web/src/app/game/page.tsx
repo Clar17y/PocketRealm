@@ -834,6 +834,7 @@ export default function GamePage() {
               : null
             }
             roomTransition={roomTransition}
+            lowHpWarning={lowHpWarning}
           />
         );
       }

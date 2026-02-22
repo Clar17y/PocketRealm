@@ -11,7 +11,7 @@ import { BossHistory } from '@/components/screens/BossHistory';
 import { Pagination } from '@/components/common/Pagination';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { monsterImageSrc } from '@/lib/assets';
-import { getMobPrefixDefinition } from '@adventure/shared';
+import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../useGameController';
 
 interface CombatScreenProps {
@@ -61,6 +61,7 @@ interface CombatScreenProps {
   onCombatPlaybackComplete?: () => void;
   fightProgress?: { current: number; total: number; room?: number } | null;
   roomTransition?: { entering: number } | null;
+  lowHpWarning?: boolean;
 }
 
 export function CombatScreen({
@@ -91,12 +92,31 @@ export function CombatScreen({
   onCombatPlaybackComplete,
   fightProgress,
   roomTransition,
+  lowHpWarning,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [strategyModalSite, setStrategyModalSite] = useState<PendingEncounter | null>(null);
+  const [lowHpPendingSite, setLowHpPendingSite] = useState<PendingEncounter | null>(null);
 
   const handleFightClick = (site: PendingEncounter) => {
+    if (
+      lowHpWarning &&
+      hpState.maxHp > 0 &&
+      (hpState.currentHp / hpState.maxHp) < HP_CONSTANTS.LOW_HP_WARNING_THRESHOLD
+    ) {
+      setLowHpPendingSite(site);
+      return;
+    }
+    if (!site.clearStrategy) {
+      setStrategyModalSite(site);
+    } else {
+      void onStartCombat(site.encounterSiteId);
+    }
+  };
+
+  const proceedWithFight = (site: PendingEncounter) => {
+    setLowHpPendingSite(null);
     if (!site.clearStrategy) {
       setStrategyModalSite(site);
     } else {
@@ -196,6 +216,32 @@ export function CombatScreen({
               <button
                 className="text-[var(--rpg-light-dim,#a0a0b0)] text-sm mt-1 hover:text-white"
                 onClick={() => setStrategyModalSite(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Low HP Warning Dialog */}
+      {lowHpPendingSite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-[var(--rpg-bg-dark,#1a1a2e)] border border-[var(--rpg-gold,#c8a84e)] rounded-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-[var(--rpg-gold,#c8a84e)] font-bold text-lg mb-1">Low HP Warning</h3>
+            <p className="text-[var(--rpg-light-dim,#a0a0b0)] text-sm mb-4">
+              Your health is low ({Math.floor(hpState.currentHp)} / {hpState.maxHp} HP). Exploring or fighting in this state is risky.
+            </p>
+            <div className="flex gap-3">
+              <button
+                className="flex-1 bg-[var(--rpg-gold)] hover:bg-[#e4b85b] text-[var(--rpg-background)] rounded-lg font-semibold py-2 transition-all"
+                onClick={() => proceedWithFight(lowHpPendingSite)}
+              >
+                Proceed Anyway
+              </button>
+              <button
+                className="flex-1 bg-[var(--rpg-surface)] hover:bg-[var(--rpg-border)] text-[var(--rpg-text-primary)] border border-[var(--rpg-border)] rounded-lg font-semibold py-2 transition-all"
+                onClick={() => setLowHpPendingSite(null)}
               >
                 Cancel
               </button>
