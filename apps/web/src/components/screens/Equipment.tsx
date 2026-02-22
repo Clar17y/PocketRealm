@@ -45,6 +45,9 @@ interface EquipmentProps {
   }>;
   onEquip?: (itemId: string, slot: string) => void | Promise<void>;
   onUnequip?: (slot: string) => void | Promise<void>;
+  onRepairItem?: (itemId: string) => void | Promise<void>;
+  onRepairAll?: () => void | Promise<void>;
+  turns?: number;
   stats: {
     attack: number;
     defence: number;
@@ -74,7 +77,7 @@ function prettySlot(slot: string) {
   return titleCaseFromSnake(slot);
 }
 
-export function Equipment({ slots, inventoryItems, onEquip, onUnequip, stats }: EquipmentProps) {
+export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairItem, onRepairAll, turns, stats }: EquipmentProps) {
   const slotPositions: Record<string, { gridColumn: string; gridRow: string; label: string }> = {
     head: { gridColumn: '2', gridRow: '1', label: 'Head' },
     neck: { gridColumn: '2', gridRow: '2', label: 'Neck' },
@@ -92,6 +95,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, stats }: 
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRepairAll, setShowRepairAll] = useState(false);
 
   const activeSlot = activeSlotId ? slots.find((s) => s.id === activeSlotId) ?? null : null;
   const currentItem = activeSlot?.item ?? null;
@@ -103,6 +107,21 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, stats }: 
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [inventoryItems, activeSlotId]);
+
+  const repairableItems = useMemo(() => {
+    return slots
+      .filter((s) => s.item && s.item.durability < s.item.maxDurability)
+      .map((s) => {
+        const item = s.item!;
+        const turnCost = item.durability <= 0 ? 150 : 100;
+        return { slotId: s.id, slotName: s.name, item, turnCost };
+      });
+  }, [slots]);
+
+  const totalRepairCost = useMemo(
+    () => repairableItems.reduce((sum, r) => sum + r.turnCost, 0),
+    [repairableItems]
+  );
 
   const closeModal = () => {
     setActiveSlotId(null);
@@ -494,6 +513,96 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, stats }: 
         </div>
       </PixelCard>
 
+      {/* Repair All */}
+      {onRepairAll && repairableItems.length > 0 && (
+        <PixelButton
+          variant="primary"
+          className="w-full"
+          disabled={busy || (turns !== undefined && turns < totalRepairCost)}
+          onClick={() => setShowRepairAll(true)}
+        >
+          Repair All ({totalRepairCost} turns)
+        </PixelButton>
+      )}
+
+      {/* Repair All Confirmation */}
+      {showRepairAll && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+          onClick={() => setShowRepairAll(false)}
+        >
+          <PixelCard className="max-w-sm w-full" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">Repair All Equipment</h3>
+              <button
+                onClick={() => setShowRepairAll(false)}
+                className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+              {repairableItems.map((r) => (
+                <div key={r.slotId} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    {r.item.imageSrc ? (
+                      <img src={r.item.imageSrc} alt={r.item.name} className="w-6 h-6 object-contain image-rendering-pixelated" />
+                    ) : (
+                      <span className="text-sm">{r.item.icon ?? '?'}</span>
+                    )}
+                    <span className="text-[var(--rpg-text-primary)]">{r.item.name}</span>
+                    {r.item.durability <= 0 && (
+                      <span className="text-[8px] font-bold text-[var(--rpg-red)] bg-[var(--rpg-red)]/10 px-1 rounded">BROKEN</span>
+                    )}
+                  </div>
+                  <span className="font-mono text-[var(--rpg-text-secondary)]">{r.turnCost}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-[var(--rpg-border)] pt-3 mb-3">
+              <div className="flex justify-between text-sm font-bold">
+                <span className="text-[var(--rpg-text-primary)]">Total Cost</span>
+                <span className="font-mono text-[var(--rpg-gold)]">{totalRepairCost} turns</span>
+              </div>
+            </div>
+
+            <div className="text-xs text-[var(--rpg-text-secondary)] mb-4">
+              Max durability will decrease slightly for each repaired item.
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <PixelButton
+                variant="secondary"
+                onClick={() => setShowRepairAll(false)}
+                disabled={busy}
+              >
+                Cancel
+              </PixelButton>
+              <PixelButton
+                variant="primary"
+                disabled={busy || (turns !== undefined && turns < totalRepairCost)}
+                onClick={async () => {
+                  if (!onRepairAll) return;
+                  setBusy(true);
+                  try {
+                    await onRepairAll();
+                    setShowRepairAll(false);
+                  } catch {
+                    setError('Failed to repair equipment.');
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Confirm
+              </PixelButton>
+            </div>
+          </PixelCard>
+        </div>
+      )}
+
       {/* Stats Panel */}
       <PixelCard>
         <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-4">Total Stats</h3>
@@ -610,7 +719,29 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, stats }: 
                         <span className="ml-1.5 text-[10px] font-bold text-[var(--rpg-red)] bg-[var(--rpg-red)]/10 px-1 py-0.5 rounded">BROKEN</span>
                       )}
                     </span>
-                    <span className="text-xs text-[var(--rpg-text-secondary)] capitalize">{slot.name}</span>
+                    <div className="flex items-center gap-2">
+                      {onRepairItem && slot.item && slot.item.durability < slot.item.maxDurability && (
+                        <PixelButton
+                          variant="secondary"
+                          size="sm"
+                          disabled={busy || (turns !== undefined && turns < (slot.item.durability <= 0 ? 150 : 100))}
+                          onClick={async () => {
+                            if (!slot.item) return;
+                            setBusy(true);
+                            try {
+                              await onRepairItem(slot.item.id);
+                            } catch {
+                              setError('Failed to repair item.');
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Repair ({slot.item.durability <= 0 ? '150' : '100'})
+                        </PixelButton>
+                      )}
+                      <span className="text-xs text-[var(--rpg-text-secondary)] capitalize">{slot.name}</span>
+                    </div>
                   </div>
                   {slot.item && (
                     <>
