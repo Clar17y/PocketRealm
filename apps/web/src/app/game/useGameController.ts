@@ -58,6 +58,7 @@ import {
   type WorldEventResponse,
 } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
+import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 
 export type Screen =
   | 'home'
@@ -845,19 +846,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (entries.length > 0) pushLog(...entries);
   };
 
-  const PERCENT_STATS = new Set(['critChance', 'critDamage']);
-  const formatStatName = (stat: string) => {
-    if (stat === 'magicDefence') return 'Magic Defence';
-    if (stat === 'critChance') return 'Crit Chance';
-    if (stat === 'critDamage') return 'Crit Damage';
-    return stat
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, (char) => char.toUpperCase())
-      .trim();
-  };
-  const formatStatValue = (stat: string, value: number) =>
-    PERCENT_STATS.has(stat) ? `${Math.round(value * 100)}%` : String(value);
-
   const currentZone =
     zones.find((z) => z.id === activeZoneId) ??
     zones.find((z) => z.discovered) ??
@@ -1315,7 +1303,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           newLogs.push({
             timestamp,
             type: 'success',
-            message: `Critical${rarityLabel} craft! +${formatStatValue(stat, value)} ${formatStatName(stat)}.`,
+            message: `Critical${rarityLabel} craft! +${formatStatValue(stat, value)} ${prettyStatName(stat)}.`,
           });
         }
       }

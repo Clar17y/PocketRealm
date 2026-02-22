@@ -7,6 +7,7 @@ import { StatBar } from '@/components/StatBar';
 import { Crosshair, Heart, Shield, Sparkles, Sword, X, Zap } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
+import { numStat, formatSignedStatValue, signedClass, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
 
 interface EquippedItem {
   id: string;
@@ -56,10 +57,6 @@ interface EquipmentProps {
   };
 }
 
-function numStat(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
 function statValue(stats: Record<string, unknown> | undefined, key: string): number {
   const v = stats ? numStat((stats as any)[key]) : null;
   return typeof v === 'number' ? v : 0;
@@ -73,42 +70,8 @@ function totalStatValue(
   return statValue(baseStats, key) + statValue(bonusStats ?? undefined, key);
 }
 
-const PERCENT_STATS = new Set(['critChance', 'critDamage']);
-
-function prettyStatName(stat: string): string {
-  if (stat === 'magicDefence') return 'Magic Defence';
-  if (stat === 'critChance') return 'Crit Chance';
-  if (stat === 'critDamage') return 'Crit Damage';
-  return stat
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (char) => char.toUpperCase())
-    .trim();
-}
-
-function formatStatValue(stat: string, value: number): string {
-  if (PERCENT_STATS.has(stat)) return `${Math.round(value * 100)}%`;
-  return String(value);
-}
-
-function formatSignedStatValue(stat: string, value: number): string {
-  const formatted = formatStatValue(stat, Math.abs(value));
-  if (value > 0) return `+${formatted}`;
-  if (value < 0) return `-${formatted}`;
-  return formatted;
-}
-
-function signedClass(value: number, positiveClass: string): string {
-  if (value < 0) return 'text-[var(--rpg-red)]';
-  return positiveClass;
-}
-
 function prettySlot(slot: string) {
   return titleCaseFromSnake(slot);
-}
-
-function prettyWeightClass(weightClass?: 'heavy' | 'medium' | 'light' | null): string | null {
-  if (!weightClass) return null;
-  return `${weightClass[0].toUpperCase()}${weightClass.slice(1)} Armor`;
 }
 
 export function Equipment({ slots, inventoryItems, onEquip, onUnequip, stats }: EquipmentProps) {

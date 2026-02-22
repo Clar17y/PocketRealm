@@ -8,6 +8,7 @@ import { Hammer, Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } 
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
+import { STAT_ORDER, prettyStatName, formatStatValue } from '@/lib/statFormat';
 
 interface Material {
   name: string;
@@ -46,25 +47,6 @@ interface CraftingProps {
   zoneCraftingLevel: number | null;
   zoneName: string | null;
   defaultMaxQuantity?: boolean;
-}
-
-const PERCENT_STATS = new Set(['critChance', 'critDamage']);
-const STAT_ORDER = ['attack', 'armor', 'magicDefence', 'health', 'dodge', 'accuracy', 'magicPower', 'luck', 'evasion', 'critChance', 'critDamage'];
-
-function prettyStatName(stat: string): string {
-  if (stat === 'magicDefence') return 'Magic Defence';
-  if (stat === 'critChance') return 'Crit Chance';
-  if (stat === 'critDamage') return 'Crit Damage';
-  if (stat === 'magicPower') return 'Magic Power';
-  return stat
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (char) => char.toUpperCase())
-    .trim();
-}
-
-function formatStatValue(stat: string, value: number): string {
-  if (PERCENT_STATS.has(stat)) return `${Math.round(value * 100)}%`;
-  return String(value);
 }
 
 function statEntries(stats: Record<string, unknown> | undefined): Array<[string, number]> {
