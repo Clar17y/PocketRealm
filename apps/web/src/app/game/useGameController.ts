@@ -448,6 +448,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     rewards: LastCombat['rewards'];
   }> | null>(null);
   const [combatPlaybackIndex, setCombatPlaybackIndex] = useState(0);
+  const [roomTransition, setRoomTransition] = useState<{ entering: number } | null>(null);
   const pendingCombatRewardsRef = useRef<LastCombat['rewards'] | null>(null);
   const siteJustClearedRef = useRef(false);
   const arrivedInTownRef = useRef(false);
@@ -1141,6 +1142,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const handleCombatPlaybackComplete = () => {
     if (combatPlaybackQueue && combatPlaybackIndex < combatPlaybackQueue.length - 1) {
+      const currentFight = combatPlaybackQueue[combatPlaybackIndex];
+      const nextFight = combatPlaybackQueue[combatPlaybackIndex + 1];
+
+      // Room transition: show interstitial briefly before advancing
+      if (currentFight?.room && nextFight?.room && currentFight.room !== nextFight.room) {
+        setRoomTransition({ entering: nextFight.room });
+        setTimeout(() => {
+          setRoomTransition(null);
+          setCombatPlaybackIndex(combatPlaybackIndex + 1);
+        }, 1500);
+        return;
+      }
+
       // More fights in the queue — advance to next
       setCombatPlaybackIndex(combatPlaybackIndex + 1);
       return;
@@ -1749,6 +1763,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     combatPlaybackData,
     combatPlaybackQueue,
     combatPlaybackIndex,
+    roomTransition,
     explorationPlaybackData,
     travelPlaybackData,
 
