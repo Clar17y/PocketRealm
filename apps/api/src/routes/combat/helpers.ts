@@ -7,7 +7,8 @@ import { grantSkillXp } from '../../services/xpService';
 import type { LootDropWithName } from '../../services/lootService';
 import { paginationSchema } from '../../utils/routeHelpers.js';
 
-export { prismaAny } from '../../utils/prismaAny.js';
+import { prismaAny } from '../../utils/prismaAny.js';
+export { prismaAny };
 
 export const attackSkillSchema = z.enum(['melee', 'ranged', 'magic']);
 

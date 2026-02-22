@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { asyncHandler } from '../../utils/asyncHandler';
 import { Prisma, prisma } from '@adventure/database';
 import {
   applyMobEventModifiers,
@@ -26,10 +27,9 @@ import type { LootDropWithName } from '../../services/lootService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { setHp, enterRecoveringState } from '../../services/hpService';
+import { setHp } from '../../services/hpService';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
-import { respawnToHomeTown } from '../../services/zoneDiscoveryService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
 import { getActiveZoneModifiers, getActiveEventSummaries } from '../../services/worldEventService';
 import {
@@ -41,7 +41,7 @@ import { buildPotionPool, deductConsumedPotions } from '../../services/potionSer
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
-import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
   startSchema,
@@ -321,20 +321,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   let respawnedTo: { townId: string; townName: string } | null = null;
 
   if (lastFight && lastFight.outcome === 'defeat') {
-    fleeResult = calculateFleeResult({
+    const defeatResult = await handleCombatDefeat(playerId, {
       evasionLevel: progression.attributes.evasion,
       mobLevel: lastPrefixedMob!.level,
       maxHp: hpState.maxHp,
-      currentGold: 0,
     });
-
-    if (fleeResult.outcome === 'knockout') {
-      await enterRecoveringState(playerId, hpState.maxHp);
-      respawnedTo = await respawnToHomeTown(playerId);
-      await trackAchievements(playerId, { totalDeaths: 1 });
-    } else {
-      await setHp(playerId, fleeResult.remainingHp);
-    }
+    fleeResult = defeatResult.fleeResult;
+    respawnedTo = defeatResult.respawnedTo;
 
     // Defeat in room: downgrade full_clear or reset room
     const siteForReset = await prismaAny.encounterSite.findFirst({ where: { id: encounterSiteId, playerId } });
@@ -526,8 +519,7 @@ export function registerStartRoutes(router: Router): void {
    * POST /api/v1/combat/start
    * Spend turns and run combat. Encounter sites fight all mobs in the current room.
    */
-  router.post('/start', async (req, res, next) => {
-    try {
+  router.post('/start', asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
       const body = startSchema.parse(req.body);
 
@@ -682,20 +674,13 @@ export function registerStartRoutes(router: Router): void {
         loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
         xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded);
       } else if (combatResult.outcome === 'defeat') {
-        fleeResult = calculateFleeResult({
+        const defeatResult = await handleCombatDefeat(playerId, {
           evasionLevel: progression.attributes.evasion,
           mobLevel: prefixedMob.level,
           maxHp: hpState.maxHp,
-          currentGold: 0,
         });
-
-        if (fleeResult.outcome === 'knockout') {
-          await enterRecoveringState(playerId, hpState.maxHp);
-          respawnedTo = await respawnToHomeTown(playerId);
-          await trackAchievements(playerId, { totalDeaths: 1 });
-        } else {
-          await setHp(playerId, fleeResult.remainingHp);
-        }
+        fleeResult = defeatResult.fleeResult;
+        respawnedTo = defeatResult.respawnedTo;
       }
 
       // Persisted mob HP
@@ -707,6 +692,8 @@ export function registerStartRoutes(router: Router): void {
 
       const lootWithNames = await enrichLootWithNames(loot);
 
+      // Zone combat: upsert bestiary on ALL outcomes (kills:0 on defeat, increment on victory).
+      // Differs from recordBestiaryKill which always increments — intentionally not consolidated.
       const bestiaryEntry = await prisma.playerBestiary.upsert({
         where: { playerId_mobTemplateId: { playerId, mobTemplateId: prefixedMob.id } },
         create: { playerId, mobTemplateId: prefixedMob.id, kills: combatResult.outcome === 'victory' ? 1 : 0 },
@@ -823,8 +810,5 @@ export function registerStartRoutes(router: Router): void {
         },
         activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
       });
-    } catch (err) {
-      next(err);
-    }
-  });
+  }));
 }
