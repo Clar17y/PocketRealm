@@ -228,6 +228,8 @@ export async function applyEncounterSiteDecayAndPersist(
 }
 
 export interface FightResult {
+  room: number;
+  slot: number;
   mobName: string;
   mobDisplayName: string;
   mobTemplateId: string;
