@@ -810,14 +810,16 @@ model GuildProjectContribution {
 }
 
 model GuildContract {
-  id            String   @id @default(uuid())
-  guildId       String   @map("guild_id")
-  contractKey   String   @map("contract_key") @db.VarChar(64)
-  targetValue   Int      @map("target_value")
-  currentValue  Int      @default(0) @map("current_value")
-  status        String   @default("active") @db.VarChar(16)
-  weekStartedAt DateTime @map("week_started_at")
-  expiresAt     DateTime @map("expires_at")
+  id                  String   @id @default(uuid())
+  guildId             String   @map("guild_id")
+  contractKey         String   @map("contract_key") @db.VarChar(64)
+  targetValue         Int      @map("target_value")
+  currentValue        Int      @default(0) @map("current_value")
+  status              String   @default("active") @db.VarChar(16)
+  rewardGuildXp       Int      @default(0) @map("reward_guild_xp")
+  rewardTreasuryTurns Int      @default(0) @map("reward_treasury_turns")
+  weekStartedAt       DateTime @map("week_started_at")
+  expiresAt           DateTime @map("expires_at")
 
   guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
 

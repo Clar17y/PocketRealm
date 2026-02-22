@@ -8,6 +8,7 @@ import {
   updateSettings, getGuildLog,
 } from '../services/guildService';
 import { activateUpgrade, getActiveUpgrades, getAvailableUpgrades } from '../services/guildUpgradeService';
+import { getActiveContracts } from '../services/guildContractService';
 
 export const guildRouter = Router();
 guildRouter.use(authenticate);
@@ -202,5 +203,15 @@ guildRouter.get('/:id/upgrades', async (req, res, next) => {
       getAvailableUpgrades(req.params.id),
     ]);
     res.json({ active, available });
+  } catch (err) { next(err); }
+});
+
+// --- Contracts ---
+
+// GET /:id/contracts
+guildRouter.get('/:id/contracts', async (req, res, next) => {
+  try {
+    const contracts = await getActiveContracts(req.params.id);
+    res.json({ contracts });
   } catch (err) { next(err); }
 });

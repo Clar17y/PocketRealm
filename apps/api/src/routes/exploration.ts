@@ -30,6 +30,8 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurns, spendPlayerTurnsTx } from '../services/turnBankService';
 import { applyGuildTaxTx } from '../services/guildTaxService';
+import { getPlayerGuildId } from '../services/guildService';
+import { incrementContractProgress } from '../services/guildContractService';
 import { enterRecoveringState, getHpState, setHp } from '../services/hpService';
 import { rollAndGrantLoot } from '../services/lootService';
 import { grantSkillXp } from '../services/xpService';
@@ -1066,6 +1068,12 @@ explorationRouter.post('/start', async (req, res, next) => {
         encounterSites: createdEncounterSites,
       };
     });
+
+    // Guild contract progress for exploration turns
+    if (spentTurns > 0) {
+      const guildId = await getPlayerGuildId(playerId);
+      if (guildId) void incrementContractProgress(guildId, 'exploration_turns', spentTurns);
+    }
 
     // --- Achievement tracking (counter-only + derived checks) ---
     if (spentTurns > 0) {

@@ -49,6 +49,7 @@ import { checkAchievements, emitAchievementNotifications } from '../services/ach
 import { addGuildXp, getPlayerGuildId } from '../services/guildService';
 import { applyGuildTaxTx } from '../services/guildTaxService';
 import { getPlayerGuildModifiers, type PlayerGuildModifiers } from '../services/guildUpgradeService';
+import { incrementContractProgress } from '../services/guildContractService';
 
 export const combatRouter = Router();
 
@@ -751,9 +752,12 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         });
       }
 
-      // Guild XP for mob kill
+      // Guild XP + contract progress for mob kill
       const guildId = await getPlayerGuildId(playerId);
-      if (guildId) await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
+      if (guildId) {
+        await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
+        void incrementContractProgress(guildId, 'kill_count', 1);
+      }
     }
 
     fightResults.push({
@@ -1270,9 +1274,12 @@ combatRouter.post('/start', async (req, res, next) => {
       loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
       xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded);
 
-      // Guild XP for mob kill
+      // Guild XP + contract progress for mob kill
       const guildId = await getPlayerGuildId(playerId);
-      if (guildId) await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
+      if (guildId) {
+        await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
+        void incrementContractProgress(guildId, 'kill_count', 1);
+      }
     } else if (combatResult.outcome === 'defeat') {
       fleeResult = calculateFleeResult({
         evasionLevel: progression.attributes.evasion,

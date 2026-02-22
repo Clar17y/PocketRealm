@@ -37,6 +37,7 @@ import { getHpState } from '../services/hpService';
 import { addGuildXp, getPlayerGuildId } from '../services/guildService';
 import { applyGuildTaxTx } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
+import { incrementContractProgress } from '../services/guildContractService';
 import { GUILD_CONSTANTS } from '@adventure/shared';
 
 export const craftingRouter = Router();
@@ -548,9 +549,17 @@ craftingRouter.post('/craft', async (req, res, next) => {
 
     const xpGrant = await grantSkillXp(playerId, recipe.skillType, recipe.xpReward * quantity);
 
-    // Guild XP for crafting
+    // Guild XP + contract progress for crafting
     const guildId = await getPlayerGuildId(playerId);
-    if (guildId) await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_CRAFT * quantity);
+    if (guildId) {
+      await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_CRAFT * quantity);
+      void incrementContractProgress(guildId, 'craft_items', quantity);
+      // Count rare+ items for craft_rare contract
+      const rareCount = craftedItemDetails.filter(
+        (d) => d.rarity === 'rare' || d.rarity === 'epic' || d.rarity === 'legendary',
+      ).length;
+      if (rareCount > 0) void incrementContractProgress(guildId, 'craft_rare', rareCount);
+    }
 
     // --- Achievement tracking (counters + derived checks) ---
     const isRealCraft = recipe.resultTemplate.itemType !== 'resource';

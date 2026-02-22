@@ -7,6 +7,8 @@ import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { applyGuildTaxTx } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
+import { incrementContractProgress } from '../services/guildContractService';
+import { getPlayerGuildId } from '../services/guildService';
 import { addStackableItemTx } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { getHpState } from '../services/hpService';
@@ -354,6 +356,10 @@ gatheringRouter.post('/mine', async (req, res, next) => {
     // XP: 5 XP per action
     const rawXp = actions * 5;
     const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp);
+
+    // Guild contract progress for gathering
+    const guildId = await getPlayerGuildId(playerId);
+    if (guildId) void incrementContractProgress(guildId, 'gather_actions', actions);
 
     // --- Achievement tracking (counters + derived checks) ---
     await incrementStats(playerId, {
