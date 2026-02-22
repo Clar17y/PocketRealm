@@ -34,10 +34,9 @@ export class ApiHelper {
     return this.ctx;
   }
 
-  private authHeaders() {
-    return this.tokens
-      ? { Authorization: `Bearer ${this.tokens.accessToken}` }
-      : {};
+  private authHeaders(): Record<string, string> {
+    if (!this.tokens) return {};
+    return { Authorization: `Bearer ${this.tokens.accessToken}` };
   }
 
   async register(username: string, email: string, password: string): Promise<AuthTokens> {
