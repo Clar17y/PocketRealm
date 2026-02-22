@@ -104,7 +104,7 @@ export async function getOwnedItem(
   itemId: string,
   opts: OwnedItemOptions = {},
 ) {
-  const item = await (prisma as any).item.findUnique({
+  const item = await prismaAny.item.findUnique({
     where: { id: itemId },
     include: { template: true },
   });
