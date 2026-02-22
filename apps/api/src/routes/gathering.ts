@@ -355,11 +355,11 @@ gatheringRouter.post('/mine', async (req, res, next) => {
 
     // XP: 5 XP per action
     const rawXp = actions * 5;
-    const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp);
+    const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp, undefined, guildMods.xpBoost);
 
     // Guild contract progress for gathering
     const guildId = await getPlayerGuildId(playerId);
-    if (guildId) void incrementContractProgress(guildId, 'gather_actions', actions);
+    if (guildId) void incrementContractProgress(guildId, 'gather_actions', actions).catch(() => {});
 
     // --- Achievement tracking (counters + derived checks) ---
     await incrementStats(playerId, {

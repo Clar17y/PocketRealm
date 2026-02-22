@@ -553,12 +553,12 @@ craftingRouter.post('/craft', async (req, res, next) => {
     const guildId = await getPlayerGuildId(playerId);
     if (guildId) {
       await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_CRAFT * quantity);
-      void incrementContractProgress(guildId, 'craft_items', quantity);
+      void incrementContractProgress(guildId, 'craft_items', quantity).catch(() => {});
       // Count rare+ items for craft_rare contract
       const rareCount = craftedItemDetails.filter(
         (d) => d.rarity === 'rare' || d.rarity === 'epic' || d.rarity === 'legendary',
       ).length;
-      if (rareCount > 0) void incrementContractProgress(guildId, 'craft_rare', rareCount);
+      if (rareCount > 0) void incrementContractProgress(guildId, 'craft_rare', rareCount).catch(() => {});
     }
 
     // --- Achievement tracking (counters + derived checks) ---

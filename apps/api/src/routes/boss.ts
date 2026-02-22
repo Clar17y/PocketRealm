@@ -12,6 +12,8 @@ import {
 } from '../services/bossEncounterService';
 import { getHpState } from '../services/hpService';
 import { getIo } from '../socket';
+import { getPlayerGuildId } from '../services/guildService';
+import { incrementContractProgress } from '../services/guildContractService';
 
 export const bossRouter = Router();
 
@@ -197,6 +199,10 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
       hpState.maxHp,
       body.autoSignUp ?? false,
     );
+
+    // Guild contract progress for boss participation
+    const guildId = await getPlayerGuildId(playerId);
+    if (guildId) void incrementContractProgress(guildId, 'boss_rounds', 1).catch(() => {});
 
     res.json({ participant });
   } catch (err) {

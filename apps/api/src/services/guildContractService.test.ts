@@ -159,15 +159,20 @@ describe('incrementContractProgress', () => {
       rewardGuildXp: 300,
       rewardTreasuryTurns: 1000,
     });
-    db.guildContract.update.mockResolvedValue({});
+    db.guildContract.updateMany.mockResolvedValue({ count: 1 });
     db.guild.update.mockResolvedValue({});
     db.guildLog.create.mockResolvedValue({});
 
     const { addGuildXp } = await import('./guildService.js');
     await incrementContractProgress(GUILD_ID, 'kill_count', 10);
 
-    // Should use transaction for completion (contract update + guild treasury + log)
+    // Should use transaction for completion with optimistic lock
     expect(db.$transaction).toHaveBeenCalled();
+    expect(db.guildContract.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'c1', status: 'active' },
+      }),
+    );
     expect(addGuildXp).toHaveBeenCalledWith(GUILD_ID, 300);
   });
 

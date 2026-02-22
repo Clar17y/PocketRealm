@@ -736,7 +736,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       await setHp(playerId, combatResult.combatantAHpRemaining);
       const rawLoot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
       mobLoot = await enrichLootWithNames(rawLoot);
-      mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded);
+      mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded, undefined, guildMods.xpBoost);
 
       // Bestiary
       await prisma.playerBestiary.upsert({
@@ -756,7 +756,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       const guildId = await getPlayerGuildId(playerId);
       if (guildId) {
         await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
-        void incrementContractProgress(guildId, 'kill_count', 1);
+        void incrementContractProgress(guildId, 'kill_count', 1).catch(() => {});
+        void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
       }
     }
 
@@ -1272,13 +1273,14 @@ combatRouter.post('/start', async (req, res, next) => {
     if (combatResult.outcome === 'victory') {
       await setHp(playerId, combatResult.combatantAHpRemaining);
       loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
-      xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded);
+      xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded, undefined, guildMods.xpBoost);
 
       // Guild XP + contract progress for mob kill
       const guildId = await getPlayerGuildId(playerId);
       if (guildId) {
         await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
-        void incrementContractProgress(guildId, 'kill_count', 1);
+        void incrementContractProgress(guildId, 'kill_count', 1).catch(() => {});
+        void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
       }
     } else if (combatResult.outcome === 'defeat') {
       fleeResult = calculateFleeResult({

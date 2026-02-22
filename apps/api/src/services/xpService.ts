@@ -21,12 +21,13 @@ export async function grantSkillXp(
   playerId: string,
   skillType: SkillType,
   rawXpGain: number,
-  now: Date = new Date()
+  now: Date = new Date(),
+  guildXpBoost?: number,
 ): Promise<GrantXpResult> {
-  // Apply guild XP boost if active
-  const guildMods = await getPlayerGuildModifiers(playerId);
-  const boostedXpGain = guildMods.xpBoost > 0
-    ? Math.floor(rawXpGain * (1 + guildMods.xpBoost))
+  // Apply guild XP boost if active (use pre-resolved value if provided)
+  const xpBoost = guildXpBoost ?? (await getPlayerGuildModifiers(playerId)).xpBoost;
+  const boostedXpGain = xpBoost > 0
+    ? Math.floor(rawXpGain * (1 + xpBoost))
     : rawXpGain;
 
   return prisma.$transaction(async (tx) => {

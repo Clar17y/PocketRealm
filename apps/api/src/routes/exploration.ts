@@ -1072,7 +1072,7 @@ explorationRouter.post('/start', async (req, res, next) => {
     // Guild contract progress for exploration turns
     if (spentTurns > 0) {
       const guildId = await getPlayerGuildId(playerId);
-      if (guildId) void incrementContractProgress(guildId, 'exploration_turns', spentTurns);
+      if (guildId) void incrementContractProgress(guildId, 'exploration_turns', spentTurns).catch(() => {});
     }
 
     // --- Achievement tracking (counter-only + derived checks) ---

@@ -23,7 +23,7 @@ export function calculateXpForLevel(level: number): number {
   return Math.floor(GUILD_CONSTANTS.XP_PER_LEVEL_BASE * level ** GUILD_CONSTANTS.XP_PER_LEVEL_EXPONENT);
 }
 
-function isActiveWithinWindow(lastActiveAt: Date): boolean {
+export function isActiveWithinWindow(lastActiveAt: Date): boolean {
   const cutoff = Date.now() - GUILD_CONSTANTS.BOOST_ELIGIBILITY_WINDOW_HOURS * 60 * 60 * 1000;
   return lastActiveAt.getTime() > cutoff;
 }

@@ -6,15 +6,7 @@ import {
   type GuildUpgradeEffectType,
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function isActiveWithinWindow(lastActiveAt: Date): boolean {
-  const cutoff = Date.now() - GUILD_CONSTANTS.BOOST_ELIGIBILITY_WINDOW_HOURS * 60 * 60 * 1000;
-  return lastActiveAt.getTime() > cutoff;
-}
+import { isActiveWithinWindow } from './guildService';
 
 function toUpgradeData(row: {
   id: string;
@@ -74,28 +66,30 @@ export async function activateUpgrade(
     throw new AppError(400, `Guild level ${tierDef.level} required for this tier`, 'GUILD_LEVEL_TOO_LOW');
   }
 
-  // Validate treasury
+  // Early check (non-authoritative, just for fast feedback)
   if (guild.treasuryTurns < tierDef.cost) {
     throw new AppError(400, 'Insufficient treasury funds', 'INSUFFICIENT_TREASURY');
   }
 
-  // Check no active upgrade of same type
   const now = new Date();
-  const existing = await prisma.guildUpgrade.findFirst({
-    where: {
-      guildId,
-      upgradeType: upgradeKey,
-      expiresAt: { gt: now },
-    },
-  });
-  if (existing) {
-    throw new AppError(400, 'An upgrade of this type is already active', 'UPGRADE_ALREADY_ACTIVE');
-  }
-
-  // Transaction: deduct treasury, create upgrade, log
   const expiresAt = new Date(now.getTime() + tierDef.durationMs);
 
+  // Transaction: re-validate treasury + duplicate, then deduct and create
   const upgrade = await prisma.$transaction(async (tx: any) => {
+    // Re-check treasury inside transaction to prevent TOCTOU race
+    const freshGuild = await tx.guild.findUnique({ where: { id: guildId }, select: { treasuryTurns: true } });
+    if (!freshGuild || freshGuild.treasuryTurns < tierDef.cost) {
+      throw new AppError(400, 'Insufficient treasury funds', 'INSUFFICIENT_TREASURY');
+    }
+
+    // Check no active upgrade of same type inside transaction
+    const existing = await tx.guildUpgrade.findFirst({
+      where: { guildId, upgradeType: upgradeKey, expiresAt: { gt: now } },
+    });
+    if (existing) {
+      throw new AppError(400, 'An upgrade of this type is already active', 'UPGRADE_ALREADY_ACTIVE');
+    }
+
     await tx.guild.update({
       where: { id: guildId },
       data: { treasuryTurns: { decrement: tierDef.cost } },

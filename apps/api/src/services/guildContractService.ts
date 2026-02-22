@@ -204,12 +204,14 @@ export async function incrementContractProgress(
   const newValue = contract.currentValue + amount;
 
   if (newValue >= contract.targetValue) {
-    // Contract completed
-    await prisma.$transaction(async (tx: any) => {
-      await tx.guildContract.update({
-        where: { id: contract.id },
+    // Contract completed — use optimistic locking to prevent double-completion
+    const completed = await prisma.$transaction(async (tx: any) => {
+      // Only complete if still active (guards against concurrent completion)
+      const { count } = await tx.guildContract.updateMany({
+        where: { id: contract.id, status: 'active' },
         data: { currentValue: newValue, status: 'completed' },
       });
+      if (count === 0) return false; // Another call already completed it
 
       // Award treasury
       await tx.guild.update({
@@ -225,13 +227,17 @@ export async function incrementContractProgress(
           metadata: { contractKey: contractType, rewardXp: contract.rewardGuildXp, rewardTreasury: contract.rewardTreasuryTurns },
         },
       });
+
+      return true;
     });
 
-    // Award guild XP (outside transaction since addGuildXp uses its own)
-    await addGuildXp(guildId, contract.rewardGuildXp);
+    if (completed) {
+      // Award guild XP (outside transaction since addGuildXp uses its own)
+      await addGuildXp(guildId, contract.rewardGuildXp);
 
-    // Fire-and-forget: check contract completion achievements for all members
-    void checkGuildAchievementsForAllMembers(guildId, ['guildContractsCompleted']);
+      // Fire-and-forget: check contract completion achievements for all members
+      void checkGuildAchievementsForAllMembers(guildId, ['guildContractsCompleted']);
+    }
   } else {
     // Just increment
     await prisma.guildContract.update({

@@ -36,6 +36,7 @@ beforeEach(() => {
 describe('activateUpgrade', () => {
   it('activates an upgrade successfully', async () => {
     db.guildMember.findUnique.mockResolvedValue(makeMembership());
+    db.guild.findUnique.mockResolvedValue({ treasuryTurns: 50_000 });
     db.guildUpgrade.findFirst.mockResolvedValue(null);
     db.guild.update.mockResolvedValue(makeGuild({ treasuryTurns: 40_000 }));
     db.guildUpgrade.create.mockResolvedValue({
@@ -79,6 +80,7 @@ describe('activateUpgrade', () => {
 
   it('rejects if same type already active', async () => {
     db.guildMember.findUnique.mockResolvedValue(makeMembership());
+    db.guild.findUnique.mockResolvedValue({ treasuryTurns: 50_000 });
     db.guildUpgrade.findFirst.mockResolvedValue({
       id: 'existing',
       upgradeType: 'xp_boost',
