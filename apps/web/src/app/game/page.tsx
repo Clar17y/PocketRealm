@@ -282,6 +282,7 @@ export default function GamePage() {
     defaultRefiningMax,
     handleSetDefaultRefiningMax,
     lowHpWarning,
+    handleSetLowHpWarning,
     handleQuickRest,
     zoneCraftingLevel,
     zoneCraftingName,
@@ -913,6 +914,16 @@ export default function GamePage() {
                     <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
                       {autoPotionThreshold === 0 ? 'Off' : `${autoPotionThreshold}%`}
                     </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-[var(--rpg-text-secondary)]">Low HP Warning</p>
+                      <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Show confirmation when starting actions below 25% HP</p>
+                    </div>
+                    <ToggleSwitch checked={lowHpWarning} onChange={handleSetLowHpWarning} />
                   </div>
                 </div>
               </div>
