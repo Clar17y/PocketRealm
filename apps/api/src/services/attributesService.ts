@@ -1,4 +1,5 @@
 import { prisma } from '@adventure/database';
+import { prismaAny } from '../utils/prismaAny.js';
 import {
   ATTRIBUTE_TYPES,
   DEFAULT_PLAYER_ATTRIBUTES,
@@ -7,8 +8,6 @@ import {
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 
-// Temporary shim until local Prisma client is regenerated with new Player fields.
-const prismaAny = prisma as unknown as any;
 
 function coerceAttributeValue(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 0;

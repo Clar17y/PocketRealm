@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   TURN_CONSTANTS,
   COMBAT_CONSTANTS,
+  CRIT_STAT_CONSTANTS,
+  SLOT_STAT_POOLS,
   SKILL_CONSTANTS,
   EXPLORATION_CONSTANTS,
   HP_CONSTANTS,
@@ -14,6 +16,14 @@ import {
   POTION_CONSTANTS,
   CHEST_CONSTANTS,
   CHARACTER_CONSTANTS,
+  CHAT_CONSTANTS,
+  PVP_CONSTANTS,
+  WORLD_EVENT_CONSTANTS,
+  ZONE_EXPLORATION_CONSTANTS,
+  TIER_BLEED_CONSTANTS,
+  ROOM_CONSTANTS,
+  FULL_CLEAR_CONSTANTS,
+  LEADERBOARD_CONSTANTS,
 } from './gameConstants';
 
 describe('TURN_CONSTANTS', () => {
@@ -182,5 +192,169 @@ describe('CHARACTER_CONSTANTS', () => {
   it('XP ratio is between 0 and 1', () => {
     expect(CHARACTER_CONSTANTS.XP_RATIO).toBeGreaterThan(0);
     expect(CHARACTER_CONSTANTS.XP_RATIO).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('CRIT_STAT_CONSTANTS', () => {
+  it('critChance range is valid', () => {
+    const { min, max } = CRIT_STAT_CONSTANTS.FIXED_RANGE_BONUS_STATS.critChance;
+    expect(min).toBeGreaterThan(0);
+    expect(max).toBeGreaterThan(min);
+    expect(max).toBeLessThanOrEqual(1);
+  });
+
+  it('critDamage range is valid', () => {
+    const { min, max } = CRIT_STAT_CONSTANTS.FIXED_RANGE_BONUS_STATS.critDamage;
+    expect(min).toBeGreaterThan(0);
+    expect(max).toBeGreaterThan(min);
+  });
+});
+
+describe('SLOT_STAT_POOLS', () => {
+  const EXPECTED_SLOTS = [
+    'main_hand', 'off_hand', 'head', 'chest', 'legs',
+    'boots', 'gloves', 'neck', 'belt', 'ring', 'charm',
+  ];
+
+  it('has all 11 equipment slots', () => {
+    for (const slot of EXPECTED_SLOTS) {
+      expect(SLOT_STAT_POOLS[slot]).toBeDefined();
+    }
+  });
+
+  it('every slot has primary and utility arrays', () => {
+    for (const slot of EXPECTED_SLOTS) {
+      const pool = SLOT_STAT_POOLS[slot];
+      expect(Array.isArray(pool.primary)).toBe(true);
+      expect(Array.isArray(pool.utility)).toBe(true);
+      expect(pool.primary.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('main_hand has offensive stats', () => {
+    expect(SLOT_STAT_POOLS.main_hand.primary).toContain('attack');
+  });
+
+  it('off_hand has defensive stats', () => {
+    expect(SLOT_STAT_POOLS.off_hand.primary).toContain('armor');
+  });
+});
+
+describe('CHAT_CONSTANTS', () => {
+  it('has positive message length limit', () => {
+    expect(CHAT_CONSTANTS.MAX_MESSAGE_LENGTH).toBeGreaterThan(0);
+  });
+
+  it('has positive rate limits', () => {
+    expect(CHAT_CONSTANTS.WORLD_RATE_LIMIT_MS).toBeGreaterThan(0);
+    expect(CHAT_CONSTANTS.ZONE_RATE_LIMIT_MS).toBeGreaterThan(0);
+  });
+});
+
+describe('PVP_CONSTANTS', () => {
+  it('has positive starting rating', () => {
+    expect(PVP_CONSTANTS.STARTING_RATING).toBeGreaterThan(0);
+  });
+
+  it('bracket range is between 0 and 1', () => {
+    expect(PVP_CONSTANTS.BRACKET_RANGE).toBeGreaterThan(0);
+    expect(PVP_CONSTANTS.BRACKET_RANGE).toBeLessThan(1);
+  });
+
+  it('turn costs are positive', () => {
+    expect(PVP_CONSTANTS.CHALLENGE_TURN_COST).toBeGreaterThan(0);
+    expect(PVP_CONSTANTS.SCOUT_TURN_COST).toBeGreaterThan(0);
+    expect(PVP_CONSTANTS.REVENGE_TURN_COST).toBeGreaterThan(0);
+  });
+
+  it('revenge is cheaper than challenge', () => {
+    expect(PVP_CONSTANTS.REVENGE_TURN_COST).toBeLessThan(PVP_CONSTANTS.CHALLENGE_TURN_COST);
+  });
+});
+
+describe('WORLD_EVENT_CONSTANTS', () => {
+  it('event durations are positive', () => {
+    expect(WORLD_EVENT_CONSTANTS.RESOURCE_EVENT_DURATION_HOURS).toBeGreaterThan(0);
+    expect(WORLD_EVENT_CONSTANTS.MOB_EVENT_DURATION_HOURS).toBeGreaterThan(0);
+    expect(WORLD_EVENT_CONSTANTS.WORLD_WIDE_EVENT_DURATION_HOURS).toBeGreaterThan(0);
+  });
+
+  it('boss tier arrays have 5 entries', () => {
+    expect(WORLD_EVENT_CONSTANTS.BOSS_HP_PER_PLAYER_BY_TIER).toHaveLength(5);
+    expect(WORLD_EVENT_CONSTANTS.BOSS_AOE_PER_PLAYER_BY_TIER).toHaveLength(5);
+    expect(WORLD_EVENT_CONSTANTS.BOSS_DEFENCE_BY_TIER).toHaveLength(5);
+    expect(WORLD_EVENT_CONSTANTS.BOSS_BASE_XP_REWARD_BY_TIER).toHaveLength(5);
+  });
+
+  it('boss tier arrays increase monotonically', () => {
+    for (let i = 1; i < 5; i++) {
+      expect(WORLD_EVENT_CONSTANTS.BOSS_HP_PER_PLAYER_BY_TIER[i]).toBeGreaterThan(
+        WORLD_EVENT_CONSTANTS.BOSS_HP_PER_PLAYER_BY_TIER[i - 1],
+      );
+    }
+  });
+});
+
+describe('ZONE_EXPLORATION_CONSTANTS', () => {
+  it('default tiers have expected structure', () => {
+    const tiers = ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
+    expect(tiers['1']).toBe(0);
+    expect(Number(tiers['2'])).toBeGreaterThan(0);
+  });
+
+  it('newest tier weight multiplier is > 1', () => {
+    expect(ZONE_EXPLORATION_CONSTANTS.NEWEST_TIER_WEIGHT_MULTIPLIER).toBeGreaterThan(1);
+  });
+});
+
+describe('TIER_BLEED_CONSTANTS', () => {
+  it('weights sum to 1', () => {
+    const sum =
+      TIER_BLEED_CONSTANTS.CURRENT_TIER_WEIGHT +
+      TIER_BLEED_CONSTANTS.PLUS_ONE_TIER_WEIGHT +
+      TIER_BLEED_CONSTANTS.PLUS_TWO_TIER_WEIGHT;
+    expect(sum).toBeCloseTo(1, 5);
+  });
+
+  it('current tier has highest weight', () => {
+    expect(TIER_BLEED_CONSTANTS.CURRENT_TIER_WEIGHT).toBeGreaterThan(
+      TIER_BLEED_CONSTANTS.PLUS_ONE_TIER_WEIGHT,
+    );
+    expect(TIER_BLEED_CONSTANTS.PLUS_ONE_TIER_WEIGHT).toBeGreaterThan(
+      TIER_BLEED_CONSTANTS.PLUS_TWO_TIER_WEIGHT,
+    );
+  });
+});
+
+describe('ROOM_CONSTANTS', () => {
+  it('room counts increase with size', () => {
+    expect(ROOM_CONSTANTS.ROOMS_SMALL.max).toBeLessThanOrEqual(ROOM_CONSTANTS.ROOMS_MEDIUM.min);
+    expect(ROOM_CONSTANTS.ROOMS_MEDIUM.max).toBeLessThanOrEqual(ROOM_CONSTANTS.ROOMS_LARGE.max);
+  });
+
+  it('min <= max for all room sizes', () => {
+    expect(ROOM_CONSTANTS.ROOMS_SMALL.min).toBeLessThanOrEqual(ROOM_CONSTANTS.ROOMS_SMALL.max);
+    expect(ROOM_CONSTANTS.ROOMS_MEDIUM.min).toBeLessThanOrEqual(ROOM_CONSTANTS.ROOMS_MEDIUM.max);
+    expect(ROOM_CONSTANTS.ROOMS_LARGE.min).toBeLessThanOrEqual(ROOM_CONSTANTS.ROOMS_LARGE.max);
+  });
+});
+
+describe('FULL_CLEAR_CONSTANTS', () => {
+  it('drop multiplier is > 1', () => {
+    expect(FULL_CLEAR_CONSTANTS.DROP_MULTIPLIER).toBeGreaterThan(1);
+  });
+
+  it('recipe multiplier is > 1', () => {
+    expect(FULL_CLEAR_CONSTANTS.RECIPE_MULTIPLIER).toBeGreaterThan(1);
+  });
+});
+
+describe('LEADERBOARD_CONSTANTS', () => {
+  it('refresh interval is positive', () => {
+    expect(LEADERBOARD_CONSTANTS.REFRESH_INTERVAL_MS).toBeGreaterThan(0);
+  });
+
+  it('page size is positive', () => {
+    expect(LEADERBOARD_CONSTANTS.PAGE_SIZE).toBeGreaterThan(0);
   });
 });

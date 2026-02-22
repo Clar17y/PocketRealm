@@ -10,11 +10,12 @@ import {
   getPlayerProgressionState,
   normalizePlayerAttributes,
 } from '../services/attributesService';
-import { incrementStats } from '../services/statsService';
-import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
+import { trackAchievements } from '../utils/routeHelpers.js';
+import { asyncHandler } from '../utils/asyncHandler';
+
+import { prismaAny } from '../utils/prismaAny.js';
 
 export const playerRouter = Router();
-const prismaAny = prisma as unknown as any;
 
 playerRouter.use(authenticate);
 
@@ -22,98 +23,86 @@ playerRouter.use(authenticate);
  * GET /api/v1/player
  * Get current player profile
  */
-playerRouter.get('/', async (req, res, next) => {
-  try {
-    const playerId = req.player!.playerId;
+playerRouter.get('/', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
 
-    const player = await prismaAny.player.findUnique({
-      where: { id: playerId },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        lastActiveAt: true,
-        characterXp: true,
-        characterLevel: true,
-        attributePoints: true,
-        attributes: true,
-        autoPotionThreshold: true,
-        tutorialStep: true,
-        combatLogSpeedMs: true,
-        explorationSpeedMs: true,
-        autoSkipKnownCombat: true,
-        defaultExploreTurns: true,
-        quickRestHealPercent: true,
-        defaultRefiningMax: true,
-        activeTitle: true,
-      },
-    });
+  const player = await prismaAny.player.findUnique({
+    where: { id: playerId },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      lastActiveAt: true,
+      characterXp: true,
+      characterLevel: true,
+      attributePoints: true,
+      attributes: true,
+      autoPotionThreshold: true,
+      tutorialStep: true,
+      combatLogSpeedMs: true,
+      explorationSpeedMs: true,
+      autoSkipKnownCombat: true,
+      defaultExploreTurns: true,
+      quickRestHealPercent: true,
+      defaultRefiningMax: true,
+      activeTitle: true,
+    },
+  });
 
-    if (!player) {
-      throw new AppError(404, 'Player not found', 'NOT_FOUND');
-    }
-
-    const titleDef = player.activeTitle ? ACHIEVEMENTS_BY_ID.get(player.activeTitle) : null;
-
-    res.json({
-      player: {
-        ...player,
-        characterXp: Number(player.characterXp),
-        attributes: normalizePlayerAttributes(player.attributes),
-        activeTitle: titleDef?.titleReward ?? null,
-      },
-    });
-  } catch (err) {
-    next(err);
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
   }
-});
+
+  const titleDef = player.activeTitle ? ACHIEVEMENTS_BY_ID.get(player.activeTitle) : null;
+
+  res.json({
+    player: {
+      ...player,
+      characterXp: Number(player.characterXp),
+      attributes: normalizePlayerAttributes(player.attributes),
+      activeTitle: titleDef?.titleReward ?? null,
+    },
+  });
+}));
 
 /**
  * GET /api/v1/player/skills
  * Get all player skills with levels and XP
  */
-playerRouter.get('/skills', async (req, res, next) => {
-  try {
-    const playerId = req.player!.playerId;
+playerRouter.get('/skills', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
 
-    const skills = await prisma.playerSkill.findMany({
-      where: { playerId },
-      select: {
-        skillType: true,
-        level: true,
-        xp: true,
-        dailyXpGained: true,
-        lastXpResetAt: true,
-      },
-    });
+  const skills = await prisma.playerSkill.findMany({
+    where: { playerId },
+    select: {
+      skillType: true,
+      level: true,
+      xp: true,
+      dailyXpGained: true,
+      lastXpResetAt: true,
+    },
+  });
 
-    // Convert BigInt to number for JSON serialization
-    const serializedSkills = skills.map((skill: typeof skills[number]) => ({
-      ...skill,
-      xp: Number(skill.xp),
-    }));
+  // Convert BigInt to number for JSON serialization
+  const serializedSkills = skills.map((skill: typeof skills[number]) => ({
+    ...skill,
+    xp: Number(skill.xp),
+  }));
 
-    res.json({ skills: serializedSkills });
-  } catch (err) {
-    next(err);
-  }
-});
+  res.json({ skills: serializedSkills });
+}));
 
 /**
  * GET /api/v1/player/attributes
  * Get character level progression and current attribute allocation.
  */
-playerRouter.get('/attributes', async (req, res, next) => {
-  try {
-    const playerId = req.player!.playerId;
-    const progression = await getPlayerProgressionState(playerId);
-    res.json(progression);
-  } catch (err) {
-    next(err);
-  }
-});
+playerRouter.get('/attributes', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const progression = await getPlayerProgressionState(playerId);
+  res.json(progression);
+}));
 
 const allocateAttributesSchema = z.object({
   attribute: z.custom<AttributeType>((value) => ATTRIBUTE_TYPES.includes(value as AttributeType), {
@@ -126,16 +115,12 @@ const allocateAttributesSchema = z.object({
  * POST /api/v1/player/attributes
  * Spend unallocated attribute points.
  */
-playerRouter.post('/attributes', async (req, res, next) => {
-  try {
-    const playerId = req.player!.playerId;
-    const body = allocateAttributesSchema.parse(req.body);
-    const progression = await allocateAttributePoints(playerId, body.attribute, body.points);
-    res.json(progression);
-  } catch (err) {
-    next(err);
-  }
-});
+playerRouter.post('/attributes', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = allocateAttributesSchema.parse(req.body);
+  const progression = await allocateAttributePoints(playerId, body.attribute, body.points);
+  res.json(progression);
+}));
 
 const SETTINGS_FIELDS = [
   'autoPotionThreshold', 'combatLogSpeedMs', 'explorationSpeedMs',
@@ -156,22 +141,18 @@ const settingsSchema = z.object({
  * PATCH /api/v1/player/settings
  * Update player settings.
  */
-playerRouter.patch('/settings', async (req, res, next) => {
-  try {
-    const playerId = req.player!.playerId;
-    const body = settingsSchema.parse(req.body);
+playerRouter.patch('/settings', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = settingsSchema.parse(req.body);
 
-    const updated = await prismaAny.player.update({
-      where: { id: playerId },
-      data: body,
-      select: Object.fromEntries(SETTINGS_FIELDS.map(f => [f, true])),
-    });
+  const updated = await prismaAny.player.update({
+    where: { id: playerId },
+    data: body,
+    select: Object.fromEntries(SETTINGS_FIELDS.map(f => [f, true])),
+  });
 
-    res.json(updated);
-  } catch (err) {
-    next(err);
-  }
-});
+  res.json(updated);
+}));
 
 const tutorialSchema = z.object({
   step: z.number().int().min(-1).max(9),
@@ -181,72 +162,62 @@ const tutorialSchema = z.object({
  * PATCH /api/v1/player/tutorial
  * Advance or skip the tutorial.
  */
-playerRouter.patch('/tutorial', async (req, res, next) => {
-  try {
-    const playerId = req.player!.playerId;
-    const body = tutorialSchema.parse(req.body);
+playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = tutorialSchema.parse(req.body);
 
-    const player = await prismaAny.player.findUnique({
-      where: { id: playerId },
-      select: { tutorialStep: true },
-    });
+  const player = await prismaAny.player.findUnique({
+    where: { id: playerId },
+    select: { tutorialStep: true },
+  });
 
-    if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
 
-    // Allow skip (-1) from any state, or advance by exactly 1
-    const isSkip = body.step === -1;
-    const isNextStep = body.step === player.tutorialStep + 1;
+  // Allow skip (-1) from any state, or advance by exactly 1
+  const isSkip = body.step === -1;
+  const isNextStep = body.step === player.tutorialStep + 1;
 
-    if (!isSkip && !isNextStep) {
-      throw new AppError(400, 'Invalid tutorial step', 'INVALID_STEP');
-    }
-
-    // Don't allow changes once tutorial is completed or skipped
-    if (player.tutorialStep >= 9 || player.tutorialStep === -1) {
-      throw new AppError(400, 'Tutorial already completed', 'TUTORIAL_COMPLETE');
-    }
-
-    await prismaAny.player.update({
-      where: { id: playerId },
-      data: { tutorialStep: body.step },
-    });
-
-    // Grant achievement for completing the tutorial (not skipping)
-    if (body.step === 9 && !isSkip) {
-      await incrementStats(playerId, { tutorialCompleted: 1 });
-      const newAchievements = await checkAchievements(playerId, { statKeys: ['tutorialCompleted'] });
-      await emitAchievementNotifications(playerId, newAchievements);
-    }
-
-    res.json({ tutorialStep: body.step });
-  } catch (err) {
-    next(err);
+  if (!isSkip && !isNextStep) {
+    throw new AppError(400, 'Invalid tutorial step', 'INVALID_STEP');
   }
-});
+
+  // Don't allow changes once tutorial is completed or skipped
+  if (player.tutorialStep >= 9 || player.tutorialStep === -1) {
+    throw new AppError(400, 'Tutorial already completed', 'TUTORIAL_COMPLETE');
+  }
+
+  await prismaAny.player.update({
+    where: { id: playerId },
+    data: { tutorialStep: body.step },
+  });
+
+  // Grant achievement for completing the tutorial (not skipping)
+  if (body.step === 9 && !isSkip) {
+    await trackAchievements(playerId, { tutorialCompleted: 1 });
+  }
+
+  res.json({ tutorialStep: body.step });
+}));
 
 /**
  * GET /api/v1/player/equipment
  * Get currently equipped items
  */
-playerRouter.get('/equipment', async (req, res, next) => {
-  try {
-    const playerId = req.player!.playerId;
+playerRouter.get('/equipment', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
 
-    await ensureEquipmentSlots(playerId);
+  await ensureEquipmentSlots(playerId);
 
-    const equipment = await prisma.playerEquipment.findMany({
-      where: { playerId },
-      include: {
-        item: {
-          include: {
-            template: true,
-          },
+  const equipment = await prisma.playerEquipment.findMany({
+    where: { playerId },
+    include: {
+      item: {
+        include: {
+          template: true,
         },
       },
-    });
+    },
+  });
 
-    res.json({ equipment });
-  } catch (err) {
-    next(err);
-  }
-});
+  res.json({ equipment });
+}));

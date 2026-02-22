@@ -1,15 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
 vi.mock('./hpService', () => ({
   getHpState: vi.fn(),
 }));
 
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { getHpState } from './hpService';
 import { useConsumable } from './consumableService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 const mockGetHpState = vi.mocked(getHpState);
 const now = new Date('2025-06-01T12:00:00Z');
 

@@ -2,6 +2,8 @@ import { Prisma, prisma } from '@adventure/database';
 import { buildPlayerCombatStats, calculateFleeResult, calculateMaxHp, runCombat } from '@adventure/game-engine';
 import { PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, type Combatant, type CombatResult, type SkillType } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
+import { buildPagination } from '../utils/routeHelpers.js';
+import { getSkillLevel } from './combatStatsService.js';
 import { calculateEloChange } from './eloService';
 import { getEquipmentStats } from './equipmentService';
 import { spendPlayerTurnsTx } from './turnBankService';
@@ -196,14 +198,6 @@ async function calculatePowerRating(playerId: string): Promise<number> {
   const skillTotal = combatSkills.reduce((sum, s) => sum + s.level, 0);
 
   return statTotal + attrTotal + skillTotal;
-}
-
-async function getSkillLevel(playerId: string, skillType: SkillType): Promise<number> {
-  const skill = await prisma.playerSkill.findUnique({
-    where: { playerId_skillType: { playerId, skillType } },
-    select: { level: true },
-  });
-  return skill?.level ?? 1;
 }
 
 export async function challenge(
@@ -522,8 +516,6 @@ export async function getHistory(playerId: string, page: number, pageSize: numbe
     prisma.pvpMatch.count({ where }),
   ]);
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
   return {
     matches: matches.map((m) => ({
       matchId: m.id,
@@ -542,14 +534,7 @@ export async function getHistory(playerId: string, page: number, pageSize: numbe
       turnsSpent: m.turnsSpent,
       createdAt: m.createdAt.toISOString(),
     })),
-    pagination: {
-      page,
-      pageSize,
-      total,
-      totalPages,
-      hasNext: page < totalPages,
-      hasPrevious: page > 1,
-    },
+    pagination: buildPagination(page, pageSize, total),
   };
 }
 

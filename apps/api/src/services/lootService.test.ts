@@ -1,14 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
 vi.mock('./inventoryService', () => ({
   addStackableItem: vi.fn().mockResolvedValue({ itemId: 'stack-1', quantity: 1 }),
 }));
 
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { rollAndGrantLoot } from './lootService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 
 beforeEach(() => {
   vi.clearAllMocks();

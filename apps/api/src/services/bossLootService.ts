@@ -1,4 +1,5 @@
 import { prisma } from '@adventure/database';
+import { prismaAny } from '../utils/prismaAny.js';
 import { WORLD_EVENT_CONSTANTS, type BossPlayerReward, type SkillType } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantLoot, enrichLootWithNames } from './lootService';
@@ -17,7 +18,6 @@ async function rollBossRecipeDrop(
   playerId: string,
   mobFamilyId: string,
 ): Promise<BossPlayerReward['recipeUnlocked'] | undefined> {
-  const prismaAny = prisma as unknown as any;
 
   const advancedRecipes = (await prismaAny.craftingRecipe.findMany({
     where: { isAdvanced: true, mobFamilyId },

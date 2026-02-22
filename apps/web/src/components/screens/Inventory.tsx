@@ -7,6 +7,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { Crosshair, Heart, Shield, Sword, X, Zap } from 'lucide-react';
 import { titleCaseFromSnake } from '@/lib/format';
+import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass } from '@/lib/statFormat';
 
 interface Item {
   id: string;
@@ -38,45 +39,8 @@ interface InventoryProps {
   zoneCraftingLevel?: number | null;
 }
 
-function numStat(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
 function prettySlot(slot: string) {
   return titleCaseFromSnake(slot);
-}
-
-const PERCENT_STATS = new Set(['critChance', 'critDamage']);
-
-function prettyStatName(stat: string): string {
-  if (stat === 'critChance') return 'Crit Chance';
-  if (stat === 'critDamage') return 'Crit Damage';
-  return stat
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (char) => char.toUpperCase())
-    .trim();
-}
-
-function formatStatValue(stat: string, value: number): string {
-  if (PERCENT_STATS.has(stat)) return `${Math.round(value * 100)}%`;
-  return String(value);
-}
-
-function formatSignedStatValue(stat: string, value: number): string {
-  const formatted = formatStatValue(stat, Math.abs(value));
-  if (value > 0) return `+${formatted}`;
-  if (value < 0) return `-${formatted}`;
-  return formatted;
-}
-
-function signedClass(value: number, positiveClass: string): string {
-  if (value < 0) return 'text-[var(--rpg-red)]';
-  return positiveClass;
-}
-
-function prettyWeightClass(weightClass?: 'heavy' | 'medium' | 'light' | null): string | null {
-  if (!weightClass) return null;
-  return `${weightClass[0].toUpperCase()}${weightClass.slice(1)} Armor`;
 }
 
 function statDisplay(stat: string) {

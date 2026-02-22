@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Combatant, CombatantStats, CombatOptions, CombatPotion, MobTemplate } from '@adventure/shared';
+import type { Combatant, CombatantStats, CombatOptions, CombatPotion, CombatResult, MobTemplate } from '@adventure/shared';
 import { runCombat } from './combatEngine';
 import { mobToCombatantStats } from './damageCalculator';
 
@@ -472,5 +472,88 @@ describe('auto-potion system', () => {
         expect(expiryEntries[0].round).toBe(firstPotionRound + 4);
       }
     }
+  });
+});
+
+describe('runCombat basic outcomes', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function makeStats(overrides: Partial<CombatantStats> = {}): CombatantStats {
+    return {
+      hp: 100, maxHp: 100, attack: 10, accuracy: 20,
+      defence: 0, magicDefence: 0, dodge: 0, evasion: 0,
+      damageMin: 10, damageMax: 10, speed: 5,
+      damageType: 'physical',
+      ...overrides,
+    };
+  }
+
+  it('returns victory when combatant A kills combatant B', () => {
+    const player: Combatant = { id: 'p1', name: 'Player', stats: makeStats({ damageMin: 200, damageMax: 200 }) };
+    const mob: Combatant = { id: 'm1', name: 'Weakling', stats: makeStats({ hp: 10, maxHp: 10, damageMin: 1, damageMax: 1 }) };
+
+    const result = runCombat(player, mob);
+    expect(result.outcome).toBe('victory');
+    expect(result.combatantBHpRemaining).toBe(0);
+    expect(result.combatantAHpRemaining).toBeGreaterThan(0);
+  });
+
+  it('returns defeat when combatant B kills combatant A', () => {
+    const player: Combatant = { id: 'p1', name: 'Player', stats: makeStats({ hp: 10, maxHp: 10, damageMin: 1, damageMax: 1 }) };
+    const mob: Combatant = { id: 'm1', name: 'Boss', stats: makeStats({ damageMin: 200, damageMax: 200 }) };
+
+    const result = runCombat(player, mob);
+    expect(result.outcome).toBe('defeat');
+    expect(result.combatantAHpRemaining).toBe(0);
+    expect(result.combatantBHpRemaining).toBeGreaterThan(0);
+  });
+
+  it('returns draw when MAX_ROUNDS (100) is exceeded', () => {
+    // Both combatants always miss (dodge too high)
+    const player: Combatant = { id: 'p1', name: 'Player', stats: makeStats({ accuracy: 0, dodge: 999 }) };
+    const mob: Combatant = { id: 'm1', name: 'Mob', stats: makeStats({ accuracy: 0, dodge: 999 }) };
+
+    const result = runCombat(player, mob);
+    expect(result.outcome).toBe('draw');
+    // Round count is derived from log entries
+    const maxRound = Math.max(...result.log.map((e) => e.round));
+    expect(maxRound).toBe(100);
+  });
+
+  it('log has at least one entry per round', () => {
+    const player: Combatant = { id: 'p1', name: 'Player', stats: makeStats({ damageMin: 5, damageMax: 5 }) };
+    const mob: Combatant = { id: 'm1', name: 'Mob', stats: makeStats({ hp: 20, maxHp: 20, damageMin: 5, damageMax: 5 }) };
+
+    const result = runCombat(player, mob);
+    const maxRound = Math.max(...result.log.map((e) => e.round));
+    expect(result.log.length).toBeGreaterThanOrEqual(maxRound);
+  });
+
+  it('combatant HP never goes below 0 in result', () => {
+    const player: Combatant = { id: 'p1', name: 'Player', stats: makeStats({ damageMin: 200, damageMax: 200 }) };
+    const mob: Combatant = { id: 'm1', name: 'Mob', stats: makeStats({ hp: 10, maxHp: 10 }) };
+
+    const result = runCombat(player, mob);
+    expect(result.combatantAHpRemaining).toBeGreaterThanOrEqual(0);
+    expect(result.combatantBHpRemaining).toBeGreaterThanOrEqual(0);
+  });
+
+  it('populates potionsConsumed as empty array when no options', () => {
+    const player: Combatant = { id: 'p1', name: 'Player', stats: makeStats({ damageMin: 200, damageMax: 200 }) };
+    const mob: Combatant = { id: 'm1', name: 'Mob', stats: makeStats({ hp: 10, maxHp: 10 }) };
+
+    const result = runCombat(player, mob);
+    expect(result.potionsConsumed).toEqual([]);
+  });
+
+  it('handles combat between identical combatants', () => {
+    const a: Combatant = { id: 'a', name: 'Fighter A', stats: makeStats() };
+    const b: Combatant = { id: 'b', name: 'Fighter B', stats: makeStats() };
+
+    const result = runCombat(a, b);
+    expect(['victory', 'defeat', 'draw']).toContain(result.outcome);
+    expect(result.log.length).toBeGreaterThan(0);
   });
 });

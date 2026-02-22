@@ -8,7 +8,7 @@ import { turnsRouter } from './routes/turns';
 import { playerRouter } from './routes/player';
 import { explorationRouter } from './routes/exploration';
 import { zonesRouter } from './routes/zones';
-import { combatRouter } from './routes/combat';
+import { combatRouter } from './routes/combat/index';
 import { inventoryRouter } from './routes/inventory';
 import { equipmentRouter } from './routes/equipment';
 import { gatheringRouter } from './routes/gathering';

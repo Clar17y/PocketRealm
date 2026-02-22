@@ -1,4 +1,5 @@
 import { prisma } from '@adventure/database';
+import { prismaAny } from '../utils/prismaAny.js';
 import {
   calculateMaxHp,
   calculateRegenPerSecond,
@@ -16,7 +17,6 @@ import { normalizePlayerAttributes } from './attributesService';
 
 async function getVitalityLevel(playerId: string): Promise<number> {
   // Temporary shim until local Prisma client is regenerated with new Player fields.
-  const prismaAny = prisma as unknown as any;
   const player = await prismaAny.player.findUnique({
     where: { id: playerId },
     select: { attributes: true },

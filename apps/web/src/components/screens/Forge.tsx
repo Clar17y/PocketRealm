@@ -10,6 +10,7 @@ import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
+import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 
 interface ForgeItem {
   id: string;
@@ -39,23 +40,6 @@ function statEntries(stats: Record<string, unknown> | null | undefined): Array<[
     .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]) && entry[1] !== 0);
 }
 
-const PERCENT_STATS = new Set(['critChance', 'critDamage']);
-
-function prettifyStat(stat: string): string {
-  if (stat === 'magicDefence') return 'Magic Defence';
-  if (stat === 'critChance') return 'Crit Chance';
-  if (stat === 'critDamage') return 'Crit Damage';
-  return stat
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (char) => char.toUpperCase())
-    .trim();
-}
-
-function formatStatValue(stat: string, value: number): string {
-  if (PERCENT_STATS.has(stat)) return `${Math.round(value * 100)}%`;
-  return String(value);
-}
-
 function titleCaseRarity(rarity: Rarity): string {
   return rarity.charAt(0).toUpperCase() + rarity.slice(1);
 }
@@ -63,7 +47,7 @@ function titleCaseRarity(rarity: Rarity): string {
 function formatBonusSummary(stats: Record<string, unknown> | null | undefined): string {
   const entries = statEntries(stats);
   if (entries.length === 0) return 'No bonus stats';
-  return entries.map(([stat, value]) => `+${formatStatValue(stat, value)} ${prettifyStat(stat)}`).join(', ');
+  return entries.map(([stat, value]) => `+${formatStatValue(stat, value)} ${prettyStatName(stat)}`).join(', ');
 }
 
 export function Forge({
@@ -233,7 +217,7 @@ export function Forge({
                   {baseEntries.length === 0 && <div className="text-[var(--rpg-text-secondary)]">None</div>}
                   {baseEntries.map(([stat, value]) => (
                     <div key={`base-${stat}`} className="text-[var(--rpg-text-primary)]">
-                      +{value} {prettifyStat(stat)}
+                      +{value} {prettyStatName(stat)}
                     </div>
                   ))}
                 </div>
@@ -244,7 +228,7 @@ export function Forge({
                   {bonusEntries.length === 0 && <div className="text-[var(--rpg-text-secondary)]">None</div>}
                   {bonusEntries.map(([stat, value]) => (
                     <div key={`bonus-${stat}`} className="text-[var(--rpg-green-light)]">
-                      +{formatStatValue(stat, value)} {prettifyStat(stat)}
+                      +{formatStatValue(stat, value)} {prettyStatName(stat)}
                     </div>
                   ))}
                 </div>
