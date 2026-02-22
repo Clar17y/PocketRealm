@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
 import { prismaAny } from '../../utils/prismaAny.js';
+import { asyncHandler } from '../../utils/asyncHandler';
 import {
   applyMobEventModifiers,
   applyMobPrefix,
@@ -64,8 +65,7 @@ export const startRouter = Router();
  * POST /api/v1/exploration/start
  * Spend turns to explore a zone and return discovered outcomes.
  */
-startRouter.post('/start', async (req, res, next) => {
-  try {
+startRouter.post('/start', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = startSchema.parse(req.body);
 
@@ -793,7 +793,4 @@ startRouter.post('/start', async (req, res, next) => {
         turnsToExplore: explorationProgress.turnsToExplore,
       },
     });
-  } catch (err) {
-    next(err);
-  }
-});
+}));

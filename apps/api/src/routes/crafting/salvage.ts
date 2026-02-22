@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
 import { CRAFTING_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
+import { asyncHandler } from '../../utils/asyncHandler';
 import { getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { addStackableItemTx } from '../../services/inventoryService';
@@ -19,8 +20,7 @@ export const salvageRouter = Router();
  * POST /api/v1/crafting/salvage
  * Salvage one crafted weapon/armor for a partial material refund.
  */
-salvageRouter.post('/', async (req, res, next) => {
-  try {
+salvageRouter.post('/', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = salvageSchema.parse(req.body);
 
@@ -157,7 +157,4 @@ salvageRouter.post('/', async (req, res, next) => {
         })),
       },
     });
-  } catch (err) {
-    next(err);
-  }
-});
+}));

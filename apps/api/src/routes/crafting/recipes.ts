@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '@adventure/database';
 import type { CraftingMaterial } from '@adventure/shared';
+import { asyncHandler } from '../../utils/asyncHandler';
 import { prismaAny, parseMaterials, buildRecipeDiscoveryHint } from './helpers';
 
 export const recipesRouter = Router();
@@ -9,8 +10,7 @@ export const recipesRouter = Router();
  * GET /api/v1/crafting/recipes
  * List recipes visible to the player (based on skill level).
  */
-recipesRouter.get('/', async (req, res, next) => {
-  try {
+recipesRouter.get('/', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
 
     const [skills, learnedAdvancedRecipes] = await Promise.all([
@@ -111,7 +111,4 @@ recipesRouter.get('/', async (req, res, next) => {
       zoneCraftingLevel: currentZone ? currentZone.maxCraftingLevel : 0,
       zoneName: currentZone?.name ?? null,
     });
-  } catch (err) {
-    next(err);
-  }
-});
+}));

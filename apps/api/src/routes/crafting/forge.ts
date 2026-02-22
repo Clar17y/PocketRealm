@@ -11,6 +11,7 @@ import {
   rollBonusStatsForRarity,
 } from '@adventure/game-engine';
 import { AppError } from '../../middleware/errorHandler';
+import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { assertNotRecovering, getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
@@ -31,8 +32,7 @@ export const forgeRouter = Router();
  * POST /api/v1/crafting/forge/upgrade
  * Attempt to upgrade item rarity by one tier. Failure destroys the item.
  */
-forgeRouter.post('/upgrade', async (req, res, next) => {
-  try {
+forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = forgeUpgradeSchema.parse(req.body);
 
@@ -222,17 +222,13 @@ forgeRouter.post('/upgrade', async (req, res, next) => {
         sacrificialItemId: sacrificial.id,
       },
     });
-  } catch (err) {
-    next(err);
-  }
-});
+}));
 
 /**
  * POST /api/v1/crafting/forge/reroll
  * Re-roll all bonus stats for an Uncommon+ unequipped weapon/armor item.
  */
-forgeRouter.post('/reroll', async (req, res, next) => {
-  try {
+forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = forgeRerollSchema.parse(req.body);
 
@@ -329,7 +325,4 @@ forgeRouter.post('/reroll', async (req, res, next) => {
         bonusStats: rerolledBonusStats ?? null,
       },
     });
-  } catch (err) {
-    next(err);
-  }
-});
+}));

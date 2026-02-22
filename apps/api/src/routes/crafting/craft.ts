@@ -12,6 +12,7 @@ import {
   rollBonusStatsForRarity,
 } from '@adventure/game-engine';
 import { AppError } from '../../middleware/errorHandler';
+import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from '../../services/inventoryService';
@@ -35,8 +36,7 @@ export const craftRouter = Router();
  * POST /api/v1/crafting/craft
  * Validate materials, spend turns, craft item, and grant XP.
  */
-craftRouter.post('/', async (req, res, next) => {
-  try {
+craftRouter.post('/', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = craftSchema.parse(req.body);
 
@@ -267,7 +267,4 @@ craftRouter.post('/', async (req, res, next) => {
       craftedItemDetails,
       xp: serializeXpGrant(xpGrant),
     });
-  } catch (err) {
-    next(err);
-  }
-});
+}));

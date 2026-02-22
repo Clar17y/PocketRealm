@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '@adventure/database';
 import { estimateExploration, validateExplorationTurns } from '@adventure/game-engine';
 import { AppError } from '../../middleware/errorHandler';
+import { asyncHandler } from '../../utils/asyncHandler';
 import { estimateQuerySchema } from './helpers';
 
 export const estimateRouter = Router();
@@ -10,8 +11,7 @@ export const estimateRouter = Router();
  * GET /api/v1/exploration/estimate?turns=123
  * Returns probability preview for exploration outcomes.
  */
-estimateRouter.get('/estimate', async (req, res, next) => {
-  try {
+estimateRouter.get('/estimate', asyncHandler(async (req, res) => {
     const query = estimateQuerySchema.parse(req.query);
 
     const validation = validateExplorationTurns(query.turns);
@@ -31,7 +31,4 @@ estimateRouter.get('/estimate', async (req, res, next) => {
     }
 
     res.json({ estimate: estimateExploration(query.turns, zoneExitChance) });
-  } catch (err) {
-    next(err);
-  }
-});
+}));

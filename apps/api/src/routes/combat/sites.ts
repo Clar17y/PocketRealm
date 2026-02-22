@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@adventure/database';
 import { getMobPrefixDefinition } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
+import { asyncHandler } from '../../utils/asyncHandler';
 import { buildPagination } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
@@ -23,8 +24,7 @@ export function registerSiteRoutes(router: Router): void {
    * GET /api/v1/combat/sites?page=1&pageSize=10&zoneId=...&mobFamilyId=...&sort=danger
    * List encounter sites for the current player with pagination and filters.
    */
-  router.get('/sites', async (req, res, next) => {
-    try {
+  router.get('/sites', asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
       const parsedQuery = listEncounterSitesQuerySchema.safeParse({
         zoneId: req.query.zoneId,
@@ -179,17 +179,13 @@ export function registerSiteRoutes(router: Router): void {
           mobFamilies,
         },
       });
-    } catch (err) {
-      next(err);
-    }
-  });
+  }));
 
   /**
    * POST /api/v1/combat/sites/abandon
    * Abandon encounter sites (optionally by zone).
    */
-  router.post('/sites/abandon', async (req, res, next) => {
-    try {
+  router.post('/sites/abandon', asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
       const body = abandonSchema.parse(req.body ?? {});
 
@@ -201,17 +197,13 @@ export function registerSiteRoutes(router: Router): void {
       });
 
       res.json({ success: true, abandoned: result.count ?? 0 });
-    } catch (err) {
-      next(err);
-    }
-  });
+  }));
 
   /**
    * POST /api/v1/combat/sites/:id/strategy
    * Select clearing strategy for an encounter site.
    */
-  router.post('/sites/:id/strategy', async (req, res, next) => {
-    try {
+  router.post('/sites/:id/strategy', asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
       const siteId = z.string().uuid().parse(req.params.id);
       const body = strategySchema.parse(req.body);
@@ -241,8 +233,5 @@ export function registerSiteRoutes(router: Router): void {
         encounterSiteId: siteId,
         strategy: body.strategy,
       });
-    } catch (err) {
-      next(err);
-    }
-  });
+  }));
 }

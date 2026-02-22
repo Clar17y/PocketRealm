@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { EquipmentSlot } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
-import { AppError } from '../middleware/errorHandler';
 import { equipItem, ensureEquipmentSlots, unequipSlot } from '../services/equipmentService';
 import { assertNotRecovering } from '../utils/routeHelpers.js';
+import { asyncHandler } from '../utils/asyncHandler';
 
 export const equipmentRouter = Router();
 
@@ -32,20 +32,16 @@ const equipSchema = z.object({
 /**
  * POST /api/v1/equipment/equip
  */
-equipmentRouter.post('/equip', async (req, res, next) => {
-  try {
-    const playerId = req.player!.playerId;
-    const body = equipSchema.parse(req.body);
+equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = equipSchema.parse(req.body);
 
-    // Check if player is recovering (prevents HP gear exploit)
-    await assertNotRecovering(playerId);
+  // Check if player is recovering (prevents HP gear exploit)
+  await assertNotRecovering(playerId);
 
-    await equipItem(playerId, body.itemId, body.slot as EquipmentSlot);
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-});
+  await equipItem(playerId, body.itemId, body.slot as EquipmentSlot);
+  res.json({ success: true });
+}));
 
 const unequipSchema = z.object({
   slot: slotSchema,
@@ -54,31 +50,23 @@ const unequipSchema = z.object({
 /**
  * POST /api/v1/equipment/unequip
  */
-equipmentRouter.post('/unequip', async (req, res, next) => {
-  try {
-    const playerId = req.player!.playerId;
-    const body = unequipSchema.parse(req.body);
+equipmentRouter.post('/unequip', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = unequipSchema.parse(req.body);
 
-    // Check if player is recovering (prevents HP gear exploit)
-    await assertNotRecovering(playerId);
+  // Check if player is recovering (prevents HP gear exploit)
+  await assertNotRecovering(playerId);
 
-    await unequipSlot(playerId, body.slot as EquipmentSlot);
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-});
+  await unequipSlot(playerId, body.slot as EquipmentSlot);
+  res.json({ success: true });
+}));
 
 /**
  * POST /api/v1/equipment/init
  * Creates rows for all equipment slots (dev helper).
  */
-equipmentRouter.post('/init', async (req, res, next) => {
-  try {
-    const playerId = req.player!.playerId;
-    await ensureEquipmentSlots(playerId);
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-});
+equipmentRouter.post('/init', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  await ensureEquipmentSlots(playerId);
+  res.json({ success: true });
+}));

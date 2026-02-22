@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma, prisma } from '@adventure/database';
 import { AppError } from '../../middleware/errorHandler';
+import { asyncHandler } from '../../utils/asyncHandler';
 import { enrichLootWithNames } from '../../services/lootService';
 import { lootDropWithNameSchema } from './helpers';
 import { paginationSchema, buildPagination } from '../../utils/routeHelpers.js';
@@ -47,8 +48,7 @@ export function registerLogRoutes(router: Router): void {
    * GET /api/v1/combat/logs
    * Fetch paginated combat history with filters.
    */
-  router.get('/logs', async (req, res, next) => {
-    try {
+  router.get('/logs', asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
       const query = listLogsQuerySchema.parse({
         page: req.query.page,
@@ -216,17 +216,13 @@ export function registerLogRoutes(router: Router): void {
           mobs: mobRows.filter((row) => row.id && row.name).map((row) => ({ id: row.id!, name: row.name! })),
         },
       });
-    } catch (err) {
-      next(err);
-    }
-  });
+  }));
 
   /**
    * GET /api/v1/combat/logs/:id
    * Fetch combat playback data for a previous encounter.
    */
-  router.get('/logs/:id', async (req, res, next) => {
-    try {
+  router.get('/logs/:id', asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
       const params = logParamsSchema.parse(req.params);
 
@@ -302,8 +298,5 @@ export function registerLogRoutes(router: Router): void {
         createdAt: log.createdAt.toISOString(),
         combat,
       });
-    } catch (err) {
-      next(err);
-    }
-  });
+  }));
 }

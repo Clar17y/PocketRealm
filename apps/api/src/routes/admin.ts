@@ -1,8 +1,9 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma, prisma } from '@adventure/database';
 import { authenticate } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
+import { asyncHandler } from '../utils/asyncHandler';
 import { refundPlayerTurns } from '../services/turnBankService';
 import { addStackableItem } from '../services/inventoryService';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
@@ -22,9 +23,6 @@ import {
 
 const router = Router();
 router.use(authenticate, requireAdmin);
-
-const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
-  (req: Request, res: Response, next: NextFunction) => fn(req, res, next).catch(next);
 
 // ---------------------------------------------------------------------------
 // Player
