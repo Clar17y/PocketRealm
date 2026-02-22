@@ -7,6 +7,7 @@ import { StatBar } from '@/components/StatBar';
 import { Crosshair, Heart, Shield, Sparkles, Sword, X, Zap } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
+import { DURABILITY_CONSTANTS } from '@adventure/shared';
 import { numStat, formatSignedStatValue, signedClass, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
 
 interface EquippedItem {
@@ -113,7 +114,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
       .filter((s) => s.item && s.item.durability < s.item.maxDurability)
       .map((s) => {
         const item = s.item!;
-        const turnCost = item.durability <= 0 ? 150 : 100;
+        const turnCost = item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST;
         return { slotId: s.id, slotName: s.name, item, turnCost };
       });
   }, [slots]);
@@ -724,7 +725,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <PixelButton
                           variant="secondary"
                           size="sm"
-                          disabled={busy || (turns !== undefined && turns < (slot.item.durability <= 0 ? 150 : 100))}
+                          disabled={busy || (turns !== undefined && turns < (slot.item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST))}
                           onClick={async () => {
                             if (!slot.item) return;
                             setBusy(true);
@@ -737,7 +738,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                             }
                           }}
                         >
-                          Repair ({slot.item.durability <= 0 ? '150' : '100'})
+                          Repair ({slot.item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST})
                         </PixelButton>
                       )}
                       <span className="text-xs text-[var(--rpg-text-secondary)] capitalize">{slot.name}</span>
