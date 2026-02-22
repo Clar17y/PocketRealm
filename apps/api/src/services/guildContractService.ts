@@ -5,7 +5,7 @@ import {
   type GuildContractData,
   type GuildContractType,
 } from '@adventure/shared';
-import { addGuildXp } from './guildService';
+import { addGuildXp, checkGuildAchievementsForAllMembers } from './guildService';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -229,6 +229,9 @@ export async function incrementContractProgress(
 
     // Award guild XP (outside transaction since addGuildXp uses its own)
     await addGuildXp(guildId, contract.rewardGuildXp);
+
+    // Fire-and-forget: check contract completion achievements for all members
+    void checkGuildAchievementsForAllMembers(guildId, ['guildContractsCompleted']);
   } else {
     // Just increment
     await prisma.guildContract.update({

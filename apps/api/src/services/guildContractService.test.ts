@@ -6,9 +6,10 @@ import { prisma } from '@adventure/database';
 import { generateWeeklyContracts, getActiveContracts, incrementContractProgress, getWeekStart } from './guildContractService';
 import { GUILD_CONTRACT_CONSTANTS } from '@adventure/shared';
 
-// Also mock guildService since incrementContractProgress calls addGuildXp
+// Also mock guildService since incrementContractProgress calls addGuildXp and checkGuildAchievementsForAllMembers
 vi.mock('./guildService.js', () => ({
   addGuildXp: vi.fn().mockResolvedValue({ level: 1, xp: 0n, leveledUp: false }),
+  checkGuildAchievementsForAllMembers: vi.fn().mockResolvedValue(undefined),
 }));
 
 const db = prisma as unknown as Record<string, any>;

@@ -18,7 +18,8 @@ export type DerivedStatKey =
   | 'totalZonesDiscovered' | 'totalZonesFullyExplored'
   | 'totalRecipesLearned' | 'totalBestiaryCompleted'
   | 'totalUniqueMonsterKills'
-  | 'highestCharacterLevel' | 'highestSkillLevel';
+  | 'highestCharacterLevel' | 'highestSkillLevel'
+  | 'guildLevel' | 'guildContractsCompleted' | 'guildTurnsContributed' | 'guildMemberCount';
 
 export type StatKey = CounterKey | DerivedStatKey;
 
@@ -69,9 +70,37 @@ interface DerivedRow {
   highest_skill_level: number;
 }
 
+interface GuildStatRow {
+  guild_level: number;
+  guild_contracts_completed: number;
+  guild_turns_contributed: number;
+  guild_member_count: number;
+}
+
+async function resolveGuildStats(playerId: string): Promise<GuildStatRow> {
+  const rows = await prisma.$queryRaw<GuildStatRow[]>(Prisma.sql`
+    SELECT
+      COALESCE(g.level, 0)::int AS guild_level,
+      COALESCE((
+        SELECT COUNT(*)::int FROM guild_contracts gc
+        WHERE gc.guild_id = gm.guild_id AND gc.status = 'completed'
+      ), 0) AS guild_contracts_completed,
+      COALESCE(gm.total_turns_contributed, 0)::int AS guild_turns_contributed,
+      COALESCE((
+        SELECT COUNT(*)::int FROM guild_members gm2
+        WHERE gm2.guild_id = gm.guild_id
+      ), 0) AS guild_member_count
+    FROM guild_members gm
+    JOIN guilds g ON g.id = gm.guild_id
+    WHERE gm.player_id = ${playerId}
+    LIMIT 1
+  `);
+  return rows[0] ?? { guild_level: 0, guild_contracts_completed: 0, guild_turns_contributed: 0, guild_member_count: 0 };
+}
+
 /** Resolve all stats (derived + counters) for a player in a single call. */
 export async function resolveAllStats(playerId: string): Promise<ResolvedStats> {
-  const [derivedRows, counters] = await Promise.all([
+  const [derivedRows, counters, guildStats] = await Promise.all([
     prisma.$queryRaw<DerivedRow[]>(Prisma.sql`
       SELECT
         COALESCE((SELECT SUM(kills)::int FROM player_bestiary WHERE player_id = ${playerId}), 0) AS total_kills,
@@ -108,6 +137,7 @@ export async function resolveAllStats(playerId: string): Promise<ResolvedStats> 
         COALESCE((SELECT MAX(level) FROM player_skills WHERE player_id = ${playerId}), 1) AS highest_skill_level
     `),
     prisma.playerStats.findUnique({ where: { playerId } }),
+    resolveGuildStats(playerId),
   ]);
 
   const d = derivedRows[0]!;
@@ -134,6 +164,10 @@ export async function resolveAllStats(playerId: string): Promise<ResolvedStats> 
     totalGatheringActions: counters?.totalGatheringActions ?? 0,
     totalTurnsSpent: counters?.totalTurnsSpent ?? 0,
     totalDeaths: counters?.totalDeaths ?? 0,
+    guildLevel: guildStats.guild_level,
+    guildContractsCompleted: guildStats.guild_contracts_completed,
+    guildTurnsContributed: guildStats.guild_turns_contributed,
+    guildMemberCount: guildStats.guild_member_count,
   };
 }
 

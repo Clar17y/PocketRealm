@@ -5,6 +5,7 @@ import {
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns } from './turnBankService';
+import { checkAchievements, emitAchievementNotifications } from './achievementService';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -304,6 +305,9 @@ export async function joinGuild(playerId: string, guildId: string): Promise<Guil
   // Add guild XP for new member
   await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
 
+  // Fire-and-forget: check member count achievements for all members
+  void checkGuildAchievementsForAllMembers(guildId, ['guildMemberCount']);
+
   return getGuild(guildId);
 }
 
@@ -570,7 +574,25 @@ export async function addGuildXp(guildId: string, amount: number): Promise<{ lev
 
   if (leveledUp) {
     await addGuildLog(guildId, 'guild_level_up', `Guild reached level ${currentLevel}`);
+    // Fire-and-forget: check guild achievements for all members
+    void checkGuildAchievementsForAllMembers(guildId, ['guildLevel', 'guildTurnsContributed']);
   }
 
   return { level: currentLevel, xp: currentXp, leveledUp };
+}
+
+/** Check guild-related achievements for all members of a guild. Fire-and-forget. */
+export async function checkGuildAchievementsForAllMembers(guildId: string, statKeys: string[]): Promise<void> {
+  try {
+    const members = await prisma.guildMember.findMany({
+      where: { guildId },
+      select: { playerId: true },
+    });
+    for (const { playerId } of members) {
+      const newAchievements = await checkAchievements(playerId, { statKeys });
+      await emitAchievementNotifications(playerId, newAchievements);
+    }
+  } catch (err) {
+    console.error('Guild achievement check failed:', err);
+  }
 }
