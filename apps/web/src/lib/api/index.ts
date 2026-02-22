@@ -165,6 +165,13 @@ export {
   getGuildUpgrades,
   activateGuildUpgrade,
   getGuildContracts,
+  getGuildProjects,
+  startGuildProject,
+  contributeProjectTurns,
+  contributeProjectMaterials,
+  getGuildSpecialization,
+  selectGuildSpecialization,
+  respecGuildSpecialization,
 } from './guild';
 export type {
   GuildResponse,
@@ -178,4 +185,10 @@ export type {
   GuildUpgradesResponse,
   GuildContractResponse,
   GuildContractsResponse,
+  GuildProjectResponse,
+  GuildProjectAvailableResponse,
+  GuildProjectsListResponse,
+  GuildProjectContributionResponse,
+  SpecializationStatusResponse,
+  SpecializationTierBonusResponse,
 } from './guild';

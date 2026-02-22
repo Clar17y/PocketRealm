@@ -12,10 +12,12 @@ import {
   type PlayerGuildResponse, type GuildResponse, type GuildMemberResponse,
   type GuildLogResponse, type GuildUpgradesResponse, type GuildContractsResponse,
 } from '@/lib/api';
+import { GuildProjectsTab } from '@/components/guild/GuildProjectsTab';
+import { GuildSpecializationTab } from '@/components/guild/GuildSpecializationTab';
 import { GUILD_CONSTANTS } from '@adventure/shared';
 const formatNumber = (n: number) => n.toLocaleString();
 
-type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'log' | 'settings';
+type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'projects' | 'specialization' | 'log' | 'settings';
 
 interface GuildScreenProps {
   playerId: string | null;
@@ -80,7 +82,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
       )}
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {(['overview', 'members', 'upgrades', 'contracts', 'log', ...(guildData.role === 'leader' || guildData.role === 'officer' ? ['settings'] : [])] as GuildTab[]).map((tab) => (
+        {(['overview', 'members', 'upgrades', 'contracts', 'projects', 'specialization', 'log', ...(guildData.role === 'leader' || guildData.role === 'officer' ? ['settings'] : [])] as GuildTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -111,6 +113,12 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
       )}
       {activeTab === 'contracts' && (
         <GuildContractsTab guildId={guildData.guild.id} />
+      )}
+      {activeTab === 'projects' && (
+        <GuildProjectsTab guildId={guildData.guild.id} myRole={guildData.role} setError={setError} onTurnsChanged={onTurnsChanged} />
+      )}
+      {activeTab === 'specialization' && (
+        <GuildSpecializationTab guildId={guildData.guild.id} guildLevel={guildData.guild.level} myRole={guildData.role} setError={setError} />
       )}
       {activeTab === 'log' && <GuildActivityLog guildId={guildData.guild.id} />}
       {activeTab === 'settings' && (
