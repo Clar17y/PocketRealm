@@ -123,6 +123,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     allSessionMobs = [{ roomNumber: currentRoom, mobs: roomMobs }];
   }
 
+  // Full clear charges turns for all remaining rooms upfront. No refund on mid-clear defeat.
+  // This is intentional: the risk/reward tradeoff is core to the full_clear strategy.
   const totalMobCount = allSessionMobs.reduce((sum, r) => sum + r.mobs.length, 0);
   const totalTurnCost = totalMobCount * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST;
 
@@ -447,7 +449,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       result: {
         zoneId,
         zoneName: zone.name,
-        mobTemplateId: lastPrefixedMob?.id ?? roomMobs[0]?.mobTemplateId,
+        mobTemplateId: lastPrefixedMob?.id ?? fightResults[0]?.mobTemplateId,
         mobName: lastBaseMob?.name,
         mobPrefix: lastPrefixedMob?.mobPrefix,
         mobDisplayName: lastPrefixedMob?.mobDisplayName,
