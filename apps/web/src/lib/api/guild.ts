@@ -105,6 +105,73 @@ export interface GuildContractsResponse {
   contracts: GuildContractResponse[];
 }
 
+// --- Projects ---
+
+export interface GuildProjectContributionResponse {
+  playerId: string;
+  username: string;
+  turnsContributed: number;
+  materialsContributed: Record<string, number>;
+}
+
+export interface GuildProjectResponse {
+  id: string;
+  projectKey: string;
+  name: string;
+  description: string;
+  level: number;
+  status: string;
+  treasuryCost: number;
+  materialCosts: { category: string; quantity: number }[];
+  materialsProgress: Record<string, number>;
+  memberTurnGoal: number;
+  turnsContributed: number;
+  perks: { effectType: string; value: number }[];
+  startedAt: string;
+  completedAt: string | null;
+  contributions?: GuildProjectContributionResponse[];
+}
+
+export interface GuildProjectAvailableResponse {
+  key: string;
+  name: string;
+  description: string;
+  level: number;
+  prerequisites: string[];
+  treasuryCost: number;
+  materialCosts: { category: string; quantity: number }[];
+  memberTurnGoal: number;
+  perks: { effectType: string; value: number }[];
+  guildXpReward: number;
+  canStart: boolean;
+  reason?: string;
+}
+
+export interface GuildProjectsListResponse {
+  projects: GuildProjectResponse[];
+  available: GuildProjectAvailableResponse[];
+}
+
+// --- Specialization ---
+
+export interface SpecializationTierBonusResponse {
+  effectType: string;
+  value: number;
+}
+
+export interface SpecializationStatusResponse {
+  path: string;
+  name: string;
+  description: string;
+  activeTier: number;
+  bonuses: SpecializationTierBonusResponse[];
+  nextTier: {
+    tier: number;
+    guildLevelGate: number;
+    bonuses: SpecializationTierBonusResponse[];
+  } | null;
+}
+
 // ---------------------------------------------------------------------------
 // API Functions
 // ---------------------------------------------------------------------------
@@ -192,4 +259,51 @@ export async function activateGuildUpgrade(guildId: string, upgradeKey: string, 
 
 export async function getGuildContracts(guildId: string) {
   return fetchApi<GuildContractsResponse>(`/api/v1/guild/${guildId}/contracts`);
+}
+
+// --- Projects ---
+
+export async function getGuildProjects(guildId: string) {
+  return fetchApi<GuildProjectsListResponse>(`/api/v1/guild/${guildId}/projects`);
+}
+
+export async function startGuildProject(guildId: string, projectKey: string) {
+  return fetchApi<GuildProjectResponse>(`/api/v1/guild/${guildId}/projects/start`, {
+    method: 'POST',
+    body: JSON.stringify({ projectKey }),
+  });
+}
+
+export async function contributeProjectTurns(guildId: string, projectId: string, amount: number) {
+  return fetchApi<GuildProjectResponse>(`/api/v1/guild/${guildId}/projects/${projectId}/contribute/turns`, {
+    method: 'POST',
+    body: JSON.stringify({ amount }),
+  });
+}
+
+export async function contributeProjectMaterials(guildId: string, projectId: string, templateId: string, quantity: number) {
+  return fetchApi<GuildProjectResponse>(`/api/v1/guild/${guildId}/projects/${projectId}/contribute/materials`, {
+    method: 'POST',
+    body: JSON.stringify({ templateId, quantity }),
+  });
+}
+
+// --- Specialization ---
+
+export async function getGuildSpecialization(guildId: string) {
+  return fetchApi<SpecializationStatusResponse | null>(`/api/v1/guild/${guildId}/specialization`);
+}
+
+export async function selectGuildSpecialization(guildId: string, path: string) {
+  return fetchApi<{ specialization: string }>(`/api/v1/guild/${guildId}/specialization/select`, {
+    method: 'POST',
+    body: JSON.stringify({ path }),
+  });
+}
+
+export async function respecGuildSpecialization(guildId: string, path: string) {
+  return fetchApi<{ specialization: string }>(`/api/v1/guild/${guildId}/specialization/respec`, {
+    method: 'POST',
+    body: JSON.stringify({ path }),
+  });
 }
