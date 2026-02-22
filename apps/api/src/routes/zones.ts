@@ -21,6 +21,7 @@ import { getPlayerProgressionState } from '../services/attributesService';
 import { grantSkillXp } from '../services/xpService';
 import { rollAndGrantLoot } from '../services/lootService';
 import { serializeXpGrant } from '../utils/routeHelpers.js';
+import { prismaAny } from '../utils/prismaAny.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
 import {
   ensureStarterDiscoveries,
@@ -33,7 +34,6 @@ import { calculateExplorationPercent, getExplorationPercent } from '../services/
 import { incrementStats } from '../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 
-const db = prisma as unknown as any;
 
 export const zonesRouter = Router();
 
@@ -52,13 +52,13 @@ zonesRouter.get('/', async (req, res, next) => {
 
     // Fetch all data in parallel
     const [zones, connections, discoveredZoneIds, player, explorations] = await Promise.all([
-      db.zone.findMany({
+      prismaAny.zone.findMany({
         orderBy: [{ isStarter: 'desc' }, { difficulty: 'asc' }, { name: 'asc' }],
       }),
-      db.zoneConnection.findMany({ select: { fromId: true, toId: true, explorationThreshold: true } }),
+      prismaAny.zoneConnection.findMany({ select: { fromId: true, toId: true, explorationThreshold: true } }),
       getDiscoveredZoneIds(playerId),
       prisma.player.findUnique({ where: { id: playerId }, select: { currentZoneId: true } }),
-      db.playerZoneExploration.findMany({
+      prismaAny.playerZoneExploration.findMany({
         where: { playerId },
         select: { zoneId: true, turnsExplored: true },
       }),
@@ -76,7 +76,7 @@ zonesRouter.get('/', async (req, res, next) => {
     // Lazy-init currentZoneId if null (existing players from before this feature)
     let currentZoneId = player?.currentZoneId ?? null;
     if (!currentZoneId) {
-      const starterZone = await db.zone.findFirst({ where: { isStarter: true } });
+      const starterZone = await prismaAny.zone.findFirst({ where: { isStarter: true } });
       if (starterZone) {
         currentZoneId = starterZone.id;
         await prisma.player.update({
@@ -148,7 +148,7 @@ zonesRouter.post('/travel', async (req, res, next) => {
     const destinationId = body.zoneId;
 
     // 1. Get player with zone info
-    const player = await db.player.findUniqueOrThrow({
+    const player = await prismaAny.player.findUniqueOrThrow({
       where: { id: playerId },
       select: {
         currentZoneId: true,
@@ -175,7 +175,7 @@ zonesRouter.post('/travel', async (req, res, next) => {
     }
 
     // 4. Validate destination is discovered
-    const discovery = await db.playerZoneDiscovery.findUnique({
+    const discovery = await prismaAny.playerZoneDiscovery.findUnique({
       where: { playerId_zoneId: { playerId, zoneId: destinationId } },
     });
     if (!discovery) {
@@ -183,7 +183,7 @@ zonesRouter.post('/travel', async (req, res, next) => {
     }
 
     // 5. Validate connection exists
-    const connection = await db.zoneConnection.findUnique({
+    const connection = await prismaAny.zoneConnection.findUnique({
       where: { fromId_toId: { fromId: currentZoneId, toId: destinationId } },
     });
     if (!connection) {
@@ -192,8 +192,8 @@ zonesRouter.post('/travel', async (req, res, next) => {
 
     // 6. Get current zone and destination zone data
     const [currentZone, destinationZone] = await Promise.all([
-      db.zone.findUniqueOrThrow({ where: { id: currentZoneId } }),
-      db.zone.findUniqueOrThrow({ where: { id: destinationId } }),
+      prismaAny.zone.findUniqueOrThrow({ where: { id: currentZoneId } }),
+      prismaAny.zone.findUniqueOrThrow({ where: { id: destinationId } }),
     ]);
 
     // Helper to fetch current turn state for the response
@@ -209,7 +209,7 @@ zonesRouter.post('/travel', async (req, res, next) => {
 
     // 7. BREADCRUMB RETURN: free travel back to where you came from
     if (destinationId === player.lastTravelledFromZoneId) {
-      await db.player.update({
+      await prismaAny.player.update({
         where: { id: playerId },
         data: {
           currentZoneId: destinationId,
@@ -219,12 +219,12 @@ zonesRouter.post('/travel', async (req, res, next) => {
 
       let newDiscoveries: Array<{ id: string; name: string }> = [];
       if (destinationZone.zoneType === 'town') {
-        await db.player.update({
+        await prismaAny.player.update({
           where: { id: playerId },
           data: { homeTownId: destinationId },
         });
         const discoveredIds = await discoverZonesFromTown(playerId, destinationId);
-        const discoveredZones = await db.zone.findMany({
+        const discoveredZones = await prismaAny.zone.findMany({
           where: { id: { in: discoveredIds } },
           select: { id: true, name: true },
         });
@@ -346,7 +346,7 @@ zonesRouter.post('/travel', async (req, res, next) => {
               update: { kills: { increment: 1 } },
             });
             if (prefixedMob.mobPrefix) {
-              await db.playerBestiaryPrefix.upsert({
+              await prismaAny.playerBestiaryPrefix.upsert({
                 where: {
                   playerId_mobTemplateId_prefix: {
                     playerId, mobTemplateId: prefixedMob.id, prefix: prefixedMob.mobPrefix,
@@ -480,7 +480,7 @@ zonesRouter.post('/travel', async (req, res, next) => {
               }
 
               const discoveredIds = await discoverZonesFromTown(playerId, respawn.townId);
-              const discoveredZones = await db.zone.findMany({
+              const discoveredZones = await prismaAny.zone.findMany({
                 where: { id: { in: discoveredIds } },
                 select: { id: true, name: true },
               });
@@ -617,14 +617,14 @@ zonesRouter.post('/travel', async (req, res, next) => {
     if (destinationZone.zoneType === 'town') {
       updateData.homeTownId = destinationId;
       const discoveredIds = await discoverZonesFromTown(playerId, destinationId);
-      const discoveredZones = await db.zone.findMany({
+      const discoveredZones = await prismaAny.zone.findMany({
         where: { id: { in: discoveredIds } },
         select: { id: true, name: true },
       });
       newDiscoveries = discoveredZones;
     }
 
-    await db.player.update({
+    await prismaAny.player.update({
       where: { id: playerId },
       data: updateData,
     });

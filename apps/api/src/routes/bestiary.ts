@@ -2,12 +2,12 @@ import { Router } from 'express';
 import { prisma } from '@adventure/database';
 import { getAllMobPrefixes } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
+import { prismaAny } from '../utils/prismaAny.js';
 import { calculateExplorationPercent } from '../services/zoneExplorationService';
 
 export const bestiaryRouter = Router();
 
 bestiaryRouter.use(authenticate);
-const prismaAny = prisma as unknown as any;
 
 function rarityFromTier(tier: number): 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' {
   if (tier >= 5) return 'legendary';

@@ -1,6 +1,6 @@
 import { prisma } from '@adventure/database';
+import { prismaAny } from '../utils/prismaAny.js';
 
-const prismaAny = prisma as unknown as any;
 
 export function calculateExplorationPercent(turnsExplored: number, turnsToExplore: number | null): number {
   if (!turnsToExplore || turnsToExplore <= 0) return 100;

@@ -12,7 +12,7 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { getSkillLevel } from '../../services/combatStatsService.js';
 
-export const prismaAny = prisma as unknown as any;
+export { prismaAny } from '../../utils/prismaAny.js';
 
 // ── Type guards ──────────────────────────────────────────────────────
 

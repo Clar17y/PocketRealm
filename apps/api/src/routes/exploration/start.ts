@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
+import { prismaAny } from '../../utils/prismaAny.js';
 import {
   applyMobEventModifiers,
   applyMobPrefix,
@@ -61,7 +62,6 @@ import {
 
 export const startRouter = Router();
 
-const prismaAny = prisma as unknown as any;
 
 /**
  * POST /api/v1/exploration/start

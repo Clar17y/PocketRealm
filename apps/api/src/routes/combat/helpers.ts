@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Prisma, prisma } from '@adventure/database';
+import { Prisma } from '@adventure/database';
 import { EXPLORATION_CONSTANTS } from '@adventure/shared';
 import type { PotionConsumed } from '@adventure/shared';
 import { degradeEquippedDurability } from '../../services/durabilityService';
@@ -7,7 +7,7 @@ import { grantSkillXp } from '../../services/xpService';
 import type { LootDropWithName } from '../../services/lootService';
 import { paginationSchema } from '../../utils/routeHelpers.js';
 
-export const prismaAny = prisma as unknown as any;
+export { prismaAny } from '../../utils/prismaAny.js';
 
 export const attackSkillSchema = z.enum(['melee', 'ranged', 'magic']);
 

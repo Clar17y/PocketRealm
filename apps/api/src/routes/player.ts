@@ -13,8 +13,9 @@ import {
 import { incrementStats } from '../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 
+import { prismaAny } from '../utils/prismaAny.js';
+
 export const playerRouter = Router();
-const prismaAny = prisma as unknown as any;
 
 playerRouter.use(authenticate);
 
