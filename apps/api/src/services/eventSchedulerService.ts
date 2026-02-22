@@ -8,21 +8,10 @@ import {
 import { expireStaleEvents, spawnWorldEvent } from './worldEventService';
 import { createBossEncounter, checkAndResolveDueBossRounds } from './bossEncounterService';
 import { emitSystemMessage } from './systemMessageService';
+import { pickWeighted } from '../utils/pickWeighted.js';
 
 let lastRunAt = 0;
 const MIN_INTERVAL_MS = 60_000;
-
-function pickWeightedTemplate(templates: WorldEventTemplate[]): WorldEventTemplate | null {
-  const totalWeight = templates.reduce((sum, t) => sum + t.weight, 0);
-  if (totalWeight <= 0) return null;
-
-  let roll = Math.random() * totalWeight;
-  for (const t of templates) {
-    roll -= t.weight;
-    if (roll <= 0) return t;
-  }
-  return templates[templates.length - 1] ?? null;
-}
 
 function pickRandom<T>(arr: T[]): T | undefined {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -178,7 +167,7 @@ async function trySpawnWorldWideEvent(io: SocketServer | null): Promise<void> {
     eligible = allWorld;
   }
 
-  const template = pickWeightedTemplate(eligible);
+  const template = pickWeighted(eligible, t => t.weight);
   if (!template) return;
 
   const resolved = await resolveTarget(template, null);
@@ -300,7 +289,7 @@ async function trySpawnZoneEvent(io: SocketServer | null): Promise<void> {
   const templates = WORLD_EVENT_TEMPLATES.filter(
     (t) => t.scope === 'zone' && !zoneEffects.has(t.effectType),
   );
-  const template = pickWeightedTemplate(templates);
+  const template = pickWeighted(templates, t => t.weight);
   if (!template) return;
 
   const resolved = await resolveTarget(template, zone.id);

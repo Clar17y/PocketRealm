@@ -36,17 +36,7 @@ export const listEncounterSitesQuerySchema = z.object({
   ...paginationSchema,
 });
 
-export function pickWeighted<T extends { encounterWeight: number }>(items: T[]): T | null {
-  const totalWeight = items.reduce((sum, item) => sum + item.encounterWeight, 0);
-  if (totalWeight <= 0) return null;
-
-  let roll = Math.random() * totalWeight;
-  for (const item of items) {
-    roll -= item.encounterWeight;
-    if (roll <= 0) return item;
-  }
-  return items[items.length - 1] ?? null;
-}
+export { pickWeighted } from '../../utils/pickWeighted.js';
 
 export function toEncounterSiteSize(value: string): EncounterSiteSize {
   if (value === 'small' || value === 'medium' || value === 'large') return value;

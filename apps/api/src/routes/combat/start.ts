@@ -622,7 +622,7 @@ export function registerStartRoutes(router: Router): void {
           allTiersUnlocked[String(c.explorationTier)] = 0;
         }
         const tieredMobs = filterAndWeightMobsByTier(candidates, 100, allTiersUnlocked);
-        const picked = pickWeighted(tieredMobs);
+        const picked = pickWeighted(tieredMobs, m => m.encounterWeight);
         if (!picked) {
           throw new AppError(400, 'No mobs available for this zone', 'NO_MOBS');
         }

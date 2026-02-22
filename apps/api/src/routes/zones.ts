@@ -22,6 +22,7 @@ import { grantSkillXp } from '../services/xpService';
 import { rollAndGrantLoot } from '../services/lootService';
 import { serializeXpGrant } from '../utils/routeHelpers.js';
 import { prismaAny } from '../utils/prismaAny.js';
+import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
 import {
   ensureStarterDiscoveries,
@@ -292,14 +293,7 @@ zonesRouter.post('/travel', async (req, res, next) => {
         for (const ambush of ambushes) {
           if (tieredMobs.length === 0) break;
 
-          // Pick weighted mob from tier-filtered pool
-          const totalWeight = tieredMobs.reduce((sum, m) => sum + m.encounterWeight, 0);
-          let roll = Math.random() * totalWeight;
-          let rawMob = tieredMobs[0]!;
-          for (const m of tieredMobs) {
-            roll -= m.encounterWeight;
-            if (roll <= 0) { rawMob = m; break; }
-          }
+          const rawMob = pickWeighted(tieredMobs, m => m.encounterWeight) ?? tieredMobs[0]!;
           const baseMob: MobTemplate = {
             ...(rawMob as unknown as MobTemplate),
             spellPattern: Array.isArray(rawMob.spellPattern) ? (rawMob.spellPattern as unknown as MobTemplate['spellPattern']) : [],

@@ -8,6 +8,7 @@ import {
   rollMobPrefix,
   selectTierWithBleedthrough,
 } from '@adventure/game-engine';
+import { pickWeighted as pickWeightedGeneric } from '../../utils/pickWeighted.js';
 
 // --- Zod schemas ---
 
@@ -105,20 +106,10 @@ export function pickWeighted<T>(
   weightKey: string,
   defaultWeight = 100
 ): T | null {
-  const getWeight = (item: T): number => {
+  return pickWeightedGeneric(items, (item) => {
     const value = (item as Record<string, unknown>)[weightKey];
     return typeof value === 'number' && Number.isFinite(value) ? value : defaultWeight;
-  };
-
-  const totalWeight = items.reduce((sum, item) => sum + Math.max(0, getWeight(item)), 0);
-  if (totalWeight <= 0) return null;
-
-  let roll = Math.random() * totalWeight;
-  for (const item of items) {
-    roll -= Math.max(0, getWeight(item));
-    if (roll <= 0) return item;
-  }
-  return items[items.length - 1] ?? null;
+  });
 }
 
 export function randomIntInclusive(min: number, max: number): number {
