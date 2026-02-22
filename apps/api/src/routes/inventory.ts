@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@adventure/database';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { getOwnedItem } from '../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { DURABILITY_CONSTANTS } from '@adventure/shared';
 import { useConsumable } from '../services/consumableService';
@@ -64,23 +65,9 @@ inventoryRouter.delete('/:id', async (req, res, next) => {
     const params = deleteParamsSchema.parse(req.params);
     const query = deleteQuerySchema.parse(req.query);
 
-    const item = await prisma.item.findUnique({
-      where: { id: params.id },
-      include: { template: true },
+    const item = await getOwnedItem(playerId, params.id, {
+      requireNotEquipped: true,
     });
-
-    if (!item || item.ownerId !== playerId) {
-      throw new AppError(404, 'Item not found', 'NOT_FOUND');
-    }
-
-    const equipped = await prisma.playerEquipment.findFirst({
-      where: { playerId, itemId: item.id },
-      select: { slot: true },
-    });
-
-    if (equipped) {
-      throw new AppError(400, 'Cannot destroy an equipped item', 'ITEM_EQUIPPED');
-    }
 
     if (item.template.stackable && query.quantity && query.quantity < item.quantity) {
       const updated = await prisma.item.update({

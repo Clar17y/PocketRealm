@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
 import { CRAFTING_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
+import { getOwnedItem } from '../../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { incrementStats } from '../../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
@@ -28,31 +29,11 @@ salvageRouter.post('/', async (req, res, next) => {
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);
 
-    const item = await prisma.item.findUnique({
-      where: { id: body.itemId },
-      include: { template: true },
+    const item = await getOwnedItem(playerId, body.itemId, {
+      requireWeaponOrArmor: true,
+      requireNotStacked: true,
+      requireNotEquipped: true,
     });
-
-    if (!item || item.ownerId !== playerId) {
-      throw new AppError(404, 'Item not found', 'NOT_FOUND');
-    }
-
-    if (item.template.itemType !== 'weapon' && item.template.itemType !== 'armor') {
-      throw new AppError(400, 'Only weapons/armor can be salvaged', 'INVALID_ITEM_TYPE');
-    }
-
-    if (item.quantity !== 1) {
-      throw new AppError(400, 'Cannot salvage stacked items', 'INVALID_STACK');
-    }
-
-    const equipped = await prisma.playerEquipment.findFirst({
-      where: { playerId, itemId: item.id },
-      select: { slot: true },
-    });
-
-    if (equipped) {
-      throw new AppError(400, 'Cannot salvage an equipped item', 'ITEM_EQUIPPED');
-    }
 
     const recipe = await prisma.craftingRecipe.findFirst({
       where: { resultTemplateId: item.templateId },
