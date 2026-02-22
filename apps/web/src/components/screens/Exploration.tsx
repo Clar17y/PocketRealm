@@ -5,6 +5,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
+import { StatBar } from '../StatBar';
 import { Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS } from '@adventure/shared';
 import Image from 'next/image';
@@ -29,6 +30,9 @@ interface ExplorationProps {
   activityLog: ActivityLogEntry[];
   isRecovering?: boolean;
   recoveryCost?: number | null;
+  currentHp?: number;
+  maxHp?: number;
+  regenPerSecond?: number;
   playbackData?: {
     totalTurns: number;
     zoneName: string;
@@ -47,7 +51,7 @@ interface ExplorationProps {
   tutorialLocked?: boolean;
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
 
   const calculateProbabilities = (turns: number) => {
@@ -69,6 +73,25 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
       {/* Knockout Banner */}
       {isRecovering && !playbackData && (
         <KnockoutBanner action="exploring" recoveryCost={recoveryCost} />
+      )}
+
+      {/* HP Status */}
+      {!playbackData && typeof currentHp === 'number' && typeof maxHp === 'number' && !isRecovering && (
+        <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className={`text-sm font-bold font-mono ${
+              (currentHp / maxHp) < 0.25 ? 'text-[var(--rpg-red)]'
+              : (currentHp / maxHp) < 0.5 ? 'text-yellow-400'
+              : 'text-[var(--rpg-green-light)]'
+            }`}>
+              {Math.floor(currentHp)} / {maxHp} HP
+            </span>
+            {typeof regenPerSecond === 'number' && (
+              <span className="text-xs text-[var(--rpg-text-secondary)]">+{regenPerSecond}/s</span>
+            )}
+          </div>
+          <StatBar current={currentHp} max={maxHp} color="health" size="sm" showNumbers={false} />
+        </div>
       )}
 
       {/* Zone Header — always visible */}

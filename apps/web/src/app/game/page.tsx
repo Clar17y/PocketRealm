@@ -416,6 +416,9 @@ export default function GamePage() {
             activityLog={activityLog}
             isRecovering={hpState.isRecovering}
             recoveryCost={hpState.recoveryCost}
+            currentHp={hpState.currentHp}
+            maxHp={hpState.maxHp}
+            regenPerSecond={hpState.regenPerSecond}
             playbackData={explorationPlaybackData}
             onPlaybackComplete={handleExplorationPlaybackComplete}
             onPlaybackSkip={handlePlaybackSkip}
