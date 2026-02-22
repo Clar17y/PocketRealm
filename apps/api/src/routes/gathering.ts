@@ -9,6 +9,7 @@ import { addStackableItemTx } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { getHpState } from '../services/hpService';
 import { serializeXpGrant, paginationSchema, buildPagination } from '../utils/routeHelpers.js';
+import { getSkillLevel } from '../services/combatStatsService.js';
 import { incrementStats } from '../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
@@ -204,15 +205,6 @@ async function getResourceTemplateId(resourceType: string): Promise<string> {
     throw new AppError(400, `No resource item template found for resourceType=${resourceType}`, 'MISSING_TEMPLATE');
   }
   return match.id;
-}
-
-async function getSkillLevel(playerId: string, skillType: SkillType): Promise<number> {
-  const skill = await prisma.playerSkill.findUnique({
-    where: { playerId_skillType: { playerId, skillType } },
-    select: { level: true },
-  });
-
-  return skill?.level ?? 1;
 }
 
 /**

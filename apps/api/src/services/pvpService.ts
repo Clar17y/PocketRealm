@@ -3,6 +3,7 @@ import { buildPlayerCombatStats, calculateFleeResult, calculateMaxHp, runCombat 
 import { PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, type Combatant, type CombatResult, type SkillType } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { buildPagination } from '../utils/routeHelpers.js';
+import { getSkillLevel } from './combatStatsService.js';
 import { calculateEloChange } from './eloService';
 import { getEquipmentStats } from './equipmentService';
 import { spendPlayerTurnsTx } from './turnBankService';
@@ -197,14 +198,6 @@ async function calculatePowerRating(playerId: string): Promise<number> {
   const skillTotal = combatSkills.reduce((sum, s) => sum + s.level, 0);
 
   return statTotal + attrTotal + skillTotal;
-}
-
-async function getSkillLevel(playerId: string, skillType: SkillType): Promise<number> {
-  const skill = await prisma.playerSkill.findUnique({
-    where: { playerId_skillType: { playerId, skillType } },
-    select: { level: true },
-  });
-  return skill?.level ?? 1;
 }
 
 export async function challenge(

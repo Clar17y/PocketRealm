@@ -141,21 +141,6 @@ startRouter.post('/start', async (req, res, next) => {
     // Fetch zone modifiers from active world events
     const zoneModifiers = await getActiveZoneModifiers(body.zoneId);
 
-    const turnSpend = await spendPlayerTurns(playerId, turnsToSpend);
-
-    const outcomes = isTutorialExplore
-      ? [{ turnOccurred: 50, type: 'ambush' as const }]
-      : simulateExploration(turnsToSpend, effectiveExitChance);
-
-    const pendingResources: PendingResourceDiscovery[] = [];
-    const pendingSites: PendingEncounterSiteDiscovery[] = [];
-    const pendingCombatLogs: PendingAmbushCombatLog[] = [];
-    const events: NarrativeEvent[] = [];
-
-    const hiddenCaches: Array<{ turnOccurred: number }> = [];
-    let zoneExitDiscovered = false;
-    let wasKnockedOut = false;
-
     // Auto-potion setup + tutorial detection
     const playerRecord = await prismaAny.player.findUnique({
       where: { id: playerId },
@@ -170,6 +155,21 @@ startRouter.post('/start', async (req, res, next) => {
       ? await buildPotionPool(playerId, hpState.maxHp)
       : [];
     const allPotionsConsumed: PotionConsumed[] = [];
+
+    const turnSpend = await spendPlayerTurns(playerId, turnsToSpend);
+
+    const outcomes = isTutorialExplore
+      ? [{ turnOccurred: 50, type: 'ambush' as const }]
+      : simulateExploration(turnsToSpend, effectiveExitChance);
+
+    const pendingResources: PendingResourceDiscovery[] = [];
+    const pendingSites: PendingEncounterSiteDiscovery[] = [];
+    const pendingCombatLogs: PendingAmbushCombatLog[] = [];
+    const events: NarrativeEvent[] = [];
+
+    const hiddenCaches: Array<{ turnOccurred: number }> = [];
+    let zoneExitDiscovered = false;
+    let wasKnockedOut = false;
 
     let currentHp = hpState.currentHp;
     let aborted = false;

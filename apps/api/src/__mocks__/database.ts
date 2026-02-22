@@ -60,6 +60,7 @@ export const prisma = {
   playerBestiary: mockModel(),
   playerBestiaryPrefix: mockModel(),
   encounterSite: mockModel(),
+  playerResourceNode: mockModel(),
   $transaction: vi.fn((fn: (tx: any) => Promise<any>) => fn(prisma)),
   $queryRaw: vi.fn(),
 };

@@ -10,6 +10,7 @@ import {
   type SkillType,
 } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
+import { getSkillLevel } from '../../services/combatStatsService.js';
 
 export const prismaAny = prisma as unknown as any;
 
@@ -34,14 +35,7 @@ export function parseItemRarity(value: string): ItemRarity {
 
 // ── DB helpers ───────────────────────────────────────────────────────
 
-export async function getSkillLevel(playerId: string, skillType: SkillType): Promise<number> {
-  const skill = await prisma.playerSkill.findUnique({
-    where: { playerId_skillType: { playerId, skillType } },
-    select: { level: true },
-  });
-
-  return skill?.level ?? 1;
-}
+export { getSkillLevel } from '../../services/combatStatsService.js';
 
 export async function getZoneCraftingLevel(playerId: string): Promise<{ maxCraftingLevel: number | null; zoneName: string }> {
   const player = await prisma.player.findUnique({
