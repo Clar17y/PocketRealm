@@ -59,6 +59,9 @@ export function Inventory({ items, onDrop, onSalvage, onRepair, onEquip, onUnequ
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const equippedItems = items.filter((item) => item.equippedSlot);
+  const backpackItems = items.filter((item) => !item.equippedSlot);
+
   const stats = selectedItem?.baseStats ?? {};
   const attack = numStat(stats.attack);
   const armor = numStat(stats.armor);
@@ -95,26 +98,53 @@ export function Inventory({ items, onDrop, onSalvage, onRepair, onEquip, onUnequ
         <div className="text-sm text-[var(--rpg-text-secondary)]">{items.length} items</div>
       </div>
 
-      {/* Item Grid */}
-      <div className="grid grid-cols-6 gap-2">
-        {items.map((item) => (
-          <ItemCard
-            key={item.id}
-            name={item.name}
-            icon={item.icon}
-            imageSrc={item.imageSrc}
-            quantity={item.quantity}
-            rarity={item.rarity}
-            onClick={() => setSelectedItem(item)}
-          />
-        ))}
-        {/* Empty slots */}
-        {Array.from({ length: Math.max(0, 24 - items.length) }).map((_, idx) => (
-          <div
-            key={`empty-${idx}`}
-            className="aspect-square bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg opacity-30"
-          />
-        ))}
+      {/* Equipped Items */}
+      {equippedItems.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
+            Equipped ({equippedItems.length})
+          </div>
+          <div className="grid grid-cols-6 gap-2">
+            {equippedItems.map((item) => (
+              <ItemCard
+                key={item.id}
+                name={item.name}
+                icon={item.icon}
+                imageSrc={item.imageSrc}
+                quantity={item.quantity}
+                rarity={item.rarity}
+                onClick={() => setSelectedItem(item)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Backpack Items */}
+      <div className="space-y-2">
+        <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
+          Backpack ({backpackItems.length})
+        </div>
+        <div className="grid grid-cols-6 gap-2">
+          {backpackItems.map((item) => (
+            <ItemCard
+              key={item.id}
+              name={item.name}
+              icon={item.icon}
+              imageSrc={item.imageSrc}
+              quantity={item.quantity}
+              rarity={item.rarity}
+              onClick={() => setSelectedItem(item)}
+            />
+          ))}
+          {/* Empty slots */}
+          {Array.from({ length: Math.max(0, 24 - backpackItems.length) }).map((_, idx) => (
+            <div
+              key={`empty-${idx}`}
+              className="aspect-square bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg opacity-30"
+            />
+          ))}
+        </div>
       </div>
 
       {/* Item Detail Modal */}
