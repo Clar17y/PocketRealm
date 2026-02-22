@@ -116,21 +116,32 @@ export async function startProject(
 export async function getGuildProjects(guildId: string) {
   const projects = await prisma.guildProject.findMany({
     where: { guildId },
-    include: {
-      contributions: {
-        include: { player: { select: { username: true } } },
-      },
-    },
+    include: { contributions: true },
     orderBy: { startedAt: 'desc' },
   });
+
+  // Collect unique player IDs from contributions to look up usernames
+  const playerIds = new Set<string>();
+  for (const p of projects) {
+    for (const c of p.contributions) {
+      playerIds.add(c.playerId);
+    }
+  }
+  const players = playerIds.size > 0
+    ? await prisma.player.findMany({
+        where: { id: { in: [...playerIds] } },
+        select: { id: true, username: true },
+      })
+    : [];
+  const usernameMap = new Map(players.map((p) => [p.id, p.username]));
 
   return projects.map((p) => {
     const def = GUILD_PROJECT_DEFINITIONS.find((d) => d.key === p.projectKey);
     return {
       ...toProjectData(p, def),
-      contributions: p.contributions.map((c: any) => ({
+      contributions: p.contributions.map((c) => ({
         playerId: c.playerId,
-        username: c.player.username,
+        username: usernameMap.get(c.playerId) ?? 'Unknown',
         turnsContributed: c.turnsContributed,
         materialsContributed: (c.materialsContributed ?? {}) as Record<string, number>,
       })),

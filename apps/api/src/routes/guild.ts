@@ -9,6 +9,13 @@ import {
 } from '../services/guildService';
 import { activateUpgrade, getActiveUpgrades, getAvailableUpgrades } from '../services/guildUpgradeService';
 import { getActiveContracts } from '../services/guildContractService';
+import {
+  startProject, getGuildProjects, getAvailableProjects,
+  contributeTurns, contributeMaterials,
+} from '../services/guildProjectService';
+import {
+  selectSpecialization, respecSpecialization, getSpecializationStatus,
+} from '../services/guildSpecializationService';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const guildRouter = Router();
@@ -155,4 +162,77 @@ guildRouter.post('/:id/upgrades/activate', asyncHandler(async (req, res) => {
 guildRouter.get('/:id/contracts', asyncHandler(async (req, res) => {
   const contracts = await getActiveContracts(req.params.id);
   res.json({ contracts });
+}));
+
+// --- Projects ---
+
+const startProjectSchema = z.object({
+  projectKey: z.string().min(1),
+});
+
+const contributeTurnsSchema = z.object({
+  amount: z.number().int().positive(),
+});
+
+const contributeMaterialsSchema = z.object({
+  templateId: z.string().uuid(),
+  quantity: z.number().int().positive(),
+});
+
+// GET /:id/projects
+guildRouter.get('/:id/projects', asyncHandler(async (req, res) => {
+  const projects = await getGuildProjects(req.params.id);
+  const available = await getAvailableProjects(req.params.id);
+  res.json({ projects, available });
+}));
+
+// POST /:id/projects/start
+guildRouter.post('/:id/projects/start', asyncHandler(async (req, res) => {
+  const body = startProjectSchema.parse(req.body);
+  const result = await startProject(req.player!.playerId, req.params.id, body.projectKey);
+  res.status(201).json(result);
+}));
+
+// POST /:id/projects/:projectId/contribute/turns
+guildRouter.post('/:id/projects/:projectId/contribute/turns', asyncHandler(async (req, res) => {
+  const body = contributeTurnsSchema.parse(req.body);
+  const result = await contributeTurns(
+    req.player!.playerId, req.params.id, req.params.projectId, body.amount,
+  );
+  res.json(result);
+}));
+
+// POST /:id/projects/:projectId/contribute/materials
+guildRouter.post('/:id/projects/:projectId/contribute/materials', asyncHandler(async (req, res) => {
+  const body = contributeMaterialsSchema.parse(req.body);
+  const result = await contributeMaterials(
+    req.player!.playerId, req.params.id, req.params.projectId, body.templateId, body.quantity,
+  );
+  res.json(result);
+}));
+
+// --- Specialization ---
+
+const selectSpecializationSchema = z.object({
+  path: z.enum(['warfare', 'industry', 'discovery']),
+});
+
+// GET /:id/specialization
+guildRouter.get('/:id/specialization', asyncHandler(async (req, res) => {
+  const result = await getSpecializationStatus(req.params.id);
+  res.json(result);
+}));
+
+// POST /:id/specialization/select
+guildRouter.post('/:id/specialization/select', asyncHandler(async (req, res) => {
+  const body = selectSpecializationSchema.parse(req.body);
+  const result = await selectSpecialization(req.player!.playerId, req.params.id, body.path);
+  res.json(result);
+}));
+
+// POST /:id/specialization/respec
+guildRouter.post('/:id/specialization/respec', asyncHandler(async (req, res) => {
+  const body = selectSpecializationSchema.parse(req.body);
+  const result = await respecSpecialization(req.player!.playerId, req.params.id, body.path);
+  res.json(result);
 }));

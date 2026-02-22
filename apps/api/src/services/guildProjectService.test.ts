@@ -150,18 +150,21 @@ describe('getGuildProjects', () => {
         turnsContributed: 50_000, materialsProgress: { ore: 1000, ingot: 500 },
         status: 'active', startedAt: new Date(), completedAt: null,
         contributions: [
-          { playerId: 'p1', turnsContributed: 30_000, materialsContributed: { ore: 600 },
-            player: { username: 'Alice' } },
-          { playerId: 'p2', turnsContributed: 20_000, materialsContributed: { ore: 400 },
-            player: { username: 'Bob' } },
+          { playerId: 'p1', turnsContributed: 30_000, materialsContributed: { ore: 600 } },
+          { playerId: 'p2', turnsContributed: 20_000, materialsContributed: { ore: 400 } },
         ],
       },
+    ]);
+    db.player.findMany.mockResolvedValue([
+      { id: 'p1', username: 'Alice' },
+      { id: 'p2', username: 'Bob' },
     ]);
 
     const result = await getGuildProjects(GUILD_ID);
     expect(result).toHaveLength(1);
     expect(result[0].projectKey).toBe('guild_forge');
     expect(result[0].turnsContributed).toBe(50_000);
+    expect(result[0].contributions[0].username).toBe('Alice');
   });
 });
 
