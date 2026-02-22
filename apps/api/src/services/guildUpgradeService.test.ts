@@ -169,6 +169,8 @@ describe('getPlayerGuildModifiers', () => {
     // 10+ active members → full scaling
     const members = Array.from({ length: 12 }, () => ({ lastActiveAt: NOW }));
     db.guildMember.findMany.mockResolvedValue(members);
+    db.guildProject.findMany.mockResolvedValue([]);
+    db.guild.findUnique.mockResolvedValue({ specialization: null, level: 5 });
 
     const mods = await getPlayerGuildModifiers(PLAYER_ID);
     expect(mods.xpBoost).toBeCloseTo(0.10);
@@ -192,6 +194,8 @@ describe('getPlayerGuildModifiers', () => {
     ]);
     const members = Array.from({ length: 7 }, () => ({ lastActiveAt: NOW }));
     db.guildMember.findMany.mockResolvedValue(members);
+    db.guildProject.findMany.mockResolvedValue([]);
+    db.guild.findUnique.mockResolvedValue({ specialization: null, level: 5 });
 
     const mods = await getPlayerGuildModifiers(PLAYER_ID);
     expect(mods.combatDamage).toBeCloseTo(0.05 * GUILD_CONSTANTS.BOOST_SCALING_MEDIUM);
@@ -215,8 +219,88 @@ describe('getPlayerGuildModifiers', () => {
     ]);
     const members = Array.from({ length: 3 }, () => ({ lastActiveAt: NOW }));
     db.guildMember.findMany.mockResolvedValue(members);
+    db.guildProject.findMany.mockResolvedValue([]);
+    db.guild.findUnique.mockResolvedValue({ specialization: null, level: 5 });
 
     const mods = await getPlayerGuildModifiers(PLAYER_ID);
     expect(mods.defenseBoost).toBeCloseTo(0.05 * GUILD_CONSTANTS.BOOST_SCALING_LOW);
+  });
+
+  it('includes project perks from completed projects', async () => {
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, lastActiveAt: NOW,
+    });
+    db.guildUpgrade.findMany.mockResolvedValue([]);
+    db.guildProject.findMany.mockResolvedValue([
+      { projectKey: 'guild_forge' },
+    ]);
+    db.guild.findUnique.mockResolvedValue({
+      specialization: null, level: 5,
+    });
+
+    const mods = await getPlayerGuildModifiers(PLAYER_ID);
+    expect(mods.craftingCrit).toBe(0.05);
+  });
+
+  it('higher-level project replaces lower-level perk', async () => {
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, lastActiveAt: NOW,
+    });
+    db.guildUpgrade.findMany.mockResolvedValue([]);
+    db.guildProject.findMany.mockResolvedValue([
+      { projectKey: 'guild_forge' },
+      { projectKey: 'advanced_forge' },
+    ]);
+    db.guild.findUnique.mockResolvedValue({
+      specialization: null, level: 5,
+    });
+
+    const mods = await getPlayerGuildModifiers(PLAYER_ID);
+    expect(mods.craftingCrit).toBe(0.10);
+  });
+
+  it('includes specialization bonuses based on guild level', async () => {
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, lastActiveAt: NOW,
+    });
+    db.guildUpgrade.findMany.mockResolvedValue([]);
+    db.guildProject.findMany.mockResolvedValue([]);
+    db.guild.findUnique.mockResolvedValue({
+      specialization: 'industry', level: 25,
+    });
+
+    const mods = await getPlayerGuildModifiers(PLAYER_ID);
+    expect(mods.craftingCrit).toBe(0.10);
+    expect(mods.gatheringYield).toBe(0.20);
+    expect(mods.repairCostReduction).toBe(0.10);
+  });
+
+  it('stacks upgrade + project + specialization bonuses', async () => {
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, lastActiveAt: NOW,
+    });
+    db.guildUpgrade.findMany.mockResolvedValue([
+      { upgradeType: 'crafting_fortune', tier: 1, expiresAt: new Date(NOW.getTime() + 3600000) },
+    ]);
+    db.guildMember.findMany.mockResolvedValue(
+      Array(10).fill({ lastActiveAt: NOW }),
+    );
+    db.guildProject.findMany.mockResolvedValue([
+      { projectKey: 'guild_forge' },
+    ]);
+    db.guild.findUnique.mockResolvedValue({
+      specialization: 'industry', level: 10,
+    });
+
+    const mods = await getPlayerGuildModifiers(PLAYER_ID);
+    // 0.05 (upgrade, full scale) + 0.05 (project) + 0.05 (spec) = 0.15
+    expect(mods.craftingCrit).toBeCloseTo(0.15);
+  });
+
+  it('returns new modifier fields with zero defaults', async () => {
+    db.guildMember.findUnique.mockResolvedValue(null);
+    const mods = await getPlayerGuildModifiers(PLAYER_ID);
+    expect(mods.travelCostReduction).toBe(0);
+    expect(mods.repairCostReduction).toBe(0);
   });
 });

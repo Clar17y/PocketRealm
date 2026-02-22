@@ -2,6 +2,8 @@ import { prisma } from '@adventure/database';
 import {
   GUILD_CONSTANTS,
   GUILD_UPGRADE_DEFINITIONS,
+  GUILD_PROJECT_DEFINITIONS,
+  GUILD_SPECIALIZATION_DEFINITIONS,
   type GuildUpgradeData,
   type GuildUpgradeEffectType,
 } from '@adventure/shared';
@@ -194,6 +196,8 @@ export interface PlayerGuildModifiers {
   craftingCrit: number;
   combatDamage: number;
   defenseBoost: number;
+  travelCostReduction: number;
+  repairCostReduction: number;
 }
 
 const NO_MODIFIERS: PlayerGuildModifiers = {
@@ -202,6 +206,8 @@ const NO_MODIFIERS: PlayerGuildModifiers = {
   craftingCrit: 0,
   combatDamage: 0,
   defenseBoost: 0,
+  travelCostReduction: 0,
+  repairCostReduction: 0,
 };
 
 export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerGuildModifiers> {
@@ -219,25 +225,24 @@ export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerG
     where: { guildId: membership.guildId, expiresAt: { gt: now } },
   });
 
-  if (activeUpgrades.length === 0) return { ...NO_MODIFIERS };
-
-  // Count active members for scaling
-  const members = await prisma.guildMember.findMany({
-    where: { guildId: membership.guildId },
-    select: { lastActiveAt: true },
-  });
-  const activeCount = members.filter((m) => isActiveWithinWindow(m.lastActiveAt)).length;
-
-  let scale: number = GUILD_CONSTANTS.BOOST_SCALING_LOW;
-  if (activeCount >= GUILD_CONSTANTS.BOOST_SCALING_MIN_FULL) {
-    scale = GUILD_CONSTANTS.BOOST_SCALING_FULL;
-  } else if (activeCount >= GUILD_CONSTANTS.BOOST_SCALING_MIN_MEDIUM) {
-    scale = GUILD_CONSTANTS.BOOST_SCALING_MEDIUM;
-  }
-
   const mods: PlayerGuildModifiers = { ...NO_MODIFIERS };
 
-  for (const upgrade of activeUpgrades) {
+  // Apply scaled upgrade bonuses if any are active
+  if (activeUpgrades.length > 0) {
+    const members = await prisma.guildMember.findMany({
+      where: { guildId: membership.guildId },
+      select: { lastActiveAt: true },
+    });
+    const activeCount = members.filter((m) => isActiveWithinWindow(m.lastActiveAt)).length;
+
+    let scale: number = GUILD_CONSTANTS.BOOST_SCALING_LOW;
+    if (activeCount >= GUILD_CONSTANTS.BOOST_SCALING_MIN_FULL) {
+      scale = GUILD_CONSTANTS.BOOST_SCALING_FULL;
+    } else if (activeCount >= GUILD_CONSTANTS.BOOST_SCALING_MIN_MEDIUM) {
+      scale = GUILD_CONSTANTS.BOOST_SCALING_MEDIUM;
+    }
+
+    for (const upgrade of activeUpgrades) {
     const def = GUILD_UPGRADE_DEFINITIONS.find((d) => d.key === upgrade.upgradeType);
     if (!def) continue;
     const tierDef = def.tiers.find((t) => t.level === upgrade.tier);
@@ -251,6 +256,53 @@ export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerG
       case 'crafting_crit': mods.craftingCrit += scaledValue; break;
       case 'combat_damage': mods.combatDamage += scaledValue; break;
       case 'defense_boost': mods.defenseBoost += scaledValue; break;
+    }
+    }
+  }
+
+  // --- Project perks (permanent, highest per effectType wins, then added to mods) ---
+  const completedProjects = await prisma.guildProject.findMany({
+    where: { guildId: membership.guildId, status: 'completed' },
+    select: { projectKey: true },
+  });
+
+  const projectPerks: Partial<Record<keyof PlayerGuildModifiers, number>> = {};
+  for (const project of completedProjects) {
+    const def = GUILD_PROJECT_DEFINITIONS.find((d) => d.key === project.projectKey);
+    if (!def) continue;
+    for (const perk of def.perks) {
+      const key = perk.effectType as keyof PlayerGuildModifiers;
+      if (key in mods) {
+        projectPerks[key] = perk.value; // Higher-level overwrites lower (definition order: L1→L2→L3)
+      }
+    }
+  }
+  for (const [key, value] of Object.entries(projectPerks)) {
+    mods[key as keyof PlayerGuildModifiers] += value;
+  }
+
+  // --- Specialization bonuses (additive on top) ---
+  const guild = await prisma.guild.findUnique({
+    where: { id: membership.guildId },
+    select: { specialization: true, level: true },
+  });
+
+  if (guild?.specialization) {
+    const specDef = GUILD_SPECIALIZATION_DEFINITIONS.find(
+      (s) => s.path === guild.specialization,
+    );
+    if (specDef) {
+      const activeTier = specDef.tiers
+        .filter((t) => guild.level >= t.guildLevelGate)
+        .sort((a, b) => b.tier - a.tier)[0];
+      if (activeTier) {
+        for (const bonus of activeTier.bonuses) {
+          const key = bonus.effectType as keyof PlayerGuildModifiers;
+          if (key in mods) {
+            mods[key] += bonus.value;
+          }
+        }
+      }
     }
   }
 
