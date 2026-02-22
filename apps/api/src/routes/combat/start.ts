@@ -26,7 +26,7 @@ import type { LootDropWithName } from '../../services/lootService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { getHpState, setHp, enterRecoveringState } from '../../services/hpService';
+import { setHp, enterRecoveringState } from '../../services/hpService';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { respawnToHomeTown } from '../../services/zoneDiscoveryService';
@@ -41,7 +41,7 @@ import { buildPotionPool, deductConsumedPotions } from '../../services/potionSer
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
-import { serializeXpGrant, toMobTemplate } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertNotRecovering } from '../../utils/routeHelpers.js';
 import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
 import {
   prismaAny,
@@ -63,10 +63,7 @@ import {
  * Handle encounter site room combat: fight ALL alive mobs in the current room sequentially.
  */
 async function handleEncounterSiteRoomCombat(req: Request, res: Response, playerId: string, encounterSiteId: string, body: { attackSkill?: 'melee' | 'ranged' | 'magic' }) {
-  const hpState = await getHpState(playerId);
-  if (hpState.isRecovering) {
-    throw new AppError(400, 'Cannot fight while recovering. Spend recovery turns first.', 'IS_RECOVERING');
-  }
+  const hpState = await assertNotRecovering(playerId);
   if (hpState.currentHp <= 0) {
     throw new AppError(400, 'Cannot fight with 0 HP. Rest to recover health.', 'NO_HP');
   }
@@ -557,10 +554,7 @@ export function registerStartRoutes(router: Router): void {
       }
 
       // --- Zone combat (single mob, unchanged) ---
-      const hpState = await getHpState(playerId);
-      if (hpState.isRecovering) {
-        throw new AppError(400, 'Cannot fight while recovering. Spend recovery turns first.', 'IS_RECOVERING');
-      }
+      const hpState = await assertNotRecovering(playerId);
       if (hpState.currentHp <= 0) {
         throw new AppError(400, 'Cannot fight with 0 HP. Rest to recover health.', 'NO_HP');
       }

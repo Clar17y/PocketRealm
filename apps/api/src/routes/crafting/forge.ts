@@ -15,7 +15,7 @@ import { getEquipmentStats } from '../../services/equipmentService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { incrementStats } from '../../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
-import { getHpState } from '../../services/hpService';
+import { assertNotRecovering } from '../../utils/routeHelpers.js';
 import {
   isItemType,
   parseItemRarity,
@@ -38,10 +38,7 @@ forgeRouter.post('/upgrade', async (req, res, next) => {
     const playerId = req.player!.playerId;
     const body = forgeUpgradeSchema.parse(req.body);
 
-    const hpState = await getHpState(playerId);
-    if (hpState.isRecovering) {
-      throw new AppError(400, 'Cannot use forge while recovering', 'IS_RECOVERING');
-    }
+    await assertNotRecovering(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);
@@ -262,10 +259,7 @@ forgeRouter.post('/reroll', async (req, res, next) => {
     const playerId = req.player!.playerId;
     const body = forgeRerollSchema.parse(req.body);
 
-    const hpState = await getHpState(playerId);
-    if (hpState.isRecovering) {
-      throw new AppError(400, 'Cannot use forge while recovering', 'IS_RECOVERING');
-    }
+    await assertNotRecovering(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);

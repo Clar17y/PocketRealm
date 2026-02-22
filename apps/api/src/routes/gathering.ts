@@ -7,8 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { addStackableItemTx } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
-import { getHpState } from '../services/hpService';
-import { serializeXpGrant, paginationSchema, buildPagination } from '../utils/routeHelpers.js';
+import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { incrementStats } from '../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
@@ -217,10 +216,7 @@ gatheringRouter.post('/mine', async (req, res, next) => {
     const body = mineSchema.parse(req.body);
 
     // Check if player is recovering
-    const hpState = await getHpState(playerId);
-    if (hpState.isRecovering) {
-      throw new AppError(400, 'Cannot gather while recovering', 'IS_RECOVERING');
-    }
+    const hpState = await assertNotRecovering(playerId);
 
     // Find the player's discovered node
     const playerNode = await prisma.playerResourceNode.findUnique({

@@ -24,11 +24,11 @@ import {
 } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurns } from '../../services/turnBankService';
-import { enterRecoveringState, getHpState, setHp } from '../../services/hpService';
+import { enterRecoveringState, setHp } from '../../services/hpService';
 import { rollAndGrantLoot } from '../../services/lootService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { serializeXpGrant, toMobTemplate } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertNotRecovering } from '../../utils/routeHelpers.js';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
@@ -72,10 +72,7 @@ startRouter.post('/start', async (req, res, next) => {
     const playerId = req.player!.playerId;
     const body = startSchema.parse(req.body);
 
-    const hpState = await getHpState(playerId);
-    if (hpState.isRecovering) {
-      throw new AppError(400, 'Cannot explore while recovering', 'IS_RECOVERING');
-    }
+    const hpState = await assertNotRecovering(playerId);
     if (hpState.currentHp <= 0) {
       throw new AppError(400, 'Cannot explore with 0 HP. Rest before exploring.', 'NO_HP');
     }

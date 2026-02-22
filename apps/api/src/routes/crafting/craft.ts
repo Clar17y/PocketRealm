@@ -18,8 +18,7 @@ import { incrementStats } from '../../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
 import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from '../../services/inventoryService';
 import { grantSkillXp } from '../../services/xpService';
-import { getHpState } from '../../services/hpService';
-import { serializeXpGrant } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, assertNotRecovering } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
   isSkillType,
@@ -44,10 +43,7 @@ craftRouter.post('/', async (req, res, next) => {
     const body = craftSchema.parse(req.body);
 
     // Check if player is recovering
-    const hpState = await getHpState(playerId);
-    if (hpState.isRecovering) {
-      throw new AppError(400, 'Cannot craft while recovering', 'IS_RECOVERING');
-    }
+    await assertNotRecovering(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);

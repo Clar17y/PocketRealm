@@ -10,9 +10,8 @@ import {
   signUpForBossRound,
   checkAndResolveDueBossRounds,
 } from '../services/bossEncounterService';
-import { getHpState } from '../services/hpService';
 import { getIo } from '../socket';
-import { paginationSchema, buildPagination } from '../utils/routeHelpers.js';
+import { paginationSchema, buildPagination, assertNotRecovering } from '../utils/routeHelpers.js';
 
 export const bossRouter = Router();
 
@@ -180,10 +179,7 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
       throw new AppError(400, 'You must be in the boss zone to sign up', 'WRONG_ZONE');
     }
 
-    const hpState = await getHpState(playerId);
-    if (hpState.isRecovering) {
-      throw new AppError(400, 'Cannot join boss while recovering', 'IS_RECOVERING');
-    }
+    const hpState = await assertNotRecovering(playerId);
 
     const participant = await signUpForBossRound(
       id,
