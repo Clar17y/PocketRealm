@@ -1,16 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TURN_CONSTANTS } from '@adventure/shared';
-
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
-
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import {
   getTurnState,
   spendPlayerTurns,
   refundPlayerTurns,
 } from './turnBankService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 const now = new Date('2025-06-01T12:00:00Z');
 
 beforeEach(() => {

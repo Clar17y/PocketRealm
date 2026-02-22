@@ -8,6 +8,7 @@ import { Hammer, Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } 
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
+import { STAT_ORDER, prettyStatName, formatStatValue } from '@/lib/statFormat';
 
 interface Material {
   name: string;
@@ -45,25 +46,7 @@ interface CraftingProps {
   recoveryCost?: number | null;
   zoneCraftingLevel: number | null;
   zoneName: string | null;
-}
-
-const PERCENT_STATS = new Set(['critChance', 'critDamage']);
-const STAT_ORDER = ['attack', 'armor', 'magicDefence', 'health', 'dodge', 'accuracy', 'magicPower', 'luck', 'evasion', 'critChance', 'critDamage'];
-
-function prettyStatName(stat: string): string {
-  if (stat === 'magicDefence') return 'Magic Defence';
-  if (stat === 'critChance') return 'Crit Chance';
-  if (stat === 'critDamage') return 'Crit Damage';
-  if (stat === 'magicPower') return 'Magic Power';
-  return stat
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (char) => char.toUpperCase())
-    .trim();
-}
-
-function formatStatValue(stat: string, value: number): string {
-  if (PERCENT_STATS.has(stat)) return `${Math.round(value * 100)}%`;
-  return String(value);
+  defaultMaxQuantity?: boolean;
 }
 
 function statEntries(stats: Record<string, unknown> | undefined): Array<[string, number]> {
@@ -79,7 +62,7 @@ function statEntries(stats: Record<string, unknown> | undefined): Array<[string,
     });
 }
 
-export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName }: CraftingProps) {
+export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
@@ -116,8 +99,12 @@ export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog,
 
   // Reset quantity when recipe changes or when max changes
   useEffect(() => {
-    setQuantity((prev) => Math.max(1, Math.min(prev, selectedMax || 1)));
-  }, [selectedRecipeId, selectedMax]);
+    if (defaultMaxQuantity && selectedMax > 0) {
+      setQuantity(selectedMax);
+    } else {
+      setQuantity((prev) => Math.max(1, Math.min(prev, selectedMax || 1)));
+    }
+  }, [selectedRecipeId, selectedMax, defaultMaxQuantity]);
 
   const canCraft = (recipe: Recipe) => {
     if (noFacility) return false;

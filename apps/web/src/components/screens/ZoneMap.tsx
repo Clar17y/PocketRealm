@@ -49,6 +49,8 @@ interface ZoneMapProps {
   onTravelPlaybackSkip?: () => void;
   onPushLog?: (...entries: Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'danger' }>) => void;
   activityLog?: ActivityLogEntry[];
+  combatSpeedMs?: number;
+  explorationSpeedMs?: number;
   onTravel: (zoneId: string) => void;
   onExploreCurrentZone: () => void;
 }
@@ -106,6 +108,8 @@ export function ZoneMap({
   onTravelPlaybackSkip,
   onPushLog,
   activityLog,
+  combatSpeedMs,
+  explorationSpeedMs,
   onTravel,
   onExploreCurrentZone,
 }: ZoneMapProps) {
@@ -520,6 +524,8 @@ export function ZoneMap({
             refundedTurns={travelPlaybackData.refundedTurns}
             playerHpBefore={travelPlaybackData.playerHpBefore}
             playerMaxHp={travelPlaybackData.playerMaxHp}
+            combatSpeedMs={combatSpeedMs}
+            explorationSpeedMs={explorationSpeedMs}
             onComplete={onTravelPlaybackComplete!}
             onSkip={onTravelPlaybackSkip!}
             onPushLog={onPushLog}

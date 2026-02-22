@@ -1,12 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
-
-import { prisma } from '@adventure/database';
+import { mockPrisma as db } from '../__test__/setup';
 import { activateUpgrade, getActiveUpgrades, getAvailableUpgrades, getPlayerGuildModifiers } from './guildUpgradeService';
 import { GUILD_CONSTANTS } from '@adventure/shared';
-
-const db = prisma as unknown as Record<string, any>;
 
 const GUILD_ID = 'guild-1';
 const PLAYER_ID = 'player-1';

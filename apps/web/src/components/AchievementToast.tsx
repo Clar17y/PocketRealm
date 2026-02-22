@@ -72,7 +72,7 @@ export function AchievementToast({ onNavigate }: AchievementToastProps) {
       {overflow > 0 && (
         <div
           className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)]/50 rounded-lg px-4 py-2 shadow-lg text-center cursor-pointer hover:border-[var(--rpg-gold)] transition-colors"
-          onClick={() => { setToasts([]); onNavigate?.(); }}
+          onClick={() => { setToasts([]); onNavigate?.('achievements'); }}
         >
           <p className="text-xs text-[var(--rpg-gold)]">
             and {overflow} more achievement{overflow > 1 ? 's' : ''} unlocked

@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { incrementStats, resolveAllStats, resolveFamilyKills, resolveAllFamilyKills } from './statsService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 
 describe('statsService', () => {
   beforeEach(() => {

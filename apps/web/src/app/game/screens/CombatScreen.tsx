@@ -55,6 +55,8 @@ interface CombatScreenProps {
     log: LastCombatLogEntry[];
     rewards: LastCombat['rewards'];
   } | null;
+  combatSpeedMs?: number;
+  autoSkipCombat?: boolean;
   onCombatPlaybackComplete?: () => void;
   fightProgress?: { current: number; total: number } | null;
 }
@@ -82,6 +84,8 @@ export function CombatScreen({
   onPendingEncounterMobFilterChange,
   onPendingEncounterSortChange,
   combatPlaybackData,
+  combatSpeedMs,
+  autoSkipCombat,
   onCombatPlaybackComplete,
   fightProgress,
 }: CombatScreenProps) {
@@ -395,6 +399,8 @@ export function CombatScreen({
                 mobMaxHp={combatPlaybackData.combatantBMaxHp}
                 log={combatPlaybackData.log}
                 rewards={combatPlaybackData.rewards}
+                speedMs={combatSpeedMs}
+                autoSkip={autoSkipCombat}
                 onComplete={onCombatPlaybackComplete ?? (() => {})}
                 onSkip={() => {
                   onCombatPlaybackComplete?.();

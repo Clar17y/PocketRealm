@@ -82,6 +82,17 @@ body {
   animation: shake 0.3s ease-in-out;
 }
 
+/* Tutorial tab pulse */
+@keyframes tutorial-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(212, 175, 55, 0); }
+}
+
+.tutorial-pulse {
+  animation: tutorial-pulse 2s ease-in-out infinite;
+  border-radius: 9999px;
+}
+
 /* Achievement toast slide-in */
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }

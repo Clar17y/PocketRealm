@@ -8,7 +8,7 @@ import { turnsRouter } from './routes/turns';
 import { playerRouter } from './routes/player';
 import { explorationRouter } from './routes/exploration';
 import { zonesRouter } from './routes/zones';
-import { combatRouter } from './routes/combat';
+import { combatRouter } from './routes/combat/index';
 import { inventoryRouter } from './routes/inventory';
 import { equipmentRouter } from './routes/equipment';
 import { gatheringRouter } from './routes/gathering';
@@ -22,6 +22,7 @@ import { bossRouter } from './routes/boss';
 import { achievementsRouter } from './routes/achievements';
 import { leaderboardRouter } from './routes/leaderboard';
 import { guildRouter } from './routes/guild';
+import { adminRouter } from './routes/admin';
 import { errorHandler } from './middleware/errorHandler';
 import { createSocketServer, getIo } from './socket';
 import { checkAndResolveDueBossRounds } from './services/bossEncounterService';
@@ -102,6 +103,7 @@ app.use('/api/v1/boss', bossRouter);
 app.use('/api/v1/achievements', achievementsRouter);
 app.use('/api/v1/leaderboard', leaderboardRouter);
 app.use('/api/v1/guild', guildRouter);
+app.use('/api/v1/admin', adminRouter);
 
 // Error handler
 app.use(errorHandler);

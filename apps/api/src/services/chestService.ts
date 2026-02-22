@@ -10,6 +10,7 @@ import {
 import { FULL_CLEAR_CONSTANTS, type LootDrop } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
+import { pickWeighted } from '../utils/pickWeighted.js';
 
 export interface RecipeUnlockReward {
   recipeId: string;
@@ -44,28 +45,6 @@ interface ChestDropEntry {
     stackable: boolean;
     maxDurability: number;
   };
-}
-
-function pickWeightedChestDrop(entries: ChestDropEntry[]): ChestDropEntry | null {
-  if (entries.length === 0) return null;
-
-  const weighted = entries
-    .map((entry) => ({
-      entry,
-      weight: Math.max(0, decimalLikeToNumber(entry.dropChance)),
-    }))
-    .filter((row) => row.weight > 0);
-
-  if (weighted.length === 0) return null;
-
-  const totalWeight = weighted.reduce((sum, row) => sum + row.weight, 0);
-  let roll = Math.random() * totalWeight;
-  for (const row of weighted) {
-    roll -= row.weight;
-    if (roll <= 0) return row.entry;
-  }
-
-  return weighted[weighted.length - 1]?.entry ?? null;
 }
 
 export async function grantEncounterSiteChestRewardsTx(
@@ -115,7 +94,7 @@ export async function grantEncounterSiteChestRewardsTx(
   };
 
   for (let i = 0; i < materialRolls; i++) {
-    const picked = pickWeightedChestDrop(dropEntries);
+    const picked = pickWeighted(dropEntries, e => Math.max(0, decimalLikeToNumber(e.dropChance)));
     if (!picked) continue;
 
     const quantity = Math.max(1, randomIntInclusive(picked.minQuantity, picked.maxQuantity));

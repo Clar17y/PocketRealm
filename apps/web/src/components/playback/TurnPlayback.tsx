@@ -14,6 +14,8 @@ interface TurnPlaybackProps {
   refundedTurns: number;
   playerHpBefore: number;
   playerMaxHp: number;
+  combatSpeedMs?: number;
+  explorationSpeedMs?: number;
   onComplete: () => void;
   onSkip: () => void;
   onPushLog?: (...entries: Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'danger' }>) => void;
@@ -27,6 +29,8 @@ export function TurnPlayback({
   refundedTurns,
   playerHpBefore,
   playerMaxHp,
+  combatSpeedMs,
+  explorationSpeedMs,
   onComplete,
   onSkip,
   onPushLog,
@@ -50,6 +54,7 @@ export function TurnPlayback({
           events={events}
           aborted={aborted}
           refundedTurns={refundedTurns}
+          speedMs={explorationSpeedMs}
           resumeFromCombat={resumeFromCombat}
           onEventRevealed={(event) => {
             // Skip logging ambush events here — they'll be logged after combat playback
@@ -123,6 +128,7 @@ export function TurnPlayback({
               effectsApplied?: Array<{ stat: string; modifier: number; duration: number; target: 'combatantA' | 'combatantB' }>;
               effectsExpired?: Array<{ name: string; target: 'combatantA' | 'combatantB' }>;
             }>) ?? []}
+            speedMs={combatSpeedMs}
             onComplete={() => {
               // Track player HP after this fight for the next combat
               const combatLog = (combatEvent.details?.log as Array<{ combatantAHpAfter?: number }>) ?? [];

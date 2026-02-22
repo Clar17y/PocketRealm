@@ -502,6 +502,15 @@ const GENERAL_ACHIEVEMENTS: AchievementDef[] = [
     secret: true,
   },
   {
+    id: 'tutorial_complete',
+    category: 'general',
+    title: 'The Graduate',
+    description: 'Complete the tutorial',
+    titleReward: 'The Graduate',
+    statKey: 'tutorialCompleted',
+    threshold: 1,
+  },
+  {
     id: 'secret_legendary_crit',
     category: 'crafting',
     title: 'Golden Hands',

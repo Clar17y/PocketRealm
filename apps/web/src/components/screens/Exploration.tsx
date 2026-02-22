@@ -41,10 +41,14 @@ interface ExplorationProps {
   onPlaybackComplete?: () => void;
   onPlaybackSkip?: () => void;
   onPushLog?: (...entries: Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'danger' }>) => void;
+  combatSpeedMs?: number;
+  explorationSpeedMs?: number;
+  defaultTurns?: number;
+  tutorialLocked?: boolean;
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog }: ExplorationProps) {
-  const [turnInvestment, setTurnInvestment] = useState([Math.min(100, availableTurns)]);
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false }: ExplorationProps) {
+  const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
 
   const calculateProbabilities = (turns: number) => {
     const expectedAmbushes = turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN;
@@ -111,6 +115,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           refundedTurns={playbackData.refundedTurns}
           playerHpBefore={playbackData.playerHpBeforeExploration}
           playerMaxHp={playbackData.playerMaxHp}
+          combatSpeedMs={combatSpeedMs}
+          explorationSpeedMs={explorationSpeedMs}
           onComplete={onPlaybackComplete!}
           onSkip={onPlaybackSkip!}
           onPushLog={onPushLog}
@@ -152,40 +158,49 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               </div>
 
               <Slider
-                value={turnInvestment}
-                onValueChange={setTurnInvestment}
-                min={10}
-                max={Math.min(10000, availableTurns)}
+                value={tutorialLocked ? [100] : turnInvestment}
+                onValueChange={tutorialLocked ? undefined : setTurnInvestment}
+                min={tutorialLocked ? 100 : 10}
+                max={tutorialLocked ? 100 : Math.min(10000, availableTurns)}
                 step={10}
+                disabled={tutorialLocked}
                 className="w-full"
               />
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setTurnInvestment([Math.min(100, availableTurns)])}
-                  className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
-                >
-                  100
-                </button>
-                <button
-                  onClick={() => setTurnInvestment([Math.min(500, availableTurns)])}
-                  className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
-                >
-                  500
-                </button>
-                <button
-                  onClick={() => setTurnInvestment([Math.min(1000, availableTurns)])}
-                  className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
-                >
-                  1K
-                </button>
-                <button
-                  onClick={() => setTurnInvestment([Math.min(5000, availableTurns)])}
-                  className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
-                >
-                  5K
-                </button>
-              </div>
+              {tutorialLocked && (
+                <p className="text-xs text-[var(--rpg-gold)] text-center">
+                  Spend 100 turns exploring
+                </p>
+              )}
+
+              {!tutorialLocked && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setTurnInvestment([Math.min(100, availableTurns)])}
+                    className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
+                  >
+                    100
+                  </button>
+                  <button
+                    onClick={() => setTurnInvestment([Math.min(500, availableTurns)])}
+                    className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
+                  >
+                    500
+                  </button>
+                  <button
+                    onClick={() => setTurnInvestment([Math.min(1000, availableTurns)])}
+                    className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
+                  >
+                    1K
+                  </button>
+                  <button
+                    onClick={() => setTurnInvestment([Math.min(5000, availableTurns)])}
+                    className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
+                  >
+                    5K
+                  </button>
+                </div>
+              )}
             </div>
           </PixelCard>
 

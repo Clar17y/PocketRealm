@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GUILD_CONSTANTS } from '@adventure/shared';
-
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
-
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import {
   createGuild, getGuild, getPlayerGuild, getPlayerGuildId,
   searchGuilds, joinGuild, leaveGuild, kickMember,
@@ -11,8 +8,6 @@ import {
   updateSettings, getGuildLog, addGuildXp,
   calculateMaxMembers, calculateTreasuryCap, calculateXpForLevel,
 } from './guildService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 
 beforeEach(() => {
   vi.clearAllMocks();

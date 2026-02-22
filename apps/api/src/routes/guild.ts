@@ -9,6 +9,7 @@ import {
 } from '../services/guildService';
 import { activateUpgrade, getActiveUpgrades, getAvailableUpgrades } from '../services/guildUpgradeService';
 import { getActiveContracts } from '../services/guildContractService';
+import { asyncHandler } from '../utils/asyncHandler';
 
 export const guildRouter = Router();
 guildRouter.use(authenticate);
@@ -35,183 +36,123 @@ const targetSchema = z.object({
   targetId: z.string().uuid(),
 });
 
-// POST / — create guild
-guildRouter.post('/', async (req, res, next) => {
-  try {
-    const parsed = createSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: { message: 'Invalid input', code: 'VALIDATION_ERROR' } });
-      return;
-    }
-    const result = await createGuild(req.player!.playerId, parsed.data.name, parsed.data.tag, parsed.data.description ?? null);
-    res.status(201).json(result);
-  } catch (err) { next(err); }
+const logQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
 });
-
-// GET / — get player's guild
-guildRouter.get('/', async (req, res, next) => {
-  try {
-    const result = await getPlayerGuild(req.player!.playerId);
-    res.json(result);
-  } catch (err) { next(err); }
-});
-
-// GET /search — search guilds
-guildRouter.get('/search', async (req, res, next) => {
-  try {
-    const parsed = searchSchema.safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({ error: { message: 'Invalid query', code: 'VALIDATION_ERROR' } });
-      return;
-    }
-    const result = await searchGuilds(parsed.data.query, parsed.data.page);
-    res.json(result);
-  } catch (err) { next(err); }
-});
-
-// GET /:id — get guild by ID
-guildRouter.get('/:id', async (req, res, next) => {
-  try {
-    const result = await getGuild(req.params.id);
-    res.json(result);
-  } catch (err) { next(err); }
-});
-
-// PATCH /:id — update settings
-guildRouter.patch('/:id', async (req, res, next) => {
-  try {
-    const parsed = settingsSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: { message: 'Invalid settings', code: 'VALIDATION_ERROR' } });
-      return;
-    }
-    const result = await updateSettings(req.player!.playerId, req.params.id, parsed.data);
-    res.json(result);
-  } catch (err) { next(err); }
-});
-
-// DELETE /:id — disband guild
-guildRouter.delete('/:id', async (req, res, next) => {
-  try {
-    await disbandGuild(req.player!.playerId, req.params.id);
-    res.json({ success: true });
-  } catch (err) { next(err); }
-});
-
-// POST /:id/join
-guildRouter.post('/:id/join', async (req, res, next) => {
-  try {
-    const result = await joinGuild(req.player!.playerId, req.params.id);
-    res.json(result);
-  } catch (err) { next(err); }
-});
-
-// POST /:id/leave
-guildRouter.post('/:id/leave', async (req, res, next) => {
-  try {
-    await leaveGuild(req.player!.playerId);
-    res.json({ success: true });
-  } catch (err) { next(err); }
-});
-
-// POST /:id/kick
-guildRouter.post('/:id/kick', async (req, res, next) => {
-  try {
-    const parsed = targetSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: { message: 'Invalid target', code: 'VALIDATION_ERROR' } });
-      return;
-    }
-    await kickMember(req.player!.playerId, parsed.data.targetId);
-    res.json({ success: true });
-  } catch (err) { next(err); }
-});
-
-// POST /:id/promote
-guildRouter.post('/:id/promote', async (req, res, next) => {
-  try {
-    const parsed = targetSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: { message: 'Invalid target', code: 'VALIDATION_ERROR' } });
-      return;
-    }
-    await promoteMember(req.player!.playerId, parsed.data.targetId);
-    res.json({ success: true });
-  } catch (err) { next(err); }
-});
-
-// POST /:id/demote
-guildRouter.post('/:id/demote', async (req, res, next) => {
-  try {
-    const parsed = targetSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: { message: 'Invalid target', code: 'VALIDATION_ERROR' } });
-      return;
-    }
-    await demoteMember(req.player!.playerId, parsed.data.targetId);
-    res.json({ success: true });
-  } catch (err) { next(err); }
-});
-
-// POST /:id/transfer
-guildRouter.post('/:id/transfer', async (req, res, next) => {
-  try {
-    const parsed = targetSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: { message: 'Invalid target', code: 'VALIDATION_ERROR' } });
-      return;
-    }
-    await transferLeadership(req.player!.playerId, parsed.data.targetId);
-    res.json({ success: true });
-  } catch (err) { next(err); }
-});
-
-// GET /:id/log
-guildRouter.get('/:id/log', async (req, res, next) => {
-  try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const result = await getGuildLog(req.params.id, page);
-    res.json(result);
-  } catch (err) { next(err); }
-});
-
-// --- Upgrades ---
 
 const activateUpgradeSchema = z.object({
   upgradeKey: z.string().min(1),
   tier: z.number().int().positive(),
 });
 
-// POST /:id/upgrades/activate
-guildRouter.post('/:id/upgrades/activate', async (req, res, next) => {
-  try {
-    const parsed = activateUpgradeSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: { message: 'Invalid input', code: 'VALIDATION_ERROR' } });
-      return;
-    }
-    const result = await activateUpgrade(req.player!.playerId, req.params.id, parsed.data.upgradeKey, parsed.data.tier);
-    res.json(result);
-  } catch (err) { next(err); }
-});
+// POST / — create guild
+guildRouter.post('/', asyncHandler(async (req, res) => {
+  const body = createSchema.parse(req.body);
+  const result = await createGuild(req.player!.playerId, body.name, body.tag, body.description ?? null);
+  res.status(201).json(result);
+}));
+
+// GET / — get player's guild
+guildRouter.get('/', asyncHandler(async (req, res) => {
+  const result = await getPlayerGuild(req.player!.playerId);
+  res.json(result);
+}));
+
+// GET /search — search guilds
+guildRouter.get('/search', asyncHandler(async (req, res) => {
+  const query = searchSchema.parse(req.query);
+  const result = await searchGuilds(query.query, query.page);
+  res.json(result);
+}));
+
+// GET /:id — get guild by ID
+guildRouter.get('/:id', asyncHandler(async (req, res) => {
+  const result = await getGuild(req.params.id);
+  res.json(result);
+}));
+
+// PATCH /:id — update settings
+guildRouter.patch('/:id', asyncHandler(async (req, res) => {
+  const body = settingsSchema.parse(req.body);
+  const result = await updateSettings(req.player!.playerId, req.params.id, body);
+  res.json(result);
+}));
+
+// DELETE /:id — disband guild
+guildRouter.delete('/:id', asyncHandler(async (req, res) => {
+  await disbandGuild(req.player!.playerId, req.params.id);
+  res.json({ success: true });
+}));
+
+// POST /:id/join
+guildRouter.post('/:id/join', asyncHandler(async (req, res) => {
+  const result = await joinGuild(req.player!.playerId, req.params.id);
+  res.json(result);
+}));
+
+// POST /:id/leave
+guildRouter.post('/:id/leave', asyncHandler(async (req, res) => {
+  await leaveGuild(req.player!.playerId);
+  res.json({ success: true });
+}));
+
+// POST /:id/kick
+guildRouter.post('/:id/kick', asyncHandler(async (req, res) => {
+  const body = targetSchema.parse(req.body);
+  await kickMember(req.player!.playerId, body.targetId);
+  res.json({ success: true });
+}));
+
+// POST /:id/promote
+guildRouter.post('/:id/promote', asyncHandler(async (req, res) => {
+  const body = targetSchema.parse(req.body);
+  await promoteMember(req.player!.playerId, body.targetId);
+  res.json({ success: true });
+}));
+
+// POST /:id/demote
+guildRouter.post('/:id/demote', asyncHandler(async (req, res) => {
+  const body = targetSchema.parse(req.body);
+  await demoteMember(req.player!.playerId, body.targetId);
+  res.json({ success: true });
+}));
+
+// POST /:id/transfer
+guildRouter.post('/:id/transfer', asyncHandler(async (req, res) => {
+  const body = targetSchema.parse(req.body);
+  await transferLeadership(req.player!.playerId, body.targetId);
+  res.json({ success: true });
+}));
+
+// GET /:id/log
+guildRouter.get('/:id/log', asyncHandler(async (req, res) => {
+  const { page } = logQuerySchema.parse(req.query);
+  const result = await getGuildLog(req.params.id, page);
+  res.json(result);
+}));
+
+// --- Upgrades ---
 
 // GET /:id/upgrades
-guildRouter.get('/:id/upgrades', async (req, res, next) => {
-  try {
-    const [active, available] = await Promise.all([
-      getActiveUpgrades(req.params.id),
-      getAvailableUpgrades(req.params.id),
-    ]);
-    res.json({ active, available });
-  } catch (err) { next(err); }
-});
+guildRouter.get('/:id/upgrades', asyncHandler(async (req, res) => {
+  const [active, available] = await Promise.all([
+    getActiveUpgrades(req.params.id),
+    getAvailableUpgrades(req.params.id),
+  ]);
+  res.json({ active, available });
+}));
+
+// POST /:id/upgrades/activate
+guildRouter.post('/:id/upgrades/activate', asyncHandler(async (req, res) => {
+  const body = activateUpgradeSchema.parse(req.body);
+  const result = await activateUpgrade(req.player!.playerId, req.params.id, body.upgradeKey, body.tier);
+  res.json(result);
+}));
 
 // --- Contracts ---
 
 // GET /:id/contracts
-guildRouter.get('/:id/contracts', async (req, res, next) => {
-  try {
-    const contracts = await getActiveContracts(req.params.id);
-    res.json({ contracts });
-  } catch (err) { next(err); }
-});
+guildRouter.get('/:id/contracts', asyncHandler(async (req, res) => {
+  const contracts = await getActiveContracts(req.params.id);
+  res.json({ contracts });
+}));

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
@@ -24,11 +24,22 @@ import { Leaderboard } from '@/components/screens/Leaderboard';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { rarityFromTier } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
 import { TURN_CONSTANTS, type SkillType } from '@adventure/shared';
 import { calculateEfficiency, xpForLevel } from '@adventure/game-engine';
 import { Sword, Shield, Crosshair, Sparkles, Pickaxe, Hammer, Leaf, FlaskConical, Axe, Scissors, Anvil } from 'lucide-react';
+import { TutorialBanner } from '@/components/TutorialBanner';
+import { TutorialDialog } from '@/components/TutorialDialog';
+import {
+  isTutorialActive,
+  TUTORIAL_STEPS,
+  TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_EXPLORE,
+  TUTORIAL_STEP_DONE,
+} from '@/lib/tutorial';
+import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
 import { GuildScreen } from '@/components/screens/GuildScreen';
 import { CombatScreen } from './screens/CombatScreen';
@@ -254,6 +265,22 @@ export default function GamePage() {
     handleSetAutoPotionThreshold,
     autoPotionThreshold,
     setAutoPotionThreshold,
+    combatLogSpeedMs,
+    setCombatLogSpeedMs,
+    handleSetCombatLogSpeed,
+    explorationSpeedMs,
+    setExplorationSpeedMs,
+    handleSetExplorationSpeed,
+    autoSkipKnownCombat,
+    handleSetAutoSkipKnownCombat,
+    defaultExploreTurns,
+    setDefaultExploreTurns,
+    handleSetDefaultExploreTurns,
+    quickRestHealPercent,
+    handleSetQuickRestHealPercent,
+    defaultRefiningMax,
+    handleSetDefaultRefiningMax,
+    handleQuickRest,
     zoneCraftingLevel,
     zoneCraftingName,
     loadTurnsAndHp,
@@ -264,6 +291,8 @@ export default function GamePage() {
     handleClaimAchievement,
     handleSetActiveTitle,
     loadAchievements,
+    tutorialStep, skipTutorial, advanceTutorial,
+    loadAll,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -274,6 +303,22 @@ export default function GamePage() {
       void loadAchievements();
     }
   }, [activeScreen, loadAchievements]);
+
+  // Auto-navigate to the relevant screen when the tutorial step changes
+  useEffect(() => {
+    if (!isTutorialActive(tutorialStep)) return;
+    const stepDef = TUTORIAL_STEPS[tutorialStep];
+    if (stepDef?.navigateTo) {
+      setActiveScreen(stepDef.navigateTo as Screen);
+    }
+  }, [tutorialStep, setActiveScreen]);
+
+  const tutorialPulseTabs = React.useMemo(() => {
+    if (!isTutorialActive(tutorialStep)) return undefined;
+    const stepDef = TUTORIAL_STEPS[tutorialStep];
+    if (!stepDef?.pulseTab) return undefined;
+    return new Set([stepDef.pulseTab]);
+  }, [tutorialStep]);
 
   if (isLoading) {
     return (
@@ -326,6 +371,9 @@ export default function GamePage() {
             onNavigate={handleNavigate}
             activityLog={activityLog}
             onAllocateAttribute={handleAllocateAttribute}
+            onQuickRest={handleQuickRest}
+            quickRestPercent={quickRestHealPercent}
+            busyAction={busyAction}
           />
         );
       case 'explore':
@@ -371,6 +419,10 @@ export default function GamePage() {
             onPlaybackComplete={handleExplorationPlaybackComplete}
             onPlaybackSkip={handlePlaybackSkip}
             onPushLog={pushLog}
+            combatSpeedMs={combatLogSpeedMs}
+            explorationSpeedMs={explorationSpeedMs}
+            defaultTurns={defaultExploreTurns}
+            tutorialLocked={tutorialStep === TUTORIAL_STEP_EXPLORE}
           />
         );
       case 'inventory':
@@ -540,6 +592,8 @@ export default function GamePage() {
             onTravelPlaybackSkip={handleTravelPlaybackSkip}
             onPushLog={pushLog}
             activityLog={activityLog}
+            combatSpeedMs={combatLogSpeedMs}
+            explorationSpeedMs={explorationSpeedMs}
             onTravel={handleTravelToZone}
             onExploreCurrentZone={() => setActiveScreen('explore')}
           />
@@ -633,6 +687,7 @@ export default function GamePage() {
               recoveryCost={hpState.recoveryCost}
               zoneCraftingLevel={zoneCraftingLevel}
               zoneName={zoneCraftingName}
+              defaultMaxQuantity={activeCraftingSkill === 'refining' && defaultRefiningMax}
             />
           </div>
         );
@@ -725,7 +780,15 @@ export default function GamePage() {
             />
           </div>
         );
-      case 'combat':
+      case 'combat': {
+        const shouldAutoSkipCombat = autoSkipKnownCombat && combatPlaybackData && (() => {
+          const mob = bestiaryMobs.find(m => m.id === combatPlaybackData.mobTemplateId);
+          if (!mob?.isDiscovered) return false;
+          if (combatPlaybackData.mobPrefix) {
+            return mob.prefixesEncountered.includes(combatPlaybackData.mobPrefix);
+          }
+          return true;
+        })();
         return (
           <CombatScreen
             hpState={hpState}
@@ -750,6 +813,8 @@ export default function GamePage() {
             onPendingEncounterMobFilterChange={handlePendingEncounterMobFilterChange}
             onPendingEncounterSortChange={handlePendingEncounterSortChange}
             combatPlaybackData={combatPlaybackData}
+            combatSpeedMs={combatLogSpeedMs}
+            autoSkipCombat={!!shouldAutoSkipCombat}
             onCombatPlaybackComplete={handleCombatPlaybackComplete}
             fightProgress={combatPlaybackQueue && combatPlaybackQueue.length > 1
               ? { current: combatPlaybackIndex + 1, total: combatPlaybackQueue.length }
@@ -757,6 +822,7 @@ export default function GamePage() {
             }
           />
         );
+      }
       case 'arena':
         return (
           <ArenaScreen
@@ -769,6 +835,7 @@ export default function GamePage() {
             onNotificationsChanged={() => void loadPvpNotificationCount()}
             onHpChanged={() => void loadTurnsAndHp()}
             onNavigate={(s) => setActiveScreen(s as Screen)}
+            combatSpeedMs={combatLogSpeedMs}
           />
         );
       case 'rest':
@@ -780,40 +847,143 @@ export default function GamePage() {
             availableTurns={turns}
           />
         );
-      case 'profile':
+      case 'settings': {
+        const speedLabel = (ms: number) =>
+          ms <= 100 ? 'Very Fast' : ms <= 300 ? 'Fast' : ms <= 500 ? 'Normal' : ms <= 700 ? 'Slow' : 'Very Slow';
         return (
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Profile</h2>
+            <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Settings</h2>
             <p className="text-[var(--rpg-text-secondary)]">Username: {player?.username}</p>
 
+            {/* Combat */}
             <PixelCard>
-              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-2">Auto-Potion</h3>
-              <p className="text-xs text-[var(--rpg-text-secondary)] mb-3">
-                Drink a health potion when HP drops below threshold. Uses your turn instead of attacking.
-              </p>
-              <div className="flex items-center gap-3">
-                <Slider
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={[autoPotionThreshold]}
-                  onValueChange={(val) => setAutoPotionThreshold(val[0])}
-                  onValueCommit={(val) => handleSetAutoPotionThreshold(val[0])}
-                />
-                <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
-                  {autoPotionThreshold === 0 ? 'Off' : `${autoPotionThreshold}%`}
-                </span>
+              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Combat</h3>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Combat Log Speed</p>
+                  <div className="flex items-center gap-3">
+                    <Slider min={100} max={1000} step={100}
+                      value={[combatLogSpeedMs]}
+                      onValueChange={(val) => setCombatLogSpeedMs(val[0])}
+                      onValueCommit={(val) => handleSetCombatLogSpeed(val[0])}
+                    />
+                    <span className="text-xs font-mono text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
+                      {speedLabel(combatLogSpeedMs)}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-[var(--rpg-text-secondary)]">Auto-Skip Known Combat</p>
+                      <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Skip playback for mob+prefix combos you&apos;ve killed before</p>
+                    </div>
+                    <ToggleSwitch checked={autoSkipKnownCombat} onChange={handleSetAutoSkipKnownCombat} />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Auto-Potion Threshold</p>
+                  <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
+                    Drink a health potion when HP drops below this threshold during combat.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Slider min={0} max={100} step={5}
+                      value={[autoPotionThreshold]}
+                      onValueChange={(val) => setAutoPotionThreshold(val[0])}
+                      onValueCommit={(val) => handleSetAutoPotionThreshold(val[0])}
+                    />
+                    <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
+                      {autoPotionThreshold === 0 ? 'Off' : `${autoPotionThreshold}%`}
+                    </span>
+                  </div>
+                </div>
               </div>
             </PixelCard>
 
+            {/* Exploration */}
+            <PixelCard>
+              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Exploration</h3>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Exploration Playback Speed</p>
+                  <div className="flex items-center gap-3">
+                    <Slider min={100} max={1000} step={100}
+                      value={[explorationSpeedMs]}
+                      onValueChange={(val) => setExplorationSpeedMs(val[0])}
+                      onValueCommit={(val) => handleSetExplorationSpeed(val[0])}
+                    />
+                    <span className="text-xs font-mono text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
+                      {speedLabel(explorationSpeedMs)}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Default Explore Turns</p>
+                  <div className="flex items-center gap-3">
+                    <Slider min={10} max={10000} step={10}
+                      value={[defaultExploreTurns]}
+                      onValueChange={(val) => setDefaultExploreTurns(val[0])}
+                      onValueCommit={(val) => handleSetDefaultExploreTurns(val[0])}
+                    />
+                    <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
+                      {defaultExploreTurns.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </PixelCard>
+
+            {/* Recovery */}
+            <PixelCard>
+              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Recovery</h3>
+              <p className="text-xs text-[var(--rpg-text-secondary)] mb-2">Quick-Rest Heal Target</p>
+              <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
+                Used by the Quick Rest button on the dashboard.
+              </p>
+              <div className="flex gap-2">
+                {[25, 50, 75, 100].map((pct) => (
+                  <button
+                    key={pct}
+                    onClick={() => handleSetQuickRestHealPercent(pct)}
+                    className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors ${
+                      quickRestHealPercent === pct
+                        ? 'bg-[var(--rpg-green-light)] text-black'
+                        : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-border)]'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+            </PixelCard>
+
+            {/* Crafting */}
+            <PixelCard>
+              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Crafting</h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-[var(--rpg-text-secondary)]">Default Refining to Max</p>
+                  <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Auto-set refining quantity to maximum when selecting a recipe</p>
+                </div>
+                <ToggleSwitch checked={defaultRefiningMax} onChange={handleSetDefaultRefiningMax} />
+              </div>
+            </PixelCard>
+
+            {/* Account */}
             <button
               onClick={() => { logout(); router.push('/'); }}
-              className="px-4 py-2 bg-[var(--rpg-red)] rounded text-white"
+              className="w-full px-4 py-2 bg-[var(--rpg-red)] rounded text-white"
             >
               Logout
             </button>
           </div>
         );
+      }
       case 'worldEvents':
         return (
           <WorldEvents
@@ -845,6 +1015,8 @@ export default function GamePage() {
             onTurnsChanged={() => void loadTurnsAndHp()}
           />
         );
+      case 'admin':
+        return <AdminScreen onAction={loadAll} />;
       default:
         return null;
     }
@@ -863,6 +1035,11 @@ export default function GamePage() {
             You have broken equipment! Broken gear provides no stats. Visit your inventory to repair.
           </div>
         )}
+
+        <TutorialBanner
+          tutorialStep={tutorialStep}
+          onSkip={skipTutorial}
+        />
 
         {/* Sub-navigation for screens */}
         {getActiveTab() === 'home' && (
@@ -894,6 +1071,18 @@ export default function GamePage() {
                 )}
               </button>
             ))}
+            {player?.role === 'admin' && (
+              <button
+                onClick={() => setActiveScreen('admin')}
+                className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
+                  activeScreen === 'admin'
+                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
+                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
+                }`}
+              >
+                Admin
+              </button>
+            )}
           </div>
         )}
 
@@ -996,6 +1185,17 @@ export default function GamePage() {
         activeTab={getActiveTab()}
         onNavigate={handleNavigate}
         badgeTabs={achievementUnclaimedCount > 0 ? new Set(['home']) : undefined}
+        pulseTabs={tutorialPulseTabs}
+      />
+      <TutorialDialog
+        tutorialStep={tutorialStep}
+        onDismiss={() => {
+          if (tutorialStep === TUTORIAL_STEP_WELCOME) {
+            advanceTutorial(TUTORIAL_STEP_WELCOME);
+          } else if (tutorialStep === TUTORIAL_STEP_DONE) {
+            advanceTutorial(TUTORIAL_STEP_DONE);
+          }
+        }}
       />
       <AchievementToast onNavigate={(category) => { setAchievementCategory(category); setActiveScreen('achievements'); }} />
     </>

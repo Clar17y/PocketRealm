@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
-
-import { prisma } from '@adventure/database';
+import { mockPrisma as db } from '../__test__/setup';
 import { generateWeeklyContracts, getActiveContracts, incrementContractProgress, getWeekStart } from './guildContractService';
 import { GUILD_CONTRACT_CONSTANTS } from '@adventure/shared';
 
@@ -11,8 +8,6 @@ vi.mock('./guildService.js', () => ({
   addGuildXp: vi.fn().mockResolvedValue({ level: 1, xp: 0n, leveledUp: false }),
   checkGuildAchievementsForAllMembers: vi.fn().mockResolvedValue(undefined),
 }));
-
-const db = prisma as unknown as Record<string, any>;
 
 const GUILD_ID = 'guild-1';
 const NOW = new Date('2026-02-23T12:00:00Z'); // A Monday at noon UTC

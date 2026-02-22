@@ -7,7 +7,7 @@ type CounterKey =
   | 'totalEpicsCrafted' | 'totalLegendariesCrafted'
   | 'totalSalvages' | 'totalForgeUpgrades'
   | 'totalGatheringActions' | 'totalTurnsSpent'
-  | 'totalDeaths';
+  | 'totalDeaths' | 'tutorialCompleted';
 
 export type StatsIncrements = Partial<Record<CounterKey, number>>;
 
@@ -164,6 +164,7 @@ export async function resolveAllStats(playerId: string): Promise<ResolvedStats> 
     totalGatheringActions: counters?.totalGatheringActions ?? 0,
     totalTurnsSpent: counters?.totalTurnsSpent ?? 0,
     totalDeaths: counters?.totalDeaths ?? 0,
+    tutorialCompleted: counters?.tutorialCompleted ?? 0,
     guildLevel: guildStats.guild_level,
     guildContractsCompleted: guildStats.guild_contracts_completed,
     guildTurnsContributed: guildStats.guild_turns_contributed,

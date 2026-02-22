@@ -36,6 +36,17 @@ model Player {
   // Auto-Potion
   autoPotionThreshold Int @default(0) @map("auto_potion_threshold")
 
+  // Tutorial
+  tutorialStep    Int      @default(0) @map("tutorial_step")
+
+  // Preferences
+  combatLogSpeedMs    Int     @default(800)  @map("combat_log_speed_ms")
+  explorationSpeedMs  Int     @default(800)  @map("exploration_speed_ms")
+  autoSkipKnownCombat Boolean @default(false) @map("auto_skip_known_combat")
+  defaultExploreTurns Int     @default(100)  @map("default_explore_turns")
+  quickRestHealPercent Int    @default(100)  @map("quick_rest_heal_percent")
+  defaultRefiningMax  Boolean @default(false) @map("default_refining_max")
+
   // Zone / Travel
   currentZoneId          String? @map("current_zone_id")
   lastTravelledFromZoneId String? @map("last_travelled_from_zone_id")
@@ -699,6 +710,7 @@ model PlayerStats {
   totalGatheringActions   Int      @default(0) @map("total_gathering_actions")
   totalTurnsSpent         Int      @default(0) @map("total_turns_spent")
   totalDeaths             Int      @default(0) @map("total_deaths")
+  tutorialCompleted       Int      @default(0) @map("tutorial_completed")
   updatedAt               DateTime @updatedAt @map("updated_at")
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
