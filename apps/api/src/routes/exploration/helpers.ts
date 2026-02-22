@@ -2,6 +2,10 @@ import { z } from 'zod';
 import {
   EXPLORATION_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
+  type EncounterSiteSize,
+  type EncounterMobRole,
+  type EncounterMobStatus,
+  type EncounterMobSlot,
 } from '@adventure/shared';
 import {
   generateRoomAssignments,
@@ -24,9 +28,8 @@ export const startSchema = z.object({
 
 // --- Types ---
 
-export type EncounterSiteSize = 'small' | 'medium' | 'large';
-export type EncounterMobRole = 'trash' | 'elite' | 'boss';
-export type EncounterMobStatus = 'alive' | 'defeated' | 'decayed';
+export type { EncounterSiteSize, EncounterMobRole, EncounterMobStatus } from '@adventure/shared';
+
 export type NarrativeEventType =
   | 'ambush_victory'
   | 'ambush_defeat'
@@ -35,15 +38,6 @@ export type NarrativeEventType =
   | 'hidden_cache'
   | 'zone_exit'
   | 'event_discovery';
-
-export interface EncounterMobSlot {
-  slot: number;
-  mobTemplateId: string;
-  role: EncounterMobRole;
-  prefix: string | null;
-  status: EncounterMobStatus;
-  room: number;
-}
 
 export interface NarrativeEvent {
   turn: number;

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Prisma } from '@adventure/database';
 import { EXPLORATION_CONSTANTS } from '@adventure/shared';
-import type { PotionConsumed } from '@adventure/shared';
+import type { PotionConsumed, EncounterSiteSize, EncounterMobRole, EncounterMobStatus, EncounterMobSlot } from '@adventure/shared';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { grantSkillXp } from '../../services/xpService';
 import type { LootDropWithName } from '../../services/lootService';
@@ -10,8 +10,6 @@ import { paginationSchema } from '../../utils/routeHelpers.js';
 export { prismaAny } from '../../utils/prismaAny.js';
 
 export const attackSkillSchema = z.enum(['melee', 'ranged', 'magic']);
-
-export type EncounterSiteSize = 'small' | 'medium' | 'large';
 
 export const lootDropWithNameSchema = z.object({
   itemTemplateId: z.string().min(1),
@@ -43,24 +41,12 @@ export function toEncounterSiteSize(value: string): EncounterSiteSize {
   return 'small';
 }
 
-export type EncounterMobRole = 'trash' | 'elite' | 'boss';
-export type EncounterMobStatus = 'alive' | 'defeated' | 'decayed';
-
-export interface EncounterMobState {
-  slot: number;
-  mobTemplateId: string;
-  role: EncounterMobRole;
-  prefix: string | null;
-  status: EncounterMobStatus;
-  room: number;
-}
-
-export function parseEncounterSiteMobs(raw: unknown): EncounterMobState[] {
+export function parseEncounterSiteMobs(raw: unknown): EncounterMobSlot[] {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
   const value = (raw as { mobs?: unknown }).mobs;
   if (!Array.isArray(value)) return [];
 
-  const parsed: EncounterMobState[] = [];
+  const parsed: EncounterMobSlot[] = [];
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
     const row = item as Record<string, unknown>;
@@ -85,11 +71,11 @@ export function parseEncounterSiteMobs(raw: unknown): EncounterMobState[] {
   return parsed.sort((a, b) => a.slot - b.slot);
 }
 
-export function serializeEncounterSiteMobs(mobs: EncounterMobState[]): Prisma.InputJsonObject {
+export function serializeEncounterSiteMobs(mobs: EncounterMobSlot[]): Prisma.InputJsonObject {
   return { mobs } as unknown as Prisma.InputJsonObject;
 }
 
-export function countEncounterSiteState(mobs: EncounterMobState[]): {
+export function countEncounterSiteState(mobs: EncounterMobSlot[]): {
   total: number;
   alive: number;
   defeated: number;
@@ -112,7 +98,7 @@ export function roleOrder(role: EncounterMobRole): number {
   return 2;
 }
 
-export function getNextEncounterMob(mobs: EncounterMobState[]): EncounterMobState | null {
+export function getNextEncounterMob(mobs: EncounterMobSlot[]): EncounterMobSlot | null {
   const alive = mobs.filter((mob) => mob.status === 'alive');
   if (alive.length === 0) return null;
   alive.sort((a, b) => {
@@ -123,7 +109,7 @@ export function getNextEncounterMob(mobs: EncounterMobState[]): EncounterMobStat
   return alive[0] ?? null;
 }
 
-export function getNextEncounterMobInRoom(mobs: EncounterMobState[], roomNumber: number): EncounterMobState | null {
+export function getNextEncounterMobInRoom(mobs: EncounterMobSlot[], roomNumber: number): EncounterMobSlot | null {
   const alive = mobs.filter((mob) => mob.status === 'alive' && mob.room === roomNumber);
   if (alive.length === 0) return null;
   alive.sort((a, b) => {
@@ -134,7 +120,7 @@ export function getNextEncounterMobInRoom(mobs: EncounterMobState[], roomNumber:
   return alive[0] ?? null;
 }
 
-export function getAllAliveMobsInRoom(mobs: EncounterMobState[], roomNumber: number): EncounterMobState[] {
+export function getAllAliveMobsInRoom(mobs: EncounterMobSlot[], roomNumber: number): EncounterMobSlot[] {
   return mobs
     .filter((mob) => mob.status === 'alive' && mob.room === roomNumber)
     .sort((a, b) => {
@@ -144,7 +130,7 @@ export function getAllAliveMobsInRoom(mobs: EncounterMobState[], roomNumber: num
     });
 }
 
-export function getRoomState(mobs: EncounterMobState[], roomNumber: number): {
+export function getRoomState(mobs: EncounterMobSlot[], roomNumber: number): {
   total: number;
   alive: number;
   defeated: number;
@@ -158,11 +144,11 @@ export function getRoomState(mobs: EncounterMobState[], roomNumber: number): {
   return { total: roomMobs.length, alive, defeated };
 }
 
-export function getMaxRoom(mobs: EncounterMobState[]): number {
+export function getMaxRoom(mobs: EncounterMobSlot[]): number {
   return Math.max(...mobs.map(m => m.room), 1);
 }
 
-export function getNextUnfinishedRoom(mobs: EncounterMobState[], startRoom: number): number | null {
+export function getNextUnfinishedRoom(mobs: EncounterMobSlot[], startRoom: number): number | null {
   const maxRoom = getMaxRoom(mobs);
   for (let r = startRoom; r <= maxRoom; r++) {
     const state = getRoomState(mobs, r);
@@ -171,8 +157,8 @@ export function getNextUnfinishedRoom(mobs: EncounterMobState[], startRoom: numb
   return null;
 }
 
-export function applyEncounterSiteDecayInMemory(mobs: EncounterMobState[], discoveredAt: Date, now: Date): {
-  mobs: EncounterMobState[];
+export function applyEncounterSiteDecayInMemory(mobs: EncounterMobSlot[], discoveredAt: Date, now: Date): {
+  mobs: EncounterMobSlot[];
   changed: boolean;
 } {
   const elapsedMs = Math.max(0, now.getTime() - discoveredAt.getTime());
@@ -203,9 +189,9 @@ export async function applyEncounterSiteDecayAndPersist(
   },
   now: Date
 ): Promise<{
-  mobs: EncounterMobState[];
+  mobs: EncounterMobSlot[];
   state: { total: number; alive: number; defeated: number; decayed: number };
-  nextMob: EncounterMobState | null;
+  nextMob: EncounterMobSlot | null;
 } | null> {
   const parsed = parseEncounterSiteMobs(site.mobs);
   if (parsed.length === 0) {
