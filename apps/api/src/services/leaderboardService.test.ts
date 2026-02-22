@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
-
 vi.mock('../redis', () => ({
   redis: {
     zcard: vi.fn(),
@@ -18,13 +16,11 @@ vi.mock('../redis', () => ({
   },
 }));
 
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { redis } from '../redis';
 import { getCategories, getLeaderboard, refreshAllLeaderboards } from './leaderboardService';
 import { AppError } from '../middleware/errorHandler';
 import { LEADERBOARD_CONSTANTS } from '@adventure/shared';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 const mockRedis = redis as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 describe('leaderboardService', () => {

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
 vi.mock('./eloService', () => ({
   calculateEloChange: vi.fn().mockReturnValue({ deltaA: 16, deltaB: -16 }),
 }));
@@ -49,7 +48,7 @@ vi.mock('@adventure/game-engine', () => ({
   calculateMaxHp: vi.fn().mockReturnValue(100),
 }));
 
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { getHpState } from './hpService';
 import {
   getOrCreateRating,
@@ -61,8 +60,6 @@ import {
   getNotificationCount,
   markNotificationsRead,
 } from './pvpService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 
 function setupChallengeMocks() {
   mockPrisma.player.findUnique

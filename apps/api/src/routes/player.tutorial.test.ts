@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
 vi.mock('../services/statsService', () => ({
   incrementStats: vi.fn(),
 }));
@@ -20,11 +19,10 @@ vi.mock('../middleware/auth', () => ({
   authenticate: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
 
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { incrementStats } from '../services/statsService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 
-const mockPrisma = prisma as unknown as Record<string, any>;
 const mockIncrementStats = incrementStats as ReturnType<typeof vi.fn>;
 const mockCheckAchievements = checkAchievements as ReturnType<typeof vi.fn>;
 const mockEmitAchievementNotifications = emitAchievementNotifications as ReturnType<typeof vi.fn>;

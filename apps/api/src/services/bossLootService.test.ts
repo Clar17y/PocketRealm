@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
 vi.mock('../utils/random', () => ({
   randomIntInclusive: vi.fn().mockReturnValue(0),
 }));
@@ -22,14 +21,12 @@ vi.mock('./achievementService', () => ({
   emitAchievementNotifications: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { WORLD_EVENT_CONSTANTS } from '@adventure/shared';
 import { distributeBossLoot } from './bossLootService';
 import { rollAndGrantLoot, enrichLootWithNames } from './lootService';
 import { grantSkillXp } from './xpService';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 
 function setupMobLookup(name = 'Dragon', familyId = 'fam-1') {
   mockPrisma.mobTemplate.findUnique.mockResolvedValue({

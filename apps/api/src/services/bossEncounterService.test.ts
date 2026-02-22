@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
 vi.mock('./systemMessageService', () => ({
   emitSystemMessage: vi.fn().mockResolvedValue(undefined),
 }));
@@ -49,7 +48,7 @@ vi.mock('@adventure/game-engine', () => ({
   calculateFleeResult: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1 }),
 }));
 
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import {
   createBossEncounter,
   signUpForBossRound,
@@ -58,8 +57,6 @@ import {
   getActiveBossEncounters,
   getBossHistory,
 } from './bossEncounterService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 
 const makeEncounterRow = (overrides: Record<string, any> = {}) => ({
   id: 'enc-1',

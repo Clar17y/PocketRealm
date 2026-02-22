@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
 vi.mock('./statsService', () => ({
   resolveStats: vi.fn(),
   resolveAllStats: vi.fn(),
@@ -9,11 +8,9 @@ vi.mock('./statsService', () => ({
   incrementStats: vi.fn(),
 }));
 
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { checkAchievements, claimReward, setActiveTitle, getPlayerAchievements } from './achievementService';
 import { resolveStats, resolveAllStats, resolveFamilyKills, resolveAllFamilyKills } from './statsService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 const mockResolveStats = resolveStats as ReturnType<typeof vi.fn>;
 const mockResolveAllStats = resolveAllStats as ReturnType<typeof vi.fn>;
 const mockResolveFamilyKills = resolveFamilyKills as ReturnType<typeof vi.fn>;

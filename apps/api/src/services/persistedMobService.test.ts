@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
 vi.mock('@adventure/game-engine', () => ({
   calculatePersistedMobHp: vi.fn(),
 }));
 
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { calculatePersistedMobHp } from '@adventure/game-engine';
 import {
   persistMobHp,
@@ -13,8 +12,6 @@ import {
   removePersistedMob,
   cleanupFullyHealedMobs,
 } from './persistedMobService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 const mockCalcHp = calculatePersistedMobHp as ReturnType<typeof vi.fn>;
 
 describe('persistedMobService', () => {

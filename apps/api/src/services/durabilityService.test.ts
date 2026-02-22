@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DURABILITY_CONSTANTS } from '@adventure/shared';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
-
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { degradeEquippedDurability } from './durabilityService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 
 beforeEach(() => {
   vi.clearAllMocks();

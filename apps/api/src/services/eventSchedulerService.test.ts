@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/database', () => import('../__mocks__/database.js'));
 vi.mock('./worldEventService', () => ({
   expireStaleEvents: vi.fn().mockResolvedValue([]),
   spawnWorldEvent: vi.fn().mockResolvedValue(null),
@@ -13,12 +12,10 @@ vi.mock('./systemMessageService', () => ({
   emitSystemMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { prisma } from '@adventure/database';
+import { mockPrisma } from '../__test__/setup';
 import { checkAndSpawnEvents } from './eventSchedulerService';
 import { expireStaleEvents } from './worldEventService';
 import { checkAndResolveDueBossRounds } from './bossEncounterService';
-
-const mockPrisma = prisma as unknown as Record<string, any>;
 
 // Each test gets a time epoch far enough apart that the module-level lastRunAt
 // from a previous test can never cause throttling.
