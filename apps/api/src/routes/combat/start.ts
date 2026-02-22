@@ -41,7 +41,7 @@ import { buildPotionPool, deductConsumedPotions } from '../../services/potionSer
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
-import { serializeXpGrant } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate } from '../../utils/routeHelpers.js';
 import { checkAchievements, emitAchievementNotifications } from '../../services/achievementService';
 import {
   prismaAny,
@@ -165,12 +165,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     const template = mobTemplateById.get(roomMob.mobTemplateId);
     if (!template) continue;
 
-    const baseMob: MobTemplate = {
-      ...(template as unknown as MobTemplate),
-      spellPattern: Array.isArray((template as { spellPattern: unknown }).spellPattern)
-        ? ((template as { spellPattern: unknown }).spellPattern as MobTemplate['spellPattern'])
-        : [],
-    };
+    const baseMob = toMobTemplate(template as unknown as Record<string, unknown>);
     const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
     const prefixedMob = applyMobPrefix(modifiedMob, roomMob.prefix ?? null);
 
@@ -651,10 +646,7 @@ export function registerStartRoutes(router: Router): void {
         equipmentStats
       );
 
-      const baseMob: MobTemplate = {
-        ...mob,
-        spellPattern: Array.isArray(mob.spellPattern) ? (mob.spellPattern as MobTemplate['spellPattern']) : [],
-      };
+      const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
       const zoneModifiers = await getActiveZoneModifiers(zoneId);
       const activeEventEffects = await getActiveEventSummaries(zoneId);
       const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);

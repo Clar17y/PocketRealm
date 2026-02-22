@@ -20,7 +20,7 @@ import { getEquipmentStats } from '../services/equipmentService';
 import { getPlayerProgressionState } from '../services/attributesService';
 import { grantSkillXp } from '../services/xpService';
 import { rollAndGrantLoot } from '../services/lootService';
-import { serializeXpGrant } from '../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate } from '../utils/routeHelpers.js';
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
@@ -294,10 +294,7 @@ zonesRouter.post('/travel', async (req, res, next) => {
           if (tieredMobs.length === 0) break;
 
           const rawMob = pickWeighted(tieredMobs, m => m.encounterWeight) ?? tieredMobs[0]!;
-          const baseMob: MobTemplate = {
-            ...(rawMob as unknown as MobTemplate),
-            spellPattern: Array.isArray(rawMob.spellPattern) ? (rawMob.spellPattern as unknown as MobTemplate['spellPattern']) : [],
-          };
+          const baseMob = toMobTemplate(rawMob as unknown as Record<string, unknown>);
           const prefixedMob = applyMobPrefix(baseMob, rollMobPrefix());
 
           const playerStats = buildPlayerCombatStats(

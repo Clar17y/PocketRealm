@@ -28,7 +28,7 @@ import { enterRecoveringState, getHpState, setHp } from '../../services/hpServic
 import { rollAndGrantLoot } from '../../services/lootService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { serializeXpGrant } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate } from '../../utils/routeHelpers.js';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
@@ -187,12 +187,7 @@ startRouter.post('/start', async (req, res, next) => {
           // Tutorial: guaranteed Field Mouse with no prefix
           const fieldMouse = mobTemplates.find(m => m.name === 'Field Mouse')
             ?? mobTemplates[0]!;
-          baseMob = {
-            ...(fieldMouse as unknown as MobTemplate),
-            spellPattern: Array.isArray((fieldMouse as { spellPattern: unknown }).spellPattern)
-              ? ((fieldMouse as { spellPattern: unknown }).spellPattern as MobTemplate['spellPattern'])
-              : [],
-          };
+          baseMob = toMobTemplate(fieldMouse as unknown as Record<string, unknown>);
           prefixedMob = applyMobPrefix(baseMob, null);
         } else {
           const tieredMobs = filterAndWeightMobsByTier(
@@ -217,12 +212,7 @@ startRouter.post('/start', async (req, res, next) => {
           const mob = pickWeighted(candidates, 'encounterWeight') as typeof candidates[number] | null;
           if (!mob) continue;
 
-          baseMob = {
-            ...(mob as unknown as MobTemplate),
-            spellPattern: Array.isArray((mob as { spellPattern: unknown }).spellPattern)
-              ? ((mob as { spellPattern: unknown }).spellPattern as MobTemplate['spellPattern'])
-              : [],
-          };
+          baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
 
           const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
           prefixedMob = applyMobPrefix(modifiedMob, rollMobPrefix());
