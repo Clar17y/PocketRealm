@@ -455,6 +455,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const pendingCombatRewardsRef = useRef<LastCombat['rewards'] | null>(null);
   const siteJustClearedRef = useRef(false);
   const arrivedInTownRef = useRef(false);
+  const lastEventLogTimeRef = useRef(0);
   const combatPlaybackData = combatPlaybackQueue?.[combatPlaybackIndex] ?? null;
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<{
     totalTurns: number;
@@ -1084,9 +1085,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       if (data.activeEvents?.length) {
-        for (const evt of data.activeEvents) {
-          const sign = evt.effectType.endsWith('_down') ? '-' : '+';
-          pushLog({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
+        const now = Date.now();
+        if (now - lastEventLogTimeRef.current >= 5 * 60 * 1000) {
+          lastEventLogTimeRef.current = now;
+          for (const evt of data.activeEvents) {
+            const sign = evt.effectType.endsWith('_down') ? '-' : '+';
+            pushLog({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
+          }
         }
       }
 
@@ -1255,9 +1260,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       if (data.activeEvents?.length) {
-        for (const evt of data.activeEvents) {
-          const sign = evt.effectType.endsWith('_down') ? '-' : '+';
-          newLogs.push({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
+        const now = Date.now();
+        if (now - lastEventLogTimeRef.current >= 5 * 60 * 1000) {
+          lastEventLogTimeRef.current = now;
+          for (const evt of data.activeEvents) {
+            const sign = evt.effectType.endsWith('_down') ? '-' : '+';
+            newLogs.push({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
+          }
         }
       }
 
