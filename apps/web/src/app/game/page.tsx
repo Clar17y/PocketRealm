@@ -1089,7 +1089,6 @@ export default function GamePage() {
               { id: 'worldEvents', label: 'Events', badge: 0 },
               { id: 'achievements', label: 'Achievements', badge: achievementUnclaimedCount },
               { id: 'leaderboard', label: 'Rankings', badge: 0 },
-              { id: 'guild', label: 'Guild', badge: 0 },
               { id: 'bestiary', label: 'Bestiary', badge: 0 },
               { id: 'skills', label: 'Skills', badge: 0 },
             ].map((tab) => (
