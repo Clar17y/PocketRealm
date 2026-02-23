@@ -113,6 +113,37 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Monster Parade */}
+      <section className="py-20 px-4">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-center text-[var(--rpg-gold)] mb-12">
+            80+ Monsters. 2 World Bosses. Good Luck.
+          </h2>
+          <div className="flex justify-center items-end gap-6 md:gap-10 flex-wrap">
+            {[
+              { src: '/assets/monsters/monster_goblin_king.png', name: 'Goblin King', size: 96 },
+              { src: '/assets/monsters/monster_crystal_titan.png', name: 'Crystal Titan', size: 120 },
+              { src: '/assets/monsters/monster_alpha_wolf.png', name: 'Alpha Wolf', size: 112 },
+              { src: '/assets/monsters/monster_ancient_spirit.png', name: 'Ancient Spirit', size: 128 },
+              { src: '/assets/monsters/monster_fae_queen.png', name: 'Fae Queen', size: 104 },
+              { src: '/assets/monsters/monster_death_knight.png', name: 'Death Knight', size: 116 },
+            ].map((monster) => (
+              <div key={monster.name} className="flex flex-col items-center gap-2">
+                <Image
+                  src={monster.src}
+                  alt={monster.name}
+                  width={monster.size}
+                  height={monster.size}
+                  className="drop-shadow-[0_0_12px_rgba(212,168,75,0.3)]"
+                  loading="lazy"
+                />
+                <span className="text-xs text-[var(--rpg-text-secondary)]">{monster.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
