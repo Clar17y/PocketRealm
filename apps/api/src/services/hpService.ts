@@ -13,7 +13,7 @@ import type { HpState, RestResult, RecoveryResult } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getEquipmentStats } from './equipmentService';
 import { spendPlayerTurnsTx } from './turnBankService';
-import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, type TaxResult } from './guildTaxService';
+import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, type TaxResult } from './guildTaxService';
 import { normalizePlayerAttributes } from './attributesService';
 
 async function getVitalityLevel(playerId: string): Promise<number> {
@@ -129,9 +129,7 @@ export async function rest(
   // Spend turns, apply tax, and update HP atomically.
   const { healing, taxResult } = await prisma.$transaction(async (tx) => {
     const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
-    const effectiveTurns = taxRate > 0
-      ? Math.floor(turnsToSpend * (1 - taxRate / 100))
-      : turnsToSpend;
+    const effectiveTurns = calculateEffectiveTurns(turnsToSpend, taxRate);
 
     const innerHealing = calculateRestHealing(currentHp, maxHp, healPerTurn, effectiveTurns);
 

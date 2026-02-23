@@ -36,6 +36,11 @@ export function calculateInflatedCost(baseCost: number, taxRatePercent: number):
   return Math.ceil(baseCost / (1 - taxRatePercent / 100));
 }
 
+export function calculateEffectiveTurns(turns: number, taxRatePercent: number): number {
+  if (taxRatePercent <= 0) return turns;
+  return Math.floor(turns * (1 - taxRatePercent / 100));
+}
+
 export function taxInfoFromResult(result: TaxResult): TaxInfo | null {
   if (!result.guildId || result.taxAmount === 0) return null;
   return {

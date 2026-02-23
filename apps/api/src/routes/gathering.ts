@@ -12,7 +12,7 @@ import { getSkillLevel } from '../services/combatStatsService.js';
 import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
 import { applyResourceEventModifiers } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
-import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, taxInfoFromResult } from '../services/guildTaxService';
+import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getPlayerGuildId } from '../services/guildService';
 import { incrementContractProgress } from '../services/guildContractService';
@@ -276,9 +276,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const { turnSpend, taxResult, actions, totalYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
     // Look up tax rate to calculate effective turns
     const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
-    const effectiveTurns = taxRate > 0
-      ? Math.floor(body.turns * (1 - taxRate / 100))
-      : body.turns;
+    const effectiveTurns = calculateEffectiveTurns(body.turns, taxRate);
 
     const maxActionsByTurns = Math.floor(effectiveTurns / GATHERING_CONSTANTS.BASE_TURN_COST);
     const maxActionsByCapacity = Math.ceil(effectiveCapacity / yieldPerAction);

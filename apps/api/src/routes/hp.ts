@@ -7,7 +7,7 @@ import { getTurnState } from '../services/turnBankService';
 import { calculateHealPerTurn, calculateRecoveryExitHp } from '@adventure/game-engine';
 import { getPlayerProgressionState } from '../services/attributesService';
 import { asyncHandler } from '../utils/asyncHandler';
-import { getPlayerTaxRate, taxInfoFromResult } from '../services/guildTaxService';
+import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 
 export const hpRouter = Router();
 
@@ -117,9 +117,7 @@ hpRouter.get('/rest/estimate', asyncHandler(async (req, res) => {
   const vitalityLevel = progression.attributes.vitality;
   const { taxRate } = await getPlayerTaxRate(playerId);
 
-  const effectiveTurns = taxRate > 0
-    ? Math.floor(query.turns * (1 - taxRate / 100))
-    : query.turns;
+  const effectiveTurns = calculateEffectiveTurns(query.turns, taxRate);
 
   const healPerTurn = calculateHealPerTurn(vitalityLevel);
   const hpNeeded = hpState.maxHp - hpState.currentHp;
