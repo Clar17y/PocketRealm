@@ -309,6 +309,11 @@ function NoGuildView({
           <p className="text-sm text-[var(--rpg-text-secondary)]">No guilds found.</p>
         ) : (
           <div className="space-y-2">
+            {characterLevel < GUILD_CONSTANTS.JOIN_MIN_LEVEL && (
+              <p className="text-xs text-[var(--rpg-gold)] px-1">
+                You must reach level {GUILD_CONSTANTS.JOIN_MIN_LEVEL} to join or request to join a guild.
+              </p>
+            )}
             {searchResults.map((guild) => (
               <div
                 key={guild.id}
