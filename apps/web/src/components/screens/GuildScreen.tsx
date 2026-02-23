@@ -992,7 +992,7 @@ function GuildSettings({
               className="w-full mt-1 p-2 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
             >
               <option value="open">Open</option>
-              <option value="invite_only">Invite Only</option>
+              <option value="invite_only">Request to Join</option>
               <option value="closed">Closed</option>
             </select>
           </div>
