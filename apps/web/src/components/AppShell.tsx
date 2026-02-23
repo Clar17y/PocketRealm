@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
 
 interface AppShellProps {
-  children: React.ReactNode;
+  children: ReactNode;
   turns?: number;
   username?: string;
   onSettings?: () => void;
@@ -34,10 +35,18 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout }
               <span className="font-mono text-[var(--rpg-gold)]">{turns.toLocaleString()}</span>
             </div>
             {username && (
-              <div className="relative">
+              <div
+                className="relative"
+                onBlur={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropdownOpen(false);
+                }}
+              >
                 {hasMenu ? (
                   <button
                     onClick={() => setDropdownOpen((o) => !o)}
+                    onKeyDown={(e) => { if (e.key === 'Escape') setDropdownOpen(false); }}
+                    aria-expanded={dropdownOpen}
+                    aria-haspopup="menu"
                     className="flex items-center gap-1 text-sm text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors"
                   >
                     {username}
@@ -57,6 +66,7 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout }
                     <div className="absolute right-0 top-full mt-1 z-50 min-w-[120px] bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg shadow-lg overflow-hidden">
                       {onSettings && (
                         <button
+                          role="menuitem"
                           onClick={() => { setDropdownOpen(false); onSettings(); }}
                           className="w-full text-left px-4 py-2 text-sm text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-background)] transition-colors"
                         >
@@ -65,6 +75,7 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout }
                       )}
                       {onLogout && (
                         <button
+                          role="menuitem"
                           onClick={() => { setDropdownOpen(false); onLogout(); }}
                           className="w-full text-left px-4 py-2 text-sm text-[var(--rpg-red)] hover:bg-[var(--rpg-background)] transition-colors"
                         >
