@@ -102,6 +102,7 @@ export default function Home() {
                   src={zone.src}
                   alt={zone.name}
                   fill
+                  sizes="288px"
                   className="object-cover"
                   loading="lazy"
                 />
@@ -149,7 +150,7 @@ export default function Home() {
       {/* Champion Subscription */}
       <section className="py-20 px-4">
         <div className="max-w-3xl mx-auto">
-          <div className="border border-[var(--rpg-gold)]/40 rounded-xl p-8 md:p-12 bg-gradient-to-b from-[var(--rpg-gold)]/5 to-transparent">
+          <div className="border border-rpg-gold/40 rounded-xl p-8 md:p-12 bg-gradient-to-b from-rpg-gold/5 to-transparent">
             <h2 className="text-3xl md:text-4xl font-bold text-center text-[var(--rpg-gold)] mb-2">
               Go Champion
             </h2>
