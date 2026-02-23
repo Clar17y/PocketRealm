@@ -710,8 +710,10 @@ export const GUILD_MATERIAL_CATEGORIES: Record<string, readonly string[]> = {
 } as const;
 
 export const GUILD_PROJECT_CONSTANTS = {
-  DAILY_MATERIAL_CAP: 200,
-  DAILY_TURN_CAP: 10_000,
+  /** Max materials a single player can contribute to one project (per category) */
+  PER_PROJECT_MATERIAL_CAP: 200,
+  /** Max turns a single player can contribute to one project */
+  PER_PROJECT_TURN_CAP: 10_000,
   MAX_ACTIVE_PROJECTS: 1,
 } as const;
 

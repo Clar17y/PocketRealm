@@ -5,21 +5,12 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import {
   getGuildSpecialization, selectGuildSpecialization, respecGuildSpecialization,
+  GUILD_MODIFIER_LABELS,
   type SpecializationStatusResponse,
 } from '@/lib/api/guild';
 import { GUILD_CONSTANTS, GUILD_SPECIALIZATION_DEFINITIONS } from '@adventure/shared';
 
 const formatNumber = (n: number) => n.toLocaleString();
-
-const BONUS_LABELS: Record<string, string> = {
-  xpBoost: 'Skill XP',
-  combatDamage: 'Combat Damage',
-  defenseBoost: 'Defense',
-  craftingCrit: 'Crafting Crit',
-  gatheringYield: 'Gathering Yield',
-  repairCostReduction: 'Repair Cost Reduction',
-  travelCostReduction: 'Travel Cost Reduction',
-};
 
 const PATH_COLORS: Record<string, { primary: string; bg: string }> = {
   warfare: { primary: 'var(--rpg-red)', bg: 'var(--rpg-red)' },
@@ -168,7 +159,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
                 className="text-xs px-2 py-0.5 rounded"
                 style={{ backgroundColor: `${colors.bg}20`, color: colors.primary }}
               >
-                +{Math.round(bonus.value * 100)}% {BONUS_LABELS[bonus.effectType] ?? bonus.effectType}
+                +{Math.round(bonus.value * 100)}% {GUILD_MODIFIER_LABELS[bonus.effectType] ?? bonus.effectType}
               </span>
             ))}
           </div>
@@ -198,7 +189,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
             <div className="mt-1.5 flex flex-wrap gap-1">
               {status.nextTier.bonuses.map((bonus, i) => (
                 <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]">
-                  +{Math.round(bonus.value * 100)}% {BONUS_LABELS[bonus.effectType] ?? bonus.effectType}
+                  +{Math.round(bonus.value * 100)}% {GUILD_MODIFIER_LABELS[bonus.effectType] ?? bonus.effectType}
                 </span>
               ))}
             </div>
@@ -282,7 +273,7 @@ function SpecTierList({
             <div className="flex flex-wrap gap-1">
               {tier.bonuses.map((bonus, i) => (
                 <span key={i} className="text-[10px] px-1 py-0.5 rounded bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]">
-                  +{Math.round(bonus.value * 100)}% {BONUS_LABELS[bonus.effectType] ?? bonus.effectType}
+                  +{Math.round(bonus.value * 100)}% {GUILD_MODIFIER_LABELS[bonus.effectType] ?? bonus.effectType}
                 </span>
               ))}
             </div>

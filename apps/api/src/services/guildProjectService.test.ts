@@ -211,7 +211,7 @@ describe('contributeTurns', () => {
       .rejects.toThrow('not found or not active');
   });
 
-  it('throws if amount exceeds daily cap', async () => {
+  it('throws if amount exceeds per-project cap', async () => {
     db.guildMember.findUnique.mockResolvedValue({
       guildId: GUILD_ID, playerId: PLAYER_ID, role: 'member',
     });
@@ -221,12 +221,12 @@ describe('contributeTurns', () => {
       status: 'active',
     });
     db.guildProjectContribution.findUnique.mockResolvedValue({
-      turnsContributed: GUILD_PROJECT_CONSTANTS.DAILY_TURN_CAP - 1000,
+      turnsContributed: GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP - 1000,
       materialsContributed: {},
     });
 
     await expect(contributeTurns(PLAYER_ID, GUILD_ID, 'proj-1', 2_000))
-      .rejects.toThrow('daily turn contribution cap');
+      .rejects.toThrow('per-project turn contribution cap');
   });
 
   it('throws if player has insufficient turns', async () => {
@@ -298,6 +298,7 @@ describe('contributeMaterials', () => {
     db.itemTemplate.findUnique.mockResolvedValue({
       id: 'tpl-wolf-leather', name: 'Wolf Leather', itemType: 'resource',
     });
+    db.guildProjectContribution.findUnique.mockResolvedValue(null);
 
     await expect(contributeMaterials(PLAYER_ID, GUILD_ID, 'proj-1', 'tpl-wolf-leather', 50))
       .rejects.toThrow('not needed for this project');
@@ -388,9 +389,31 @@ describe('contributeMaterials', () => {
     db.itemTemplate.findUnique.mockResolvedValue({
       id: 'tpl-iron-ore', name: 'Iron Ore', itemType: 'resource',
     });
+    db.guildProjectContribution.findUnique.mockResolvedValue(null);
 
     await expect(contributeMaterials(PLAYER_ID, GUILD_ID, 'proj-1', 'tpl-iron-ore', 50))
       .rejects.toThrow('already fully contributed');
+  });
+
+  it('throws if player exceeds per-project material cap', async () => {
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'member',
+    });
+    db.guildProject.findFirst.mockResolvedValue({
+      id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
+      turnsContributed: 0, materialsProgress: { ore: 100 },
+      status: 'active',
+    });
+    db.itemTemplate.findUnique.mockResolvedValue({
+      id: 'tpl-iron-ore', name: 'Iron Ore', itemType: 'resource',
+    });
+    db.guildProjectContribution.findUnique.mockResolvedValue({
+      turnsContributed: 0,
+      materialsContributed: { ore: GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP - 10 },
+    });
+
+    await expect(contributeMaterials(PLAYER_ID, GUILD_ID, 'proj-1', 'tpl-iron-ore', 50))
+      .rejects.toThrow('per-project material contribution cap');
   });
 });
 

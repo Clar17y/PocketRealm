@@ -5,21 +5,13 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import {
   getGuildProjects, startGuildProject, contributeProjectTurns, contributeProjectMaterials,
+  GUILD_MODIFIER_LABELS,
   type GuildProjectResponse, type GuildProjectAvailableResponse, type GuildProjectsListResponse,
 } from '@/lib/api/guild';
-import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS } from '@adventure/shared';
+import { getInventory } from '@/lib/api/items';
+import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS, GUILD_MATERIAL_CATEGORIES } from '@adventure/shared';
 
 const formatNumber = (n: number) => n.toLocaleString();
-
-const PERK_LABELS: Record<string, string> = {
-  craftingCrit: 'Crafting Crit',
-  xpBoost: 'Skill XP',
-  travelCostReduction: 'Travel Cost Reduction',
-  repairCostReduction: 'Repair Cost Reduction',
-  gatheringYield: 'Gathering Yield',
-  combatDamage: 'Combat Damage',
-  defenseBoost: 'Defense',
-};
 
 interface GuildProjectsTabProps {
   guildId: string;
@@ -28,12 +20,29 @@ interface GuildProjectsTabProps {
   onTurnsChanged: () => void;
 }
 
+interface ResourceItem {
+  templateId: string;
+  templateName: string;
+  quantity: number;
+  category: string;
+}
+
+function getCategoryForTemplate(name: string): string | null {
+  for (const [category, names] of Object.entries(GUILD_MATERIAL_CATEGORIES)) {
+    if ((names as readonly string[]).includes(name)) return category;
+  }
+  return null;
+}
+
 export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: GuildProjectsTabProps) {
   const [data, setData] = useState<GuildProjectsListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [turnAmount, setTurnAmount] = useState('1000');
   const [showContribute, setShowContribute] = useState<string | null>(null);
+  const [resourceItems, setResourceItems] = useState<ResourceItem[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [materialQuantity, setMaterialQuantity] = useState('10');
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
 
@@ -48,6 +57,31 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
   }, [guildId]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
+
+  // Load resource items when materials contribute panel opens
+  const loadResourceItems = useCallback(async (neededCategories: string[]) => {
+    try {
+      const res = await getInventory();
+      if (!res.data) return;
+      const resources: ResourceItem[] = [];
+      for (const item of res.data.items) {
+        if (item.template.itemType !== 'resource' || item.quantity <= 0) continue;
+        const cat = getCategoryForTemplate(item.template.name);
+        if (cat && neededCategories.includes(cat)) {
+          resources.push({
+            templateId: item.templateId,
+            templateName: item.template.name,
+            quantity: item.quantity,
+            category: cat,
+          });
+        }
+      }
+      setResourceItems(resources);
+      if (resources.length > 0 && !selectedTemplateId) {
+        setSelectedTemplateId(resources[0].templateId);
+      }
+    } catch { /* */ }
+  }, [selectedTemplateId]);
 
   const handleStartProject = async (projectKey: string) => {
     if (!confirm('Start this project? The treasury cost will be deducted immediately.')) return;
@@ -81,6 +115,30 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
     }
   };
 
+  const handleContributeMaterials = async (projectId: string) => {
+    const qty = parseInt(materialQuantity);
+    if (!qty || qty <= 0 || !selectedTemplateId) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await contributeProjectMaterials(guildId, projectId, selectedTemplateId, qty);
+      if (res.error) { setError(res.error.message); return; }
+      void loadProjects();
+      // Refresh resource items
+      const activeProject = data?.projects.find((p) => p.status === 'active');
+      if (activeProject) {
+        const neededCategories = activeProject.materialCosts
+          .filter((c) => (activeProject.materialsProgress[c.category] ?? 0) < c.quantity)
+          .map((c) => c.category);
+        void loadResourceItems(neededCategories);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to contribute materials');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading && !data) return <PixelCard><p className="text-sm opacity-60">Loading...</p></PixelCard>;
 
   const activeProject = data?.projects.find((p) => p.status === 'active');
@@ -94,11 +152,25 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
         <ActiveProjectCard
           project={activeProject}
           showContribute={showContribute}
-          setShowContribute={setShowContribute}
+          setShowContribute={(mode) => {
+            setShowContribute(mode);
+            if (mode === 'materials') {
+              const neededCategories = activeProject.materialCosts
+                .filter((c) => (activeProject.materialsProgress[c.category] ?? 0) < c.quantity)
+                .map((c) => c.category);
+              void loadResourceItems(neededCategories);
+            }
+          }}
           turnAmount={turnAmount}
           setTurnAmount={setTurnAmount}
           actionLoading={actionLoading}
           onContributeTurns={() => handleContributeTurns(activeProject.id)}
+          resourceItems={resourceItems}
+          selectedTemplateId={selectedTemplateId}
+          setSelectedTemplateId={setSelectedTemplateId}
+          materialQuantity={materialQuantity}
+          setMaterialQuantity={setMaterialQuantity}
+          onContributeMaterials={() => handleContributeMaterials(activeProject.id)}
         />
       )}
 
@@ -139,7 +211,7 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
                 <div className="mt-2 flex flex-wrap gap-2">
                   {proj.perks.map((perk, i) => (
                     <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
-                      +{Math.round(perk.value * 100)}% {PERK_LABELS[perk.effectType] ?? perk.effectType}
+                      +{Math.round(perk.value * 100)}% {GUILD_MODIFIER_LABELS[perk.effectType] ?? perk.effectType}
                     </span>
                   ))}
                 </div>
@@ -170,6 +242,12 @@ function ActiveProjectCard({
   setTurnAmount,
   actionLoading,
   onContributeTurns,
+  resourceItems,
+  selectedTemplateId,
+  setSelectedTemplateId,
+  materialQuantity,
+  setMaterialQuantity,
+  onContributeMaterials,
 }: {
   project: GuildProjectResponse;
   showContribute: string | null;
@@ -178,8 +256,17 @@ function ActiveProjectCard({
   setTurnAmount: (v: string) => void;
   actionLoading: boolean;
   onContributeTurns: () => void;
+  resourceItems: ResourceItem[];
+  selectedTemplateId: string;
+  setSelectedTemplateId: (id: string) => void;
+  materialQuantity: string;
+  setMaterialQuantity: (v: string) => void;
+  onContributeMaterials: () => void;
 }) {
   const turnsPercent = Math.min(100, (project.turnsContributed / project.memberTurnGoal) * 100);
+  const hasMaterialsNeeded = project.materialCosts.some(
+    (c) => (project.materialsProgress[c.category] ?? 0) < c.quantity,
+  );
 
   return (
     <PixelCard>
@@ -238,7 +325,7 @@ function ActiveProjectCard({
       <div className="mt-3 flex flex-wrap gap-2">
         {project.perks.map((perk, i) => (
           <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]">
-            +{Math.round(perk.value * 100)}% {PERK_LABELS[perk.effectType] ?? perk.effectType}
+            +{Math.round(perk.value * 100)}% {GUILD_MODIFIER_LABELS[perk.effectType] ?? perk.effectType}
           </span>
         ))}
       </div>
@@ -251,6 +338,13 @@ function ActiveProjectCard({
           >
             Contribute Turns
           </PixelButton>
+          {hasMaterialsNeeded && (
+            <PixelButton
+              onClick={() => setShowContribute(showContribute === 'materials' ? null : 'materials')}
+            >
+              Contribute Materials
+            </PixelButton>
+          )}
         </div>
 
         {showContribute === 'turns' && (
@@ -258,14 +352,14 @@ function ActiveProjectCard({
             <div className="flex gap-2 items-end">
               <div className="flex-1">
                 <label className="text-xs text-[var(--rpg-text-secondary)]">
-                  Amount (max {formatNumber(GUILD_PROJECT_CONSTANTS.DAILY_TURN_CAP)}/day)
+                  Amount (max {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP)} per project)
                 </label>
                 <input
                   type="number"
                   value={turnAmount}
                   onChange={(e) => setTurnAmount(e.target.value)}
                   min={1}
-                  max={GUILD_PROJECT_CONSTANTS.DAILY_TURN_CAP}
+                  max={GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP}
                   className="w-full mt-1 p-2 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
                 />
               </div>
@@ -273,6 +367,46 @@ function ActiveProjectCard({
                 {actionLoading ? '...' : 'Contribute'}
               </PixelButton>
             </div>
+          </div>
+        )}
+
+        {showContribute === 'materials' && (
+          <div className="mt-3 p-3 bg-[var(--rpg-background)] rounded border border-[var(--rpg-border)]">
+            {resourceItems.length === 0 ? (
+              <p className="text-xs text-[var(--rpg-text-secondary)]">No matching materials in your inventory.</p>
+            ) : (
+              <div className="space-y-2">
+                <div>
+                  <label className="text-xs text-[var(--rpg-text-secondary)]">Material</label>
+                  <select
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    className="w-full mt-1 p-2 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
+                  >
+                    {resourceItems.map((item) => (
+                      <option key={item.templateId} value={item.templateId}>
+                        {item.templateName} ({item.category}) — {formatNumber(item.quantity)} owned
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="text-xs text-[var(--rpg-text-secondary)]">Quantity</label>
+                    <input
+                      type="number"
+                      value={materialQuantity}
+                      onChange={(e) => setMaterialQuantity(e.target.value)}
+                      min={1}
+                      className="w-full mt-1 p-2 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
+                    />
+                  </div>
+                  <PixelButton onClick={onContributeMaterials} disabled={actionLoading}>
+                    {actionLoading ? '...' : 'Contribute'}
+                  </PixelButton>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -337,7 +471,7 @@ function AvailableProjectCard({
       <div className="mt-2 flex flex-wrap gap-1">
         {project.perks.map((perk, i) => (
           <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)]">
-            +{Math.round(perk.value * 100)}% {PERK_LABELS[perk.effectType] ?? perk.effectType}
+            +{Math.round(perk.value * 100)}% {GUILD_MODIFIER_LABELS[perk.effectType] ?? perk.effectType}
           </span>
         ))}
       </div>

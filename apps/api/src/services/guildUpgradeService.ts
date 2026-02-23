@@ -243,20 +243,20 @@ export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerG
     }
 
     for (const upgrade of activeUpgrades) {
-    const def = GUILD_UPGRADE_DEFINITIONS.find((d) => d.key === upgrade.upgradeType);
-    if (!def) continue;
-    const tierDef = def.tiers.find((t) => t.level === upgrade.tier);
-    if (!tierDef) continue;
+      const def = GUILD_UPGRADE_DEFINITIONS.find((d) => d.key === upgrade.upgradeType);
+      if (!def) continue;
+      const tierDef = def.tiers.find((t) => t.level === upgrade.tier);
+      if (!tierDef) continue;
 
-    const scaledValue = tierDef.effectValue * scale;
+      const scaledValue = tierDef.effectValue * scale;
 
-    switch (def.effectType) {
-      case 'xp_boost': mods.xpBoost += scaledValue; break;
-      case 'gathering_yield': mods.gatheringYield += scaledValue; break;
-      case 'crafting_crit': mods.craftingCrit += scaledValue; break;
-      case 'combat_damage': mods.combatDamage += scaledValue; break;
-      case 'defense_boost': mods.defenseBoost += scaledValue; break;
-    }
+      switch (def.effectType) {
+        case 'xp_boost': mods.xpBoost += scaledValue; break;
+        case 'gathering_yield': mods.gatheringYield += scaledValue; break;
+        case 'crafting_crit': mods.craftingCrit += scaledValue; break;
+        case 'combat_damage': mods.combatDamage += scaledValue; break;
+        case 'defense_boost': mods.defenseBoost += scaledValue; break;
+      }
     }
   }
 
@@ -273,7 +273,7 @@ export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerG
     for (const perk of def.perks) {
       const key = perk.effectType as keyof PlayerGuildModifiers;
       if (key in mods) {
-        projectPerks[key] = perk.value; // Higher-level overwrites lower (definition order: L1→L2→L3)
+        projectPerks[key] = Math.max(projectPerks[key] ?? 0, perk.value);
       }
     }
   }

@@ -175,13 +175,13 @@ export async function contributeTurns(
     throw new AppError(404, 'Project not found or not active', 'PROJECT_NOT_ACTIVE');
   }
 
-  // Check daily cap
+  // Check per-project turn cap
   const contribution = await prisma.guildProjectContribution.findUnique({
     where: { projectId_playerId: { projectId, playerId } },
   });
-  const dailyTurns = contribution?.turnsContributed ?? 0;
-  if (dailyTurns + amount > GUILD_PROJECT_CONSTANTS.DAILY_TURN_CAP) {
-    throw new AppError(400, `Exceeds daily turn contribution cap (${GUILD_PROJECT_CONSTANTS.DAILY_TURN_CAP})`, 'DAILY_CAP_EXCEEDED');
+  const contributedTurns = contribution?.turnsContributed ?? 0;
+  if (contributedTurns + amount > GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP) {
+    throw new AppError(400, `Exceeds per-project turn contribution cap (${GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP})`, 'CONTRIBUTION_CAP_EXCEEDED');
   }
 
   const def = GUILD_PROJECT_DEFINITIONS.find((d) => d.key === project.projectKey);
@@ -260,6 +260,20 @@ export async function contributeMaterials(
   const requiredCost = def.materialCosts.find((c) => c.category === category);
   if (!requiredCost) {
     throw new AppError(400, 'This material is not needed for this project', 'INVALID_MATERIAL');
+  }
+
+  // Check per-project material cap for this player
+  const existingContribution = await prisma.guildProjectContribution.findUnique({
+    where: { projectId_playerId: { projectId, playerId } },
+  });
+  const contributedMaterials = (existingContribution?.materialsContributed ?? {}) as Record<string, number>;
+  const playerCategoryTotal = contributedMaterials[category] ?? 0;
+  if (playerCategoryTotal + quantity > GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP) {
+    throw new AppError(
+      400,
+      `Exceeds per-project material contribution cap (${GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP} per category)`,
+      'CONTRIBUTION_CAP_EXCEEDED',
+    );
   }
 
   // Check category not already fully contributed
@@ -400,8 +414,8 @@ async function checkAndCompleteProject(
     data: { status: 'completed', completedAt: new Date() },
   });
 
-  // Grant guild XP
-  await addGuildXp(guildId, def.guildXpReward);
+  // Grant guild XP (inside transaction)
+  await addGuildXp(guildId, def.guildXpReward, tx);
 
   // Log
   await tx.guildLog.create({

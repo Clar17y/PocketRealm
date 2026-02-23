@@ -1,4 +1,4 @@
-import { prisma } from '@adventure/database';
+import { prisma, Prisma } from '@adventure/database';
 import {
   GUILD_CONSTANTS, GuildData, GuildMemberData, GuildLogEntry, GuildSearchResult,
   type GuildRecruitmentMode, type GuildRole, type GuildSpecialization,
@@ -550,8 +550,13 @@ export async function getGuildLog(
 // Guild XP
 // ---------------------------------------------------------------------------
 
-export async function addGuildXp(guildId: string, amount: number): Promise<{ level: number; xp: bigint; leveledUp: boolean }> {
-  const guild = await prisma.guild.findUnique({ where: { id: guildId }, select: { level: true, xp: true } });
+export async function addGuildXp(
+  guildId: string,
+  amount: number,
+  tx?: Prisma.TransactionClient,
+): Promise<{ level: number; xp: bigint; leveledUp: boolean }> {
+  const client = tx ?? prisma;
+  const guild = await client.guild.findUnique({ where: { id: guildId }, select: { level: true, xp: true } });
   if (!guild) return { level: 1, xp: 0n, leveledUp: false };
 
   let currentXp = guild.xp + BigInt(amount);
@@ -567,13 +572,13 @@ export async function addGuildXp(guildId: string, amount: number): Promise<{ lev
     xpNeeded = calculateXpForLevel(currentLevel);
   }
 
-  await prisma.guild.update({
+  await client.guild.update({
     where: { id: guildId },
     data: { xp: currentXp, level: currentLevel },
   });
 
   if (leveledUp) {
-    await addGuildLog(guildId, 'guild_level_up', `Guild reached level ${currentLevel}`);
+    await addGuildLog(guildId, 'guild_level_up', `Guild reached level ${currentLevel}`, undefined, tx);
     // Fire-and-forget: check guild achievements for all members
     void checkGuildAchievementsForAllMembers(guildId, ['guildLevel', 'guildTurnsContributed']);
   }

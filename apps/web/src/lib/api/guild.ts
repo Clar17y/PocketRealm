@@ -173,6 +173,20 @@ export interface SpecializationStatusResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Shared UI Labels
+// ---------------------------------------------------------------------------
+
+export const GUILD_MODIFIER_LABELS: Record<string, string> = {
+  craftingCrit: 'Crafting Crit',
+  xpBoost: 'Skill XP',
+  travelCostReduction: 'Travel Cost Reduction',
+  repairCostReduction: 'Repair Cost Reduction',
+  gatheringYield: 'Gathering Yield',
+  combatDamage: 'Combat Damage',
+  defenseBoost: 'Defense',
+};
+
+// ---------------------------------------------------------------------------
 // API Functions
 // ---------------------------------------------------------------------------
 

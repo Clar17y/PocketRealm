@@ -49,18 +49,22 @@ export async function selectSpecialization(
 
   const specDef = GUILD_SPECIALIZATION_DEFINITIONS.find((s) => s.path === path)!;
 
-  const updated = await prisma.guild.update({
-    where: { id: guildId },
-    data: { specialization: path },
-  });
+  const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const result = await tx.guild.update({
+      where: { id: guildId },
+      data: { specialization: path },
+    });
 
-  await prisma.guildLog.create({
-    data: {
-      guildId,
-      eventType: 'specialization_selected',
-      message: `${specDef.name} specialization selected`,
-      metadata: { path },
-    },
+    await tx.guildLog.create({
+      data: {
+        guildId,
+        eventType: 'specialization_selected',
+        message: `${specDef.name} specialization selected`,
+        metadata: { path },
+      },
+    });
+
+    return result;
   });
 
   return updated;
