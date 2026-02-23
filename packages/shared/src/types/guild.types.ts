@@ -27,6 +27,12 @@ export interface GuildData {
   createdAt: string;
 }
 
+export interface TaxInfo {
+  rate: number;
+  amount: number;
+  guildId: string;
+}
+
 export interface GuildMemberData {
   playerId: string;
   username: string;

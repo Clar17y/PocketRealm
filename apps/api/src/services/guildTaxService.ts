@@ -1,4 +1,5 @@
 import { Prisma, prisma } from '@adventure/database';
+import type { TaxInfo } from '@adventure/shared';
 import { calculateTreasuryCap } from './guildService';
 
 export interface TaxResult {
@@ -11,6 +12,36 @@ export interface TaxResult {
 const NO_TAX = (turnAmount: number): TaxResult => ({
   preTaxAmount: turnAmount, taxAmount: 0, postTaxAmount: turnAmount, guildId: null,
 });
+
+export async function getPlayerTaxRateTx(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+): Promise<{ taxRate: number; guildId: string | null }> {
+  const membership = await tx.guildMember.findUnique({
+    where: { playerId },
+    include: { guild: { select: { id: true, taxRate: true } } },
+  });
+  if (!membership || membership.guild.taxRate === 0) return { taxRate: 0, guildId: null };
+  return { taxRate: membership.guild.taxRate, guildId: membership.guild.id };
+}
+
+export async function getPlayerTaxRate(playerId: string): Promise<{ taxRate: number; guildId: string | null }> {
+  return prisma.$transaction(async (tx) => getPlayerTaxRateTx(tx, playerId));
+}
+
+export function calculateInflatedCost(baseCost: number, taxRatePercent: number): number {
+  if (taxRatePercent <= 0) return baseCost;
+  return Math.ceil(baseCost / (1 - taxRatePercent / 100));
+}
+
+export function taxInfoFromResult(result: TaxResult): TaxInfo | null {
+  if (!result.guildId || result.taxAmount === 0) return null;
+  return {
+    rate: Math.round((result.taxAmount / result.preTaxAmount) * 100),
+    amount: result.taxAmount,
+    guildId: result.guildId,
+  };
+}
 
 /**
  * Apply guild tax within an existing Prisma transaction.
