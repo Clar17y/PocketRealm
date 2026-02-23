@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
 import {
   CRAFTING_CONSTANTS,
+  GUILD_CONSTANTS,
   type EquipmentSlot,
   type ItemRarity,
   type ItemStats,
@@ -17,6 +18,10 @@ import { getEquipmentStats } from '../../services/equipmentService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from '../../services/inventoryService';
 import { grantSkillXp } from '../../services/xpService';
+import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
+import { applyGuildTaxTx } from '../../services/guildTaxService';
+import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
+import { incrementContractProgress } from '../../services/guildContractService';
 import { serializeXpGrant, assertNotRecovering, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
@@ -105,6 +110,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     const totalTurnCost = recipe.turnCost * quantity;
     const turnSpend = await prisma.$transaction(async (tx) => {
       const spent = await spendPlayerTurnsTx(tx, playerId, totalTurnCost);
+      await applyGuildTaxTx(tx, playerId, totalTurnCost);
 
       for (const mat of materials) {
         await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * quantity);
@@ -159,6 +165,10 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         ? recipe.resultTemplate.itemType
         : 'resource';
       const equipStats = await getEquipmentStats(playerId);
+      const guildMods = await getPlayerGuildModifiers(playerId);
+      const effectiveLuck = guildMods.craftingCrit > 0
+        ? equipStats.luck + Math.floor(guildMods.craftingCrit / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
+        : equipStats.luck;
       const templateBaseStats = recipe.resultTemplate.baseStats as ItemStats | null | undefined;
 
       const templateSlot = (recipe.resultTemplate.slot as EquipmentSlot | null) ?? undefined;
@@ -166,7 +176,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         const critResult = calculateCraftingCrit({
           skillLevel,
           requiredLevel: recipe.requiredLevel,
-          luckStat: equipStats.luck,
+          luckStat: effectiveLuck,
           itemType,
           baseStats: templateBaseStats,
           slot: templateSlot,
@@ -211,6 +221,19 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     }
 
     const xpGrant = await grantSkillXp(playerId, recipe.skillType, recipe.xpReward * quantity);
+
+    // --- Guild XP & contract progress ---
+    const guildId = await getPlayerGuildId(playerId);
+    if (guildId) {
+      await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_CRAFT * quantity);
+      await incrementContractProgress(guildId, 'craft_items', quantity);
+      const rareCount = craftedItemDetails.filter(
+        (d) => d.rarity === 'rare' || d.rarity === 'epic' || d.rarity === 'legendary',
+      ).length;
+      if (rareCount > 0) {
+        await incrementContractProgress(guildId, 'craft_rare', rareCount);
+      }
+    }
 
     // --- Achievement tracking (counters + derived checks) ---
     const isRealCraft = recipe.resultTemplate.itemType !== 'resource';

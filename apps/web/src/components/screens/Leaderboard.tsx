@@ -103,6 +103,7 @@ export function Leaderboard({ playerId }: LeaderboardProps) {
           lastRefreshedAt={data?.lastRefreshedAt ?? null}
           showAroundMe={aroundMe}
           onToggleAroundMe={() => setAroundMe((v) => !v)}
+          isGuildCategory={activeGroup === 'Guilds'}
         />
       </PixelCard>
     </div>

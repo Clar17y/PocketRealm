@@ -21,6 +21,7 @@ import { worldEventsRouter } from './routes/worldEvents';
 import { bossRouter } from './routes/boss';
 import { achievementsRouter } from './routes/achievements';
 import { leaderboardRouter } from './routes/leaderboard';
+import { guildRouter } from './routes/guild';
 import { adminRouter } from './routes/admin';
 import { errorHandler } from './middleware/errorHandler';
 import { createSocketServer, getIo } from './socket';
@@ -101,6 +102,7 @@ app.use('/api/v1/events', worldEventsRouter);
 app.use('/api/v1/boss', bossRouter);
 app.use('/api/v1/achievements', achievementsRouter);
 app.use('/api/v1/leaderboard', leaderboardRouter);
+app.use('/api/v1/guild', guildRouter);
 app.use('/api/v1/admin', adminRouter);
 
 // Error handler

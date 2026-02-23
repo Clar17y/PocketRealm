@@ -42,11 +42,18 @@ const COMBAT_CATEGORIES: CategoryDef[] = [
   { slug: 'boss_damage', label: 'Boss Damage', group: 'Combat' },
 ];
 
+const GUILD_CATEGORIES: CategoryDef[] = [
+  { slug: 'guild_level', label: 'Guild Level', group: 'Guilds' },
+  { slug: 'guild_renown', label: 'Renown', group: 'Guilds' },
+  { slug: 'guild_members', label: 'Member Count', group: 'Guilds' },
+];
+
 const ALL_CATEGORIES = [
   ...PVP_CATEGORIES,
   ...PROGRESSION_CATEGORIES,
   ...SKILL_CATEGORIES,
   ...COMBAT_CATEGORIES,
+  ...GUILD_CATEGORIES,
 ];
 
 const VALID_SLUGS = new Set(ALL_CATEGORIES.map((c) => c.slug));
@@ -381,6 +388,48 @@ async function refreshCombat() {
   }
 }
 
+async function refreshGuilds() {
+  const guilds = await prisma.guild.findMany({
+    select: { id: true, name: true, tag: true, level: true, renown: true, _count: { select: { members: true } } },
+  });
+
+  await writeToZset(
+    'guild_level',
+    guilds.map((g) => ({
+      playerId: g.id,
+      score: g.level,
+      username: `[${g.tag}] ${g.name}`,
+      characterLevel: g.level,
+      isBot: false,
+      isAdmin: false,
+    })),
+  );
+
+  await writeToZset(
+    'guild_renown',
+    guilds.map((g) => ({
+      playerId: g.id,
+      score: g.renown,
+      username: `[${g.tag}] ${g.name}`,
+      characterLevel: g.level,
+      isBot: false,
+      isAdmin: false,
+    })),
+  );
+
+  await writeToZset(
+    'guild_members',
+    guilds.map((g) => ({
+      playerId: g.id,
+      score: g._count.members,
+      username: `[${g.tag}] ${g.name}`,
+      characterLevel: g.level,
+      isBot: false,
+      isAdmin: false,
+    })),
+  );
+}
+
 export async function refreshAllLeaderboards(): Promise<void> {
   const start = Date.now();
   let failures = 0;
@@ -389,6 +438,7 @@ export async function refreshAllLeaderboards(): Promise<void> {
   try { await refreshProgression(); } catch (err) { failures++; console.error('Leaderboard refresh error (progression):', err); }
   try { await refreshSkills(); } catch (err) { failures++; console.error('Leaderboard refresh error (skills):', err); }
   try { await refreshCombat(); } catch (err) { failures++; console.error('Leaderboard refresh error (combat):', err); }
+  try { await refreshGuilds(); } catch (err) { failures++; console.error('Leaderboard refresh error (guilds):', err); }
 
   if (failures === 0) {
     await redis.set('leaderboard:last_refresh', new Date().toISOString());

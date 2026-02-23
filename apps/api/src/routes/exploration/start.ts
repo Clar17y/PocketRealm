@@ -24,8 +24,11 @@ import {
   type PotionConsumed,
 } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
-import { refundPlayerTurns, spendPlayerTurns } from '../../services/turnBankService';
+import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankService';
 import { enterRecoveringState, setHp } from '../../services/hpService';
+import { applyGuildTaxTx } from '../../services/guildTaxService';
+import { getPlayerGuildId } from '../../services/guildService';
+import { incrementContractProgress } from '../../services/guildContractService';
 import { rollAndGrantLoot } from '../../services/lootService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
@@ -150,11 +153,19 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       : [];
     const allPotionsConsumed: PotionConsumed[] = [];
 
-    const turnSpend = await spendPlayerTurns(playerId, turnsToSpend);
+    // Spend turns and apply guild tax atomically
+    const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
+      const spend = await spendPlayerTurnsTx(tx, playerId, turnsToSpend);
+      const tax = await applyGuildTaxTx(tx, playerId, turnsToSpend);
+      return { turnSpend: spend, taxResult: tax };
+    });
+
+    // Guild tax reduces effective exploration turns
+    const effectiveTurns = isTutorialExplore ? turnsToSpend : taxResult.postTaxAmount;
 
     const outcomes = isTutorialExplore
       ? [{ turnOccurred: 50, type: 'ambush' as const }]
-      : simulateExploration(turnsToSpend, effectiveExitChance);
+      : simulateExploration(effectiveTurns, effectiveExitChance);
 
     const pendingResources: PendingResourceDiscovery[] = [];
     const pendingSites: PendingEncounterSiteDiscovery[] = [];
@@ -606,13 +617,13 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     // Deduct all potions consumed across ambushes
     await deductConsumedPotions(playerId, allPotionsConsumed);
 
-    const spentTurns = aborted && abortedAtTurn ? abortedAtTurn : turnsToSpend;
+    const spentTurns = aborted && abortedAtTurn ? abortedAtTurn : effectiveTurns;
     const explorationBefore = await getExplorationPercent(playerId, body.zoneId);
     await addExplorationTurns(playerId, body.zoneId, spentTurns);
     const explorationAfter = await getExplorationPercent(playerId, body.zoneId);
     const zoneJustFullyExplored = explorationBefore.percent < 100 && explorationAfter.percent >= 100;
 
-    const refundAmount = aborted && abortedAtTurn ? Math.max(0, turnsToSpend - abortedAtTurn) : 0;
+    const refundAmount = aborted && abortedAtTurn ? Math.max(0, effectiveTurns - abortedAtTurn) : 0;
     const refundedTurns = refundAmount > 0 ? await refundPlayerTurns(playerId, refundAmount) : null;
 
     const persisted = await prisma.$transaction(async (tx) => {
@@ -762,11 +773,15 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       familyIds: [...familyIdSet],
     });
 
+    // Guild contract progress: track exploration turns
+    const guildId = taxResult.guildId ?? await getPlayerGuildId(playerId);
+    if (guildId) void incrementContractProgress(guildId, 'exploration_turns', spentTurns).catch(() => {});
+
     if (events.length === 0) {
       events.push({
-        turn: turnsToSpend,
+        turn: effectiveTurns,
         type: 'hidden_cache',
-        description: `You explored the ${zone.name} for ${turnsToSpend} turns but found nothing of interest.`,
+        description: `You explored the ${zone.name} for ${effectiveTurns} turns but found nothing of interest.`,
         details: {},
       });
     }

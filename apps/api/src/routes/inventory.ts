@@ -6,6 +6,7 @@ import { AppError } from '../middleware/errorHandler';
 import { getOwnedItem } from '../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { useConsumable } from '../services/consumableService';
+import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { repairAllEquipped, repairTurnCost, repairItemDurability } from '../services/repairService';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -89,6 +90,7 @@ const repairSchema = z.object({
 inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = repairSchema.parse(req.body);
+  const guildMods = await getPlayerGuildModifiers(playerId);
   const result = await prisma.$transaction(async (tx) => {
     const item = await tx.item.findUnique({
       where: { id: body.itemId },
@@ -115,7 +117,10 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
       };
     }
 
-    const turnCost = repairTurnCost(current);
+    const baseCost = repairTurnCost(current);
+    const turnCost = guildMods.repairCostReduction > 0
+      ? Math.max(1, Math.round(baseCost * (1 - guildMods.repairCostReduction)))
+      : baseCost;
     const turnSpend = await spendPlayerTurnsTx(tx, playerId, turnCost);
     const { newMax, decay } = await repairItemDurability(tx, { ...item, ownerId: playerId });
 

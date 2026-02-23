@@ -5,6 +5,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
+import { applyGuildTaxTx } from '../../services/guildTaxService';
 import { addStackableItemTx } from '../../services/inventoryService';
 import {
   getZoneCraftingLevel,
@@ -56,6 +57,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
 
     const { turnSpend, returned } = await prisma.$transaction(async (tx) => {
       const spent = await spendPlayerTurnsTx(tx, playerId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
+      await applyGuildTaxTx(tx, playerId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
 
       const consumed = await tx.item.deleteMany({
         where: {

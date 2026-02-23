@@ -79,6 +79,7 @@ export type Screen =
   | 'worldEvents'
   | 'achievements'
   | 'leaderboard'
+  | 'guild'
   | 'admin';
 
 export interface PendingEncounter {
@@ -813,7 +814,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
     if (['combat', 'arena'].includes(activeScreen)) return 'combat';
-    return 'settings';
+    if (activeScreen === 'guild') return 'guild';
+    return 'home';
   };
 
   const nowStamp = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
