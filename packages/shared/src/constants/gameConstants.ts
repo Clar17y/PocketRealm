@@ -178,6 +178,24 @@ export const GATHERING_CONSTANTS = {
 } as const;
 
 // =============================================================================
+// GATHERING CRITS (precious gem drops)
+// =============================================================================
+
+export const GEM_CRIT_CONSTANTS = {
+  /** Base chance for a gathering action to yield a bonus gem */
+  BASE_CHANCE: 0.03,
+
+  /** Additional gem crit chance per skill level above node requirement */
+  LEVEL_BONUS: 0.005,
+
+  /** Additional gem crit chance per point of equipped luck */
+  LUCK_BONUS: 0.003,
+
+  /** Maximum gem crit chance (cap) */
+  MAX_CHANCE: 0.25,
+} as const;
+
+// =============================================================================
 // CRAFTING
 // =============================================================================
 
