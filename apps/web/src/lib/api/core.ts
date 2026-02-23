@@ -117,7 +117,8 @@ export async function fetchApi<T>(
       credentials: options.credentials ?? 'include',
     });
 
-    const json = (await res.json().catch(() => null)) as
+    let jsonParsed = false;
+    const json = await res.json().then((v: unknown) => { jsonParsed = true; return v; }).catch(() => null) as
       | (T & { error?: { message: string; code: string } })
       | { error?: { message: string; code: string } }
       | null;
@@ -138,7 +139,7 @@ export async function fetchApi<T>(
       return { error };
     }
 
-    if (!json) return { error: { message: 'Invalid server response', code: 'INVALID_RESPONSE' } };
+    if (!jsonParsed) return { error: { message: 'Invalid server response', code: 'INVALID_RESPONSE' } };
     return { data: json as T };
   } catch (err) {
     return { error: { message: 'Network error', code: 'NETWORK_ERROR' } };

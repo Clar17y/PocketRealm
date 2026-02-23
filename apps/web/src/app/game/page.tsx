@@ -41,6 +41,7 @@ import {
 } from '@/lib/tutorial';
 import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
+import { GuildScreen } from '@/components/screens/GuildScreen';
 import { CombatScreen } from './screens/CombatScreen';
 import { useGameController, type Screen } from './useGameController';
 import { useChat } from '@/hooks/useChat';
@@ -1040,6 +1041,14 @@ export default function GamePage() {
         );
       case 'leaderboard':
         return <Leaderboard playerId={player?.id ?? null} />;
+      case 'guild':
+        return (
+          <GuildScreen
+            playerId={player?.id ?? null}
+            characterLevel={characterProgression.characterLevel}
+            onTurnsChanged={() => void loadTurnsAndHp()}
+          />
+        );
       case 'admin':
         return <AdminScreen onAction={loadAll} />;
       default:
@@ -1049,7 +1058,12 @@ export default function GamePage() {
 
   return (
     <>
-      <AppShell turns={turns} username={player?.username}>
+      <AppShell
+  turns={turns}
+  username={player?.username}
+  onSettings={() => handleNavigate('settings')}
+  onLogout={() => { logout(); router.push('/'); }}
+>
         {/* Broken gear warning banner */}
         {equipment.some((e) => {
           if (!e.item) return false;

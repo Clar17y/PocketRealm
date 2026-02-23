@@ -2,7 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../services/turnBankService', () => ({
   spendPlayerTurns: vi.fn().mockResolvedValue({ currentTurns: 86300, timeToCapMs: null, lastRegenAt: new Date().toISOString() }),
+  spendPlayerTurnsTx: vi.fn().mockResolvedValue({ currentTurns: 86300, timeToCapMs: null, lastRegenAt: new Date().toISOString() }),
   refundPlayerTurns: vi.fn().mockResolvedValue({ currentTurns: 86400, timeToCapMs: null, lastRegenAt: new Date().toISOString() }),
+}));
+vi.mock('../../services/guildTaxService', () => ({
+  applyGuildTaxTx: vi.fn().mockImplementation((_tx: unknown, _pid: string, amount: number) =>
+    Promise.resolve({ preTaxAmount: amount, taxAmount: 0, postTaxAmount: amount, guildId: null }),
+  ),
+}));
+vi.mock('../../services/guildService', () => ({
+  getPlayerGuildId: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('../../services/guildContractService', () => ({
+  incrementContractProgress: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../services/hpService', () => ({
   getHpState: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
@@ -116,11 +128,11 @@ vi.mock('@adventure/game-engine', () => ({
 }));
 
 import { mockPrisma } from '../../__test__/setup';
-import { spendPlayerTurns } from '../../services/turnBankService';
+import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { applyMobPrefix, simulateExploration, runCombat } from '@adventure/game-engine';
 import { startRouter } from './start';
 
-const mockSpendPlayerTurns = spendPlayerTurns as ReturnType<typeof vi.fn>;
+const mockSpendPlayerTurnsTx = spendPlayerTurnsTx as ReturnType<typeof vi.fn>;
 const mockApplyMobPrefix = applyMobPrefix as ReturnType<typeof vi.fn>;
 const mockSimulateExploration = simulateExploration as ReturnType<typeof vi.fn>;
 const mockRunCombat = runCombat as ReturnType<typeof vi.fn>;
@@ -181,8 +193,8 @@ describe('exploration tutorial path', () => {
     const handler = findHandler('post', '/start');
     await handler(req, res, vi.fn());
 
-    // Should spend 100 turns, not 500
-    expect(mockSpendPlayerTurns).toHaveBeenCalledWith('p1', 100);
+    // Should spend 100 turns, not 500 (called via transaction)
+    expect(mockSpendPlayerTurnsTx).toHaveBeenCalledWith(expect.anything(), 'p1', 100);
   });
 
   it('produces exactly one ambush at turn 50 and does not call simulateExploration', async () => {
@@ -241,8 +253,8 @@ describe('exploration tutorial path', () => {
     const handler = findHandler('post', '/start');
     await handler(req, res, vi.fn());
 
-    // Should spend the requested turns, not 100
-    expect(mockSpendPlayerTurns).toHaveBeenCalledWith('p1', 500);
+    // Should spend the requested turns, not 100 (called via transaction)
+    expect(mockSpendPlayerTurnsTx).toHaveBeenCalledWith(expect.anything(), 'p1', 500);
     // Should call simulateExploration (exitChance is null when no undiscovered neighbors)
     expect(mockSimulateExploration).toHaveBeenCalledWith(500, null);
   });

@@ -33,6 +33,8 @@ import {
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../services/combatStatsService';
 import { calculateExplorationPercent, getExplorationPercent } from '../services/zoneExplorationService';
 import { asyncHandler } from '../utils/asyncHandler';
+import { applyGuildTax } from '../services/guildTaxService';
+import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 
 
 export const zonesRouter = Router();
@@ -243,10 +245,15 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
   // Town departure: destination's travelCost, no ambushes
   // Wild traversal: current zone's travelCost, ambushes from current zone
   const isTownDeparture = currentZone.zoneType === 'town';
-  const travelCost: number = isTownDeparture ? destinationZone.travelCost : currentZone.travelCost;
+  const baseTravelCost: number = isTownDeparture ? destinationZone.travelCost : currentZone.travelCost;
+  const guildMods = await getPlayerGuildModifiers(playerId);
+  const travelCost = guildMods.travelCostReduction > 0
+    ? Math.max(1, Math.round(baseTravelCost * (1 - guildMods.travelCostReduction)))
+    : baseTravelCost;
 
-  // 9. Spend turns
+  // 9. Spend turns + guild tax
   await spendPlayerTurns(playerId, travelCost);
+  await applyGuildTax(playerId, travelCost);
 
   const events: TravelEvent[] = [];
 

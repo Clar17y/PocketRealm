@@ -7,6 +7,7 @@ import { getTurnState } from '../services/turnBankService';
 import { calculateHealPerTurn, calculateRecoveryExitHp } from '@adventure/game-engine';
 import { getPlayerProgressionState } from '../services/attributesService';
 import { asyncHandler } from '../utils/asyncHandler';
+import { applyGuildTax } from '../services/guildTaxService';
 
 export const hpRouter = Router();
 
@@ -35,6 +36,7 @@ hpRouter.post('/rest', asyncHandler(async (req, res) => {
   const body = restSchema.parse(req.body);
 
   const result = await rest(playerId, body.turns);
+  await applyGuildTax(playerId, result.turnsSpent);
   const turns = await getTurnState(playerId);
 
   // Log the activity

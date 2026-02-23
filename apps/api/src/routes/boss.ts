@@ -13,6 +13,8 @@ import {
 import { getIo } from '../socket';
 import { paginationSchema, buildPagination, assertNotRecovering } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
+import { getPlayerGuildId } from '../services/guildService';
+import { incrementContractProgress } from '../services/guildContractService';
 
 export const bossRouter = Router();
 
@@ -178,6 +180,10 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
       hpState.maxHp,
       body.autoSignUp ?? false,
     );
+
+    // Guild contract progress for boss participation
+    const guildId = await getPlayerGuildId(playerId);
+    if (guildId) void incrementContractProgress(guildId, 'boss_rounds', 1).catch(() => {});
 
     res.json({ participant });
   } catch (err) {

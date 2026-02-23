@@ -12,6 +12,10 @@ import { getSkillLevel } from '../services/combatStatsService.js';
 import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
 import { applyResourceEventModifiers } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
+import { applyGuildTaxTx } from '../services/guildTaxService';
+import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
+import { getPlayerGuildId } from '../services/guildService';
+import { incrementContractProgress } from '../services/guildContractService';
 
 export const gatheringRouter = Router();
 
@@ -262,10 +266,14 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const baseYield = Math.max(template.baseYield, GATHERING_CONSTANTS.BASE_YIELD);
   const baseYieldPerAction = Math.floor(baseYield * yieldMultiplier);
 
-  // Apply world event resource modifiers
+  // Apply world event resource modifiers + guild gathering yield
   const zoneModifiers = await getActiveZoneModifiers(template.zoneId);
   const activeEventEffects = await getActiveEventSummaries(template.zoneId);
-  const yieldPerAction = applyResourceEventModifiers(baseYieldPerAction, zoneModifiers);
+  const guildMods = await getPlayerGuildModifiers(playerId);
+  const eventYield = applyResourceEventModifiers(baseYieldPerAction, zoneModifiers);
+  const yieldPerAction = guildMods.gatheringYield > 0
+    ? Math.floor(eventYield * (1 + guildMods.gatheringYield))
+    : eventYield;
 
   // Cap actions by remaining capacity
   const maxActionsByCapacity = Math.ceil(effectiveCapacity / yieldPerAction);
@@ -284,6 +292,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const resourceTemplateId = await getResourceTemplateId(template.resourceType);
   const { turnSpend, stack } = await prisma.$transaction(async (tx) => {
     const spent = await spendPlayerTurnsTx(tx, playerId, turnsSpent);
+    await applyGuildTaxTx(tx, playerId, turnsSpent);
 
     if (nodeDepleted) {
       const depleted = await tx.playerResourceNode.deleteMany({
@@ -321,7 +330,11 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
 
   // XP: 5 XP per action
   const rawXp = actions * 5;
-  const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp);
+  const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp, undefined, guildMods.xpBoost || undefined);
+
+  // Guild contract progress for gathering
+  const guildId = await getPlayerGuildId(playerId);
+  if (guildId) void incrementContractProgress(guildId, 'gather_actions', actions).catch(() => {});
 
   // --- Achievement tracking (counters + derived checks) ---
   const gatherAchKeys = ['totalGatheringActions'];
