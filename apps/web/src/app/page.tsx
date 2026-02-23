@@ -1,5 +1,8 @@
 import Image from 'next/image';
-import { PixelButton } from '@/components/PixelButton';
+
+const linkPrimary = 'inline-block rounded-lg font-semibold transition-all active:scale-95 px-6 py-3 text-lg min-h-[56px] bg-[var(--rpg-green-dark)] hover:bg-[var(--rpg-green-light)] text-[var(--rpg-text-primary)]';
+const linkSecondary = 'inline-block rounded-lg font-semibold transition-all active:scale-95 px-6 py-3 text-lg min-h-[56px] border-2 border-[var(--rpg-border)] hover:border-[var(--rpg-text-secondary)] text-[var(--rpg-text-primary)] bg-transparent';
+const linkGold = 'inline-block rounded-lg font-semibold transition-all active:scale-95 px-6 py-3 text-lg min-h-[56px] bg-[var(--rpg-gold)] hover:bg-[#e4b85b] text-[var(--rpg-background)]';
 
 export default function Home() {
   return (
@@ -25,12 +28,8 @@ export default function Home() {
             Explore. Fight. Craft. Progress — at your own pace.
           </p>
           <div className="flex gap-4 justify-center">
-            <a href="/register">
-              <PixelButton variant="primary" size="lg">Play Free</PixelButton>
-            </a>
-            <a href="#features">
-              <PixelButton variant="secondary" size="lg">Learn More</PixelButton>
-            </a>
+            <a href="/register" className={linkPrimary}>Play Free</a>
+            <a href="#features" className={linkSecondary}>Learn More</a>
           </div>
         </div>
       </section>
