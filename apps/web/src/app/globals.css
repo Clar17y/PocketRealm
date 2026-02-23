@@ -114,3 +114,12 @@ body {
   animation: rainbow-title 3s linear infinite;
   font-weight: bold;
 }
+
+/* Hide scrollbar for horizontal scroll strips */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

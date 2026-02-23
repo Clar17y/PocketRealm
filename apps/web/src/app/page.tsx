@@ -79,6 +79,41 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Zone Showcase */}
+      <section className="py-20 px-4">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-center text-[var(--rpg-gold)] mb-12">
+            11 Zones to Discover
+          </h2>
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+            {[
+              { src: '/assets/zones/zone_ancient_grove.png', name: 'Ancient Grove' },
+              { src: '/assets/zones/zone_crystal_caverns.png', name: 'Crystal Caverns' },
+              { src: '/assets/zones/zone_haunted_marsh.png', name: 'Haunted Marsh' },
+              { src: '/assets/zones/zone_sunken_ruins.png', name: 'Sunken Ruins' },
+              { src: '/assets/zones/zone_deep_forest.png', name: 'Deep Forest' },
+            ].map((zone) => (
+              <div
+                key={zone.name}
+                className="relative flex-shrink-0 w-72 h-44 rounded-lg overflow-hidden snap-center"
+              >
+                <Image
+                  src={zone.src}
+                  alt={zone.name}
+                  fill
+                  className="object-cover"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                <span className="absolute bottom-3 left-3 text-[var(--rpg-gold)] font-bold text-sm">
+                  {zone.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
