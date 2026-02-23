@@ -6,6 +6,7 @@ import {
   joinGuild, leaveGuild, kickMember, promoteMember,
   demoteMember, transferLeadership, disbandGuild,
   updateSettings, getGuildLog,
+  requestJoinGuild, getJoinRequests, respondToJoinRequest,
 } from '../services/guildService';
 import { activateUpgrade, getActiveUpgrades, getAvailableUpgrades } from '../services/guildUpgradeService';
 import { getActiveContracts } from '../services/guildContractService';
@@ -100,6 +101,30 @@ guildRouter.post('/:id/join', asyncHandler(async (req, res) => {
 // POST /:id/leave
 guildRouter.post('/:id/leave', asyncHandler(async (req, res) => {
   await leaveGuild(req.player!.playerId);
+  res.json({ success: true });
+}));
+
+// POST /:id/request — submit a join request (invite_only guilds)
+guildRouter.post('/:id/request', asyncHandler(async (req, res) => {
+  await requestJoinGuild(req.player!.playerId, req.params.id);
+  res.json({ success: true });
+}));
+
+// GET /:id/requests — list pending join requests (officers/leaders only)
+guildRouter.get('/:id/requests', asyncHandler(async (req, res) => {
+  const requests = await getJoinRequests(req.player!.playerId);
+  res.json({ requests });
+}));
+
+// POST /:id/requests/:requestId/accept
+guildRouter.post('/:id/requests/:requestId/accept', asyncHandler(async (req, res) => {
+  await respondToJoinRequest(req.player!.playerId, req.params.requestId, true);
+  res.json({ success: true });
+}));
+
+// POST /:id/requests/:requestId/reject
+guildRouter.post('/:id/requests/:requestId/reject', asyncHandler(async (req, res) => {
+  await respondToJoinRequest(req.player!.playerId, req.params.requestId, false);
   res.json({ success: true });
 }));
 
