@@ -6,6 +6,7 @@ import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
 import { MapPin, Star, Hourglass, Lock } from 'lucide-react';
+import { inflateCost } from '@/lib/taxCalc';
 
 function getMilestoneHint(percent: number): ReactNode {
   if (percent >= 75) return <p className="text-xs text-amber-400 mt-1 italic">The apex predator stirs...</p>;
@@ -184,9 +185,7 @@ export function ZoneMap({
     selectedZone.id !== currentZoneId &&
     !isRecovering &&
     !playbackActive &&
-    availableTurns >= (guildTaxRate > 0
-      ? Math.ceil(selectedZone.travelCost / (1 - guildTaxRate / 100))
-      : selectedZone.travelCost);
+    availableTurns >= inflateCost(selectedZone.travelCost, guildTaxRate);
 
   return (
     <div className="space-y-4">
@@ -427,9 +426,7 @@ export function ZoneMap({
               <span className="text-[var(--rpg-text-secondary)]">{'\u{1F3D8}\uFE0F'} Town</span>
             )}
             {selectedZone.travelCost > 0 && (() => {
-              const inflated = guildTaxRate > 0
-                ? Math.ceil(selectedZone.travelCost / (1 - guildTaxRate / 100))
-                : selectedZone.travelCost;
+              const inflated = inflateCost(selectedZone.travelCost, guildTaxRate);
               const taxAmount = inflated - selectedZone.travelCost;
               return (
                 <div className="flex items-center gap-1 text-[var(--rpg-gold)]">
@@ -507,9 +504,7 @@ export function ZoneMap({
               disabled={!canTravel}
             >
               {(() => {
-                const inflated = guildTaxRate > 0
-                  ? Math.ceil(selectedZone.travelCost / (1 - guildTaxRate / 100))
-                  : selectedZone.travelCost;
+                const inflated = inflateCost(selectedZone.travelCost, guildTaxRate);
                 if (isRecovering) return 'Recover first to travel';
                 if (availableTurns < inflated) return `Need ${inflated} turns (have ${availableTurns})`;
                 return `Travel to ${selectedZone.name} (${inflated} turns)`;

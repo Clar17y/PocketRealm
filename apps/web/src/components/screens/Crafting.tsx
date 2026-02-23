@@ -7,6 +7,7 @@ import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { Hammer, Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ActivityLog } from '@/components/ActivityLog';
+import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
 import { STAT_ORDER, prettyStatName, formatStatValue } from '@/lib/statFormat';
 
@@ -324,9 +325,7 @@ export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog,
               </div>
               {(() => {
                 const baseCost = selectedRecipe.turnCost * quantity;
-                const inflated = guildTaxRate > 0
-                  ? Math.ceil(baseCost / (1 - guildTaxRate / 100))
-                  : baseCost;
+                const inflated = inflateCost(baseCost, guildTaxRate);
                 const taxAmount = inflated - baseCost;
                 return (
                   <>

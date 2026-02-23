@@ -9,6 +9,7 @@ import { HpStatusBar } from '../common/HpStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, HP_CONSTANTS } from '@adventure/shared';
+import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
@@ -74,10 +75,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
     return { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance };
   };
 
-  const effectiveTurns = guildTaxRate > 0
-    ? Math.floor(turnInvestment[0] * (1 - guildTaxRate / 100))
-    : turnInvestment[0];
-  const { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance } = calculateProbabilities(effectiveTurns);
+  const effective = calcEffectiveTurns(turnInvestment[0], guildTaxRate);
+  const { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance } = calculateProbabilities(effective);
 
   return (
     <div className="space-y-4">
@@ -186,7 +185,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                   </div>
                   {guildTaxRate > 0 && (
                     <div className="text-xs text-[var(--rpg-text-secondary)]">
-                      {effectiveTurns.toLocaleString()} effective ({guildTaxRate}% tax)
+                      {effective.toLocaleString()} effective ({guildTaxRate}% tax)
                     </div>
                   )}
                   <div className="text-xs text-[var(--rpg-text-secondary)]">

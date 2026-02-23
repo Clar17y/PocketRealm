@@ -9,6 +9,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ActivityLog } from '@/components/ActivityLog';
+import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 
@@ -134,6 +135,8 @@ export function Forge({
   const hasRerollSacrifice = rerollSacrifices.length > 0;
   const upgradeCost = selected ? getForgeUpgradeCost(selected.rarity) : null;
   const rerollCost = selected ? getForgeRerollCost(selected.rarity) : null;
+  const inflatedUpgradeCost = upgradeCost !== null ? inflateCost(upgradeCost, guildTaxRate) : null;
+  const inflatedRerollCost = rerollCost !== null ? inflateCost(rerollCost, guildTaxRate) : null;
   const nextRarity = selected ? getNextRarity(selected.rarity) : null;
   const upgradeChance = selected ? calculateForgeUpgradeSuccessChance(selected.rarity, equippedLuck) : null;
   const bonusEntries = statEntries(selected?.bonusStats);
@@ -251,8 +254,8 @@ export function Forge({
                 Success keeps existing bonus stats and adds one new bonus roll.
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
-                Cost: {upgradeCost !== null && guildTaxRate > 0
-                  ? `${Math.ceil(upgradeCost / (1 - guildTaxRate / 100))} turns (${Math.ceil(upgradeCost / (1 - guildTaxRate / 100)) - upgradeCost} tax)`
+                Cost: {inflatedUpgradeCost !== null && inflatedUpgradeCost !== upgradeCost
+                  ? `${inflatedUpgradeCost} turns (${inflatedUpgradeCost - upgradeCost!} tax)`
                   : `${upgradeCost ?? '-'} turns`
                 } + 1 sacrificial {selected?.rarity ?? ''} {selected?.type ?? 'item'}
               </div>
@@ -322,8 +325,8 @@ export function Forge({
                 Rerolls all bonus stats for current rarity.
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
-                Cost: {rerollCost !== null && guildTaxRate > 0
-                  ? `${Math.ceil(rerollCost / (1 - guildTaxRate / 100))} turns (${Math.ceil(rerollCost / (1 - guildTaxRate / 100)) - rerollCost} tax)`
+                Cost: {inflatedRerollCost !== null && inflatedRerollCost !== rerollCost
+                  ? `${inflatedRerollCost} turns (${inflatedRerollCost - rerollCost!} tax)`
                   : `${rerollCost ?? '-'} turns`
                 } + 1 sacrificial duplicate at same rarity
               </div>

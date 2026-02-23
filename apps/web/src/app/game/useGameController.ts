@@ -577,7 +577,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     getPlayerGuild().then((guildRes) => {
       if (guildRes.data?.guild) setGuildTaxRate(guildRes.data.guild.taxRate);
       else setGuildTaxRate(0);
-    });
+    }).catch(() => setGuildTaxRate(0));
   }, []);
 
   const advanceTutorial = useCallback(async (fromStep: number) => {

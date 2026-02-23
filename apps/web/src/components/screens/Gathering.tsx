@@ -10,6 +10,7 @@ import { titleCaseFromSnake } from '@/lib/format';
 import { Pickaxe, MapPin } from 'lucide-react';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { GATHERING_CONSTANTS } from '@adventure/shared';
+import { effectiveTurns as calcEffectiveTurns, inflateCost } from '@/lib/taxCalc';
 import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
 
@@ -91,8 +92,9 @@ export function Gathering({
     const yieldMultiplier = 1 + levelsAbove * GATHERING_CONSTANTS.YIELD_MULTIPLIER_PER_LEVEL;
     const baseYield = Math.max(node.baseYield, GATHERING_CONSTANTS.BASE_YIELD);
     const yieldPerAction = Math.floor(baseYield * yieldMultiplier);
-    if (yieldPerAction <= 0) return GATHERING_CONSTANTS.BASE_TURN_COST;
-    return Math.ceil(node.remainingCapacity / yieldPerAction) * GATHERING_CONSTANTS.BASE_TURN_COST;
+    if (yieldPerAction <= 0) return inflateCost(GATHERING_CONSTANTS.BASE_TURN_COST, guildTaxRate);
+    const baseTurns = Math.ceil(node.remainingCapacity / yieldPerAction) * GATHERING_CONSTANTS.BASE_TURN_COST;
+    return inflateCost(baseTurns, guildTaxRate);
   };
 
   const [selectedNode, setSelectedNode] = useState<ResourceNode | null>(nodes[0] || null);
@@ -129,9 +131,7 @@ export function Gathering({
 
   const calculateYield = (node: ResourceNode, turns: number) => {
     // Match backend formula exactly: linear +10% per level above requirement
-    const effective = guildTaxRate > 0
-      ? Math.floor(turns * (1 - guildTaxRate / 100))
-      : turns;
+    const effective = calcEffectiveTurns(turns, guildTaxRate);
     const maxActionsByTurns = Math.floor(effective / GATHERING_CONSTANTS.BASE_TURN_COST);
     const levelsAbove = Math.max(0, skillLevel - node.levelRequired);
     const yieldMultiplier = 1 + levelsAbove * GATHERING_CONSTANTS.YIELD_MULTIPLIER_PER_LEVEL;
@@ -168,7 +168,8 @@ export function Gathering({
     const targetYield = Math.ceil(selectedNode.remainingCapacity * pct);
     const actions = Math.ceil(targetYield / Math.max(1, yieldPerAction));
     const rawTurns = actions * GATHERING_CONSTANTS.BASE_TURN_COST;
-    return { label, turns: Math.min(Math.max(GATHERING_CONSTANTS.BASE_TURN_COST, rawTurns), availableTurns) };
+    const inflated = inflateCost(rawTurns, guildTaxRate);
+    return { label, turns: Math.min(Math.max(GATHERING_CONSTANTS.BASE_TURN_COST, inflated), availableTurns) };
   }) : null;
 
   return (
@@ -326,7 +327,7 @@ export function Gathering({
                 <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">{turnInvestment[0]}</div>
                 {guildTaxRate > 0 && (
                   <div className="text-xs text-[var(--rpg-text-secondary)]">
-                    {Math.floor(turnInvestment[0] * (1 - guildTaxRate / 100))} effective ({guildTaxRate}% tax)
+                    {calcEffectiveTurns(turnInvestment[0], guildTaxRate)} effective ({guildTaxRate}% tax)
                   </div>
                 )}
                 <div className="text-xs text-[var(--rpg-text-secondary)]">of {availableTurns.toLocaleString()} available</div>
