@@ -258,6 +258,7 @@ export default function GamePage() {
     handleForgeReroll,
     handleDestroyItem,
     handleRepairItem,
+    handleRepairAllEquipped,
     handleUseItem,
     handleEquipItem,
     handleUnequipSlot,
@@ -509,6 +510,9 @@ export default function GamePage() {
               })}
             onEquip={handleEquipItem}
             onUnequip={handleUnequipSlot}
+            onRepairItem={handleRepairItem}
+            onRepairAll={handleRepairAllEquipped}
+            turns={turns}
             stats={(() => {
               let attack = 0;
               let defence = 0;

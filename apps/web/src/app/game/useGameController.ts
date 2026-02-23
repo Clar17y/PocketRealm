@@ -43,6 +43,7 @@ import {
   getZoneEvents,
   mine,
   repairItem,
+  repairAllEquipped,
   rest,
   restEstimate,
   salvage,
@@ -1454,6 +1455,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
+  const handleRepairAllEquipped = async () => {
+    await runAction('repair_all', async () => {
+      const res = await repairAllEquipped();
+      const data = res.data;
+      if (!data) {
+        setActionError(res.error?.message ?? 'Repair all failed');
+        return;
+      }
+      if (data.turns) setTurns(data.turns.currentTurns);
+      await loadAll();
+    });
+  };
+
   const handleUseItem = async (itemId: string) => {
     await runAction('use_item', async () => {
       const res = await useItem(itemId);
@@ -1810,6 +1824,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleForgeReroll,
     handleDestroyItem,
     handleRepairItem,
+    handleRepairAllEquipped,
     handleUseItem,
     handleEquipItem,
     handleUnequipSlot,
