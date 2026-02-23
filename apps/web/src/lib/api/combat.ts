@@ -216,6 +216,7 @@ export interface CombatResultResponse {
 }
 
 export interface CombatFightResult {
+  room?: number;
   mobName: string;
   mobDisplayName: string;
   mobTemplateId: string;
@@ -228,7 +229,7 @@ export interface CombatFightResult {
   playerHpRemaining: number;
   potionsConsumed: Array<{ tier: number; healAmount: number; round: number; templateId?: string }>;
   xp: number;
-  loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string; itemName?: string | null }>;
+  loot: Array<{ itemTemplateId: string; quantity: number; rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'; itemName?: string | null }>;
   durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
   skillXp: SkillXpGrantResponse | null;
 }
