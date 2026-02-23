@@ -10,6 +10,8 @@ const wep = IDS.wep;
 const arm = IDS.arm;
 const adv = IDS.adv;
 const fam = IDS.families;
+const gems = IDS.gems;
+const jewel = IDS.jewel;
 const trophy = IDS.trophy;
 const bossGear = IDS.bossGear;
 
@@ -183,6 +185,58 @@ function armorRecipes() {
   return recipes;
 }
 
+// ── Gem Refining Recipes (raw gem → cut gem via refining) ───────────────────
+
+function gemRefiningRecipes() {
+  return [
+    // Mining gems
+    recipe({ skillType: 'refining', requiredLevel: 1, resultTemplateId: gems.cutRuby, turnCost: 5, xpReward: 6, materials: [{ itemTemplateId: gems.roughRuby, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 5, resultTemplateId: gems.cutSapphire, turnCost: 8, xpReward: 12, materials: [{ itemTemplateId: gems.roughSapphire, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 12, resultTemplateId: gems.cutEmerald, turnCost: 12, xpReward: 20, materials: [{ itemTemplateId: gems.roughEmerald, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 20, resultTemplateId: gems.cutDiamond, turnCost: 18, xpReward: 32, materials: [{ itemTemplateId: gems.roughDiamond, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 28, resultTemplateId: gems.cutOpal, turnCost: 25, xpReward: 45, materials: [{ itemTemplateId: gems.roughOpal, quantity: 2 }] }),
+    // Foraging gems
+    recipe({ skillType: 'refining', requiredLevel: 1, resultTemplateId: gems.cutAmber, turnCost: 5, xpReward: 6, materials: [{ itemTemplateId: gems.rawAmber, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 5, resultTemplateId: gems.cutPearl, turnCost: 8, xpReward: 12, materials: [{ itemTemplateId: gems.rawPearl, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 12, resultTemplateId: gems.cutJade, turnCost: 12, xpReward: 20, materials: [{ itemTemplateId: gems.rawJade, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 20, resultTemplateId: gems.cutMoonstone, turnCost: 18, xpReward: 32, materials: [{ itemTemplateId: gems.rawMoonstone, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 28, resultTemplateId: gems.cutStarcrystal, turnCost: 25, xpReward: 45, materials: [{ itemTemplateId: gems.rawStarcrystal, quantity: 2 }] }),
+    // Woodcutting gems
+    recipe({ skillType: 'refining', requiredLevel: 1, resultTemplateId: gems.cutResin, turnCost: 5, xpReward: 6, materials: [{ itemTemplateId: gems.treeResin, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 5, resultTemplateId: gems.cutSap, turnCost: 8, xpReward: 12, materials: [{ itemTemplateId: gems.fossilizedSap, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 12, resultTemplateId: gems.cutBark, turnCost: 12, xpReward: 20, materials: [{ itemTemplateId: gems.crystalBark, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 20, resultTemplateId: gems.cutHeartwood, turnCost: 18, xpReward: 32, materials: [{ itemTemplateId: gems.heartwoodGem, quantity: 2 }] }),
+    recipe({ skillType: 'refining', requiredLevel: 28, resultTemplateId: gems.cutAncientAmber, turnCost: 25, xpReward: 45, materials: [{ itemTemplateId: gems.ancientAmber, quantity: 2 }] }),
+  ];
+}
+
+// ── Jewelcrafting Recipes ───────────────────────────────────────────────────
+
+function jewelcraftingRecipes() {
+  return [
+    // Tier 1 — metal + gem only
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 1, resultTemplateId: jewel.copperRing, turnCost: 10, xpReward: 15, materials: [{ itemTemplateId: proc.copperIngot, quantity: 3 }, { itemTemplateId: gems.cutRuby, quantity: 1 }] }),
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 1, resultTemplateId: jewel.copperPendant, turnCost: 10, xpReward: 15, materials: [{ itemTemplateId: proc.copperIngot, quantity: 3 }, { itemTemplateId: gems.cutAmber, quantity: 1 }] }),
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 1, resultTemplateId: jewel.copperCharm, turnCost: 10, xpReward: 15, materials: [{ itemTemplateId: proc.copperIngot, quantity: 3 }, { itemTemplateId: gems.cutResin, quantity: 1 }] }),
+    // Tier 2 — metal + gem
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 5, resultTemplateId: jewel.ironBand, turnCost: 18, xpReward: 28, materials: [{ itemTemplateId: proc.ironIngot, quantity: 4 }, { itemTemplateId: gems.cutSapphire, quantity: 1 }] }),
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 5, resultTemplateId: jewel.ironChain, turnCost: 18, xpReward: 28, materials: [{ itemTemplateId: proc.ironIngot, quantity: 4 }, { itemTemplateId: gems.cutPearl, quantity: 1 }] }),
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 5, resultTemplateId: jewel.ironTalisman, turnCost: 18, xpReward: 28, materials: [{ itemTemplateId: proc.ironIngot, quantity: 4 }, { itemTemplateId: gems.cutSap, quantity: 1 }] }),
+    // Tier 3 — metal + gem + mob drop
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 12, resultTemplateId: jewel.darkIronRing, turnCost: 30, xpReward: 45, materials: [{ itemTemplateId: proc.darkIronIngot, quantity: 5 }, { itemTemplateId: gems.cutEmerald, quantity: 2 }, { itemTemplateId: drop.crystalShard, quantity: 2 }] }),
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 12, resultTemplateId: jewel.darkIronAmulet, turnCost: 30, xpReward: 45, materials: [{ itemTemplateId: proc.darkIronIngot, quantity: 5 }, { itemTemplateId: gems.cutJade, quantity: 2 }, { itemTemplateId: drop.faeSilk, quantity: 2 }] }),
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 12, resultTemplateId: jewel.darkIronCharm, turnCost: 30, xpReward: 45, materials: [{ itemTemplateId: proc.darkIronIngot, quantity: 5 }, { itemTemplateId: gems.cutBark, quantity: 2 }, { itemTemplateId: drop.harpyFeather, quantity: 2 }] }),
+    // Tier 4 — metal + gem + mob drop
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 20, resultTemplateId: jewel.mithrilRing, turnCost: 45, xpReward: 70, materials: [{ itemTemplateId: proc.mithrilIngot, quantity: 6 }, { itemTemplateId: gems.cutDiamond, quantity: 3 }, { itemTemplateId: drop.darkCrystal, quantity: 3 }] }),
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 20, resultTemplateId: jewel.mithrilNecklace, turnCost: 45, xpReward: 70, materials: [{ itemTemplateId: proc.mithrilIngot, quantity: 6 }, { itemTemplateId: gems.cutMoonstone, quantity: 3 }, { itemTemplateId: drop.bogHeart, quantity: 3 }] }),
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 20, resultTemplateId: jewel.mithrilTalisman, turnCost: 45, xpReward: 70, materials: [{ itemTemplateId: proc.mithrilIngot, quantity: 6 }, { itemTemplateId: gems.cutHeartwood, quantity: 3 }, { itemTemplateId: drop.wraithEssence, quantity: 3 }] }),
+    // Tier 5 — metal + gem + rare mob drop
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 28, resultTemplateId: jewel.ancientRing, turnCost: 70, xpReward: 110, materials: [{ itemTemplateId: proc.ancientIngot, quantity: 8 }, { itemTemplateId: gems.cutOpal, quantity: 4 }, { itemTemplateId: drop.eldritchFragment, quantity: 4 }] }),
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 28, resultTemplateId: jewel.ancientAmulet, turnCost: 70, xpReward: 110, materials: [{ itemTemplateId: proc.ancientIngot, quantity: 8 }, { itemTemplateId: gems.cutStarcrystal, quantity: 4 }, { itemTemplateId: drop.nagaPearl, quantity: 4 }] }),
+    recipe({ skillType: 'jewelcrafting', requiredLevel: 28, resultTemplateId: jewel.ancientCharm, turnCost: 70, xpReward: 110, materials: [{ itemTemplateId: proc.ancientIngot, quantity: 8 }, { itemTemplateId: gems.cutAncientAmber, quantity: 4 }, { itemTemplateId: drop.lichDust, quantity: 4 }] }),
+  ];
+}
+
 // ── Advanced (Soulbound) Recipes ──────────────────────────────────────────────
 
 function advancedRecipes() {
@@ -243,5 +297,5 @@ function bossRecipes() {
 // ── Export ─────────────────────────────────────────────────────────────────────
 
 export function getAllRecipes() {
-  return [...processingRecipes(), ...weaponRecipes(), ...armorRecipes(), ...advancedRecipes(), ...bossRecipes()];
+  return [...processingRecipes(), ...gemRefiningRecipes(), ...weaponRecipes(), ...armorRecipes(), ...jewelcraftingRecipes(), ...advancedRecipes(), ...bossRecipes()];
 }

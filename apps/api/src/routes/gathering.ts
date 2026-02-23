@@ -9,8 +9,9 @@ import { addStackableItemTx } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
+import { getEquipmentStats } from '../services/equipmentService.js';
 import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
-import { applyResourceEventModifiers } from '@adventure/game-engine';
+import { applyResourceEventModifiers, rollGemCritBatch } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
@@ -191,6 +192,31 @@ function toResourceTemplateKey(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, '_');
 }
 
+// Gem template lookup: (gathering skill, tier) → raw gem name
+const GEM_BY_SKILL_TIER: Record<string, Record<number, string>> = {
+  mining: { 1: 'Rough Ruby', 2: 'Rough Sapphire', 3: 'Rough Emerald', 4: 'Rough Diamond', 5: 'Rough Opal' },
+  foraging: { 1: 'Raw Amber', 2: 'Raw Pearl', 3: 'Raw Jade', 4: 'Raw Moonstone', 5: 'Raw Starcrystal' },
+  woodcutting: { 1: 'Tree Resin', 2: 'Fossilized Sap', 3: 'Crystal Bark', 4: 'Heartwood Gem', 5: 'Ancient Amber' },
+};
+
+function levelToGemTier(levelRequired: number): number {
+  if (levelRequired >= 28) return 5;
+  if (levelRequired >= 20) return 4;
+  if (levelRequired >= 12) return 3;
+  if (levelRequired >= 5) return 2;
+  return 1;
+}
+
+async function getGemTemplateId(skill: string, tier: number): Promise<string | null> {
+  const gemName = GEM_BY_SKILL_TIER[skill]?.[tier];
+  if (!gemName) return null;
+  const template = await prisma.itemTemplate.findFirst({
+    where: { name: gemName, itemType: 'resource' },
+    select: { id: true },
+  });
+  return template?.id ?? null;
+}
+
 async function getResourceTemplateId(resourceType: string): Promise<string> {
   const normalizedResourceType = toResourceTemplateKey(resourceType);
   const templates = await prisma.itemTemplate.findMany({
@@ -336,6 +362,33 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const guildId = await getPlayerGuildId(playerId);
   if (guildId) void incrementContractProgress(guildId, 'gather_actions', actions).catch(() => {});
 
+  // --- Gem crit rolls (one per gathering action) ---
+  let gemCrit: { itemTemplateId: string; itemId: string; gemName: string; gemsFound: number; critChance: number } | null = null;
+  const gemTemplateId = await getGemTemplateId(skillRequired, levelToGemTier(template.levelRequired));
+  if (gemTemplateId) {
+    const equipStats = await getEquipmentStats(playerId);
+    const luckStat = equipStats.luck;
+
+    const critResult = rollGemCritBatch(
+      { skillLevel: level, nodeLevel: template.levelRequired, luckStat },
+      actions,
+    );
+
+    if (critResult.gemsFound > 0) {
+      const gemStack = await prisma.$transaction(async (tx) => {
+        return addStackableItemTx(tx, playerId, gemTemplateId, critResult.gemsFound);
+      });
+      const gemTier = levelToGemTier(template.levelRequired);
+      gemCrit = {
+        itemTemplateId: gemTemplateId,
+        itemId: gemStack.itemId,
+        gemName: GEM_BY_SKILL_TIER[skillRequired]?.[gemTier] ?? 'Unknown Gem',
+        gemsFound: critResult.gemsFound,
+        critChance: critResult.critChance,
+      };
+    }
+  }
+
   // --- Achievement tracking (counters + derived checks) ---
   const gatherAchKeys = ['totalGatheringActions'];
   if (xpGrant.newLevel) gatherAchKeys.push('highestSkillLevel');
@@ -365,6 +418,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
         itemTemplateId: resourceTemplateId,
         itemId: stack.itemId,
         xp: serializeXpGrant(xpGrant),
+        gemCrit: gemCrit ? { itemTemplateId: gemCrit.itemTemplateId, gemName: gemCrit.gemName, gemsFound: gemCrit.gemsFound } : undefined,
       } as unknown as Prisma.InputJsonValue,
     },
   });
@@ -391,6 +445,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       itemId: stack.itemId,
     },
     xp: serializeXpGrant(xpGrant),
+    gemCrit: gemCrit ?? undefined,
     activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
   });
 }));

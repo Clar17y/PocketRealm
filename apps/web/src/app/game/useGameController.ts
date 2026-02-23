@@ -364,7 +364,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     materialTemplates: Array<{ id: string; name: string; itemType: string; stackable: boolean }>;
     xpReward: number;
   }>>([]);
-  const [activeCraftingSkill, setActiveCraftingSkill] = useState<'refining' | 'tanning' | 'weaving' | 'weaponsmithing' | 'armorsmithing' | 'leatherworking' | 'tailoring' | 'alchemy'>('weaponsmithing');
+  const [activeCraftingSkill, setActiveCraftingSkill] = useState<'refining' | 'tanning' | 'weaving' | 'weaponsmithing' | 'armorsmithing' | 'leatherworking' | 'tailoring' | 'alchemy' | 'jewelcrafting'>('weaponsmithing');
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [pendingEncounters, setPendingEncounters] = useState<PendingEncounter[]>([]);
   const [pendingEncountersLoading, setPendingEncountersLoading] = useState(false);
@@ -1268,6 +1268,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
             newLogs.push({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
           }
         }
+      }
+
+      if (data.gemCrit) {
+        const qty = data.gemCrit.gemsFound;
+        newLogs.push({
+          timestamp: nowStamp(),
+          type: 'success',
+          message: qty === 1
+            ? `Gem crit! Found a ${data.gemCrit.gemName}!`
+            : `Gem crits! Found ${qty}x ${data.gemCrit.gemName}!`,
+        });
       }
 
       if (data.node.nodeDepleted) {

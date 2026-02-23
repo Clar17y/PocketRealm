@@ -186,6 +186,7 @@ export async function mine(playerNodeId: string, turns: number, currentZoneId: s
       attributePointsAfter: number;
       characterLeveledUp: boolean;
     };
+    gemCrit?: { itemTemplateId: string; gemName: string; gemsFound: number };
     activeEvents?: Array<{ title: string; effectType: string; effectValue: number }>;
   }>('/api/v1/gathering/mine', {
     method: 'POST',
