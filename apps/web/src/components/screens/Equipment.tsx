@@ -519,7 +519,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
         <PixelButton
           variant="primary"
           className="w-full"
-          disabled={busy || (turns !== undefined && turns < totalRepairCost)}
+          disabled={busy || turns === undefined || turns < totalRepairCost}
           onClick={() => setShowRepairAll(true)}
         >
           Repair All ({totalRepairCost} turns)
@@ -542,6 +542,12 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                 <X size={20} />
               </button>
             </div>
+
+            {error && (
+              <div className="mb-3 p-2 rounded bg-[var(--rpg-background)] border border-[var(--rpg-red)] text-[var(--rpg-red)] text-sm">
+                {error}
+              </div>
+            )}
 
             <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
               {repairableItems.map((r) => (
@@ -583,7 +589,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
               </PixelButton>
               <PixelButton
                 variant="primary"
-                disabled={busy || (turns !== undefined && turns < totalRepairCost)}
+                disabled={busy || turns === undefined || turns < totalRepairCost}
                 onClick={async () => {
                   if (!onRepairAll) return;
                   setBusy(true);
@@ -725,7 +731,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <PixelButton
                           variant="secondary"
                           size="sm"
-                          disabled={busy || (turns !== undefined && turns < (slot.item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST))}
+                          disabled={busy || turns === undefined || turns < (slot.item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST)}
                           onClick={async () => {
                             if (!slot.item) return;
                             setBusy(true);

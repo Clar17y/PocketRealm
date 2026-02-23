@@ -3,6 +3,42 @@ import { DURABILITY_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 
+/** Compute the turn cost to repair a single item. */
+export function repairTurnCost(currentDurability: number): number {
+  return currentDurability <= 0
+    ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST
+    : DURABILITY_CONSTANTS.REPAIR_TURN_COST;
+}
+
+/** Apply durability repair to a single item inside a transaction. */
+export async function repairItemDurability(
+  tx: Prisma.TransactionClient,
+  item: { id: string; ownerId: string; currentDurability: number | null; maxDurability: number | null; template: { maxDurability: number } },
+  randomFn: () => number = Math.random,
+): Promise<{ newMax: number; decay: number }> {
+  const max = item.maxDurability ?? item.template.maxDurability;
+  const decay = Math.min(
+    DURABILITY_CONSTANTS.REPAIR_MAX_DECAY,
+    Math.max(1, Math.floor(randomFn() * (DURABILITY_CONSTANTS.REPAIR_MAX_DECAY + 1))),
+  );
+  const newMax = Math.max(DURABILITY_CONSTANTS.MIN_MAX_DURABILITY, max - decay);
+
+  const updated = await tx.item.updateMany({
+    where: {
+      id: item.id,
+      ownerId: item.ownerId,
+      currentDurability: item.currentDurability,
+      maxDurability: item.maxDurability,
+    },
+    data: { maxDurability: newMax, currentDurability: newMax },
+  });
+  if (updated.count !== 1) {
+    throw new AppError(409, 'Item durability changed; try again', 'ITEM_STATE_CHANGED');
+  }
+
+  return { newMax, decay };
+}
+
 export interface RepairEquippedResult {
   repaired: boolean;
   turns?: {
@@ -55,9 +91,7 @@ export async function repairAllEquipped(
 
   const itemCosts = damaged.map((d) => ({
     ...d,
-    turnCost: d.current <= 0
-      ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST
-      : DURABILITY_CONSTANTS.REPAIR_TURN_COST,
+    turnCost: repairTurnCost(d.current),
   }));
   const totalTurnCost = itemCosts.reduce((sum, ic) => sum + ic.turnCost, 0);
 
@@ -65,25 +99,11 @@ export async function repairAllEquipped(
 
   const repairedItems = [];
   for (const ic of itemCosts) {
-    const max = ic.item.maxDurability ?? ic.item.template.maxDurability;
-    const decay = Math.min(
-      DURABILITY_CONSTANTS.REPAIR_MAX_DECAY,
-      Math.max(1, Math.floor(randomFn() * (DURABILITY_CONSTANTS.REPAIR_MAX_DECAY + 1))),
+    const { newMax, decay } = await repairItemDurability(
+      tx,
+      { ...ic.item, ownerId: playerId },
+      randomFn,
     );
-    const newMax = Math.max(DURABILITY_CONSTANTS.MIN_MAX_DURABILITY, max - decay);
-
-    const updated = await tx.item.updateMany({
-      where: {
-        id: ic.item.id,
-        ownerId: playerId,
-        currentDurability: ic.item.currentDurability,
-        maxDurability: ic.item.maxDurability,
-      },
-      data: { maxDurability: newMax, currentDurability: newMax },
-    });
-    if (updated.count !== 1) {
-      throw new AppError(409, 'Item durability changed; try again', 'ITEM_STATE_CHANGED');
-    }
 
     repairedItems.push({
       itemId: ic.item.id,

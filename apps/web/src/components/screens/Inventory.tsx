@@ -124,7 +124,7 @@ export function Inventory({ items, onDrop, onSalvage, onRepair, onEquip, onUnequ
       {/* Backpack Items */}
       <div className="space-y-2">
         <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
-          Backpack ({backpackItems.length})
+          Backpack ({backpackItems.length}/24)
         </div>
         <div className="grid grid-cols-6 gap-2">
           {backpackItems.map((item) => (
