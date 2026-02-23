@@ -5,8 +5,8 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { getOwnedItem } from '../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
-import { DURABILITY_CONSTANTS } from '@adventure/shared';
 import { useConsumable } from '../services/consumableService';
+import { repairAllEquipped, repairTurnCost, repairItemDurability } from '../services/repairService';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const inventoryRouter = Router();
@@ -115,31 +115,9 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
       };
     }
 
-    const turnCost = current <= 0
-      ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST
-      : DURABILITY_CONSTANTS.REPAIR_TURN_COST;
+    const turnCost = repairTurnCost(current);
     const turnSpend = await spendPlayerTurnsTx(tx, playerId, turnCost);
-    const decay = Math.min(
-      DURABILITY_CONSTANTS.REPAIR_MAX_DECAY,
-      Math.max(1, Math.floor(Math.random() * (DURABILITY_CONSTANTS.REPAIR_MAX_DECAY + 1)))
-    );
-    const newMax = Math.max(DURABILITY_CONSTANTS.MIN_MAX_DURABILITY, max - decay);
-
-    const updated = await tx.item.updateMany({
-      where: {
-        id: item.id,
-        ownerId: playerId,
-        currentDurability: item.currentDurability,
-        maxDurability: item.maxDurability,
-      },
-      data: {
-        maxDurability: newMax,
-        currentDurability: newMax,
-      },
-    });
-    if (updated.count !== 1) {
-      throw new AppError(409, 'Item durability changed; try again', 'ITEM_STATE_CHANGED');
-    }
+    const { newMax, decay } = await repairItemDurability(tx, { ...item, ownerId: playerId });
 
     return {
       repaired: true as const,
@@ -152,6 +130,18 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
     };
   });
 
+  res.json(result);
+}));
+
+/**
+ * POST /api/v1/inventory/repair-equipped
+ * Batch-repair all equipped items that have durability below max.
+ */
+inventoryRouter.post('/repair-equipped', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const result = await prisma.$transaction(async (tx) => {
+    return repairAllEquipped(tx, playerId);
+  });
   res.json(result);
 }));
 

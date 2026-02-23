@@ -5,8 +5,10 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
+import { HpStatusBar } from '../common/HpStatusBar';
+import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Mountain, Play } from 'lucide-react';
-import { EXPLORATION_CONSTANTS } from '@adventure/shared';
+import { EXPLORATION_CONSTANTS, HP_CONSTANTS } from '@adventure/shared';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
@@ -29,6 +31,9 @@ interface ExplorationProps {
   activityLog: ActivityLogEntry[];
   isRecovering?: boolean;
   recoveryCost?: number | null;
+  currentHp?: number;
+  maxHp?: number;
+  regenPerSecond?: number;
   playbackData?: {
     totalTurns: number;
     zoneName: string;
@@ -45,10 +50,16 @@ interface ExplorationProps {
   explorationSpeedMs?: number;
   defaultTurns?: number;
   tutorialLocked?: boolean;
+  lowHpWarning?: boolean;
+  onQuickRest?: () => Promise<void>;
+  quickRestPercent?: number;
+  busyAction?: string | null;
+  onNavigateToRest?: () => void;
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
+  const [showLowHpWarning, setShowLowHpWarning] = useState(false);
 
   const calculateProbabilities = (turns: number) => {
     const expectedAmbushes = turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN;
@@ -66,9 +77,27 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
 
   return (
     <div className="space-y-4">
+      {/* Low HP Warning Dialog */}
+      {showLowHpWarning && typeof currentHp === 'number' && typeof maxHp === 'number' && (
+        <LowHpWarningDialog
+          currentHp={currentHp}
+          maxHp={maxHp}
+          onProceed={() => {
+            setShowLowHpWarning(false);
+            onStartExploration(turnInvestment[0]);
+          }}
+          onCancel={() => setShowLowHpWarning(false)}
+        />
+      )}
+
       {/* Knockout Banner */}
       {isRecovering && !playbackData && (
-        <KnockoutBanner action="exploring" recoveryCost={recoveryCost} />
+        <KnockoutBanner action="exploring" recoveryCost={recoveryCost} onClick={onNavigateToRest} />
+      )}
+
+      {/* HP Status */}
+      {!playbackData && typeof currentHp === 'number' && typeof maxHp === 'number' && !isRecovering && (
+        <HpStatusBar currentHp={currentHp} maxHp={maxHp} regenPerSecond={regenPerSecond} onQuickRest={onQuickRest} quickRestPercent={quickRestPercent} busyAction={busyAction} />
       )}
 
       {/* Zone Header — always visible */}
@@ -238,7 +267,17 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
             variant="gold"
             size="lg"
             className="w-full"
-            onClick={() => onStartExploration(turnInvestment[0])}
+            onClick={() => {
+              if (
+                lowHpWarning &&
+                typeof currentHp === 'number' && typeof maxHp === 'number' &&
+                maxHp > 0 && (currentHp / maxHp) < HP_CONSTANTS.LOW_HP_WARNING_THRESHOLD
+              ) {
+                setShowLowHpWarning(true);
+              } else {
+                onStartExploration(turnInvestment[0]);
+              }
+            }}
             disabled={isRecovering || turnInvestment[0] > availableTurns}
           >
             <div className="flex items-center justify-center gap-2">

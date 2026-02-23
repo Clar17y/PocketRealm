@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from 'react';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
+import { HpStatusBar } from '@/components/common/HpStatusBar';
+import { LowHpWarningDialog } from '@/components/common/LowHpWarningDialog';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
@@ -10,7 +12,7 @@ import { BossHistory } from '@/components/screens/BossHistory';
 import { Pagination } from '@/components/common/Pagination';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { monsterImageSrc } from '@/lib/assets';
-import { getMobPrefixDefinition } from '@adventure/shared';
+import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../useGameController';
 
 interface CombatScreenProps {
@@ -60,6 +62,10 @@ interface CombatScreenProps {
   onCombatPlaybackComplete?: () => void;
   fightProgress?: { current: number; total: number; room?: number } | null;
   roomTransition?: { entering: number } | null;
+  lowHpWarning?: boolean;
+  onQuickRest?: () => Promise<void>;
+  quickRestPercent?: number;
+  onNavigateToRest?: () => void;
 }
 
 export function CombatScreen({
@@ -90,12 +96,34 @@ export function CombatScreen({
   onCombatPlaybackComplete,
   fightProgress,
   roomTransition,
+  lowHpWarning,
+  onQuickRest,
+  quickRestPercent,
+  onNavigateToRest,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [strategyModalSite, setStrategyModalSite] = useState<PendingEncounter | null>(null);
+  const [lowHpPendingSite, setLowHpPendingSite] = useState<PendingEncounter | null>(null);
 
   const handleFightClick = (site: PendingEncounter) => {
+    if (
+      lowHpWarning &&
+      hpState.maxHp > 0 &&
+      (hpState.currentHp / hpState.maxHp) < HP_CONSTANTS.LOW_HP_WARNING_THRESHOLD
+    ) {
+      setLowHpPendingSite(site);
+      return;
+    }
+    if (!site.clearStrategy) {
+      setStrategyModalSite(site);
+    } else {
+      void onStartCombat(site.encounterSiteId);
+    }
+  };
+
+  const proceedWithFight = (site: PendingEncounter) => {
+    setLowHpPendingSite(null);
     if (!site.clearStrategy) {
       setStrategyModalSite(site);
     } else {
@@ -203,9 +231,24 @@ export function CombatScreen({
         </div>
       )}
 
+      {/* Low HP Warning Dialog */}
+      {lowHpPendingSite && (
+        <LowHpWarningDialog
+          currentHp={hpState.currentHp}
+          maxHp={hpState.maxHp}
+          onProceed={() => proceedWithFight(lowHpPendingSite)}
+          onCancel={() => setLowHpPendingSite(null)}
+        />
+      )}
+
       {/* Knockout Banner */}
       {hpState.isRecovering && (
-        <KnockoutBanner action="fighting" recoveryCost={hpState.recoveryCost} />
+        <KnockoutBanner action="fighting" recoveryCost={hpState.recoveryCost} onClick={onNavigateToRest} />
+      )}
+
+      {/* HP Status */}
+      {!combatPlaybackData && !hpState.isRecovering && (
+        <HpStatusBar currentHp={hpState.currentHp} maxHp={hpState.maxHp} regenPerSecond={hpState.regenPerSecond} onQuickRest={onQuickRest} quickRestPercent={quickRestPercent} busyAction={busyAction} />
       )}
 
       <div className="flex gap-2">

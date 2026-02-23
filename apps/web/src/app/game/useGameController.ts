@@ -43,6 +43,7 @@ import {
   getZoneEvents,
   mine,
   repairItem,
+  repairAllEquipped,
   rest,
   restEstimate,
   salvage,
@@ -430,6 +431,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [defaultExploreTurns, setDefaultExploreTurns] = useState(100);
   const [quickRestHealPercent, setQuickRestHealPercent] = useState(100);
   const [defaultRefiningMax, setDefaultRefiningMax] = useState(false);
+  const [lowHpWarning, setLowHpWarning] = useState(true);
   const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
   const [achievementUnclaimedCount, setAchievementUnclaimedCount] = useState(0);
   const [activeTitle, setActiveTitleState] = useState<string | null>(null);
@@ -529,6 +531,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setDefaultExploreTurns(playerRes.data.player.defaultExploreTurns ?? 100);
       setQuickRestHealPercent(playerRes.data.player.quickRestHealPercent ?? 100);
       setDefaultRefiningMax(playerRes.data.player.defaultRefiningMax ?? false);
+      setLowHpWarning(playerRes.data.player.lowHpWarning ?? true);
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
     if (hpRes.data) setHpState(hpRes.data);
@@ -1454,6 +1457,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
+  const handleRepairAllEquipped = async () => {
+    await runAction('repair_all', async () => {
+      const res = await repairAllEquipped();
+      const data = res.data;
+      if (!data) {
+        setActionError(res.error?.message ?? 'Repair all failed');
+        return;
+      }
+      if (data.turns) setTurns(data.turns.currentTurns);
+      await loadAll();
+    });
+  };
+
   const handleUseItem = async (itemId: string) => {
     await runAction('use_item', async () => {
       const res = await useItem(itemId);
@@ -1657,6 +1673,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetSetting('quickRestHealPercent', value, setQuickRestHealPercent, quickRestHealPercent);
   const handleSetDefaultRefiningMax = (value: boolean) =>
     handleSetSetting('defaultRefiningMax', value, setDefaultRefiningMax, defaultRefiningMax);
+  const handleSetLowHpWarning = (value: boolean) =>
+    handleSetSetting('lowHpWarning', value, setLowHpWarning, lowHpWarning);
 
   const handleQuickRest = async () => {
     if (!hpState || hpState.currentHp >= hpState.maxHp || hpState.isRecovering || turns <= 0) return;
@@ -1761,6 +1779,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setDefaultExploreTurns,
     quickRestHealPercent,
     defaultRefiningMax,
+    lowHpWarning,
+    handleSetLowHpWarning,
     playbackActive,
     combatPlaybackData,
     combatPlaybackQueue,
@@ -1810,6 +1830,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleForgeReroll,
     handleDestroyItem,
     handleRepairItem,
+    handleRepairAllEquipped,
     handleUseItem,
     handleEquipItem,
     handleUnequipSlot,
