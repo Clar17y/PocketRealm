@@ -197,6 +197,22 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Footer CTA */}
+      <section className="py-20 px-4 border-t border-[var(--rpg-border)]">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-[var(--rpg-text-primary)] mb-8">
+            Your Adventure Starts Now
+          </h2>
+          <div className="flex gap-4 justify-center mb-6">
+            <a href="/register" className={linkPrimary}>Play Free</a>
+            <a href="/register" className={linkGold}>Become Champion</a>
+          </div>
+          <a href="/login" className="text-sm text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors">
+            Already playing? Log in
+          </a>
+        </div>
+      </section>
     </main>
   );
 }
