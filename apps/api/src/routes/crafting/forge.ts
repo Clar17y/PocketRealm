@@ -14,6 +14,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
+import { applyGuildTaxTx } from '../../services/guildTaxService';
 import { assertNotRecovering, getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   isItemType,
@@ -65,6 +66,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
 
     const turnSpend = await prisma.$transaction(async (tx) => {
       const spent = await spendPlayerTurnsTx(tx, playerId, upgradeCost);
+      await applyGuildTaxTx(tx, playerId, upgradeCost);
       const consumed = await tx.item.deleteMany({
         where: {
           id: sacrificial.id,
@@ -266,6 +268,7 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
 
     const turnSpend = await prisma.$transaction(async (tx) => {
       const spent = await spendPlayerTurnsTx(tx, playerId, rerollCost);
+      await applyGuildTaxTx(tx, playerId, rerollCost);
       const consumed = await tx.item.deleteMany({
         where: {
           id: sacrificial.id,

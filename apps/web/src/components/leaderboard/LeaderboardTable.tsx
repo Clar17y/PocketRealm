@@ -13,6 +13,7 @@ interface LeaderboardTableProps {
   lastRefreshedAt: string | null;
   showAroundMe?: boolean;
   onToggleAroundMe?: () => void;
+  isGuildCategory?: boolean;
 }
 
 function formatScore(score: number): string {
@@ -45,6 +46,7 @@ export function LeaderboardTable({
   lastRefreshedAt,
   showAroundMe = false,
   onToggleAroundMe,
+  isGuildCategory = false,
 }: LeaderboardTableProps) {
   if (loading) {
     return (
@@ -66,7 +68,7 @@ export function LeaderboardTable({
     <div className="space-y-2">
       {/* Header info */}
       <div className="flex justify-between items-center text-xs text-[var(--rpg-text-secondary)] px-1">
-        <span>{totalPlayers.toLocaleString()} players ranked</span>
+        <span>{totalPlayers.toLocaleString()} {isGuildCategory ? 'guilds' : 'players'} ranked</span>
         {lastRefreshedAt && <span>Updated {timeSince(lastRefreshedAt)}</span>}
       </div>
 

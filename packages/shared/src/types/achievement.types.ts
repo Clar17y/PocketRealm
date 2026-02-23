@@ -6,7 +6,8 @@ export type AchievementCategory =
   | 'gathering'
   | 'bestiary'
   | 'general'
-  | 'family';
+  | 'family'
+  | 'guild';
 
 export interface AchievementReward {
   type: 'xp' | 'turns' | 'attribute_points' | 'item';

@@ -41,6 +41,7 @@ import {
 } from '@/lib/tutorial';
 import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
+import { GuildScreen } from '@/components/screens/GuildScreen';
 import { CombatScreen } from './screens/CombatScreen';
 import { useGameController, type Screen } from './useGameController';
 import { useChat } from '@/hooks/useChat';
@@ -258,6 +259,7 @@ export default function GamePage() {
     handleForgeReroll,
     handleDestroyItem,
     handleRepairItem,
+    handleRepairAllEquipped,
     handleUseItem,
     handleEquipItem,
     handleUnequipSlot,
@@ -280,6 +282,8 @@ export default function GamePage() {
     handleSetQuickRestHealPercent,
     defaultRefiningMax,
     handleSetDefaultRefiningMax,
+    lowHpWarning,
+    handleSetLowHpWarning,
     handleQuickRest,
     zoneCraftingLevel,
     zoneCraftingName,
@@ -415,6 +419,9 @@ export default function GamePage() {
             activityLog={activityLog}
             isRecovering={hpState.isRecovering}
             recoveryCost={hpState.recoveryCost}
+            currentHp={hpState.currentHp}
+            maxHp={hpState.maxHp}
+            regenPerSecond={hpState.regenPerSecond}
             playbackData={explorationPlaybackData}
             onPlaybackComplete={handleExplorationPlaybackComplete}
             onPlaybackSkip={handlePlaybackSkip}
@@ -423,6 +430,11 @@ export default function GamePage() {
             explorationSpeedMs={explorationSpeedMs}
             defaultTurns={defaultExploreTurns}
             tutorialLocked={tutorialStep === TUTORIAL_STEP_EXPLORE}
+            lowHpWarning={lowHpWarning}
+            onQuickRest={handleQuickRest}
+            quickRestPercent={quickRestHealPercent}
+            busyAction={busyAction}
+            onNavigateToRest={() => handleNavigate('rest')}
           />
         );
       case 'inventory':
@@ -509,6 +521,9 @@ export default function GamePage() {
               })}
             onEquip={handleEquipItem}
             onUnequip={handleUnequipSlot}
+            onRepairItem={handleRepairItem}
+            onRepairAll={handleRepairAllEquipped}
+            turns={turns}
             stats={(() => {
               let attack = 0;
               let defence = 0;
@@ -825,6 +840,10 @@ export default function GamePage() {
               : null
             }
             roomTransition={roomTransition}
+            lowHpWarning={lowHpWarning}
+            onQuickRest={handleQuickRest}
+            quickRestPercent={quickRestHealPercent}
+            onNavigateToRest={() => handleNavigate('rest')}
           />
         );
       }
@@ -903,6 +922,16 @@ export default function GamePage() {
                     <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
                       {autoPotionThreshold === 0 ? 'Off' : `${autoPotionThreshold}%`}
                     </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-[var(--rpg-text-secondary)]">Low HP Warning</p>
+                      <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Show confirmation when starting actions below 25% HP</p>
+                    </div>
+                    <ToggleSwitch checked={lowHpWarning} onChange={handleSetLowHpWarning} />
                   </div>
                 </div>
               </div>
@@ -1012,6 +1041,14 @@ export default function GamePage() {
         );
       case 'leaderboard':
         return <Leaderboard playerId={player?.id ?? null} />;
+      case 'guild':
+        return (
+          <GuildScreen
+            playerId={player?.id ?? null}
+            characterLevel={characterProgression.characterLevel}
+            onTurnsChanged={() => void loadTurnsAndHp()}
+          />
+        );
       case 'admin':
         return <AdminScreen onAction={loadAll} />;
       default:
@@ -1021,7 +1058,12 @@ export default function GamePage() {
 
   return (
     <>
-      <AppShell turns={turns} username={player?.username}>
+      <AppShell
+  turns={turns}
+  username={player?.username}
+  onSettings={() => handleNavigate('settings')}
+  onLogout={() => { logout(); router.push('/'); }}
+>
         {/* Broken gear warning banner */}
         {equipment.some((e) => {
           if (!e.item) return false;

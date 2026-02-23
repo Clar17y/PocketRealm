@@ -3,6 +3,11 @@
  * Change these to adjust game balance without touching logic.
  */
 
+import type {
+  GuildProjectDefinition,
+  GuildSpecializationDefinition,
+} from '../types/guild.types';
+
 // =============================================================================
 // TURN ECONOMY
 // =============================================================================
@@ -338,6 +343,7 @@ export const HP_CONSTANTS = {
 
   /** HP percentage restored after recovery */
   RECOVERY_EXIT_HP_PERCENT: 0.25,
+  LOW_HP_WARNING_THRESHOLD: 0.25,
 } as const;
 
 export const FLEE_CONSTANTS = {
@@ -531,3 +537,437 @@ export const LEADERBOARD_CONSTANTS = {
   PAGE_SIZE: 25,
   TOP_N: 25,
 } as const;
+
+// =============================================================================
+// GUILD
+// =============================================================================
+
+export const GUILD_CONSTANTS = {
+  /** Turn cost to create a guild */
+  CREATION_TURN_COST: 50_000,
+  /** Minimum character level to create a guild */
+  CREATION_MIN_LEVEL: 20,
+  /** Minimum character level to join a guild */
+  JOIN_MIN_LEVEL: 10,
+  /** Base max members at guild level 1 */
+  BASE_MAX_MEMBERS: 10,
+  /** Additional member slots per 2 guild levels */
+  MEMBERS_PER_TWO_LEVELS: 1,
+  /** Maximum tax rate (percentage) */
+  MAX_TAX_RATE: 20,
+  /** Base treasury capacity */
+  TREASURY_BASE_CAP: 100_000,
+  /** Additional treasury capacity per guild level */
+  TREASURY_CAP_PER_LEVEL: 10_000,
+  /** Guild level required to unlock specialization */
+  SPECIALIZATION_UNLOCK_LEVEL: 10,
+  /** Treasury cost to respec specialization */
+  SPECIALIZATION_RESPEC_COST: 2_000_000,
+  /** Hours of XP activity required to be considered "active" for boost eligibility */
+  BOOST_ELIGIBILITY_WINDOW_HOURS: 48,
+  /** Active member thresholds for boost scaling: <5 = 50%, 5-9 = 75%, 10+ = 100% */
+  BOOST_SCALING_MIN_FULL: 10,
+  BOOST_SCALING_MIN_MEDIUM: 5,
+  BOOST_SCALING_FULL: 1.0,
+  BOOST_SCALING_MEDIUM: 0.75,
+  BOOST_SCALING_LOW: 0.5,
+  /** XP required per guild level: floor(BASE * level^EXPONENT) */
+  XP_PER_LEVEL_BASE: 100,
+  XP_PER_LEVEL_EXPONENT: 1.8,
+  /** Guild XP earned per member action */
+  XP_PER_MOB_KILL: 1,
+  XP_PER_CRAFT: 2,
+  XP_PER_BOSS_ROUND: 10,
+  XP_PER_MEMBER_JOIN: 50,
+  /** Guild log page size */
+  LOG_PAGE_SIZE: 50,
+  /** Max description length */
+  MAX_DESCRIPTION_LENGTH: 200,
+  /** Guild name constraints */
+  MIN_NAME_LENGTH: 3,
+  MAX_NAME_LENGTH: 32,
+  /** Guild tag constraints */
+  MIN_TAG_LENGTH: 2,
+  MAX_TAG_LENGTH: 4,
+} as const;
+
+// =============================================================================
+// GUILD UPGRADES
+// =============================================================================
+
+export type GuildUpgradeEffectType =
+  | 'xp_boost'
+  | 'gathering_yield'
+  | 'crafting_crit'
+  | 'combat_damage'
+  | 'defense_boost';
+
+export interface GuildUpgradeTier {
+  level: number;
+  effectValue: number;
+  cost: number;
+  durationMs: number;
+}
+
+export interface GuildUpgradeDefinition {
+  key: string;
+  name: string;
+  effectType: GuildUpgradeEffectType;
+  tiers: readonly GuildUpgradeTier[];
+}
+
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+
+export const GUILD_UPGRADE_DEFINITIONS: readonly GuildUpgradeDefinition[] = [
+  {
+    key: 'xp_boost',
+    name: 'XP Boost',
+    effectType: 'xp_boost',
+    tiers: [
+      { level: 1, effectValue: 0.05, cost: 5_000, durationMs: TWO_HOURS_MS },
+      { level: 10, effectValue: 0.10, cost: 10_000, durationMs: TWO_HOURS_MS },
+      { level: 25, effectValue: 0.15, cost: 20_000, durationMs: TWO_HOURS_MS },
+    ],
+  },
+  {
+    key: 'gathering_yield',
+    name: 'Gathering Yield',
+    effectType: 'gathering_yield',
+    tiers: [
+      { level: 1, effectValue: 0.10, cost: 5_000, durationMs: TWO_HOURS_MS },
+      { level: 10, effectValue: 0.20, cost: 10_000, durationMs: TWO_HOURS_MS },
+      { level: 25, effectValue: 0.30, cost: 20_000, durationMs: TWO_HOURS_MS },
+    ],
+  },
+  {
+    key: 'crafting_fortune',
+    name: 'Crafting Fortune',
+    effectType: 'crafting_crit',
+    tiers: [
+      { level: 1, effectValue: 0.05, cost: 8_000, durationMs: TWO_HOURS_MS },
+      { level: 10, effectValue: 0.10, cost: 15_000, durationMs: TWO_HOURS_MS },
+      { level: 25, effectValue: 0.15, cost: 25_000, durationMs: TWO_HOURS_MS },
+    ],
+  },
+  {
+    key: 'warriors_might',
+    name: "Warrior's Might",
+    effectType: 'combat_damage',
+    tiers: [
+      { level: 1, effectValue: 0.05, cost: 8_000, durationMs: TWO_HOURS_MS },
+      { level: 10, effectValue: 0.10, cost: 15_000, durationMs: TWO_HOURS_MS },
+      { level: 25, effectValue: 0.15, cost: 25_000, durationMs: TWO_HOURS_MS },
+    ],
+  },
+  {
+    key: 'iron_skin',
+    name: 'Iron Skin',
+    effectType: 'defense_boost',
+    tiers: [
+      { level: 1, effectValue: 0.05, cost: 5_000, durationMs: TWO_HOURS_MS },
+      { level: 10, effectValue: 0.10, cost: 10_000, durationMs: TWO_HOURS_MS },
+      { level: 25, effectValue: 0.15, cost: 20_000, durationMs: TWO_HOURS_MS },
+    ],
+  },
+] as const;
+
+// =============================================================================
+// GUILD CONTRACTS
+// =============================================================================
+
+export type GuildContractType =
+  | 'kill_count'
+  | 'kill_family'
+  | 'boss_rounds'
+  | 'craft_items'
+  | 'craft_rare'
+  | 'gather_actions'
+  | 'exploration_turns'
+  | 'pvp_wins';
+
+export type GuildContractCategory = 'combat' | 'crafting' | 'gathering' | 'exploration' | 'pvp';
+
+export interface GuildContractDefinition {
+  key: GuildContractType;
+  name: string;
+  category: GuildContractCategory;
+  targets: { low: number; mid: number; high: number };
+}
+
+export const GUILD_CONTRACT_DEFINITIONS: readonly GuildContractDefinition[] = [
+  { key: 'kill_count', name: 'Mob Slayer', category: 'combat', targets: { low: 2_000, mid: 5_000, high: 15_000 } },
+  { key: 'kill_family', name: 'Family Hunter', category: 'combat', targets: { low: 5_000, mid: 15_000, high: 40_000 } },
+  { key: 'boss_rounds', name: 'Boss Challenger', category: 'combat', targets: { low: 500, mid: 1_500, high: 3_750 } },
+  { key: 'craft_items', name: 'Master Crafter', category: 'crafting', targets: { low: 5_000, mid: 20_000, high: 50_000 } },
+  { key: 'craft_rare', name: 'Rare Artisan', category: 'crafting', targets: { low: 50, mid: 150, high: 500 } },
+  { key: 'gather_actions', name: 'Resource Gatherer', category: 'gathering', targets: { low: 10_000, mid: 40_000, high: 100_000 } },
+  { key: 'exploration_turns', name: 'Pathfinder', category: 'exploration', targets: { low: 500_000, mid: 2_000_000, high: 5_000_000 } },
+  { key: 'pvp_wins', name: 'Arena Champion', category: 'pvp', targets: { low: 1_000, mid: 3_000, high: 10_000 } },
+] as const;
+
+export const GUILD_CONTRACT_CONSTANTS = {
+  CONTRACTS_PER_WEEK: 3,
+  MIN_CATEGORIES: 2,
+  REWARD_GUILD_XP_MIN: 200,
+  REWARD_GUILD_XP_MAX: 800,
+  REWARD_TREASURY_MIN: 500,
+  REWARD_TREASURY_MAX: 2_000,
+} as const;
+
+// =============================================================================
+// GUILD PROJECTS
+// =============================================================================
+
+export const GUILD_MATERIAL_CATEGORIES: Record<string, readonly string[]> = {
+  ore: ['Copper Ore', 'Tin Ore', 'Iron Ore', 'Sandstone', 'Dark Iron Ore', 'Mithril Ore', 'Ancient Ore'],
+  ingot: ['Copper Ingot', 'Tin Ingot', 'Iron Ingot', 'Cut Stone', 'Dark Iron Ingot', 'Mithril Ingot', 'Ancient Ingot'],
+  log: ['Oak Log', 'Maple Log', 'Fungal Wood', 'Elderwood Log', 'Willow Log', 'Bogwood Log', 'Crystal Wood', 'Petrified Wood'],
+  plank: ['Oak Plank', 'Maple Plank', 'Fungal Plank', 'Elderwood Plank', 'Willow Plank', 'Bogwood Plank', 'Crystal Plank', 'Petrified Plank'],
+  herb: ['Forest Sage', 'Moonpetal', 'Cave Moss', 'Starbloom', 'Glowcap Mushroom', 'Windbloom', 'Gravemoss', 'Shimmer Fern', 'Abyssal Kelp'],
+  leather: ['Rat Leather', 'Boar Leather', 'Wolf Leather', 'Bat Leather', 'Warg Leather', 'Croc Leather', 'Naga Leather'],
+  cloth: ['Silk Cloth', 'Woven Cloth', 'Fae Fabric', 'Cursed Fabric', 'Ethereal Cloth', 'Spectral Fabric'],
+} as const;
+
+export function getCategoryForTemplate(templateName: string): string | null {
+  for (const [category, names] of Object.entries(GUILD_MATERIAL_CATEGORIES)) {
+    if ((names as readonly string[]).includes(templateName)) return category;
+  }
+  return null;
+}
+
+export const GUILD_PROJECT_CONSTANTS = {
+  /** Max materials a single player can contribute to one project (per category) */
+  PER_PROJECT_MATERIAL_CAP: 200,
+  /** Max turns a single player can contribute to one project */
+  PER_PROJECT_TURN_CAP: 10_000,
+  MAX_ACTIVE_PROJECTS: 1,
+} as const;
+
+export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
+  // --- Level 1: No prerequisites ---
+  {
+    key: 'guild_forge',
+    name: 'Guild Forge',
+    description: 'A communal forge that improves crafting outcomes for all members.',
+    level: 1,
+    prerequisites: [],
+    treasuryCost: 500_000,
+    materialCosts: [
+      { category: 'ore', quantity: 2_000 },
+      { category: 'ingot', quantity: 1_000 },
+    ],
+    memberTurnGoal: 100_000,
+    perks: [{ effectType: 'craftingCrit', value: 0.05 }],
+    guildXpReward: 500,
+  },
+  {
+    key: 'war_room',
+    name: 'War Room',
+    description: 'A strategic planning center that sharpens combat skills.',
+    level: 1,
+    prerequisites: [],
+    treasuryCost: 500_000,
+    materialCosts: [
+      { category: 'leather', quantity: 1_500 },
+      { category: 'plank', quantity: 1_000 },
+    ],
+    memberTurnGoal: 100_000,
+    perks: [{ effectType: 'xpBoost', value: 0.05 }],
+    guildXpReward: 500,
+  },
+  {
+    key: 'scout_network',
+    name: 'Scout Network',
+    description: 'A network of scouts that reduces travel time across zones.',
+    level: 1,
+    prerequisites: [],
+    treasuryCost: 500_000,
+    materialCosts: [
+      { category: 'herb', quantity: 1_000 },
+      { category: 'plank', quantity: 1_500 },
+    ],
+    memberTurnGoal: 100_000,
+    perks: [{ effectType: 'travelCostReduction', value: 0.10 }],
+    guildXpReward: 500,
+  },
+  // --- Level 2: Require one Level 1 ---
+  {
+    key: 'advanced_forge',
+    name: 'Advanced Forge',
+    description: 'An upgraded forge with superior tools and techniques.',
+    level: 2,
+    prerequisites: ['guild_forge'],
+    treasuryCost: 2_000_000,
+    materialCosts: [
+      { category: 'ore', quantity: 5_000 },
+      { category: 'ingot', quantity: 2_000 },
+    ],
+    memberTurnGoal: 400_000,
+    perks: [{ effectType: 'craftingCrit', value: 0.10 }],
+    guildXpReward: 1_000,
+  },
+  {
+    key: 'barracks',
+    name: 'Barracks',
+    description: 'Training grounds that hone combat expertise.',
+    level: 2,
+    prerequisites: ['war_room'],
+    treasuryCost: 2_000_000,
+    materialCosts: [
+      { category: 'leather', quantity: 3_000 },
+      { category: 'ingot', quantity: 2_000 },
+    ],
+    memberTurnGoal: 400_000,
+    perks: [{ effectType: 'xpBoost', value: 0.10 }],
+    guildXpReward: 1_000,
+  },
+  {
+    key: 'cartographers_lodge',
+    name: "Cartographer's Lodge",
+    description: 'Expert mapmakers chart safer and faster travel routes.',
+    level: 2,
+    prerequisites: ['scout_network'],
+    treasuryCost: 2_000_000,
+    materialCosts: [
+      { category: 'plank', quantity: 2_500 },
+      { category: 'herb', quantity: 2_000 },
+    ],
+    memberTurnGoal: 400_000,
+    perks: [{ effectType: 'travelCostReduction', value: 0.20 }],
+    guildXpReward: 1_000,
+  },
+  {
+    key: 'apothecary',
+    name: 'Apothecary',
+    description: 'An alchemical lab that reduces repair costs guild-wide.',
+    level: 2,
+    prerequisites: [], // requires ANY one L1 project (checked in service)
+    treasuryCost: 1_500_000,
+    materialCosts: [
+      { category: 'herb', quantity: 2_000 },
+      { category: 'cloth', quantity: 1_500 },
+    ],
+    memberTurnGoal: 300_000,
+    perks: [{ effectType: 'repairCostReduction', value: 0.10 }],
+    guildXpReward: 800,
+  },
+  // --- Level 3: Require two Level 2 ---
+  {
+    key: 'master_workshop',
+    name: 'Master Workshop',
+    description: 'The pinnacle of guild craftsmanship.',
+    level: 3,
+    prerequisites: ['advanced_forge', 'apothecary'],
+    treasuryCost: 5_000_000,
+    materialCosts: [
+      { category: 'ore', quantity: 10_000 },
+      { category: 'ingot', quantity: 5_000 },
+      { category: 'herb', quantity: 3_000 },
+    ],
+    memberTurnGoal: 1_000_000,
+    perks: [{ effectType: 'craftingCrit', value: 0.15 }],
+    guildXpReward: 2_000,
+  },
+  {
+    key: 'raid_hall',
+    name: 'Raid Hall',
+    description: 'A war council chamber for elite combat coordination.',
+    level: 3,
+    prerequisites: ['barracks', 'apothecary'],
+    treasuryCost: 5_000_000,
+    materialCosts: [
+      { category: 'leather', quantity: 5_000 },
+      { category: 'ingot', quantity: 4_000 },
+      { category: 'plank', quantity: 3_000 },
+    ],
+    memberTurnGoal: 1_000_000,
+    perks: [{ effectType: 'xpBoost', value: 0.15 }],
+    guildXpReward: 2_000,
+  },
+  {
+    key: 'explorers_guild',
+    name: "Explorer's Guild",
+    description: 'Master explorers that command unmatched knowledge of the land.',
+    level: 3,
+    prerequisites: ['cartographers_lodge', 'apothecary'],
+    treasuryCost: 5_000_000,
+    materialCosts: [
+      { category: 'plank', quantity: 5_000 },
+      { category: 'herb', quantity: 4_000 },
+      { category: 'cloth', quantity: 3_000 },
+    ],
+    memberTurnGoal: 1_000_000,
+    perks: [
+      { effectType: 'travelCostReduction', value: 0.30 },
+      { effectType: 'gatheringYield', value: 0.15 },
+    ],
+    guildXpReward: 2_000,
+  },
+] as const;
+
+// =============================================================================
+// GUILD SPECIALIZATION
+// =============================================================================
+
+export const GUILD_SPECIALIZATION_DEFINITIONS: readonly GuildSpecializationDefinition[] = [
+  {
+    path: 'warfare',
+    name: 'Warfare',
+    description: 'Focused on combat prowess and boss encounters.',
+    tiers: [
+      { tier: 1, guildLevelGate: 10, bonuses: [
+        { effectType: 'xpBoost', value: 0.05 },
+        { effectType: 'combatDamage', value: 0.05 },
+      ]},
+      { tier: 2, guildLevelGate: 25, bonuses: [
+        { effectType: 'xpBoost', value: 0.10 },
+        { effectType: 'combatDamage', value: 0.10 },
+      ]},
+      { tier: 3, guildLevelGate: 40, bonuses: [
+        { effectType: 'xpBoost', value: 0.15 },
+        { effectType: 'combatDamage', value: 0.15 },
+        { effectType: 'defenseBoost', value: 0.05 },
+      ]},
+    ],
+  },
+  {
+    path: 'industry',
+    name: 'Industry',
+    description: 'Focused on crafting excellence and gathering efficiency.',
+    tiers: [
+      { tier: 1, guildLevelGate: 10, bonuses: [
+        { effectType: 'craftingCrit', value: 0.05 },
+        { effectType: 'gatheringYield', value: 0.10 },
+      ]},
+      { tier: 2, guildLevelGate: 25, bonuses: [
+        { effectType: 'craftingCrit', value: 0.10 },
+        { effectType: 'gatheringYield', value: 0.20 },
+        { effectType: 'repairCostReduction', value: 0.10 },
+      ]},
+      { tier: 3, guildLevelGate: 40, bonuses: [
+        { effectType: 'craftingCrit', value: 0.15 },
+        { effectType: 'gatheringYield', value: 0.30 },
+        { effectType: 'repairCostReduction', value: 0.20 },
+      ]},
+    ],
+  },
+  {
+    path: 'discovery',
+    name: 'Discovery',
+    description: 'Focused on exploration and resource acquisition.',
+    tiers: [
+      { tier: 1, guildLevelGate: 10, bonuses: [
+        { effectType: 'travelCostReduction', value: 0.10 },
+        { effectType: 'gatheringYield', value: 0.15 },
+      ]},
+      { tier: 2, guildLevelGate: 25, bonuses: [
+        { effectType: 'travelCostReduction', value: 0.20 },
+        { effectType: 'gatheringYield', value: 0.30 },
+      ]},
+      { tier: 3, guildLevelGate: 40, bonuses: [
+        { effectType: 'travelCostReduction', value: 0.30 },
+        { effectType: 'gatheringYield', value: 0.50 },
+      ]},
+    ],
+  },
+] as const;

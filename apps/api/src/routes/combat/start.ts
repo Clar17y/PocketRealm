@@ -14,6 +14,7 @@ import {
 } from '@adventure/game-engine';
 import {
   COMBAT_CONSTANTS,
+  GUILD_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
   type Combatant,
   type CombatOptions,
@@ -42,6 +43,9 @@ import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../s
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
 import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
+import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
+import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
+import { incrementContractProgress } from '../../services/guildContractService';
 import {
   prismaAny,
   startSchema,
@@ -149,6 +153,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   ]);
   const equipmentStats = await getEquipmentStats(playerId);
 
+  // Guild combat modifiers
+  const guildMods = await getPlayerGuildModifiers(playerId);
+
   // Apply room carry HP
   let currentPlayerHp = hpState.currentHp;
   if (site.roomCarryHp !== null && site.roomCarryHp !== undefined) {
@@ -196,6 +203,16 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         equipmentStats
       );
 
+      // Apply guild combat modifiers
+      if (guildMods.combatDamage > 0) {
+        playerStats.damageMin = Math.round(playerStats.damageMin * (1 + guildMods.combatDamage));
+        playerStats.damageMax = Math.round(playerStats.damageMax * (1 + guildMods.combatDamage));
+      }
+      if (guildMods.defenseBoost > 0) {
+        playerStats.defence = Math.round(playerStats.defence * (1 + guildMods.defenseBoost));
+        playerStats.magicDefence = Math.round(playerStats.magicDefence * (1 + guildMods.defenseBoost));
+      }
+
       let combatOptions: CombatOptions | undefined;
       if (autoPotionThreshold > 0 && potionPool.length > 0) {
         combatOptions = { autoPotionThreshold, potions: [...potionPool] };
@@ -231,10 +248,18 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         await setHp(playerId, combatResult.combatantAHpRemaining);
         const rawLoot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
         mobLoot = await enrichLootWithNames(rawLoot);
-        mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded);
+        mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded, undefined, guildMods.xpBoost || undefined);
 
         // Bestiary
         await recordBestiaryKill(playerId, prefixedMob.id, prefixedMob.mobPrefix);
+
+        // Guild XP and contract progress
+        const guildId = await getPlayerGuildId(playerId);
+        if (guildId) {
+          await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
+          void incrementContractProgress(guildId, 'kill_count', 1).catch(() => {});
+          void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
+        }
       }
 
       fightResults.push({
@@ -653,6 +678,17 @@ export function registerStartRoutes(router: Router): void {
         equipmentStats
       );
 
+      // Guild combat modifiers
+      const guildMods = await getPlayerGuildModifiers(playerId);
+      if (guildMods.combatDamage > 0) {
+        playerStats.damageMin = Math.round(playerStats.damageMin * (1 + guildMods.combatDamage));
+        playerStats.damageMax = Math.round(playerStats.damageMax * (1 + guildMods.combatDamage));
+      }
+      if (guildMods.defenseBoost > 0) {
+        playerStats.defence = Math.round(playerStats.defence * (1 + guildMods.defenseBoost));
+        playerStats.magicDefence = Math.round(playerStats.magicDefence * (1 + guildMods.defenseBoost));
+      }
+
       const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
       const zoneModifiers = await getActiveZoneModifiers(zoneId);
       const activeEventEffects = await getActiveEventSummaries(zoneId);
@@ -709,7 +745,15 @@ export function registerStartRoutes(router: Router): void {
       if (combatResult.outcome === 'victory') {
         await setHp(playerId, combatResult.combatantAHpRemaining);
         loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
-        xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded);
+        xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded, undefined, guildMods.xpBoost || undefined);
+
+        // Guild XP and contract progress
+        const guildId = await getPlayerGuildId(playerId);
+        if (guildId) {
+          await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
+          void incrementContractProgress(guildId, 'kill_count', 1).catch(() => {});
+          void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
+        }
       } else if (combatResult.outcome === 'defeat') {
         const defeatResult = await handleCombatDefeat(playerId, {
           evasionLevel: progression.attributes.evasion,

@@ -46,6 +46,7 @@ model Player {
   defaultExploreTurns Int     @default(100)  @map("default_explore_turns")
   quickRestHealPercent Int    @default(100)  @map("quick_rest_heal_percent")
   defaultRefiningMax  Boolean @default(false) @map("default_refining_max")
+  lowHpWarning        Boolean @default(true)  @map("low_hp_warning")
 
   // Zone / Travel
   currentZoneId          String? @map("current_zone_id")
@@ -79,6 +80,8 @@ model Player {
   persistedMobs      PersistedMob[]
   stats              PlayerStats?
   achievements       PlayerAchievement[]
+  guildMember        GuildMember?
+  guildJoinRequests  GuildJoinRequest[]
 
   @@map("players")
 }
@@ -727,4 +730,143 @@ model PlayerAchievement {
 
   @@id([playerId, achievementId])
   @@map("player_achievements")
+}
+
+// =============================================================================
+// GUILDS
+// =============================================================================
+
+model Guild {
+  id                  String   @id @default(uuid())
+  name                String   @unique @db.VarChar(32)
+  tag                 String   @unique @db.VarChar(4)
+  description         String?  @db.VarChar(200)
+  leaderId            String   @map("leader_id")
+  level               Int      @default(1)
+  xp                  BigInt   @default(0)
+  recruitmentMode     String   @default("request_to_join") @map("recruitment_mode") @db.VarChar(16)
+  minLevelRequirement Int      @default(0) @map("min_level_requirement")
+  taxRate             Int      @default(5) @map("tax_rate")
+  specialization      String?  @db.VarChar(16)
+  renown              Int      @default(0)
+  seasonalRenown      Int      @default(0) @map("seasonal_renown")
+  treasuryTurns       Int      @default(0) @map("treasury_turns")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  members      GuildMember[]
+  upgrades     GuildUpgrade[]
+  projects     GuildProject[]
+  contracts    GuildContract[]
+  logs         GuildLog[]
+  joinRequests GuildJoinRequest[]
+
+  @@map("guilds")
+}
+
+model GuildMember {
+  guildId                String   @map("guild_id")
+  playerId               String   @unique @map("player_id")
+  role                   String   @default("member") @db.VarChar(16)
+  joinedAt               DateTime @default(now()) @map("joined_at")
+  totalTurnsContributed  Int      @default(0) @map("total_turns_contributed")
+  weeklyTurnsContributed Int      @default(0) @map("weekly_turns_contributed")
+  lastActiveAt           DateTime @default(now()) @map("last_active_at")
+
+  guild  Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@id([guildId, playerId])
+  @@map("guild_members")
+}
+
+model GuildUpgrade {
+  id          String   @id @default(uuid())
+  guildId     String   @map("guild_id")
+  upgradeType String   @map("upgrade_type") @db.VarChar(32)
+  tier        Int      @default(1)
+  activatedAt DateTime @default(now()) @map("activated_at")
+  expiresAt   DateTime @map("expires_at")
+  activatedBy String   @map("activated_by")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, upgradeType, expiresAt])
+  @@map("guild_upgrades")
+}
+
+model GuildProject {
+  id                String    @id @default(uuid())
+  guildId           String    @map("guild_id")
+  projectKey        String    @map("project_key") @db.VarChar(64)
+  turnsContributed  Int       @default(0) @map("turns_contributed")
+  materialsProgress Json      @default("{}") @map("materials_progress")
+  status            String    @default("active") @db.VarChar(16)
+  startedAt         DateTime  @default(now()) @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+
+  guild         Guild                     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  contributions GuildProjectContribution[]
+
+  @@unique([guildId, projectKey])
+  @@map("guild_projects")
+}
+
+model GuildProjectContribution {
+  id                   String @id @default(uuid())
+  projectId            String @map("project_id")
+  playerId             String @map("player_id")
+  turnsContributed     Int    @default(0) @map("turns_contributed")
+  materialsContributed Json   @default("{}") @map("materials_contributed")
+
+  project GuildProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, playerId])
+  @@map("guild_project_contributions")
+}
+
+model GuildContract {
+  id                  String   @id @default(uuid())
+  guildId             String   @map("guild_id")
+  contractKey         String   @map("contract_key") @db.VarChar(64)
+  targetValue         Int      @map("target_value")
+  currentValue        Int      @default(0) @map("current_value")
+  status              String   @default("active") @db.VarChar(16)
+  rewardGuildXp       Int      @default(0) @map("reward_guild_xp")
+  rewardTreasuryTurns Int      @default(0) @map("reward_treasury_turns")
+  weekStartedAt       DateTime @map("week_started_at")
+  expiresAt           DateTime @map("expires_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, status])
+  @@map("guild_contracts")
+}
+
+model GuildLog {
+  id        String   @id @default(uuid())
+  guildId   String   @map("guild_id")
+  eventType String   @map("event_type") @db.VarChar(32)
+  message   String   @db.VarChar(200)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, createdAt])
+  @@map("guild_logs")
+}
+
+model GuildJoinRequest {
+  id        String   @id @default(uuid())
+  guildId   String   @map("guild_id")
+  playerId  String   @map("player_id")
+  status    String   @default("pending") @db.VarChar(16)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  guild  Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, playerId])
+  @@index([guildId, status])
+  @@map("guild_join_requests")
 }

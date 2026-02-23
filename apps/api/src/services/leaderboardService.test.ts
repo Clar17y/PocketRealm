@@ -179,6 +179,7 @@ describe('leaderboardService', () => {
       mockPrisma.playerSkill.findMany.mockResolvedValue([]);
       mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
       mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+      mockPrisma.guild.findMany.mockResolvedValue([]);
 
       await refreshAllLeaderboards();
 
@@ -194,6 +195,7 @@ describe('leaderboardService', () => {
       mockPrisma.playerSkill.findMany.mockResolvedValue([]);
       mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
       mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+      mockPrisma.guild.findMany.mockResolvedValue([]);
 
       await refreshAllLeaderboards();
 
