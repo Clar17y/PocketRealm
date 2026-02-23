@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
 
@@ -7,9 +8,14 @@ interface AppShellProps {
   children: React.ReactNode;
   turns?: number;
   username?: string;
+  onSettings?: () => void;
+  onLogout?: () => void;
 }
 
-export function AppShell({ children, turns = 0, username }: AppShellProps) {
+export function AppShell({ children, turns = 0, username, onSettings, onLogout }: AppShellProps) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const hasMenu = Boolean(onSettings || onLogout);
+
   return (
     <div className="min-h-dvh w-full bg-[var(--rpg-background)] flex flex-col safe-area-top">
       {/* Header */}
@@ -28,7 +34,47 @@ export function AppShell({ children, turns = 0, username }: AppShellProps) {
               <span className="font-mono text-[var(--rpg-gold)]">{turns.toLocaleString()}</span>
             </div>
             {username && (
-              <span className="text-sm text-[var(--rpg-text-secondary)]">{username}</span>
+              <div className="relative">
+                {hasMenu ? (
+                  <button
+                    onClick={() => setDropdownOpen((o) => !o)}
+                    className="flex items-center gap-1 text-sm text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors"
+                  >
+                    {username}
+                    <span className="text-xs opacity-60">▾</span>
+                  </button>
+                ) : (
+                  <span className="text-sm text-[var(--rpg-text-secondary)]">{username}</span>
+                )}
+
+                {dropdownOpen && (
+                  <>
+                    {/* Backdrop — closes dropdown on outside click */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setDropdownOpen(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-1 z-50 min-w-[120px] bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg shadow-lg overflow-hidden">
+                      {onSettings && (
+                        <button
+                          onClick={() => { setDropdownOpen(false); onSettings(); }}
+                          className="w-full text-left px-4 py-2 text-sm text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-background)] transition-colors"
+                        >
+                          Settings
+                        </button>
+                      )}
+                      {onLogout && (
+                        <button
+                          onClick={() => { setDropdownOpen(false); onLogout(); }}
+                          className="w-full text-left px-4 py-2 text-sm text-[var(--rpg-red)] hover:bg-[var(--rpg-background)] transition-colors"
+                        >
+                          Logout
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
