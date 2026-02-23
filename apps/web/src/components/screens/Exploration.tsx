@@ -51,9 +51,13 @@ interface ExplorationProps {
   defaultTurns?: number;
   tutorialLocked?: boolean;
   lowHpWarning?: boolean;
+  onQuickRest?: () => Promise<void>;
+  quickRestPercent?: number;
+  busyAction?: string | null;
+  onNavigateToRest?: () => void;
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
 
@@ -88,12 +92,12 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
 
       {/* Knockout Banner */}
       {isRecovering && !playbackData && (
-        <KnockoutBanner action="exploring" recoveryCost={recoveryCost} />
+        <KnockoutBanner action="exploring" recoveryCost={recoveryCost} onClick={onNavigateToRest} />
       )}
 
       {/* HP Status */}
       {!playbackData && typeof currentHp === 'number' && typeof maxHp === 'number' && !isRecovering && (
-        <HpStatusBar currentHp={currentHp} maxHp={maxHp} regenPerSecond={regenPerSecond} />
+        <HpStatusBar currentHp={currentHp} maxHp={maxHp} regenPerSecond={regenPerSecond} onQuickRest={onQuickRest} quickRestPercent={quickRestPercent} busyAction={busyAction} />
       )}
 
       {/* Zone Header — always visible */}

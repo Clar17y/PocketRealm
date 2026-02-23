@@ -430,6 +430,10 @@ export default function GamePage() {
             defaultTurns={defaultExploreTurns}
             tutorialLocked={tutorialStep === TUTORIAL_STEP_EXPLORE}
             lowHpWarning={lowHpWarning}
+            onQuickRest={handleQuickRest}
+            quickRestPercent={quickRestHealPercent}
+            busyAction={busyAction}
+            onNavigateToRest={() => handleNavigate('rest')}
           />
         );
       case 'inventory':
@@ -836,6 +840,9 @@ export default function GamePage() {
             }
             roomTransition={roomTransition}
             lowHpWarning={lowHpWarning}
+            onQuickRest={handleQuickRest}
+            quickRestPercent={quickRestHealPercent}
+            onNavigateToRest={() => handleNavigate('rest')}
           />
         );
       }

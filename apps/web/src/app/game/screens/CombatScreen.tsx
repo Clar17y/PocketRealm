@@ -63,6 +63,9 @@ interface CombatScreenProps {
   fightProgress?: { current: number; total: number; room?: number } | null;
   roomTransition?: { entering: number } | null;
   lowHpWarning?: boolean;
+  onQuickRest?: () => Promise<void>;
+  quickRestPercent?: number;
+  onNavigateToRest?: () => void;
 }
 
 export function CombatScreen({
@@ -94,6 +97,9 @@ export function CombatScreen({
   fightProgress,
   roomTransition,
   lowHpWarning,
+  onQuickRest,
+  quickRestPercent,
+  onNavigateToRest,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
@@ -237,12 +243,12 @@ export function CombatScreen({
 
       {/* Knockout Banner */}
       {hpState.isRecovering && (
-        <KnockoutBanner action="fighting" recoveryCost={hpState.recoveryCost} />
+        <KnockoutBanner action="fighting" recoveryCost={hpState.recoveryCost} onClick={onNavigateToRest} />
       )}
 
       {/* HP Status */}
       {!combatPlaybackData && !hpState.isRecovering && (
-        <HpStatusBar currentHp={hpState.currentHp} maxHp={hpState.maxHp} regenPerSecond={hpState.regenPerSecond} />
+        <HpStatusBar currentHp={hpState.currentHp} maxHp={hpState.maxHp} regenPerSecond={hpState.regenPerSecond} onQuickRest={onQuickRest} quickRestPercent={quickRestPercent} busyAction={busyAction} />
       )}
 
       <div className="flex gap-2">
