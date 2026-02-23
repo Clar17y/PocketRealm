@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateGemCritChance, rollGemCrit } from './gatheringCrit';
+import { calculateGemCritChance, rollGemCrit, rollGemCritBatch } from './gatheringCrit';
 
 describe('calculateGemCritChance', () => {
   it('returns base chance at exact node level with no luck', () => {
@@ -47,5 +47,41 @@ describe('rollGemCrit', () => {
     const result = rollGemCrit({ skillLevel: 5, nodeLevel: 5, luckStat: 0 });
     expect(typeof result.isCrit).toBe('boolean');
     expect(result.critChance).toBeCloseTo(0.03);
+  });
+});
+
+describe('rollGemCritBatch', () => {
+  const input = { skillLevel: 5, nodeLevel: 5, luckStat: 0 }; // 3% chance
+
+  it('returns 0 gems when no rolls succeed', () => {
+    const rolls = [0.5, 0.6, 0.7, 0.8, 0.9];
+    const result = rollGemCritBatch(input, 5, rolls);
+    expect(result.gemsFound).toBe(0);
+    expect(result.critChance).toBeCloseTo(0.03);
+  });
+
+  it('counts each successful roll as a gem', () => {
+    // 3% chance, so rolls below 0.03 succeed
+    const rolls = [0.01, 0.5, 0.02, 0.9, 0.029];
+    const result = rollGemCritBatch(input, 5, rolls);
+    expect(result.gemsFound).toBe(3);
+  });
+
+  it('all actions can crit', () => {
+    const rolls = [0.01, 0.01, 0.01];
+    const result = rollGemCritBatch(input, 3, rolls);
+    expect(result.gemsFound).toBe(3);
+  });
+
+  it('handles single action', () => {
+    const result = rollGemCritBatch(input, 1, [0.01]);
+    expect(result.gemsFound).toBe(1);
+  });
+
+  it('uses Math.random when no rolls provided', () => {
+    const result = rollGemCritBatch(input, 10);
+    expect(typeof result.gemsFound).toBe('number');
+    expect(result.gemsFound).toBeGreaterThanOrEqual(0);
+    expect(result.gemsFound).toBeLessThanOrEqual(10);
   });
 });

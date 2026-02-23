@@ -11,7 +11,7 @@ import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecoverin
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
 import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
-import { applyResourceEventModifiers, rollGemCrit } from '@adventure/game-engine';
+import { applyResourceEventModifiers, rollGemCritBatch } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
@@ -362,28 +362,28 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const guildId = await getPlayerGuildId(playerId);
   if (guildId) void incrementContractProgress(guildId, 'gather_actions', actions).catch(() => {});
 
-  // --- Gem crit roll ---
-  let gemCrit: { itemTemplateId: string; itemId: string; gemName: string; critChance: number } | null = null;
+  // --- Gem crit rolls (one per gathering action) ---
+  let gemCrit: { itemTemplateId: string; itemId: string; gemName: string; gemsFound: number; critChance: number } | null = null;
   const gemTemplateId = await getGemTemplateId(skillRequired, levelToGemTier(template.levelRequired));
   if (gemTemplateId) {
     const equipStats = await getEquipmentStats(playerId);
     const luckStat = equipStats.luck;
 
-    const critResult = rollGemCrit({
-      skillLevel: level,
-      nodeLevel: template.levelRequired,
-      luckStat,
-    });
+    const critResult = rollGemCritBatch(
+      { skillLevel: level, nodeLevel: template.levelRequired, luckStat },
+      actions,
+    );
 
-    if (critResult.isCrit) {
+    if (critResult.gemsFound > 0) {
       const gemStack = await prisma.$transaction(async (tx) => {
-        return addStackableItemTx(tx, playerId, gemTemplateId, 1);
+        return addStackableItemTx(tx, playerId, gemTemplateId, critResult.gemsFound);
       });
       const gemTier = levelToGemTier(template.levelRequired);
       gemCrit = {
         itemTemplateId: gemTemplateId,
         itemId: gemStack.itemId,
         gemName: GEM_BY_SKILL_TIER[skillRequired]?.[gemTier] ?? 'Unknown Gem',
+        gemsFound: critResult.gemsFound,
         critChance: critResult.critChance,
       };
     }
@@ -418,7 +418,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
         itemTemplateId: resourceTemplateId,
         itemId: stack.itemId,
         xp: serializeXpGrant(xpGrant),
-        gemCrit: gemCrit ? { itemTemplateId: gemCrit.itemTemplateId, gemName: gemCrit.gemName } : undefined,
+        gemCrit: gemCrit ? { itemTemplateId: gemCrit.itemTemplateId, gemName: gemCrit.gemName, gemsFound: gemCrit.gemsFound } : undefined,
       } as unknown as Prisma.InputJsonValue,
     },
   });
