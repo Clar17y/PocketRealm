@@ -9,9 +9,8 @@ import {
   type GuildProjectResponse, type GuildProjectAvailableResponse, type GuildProjectsListResponse,
 } from '@/lib/api/guild';
 import { getInventory } from '@/lib/api/items';
-import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS, GUILD_MATERIAL_CATEGORIES } from '@adventure/shared';
-
-const formatNumber = (n: number) => n.toLocaleString();
+import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS, getCategoryForTemplate } from '@adventure/shared';
+import { formatNumber } from '@/lib/format';
 
 interface GuildProjectsTabProps {
   guildId: string;
@@ -25,13 +24,6 @@ interface ResourceItem {
   templateName: string;
   quantity: number;
   category: string;
-}
-
-function getCategoryForTemplate(name: string): string | null {
-  for (const [category, names] of Object.entries(GUILD_MATERIAL_CATEGORIES)) {
-    if ((names as readonly string[]).includes(name)) return category;
-  }
-  return null;
 }
 
 export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: GuildProjectsTabProps) {

@@ -9,8 +9,7 @@ import {
   type SpecializationStatusResponse,
 } from '@/lib/api/guild';
 import { GUILD_CONSTANTS, GUILD_SPECIALIZATION_DEFINITIONS } from '@adventure/shared';
-
-const formatNumber = (n: number) => n.toLocaleString();
+import { formatNumber } from '@/lib/format';
 
 const PATH_COLORS: Record<string, { primary: string; bg: string }> = {
   warfare: { primary: 'var(--rpg-red)', bg: 'var(--rpg-red)' },

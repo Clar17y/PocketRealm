@@ -15,7 +15,7 @@ import {
 import { GuildProjectsTab } from '@/components/guild/GuildProjectsTab';
 import { GuildSpecializationTab } from '@/components/guild/GuildSpecializationTab';
 import { GUILD_CONSTANTS } from '@adventure/shared';
-const formatNumber = (n: number) => n.toLocaleString();
+import { formatNumber } from '@/lib/format';
 
 type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'projects' | 'specialization' | 'log' | 'settings';
 

@@ -709,6 +709,13 @@ export const GUILD_MATERIAL_CATEGORIES: Record<string, readonly string[]> = {
   cloth: ['Silk Cloth', 'Woven Cloth', 'Fae Fabric', 'Cursed Fabric', 'Ethereal Cloth', 'Spectral Fabric'],
 } as const;
 
+export function getCategoryForTemplate(templateName: string): string | null {
+  for (const [category, names] of Object.entries(GUILD_MATERIAL_CATEGORIES)) {
+    if ((names as readonly string[]).includes(templateName)) return category;
+  }
+  return null;
+}
+
 export const GUILD_PROJECT_CONSTANTS = {
   /** Max materials a single player can contribute to one project (per category) */
   PER_PROJECT_MATERIAL_CAP: 200,

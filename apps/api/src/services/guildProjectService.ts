@@ -2,24 +2,13 @@ import { prisma, Prisma } from '@adventure/database';
 import {
   GUILD_PROJECT_DEFINITIONS,
   GUILD_PROJECT_CONSTANTS,
-  GUILD_MATERIAL_CATEGORIES,
+  getCategoryForTemplate,
   type GuildProjectDefinition,
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { consumeItemsByTemplateTx } from './inventoryService';
 import { addGuildXp } from './guildService';
-
-// ---------------------------------------------------------------------------
-// Category lookup
-// ---------------------------------------------------------------------------
-
-export function getCategoryForTemplate(templateName: string): string | null {
-  for (const [category, names] of Object.entries(GUILD_MATERIAL_CATEGORIES)) {
-    if ((names as readonly string[]).includes(templateName)) return category;
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Start Project
