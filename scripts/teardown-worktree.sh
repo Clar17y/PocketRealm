@@ -91,12 +91,18 @@ info "Worktree removed"
 
 # --- Drop database ---
 info "Dropping database '$DB_NAME'..."
-docker exec "$CONTAINER" psql -U "$PG_USER" -tc \
-  "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" \
-  | grep -q 1 \
-  && docker exec "$CONTAINER" psql -U "$PG_USER" -c "DROP DATABASE $DB_NAME;" \
-  && info "Database dropped" \
-  || warn "Database '$DB_NAME' does not exist (already dropped?)"
+if docker exec "$CONTAINER" psql -U "$PG_USER" -tc \
+  "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1; then
+  # Terminate any active connections before dropping
+  docker exec "$CONTAINER" psql -U "$PG_USER" -c \
+    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();" \
+    > /dev/null 2>&1 || true
+  docker exec "$CONTAINER" psql -U "$PG_USER" -c "DROP DATABASE $DB_NAME;" \
+    && info "Database dropped" \
+    || warn "Failed to drop database '$DB_NAME'"
+else
+  warn "Database '$DB_NAME' does not exist (already dropped?)"
+fi
 
 # --- Delete branch ---
 if [[ "$KEEP_BRANCH" == false ]]; then

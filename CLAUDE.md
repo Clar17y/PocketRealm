@@ -240,6 +240,7 @@ npm run dev
 8. **Zod Validation** - Request validation at API boundaries
 9. **Prisma Transactions** - Used for multi-step DB operations to ensure consistency
 10. **Extract Shared Patterns** - When implementing UI or logic that duplicates an existing pattern across 2+ files, proactively extract it into a shared component (`components/common/`) or utility. Don't wait to be asked
+11. **File Operations** - ALWAYS use the Write tool to create or overwrite files. NEVER use cat, sed, awk, echo, or shell heredocs to write file contents. ALWAYS use the Edit tool for partial file modifications.
 
 ## grepai - Semantic Code Search
 

@@ -78,6 +78,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
       passwordHash,
       lastActiveAt: now,
       currentZoneId: startingZone.id,
+      lastTravelledFromZoneId: starterTown.id,
       homeTownId: starterTown.id,
       turnBank: {
         create: {
