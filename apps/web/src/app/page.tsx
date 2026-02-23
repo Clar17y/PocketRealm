@@ -1,9 +1,10 @@
 import Image from 'next/image';
 import { ChampionBadge } from '@/components/common/ChampionBadge';
+import { pixelButtonBase, pixelButtonVariants, pixelButtonSizes } from '@/components/PixelButton';
 
-const linkPrimary = 'inline-block rounded-lg font-semibold transition-all active:scale-95 px-6 py-3 text-lg min-h-[56px] bg-[var(--rpg-green-dark)] hover:bg-[var(--rpg-green-light)] text-[var(--rpg-text-primary)]';
-const linkSecondary = 'inline-block rounded-lg font-semibold transition-all active:scale-95 px-6 py-3 text-lg min-h-[56px] border-2 border-[var(--rpg-border)] hover:border-[var(--rpg-text-secondary)] text-[var(--rpg-text-primary)] bg-transparent';
-const linkGold = 'inline-block rounded-lg font-semibold transition-all active:scale-95 px-6 py-3 text-lg min-h-[56px] bg-[var(--rpg-gold)] hover:bg-[#e4b85b] text-[var(--rpg-background)]';
+const linkPrimary = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.primary}`;
+const linkSecondary = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.secondary}`;
+const linkGold = `inline-block ${pixelButtonBase} ${pixelButtonSizes.lg} ${pixelButtonVariants.gold}`;
 
 export default function Home() {
   return (
