@@ -349,6 +349,10 @@ export async function requestJoinGuild(playerId: string, guildId: string): Promi
   const existingMembership = await prisma.guildMember.findUnique({ where: { playerId } });
   if (existingMembership) throw new AppError(400, 'Already in a guild', 'ALREADY_IN_GUILD');
 
+  if (player.characterLevel < GUILD_CONSTANTS.JOIN_MIN_LEVEL) {
+    throw new AppError(400, `Character level ${GUILD_CONSTANTS.JOIN_MIN_LEVEL} required to join a guild`, 'LEVEL_TOO_LOW');
+  }
+
   const guild = await prisma.guild.findUnique({
     where: { id: guildId },
     include: { _count: { select: { members: true } } },
@@ -369,9 +373,14 @@ export async function requestJoinGuild(playerId: string, guildId: string): Promi
   const existing = await prisma.guildJoinRequest.findUnique({
     where: { guildId_playerId: { guildId, playerId } },
   });
-  if (existing) throw new AppError(400, 'Join request already pending', 'REQUEST_ALREADY_SENT');
+  if (existing?.status === 'pending') throw new AppError(400, 'Join request already pending', 'REQUEST_ALREADY_SENT');
 
-  await prisma.guildJoinRequest.create({ data: { guildId, playerId, status: 'pending' } });
+  // Upsert so a previously rejected player can re-request without hitting the unique constraint
+  await prisma.guildJoinRequest.upsert({
+    where: { guildId_playerId: { guildId, playerId } },
+    create: { guildId, playerId, status: 'pending' },
+    update: { status: 'pending' },
+  });
   await addGuildLog(guildId, 'join_request_sent', `${player.username} requested to join`);
 }
 
@@ -432,10 +441,8 @@ export async function respondToJoinRequest(
     await addGuildXp(membership.guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
     void checkGuildAchievementsForAllMembers(membership.guildId, ['guildMemberCount']);
   } else {
-    await prisma.$transaction(async (tx: any) => {
-      await tx.guildJoinRequest.update({ where: { id: requestId }, data: { status: 'rejected' } });
-      await addGuildLog(membership.guildId, 'join_request_rejected', `${request.player.username}'s join request was declined`, undefined, tx);
-    });
+    await prisma.guildJoinRequest.update({ where: { id: requestId }, data: { status: 'rejected' } });
+    await addGuildLog(membership.guildId, 'join_request_rejected', `${request.player.username}'s join request was declined`);
   }
 }
 
