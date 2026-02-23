@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { ChampionBadge } from '@/components/common/ChampionBadge';
 
 const linkPrimary = 'inline-block rounded-lg font-semibold transition-all active:scale-95 px-6 py-3 text-lg min-h-[56px] bg-[var(--rpg-green-dark)] hover:bg-[var(--rpg-green-light)] text-[var(--rpg-text-primary)]';
 const linkSecondary = 'inline-block rounded-lg font-semibold transition-all active:scale-95 px-6 py-3 text-lg min-h-[56px] border-2 border-[var(--rpg-border)] hover:border-[var(--rpg-text-secondary)] text-[var(--rpg-text-primary)] bg-transparent';
@@ -141,6 +142,58 @@ export default function Home() {
                 <span className="text-xs text-[var(--rpg-text-secondary)]">{monster.name}</span>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Champion Subscription */}
+      <section className="py-20 px-4">
+        <div className="max-w-3xl mx-auto">
+          <div className="border border-[var(--rpg-gold)]/40 rounded-xl p-8 md:p-12 bg-gradient-to-b from-[var(--rpg-gold)]/5 to-transparent">
+            <h2 className="text-3xl md:text-4xl font-bold text-center text-[var(--rpg-gold)] mb-2">
+              Go Champion
+            </h2>
+            <p className="text-center text-2xl font-bold text-[var(--rpg-text-primary)] mb-2">
+              £4.99/month
+            </p>
+            <p className="text-center text-[var(--rpg-text-secondary)] mb-8">
+              Everything you do, 10% better.
+            </p>
+
+            {/* Mock leaderboard preview */}
+            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-4 mb-8 flex items-center justify-center gap-3 text-sm">
+              <span className="text-[var(--rpg-text-secondary)]">#1</span>
+              <ChampionBadge size="sm" />
+              <span className="text-[var(--rpg-text-primary)] font-semibold">YourName</span>
+              <span className="rainbow-title">Champion</span>
+              <span className="text-[var(--rpg-text-secondary)]">Lv. 42</span>
+            </div>
+
+            {/* Perks grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 text-sm">
+              {[
+                '10% more turns (24h bank cap)',
+                '10% faster turn regen',
+                '10% crafting crit bonus',
+                '10% gathering yield & crit',
+                '10% more chest & cache loot',
+                '10% boss reward bonus',
+                'Rainbow Champion title',
+                'Leaderboard badge',
+              ].map((perk) => (
+                <div key={perk} className="flex items-center gap-2 text-[var(--rpg-text-primary)]">
+                  <span className="text-[var(--rpg-gold)]">+</span>
+                  {perk}
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <a href="/register" className={linkGold}>Become Champion</a>
+              <p className="text-xs text-[var(--rpg-text-secondary)] mt-3">
+                No combat advantages. No pay-to-win. Just efficiency.
+              </p>
+            </div>
           </div>
         </div>
       </section>
