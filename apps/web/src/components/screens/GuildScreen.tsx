@@ -344,6 +344,7 @@ function NoGuildView({
                   </p>
                   <p className="text-xs text-[var(--rpg-text-secondary)]">
                     Level {guild.level} &middot; {guild.memberCount}/{guild.maxMembers} members
+                    {guild.taxRate > 0 && ` · ${guild.taxRate}% tax`}
                     {guild.minLevelRequirement > 0 && ` · Min Level ${guild.minLevelRequirement}`}
                   </p>
                   {guild.description && (
