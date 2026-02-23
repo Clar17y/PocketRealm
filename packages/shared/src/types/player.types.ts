@@ -69,12 +69,13 @@ export type SkillType =
   | 'armorsmithing'
   | 'leatherworking'
   | 'tailoring'
-  | 'alchemy';
+  | 'alchemy'
+  | 'jewelcrafting';
 
 export const COMBAT_SKILLS: SkillType[] = ['melee', 'ranged', 'magic'];
 export const GATHERING_SKILLS: SkillType[] = ['mining', 'foraging', 'woodcutting'];
 export const PROCESSING_SKILLS: SkillType[] = ['refining', 'tanning', 'weaving'];
-export const CRAFTING_SKILLS: SkillType[] = ['weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring', 'alchemy'];
+export const CRAFTING_SKILLS: SkillType[] = ['weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring', 'alchemy', 'jewelcrafting'];
 export const ALL_SKILLS: SkillType[] = [
   ...COMBAT_SKILLS,
   ...GATHERING_SKILLS,

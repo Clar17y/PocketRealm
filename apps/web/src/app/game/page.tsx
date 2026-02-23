@@ -29,7 +29,7 @@ import { rarityFromTier } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
 import { TURN_CONSTANTS, type SkillType } from '@adventure/shared';
 import { calculateEfficiency, xpForLevel } from '@adventure/game-engine';
-import { Sword, Shield, Crosshair, Sparkles, Pickaxe, Hammer, Leaf, FlaskConical, Axe, Scissors, Anvil } from 'lucide-react';
+import { Sword, Shield, Crosshair, Sparkles, Pickaxe, Hammer, Leaf, FlaskConical, Axe, Scissors, Anvil, Gem } from 'lucide-react';
 import { TutorialBanner } from '@/components/TutorialBanner';
 import { TutorialDialog } from '@/components/TutorialDialog';
 import {
@@ -62,6 +62,7 @@ const SKILL_META: Record<string, { name: string; icon: typeof Sword; color: stri
   leatherworking: { name: 'Leatherworking', icon: Shield, color: 'var(--rpg-green-light)' },
   tailoring: { name: 'Tailoring', icon: Scissors, color: 'var(--rpg-purple)' },
   alchemy: { name: 'Alchemy', icon: FlaskConical, color: 'var(--rpg-purple)' },
+  jewelcrafting: { name: 'Jewelcrafting', icon: Gem, color: 'var(--rpg-gold)' },
 };
 
 const GATHERING_SKILL_TABS = [
@@ -79,6 +80,7 @@ const CRAFTING_SKILL_TABS = [
   { id: 'leatherworking', label: 'Leatherworking' },
   { id: 'tailoring', label: 'Tailoring' },
   { id: 'alchemy', label: 'Alchemy' },
+  { id: 'jewelcrafting', label: 'Jewelcrafting' },
 ] as const;
 
 /* Mock data for demo - will be replaced with API calls

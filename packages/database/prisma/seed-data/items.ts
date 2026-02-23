@@ -76,6 +76,77 @@ const rawResources = [
   resource(IDS.res.abyssalKelp, 'Abyssal Kelp', 5),
 ];
 
+// ── Raw Gems (gathering crit drops) ──────────────────────────────────────────
+
+const rawGems = [
+  // Mining gems (T1-T5)
+  resource(IDS.gems.roughRuby, 'Rough Ruby', 1),
+  resource(IDS.gems.roughSapphire, 'Rough Sapphire', 2),
+  resource(IDS.gems.roughEmerald, 'Rough Emerald', 3),
+  resource(IDS.gems.roughDiamond, 'Rough Diamond', 4),
+  resource(IDS.gems.roughOpal, 'Rough Opal', 5),
+  // Foraging gems (T1-T5)
+  resource(IDS.gems.rawAmber, 'Raw Amber', 1),
+  resource(IDS.gems.rawPearl, 'Raw Pearl', 2),
+  resource(IDS.gems.rawJade, 'Raw Jade', 3),
+  resource(IDS.gems.rawMoonstone, 'Raw Moonstone', 4),
+  resource(IDS.gems.rawStarcrystal, 'Raw Starcrystal', 5),
+  // Woodcutting gems (T1-T5)
+  resource(IDS.gems.treeResin, 'Tree Resin', 1),
+  resource(IDS.gems.fossilizedSap, 'Fossilized Sap', 2),
+  resource(IDS.gems.crystalBark, 'Crystal Bark', 3),
+  resource(IDS.gems.heartwoodGem, 'Heartwood Gem', 4),
+  resource(IDS.gems.ancientAmber, 'Ancient Amber', 5),
+];
+
+// ── Cut Gems (refined from raw gems) ────────────────────────────────────────
+
+const cutGems = [
+  // Mining
+  resource(IDS.gems.cutRuby, 'Cut Ruby', 1),
+  resource(IDS.gems.cutSapphire, 'Cut Sapphire', 2),
+  resource(IDS.gems.cutEmerald, 'Cut Emerald', 3),
+  resource(IDS.gems.cutDiamond, 'Cut Diamond', 4),
+  resource(IDS.gems.cutOpal, 'Cut Opal', 5),
+  // Foraging
+  resource(IDS.gems.cutAmber, 'Cut Amber', 1),
+  resource(IDS.gems.cutPearl, 'Cut Pearl', 2),
+  resource(IDS.gems.cutJade, 'Cut Jade', 3),
+  resource(IDS.gems.cutMoonstone, 'Cut Moonstone', 4),
+  resource(IDS.gems.cutStarcrystal, 'Cut Starcrystal', 5),
+  // Woodcutting
+  resource(IDS.gems.cutResin, 'Cut Resin', 1),
+  resource(IDS.gems.cutSap, 'Cut Sap', 2),
+  resource(IDS.gems.cutBark, 'Cut Bark', 3),
+  resource(IDS.gems.cutHeartwood, 'Cut Heartwood', 4),
+  resource(IDS.gems.cutAncientAmber, 'Cut Ancient Amber', 5),
+];
+
+// ── Jewellery Equipment ─────────────────────────────────────────────────────
+
+const jewellery = [
+  // Tier 1
+  it({ id: IDS.jewel.copperRing, name: 'Copper Ring', itemType: 'armor', slot: 'ring', tier: 1, requiredLevel: 1, baseStats: { luck: 2, critChance: 0.01 }, maxDurability: 60 }),
+  it({ id: IDS.jewel.copperPendant, name: 'Copper Pendant', itemType: 'armor', slot: 'neck', tier: 1, requiredLevel: 1, baseStats: { health: 3, luck: 1 }, maxDurability: 60 }),
+  it({ id: IDS.jewel.copperCharm, name: 'Copper Charm', itemType: 'armor', slot: 'charm', tier: 1, requiredLevel: 1, baseStats: { luck: 2, dodge: 1 }, maxDurability: 60 }),
+  // Tier 2
+  it({ id: IDS.jewel.ironBand, name: 'Iron Band', itemType: 'armor', slot: 'ring', tier: 2, requiredLevel: 5, baseStats: { luck: 3, accuracy: 2, critChance: 0.01 }, maxDurability: 80 }),
+  it({ id: IDS.jewel.ironChain, name: 'Iron Chain', itemType: 'armor', slot: 'neck', tier: 2, requiredLevel: 5, baseStats: { health: 5, luck: 2 }, maxDurability: 80 }),
+  it({ id: IDS.jewel.ironTalisman, name: 'Iron Talisman', itemType: 'armor', slot: 'charm', tier: 2, requiredLevel: 5, baseStats: { luck: 3, dodge: 2 }, maxDurability: 80 }),
+  // Tier 3
+  it({ id: IDS.jewel.darkIronRing, name: 'Dark Iron Ring', itemType: 'armor', slot: 'ring', tier: 3, requiredLevel: 12, baseStats: { luck: 4, accuracy: 3, critChance: 0.02 }, maxDurability: 100 }),
+  it({ id: IDS.jewel.darkIronAmulet, name: 'Dark Iron Amulet', itemType: 'armor', slot: 'neck', tier: 3, requiredLevel: 12, baseStats: { health: 8, luck: 3, accuracy: 1 }, maxDurability: 100 }),
+  it({ id: IDS.jewel.darkIronCharm, name: 'Dark Iron Charm', itemType: 'armor', slot: 'charm', tier: 3, requiredLevel: 12, baseStats: { luck: 4, dodge: 3, critChance: 0.01 }, maxDurability: 100 }),
+  // Tier 4
+  it({ id: IDS.jewel.mithrilRing, name: 'Mithril Ring', itemType: 'armor', slot: 'ring', tier: 4, requiredLevel: 20, baseStats: { luck: 5, accuracy: 4, critChance: 0.03, critDamage: 0.05 }, maxDurability: 120 }),
+  it({ id: IDS.jewel.mithrilNecklace, name: 'Mithril Necklace', itemType: 'armor', slot: 'neck', tier: 4, requiredLevel: 20, baseStats: { health: 12, luck: 4, accuracy: 2 }, maxDurability: 120 }),
+  it({ id: IDS.jewel.mithrilTalisman, name: 'Mithril Talisman', itemType: 'armor', slot: 'charm', tier: 4, requiredLevel: 20, baseStats: { luck: 5, dodge: 4, critChance: 0.02, critDamage: 0.05 }, maxDurability: 120 }),
+  // Tier 5
+  it({ id: IDS.jewel.ancientRing, name: 'Ancient Ring', itemType: 'armor', slot: 'ring', tier: 5, requiredLevel: 28, baseStats: { luck: 7, accuracy: 5, critChance: 0.04, critDamage: 0.1 }, maxDurability: 150 }),
+  it({ id: IDS.jewel.ancientAmulet, name: 'Ancient Amulet', itemType: 'armor', slot: 'neck', tier: 5, requiredLevel: 28, baseStats: { health: 16, luck: 5, accuracy: 3 }, maxDurability: 150 }),
+  it({ id: IDS.jewel.ancientCharm, name: 'Ancient Charm', itemType: 'armor', slot: 'charm', tier: 5, requiredLevel: 28, baseStats: { luck: 7, dodge: 5, critChance: 0.03, critDamage: 0.1 }, maxDurability: 150 }),
+];
+
 // ── Processed Materials ──────────────────────────────────────────────────────
 
 const processedMaterials = [
@@ -431,6 +502,9 @@ export function getAllItemTemplates() {
     ...consumables,
     ...weapons,
     ...generateArmor(),
+    ...rawGems,
+    ...cutGems,
+    ...jewellery,
     ...advancedGear,
     ...bossTrophyMaterials,
     ...bossEquipment,

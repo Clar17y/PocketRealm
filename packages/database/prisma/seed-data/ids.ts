@@ -69,6 +69,46 @@ export const IDS = {
     abyssalKelp: randomUUID(),
   },
 
+  // ── Item Templates: Raw & Cut Gems ──────────────────────────────────────────
+  gems: {
+    // Raw gems (gathering crits) — mining
+    roughRuby: randomUUID(),
+    roughSapphire: randomUUID(),
+    roughEmerald: randomUUID(),
+    roughDiamond: randomUUID(),
+    roughOpal: randomUUID(),
+    // Raw gems — foraging
+    rawAmber: randomUUID(),
+    rawPearl: randomUUID(),
+    rawJade: randomUUID(),
+    rawMoonstone: randomUUID(),
+    rawStarcrystal: randomUUID(),
+    // Raw gems — woodcutting
+    treeResin: randomUUID(),
+    fossilizedSap: randomUUID(),
+    crystalBark: randomUUID(),
+    heartwoodGem: randomUUID(),
+    ancientAmber: randomUUID(),
+    // Cut gems — mining
+    cutRuby: randomUUID(),
+    cutSapphire: randomUUID(),
+    cutEmerald: randomUUID(),
+    cutDiamond: randomUUID(),
+    cutOpal: randomUUID(),
+    // Cut gems — foraging
+    cutAmber: randomUUID(),
+    cutPearl: randomUUID(),
+    cutJade: randomUUID(),
+    cutMoonstone: randomUUID(),
+    cutStarcrystal: randomUUID(),
+    // Cut gems — woodcutting
+    cutResin: randomUUID(),
+    cutSap: randomUUID(),
+    cutBark: randomUUID(),
+    cutHeartwood: randomUUID(),
+    cutAncientAmber: randomUUID(),
+  },
+
   // ── Item Templates: Processed Materials ───────────────────────────────────
   proc: {
     copperIngot: randomUUID(),
@@ -285,6 +325,28 @@ export const IDS = {
     t5_light_boots: randomUUID(),
     t5_light_gloves: randomUUID(),
     t5_light_belt: randomUUID(),
+  },
+
+  // ── Item Templates: Jewellery ───────────────────────────────────────────────
+  jewel: {
+    // Rings (T1-T5)
+    copperRing: randomUUID(),
+    ironBand: randomUUID(),
+    darkIronRing: randomUUID(),
+    mithrilRing: randomUUID(),
+    ancientRing: randomUUID(),
+    // Necklaces (T1-T5)
+    copperPendant: randomUUID(),
+    ironChain: randomUUID(),
+    darkIronAmulet: randomUUID(),
+    mithrilNecklace: randomUUID(),
+    ancientAmulet: randomUUID(),
+    // Charms (T1-T5)
+    copperCharm: randomUUID(),
+    ironTalisman: randomUUID(),
+    darkIronCharm: randomUUID(),
+    mithrilTalisman: randomUUID(),
+    ancientCharm: randomUUID(),
   },
 
   // ── Item Templates: Advanced (Soulbound) Gear ─────────────────────────────
