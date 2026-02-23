@@ -26,7 +26,7 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankService';
 import { enterRecoveringState, setHp } from '../../services/hpService';
-import { applyGuildTaxTx } from '../../services/guildTaxService';
+import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildId } from '../../services/guildService';
 import { incrementContractProgress } from '../../services/guildContractService';
 import { rollAndGrantLoot } from '../../services/lootService';
@@ -807,5 +807,6 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         percent: calculateExplorationPercent(explorationProgress.turnsExplored + spentTurns, explorationProgress.turnsToExplore),
         turnsToExplore: explorationProgress.turnsToExplore,
       },
+      tax: taxInfoFromResult(taxResult),
     });
 }));
