@@ -815,7 +815,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
     if (['combat', 'arena'].includes(activeScreen)) return 'combat';
     if (activeScreen === 'guild') return 'guild';
-    return 'settings';
+    return 'home';
   };
 
   const nowStamp = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
