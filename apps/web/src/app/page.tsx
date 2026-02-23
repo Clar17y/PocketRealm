@@ -28,7 +28,7 @@ export default function Home() {
           <p className="text-base md:text-lg text-[var(--rpg-text-secondary)] mb-8">
             Explore. Fight. Craft. Progress — at your own pace.
           </p>
-          <div className="flex gap-4 justify-center">
+          <div className="flex gap-4 justify-center flex-wrap">
             <a href="/register" className={linkPrimary}>Play Free</a>
             <a href="#features" className={linkSecondary}>Learn More</a>
           </div>
@@ -161,7 +161,7 @@ export default function Home() {
             </p>
 
             {/* Mock leaderboard preview */}
-            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-4 mb-8 flex items-center justify-center gap-3 text-sm">
+            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-4 mb-8 flex items-center justify-center gap-3 text-sm flex-wrap">
               <span className="text-[var(--rpg-text-secondary)]">#1</span>
               <ChampionBadge size="sm" />
               <span className="text-[var(--rpg-text-primary)] font-semibold">YourName</span>
@@ -204,7 +204,7 @@ export default function Home() {
           <h2 className="text-3xl md:text-4xl font-bold text-[var(--rpg-text-primary)] mb-8">
             Your Adventure Starts Now
           </h2>
-          <div className="flex gap-4 justify-center mb-6">
+          <div className="flex gap-4 justify-center mb-6 flex-wrap">
             <a href="/register" className={linkPrimary}>Play Free</a>
             <a href="/register" className={linkGold}>Become Champion</a>
           </div>
