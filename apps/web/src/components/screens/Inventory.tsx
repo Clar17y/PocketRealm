@@ -113,6 +113,7 @@ export function Inventory({ items, onDrop, onSalvage, onRepair, onEquip, onUnequ
                 imageSrc={item.imageSrc}
                 quantity={item.quantity}
                 rarity={item.rarity}
+                durability={item.durability}
                 onClick={() => setSelectedItem(item)}
               />
             ))}
@@ -134,6 +135,7 @@ export function Inventory({ items, onDrop, onSalvage, onRepair, onEquip, onUnequ
               imageSrc={item.imageSrc}
               quantity={item.quantity}
               rarity={item.rarity}
+              durability={item.durability}
               onClick={() => setSelectedItem(item)}
             />
           ))}
