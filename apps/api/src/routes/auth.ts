@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { prisma } from '@adventure/database';
-import { TURN_CONSTANTS, SkillType } from '@adventure/shared';
+import { TURN_CONSTANTS, ALL_SKILLS } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import {
   generateAccessToken,
@@ -27,13 +27,6 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-const ALL_SKILLS: SkillType[] = [
-  'melee', 'ranged', 'magic',
-  'mining', 'foraging', 'woodcutting',
-  'refining', 'tanning', 'weaving',
-  'weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring', 'alchemy',
-  'jewelcrafting',
-];
 
 function isRecentlyActive(lastActiveAt: Date | null, nowMs = Date.now()): boolean {
   if (!lastActiveAt) return false;
