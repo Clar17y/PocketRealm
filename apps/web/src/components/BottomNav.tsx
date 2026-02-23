@@ -46,7 +46,7 @@ export function BottomNav({ activeTab, onNavigate, badgeTabs = new Set(), pulseT
             >
               {LucideIcon ? (
                 <LucideIcon
-                  size={28}
+                  size={40}
                   className={cn('transition-opacity', isActive ? 'opacity-100' : 'opacity-60')}
                 />
               ) : item.icon ? (
@@ -55,7 +55,7 @@ export function BottomNav({ activeTab, onNavigate, badgeTabs = new Set(), pulseT
                   alt={item.label}
                   width={40}
                   height={40}
-                  className={cn('image-rendering-pixelated', isActive ? '' : 'opacity-60')}
+                  className={cn('image-rendering-pixelated transition-opacity', isActive ? '' : 'opacity-60')}
                 />
               ) : null}
               {badgeTabs.has(item.id) && (
