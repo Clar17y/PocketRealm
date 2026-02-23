@@ -744,7 +744,7 @@ model Guild {
   leaderId            String   @map("leader_id")
   level               Int      @default(1)
   xp                  BigInt   @default(0)
-  recruitmentMode     String   @default("invite_only") @map("recruitment_mode") @db.VarChar(16)
+  recruitmentMode     String   @default("request_to_join") @map("recruitment_mode") @db.VarChar(16)
   minLevelRequirement Int      @default(0) @map("min_level_requirement")
   taxRate             Int      @default(5) @map("tax_rate")
   specialization      String?  @db.VarChar(16)

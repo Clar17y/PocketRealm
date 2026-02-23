@@ -29,7 +29,7 @@ const createSchema = z.object({
 });
 
 const settingsSchema = z.object({
-  recruitmentMode: z.enum(['open', 'invite_only', 'closed']).optional(),
+  recruitmentMode: z.enum(['open', 'request_to_join', 'closed']).optional(),
   minLevelRequirement: z.number().int().min(0).max(100).optional(),
   taxRate: z.number().int().min(0).max(20).optional(),
   description: z.string().max(200).trim().nullable().optional(),
@@ -104,7 +104,7 @@ guildRouter.post('/:id/leave', asyncHandler(async (req, res) => {
   res.json({ success: true });
 }));
 
-// POST /:id/request — submit a join request (invite_only guilds)
+// POST /:id/request — submit a join request (request_to_join guilds)
 guildRouter.post('/:id/request', asyncHandler(async (req, res) => {
   await requestJoinGuild(req.player!.playerId, req.params.id);
   res.json({ success: true });

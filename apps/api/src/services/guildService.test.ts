@@ -59,7 +59,7 @@ describe('createGuild', () => {
     // The $transaction mock passes prisma as tx, so guild.create is on mockPrisma
     mockPrisma.guild.create.mockResolvedValue({
       id: 'g1', name: 'TestGuild', tag: 'TG', description: null,
-      leaderId: 'p1', level: 1, xp: 0n, recruitmentMode: 'invite_only',
+      leaderId: 'p1', level: 1, xp: 0n, recruitmentMode: 'request_to_join',
       minLevelRequirement: 0, taxRate: 5, specialization: null,
       renown: 0, seasonalRenown: 0, treasuryTurns: 0,
       createdAt: new Date('2026-01-01'),
@@ -271,7 +271,7 @@ describe('joinGuild', () => {
     mockPrisma.player.findUnique.mockResolvedValue({ id: 'p1', characterLevel: 15, username: 'X' });
     mockPrisma.guildMember.findUnique.mockResolvedValue(null);
     mockPrisma.guild.findUnique.mockResolvedValue({
-      id: 'g1', recruitmentMode: 'invite_only', minLevelRequirement: 0,
+      id: 'g1', recruitmentMode: 'request_to_join', minLevelRequirement: 0,
       level: 1, _count: { members: 3 },
     });
 

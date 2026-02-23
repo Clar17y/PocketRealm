@@ -284,7 +284,7 @@ export async function joinGuild(playerId: string, guildId: string): Promise<Guil
     throw new AppError(400, `Character level ${GUILD_CONSTANTS.JOIN_MIN_LEVEL} required to join a guild`, 'LEVEL_TOO_LOW');
   }
 
-  if (guild.recruitmentMode === 'closed' || guild.recruitmentMode === 'invite_only') {
+  if (guild.recruitmentMode === 'closed' || guild.recruitmentMode === 'request_to_join') {
     throw new AppError(400, 'Guild is not open for recruitment', 'RECRUITMENT_CLOSED');
   }
 
@@ -359,7 +359,7 @@ export async function requestJoinGuild(playerId: string, guildId: string): Promi
   });
   if (!guild) throw new AppError(404, 'Guild not found', 'NOT_FOUND');
 
-  if (guild.recruitmentMode !== 'invite_only') {
+  if (guild.recruitmentMode !== 'request_to_join') {
     throw new AppError(400, 'Guild does not accept join requests', 'NOT_INVITE_ONLY');
   }
 

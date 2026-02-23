@@ -356,7 +356,7 @@ function NoGuildView({
                     Join
                   </PixelButton>
                 )}
-                {guild.recruitmentMode === 'invite_only' && (
+                {guild.recruitmentMode === 'request_to_join' && (
                   requestedGuildIds.has(guild.id) ? (
                     <span className="text-xs text-[var(--rpg-green-light)]">Request Sent</span>
                   ) : (
@@ -975,7 +975,7 @@ function GuildSettings({
 
   return (
     <div className="space-y-3">
-      {guild.recruitmentMode === 'invite_only' && (myRole === 'leader' || myRole === 'officer') && (
+      {guild.recruitmentMode === 'request_to_join' && (myRole === 'leader' || myRole === 'officer') && (
         <PixelCard>
           <h3 className="text-lg font-bold text-[var(--rpg-text-primary)] mb-3">Join Requests</h3>
           <JoinRequestsSection guildId={guild.id} onRefresh={onRefresh} setError={setError} />
@@ -992,7 +992,7 @@ function GuildSettings({
               className="w-full mt-1 p-2 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
             >
               <option value="open">Open</option>
-              <option value="invite_only">Request to Join</option>
+              <option value="request_to_join">Request to Join</option>
               <option value="closed">Closed</option>
             </select>
           </div>

@@ -1,9 +1,9 @@
 export type GuildRole = 'leader' | 'officer' | 'member';
-export type GuildRecruitmentMode = 'open' | 'invite_only' | 'closed';
+export type GuildRecruitmentMode = 'open' | 'request_to_join' | 'closed';
 export type GuildSpecialization = 'warfare' | 'industry' | 'discovery';
 
 export const GUILD_ROLES: GuildRole[] = ['leader', 'officer', 'member'];
-export const GUILD_RECRUITMENT_MODES: GuildRecruitmentMode[] = ['open', 'invite_only', 'closed'];
+export const GUILD_RECRUITMENT_MODES: GuildRecruitmentMode[] = ['open', 'request_to_join', 'closed'];
 
 export interface GuildData {
   id: string;
