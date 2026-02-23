@@ -12,7 +12,7 @@ import { getSkillLevel } from '../services/combatStatsService.js';
 import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
 import { applyResourceEventModifiers } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
-import { applyGuildTaxTx } from '../services/guildTaxService';
+import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getPlayerGuildId } from '../services/guildService';
 import { incrementContractProgress } from '../services/guildContractService';
@@ -257,9 +257,6 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     throw new AppError(400, `Minimum is ${GATHERING_CONSTANTS.BASE_TURN_COST} turns`, 'INVALID_TURNS');
   }
 
-  // Calculate how many actions we can do (limited by turns AND remaining capacity)
-  const maxActionsByTurns = Math.floor(body.turns / GATHERING_CONSTANTS.BASE_TURN_COST);
-
   // Linear yield scaling: +10% per level above requirement
   const levelsAbove = Math.max(0, level - template.levelRequired);
   const yieldMultiplier = 1 + levelsAbove * GATHERING_CONSTANTS.YIELD_MULTIPLIER_PER_LEVEL;
@@ -275,26 +272,33 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     ? Math.floor(eventYield * (1 + guildMods.gatheringYield))
     : eventYield;
 
-  // Cap actions by remaining capacity
-  const maxActionsByCapacity = Math.ceil(effectiveCapacity / yieldPerAction);
-  const actions = Math.min(maxActionsByTurns, maxActionsByCapacity);
-
-  if (actions <= 0) {
-    throw new AppError(400, 'Node is depleted', 'NODE_DEPLETED');
-  }
-
-  const turnsSpent = actions * GATHERING_CONSTANTS.BASE_TURN_COST;
-  const totalYield = Math.min(actions * yieldPerAction, effectiveCapacity);
-
-  const newCapacity = effectiveCapacity - totalYield;
-  const nodeDepleted = newCapacity <= 0;
-
   const resourceTemplateId = await getResourceTemplateId(template.resourceType);
-  const { turnSpend, stack } = await prisma.$transaction(async (tx) => {
-    const spent = await spendPlayerTurnsTx(tx, playerId, turnsSpent);
-    await applyGuildTaxTx(tx, playerId, turnsSpent);
+  const { turnSpend, taxResult, actions, totalYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
+    // Look up tax rate to calculate effective turns
+    const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
+    const effectiveTurns = taxRate > 0
+      ? Math.floor(body.turns * (1 - taxRate / 100))
+      : body.turns;
 
-    if (nodeDepleted) {
+    const maxActionsByTurns = Math.floor(effectiveTurns / GATHERING_CONSTANTS.BASE_TURN_COST);
+    const maxActionsByCapacity = Math.ceil(effectiveCapacity / yieldPerAction);
+    const innerActions = Math.min(maxActionsByTurns, maxActionsByCapacity);
+
+    if (innerActions <= 0) {
+      throw new AppError(400, 'Not enough turns after guild tax', 'INSUFFICIENT_TURNS');
+    }
+
+    const baseTurns = innerActions * GATHERING_CONSTANTS.BASE_TURN_COST;
+    const actualTurns = calculateInflatedCost(baseTurns, taxRate);
+
+    const innerTotalYield = Math.min(innerActions * yieldPerAction, effectiveCapacity);
+    const innerNewCapacity = effectiveCapacity - innerTotalYield;
+    const innerNodeDepleted = innerNewCapacity <= 0;
+
+    const spent = await spendPlayerTurnsTx(tx, playerId, actualTurns);
+    const tax = await applyGuildTaxTx(tx, playerId, actualTurns);
+
+    if (innerNodeDepleted) {
       const depleted = await tx.playerResourceNode.deleteMany({
         where: {
           id: playerNode.id,
@@ -315,7 +319,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
           decayedCapacity: playerNode.decayedCapacity,
         },
         data: {
-          remainingCapacity: newCapacity,
+          remainingCapacity: innerNewCapacity,
           decayedCapacity: decay.targetDecay,
         },
       });
@@ -324,8 +328,16 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       }
     }
 
-    const minedStack = await addStackableItemTx(tx, playerId, resourceTemplateId, totalYield);
-    return { turnSpend: spent, stack: minedStack };
+    const minedStack = await addStackableItemTx(tx, playerId, resourceTemplateId, innerTotalYield);
+    return {
+      turnSpend: spent,
+      taxResult: tax,
+      actions: innerActions,
+      totalYield: innerTotalYield,
+      newCapacity: innerNewCapacity,
+      nodeDepleted: innerNodeDepleted,
+      stack: minedStack,
+    };
   });
 
   // XP: 5 XP per action
@@ -342,14 +354,14 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   if (xpGrant.characterLevelAfter && xpGrant.characterLevelAfter > (xpGrant.characterLevelBefore ?? 0)) gatherAchKeys.push('highestCharacterLevel');
   await trackAchievements(playerId, {
     totalGatheringActions: actions,
-    totalTurnsSpent: turnsSpent,
+    totalTurnsSpent: turnSpend.spent,
   }, { statKeys: gatherAchKeys });
 
   const log = await prisma.activityLog.create({
     data: {
       playerId,
       activityType: skillRequired,
-      turnsSpent,
+      turnsSpent: turnSpend.spent,
       result: {
         zoneId: template.zoneId,
         zoneName: template.zone.name,
@@ -392,5 +404,6 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     },
     xp: serializeXpGrant(xpGrant),
     activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
+    tax: taxInfoFromResult(taxResult),
   });
 }));
