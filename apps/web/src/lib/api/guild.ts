@@ -105,6 +105,18 @@ export interface GuildContractsResponse {
   contracts: GuildContractResponse[];
 }
 
+export interface GuildJoinRequestResponse {
+  id: string;
+  playerId: string;
+  username: string;
+  characterLevel: number;
+  createdAt: string;
+}
+
+export interface GuildJoinRequestsResponse {
+  requests: GuildJoinRequestResponse[];
+}
+
 // --- Projects ---
 
 export interface GuildProjectContributionResponse {
@@ -320,4 +332,22 @@ export async function respecGuildSpecialization(guildId: string, path: string) {
     method: 'POST',
     body: JSON.stringify({ path }),
   });
+}
+
+// --- Join Requests ---
+
+export async function requestJoinGuild(guildId: string) {
+  return fetchApi(`/api/v1/guild/${guildId}/request`, { method: 'POST' });
+}
+
+export async function getGuildJoinRequests(guildId: string) {
+  return fetchApi<GuildJoinRequestsResponse>(`/api/v1/guild/${guildId}/requests`);
+}
+
+export async function acceptJoinRequest(guildId: string, requestId: string) {
+  return fetchApi(`/api/v1/guild/${guildId}/requests/${requestId}/accept`, { method: 'POST' });
+}
+
+export async function rejectJoinRequest(guildId: string, requestId: string) {
+  return fetchApi(`/api/v1/guild/${guildId}/requests/${requestId}/reject`, { method: 'POST' });
 }
