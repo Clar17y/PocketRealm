@@ -9,8 +9,10 @@ import {
   kickGuildMember, promoteGuildMember, demoteGuildMember,
   transferGuildLeadership, disbandGuild, updateGuildSettings, getGuildLog,
   getGuildUpgrades, activateGuildUpgrade, getGuildContracts,
+  requestJoinGuild, getGuildJoinRequests, acceptJoinRequest, rejectJoinRequest,
   type PlayerGuildResponse, type GuildResponse, type GuildMemberResponse,
   type GuildLogResponse, type GuildUpgradesResponse, type GuildContractsResponse,
+  type GuildJoinRequestResponse,
 } from '@/lib/api';
 import { GuildProjectsTab } from '@/components/guild/GuildProjectsTab';
 import { GuildSpecializationTab } from '@/components/guild/GuildSpecializationTab';
@@ -157,6 +159,7 @@ function NoGuildView({
   const [searching, setSearching] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [requestedGuildIds, setRequestedGuildIds] = useState<Set<string>>(new Set());
 
   // Create form
   const [name, setName] = useState('');
@@ -206,6 +209,20 @@ function NoGuildView({
       onGuildJoined();
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : 'Failed to join guild');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRequest = async (guildId: string) => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const res = await requestJoinGuild(guildId);
+      if (res.error) { setActionError(res.error.message); return; }
+      setRequestedGuildIds((prev) => new Set([...prev, guildId]));
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Failed to send request');
     } finally {
       setActionLoading(false);
     }
@@ -339,8 +356,20 @@ function NoGuildView({
                     Join
                   </PixelButton>
                 )}
-                {guild.recruitmentMode !== 'open' && (
-                  <span className="text-xs text-[var(--rpg-text-secondary)] capitalize">{guild.recruitmentMode.replace('_', ' ')}</span>
+                {guild.recruitmentMode === 'invite_only' && (
+                  requestedGuildIds.has(guild.id) ? (
+                    <span className="text-xs text-[var(--rpg-green-light)]">Request Sent</span>
+                  ) : (
+                    <PixelButton
+                      onClick={() => handleRequest(guild.id)}
+                      disabled={actionLoading || characterLevel < (guild.minLevelRequirement || GUILD_CONSTANTS.JOIN_MIN_LEVEL)}
+                    >
+                      Request
+                    </PixelButton>
+                  )
+                )}
+                {guild.recruitmentMode === 'closed' && (
+                  <span className="text-xs text-[var(--rpg-text-secondary)]">Closed</span>
                 )}
               </div>
             ))}
@@ -808,6 +837,87 @@ function GuildContractsTab({ guildId }: { guildId: string }) {
 // Settings Tab
 // ---------------------------------------------------------------------------
 
+function JoinRequestsSection({
+  guildId,
+  onRefresh,
+  setError,
+}: {
+  guildId: string;
+  onRefresh: () => void;
+  setError: (err: string | null) => void;
+}) {
+  const [requests, setRequests] = useState<GuildJoinRequestResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const loadRequests = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getGuildJoinRequests(guildId);
+      if (res.data) setRequests(res.data.requests);
+    } catch { /* */ } finally {
+      setLoading(false);
+    }
+  }, [guildId]);
+
+  useEffect(() => { void loadRequests(); }, [loadRequests]);
+
+  const handleRespond = async (requestId: string, accept: boolean) => {
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = accept
+        ? await acceptJoinRequest(guildId, requestId)
+        : await rejectJoinRequest(guildId, requestId);
+      if (res.error) { setError(res.error.message); return; }
+      await loadRequests();
+      onRefresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  if (loading) return <p className="text-sm opacity-60">Loading requests...</p>;
+
+  if (requests.length === 0) {
+    return <p className="text-sm text-[var(--rpg-text-secondary)]">No pending join requests.</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {requests.map((req) => (
+        <div
+          key={req.id}
+          className="p-3 bg-[var(--rpg-background)] rounded border border-[var(--rpg-border)] flex justify-between items-center"
+        >
+          <div>
+            <p className="text-sm font-bold text-[var(--rpg-text-primary)]">{req.username}</p>
+            <p className="text-xs text-[var(--rpg-text-secondary)]">Level {req.characterLevel}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleRespond(req.id, true)}
+              disabled={actionLoading}
+              className="text-xs px-2 py-1 rounded bg-[var(--rpg-green-light)]/20 text-[var(--rpg-green-light)]"
+            >
+              Accept
+            </button>
+            <button
+              onClick={() => handleRespond(req.id, false)}
+              disabled={actionLoading}
+              className="text-xs px-2 py-1 rounded bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]"
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function GuildSettings({
   guild,
   myRole,
@@ -865,6 +975,12 @@ function GuildSettings({
 
   return (
     <div className="space-y-3">
+      {guild.recruitmentMode === 'invite_only' && (
+        <PixelCard>
+          <h3 className="text-lg font-bold text-[var(--rpg-text-primary)] mb-3">Join Requests</h3>
+          <JoinRequestsSection guildId={guild.id} onRefresh={onRefresh} setError={setError} />
+        </PixelCard>
+      )}
       <PixelCard>
         <h3 className="text-lg font-bold text-[var(--rpg-text-primary)] mb-3">Guild Settings</h3>
         <div className="space-y-3">
