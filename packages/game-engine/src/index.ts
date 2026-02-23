@@ -21,6 +21,9 @@ export * from './exploration/roomGenerator';
 export * from './hp/hpCalculator';
 export * from './hp/fleeMechanics';
 
+// Gathering
+export * from './gathering/gatheringCrit';
+
 // Crafting
 export * from './crafting/craftingCrit';
 
