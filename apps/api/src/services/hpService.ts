@@ -166,7 +166,7 @@ export async function rest(
     healedAmount: healing.healedAmount,
     currentHp: healing.newHp,
     maxHp,
-    turnsSpent: healing.turnsUsed,
+    turnsSpent: taxResult.preTaxAmount,
     taxResult,
   };
 }
