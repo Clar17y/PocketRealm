@@ -32,6 +32,7 @@ const ALL_SKILLS: SkillType[] = [
   'mining', 'foraging', 'woodcutting',
   'refining', 'tanning', 'weaving',
   'weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring', 'alchemy',
+  'jewelcrafting',
 ];
 
 function isRecentlyActive(lastActiveAt: Date | null, nowMs = Date.now()): boolean {
