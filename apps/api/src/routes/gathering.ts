@@ -9,6 +9,7 @@ import { addStackableItemTx } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
+import { getEquipmentStats } from '../services/equipmentService.js';
 import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
 import { applyResourceEventModifiers, rollGemCrit } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -352,15 +353,8 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   let gemCrit: { itemTemplateId: string; itemId: string; gemName: string; critChance: number } | null = null;
   const gemTemplateId = await getGemTemplateId(skillRequired, levelToGemTier(template.levelRequired));
   if (gemTemplateId) {
-    const equippedItems = await prisma.playerEquipment.findMany({
-      where: { playerId, itemId: { not: null } },
-      include: { item: { include: { template: true } } },
-    });
-    let luckStat = 0;
-    for (const eq of equippedItems) {
-      const stats = eq.item?.template?.baseStats as Record<string, number> | null;
-      if (stats?.luck) luckStat += stats.luck;
-    }
+    const equipStats = await getEquipmentStats(playerId);
+    const luckStat = equipStats.luck;
 
     const critResult = rollGemCrit({
       skillLevel: level,
@@ -372,11 +366,11 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       const gemStack = await prisma.$transaction(async (tx) => {
         return addStackableItemTx(tx, playerId, gemTemplateId, 1);
       });
-      const gemTemplate = await prisma.itemTemplate.findUnique({ where: { id: gemTemplateId }, select: { name: true } });
+      const gemTier = levelToGemTier(template.levelRequired);
       gemCrit = {
         itemTemplateId: gemTemplateId,
         itemId: gemStack.itemId,
-        gemName: gemTemplate?.name ?? 'Unknown Gem',
+        gemName: GEM_BY_SKILL_TIER[skillRequired]?.[gemTier] ?? 'Unknown Gem',
         critChance: critResult.critChance,
       };
     }
