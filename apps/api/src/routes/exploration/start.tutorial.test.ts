@@ -7,8 +7,9 @@ vi.mock('../../services/turnBankService', () => ({
 }));
 vi.mock('../../services/guildTaxService', () => ({
   applyGuildTaxTx: vi.fn().mockImplementation((_tx: unknown, _pid: string, amount: number) =>
-    Promise.resolve({ preTaxAmount: amount, taxAmount: 0, postTaxAmount: amount, guildId: null }),
+    Promise.resolve({ preTaxAmount: amount, taxAmount: 0, postTaxAmount: amount, taxRatePercent: 0, guildId: null }),
   ),
+  taxInfoFromResult: vi.fn().mockReturnValue(null),
 }));
 vi.mock('../../services/guildService', () => ({
   getPlayerGuildId: vi.fn().mockResolvedValue(null),
