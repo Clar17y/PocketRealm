@@ -13,6 +13,12 @@ export interface TurnStateResponse {
   lastRegenAt: string;
 }
 
+export interface TaxInfo {
+  rate: number;
+  amount: number;
+  guildId: string;
+}
+
 type RefreshOutcome =
   | { ok: true; accessToken: string; refreshToken: string }
   | { ok: false; reason: 'missing' | 'invalid' | 'network' | 'bad_response' };

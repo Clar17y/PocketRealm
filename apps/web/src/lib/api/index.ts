@@ -1,5 +1,5 @@
 export { fetchApi, clearStoredTokens, getJwtExpMs } from './core';
-export type { ApiResponse } from './core';
+export type { ApiResponse, TaxInfo } from './core';
 
 export { register, login, refreshToken } from './auth';
 
