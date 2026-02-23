@@ -13,8 +13,7 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { spendPlayerTurnsTx } from '../../services/turnBankService';
-import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, taxInfoFromResult } from '../../services/guildTaxService';
+import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { assertNotRecovering, getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   isItemType,
@@ -65,10 +64,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
     });
 
     const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
-      const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
-      const actualUpgradeCost = calculateInflatedCost(upgradeCost, taxRate);
-      const spent = await spendPlayerTurnsTx(tx, playerId, actualUpgradeCost);
-      const tax = await applyGuildTaxTx(tx, playerId, actualUpgradeCost);
+      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, upgradeCost);
       const consumed = await tx.item.deleteMany({
         where: {
           id: sacrificial.id,
@@ -271,10 +267,7 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
     const templateBaseStats = item.template.baseStats as ItemStats | null | undefined;
 
     const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
-      const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
-      const actualRerollCost = calculateInflatedCost(rerollCost, taxRate);
-      const spent = await spendPlayerTurnsTx(tx, playerId, actualRerollCost);
-      const tax = await applyGuildTaxTx(tx, playerId, actualRerollCost);
+      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, rerollCost);
       const consumed = await tx.item.deleteMany({
         where: {
           id: sacrificial.id,

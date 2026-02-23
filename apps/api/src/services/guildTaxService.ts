@@ -1,6 +1,7 @@
 import { Prisma, prisma } from '@adventure/database';
 import type { TaxInfo } from '@adventure/shared';
 import { calculateTreasuryCap } from './guildService';
+import { spendPlayerTurnsTx, type SpendTurnsResult } from './turnBankService';
 
 export interface TaxResult {
   preTaxAmount: number;
@@ -42,6 +43,23 @@ export function taxInfoFromResult(result: TaxResult): TaxInfo | null {
     amount: result.taxAmount,
     guildId: result.guildId,
   };
+}
+
+/**
+ * Inflate a fixed turn cost by the guild tax rate, spend the inflated amount,
+ * and route the tax to the guild treasury — all in one atomic step.
+ * Use for fixed-cost routes (crafting, forge, salvage, travel).
+ */
+export async function spendWithTaxTx(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  baseCost: number,
+): Promise<{ turnSpend: SpendTurnsResult; taxResult: TaxResult }> {
+  const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
+  const actualCost = calculateInflatedCost(baseCost, taxRate);
+  const turnSpend = await spendPlayerTurnsTx(tx, playerId, actualCost);
+  const taxResult = await applyGuildTaxTx(tx, playerId, actualCost);
+  return { turnSpend, taxResult };
 }
 
 /**

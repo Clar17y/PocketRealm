@@ -15,11 +15,10 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from '../../services/inventoryService';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
-import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, taxInfoFromResult } from '../../services/guildTaxService';
+import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { incrementContractProgress } from '../../services/guildContractService';
 import { serializeXpGrant, assertNotRecovering, trackAchievements } from '../../utils/routeHelpers.js';
@@ -109,10 +108,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
 
     const baseTurnCost = recipe.turnCost * quantity;
     const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
-      const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
-      const totalTurnCost = calculateInflatedCost(baseTurnCost, taxRate);
-      const spent = await spendPlayerTurnsTx(tx, playerId, totalTurnCost);
-      const tax = await applyGuildTaxTx(tx, playerId, totalTurnCost);
+      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, baseTurnCost);
 
       for (const mat of materials) {
         await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * quantity);
