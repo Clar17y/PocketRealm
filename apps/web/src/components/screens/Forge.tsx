@@ -33,6 +33,7 @@ interface ForgeProps {
   isRecovering?: boolean;
   recoveryCost?: number | null;
   zoneCraftingLevel: number | null;
+  guildTaxRate?: number;
 }
 
 function statEntries(stats: Record<string, unknown> | null | undefined): Array<[string, number]> {
@@ -59,6 +60,7 @@ export function Forge({
   isRecovering = false,
   recoveryCost,
   zoneCraftingLevel,
+  guildTaxRate = 0,
 }: ForgeProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(items[0]?.id ?? null);
   const [selectedUpgradeSacrificeId, setSelectedUpgradeSacrificeId] = useState<string | null>(null);
@@ -249,7 +251,10 @@ export function Forge({
                 Success keeps existing bonus stats and adds one new bonus roll.
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
-                Cost: {upgradeCost ?? '-'} turns + 1 sacrificial {selected?.rarity ?? ''} {selected?.type ?? 'item'}
+                Cost: {upgradeCost !== null && guildTaxRate > 0
+                  ? `${Math.ceil(upgradeCost / (1 - guildTaxRate / 100))} turns (${Math.ceil(upgradeCost / (1 - guildTaxRate / 100)) - upgradeCost} tax)`
+                  : `${upgradeCost ?? '-'} turns`
+                } + 1 sacrificial {selected?.rarity ?? ''} {selected?.type ?? 'item'}
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
                 Success: {typeof upgradeChance === 'number' ? `${(upgradeChance * 100).toFixed(1)}%` : '-'}
@@ -317,7 +322,10 @@ export function Forge({
                 Rerolls all bonus stats for current rarity.
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
-                Cost: {rerollCost ?? '-'} turns + 1 sacrificial duplicate at same rarity
+                Cost: {rerollCost !== null && guildTaxRate > 0
+                  ? `${Math.ceil(rerollCost / (1 - guildTaxRate / 100))} turns (${Math.ceil(rerollCost / (1 - guildTaxRate / 100)) - rerollCost} tax)`
+                  : `${rerollCost ?? '-'} turns`
+                } + 1 sacrificial duplicate at same rarity
               </div>
 
               <div className="space-y-1">

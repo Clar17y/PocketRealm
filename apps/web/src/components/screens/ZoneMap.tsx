@@ -53,6 +53,7 @@ interface ZoneMapProps {
   explorationSpeedMs?: number;
   onTravel: (zoneId: string) => void;
   onExploreCurrentZone: () => void;
+  guildTaxRate?: number;
 }
 
 /** BFS from the starter zone to compute shortest-path tier for each zone. */
@@ -112,6 +113,7 @@ export function ZoneMap({
   explorationSpeedMs,
   onTravel,
   onExploreCurrentZone,
+  guildTaxRate = 0,
 }: ZoneMapProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
@@ -182,7 +184,9 @@ export function ZoneMap({
     selectedZone.id !== currentZoneId &&
     !isRecovering &&
     !playbackActive &&
-    availableTurns >= selectedZone.travelCost;
+    availableTurns >= (guildTaxRate > 0
+      ? Math.ceil(selectedZone.travelCost / (1 - guildTaxRate / 100))
+      : selectedZone.travelCost);
 
   return (
     <div className="space-y-4">
@@ -422,12 +426,18 @@ export function ZoneMap({
             {selectedZone.zoneType === 'town' && (
               <span className="text-[var(--rpg-text-secondary)]">{'\u{1F3D8}\uFE0F'} Town</span>
             )}
-            {selectedZone.travelCost > 0 && (
-              <div className="flex items-center gap-1 text-[var(--rpg-gold)]">
-                <Hourglass size={12} />
-                <span>{selectedZone.travelCost} turns</span>
-              </div>
-            )}
+            {selectedZone.travelCost > 0 && (() => {
+              const inflated = guildTaxRate > 0
+                ? Math.ceil(selectedZone.travelCost / (1 - guildTaxRate / 100))
+                : selectedZone.travelCost;
+              const taxAmount = inflated - selectedZone.travelCost;
+              return (
+                <div className="flex items-center gap-1 text-[var(--rpg-gold)]">
+                  <Hourglass size={12} />
+                  <span>{inflated} turns{taxAmount > 0 ? ` (${taxAmount} tax)` : ''}</span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Exploration progress bar */}
@@ -496,11 +506,14 @@ export function ZoneMap({
               onClick={() => onTravel(selectedZone.id)}
               disabled={!canTravel}
             >
-              {isRecovering
-                ? 'Recover first to travel'
-                : availableTurns < selectedZone.travelCost
-                ? `Need ${selectedZone.travelCost} turns (have ${availableTurns})`
-                : `Travel to ${selectedZone.name} (${selectedZone.travelCost} turns)`}
+              {(() => {
+                const inflated = guildTaxRate > 0
+                  ? Math.ceil(selectedZone.travelCost / (1 - guildTaxRate / 100))
+                  : selectedZone.travelCost;
+                if (isRecovering) return 'Recover first to travel';
+                if (availableTurns < inflated) return `Need ${inflated} turns (have ${availableTurns})`;
+                return `Travel to ${selectedZone.name} (${inflated} turns)`;
+              })()}
             </PixelButton>
           )}
         </div>

@@ -60,6 +60,7 @@ interface GatheringProps {
   onStartGathering: (nodeId: string, turns: number) => void;
   isRecovering?: boolean;
   recoveryCost?: number | null;
+  guildTaxRate?: number;
 }
 
 export function Gathering({
@@ -83,6 +84,7 @@ export function Gathering({
   onStartGathering,
   isRecovering = false,
   recoveryCost,
+  guildTaxRate = 0,
 }: GatheringProps) {
   const getNodeTurnsToDeplete = (node: ResourceNode) => {
     const levelsAbove = Math.max(0, skillLevel - node.levelRequired);
@@ -127,7 +129,10 @@ export function Gathering({
 
   const calculateYield = (node: ResourceNode, turns: number) => {
     // Match backend formula exactly: linear +10% per level above requirement
-    const maxActionsByTurns = Math.floor(turns / GATHERING_CONSTANTS.BASE_TURN_COST);
+    const effective = guildTaxRate > 0
+      ? Math.floor(turns * (1 - guildTaxRate / 100))
+      : turns;
+    const maxActionsByTurns = Math.floor(effective / GATHERING_CONSTANTS.BASE_TURN_COST);
     const levelsAbove = Math.max(0, skillLevel - node.levelRequired);
     const yieldMultiplier = 1 + levelsAbove * GATHERING_CONSTANTS.YIELD_MULTIPLIER_PER_LEVEL;
     const baseYield = Math.max(node.baseYield, GATHERING_CONSTANTS.BASE_YIELD);
@@ -319,6 +324,11 @@ export function Gathering({
               <h3 className="font-semibold text-[var(--rpg-text-primary)]">Turn Investment</h3>
               <div className="text-right">
                 <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">{turnInvestment[0]}</div>
+                {guildTaxRate > 0 && (
+                  <div className="text-xs text-[var(--rpg-text-secondary)]">
+                    {Math.floor(turnInvestment[0] * (1 - guildTaxRate / 100))} effective ({guildTaxRate}% tax)
+                  </div>
+                )}
                 <div className="text-xs text-[var(--rpg-text-secondary)]">of {availableTurns.toLocaleString()} available</div>
               </div>
             </div>

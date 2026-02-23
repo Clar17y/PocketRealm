@@ -31,6 +31,8 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
     healAmount: number;
     resultingHp: number;
     turnsNeeded: number;
+    effectiveTurns?: number;
+    taxRate?: number;
   } | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -66,6 +68,8 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
           healAmount: result.data.healAmount ?? 0,
           resultingHp: result.data.resultingHp ?? 0,
           turnsNeeded: result.data.turnsNeeded ?? 0,
+          effectiveTurns: result.data.effectiveTurns,
+          taxRate: result.data.taxRate,
         });
       }
     }, 300);
@@ -253,6 +257,11 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
                 <span className="text-sm text-[var(--rpg-text-secondary)]">Turns to spend</span>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">{turns}</div>
+                  {estimate?.taxRate != null && estimate.taxRate > 0 && estimate.effectiveTurns != null && (
+                    <div className="text-xs text-[var(--rpg-text-secondary)]">
+                      {estimate.effectiveTurns} effective ({estimate.taxRate}% tax)
+                    </div>
+                  )}
                   <div className="text-xs text-[var(--rpg-text-secondary)]">of {availableTurns.toLocaleString()} available</div>
                 </div>
               </div>

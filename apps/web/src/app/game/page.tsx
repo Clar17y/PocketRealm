@@ -285,6 +285,7 @@ export default function GamePage() {
     lowHpWarning,
     handleSetLowHpWarning,
     handleQuickRest,
+    guildTaxRate,
     zoneCraftingLevel,
     zoneCraftingName,
     loadTurnsAndHp,
@@ -435,6 +436,7 @@ export default function GamePage() {
             quickRestPercent={quickRestHealPercent}
             busyAction={busyAction}
             onNavigateToRest={() => handleNavigate('rest')}
+            guildTaxRate={guildTaxRate}
           />
         );
       case 'inventory':
@@ -611,6 +613,7 @@ export default function GamePage() {
             explorationSpeedMs={explorationSpeedMs}
             onTravel={handleTravelToZone}
             onExploreCurrentZone={() => setActiveScreen('explore')}
+            guildTaxRate={guildTaxRate}
           />
         );
       case 'bestiary':
@@ -703,6 +706,7 @@ export default function GamePage() {
               zoneCraftingLevel={zoneCraftingLevel}
               zoneName={zoneCraftingName}
               defaultMaxQuantity={activeCraftingSkill === 'refining' && defaultRefiningMax}
+              guildTaxRate={guildTaxRate}
             />
           </div>
         );
@@ -735,6 +739,7 @@ export default function GamePage() {
             isRecovering={hpState.isRecovering}
             recoveryCost={hpState.recoveryCost}
             zoneCraftingLevel={zoneCraftingLevel}
+            guildTaxRate={guildTaxRate}
           />
         );
       case 'gathering':
@@ -792,6 +797,7 @@ export default function GamePage() {
               onStartGathering={handleMine}
               isRecovering={hpState.isRecovering}
               recoveryCost={hpState.recoveryCost}
+              guildTaxRate={guildTaxRate}
             />
           </div>
         );

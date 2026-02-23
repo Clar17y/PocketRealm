@@ -55,9 +55,10 @@ interface ExplorationProps {
   quickRestPercent?: number;
   busyAction?: string | null;
   onNavigateToRest?: () => void;
+  guildTaxRate?: number;
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0 }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
 
@@ -73,7 +74,10 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
     return { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance };
   };
 
-  const { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance } = calculateProbabilities(turnInvestment[0]);
+  const effectiveTurns = guildTaxRate > 0
+    ? Math.floor(turnInvestment[0] * (1 - guildTaxRate / 100))
+    : turnInvestment[0];
+  const { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance } = calculateProbabilities(effectiveTurns);
 
   return (
     <div className="space-y-4">
@@ -180,6 +184,11 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                   <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">
                     {turnInvestment[0].toLocaleString()}
                   </div>
+                  {guildTaxRate > 0 && (
+                    <div className="text-xs text-[var(--rpg-text-secondary)]">
+                      {effectiveTurns.toLocaleString()} effective ({guildTaxRate}% tax)
+                    </div>
+                  )}
                   <div className="text-xs text-[var(--rpg-text-secondary)]">
                     of {availableTurns.toLocaleString()} available
                   </div>
