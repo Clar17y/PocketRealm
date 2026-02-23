@@ -1058,7 +1058,12 @@ export default function GamePage() {
 
   return (
     <>
-      <AppShell turns={turns} username={player?.username}>
+      <AppShell
+  turns={turns}
+  username={player?.username}
+  onSettings={() => handleNavigate('settings')}
+  onLogout={() => { logout(); router.push('/'); }}
+>
         {/* Broken gear warning banner */}
         {equipment.some((e) => {
           if (!e.item) return false;

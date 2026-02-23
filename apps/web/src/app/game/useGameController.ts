@@ -810,10 +810,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, []);
 
   const getActiveTab = () => {
-    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'guild', 'admin'].includes(activeScreen)) return 'home';
+    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'admin'].includes(activeScreen)) return 'home';
     if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
     if (['combat', 'arena'].includes(activeScreen)) return 'combat';
+    if (activeScreen === 'guild') return 'guild';
     return 'settings';
   };
 
