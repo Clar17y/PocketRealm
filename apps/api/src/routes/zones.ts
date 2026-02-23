@@ -33,7 +33,7 @@ import {
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../services/combatStatsService';
 import { calculateExplorationPercent, getExplorationPercent } from '../services/zoneExplorationService';
 import { asyncHandler } from '../utils/asyncHandler';
-import { applyGuildTax } from '../services/guildTaxService';
+import { applyGuildTax, getPlayerTaxRate, calculateInflatedCost, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 
 
@@ -247,13 +247,15 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
   const isTownDeparture = currentZone.zoneType === 'town';
   const baseTravelCost: number = isTownDeparture ? destinationZone.travelCost : currentZone.travelCost;
   const guildMods = await getPlayerGuildModifiers(playerId);
-  const travelCost = guildMods.travelCostReduction > 0
+  const guildReducedCost = guildMods.travelCostReduction > 0
     ? Math.max(1, Math.round(baseTravelCost * (1 - guildMods.travelCostReduction)))
     : baseTravelCost;
 
-  // 9. Spend turns + guild tax
+  // 9. Inflate by guild tax, spend, route tax to treasury
+  const { taxRate } = await getPlayerTaxRate(playerId);
+  const travelCost = calculateInflatedCost(guildReducedCost, taxRate);
   await spendPlayerTurns(playerId, travelCost);
-  await applyGuildTax(playerId, travelCost);
+  const taxResult = await applyGuildTax(playerId, travelCost);
 
   const events: TravelEvent[] = [];
 
@@ -482,6 +484,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
               refundedTurns: refundAmount,
               respawnedTo: respawn,
               newDiscoveries: discoveredZones,
+              tax: taxInfoFromResult(taxResult),
             });
             return;
           } else {
@@ -564,6 +567,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
               refundedTurns: refundAmount,
               respawnedTo: null,
               newDiscoveries: [],
+              tax: taxInfoFromResult(taxResult),
             });
             return;
           }
@@ -616,5 +620,6 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     refundedTurns: 0,
     respawnedTo: null,
     newDiscoveries,
+    tax: taxInfoFromResult(taxResult),
   });
 }));
