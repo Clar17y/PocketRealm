@@ -54,6 +54,7 @@ export {
   destroyInventoryItem,
   useItem,
   repairItem,
+  repairAllEquipped,
   equip,
   unequip,
   getGatheringNodes,

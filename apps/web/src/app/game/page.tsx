@@ -232,6 +232,7 @@ export default function GamePage() {
     combatPlaybackData,
     combatPlaybackQueue,
     combatPlaybackIndex,
+    roomTransition,
     explorationPlaybackData,
     travelPlaybackData,
     currentZone,
@@ -258,6 +259,7 @@ export default function GamePage() {
     handleForgeReroll,
     handleDestroyItem,
     handleRepairItem,
+    handleRepairAllEquipped,
     handleUseItem,
     handleEquipItem,
     handleUnequipSlot,
@@ -280,6 +282,8 @@ export default function GamePage() {
     handleSetQuickRestHealPercent,
     defaultRefiningMax,
     handleSetDefaultRefiningMax,
+    lowHpWarning,
+    handleSetLowHpWarning,
     handleQuickRest,
     zoneCraftingLevel,
     zoneCraftingName,
@@ -415,6 +419,9 @@ export default function GamePage() {
             activityLog={activityLog}
             isRecovering={hpState.isRecovering}
             recoveryCost={hpState.recoveryCost}
+            currentHp={hpState.currentHp}
+            maxHp={hpState.maxHp}
+            regenPerSecond={hpState.regenPerSecond}
             playbackData={explorationPlaybackData}
             onPlaybackComplete={handleExplorationPlaybackComplete}
             onPlaybackSkip={handlePlaybackSkip}
@@ -423,6 +430,11 @@ export default function GamePage() {
             explorationSpeedMs={explorationSpeedMs}
             defaultTurns={defaultExploreTurns}
             tutorialLocked={tutorialStep === TUTORIAL_STEP_EXPLORE}
+            lowHpWarning={lowHpWarning}
+            onQuickRest={handleQuickRest}
+            quickRestPercent={quickRestHealPercent}
+            busyAction={busyAction}
+            onNavigateToRest={() => handleNavigate('rest')}
           />
         );
       case 'inventory':
@@ -509,6 +521,9 @@ export default function GamePage() {
               })}
             onEquip={handleEquipItem}
             onUnequip={handleUnequipSlot}
+            onRepairItem={handleRepairItem}
+            onRepairAll={handleRepairAllEquipped}
+            turns={turns}
             stats={(() => {
               let attack = 0;
               let defence = 0;
@@ -817,9 +832,18 @@ export default function GamePage() {
             autoSkipCombat={!!shouldAutoSkipCombat}
             onCombatPlaybackComplete={handleCombatPlaybackComplete}
             fightProgress={combatPlaybackQueue && combatPlaybackQueue.length > 1
-              ? { current: combatPlaybackIndex + 1, total: combatPlaybackQueue.length }
+              ? {
+                  current: combatPlaybackIndex + 1,
+                  total: combatPlaybackQueue.length,
+                  room: combatPlaybackQueue[combatPlaybackIndex]?.room,
+                }
               : null
             }
+            roomTransition={roomTransition}
+            lowHpWarning={lowHpWarning}
+            onQuickRest={handleQuickRest}
+            quickRestPercent={quickRestHealPercent}
+            onNavigateToRest={() => handleNavigate('rest')}
           />
         );
       }
@@ -898,6 +922,16 @@ export default function GamePage() {
                     <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
                       {autoPotionThreshold === 0 ? 'Off' : `${autoPotionThreshold}%`}
                     </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-[var(--rpg-text-secondary)]">Low HP Warning</p>
+                      <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Show confirmation when starting actions below 25% HP</p>
+                    </div>
+                    <ToggleSwitch checked={lowHpWarning} onChange={handleSetLowHpWarning} />
                   </div>
                 </div>
               </div>

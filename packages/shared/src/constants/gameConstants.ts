@@ -325,6 +325,7 @@ export const HP_CONSTANTS = {
 
   /** HP percentage restored after recovery */
   RECOVERY_EXIT_HP_PERCENT: 0.25,
+  LOW_HP_WARNING_THRESHOLD: 0.25,
 } as const;
 
 export const FLEE_CONSTANTS = {

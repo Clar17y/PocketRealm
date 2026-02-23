@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from 'react';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
+import { HpStatusBar } from '@/components/common/HpStatusBar';
+import { LowHpWarningDialog } from '@/components/common/LowHpWarningDialog';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
@@ -10,7 +12,7 @@ import { BossHistory } from '@/components/screens/BossHistory';
 import { Pagination } from '@/components/common/Pagination';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { monsterImageSrc } from '@/lib/assets';
-import { getMobPrefixDefinition } from '@adventure/shared';
+import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../useGameController';
 
 interface CombatScreenProps {
@@ -58,7 +60,12 @@ interface CombatScreenProps {
   combatSpeedMs?: number;
   autoSkipCombat?: boolean;
   onCombatPlaybackComplete?: () => void;
-  fightProgress?: { current: number; total: number } | null;
+  fightProgress?: { current: number; total: number; room?: number } | null;
+  roomTransition?: { entering: number } | null;
+  lowHpWarning?: boolean;
+  onQuickRest?: () => Promise<void>;
+  quickRestPercent?: number;
+  onNavigateToRest?: () => void;
 }
 
 export function CombatScreen({
@@ -88,12 +95,35 @@ export function CombatScreen({
   autoSkipCombat,
   onCombatPlaybackComplete,
   fightProgress,
+  roomTransition,
+  lowHpWarning,
+  onQuickRest,
+  quickRestPercent,
+  onNavigateToRest,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [strategyModalSite, setStrategyModalSite] = useState<PendingEncounter | null>(null);
+  const [lowHpPendingSite, setLowHpPendingSite] = useState<PendingEncounter | null>(null);
 
   const handleFightClick = (site: PendingEncounter) => {
+    if (
+      lowHpWarning &&
+      hpState.maxHp > 0 &&
+      (hpState.currentHp / hpState.maxHp) < HP_CONSTANTS.LOW_HP_WARNING_THRESHOLD
+    ) {
+      setLowHpPendingSite(site);
+      return;
+    }
+    if (!site.clearStrategy) {
+      setStrategyModalSite(site);
+    } else {
+      void onStartCombat(site.encounterSiteId);
+    }
+  };
+
+  const proceedWithFight = (site: PendingEncounter) => {
+    setLowHpPendingSite(null);
     if (!site.clearStrategy) {
       setStrategyModalSite(site);
     } else {
@@ -201,9 +231,24 @@ export function CombatScreen({
         </div>
       )}
 
+      {/* Low HP Warning Dialog */}
+      {lowHpPendingSite && (
+        <LowHpWarningDialog
+          currentHp={hpState.currentHp}
+          maxHp={hpState.maxHp}
+          onProceed={() => proceedWithFight(lowHpPendingSite)}
+          onCancel={() => setLowHpPendingSite(null)}
+        />
+      )}
+
       {/* Knockout Banner */}
       {hpState.isRecovering && (
-        <KnockoutBanner action="fighting" recoveryCost={hpState.recoveryCost} />
+        <KnockoutBanner action="fighting" recoveryCost={hpState.recoveryCost} onClick={onNavigateToRest} />
+      )}
+
+      {/* HP Status */}
+      {!combatPlaybackData && !hpState.isRecovering && (
+        <HpStatusBar currentHp={hpState.currentHp} maxHp={hpState.maxHp} regenPerSecond={hpState.regenPerSecond} onQuickRest={onQuickRest} quickRestPercent={quickRestPercent} busyAction={busyAction} />
       )}
 
       <div className="flex gap-2">
@@ -381,12 +426,27 @@ export function CombatScreen({
             )}
           </div>
 
+          {/* Room transition interstitial */}
+          {roomTransition && (
+            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)]/30 rounded-lg p-6 text-center">
+              <div className="text-lg font-bold text-[var(--rpg-gold)] mb-1">
+                Entering Room {roomTransition.entering}
+              </div>
+              <div className="text-sm text-[var(--rpg-text-secondary)]">
+                Prepare for the next fight...
+              </div>
+            </div>
+          )}
+
           {/* Combat Playback (animated) */}
-          {combatPlaybackData && (
+          {combatPlaybackData && !roomTransition && (
             <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3">
               {fightProgress && fightProgress.total > 1 && (
                 <div className="text-sm text-[var(--rpg-gold)] font-semibold mb-2">
-                  Fight {fightProgress.current}/{fightProgress.total}
+                  {fightProgress.room
+                    ? `Room ${fightProgress.room} — Fight ${fightProgress.current}/${fightProgress.total}`
+                    : `Fight ${fightProgress.current}/${fightProgress.total}`
+                  }
                 </div>
               )}
               <CombatPlayback

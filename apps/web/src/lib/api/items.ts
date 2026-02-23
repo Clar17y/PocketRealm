@@ -67,6 +67,25 @@ export async function repairItem(itemId: string) {
   });
 }
 
+export async function repairAllEquipped() {
+  return fetchApi<{
+    repaired: boolean;
+    turns?: TurnStateResponse;
+    totalTurnCost: number;
+    items: Array<{
+      itemId: string;
+      name: string;
+      slot: string;
+      turnCost: number;
+      currentDurability: number;
+      maxDurability: number;
+      maxDurabilityDecay: number;
+    }>;
+  }>('/api/v1/inventory/repair-equipped', {
+    method: 'POST',
+  });
+}
+
 // Equipment
 
 export async function equip(itemId: string, slot: string) {

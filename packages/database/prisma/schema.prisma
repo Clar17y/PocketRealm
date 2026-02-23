@@ -46,6 +46,7 @@ model Player {
   defaultExploreTurns Int     @default(100)  @map("default_explore_turns")
   quickRestHealPercent Int    @default(100)  @map("quick_rest_heal_percent")
   defaultRefiningMax  Boolean @default(false) @map("default_refining_max")
+  lowHpWarning        Boolean @default(true)  @map("low_hp_warning")
 
   // Zone / Travel
   currentZoneId          String? @map("current_zone_id")

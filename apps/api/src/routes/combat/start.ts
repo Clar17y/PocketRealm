@@ -111,8 +111,26 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     if (!advanced) throw new AppError(410, 'Encounter site has decayed', 'SITE_DECAYED');
   }
 
-  // Upfront turn cost for entire room
-  const totalTurnCost = roomMobs.length * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST;
+  // Collect mobs for this combat session
+  let allSessionMobs: Array<{ roomNumber: number; mobs: typeof roomMobs }> = [];
+
+  if (siteStrategy === 'full_clear' && siteFullClearActive) {
+    // Full clear: gather all remaining rooms
+    const allRooms = [...new Set(decayed.mobs.map(m => m.room))].sort((a, b) => a - b);
+    for (const r of allRooms) {
+      if (r < currentRoom) continue;
+      const alive = getAllAliveMobsInRoom(decayed.mobs, r);
+      if (alive.length > 0) allSessionMobs.push({ roomNumber: r, mobs: alive });
+    }
+  } else {
+    // Room-by-room: just current room
+    allSessionMobs = [{ roomNumber: currentRoom, mobs: roomMobs }];
+  }
+
+  // Full clear charges turns for all remaining rooms upfront. No refund on mid-clear defeat.
+  // This is intentional: the risk/reward tradeoff is core to the full_clear strategy.
+  const totalMobCount = allSessionMobs.reduce((sum, r) => sum + r.mobs.length, 0);
+  const totalTurnCost = totalMobCount * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST;
 
   // Load zone
   const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
@@ -120,9 +138,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   const explorationProgress = await getExplorationPercent(playerId, zoneId);
 
-  // Batch-load mob templates
-  const mobTemplateIds = [...new Set(roomMobs.map(m => m.mobTemplateId))];
-  const mobTemplateRows = await prisma.mobTemplate.findMany({ where: { id: { in: mobTemplateIds } } });
+  // Batch-load mob templates for all session rooms
+  const allMobTemplateIds = [...new Set(allSessionMobs.flatMap(s => s.mobs.map(m => m.mobTemplateId)))];
+  const mobTemplateRows = await prisma.mobTemplate.findMany({ where: { id: { in: allMobTemplateIds } } });
   const mobTemplateById = new Map(mobTemplateRows.map(t => [t.id, t]));
 
   // Build player stats once
@@ -158,114 +176,128 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const zoneModifiers = await getActiveZoneModifiers(zoneId);
   const activeEventEffects = await getActiveEventSummaries(zoneId);
 
-  // Fight loop
+  // Fight loop — iterate rooms (full clear) or single room (room-by-room)
   const fightResults: FightResult[] = [];
   let lastCombatResult: ReturnType<typeof runCombat> | null = null;
   let lastPrefixedMob: (MobTemplate & { mobPrefix: string | null; mobDisplayName: string | null }) | null = null;
   let lastBaseMob: MobTemplate | null = null;
+  let defeatedInRoom = currentRoom;
+  let playerDefeated = false;
 
-  for (const roomMob of roomMobs) {
-    const template = mobTemplateById.get(roomMob.mobTemplateId);
-    if (!template) continue;
+  for (const session of allSessionMobs) {
+    currentRoom = session.roomNumber;
 
-    const baseMob = toMobTemplate(template as unknown as Record<string, unknown>);
-    const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
-    const prefixedMob = applyMobPrefix(modifiedMob, roomMob.prefix ?? null);
+    for (const roomMob of session.mobs) {
+      const template = mobTemplateById.get(roomMob.mobTemplateId);
+      if (!template) continue;
 
-    const playerStartHp = currentPlayerHp;
-    const playerStats = buildPlayerCombatStats(
-      currentPlayerHp,
-      hpState.maxHp,
-      { attackStyle: attackSkill, skillLevel: attackLevel, attributes: progression.attributes },
-      equipmentStats
-    );
+      const baseMob = toMobTemplate(template as unknown as Record<string, unknown>);
+      const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
+      const prefixedMob = applyMobPrefix(modifiedMob, roomMob.prefix ?? null);
 
-    // Apply guild combat modifiers
-    if (guildMods.combatDamage > 0) {
-      playerStats.damageMin = Math.round(playerStats.damageMin * (1 + guildMods.combatDamage));
-      playerStats.damageMax = Math.round(playerStats.damageMax * (1 + guildMods.combatDamage));
-    }
-    if (guildMods.defenseBoost > 0) {
-      playerStats.defence = Math.round(playerStats.defence * (1 + guildMods.defenseBoost));
-      playerStats.magicDefence = Math.round(playerStats.magicDefence * (1 + guildMods.defenseBoost));
-    }
+      const playerStartHp = currentPlayerHp;
+      const playerStats = buildPlayerCombatStats(
+        currentPlayerHp,
+        hpState.maxHp,
+        { attackStyle: attackSkill, skillLevel: attackLevel, attributes: progression.attributes },
+        equipmentStats
+      );
 
-    let combatOptions: CombatOptions | undefined;
-    if (autoPotionThreshold > 0 && potionPool.length > 0) {
-      combatOptions = { autoPotionThreshold, potions: [...potionPool] };
-    }
+      // Apply guild combat modifiers
+      if (guildMods.combatDamage > 0) {
+        playerStats.damageMin = Math.round(playerStats.damageMin * (1 + guildMods.combatDamage));
+        playerStats.damageMax = Math.round(playerStats.damageMax * (1 + guildMods.combatDamage));
+      }
+      if (guildMods.defenseBoost > 0) {
+        playerStats.defence = Math.round(playerStats.defence * (1 + guildMods.defenseBoost));
+        playerStats.magicDefence = Math.round(playerStats.magicDefence * (1 + guildMods.defenseBoost));
+      }
 
-    const combatantA: Combatant = { id: playerId, name: req.player!.username, stats: playerStats };
-    const combatantB: Combatant = {
-      id: prefixedMob.id,
-      name: prefixedMob.mobDisplayName ?? prefixedMob.name,
-      stats: mobToCombatantStats(prefixedMob),
-      spells: prefixedMob.spellPattern,
-    };
+      let combatOptions: CombatOptions | undefined;
+      if (autoPotionThreshold > 0 && potionPool.length > 0) {
+        combatOptions = { autoPotionThreshold, potions: [...potionPool] };
+      }
 
-    const combatResult = runCombat(combatantA, combatantB, combatOptions);
-    lastCombatResult = combatResult;
-    lastPrefixedMob = prefixedMob;
-    lastBaseMob = baseMob;
+      const combatantA: Combatant = { id: playerId, name: req.player!.username, stats: playerStats };
+      const combatantB: Combatant = {
+        id: prefixedMob.id,
+        name: prefixedMob.mobDisplayName ?? prefixedMob.name,
+        stats: mobToCombatantStats(prefixedMob),
+        spells: prefixedMob.spellPattern,
+      };
 
-    // Remove consumed potions from shared pool
-    for (const consumed of combatResult.potionsConsumed) {
-      const idx = potionPool.findIndex(p => p.templateId === consumed.templateId);
-      if (idx !== -1) potionPool.splice(idx, 1);
-      allPotionsConsumed.push(consumed);
-    }
+      const combatResult = runCombat(combatantA, combatantB, combatOptions);
+      lastCombatResult = combatResult;
+      lastPrefixedMob = prefixedMob;
+      lastBaseMob = baseMob;
 
-    // Per-mob post-combat rewards (only on victory)
-    let mobLoot: LootDropWithName[] = [];
-    let mobXpGrant: Awaited<ReturnType<typeof grantSkillXp>> | null = null;
-    const mobXpAwarded = combatResult.outcome === 'victory' ? Math.max(0, prefixedMob.xpReward) : 0;
-    const mobDurabilityLost = await degradeEquippedDurability(playerId);
+      // Remove consumed potions from shared pool
+      for (const consumed of combatResult.potionsConsumed) {
+        const idx = potionPool.findIndex(p => p.templateId === consumed.templateId);
+        if (idx !== -1) potionPool.splice(idx, 1);
+        allPotionsConsumed.push(consumed);
+      }
 
-    if (combatResult.outcome === 'victory') {
-      await setHp(playerId, combatResult.combatantAHpRemaining);
-      const rawLoot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
-      mobLoot = await enrichLootWithNames(rawLoot);
-      mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded, undefined, guildMods.xpBoost || undefined);
+      // Per-mob post-combat rewards (only on victory)
+      let mobLoot: LootDropWithName[] = [];
+      let mobXpGrant: Awaited<ReturnType<typeof grantSkillXp>> | null = null;
+      const mobXpAwarded = combatResult.outcome === 'victory' ? Math.max(0, prefixedMob.xpReward) : 0;
+      const mobDurabilityLost = await degradeEquippedDurability(playerId);
 
-      // Bestiary
-      await recordBestiaryKill(playerId, prefixedMob.id, prefixedMob.mobPrefix);
+      if (combatResult.outcome === 'victory') {
+        await setHp(playerId, combatResult.combatantAHpRemaining);
+        const rawLoot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+        mobLoot = await enrichLootWithNames(rawLoot);
+        mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded, undefined, guildMods.xpBoost || undefined);
 
-      // Guild XP and contract progress
-      const guildId = await getPlayerGuildId(playerId);
-      if (guildId) {
-        await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
-        void incrementContractProgress(guildId, 'kill_count', 1).catch(() => {});
-        void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
+        // Bestiary
+        await recordBestiaryKill(playerId, prefixedMob.id, prefixedMob.mobPrefix);
+
+        // Guild XP and contract progress
+        const guildId = await getPlayerGuildId(playerId);
+        if (guildId) {
+          await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
+          void incrementContractProgress(guildId, 'kill_count', 1).catch(() => {});
+          void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
+        }
+      }
+
+      fightResults.push({
+        room: session.roomNumber,
+        slot: roomMob.slot,
+        mobName: template.name as string,
+        mobDisplayName: prefixedMob.mobDisplayName ?? prefixedMob.name,
+        mobTemplateId: prefixedMob.id,
+        mobPrefix: prefixedMob.mobPrefix,
+        outcome: combatResult.outcome,
+        playerMaxHp: combatResult.combatantAMaxHp,
+        playerStartHp,
+        mobMaxHp: combatResult.combatantBMaxHp,
+        log: combatResult.log,
+        playerHpRemaining: combatResult.combatantAHpRemaining,
+        potionsConsumed: combatResult.potionsConsumed,
+        xp: mobXpAwarded,
+        loot: mobLoot,
+        durabilityLost: mobDurabilityLost,
+        skillXp: mobXpGrant,
+      });
+
+      // Carry HP
+      currentPlayerHp = combatResult.combatantAHpRemaining;
+
+      // Stop on defeat
+      if (combatResult.outcome !== 'victory') {
+        defeatedInRoom = session.roomNumber;
+        playerDefeated = true;
+        break;
       }
     }
 
-    fightResults.push({
-      mobName: template.name as string,
-      mobDisplayName: prefixedMob.mobDisplayName ?? prefixedMob.name,
-      mobTemplateId: prefixedMob.id,
-      mobPrefix: prefixedMob.mobPrefix,
-      outcome: combatResult.outcome,
-      playerMaxHp: combatResult.combatantAMaxHp,
-      playerStartHp,
-      mobMaxHp: combatResult.combatantBMaxHp,
-      log: combatResult.log,
-      playerHpRemaining: combatResult.combatantAHpRemaining,
-      potionsConsumed: combatResult.potionsConsumed,
-      xp: mobXpAwarded,
-      loot: mobLoot,
-      durabilityLost: mobDurabilityLost,
-      skillXp: mobXpGrant,
-    });
-
-    // Carry HP
-    currentPlayerHp = combatResult.combatantAHpRemaining;
-
-    // Stop on defeat
-    if (combatResult.outcome !== 'victory') break;
+    if (playerDefeated) break;
   }
 
   // --- Transaction: spend turns, mark defeated mobs, room/site clearing ---
-  const defeatedSlots = fightResults.filter(f => f.outcome === 'victory').map((_f, i) => roomMobs[i]!.slot);
+  const defeatedSlots = fightResults.filter(f => f.outcome === 'victory').map(f => f.slot);
   let encounterSiteCleared = false;
   let roomCleared = false;
 
@@ -289,27 +321,31 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     }
 
     // Room-aware post-combat logic
-    const roomState = getRoomState(mobs, currentRoom);
     let newCurrentRoom = currentRoom;
     let newRoomCarryHp: number | null = currentPlayerHp;
     let siteCleared = false;
 
-    if (roomState.alive <= 0) {
+    if (!playerDefeated) {
+      // All fights won
       roomCleared = true;
-      if (siteStrategy === 'full_clear' && siteFullClearActive) {
-        const nextRoom = getNextUnfinishedRoom(mobs, currentRoom + 1);
-        if (nextRoom) { newCurrentRoom = nextRoom; }
-        else { siteCleared = true; }
+      const overallCounts = countEncounterSiteState(mobs);
+      if (overallCounts.alive <= 0) {
+        siteCleared = true;
       } else {
-        const overallCounts = countEncounterSiteState(mobs);
-        if (overallCounts.alive <= 0) {
-          siteCleared = true;
-        } else {
-          const nextRoom = getNextUnfinishedRoom(mobs, currentRoom + 1);
-          if (nextRoom) newCurrentRoom = nextRoom;
-          newRoomCarryHp = null;
-        }
+        const nextRoom = getNextUnfinishedRoom(mobs, currentRoom + 1);
+        if (nextRoom) newCurrentRoom = nextRoom;
+        else siteCleared = true;
       }
+    } else {
+      // Player was defeated mid-clear
+      const roomState = getRoomState(mobs, defeatedInRoom);
+      if (roomState.alive <= 0) {
+        roomCleared = true;
+        const nextRoom = getNextUnfinishedRoom(mobs, defeatedInRoom + 1);
+        if (nextRoom) newCurrentRoom = nextRoom;
+        else siteCleared = true;
+      }
+      newRoomCarryHp = null;
     }
 
     let completionRewards: Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>> | null = null;
@@ -365,7 +401,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       } else {
         const siteMobs = parseEncounterSiteMobs(siteForReset.mobs);
         const resetMobs = siteMobs.map(m =>
-          m.room === currentRoom && m.status === 'defeated' ? { ...m, status: 'alive' as const } : m
+          m.room === defeatedInRoom && m.status === 'defeated' ? { ...m, status: 'alive' as const } : m
         );
         await prismaAny.encounterSite.update({
           where: { id: encounterSiteId },
@@ -438,7 +474,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       result: {
         zoneId,
         zoneName: zone.name,
-        mobTemplateId: lastPrefixedMob?.id ?? roomMobs[0]?.mobTemplateId,
+        mobTemplateId: lastPrefixedMob?.id ?? fightResults[0]?.mobTemplateId,
         mobName: lastBaseMob?.name,
         mobPrefix: lastPrefixedMob?.mobPrefix,
         mobDisplayName: lastPrefixedMob?.mobDisplayName,
@@ -502,6 +538,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         fullClearActive: siteFullClearActive,
       },
       fights: fightResults.map(f => ({
+        room: f.room,
         mobName: f.mobName,
         mobDisplayName: f.mobDisplayName,
         mobTemplateId: f.mobTemplateId,
