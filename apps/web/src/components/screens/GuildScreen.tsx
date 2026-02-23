@@ -855,10 +855,12 @@ function JoinRequestsSection({
     try {
       const res = await getGuildJoinRequests(guildId);
       if (res.data) setRequests(res.data.requests);
-    } catch { /* */ } finally {
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load requests');
+    } finally {
       setLoading(false);
     }
-  }, [guildId]);
+  }, [guildId, setError]);
 
   useEffect(() => { void loadRequests(); }, [loadRequests]);
 
@@ -975,7 +977,7 @@ function GuildSettings({
 
   return (
     <div className="space-y-3">
-      {guild.recruitmentMode === 'invite_only' && (
+      {guild.recruitmentMode === 'invite_only' && (myRole === 'leader' || myRole === 'officer') && (
         <PixelCard>
           <h3 className="text-lg font-bold text-[var(--rpg-text-primary)] mb-3">Join Requests</h3>
           <JoinRequestsSection guildId={guild.id} onRefresh={onRefresh} setError={setError} />

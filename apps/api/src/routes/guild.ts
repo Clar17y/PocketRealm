@@ -112,7 +112,7 @@ guildRouter.post('/:id/request', asyncHandler(async (req, res) => {
 
 // GET /:id/requests — list pending join requests (officers/leaders only)
 guildRouter.get('/:id/requests', asyncHandler(async (req, res) => {
-  const requests = await getJoinRequests(req.player!.playerId);
+  const requests = await getJoinRequests(req.player!.playerId, req.params.id);
   res.json({ requests });
 }));
 

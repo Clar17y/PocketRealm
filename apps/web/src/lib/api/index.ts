@@ -173,6 +173,10 @@ export {
   getGuildSpecialization,
   selectGuildSpecialization,
   respecGuildSpecialization,
+  requestJoinGuild,
+  getGuildJoinRequests,
+  acceptJoinRequest,
+  rejectJoinRequest,
 } from './guild';
 export type {
   GuildResponse,
@@ -192,4 +196,6 @@ export type {
   GuildProjectContributionResponse,
   SpecializationStatusResponse,
   SpecializationTierBonusResponse,
+  GuildJoinRequestResponse,
+  GuildJoinRequestsResponse,
 } from './guild';

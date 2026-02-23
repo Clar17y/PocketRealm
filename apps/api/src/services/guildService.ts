@@ -384,8 +384,9 @@ export async function requestJoinGuild(playerId: string, guildId: string): Promi
   await addGuildLog(guildId, 'join_request_sent', `${player.username} requested to join`);
 }
 
-export async function getJoinRequests(officerId: string): Promise<JoinRequestData[]> {
+export async function getJoinRequests(officerId: string, guildId: string): Promise<JoinRequestData[]> {
   const membership = await requireRole(officerId, 'officer');
+  if (membership.guildId !== guildId) throw new AppError(403, 'Not your guild', 'INSUFFICIENT_ROLE');
 
   const requests = await prisma.guildJoinRequest.findMany({
     where: { guildId: membership.guildId, status: 'pending' },

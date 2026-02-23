@@ -337,7 +337,7 @@ export async function respecGuildSpecialization(guildId: string, path: string) {
 // --- Join Requests ---
 
 export async function requestJoinGuild(guildId: string) {
-  return fetchApi(`/api/v1/guild/${guildId}/request`, { method: 'POST' });
+  return fetchApi<void>(`/api/v1/guild/${guildId}/request`, { method: 'POST' });
 }
 
 export async function getGuildJoinRequests(guildId: string) {
@@ -345,9 +345,9 @@ export async function getGuildJoinRequests(guildId: string) {
 }
 
 export async function acceptJoinRequest(guildId: string, requestId: string) {
-  return fetchApi(`/api/v1/guild/${guildId}/requests/${requestId}/accept`, { method: 'POST' });
+  return fetchApi<void>(`/api/v1/guild/${guildId}/requests/${requestId}/accept`, { method: 'POST' });
 }
 
 export async function rejectJoinRequest(guildId: string, requestId: string) {
-  return fetchApi(`/api/v1/guild/${guildId}/requests/${requestId}/reject`, { method: 'POST' });
+  return fetchApi<void>(`/api/v1/guild/${guildId}/requests/${requestId}/reject`, { method: 'POST' });
 }
