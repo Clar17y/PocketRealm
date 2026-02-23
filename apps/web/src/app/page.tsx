@@ -42,22 +42,22 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
-                icon: '/assets/ui/ui_attack.png',
+                icon: '/assets/ui/ui_attack-pixelated-128.png',
                 title: 'Fight',
                 desc: 'Battle 80+ monsters across 11 zones. D&D-style combat with crits, spells, and boss raids.',
               },
               {
-                icon: '/assets/ui/ui_explore.png',
+                icon: '/assets/ui/ui_explore-pixelated-128.png',
                 title: 'Explore',
                 desc: 'Discover hidden caches, encounter sites, and zone exits. Every turn spent is a roll of the dice.',
               },
               {
-                icon: '/assets/ui/ui_inventory.png',
+                icon: '/assets/ui/ui_inventory-pixelated-128.png',
                 title: 'Craft',
                 desc: 'Forge weapons, brew potions, salvage loot. 14 skills to master from weaponsmithing to alchemy.',
               },
               {
-                icon: '/assets/ui/ui_turn.png',
+                icon: '/assets/ui/ui_turn-pixelated-128.png',
                 title: 'Play Your Way',
                 desc: 'Turns regenerate in real-time. Play in bursts or binge your bank — no energy walls, no waiting rooms.',
               },
@@ -71,7 +71,7 @@ export default function Home() {
                   alt={feature.title}
                   width={64}
                   height={64}
-                  className="mx-auto mb-4"
+                  className="mx-auto mb-4 image-rendering-pixelated"
                 />
                 <h3 className="text-lg font-bold text-[var(--rpg-gold)] mb-2">{feature.title}</h3>
                 <p className="text-sm text-[var(--rpg-text-secondary)]">{feature.desc}</p>
@@ -125,12 +125,12 @@ export default function Home() {
           </h2>
           <div className="flex justify-center items-end gap-6 md:gap-10 flex-wrap">
             {[
-              { src: '/assets/monsters/monster_goblin_king.png', name: 'Goblin King', size: 96 },
-              { src: '/assets/monsters/monster_crystal_titan.png', name: 'Crystal Titan', size: 120 },
-              { src: '/assets/monsters/monster_alpha_wolf.png', name: 'Alpha Wolf', size: 112 },
-              { src: '/assets/monsters/monster_ancient_spirit.png', name: 'Ancient Spirit', size: 128 },
-              { src: '/assets/monsters/monster_fae_queen.png', name: 'Fae Queen', size: 104 },
-              { src: '/assets/monsters/monster_death_knight.png', name: 'Death Knight', size: 116 },
+              { src: '/assets/monsters/monster_goblin_king-pixelated-128.png', name: 'Goblin King', size: 96 },
+              { src: '/assets/monsters/monster_crystal_titan-pixelated-128.png', name: 'Crystal Titan', size: 120 },
+              { src: '/assets/monsters/monster_alpha_wolf-pixelated-128.png', name: 'Alpha Wolf', size: 112 },
+              { src: '/assets/monsters/monster_ancient_spirit-pixelated-128.png', name: 'Ancient Spirit', size: 128 },
+              { src: '/assets/monsters/monster_fae_queen-pixelated-128.png', name: 'Fae Queen', size: 104 },
+              { src: '/assets/monsters/monster_death_knight-pixelated-128.png', name: 'Death Knight', size: 116 },
             ].map((monster) => (
               <div key={monster.name} className="flex flex-col items-center gap-2">
                 <Image
@@ -138,7 +138,7 @@ export default function Home() {
                   alt={monster.name}
                   width={monster.size}
                   height={monster.size}
-                  className="drop-shadow-[0_0_12px_rgba(212,168,75,0.3)]"
+                  className="drop-shadow-[0_0_12px_rgba(212,168,75,0.3)] image-rendering-pixelated"
                   loading="lazy"
                 />
                 <span className="text-xs text-[var(--rpg-text-secondary)]">{monster.name}</span>
