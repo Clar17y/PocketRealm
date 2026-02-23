@@ -1,16 +1,71 @@
 import { Prisma, prisma } from '@adventure/database';
+import type { TaxInfo } from '@adventure/shared';
 import { calculateTreasuryCap } from './guildService';
+import { spendPlayerTurnsTx, type SpendTurnsResult } from './turnBankService';
 
 export interface TaxResult {
   preTaxAmount: number;
   taxAmount: number;
   postTaxAmount: number;
+  taxRatePercent: number;
   guildId: string | null;
 }
 
 const NO_TAX = (turnAmount: number): TaxResult => ({
-  preTaxAmount: turnAmount, taxAmount: 0, postTaxAmount: turnAmount, guildId: null,
+  preTaxAmount: turnAmount, taxAmount: 0, postTaxAmount: turnAmount, taxRatePercent: 0, guildId: null,
 });
+
+export async function getPlayerTaxRateTx(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+): Promise<{ taxRate: number; guildId: string | null }> {
+  const membership = await tx.guildMember.findUnique({
+    where: { playerId },
+    include: { guild: { select: { id: true, taxRate: true } } },
+  });
+  if (!membership || membership.guild.taxRate === 0) return { taxRate: 0, guildId: null };
+  return { taxRate: membership.guild.taxRate, guildId: membership.guild.id };
+}
+
+export async function getPlayerTaxRate(playerId: string): Promise<{ taxRate: number; guildId: string | null }> {
+  return prisma.$transaction(async (tx) => getPlayerTaxRateTx(tx, playerId));
+}
+
+export function calculateInflatedCost(baseCost: number, taxRatePercent: number): number {
+  if (taxRatePercent <= 0) return baseCost;
+  return Math.ceil(baseCost / (1 - taxRatePercent / 100));
+}
+
+export function calculateEffectiveTurns(turns: number, taxRatePercent: number): number {
+  if (taxRatePercent <= 0) return turns;
+  return Math.floor(turns * (1 - taxRatePercent / 100));
+}
+
+export function taxInfoFromResult(result: TaxResult): TaxInfo | null {
+  if (!result.guildId || result.taxAmount === 0) return null;
+  return {
+    rate: result.taxRatePercent,
+    amount: result.taxAmount,
+    guildId: result.guildId,
+  };
+}
+
+/**
+ * Inflate a fixed turn cost by the guild tax rate, spend the inflated amount,
+ * and route the tax to the guild treasury — all in one atomic step.
+ * Use for fixed-cost routes (crafting, forge, salvage, travel).
+ */
+export async function spendWithTaxTx(
+  tx: Prisma.TransactionClient,
+  playerId: string,
+  baseCost: number,
+): Promise<{ turnSpend: SpendTurnsResult; taxResult: TaxResult }> {
+  const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
+  const actualCost = calculateInflatedCost(baseCost, taxRate);
+  const turnSpend = await spendPlayerTurnsTx(tx, playerId, actualCost);
+  const taxResult = await applyGuildTaxTx(tx, playerId, actualCost);
+  return { turnSpend, taxResult };
+}
 
 /**
  * Apply guild tax within an existing Prisma transaction.
@@ -59,6 +114,7 @@ export async function applyGuildTaxTx(
     preTaxAmount: turnAmount,
     taxAmount,
     postTaxAmount,
+    taxRatePercent: membership.guild.taxRate,
     guildId: membership.guild.id,
   };
 }

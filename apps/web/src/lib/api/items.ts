@@ -1,4 +1,4 @@
-import { fetchApi, type TurnStateResponse } from './core';
+import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 
 // Inventory
 
@@ -188,6 +188,7 @@ export async function mine(playerNodeId: string, turns: number, currentZoneId: s
     };
     gemCrit?: { itemTemplateId: string; gemName: string; gemsFound: number };
     activeEvents?: Array<{ title: string; effectType: string; effectValue: number }>;
+    tax: TaxInfo | null;
   }>('/api/v1/gathering/mine', {
     method: 'POST',
     body: JSON.stringify({ playerNodeId, turns, currentZoneId }),
@@ -258,6 +259,7 @@ export async function craft(recipeId: string, quantity: number = 1) {
       attributePointsAfter: number;
       characterLeveledUp: boolean;
     };
+    tax: TaxInfo | null;
   }>('/api/v1/crafting/craft', {
     method: 'POST',
     body: JSON.stringify({ recipeId, quantity }),
@@ -273,6 +275,7 @@ export async function salvage(itemId: string) {
       salvagedTemplateId: string;
       returnedMaterials: Array<{ templateId: string; name: string; quantity: number }>;
     };
+    tax: TaxInfo | null;
   }>('/api/v1/crafting/salvage', {
     method: 'POST',
     body: JSON.stringify({ itemId }),
@@ -295,6 +298,7 @@ export async function forgeUpgrade(itemId: string, sacrificialItemId: string) {
       sacrificialItemId: string;
       bonusStats?: Record<string, number> | null;
     };
+    tax: TaxInfo | null;
   }>('/api/v1/crafting/forge/upgrade', {
     method: 'POST',
     body: JSON.stringify({ itemId, sacrificialItemId }),
@@ -313,6 +317,7 @@ export async function forgeReroll(itemId: string, sacrificialItemId: string) {
       sacrificialItemId: string;
       bonusStats: Record<string, number> | null;
     };
+    tax: TaxInfo | null;
   }>('/api/v1/crafting/forge/reroll', {
     method: 'POST',
     body: JSON.stringify({ itemId, sacrificialItemId }),

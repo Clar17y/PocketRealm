@@ -9,6 +9,7 @@ import { HpStatusBar } from '../common/HpStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, HP_CONSTANTS } from '@adventure/shared';
+import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
@@ -55,9 +56,10 @@ interface ExplorationProps {
   quickRestPercent?: number;
   busyAction?: string | null;
   onNavigateToRest?: () => void;
+  guildTaxRate?: number;
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0 }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
 
@@ -73,7 +75,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
     return { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance };
   };
 
-  const { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance } = calculateProbabilities(turnInvestment[0]);
+  const effective = calcEffectiveTurns(turnInvestment[0], guildTaxRate);
+  const { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance } = calculateProbabilities(effective);
 
   return (
     <div className="space-y-4">
@@ -180,6 +183,11 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                   <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">
                     {turnInvestment[0].toLocaleString()}
                   </div>
+                  {guildTaxRate > 0 && (
+                    <div className="text-xs text-[var(--rpg-text-secondary)]">
+                      {effective.toLocaleString()} effective ({guildTaxRate}% tax)
+                    </div>
+                  )}
                   <div className="text-xs text-[var(--rpg-text-secondary)]">
                     of {availableTurns.toLocaleString()} available
                   </div>

@@ -35,6 +35,7 @@ import {
   getHpState,
   getInventory,
   getPlayer,
+  getPlayerGuild,
   getEncounterSites,
   getPvpNotificationCount,
   getSkills,
@@ -433,6 +434,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [quickRestHealPercent, setQuickRestHealPercent] = useState(100);
   const [defaultRefiningMax, setDefaultRefiningMax] = useState(false);
   const [lowHpWarning, setLowHpWarning] = useState(true);
+  const [guildTaxRate, setGuildTaxRate] = useState(0);
   const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
   const [achievementUnclaimedCount, setAchievementUnclaimedCount] = useState(0);
   const [activeTitle, setActiveTitleState] = useState<string | null>(null);
@@ -571,6 +573,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setZoneCraftingLevel(recipesRes.data.zoneCraftingLevel);
       setZoneCraftingName(recipesRes.data.zoneName);
     }
+
+    // Fetch guild tax rate (non-blocking — don't delay initial load)
+    getPlayerGuild().then((guildRes) => {
+      if (guildRes.data?.guild) setGuildTaxRate(guildRes.data.guild.taxRate);
+      else setGuildTaxRate(0);
+    }).catch(() => setGuildTaxRate(0));
   }, []);
 
   const advanceTutorial = useCallback(async (fromStep: number) => {
@@ -1821,6 +1829,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
     // Tutorial
     tutorialStep, skipTutorial, advanceTutorial,
+
+    // Guild
+    guildTaxRate,
 
     // World Events
     activeEvents,

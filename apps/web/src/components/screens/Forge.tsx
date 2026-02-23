@@ -9,6 +9,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ActivityLog } from '@/components/ActivityLog';
+import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 
@@ -33,6 +34,7 @@ interface ForgeProps {
   isRecovering?: boolean;
   recoveryCost?: number | null;
   zoneCraftingLevel: number | null;
+  guildTaxRate?: number;
 }
 
 function statEntries(stats: Record<string, unknown> | null | undefined): Array<[string, number]> {
@@ -59,6 +61,7 @@ export function Forge({
   isRecovering = false,
   recoveryCost,
   zoneCraftingLevel,
+  guildTaxRate = 0,
 }: ForgeProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(items[0]?.id ?? null);
   const [selectedUpgradeSacrificeId, setSelectedUpgradeSacrificeId] = useState<string | null>(null);
@@ -132,6 +135,8 @@ export function Forge({
   const hasRerollSacrifice = rerollSacrifices.length > 0;
   const upgradeCost = selected ? getForgeUpgradeCost(selected.rarity) : null;
   const rerollCost = selected ? getForgeRerollCost(selected.rarity) : null;
+  const inflatedUpgradeCost = upgradeCost !== null ? inflateCost(upgradeCost, guildTaxRate) : null;
+  const inflatedRerollCost = rerollCost !== null ? inflateCost(rerollCost, guildTaxRate) : null;
   const nextRarity = selected ? getNextRarity(selected.rarity) : null;
   const upgradeChance = selected ? calculateForgeUpgradeSuccessChance(selected.rarity, equippedLuck) : null;
   const bonusEntries = statEntries(selected?.bonusStats);
@@ -249,7 +254,10 @@ export function Forge({
                 Success keeps existing bonus stats and adds one new bonus roll.
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
-                Cost: {upgradeCost ?? '-'} turns + 1 sacrificial {selected?.rarity ?? ''} {selected?.type ?? 'item'}
+                Cost: {inflatedUpgradeCost !== null && inflatedUpgradeCost !== upgradeCost
+                  ? `${inflatedUpgradeCost} turns (${inflatedUpgradeCost - upgradeCost!} tax)`
+                  : `${upgradeCost ?? '-'} turns`
+                } + 1 sacrificial {selected?.rarity ?? ''} {selected?.type ?? 'item'}
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
                 Success: {typeof upgradeChance === 'number' ? `${(upgradeChance * 100).toFixed(1)}%` : '-'}
@@ -317,7 +325,10 @@ export function Forge({
                 Rerolls all bonus stats for current rarity.
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
-                Cost: {rerollCost ?? '-'} turns + 1 sacrificial duplicate at same rarity
+                Cost: {inflatedRerollCost !== null && inflatedRerollCost !== rerollCost
+                  ? `${inflatedRerollCost} turns (${inflatedRerollCost - rerollCost!} tax)`
+                  : `${rerollCost ?? '-'} turns`
+                } + 1 sacrificial duplicate at same rarity
               </div>
 
               <div className="space-y-1">

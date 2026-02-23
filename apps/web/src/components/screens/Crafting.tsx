@@ -7,6 +7,7 @@ import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { Hammer, Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ActivityLog } from '@/components/ActivityLog';
+import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
 import { STAT_ORDER, prettyStatName, formatStatValue } from '@/lib/statFormat';
 
@@ -47,6 +48,7 @@ interface CraftingProps {
   zoneCraftingLevel: number | null;
   zoneName: string | null;
   defaultMaxQuantity?: boolean;
+  guildTaxRate?: number;
 }
 
 function statEntries(stats: Record<string, unknown> | undefined): Array<[string, number]> {
@@ -62,7 +64,7 @@ function statEntries(stats: Record<string, unknown> | undefined): Array<[string,
     });
 }
 
-export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false }: CraftingProps) {
+export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0 }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
@@ -321,14 +323,28 @@ export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog,
                 <Hourglass size={16} color="var(--rpg-gold)" />
                 <span className="text-xs text-[var(--rpg-text-secondary)]">Turn Cost</span>
               </div>
-              <div className="text-xl font-bold text-[var(--rpg-gold)] font-mono">
-                {selectedRecipe.turnCost * quantity}
-                {quantity > 1 && (
-                  <span className="text-xs font-normal text-[var(--rpg-text-secondary)] ml-1">
-                    ({selectedRecipe.turnCost} ea)
-                  </span>
-                )}
-              </div>
+              {(() => {
+                const baseCost = selectedRecipe.turnCost * quantity;
+                const inflated = inflateCost(baseCost, guildTaxRate);
+                const taxAmount = inflated - baseCost;
+                return (
+                  <>
+                    <div className="text-xl font-bold text-[var(--rpg-gold)] font-mono">
+                      {inflated}
+                      {quantity > 1 && (
+                        <span className="text-xs font-normal text-[var(--rpg-text-secondary)] ml-1">
+                          ({selectedRecipe.turnCost} ea)
+                        </span>
+                      )}
+                    </div>
+                    {taxAmount > 0 && (
+                      <div className="text-xs text-[var(--rpg-text-secondary)]">
+                        {taxAmount} guild tax
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             <div className="bg-[var(--rpg-surface)] rounded-lg p-3">

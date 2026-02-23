@@ -13,6 +13,7 @@ import type { HpState, RestResult, RecoveryResult } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getEquipmentStats } from './equipmentService';
 import { spendPlayerTurnsTx } from './turnBankService';
+import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, type TaxResult } from './guildTaxService';
 import { normalizePlayerAttributes } from './attributesService';
 
 async function getVitalityLevel(playerId: string): Promise<number> {
@@ -78,7 +79,7 @@ export async function rest(
   playerId: string,
   turnsToSpend: number,
   now: Date = new Date()
-): Promise<RestResult> {
+): Promise<RestResult & { taxResult: TaxResult }> {
   if (!Number.isInteger(turnsToSpend) || turnsToSpend <= 0) {
     throw new AppError(400, 'Turns must be a positive integer', 'INVALID_TURNS');
   }
@@ -124,11 +125,19 @@ export async function rest(
   }
 
   const healPerTurn = calculateHealPerTurn(vitalityLevel);
-  const healing = calculateRestHealing(currentHp, maxHp, healPerTurn, turnsToSpend);
 
-  // Spend turns and apply HP update atomically.
-  await prisma.$transaction(async (tx) => {
-    await spendPlayerTurnsTx(tx, playerId, healing.turnsUsed, now);
+  // Spend turns, apply tax, and update HP atomically.
+  const { healing, taxResult } = await prisma.$transaction(async (tx) => {
+    const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
+    const effectiveTurns = calculateEffectiveTurns(turnsToSpend, taxRate);
+
+    const innerHealing = calculateRestHealing(currentHp, maxHp, healPerTurn, effectiveTurns);
+
+    // Inflate the effective turns used back to the actual bank cost
+    const actualTurnsToDeduct = calculateInflatedCost(innerHealing.turnsUsed, taxRate);
+
+    await spendPlayerTurnsTx(tx, playerId, actualTurnsToDeduct, now);
+    const tax = await applyGuildTaxTx(tx, playerId, actualTurnsToDeduct);
 
     const updated = await tx.player.updateMany({
       where: {
@@ -138,7 +147,7 @@ export async function rest(
         isRecovering: false,
       },
       data: {
-        currentHp: healing.newHp,
+        currentHp: innerHealing.newHp,
         lastHpRegenAt: now,
       },
     });
@@ -146,6 +155,8 @@ export async function rest(
     if (updated.count !== 1) {
       throw new AppError(409, 'HP state changed; try again', 'HP_STATE_CHANGED');
     }
+
+    return { healing: innerHealing, taxResult: tax };
   });
 
   return {
@@ -153,7 +164,8 @@ export async function rest(
     healedAmount: healing.healedAmount,
     currentHp: healing.newHp,
     maxHp,
-    turnsSpent: healing.turnsUsed,
+    turnsSpent: taxResult.preTaxAmount,
+    taxResult,
   };
 }
 

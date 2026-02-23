@@ -3,6 +3,7 @@ import { prisma } from '@adventure/database';
 import { estimateExploration, validateExplorationTurns } from '@adventure/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
+import { getPlayerTaxRate, calculateEffectiveTurns } from '../../services/guildTaxService';
 import { estimateQuerySchema } from './helpers';
 
 export const estimateRouter = Router();
@@ -30,5 +31,12 @@ estimateRouter.get('/estimate', asyncHandler(async (req, res) => {
       }
     }
 
-    res.json({ estimate: estimateExploration(query.turns, zoneExitChance) });
+    const { taxRate } = await getPlayerTaxRate(req.player!.playerId);
+    const effectiveTurns = calculateEffectiveTurns(query.turns, taxRate);
+
+    res.json({
+      estimate: estimateExploration(effectiveTurns, zoneExitChance),
+      taxRate,
+      effectiveTurns,
+    });
 }));

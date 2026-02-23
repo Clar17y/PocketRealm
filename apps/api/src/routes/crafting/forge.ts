@@ -13,8 +13,7 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { spendPlayerTurnsTx } from '../../services/turnBankService';
-import { applyGuildTaxTx } from '../../services/guildTaxService';
+import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { assertNotRecovering, getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   isItemType,
@@ -64,9 +63,8 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       action: 'upgrade',
     });
 
-    const turnSpend = await prisma.$transaction(async (tx) => {
-      const spent = await spendPlayerTurnsTx(tx, playerId, upgradeCost);
-      await applyGuildTaxTx(tx, playerId, upgradeCost);
+    const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
+      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, upgradeCost);
       const consumed = await tx.item.deleteMany({
         where: {
           id: sacrificial.id,
@@ -77,7 +75,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       if (consumed.count !== 1) {
         throw new AppError(409, 'Sacrificial item is no longer available', 'FORGE_SACRIFICE_UNAVAILABLE');
       }
-      return spent;
+      return { turnSpend: spent, taxResult: tax };
     });
     const equipmentStats = await getEquipmentStats(playerId);
     const successChance = calculateForgeUpgradeSuccessChance(currentRarity, equipmentStats.luck);
@@ -130,7 +128,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         data: {
           playerId,
           activityType: 'forge_upgrade',
-          turnsSpent: upgradeCost,
+          turnsSpent: turnSpend.spent,
           result: {
             itemId: item.id,
             templateId: item.templateId,
@@ -170,6 +168,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
           addedBonusValue: newRoll.value,
           bonusStats: upgradedBonusStats,
         },
+        tax: taxInfoFromResult(taxResult),
       });
       return;
     }
@@ -188,7 +187,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       data: {
         playerId,
         activityType: 'forge_upgrade',
-        turnsSpent: upgradeCost,
+        turnsSpent: turnSpend.spent,
         result: {
           itemId: item.id,
           templateId: item.templateId,
@@ -223,6 +222,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         roll,
         sacrificialItemId: sacrificial.id,
       },
+      tax: taxInfoFromResult(taxResult),
     });
 }));
 
@@ -266,9 +266,8 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
     }
     const templateBaseStats = item.template.baseStats as ItemStats | null | undefined;
 
-    const turnSpend = await prisma.$transaction(async (tx) => {
-      const spent = await spendPlayerTurnsTx(tx, playerId, rerollCost);
-      await applyGuildTaxTx(tx, playerId, rerollCost);
+    const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
+      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, rerollCost);
       const consumed = await tx.item.deleteMany({
         where: {
           id: sacrificial.id,
@@ -279,7 +278,7 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
       if (consumed.count !== 1) {
         throw new AppError(409, 'Sacrificial item is no longer available', 'FORGE_SACRIFICE_UNAVAILABLE');
       }
-      return spent;
+      return { turnSpend: spent, taxResult: tax };
     });
     const rerollSlot = (item.template.slot as EquipmentSlot | null) ?? undefined;
     const rerolledBonusStats = rollBonusStatsForRarity({
@@ -300,7 +299,7 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
       data: {
         playerId,
         activityType: 'forge_reroll',
-        turnsSpent: rerollCost,
+        turnsSpent: turnSpend.spent,
         result: {
           itemId: item.id,
           templateId: item.templateId,
@@ -327,5 +326,6 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
         sacrificialItemId: sacrificial.id,
         bonusStats: rerolledBonusStats ?? null,
       },
+      tax: taxInfoFromResult(taxResult),
     });
 }));

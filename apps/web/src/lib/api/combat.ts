@@ -1,4 +1,4 @@
-import { fetchApi, type TurnStateResponse } from './core';
+import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 
 // Zones
 
@@ -43,6 +43,7 @@ export async function travelToZone(zoneId: string) {
     refundedTurns: number;
     respawnedTo: { townId: string; townName: string } | null;
     newDiscoveries: Array<{ id: string; name: string }>;
+    tax: TaxInfo | null;
   }>('/api/v1/zones/travel', {
     method: 'POST',
     body: JSON.stringify({ zoneId }),
@@ -62,6 +63,8 @@ export async function estimateExploration(turns: number) {
       expectedAmbushes: number;
       expectedEncounterSites: number;
     };
+    taxRate: number;
+    effectiveTurns: number;
   }>(`/api/v1/exploration/estimate?turns=${turns}`);
 }
 
@@ -102,6 +105,7 @@ export async function startExploration(zoneId: string, turns: number) {
       percent: number;
       turnsToExplore: number | null;
     };
+    tax: TaxInfo | null;
   }>('/api/v1/exploration/start', {
     method: 'POST',
     body: JSON.stringify({ zoneId, turns }),

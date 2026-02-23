@@ -7,7 +7,7 @@ import { getTurnState } from '../services/turnBankService';
 import { calculateHealPerTurn, calculateRecoveryExitHp } from '@adventure/game-engine';
 import { getPlayerProgressionState } from '../services/attributesService';
 import { asyncHandler } from '../utils/asyncHandler';
-import { applyGuildTax } from '../services/guildTaxService';
+import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 
 export const hpRouter = Router();
 
@@ -35,8 +35,7 @@ hpRouter.post('/rest', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = restSchema.parse(req.body);
 
-  const result = await rest(playerId, body.turns);
-  await applyGuildTax(playerId, result.turnsSpent);
+  const { taxResult, ...result } = await rest(playerId, body.turns);
   const turns = await getTurnState(playerId);
 
   // Log the activity
@@ -44,7 +43,7 @@ hpRouter.post('/rest', asyncHandler(async (req, res) => {
     data: {
       playerId,
       activityType: 'rest',
-      turnsSpent: result.turnsSpent,
+      turnsSpent: taxResult.preTaxAmount,
       result: {
         previousHp: result.previousHp,
         healedAmount: result.healedAmount,
@@ -57,6 +56,7 @@ hpRouter.post('/rest', asyncHandler(async (req, res) => {
   res.json({
     ...result,
     turns,
+    tax: taxInfoFromResult(taxResult),
   });
 }));
 
@@ -115,10 +115,13 @@ hpRouter.get('/rest/estimate', asyncHandler(async (req, res) => {
 
   const progression = await getPlayerProgressionState(playerId);
   const vitalityLevel = progression.attributes.vitality;
+  const { taxRate } = await getPlayerTaxRate(playerId);
+
+  const effectiveTurns = calculateEffectiveTurns(query.turns, taxRate);
 
   const healPerTurn = calculateHealPerTurn(vitalityLevel);
   const hpNeeded = hpState.maxHp - hpState.currentHp;
-  const maxHealAmount = healPerTurn * query.turns;
+  const maxHealAmount = healPerTurn * effectiveTurns;
   const actualHealAmount = Math.min(hpNeeded, maxHealAmount);
   const turnsNeeded = Math.ceil(actualHealAmount / healPerTurn);
 
@@ -128,8 +131,10 @@ hpRouter.get('/rest/estimate', asyncHandler(async (req, res) => {
     maxHp: hpState.maxHp,
     healPerTurn,
     turnsRequested: query.turns,
-    turnsNeeded: Math.min(turnsNeeded, query.turns),
+    effectiveTurns,
+    turnsNeeded: Math.min(turnsNeeded, effectiveTurns),
     healAmount: actualHealAmount,
     resultingHp: Math.min(hpState.currentHp + actualHealAmount, hpState.maxHp),
+    taxRate,
   });
 }));

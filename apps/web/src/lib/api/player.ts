@@ -1,4 +1,4 @@
-import { fetchApi, type TurnStateResponse } from './core';
+import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 
 export async function getPlayer() {
   return fetchApi<{
@@ -210,9 +210,11 @@ export async function restEstimate(turns: number) {
     maxHp?: number;
     healPerTurn?: number;
     turnsRequested?: number;
+    effectiveTurns?: number;
     turnsNeeded?: number;
     healAmount?: number;
     resultingHp?: number;
+    taxRate?: number;
   }>(`/api/v1/hp/rest/estimate?turns=${turns}`);
 }
 
@@ -224,6 +226,7 @@ export async function rest(turns: number) {
     maxHp: number;
     turnsSpent: number;
     turns: TurnStateResponse;
+    tax: TaxInfo | null;
   }>('/api/v1/hp/rest', {
     method: 'POST',
     body: JSON.stringify({ turns }),
