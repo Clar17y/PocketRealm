@@ -5,7 +5,8 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
-import { StatBar } from '../StatBar';
+import { HpStatusBar } from '../common/HpStatusBar';
+import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, HP_CONSTANTS } from '@adventure/shared';
 import Image from 'next/image';
@@ -73,32 +74,16 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
   return (
     <div className="space-y-4">
       {/* Low HP Warning Dialog */}
-      {showLowHpWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-[var(--rpg-bg-dark,#1a1a2e)] border border-[var(--rpg-gold,#c8a84e)] rounded-lg p-6 max-w-sm w-full mx-4">
-            <h3 className="text-[var(--rpg-gold,#c8a84e)] font-bold text-lg mb-1">Low HP Warning</h3>
-            <p className="text-[var(--rpg-light-dim,#a0a0b0)] text-sm mb-4">
-              Your health is low ({Math.floor(currentHp!)} / {maxHp} HP). Exploring or fighting in this state is risky.
-            </p>
-            <div className="flex gap-3">
-              <button
-                className="flex-1 bg-[var(--rpg-gold)] hover:bg-[#e4b85b] text-[var(--rpg-background)] rounded-lg font-semibold py-2 transition-all"
-                onClick={() => {
-                  setShowLowHpWarning(false);
-                  onStartExploration(turnInvestment[0]);
-                }}
-              >
-                Proceed Anyway
-              </button>
-              <button
-                className="flex-1 bg-[var(--rpg-surface)] hover:bg-[var(--rpg-border)] text-[var(--rpg-text-primary)] border border-[var(--rpg-border)] rounded-lg font-semibold py-2 transition-all"
-                onClick={() => setShowLowHpWarning(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+      {showLowHpWarning && typeof currentHp === 'number' && typeof maxHp === 'number' && (
+        <LowHpWarningDialog
+          currentHp={currentHp}
+          maxHp={maxHp}
+          onProceed={() => {
+            setShowLowHpWarning(false);
+            onStartExploration(turnInvestment[0]);
+          }}
+          onCancel={() => setShowLowHpWarning(false)}
+        />
       )}
 
       {/* Knockout Banner */}
@@ -108,21 +93,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
 
       {/* HP Status */}
       {!playbackData && typeof currentHp === 'number' && typeof maxHp === 'number' && !isRecovering && (
-        <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className={`text-sm font-bold font-mono ${
-              (currentHp / maxHp) < 0.25 ? 'text-[var(--rpg-red)]'
-              : (currentHp / maxHp) < 0.5 ? 'text-yellow-400'
-              : 'text-[var(--rpg-green-light)]'
-            }`}>
-              {Math.floor(currentHp)} / {maxHp} HP
-            </span>
-            {typeof regenPerSecond === 'number' && (
-              <span className="text-xs text-[var(--rpg-text-secondary)]">+{regenPerSecond}/s</span>
-            )}
-          </div>
-          <StatBar current={currentHp} max={maxHp} color="health" size="sm" showNumbers={false} />
-        </div>
+        <HpStatusBar currentHp={currentHp} maxHp={maxHp} regenPerSecond={regenPerSecond} />
       )}
 
       {/* Zone Header — always visible */}
