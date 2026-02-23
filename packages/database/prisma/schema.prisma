@@ -81,6 +81,7 @@ model Player {
   stats              PlayerStats?
   achievements       PlayerAchievement[]
   guildMember        GuildMember?
+  guildJoinRequests  GuildJoinRequest[]
 
   @@map("players")
 }
@@ -757,6 +758,7 @@ model Guild {
   projects     GuildProject[]
   contracts    GuildContract[]
   logs         GuildLog[]
+  joinRequests GuildJoinRequest[]
 
   @@map("guilds")
 }
@@ -852,4 +854,19 @@ model GuildLog {
 
   @@index([guildId, createdAt])
   @@map("guild_logs")
+}
+
+model GuildJoinRequest {
+  id        String   @id @default(uuid())
+  guildId   String   @map("guild_id")
+  playerId  String   @map("player_id")
+  status    String   @default("pending") @db.VarChar(16)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  guild  Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, playerId])
+  @@index([guildId, status])
+  @@map("guild_join_requests")
 }
