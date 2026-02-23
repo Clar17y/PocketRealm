@@ -11,6 +11,7 @@ export type UiIconName =
   | 'attack'
   | 'explore'
   | 'gold'
+  | 'guild'
   | 'hp'
   | 'inventory'
   | 'rest'
