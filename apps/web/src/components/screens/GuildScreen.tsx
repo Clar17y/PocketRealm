@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
+import { DebouncedInput } from '@/components/common/DebouncedInput';
 import { Pagination } from '@/components/common/Pagination';
 import {
   getPlayerGuild, createGuild, searchGuilds, joinGuild, leaveGuild,
@@ -166,11 +167,11 @@ function NoGuildView({
   const [tag, setTag] = useState('');
   const [description, setDescription] = useState('');
 
-  const handleSearch = useCallback(async (page = 1) => {
+  const handleSearch = useCallback(async (query: string, page = 1) => {
     setSearching(true);
     setActionError(null);
     try {
-      const res = await searchGuilds(searchQuery || undefined, page);
+      const res = await searchGuilds(query || undefined, page);
       if (res.error) { setActionError(res.error.message); return; }
       setSearchResults(res.data?.guilds ?? []);
       setSearchTotal(res.data?.total ?? 0);
@@ -180,10 +181,10 @@ function NoGuildView({
     } finally {
       setSearching(false);
     }
-  }, [searchQuery]);
+  }, []);
 
   useEffect(() => {
-    void handleSearch(1);
+    void handleSearch('', 1);
   }, [handleSearch]);
 
   const handleCreate = async () => {
@@ -307,18 +308,14 @@ function NoGuildView({
 
       <PixelCard>
         <h3 className="text-lg font-bold text-[var(--rpg-text-primary)] mb-3">Find Guilds</h3>
-        <div className="flex gap-2 mb-3">
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 p-2 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
-            placeholder="Search by name or tag..."
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch(1)}
-          />
-          <PixelButton onClick={() => handleSearch(1)} disabled={searching}>
-            Search
-          </PixelButton>
-        </div>
+        <DebouncedInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          onDebouncedChange={(query) => handleSearch(query, 1)}
+          debounceMs={300}
+          className="w-full mb-3 p-2 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
+          placeholder="Search by name or tag..."
+        />
 
         {searching ? (
           <p className="text-sm opacity-60">Searching...</p>
@@ -375,7 +372,7 @@ function NoGuildView({
               <Pagination
                 page={searchPage}
                 totalPages={Math.ceil(searchTotal / GUILD_CONSTANTS.LOG_PAGE_SIZE)}
-                onPageChange={(p) => handleSearch(p)}
+                onPageChange={(p) => handleSearch(searchQuery, p)}
               />
             )}
           </div>
