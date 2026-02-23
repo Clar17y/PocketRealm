@@ -132,7 +132,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         data: {
           playerId,
           activityType: 'forge_upgrade',
-          turnsSpent: upgradeCost,
+          turnsSpent: turnSpend.spent,
           result: {
             itemId: item.id,
             templateId: item.templateId,
@@ -191,7 +191,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       data: {
         playerId,
         activityType: 'forge_upgrade',
-        turnsSpent: upgradeCost,
+        turnsSpent: turnSpend.spent,
         result: {
           itemId: item.id,
           templateId: item.templateId,
@@ -306,7 +306,7 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
       data: {
         playerId,
         activityType: 'forge_reroll',
-        turnsSpent: rerollCost,
+        turnsSpent: turnSpend.spent,
         result: {
           itemId: item.id,
           templateId: item.templateId,

@@ -6,11 +6,12 @@ export interface TaxResult {
   preTaxAmount: number;
   taxAmount: number;
   postTaxAmount: number;
+  taxRatePercent: number;
   guildId: string | null;
 }
 
 const NO_TAX = (turnAmount: number): TaxResult => ({
-  preTaxAmount: turnAmount, taxAmount: 0, postTaxAmount: turnAmount, guildId: null,
+  preTaxAmount: turnAmount, taxAmount: 0, postTaxAmount: turnAmount, taxRatePercent: 0, guildId: null,
 });
 
 export async function getPlayerTaxRateTx(
@@ -37,7 +38,7 @@ export function calculateInflatedCost(baseCost: number, taxRatePercent: number):
 export function taxInfoFromResult(result: TaxResult): TaxInfo | null {
   if (!result.guildId || result.taxAmount === 0) return null;
   return {
-    rate: Math.round((result.taxAmount / result.preTaxAmount) * 100),
+    rate: result.taxRatePercent,
     amount: result.taxAmount,
     guildId: result.guildId,
   };
@@ -90,6 +91,7 @@ export async function applyGuildTaxTx(
     preTaxAmount: turnAmount,
     taxAmount,
     postTaxAmount,
+    taxRatePercent: membership.guild.taxRate,
     guildId: membership.guild.id,
   };
 }

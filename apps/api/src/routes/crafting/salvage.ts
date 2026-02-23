@@ -132,7 +132,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
       data: {
         playerId,
         activityType: 'salvage',
-        turnsSpent: CRAFTING_CONSTANTS.SALVAGE_TURN_COST,
+        turnsSpent: turnSpend.spent,
         result: {
           salvagedItemId: item.id,
           salvagedTemplateId: item.templateId,
