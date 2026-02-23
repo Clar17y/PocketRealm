@@ -331,7 +331,9 @@ function NoGuildView({
                 You must reach level {GUILD_CONSTANTS.JOIN_MIN_LEVEL} to join or request to join a guild.
               </p>
             )}
-            {searchResults.map((guild) => (
+            {searchResults.map((guild) => {
+              const levelDisabled = actionLoading || characterLevel < (guild.minLevelRequirement || GUILD_CONSTANTS.JOIN_MIN_LEVEL);
+              return (
               <div
                 key={guild.id}
                 className="p-3 bg-[var(--rpg-background)] rounded border border-[var(--rpg-border)] flex justify-between items-center"
@@ -349,10 +351,7 @@ function NoGuildView({
                   )}
                 </div>
                 {guild.recruitmentMode === 'open' && (
-                  <PixelButton
-                    onClick={() => handleJoin(guild.id)}
-                    disabled={actionLoading || characterLevel < (guild.minLevelRequirement || GUILD_CONSTANTS.JOIN_MIN_LEVEL)}
-                  >
+                  <PixelButton onClick={() => handleJoin(guild.id)} disabled={levelDisabled}>
                     Join
                   </PixelButton>
                 )}
@@ -360,10 +359,7 @@ function NoGuildView({
                   requestedGuildIds.has(guild.id) ? (
                     <span className="text-xs text-[var(--rpg-green-light)]">Request Sent</span>
                   ) : (
-                    <PixelButton
-                      onClick={() => handleRequest(guild.id)}
-                      disabled={actionLoading || characterLevel < (guild.minLevelRequirement || GUILD_CONSTANTS.JOIN_MIN_LEVEL)}
-                    >
+                    <PixelButton onClick={() => handleRequest(guild.id)} disabled={levelDisabled}>
                       Request
                     </PixelButton>
                   )
@@ -372,7 +368,8 @@ function NoGuildView({
                   <span className="text-xs text-[var(--rpg-text-secondary)]">Closed</span>
                 )}
               </div>
-            ))}
+              );
+            })}
             {searchTotal > GUILD_CONSTANTS.LOG_PAGE_SIZE && (
               <Pagination
                 page={searchPage}
