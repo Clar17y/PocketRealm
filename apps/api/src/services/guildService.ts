@@ -328,6 +328,118 @@ export async function leaveGuild(playerId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Join Requests
+// ---------------------------------------------------------------------------
+
+export interface JoinRequestData {
+  id: string;
+  playerId: string;
+  username: string;
+  characterLevel: number;
+  createdAt: string;
+}
+
+export async function requestJoinGuild(playerId: string, guildId: string): Promise<void> {
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { id: true, username: true, characterLevel: true },
+  });
+  if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
+
+  const existingMembership = await prisma.guildMember.findUnique({ where: { playerId } });
+  if (existingMembership) throw new AppError(400, 'Already in a guild', 'ALREADY_IN_GUILD');
+
+  const guild = await prisma.guild.findUnique({
+    where: { id: guildId },
+    include: { _count: { select: { members: true } } },
+  });
+  if (!guild) throw new AppError(404, 'Guild not found', 'NOT_FOUND');
+
+  if (guild.recruitmentMode !== 'invite_only') {
+    throw new AppError(400, 'Guild does not accept join requests', 'NOT_INVITE_ONLY');
+  }
+
+  const maxMembers = calculateMaxMembers(guild.level);
+  if (guild._count.members >= maxMembers) throw new AppError(400, 'Guild is full', 'GUILD_FULL');
+
+  if (guild.minLevelRequirement > 0 && player.characterLevel < guild.minLevelRequirement) {
+    throw new AppError(400, `Character level ${guild.minLevelRequirement} required`, 'LEVEL_TOO_LOW');
+  }
+
+  const existing = await prisma.guildJoinRequest.findUnique({
+    where: { guildId_playerId: { guildId, playerId } },
+  });
+  if (existing) throw new AppError(400, 'Join request already pending', 'REQUEST_ALREADY_SENT');
+
+  await prisma.guildJoinRequest.create({ data: { guildId, playerId, status: 'pending' } });
+  await addGuildLog(guildId, 'join_request_sent', `${player.username} requested to join`);
+}
+
+export async function getJoinRequests(officerId: string): Promise<JoinRequestData[]> {
+  const membership = await requireRole(officerId, 'officer');
+
+  const requests = await prisma.guildJoinRequest.findMany({
+    where: { guildId: membership.guildId, status: 'pending' },
+    include: { player: { select: { username: true, characterLevel: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  return requests.map((r) => ({
+    id: r.id,
+    playerId: r.playerId,
+    username: r.player.username,
+    characterLevel: r.player.characterLevel,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
+
+export async function respondToJoinRequest(
+  officerId: string,
+  requestId: string,
+  accept: boolean,
+): Promise<void> {
+  const membership = await requireRole(officerId, 'officer');
+
+  const request = await prisma.guildJoinRequest.findFirst({
+    where: { id: requestId, guildId: membership.guildId, status: 'pending' },
+    include: { player: { select: { username: true } } },
+  });
+  if (!request) throw new AppError(404, 'Request not found or already processed', 'NOT_FOUND');
+
+  if (accept) {
+    const guild = await prisma.guild.findUnique({
+      where: { id: membership.guildId },
+      include: { _count: { select: { members: true } } },
+    });
+    if (!guild) throw new AppError(404, 'Guild not found', 'NOT_FOUND');
+
+    const maxMembers = calculateMaxMembers(guild.level);
+    if (guild._count.members >= maxMembers) throw new AppError(400, 'Guild is full', 'GUILD_FULL');
+
+    // Player may have joined elsewhere between request and acceptance
+    const alreadyMember = await prisma.guildMember.findUnique({ where: { playerId: request.playerId } });
+    if (alreadyMember) {
+      await prisma.guildJoinRequest.update({ where: { id: requestId }, data: { status: 'rejected' } });
+      throw new AppError(400, 'Player is already in a guild', 'ALREADY_IN_GUILD');
+    }
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.guildMember.create({ data: { guildId: membership.guildId, playerId: request.playerId, role: 'member' } });
+      await tx.guildJoinRequest.update({ where: { id: requestId }, data: { status: 'accepted' } });
+      await addGuildLog(membership.guildId, 'join_request_accepted', `${request.player.username} was accepted into the guild`, undefined, tx);
+    });
+
+    await addGuildXp(membership.guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
+    void checkGuildAchievementsForAllMembers(membership.guildId, ['guildMemberCount']);
+  } else {
+    await prisma.$transaction(async (tx: any) => {
+      await tx.guildJoinRequest.update({ where: { id: requestId }, data: { status: 'rejected' } });
+      await addGuildLog(membership.guildId, 'join_request_rejected', `${request.player.username}'s join request was declined`, undefined, tx);
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Member Management
 // ---------------------------------------------------------------------------
 
