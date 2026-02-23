@@ -239,6 +239,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       respawnedTo: null,
       newDiscoveries,
     });
+    return;
   }
 
   // 8. Determine travel cost
