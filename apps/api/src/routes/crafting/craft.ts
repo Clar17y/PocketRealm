@@ -19,7 +19,7 @@ import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from '../../services/inventoryService';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
-import { applyGuildTaxTx } from '../../services/guildTaxService';
+import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { incrementContractProgress } from '../../services/guildContractService';
 import { serializeXpGrant, assertNotRecovering, trackAchievements } from '../../utils/routeHelpers.js';
@@ -107,16 +107,18 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       }
     }
 
-    const totalTurnCost = recipe.turnCost * quantity;
-    const turnSpend = await prisma.$transaction(async (tx) => {
+    const baseTurnCost = recipe.turnCost * quantity;
+    const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
+      const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
+      const totalTurnCost = calculateInflatedCost(baseTurnCost, taxRate);
       const spent = await spendPlayerTurnsTx(tx, playerId, totalTurnCost);
-      await applyGuildTaxTx(tx, playerId, totalTurnCost);
+      const tax = await applyGuildTaxTx(tx, playerId, totalTurnCost);
 
       for (const mat of materials) {
         await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * quantity);
       }
 
-      return spent;
+      return { turnSpend: spent, taxResult: tax };
     });
 
     // Create result items (stack where possible)
@@ -237,7 +239,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
 
     // --- Achievement tracking (counters + derived checks) ---
     const isRealCraft = recipe.resultTemplate.itemType !== 'resource';
-    const craftCounters: Record<string, number> = { totalTurnsSpent: totalTurnCost };
+    const craftCounters: Record<string, number> = { totalTurnsSpent: turnSpend.spent };
     if (isRealCraft) {
       craftCounters.totalCrafts = quantity;
       for (const item of craftedItemDetails) {
@@ -259,7 +261,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       data: {
         playerId,
         activityType: 'crafting',
-        turnsSpent: totalTurnCost,
+        turnsSpent: turnSpend.spent,
         result: {
           recipeId: recipe.id,
           skillType: recipe.skillType,
@@ -289,5 +291,6 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       },
       craftedItemDetails,
       xp: serializeXpGrant(xpGrant),
+      tax: taxInfoFromResult(taxResult),
     });
 }));

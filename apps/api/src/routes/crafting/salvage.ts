@@ -5,7 +5,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
-import { applyGuildTaxTx } from '../../services/guildTaxService';
+import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, taxInfoFromResult } from '../../services/guildTaxService';
 import { addStackableItemTx } from '../../services/inventoryService';
 import {
   getZoneCraftingLevel,
@@ -55,9 +55,11 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
     });
     const templateById = new Map(materialTemplates.map((template) => [template.id, template]));
 
-    const { turnSpend, returned } = await prisma.$transaction(async (tx) => {
-      const spent = await spendPlayerTurnsTx(tx, playerId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
-      await applyGuildTaxTx(tx, playerId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
+    const { turnSpend, taxResult, returned } = await prisma.$transaction(async (tx) => {
+      const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
+      const actualSalvageCost = calculateInflatedCost(CRAFTING_CONSTANTS.SALVAGE_TURN_COST, taxRate);
+      const spent = await spendPlayerTurnsTx(tx, playerId, actualSalvageCost);
+      const tax = await applyGuildTaxTx(tx, playerId, actualSalvageCost);
 
       const consumed = await tx.item.deleteMany({
         where: {
@@ -120,7 +122,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
         });
       }
 
-      return { turnSpend: spent, returned: minted };
+      return { turnSpend: spent, taxResult: tax, returned: minted };
     });
 
     // --- Achievement stat tracking ---
@@ -158,5 +160,6 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
           quantity: entry.quantity,
         })),
       },
+      tax: taxInfoFromResult(taxResult),
     });
 }));
