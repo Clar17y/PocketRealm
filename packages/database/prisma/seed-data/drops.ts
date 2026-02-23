@@ -5,6 +5,7 @@ const m = IDS.mobs;
 const r = IDS.res;
 const d = IDS.drop;
 const p = IDS.pots;
+const g = IDS.gems;
 
 // Helper: creates a drop table row { id, mobTemplateId, itemTemplateId, dropChance (decimal), minQuantity, maxQuantity }
 function dr(mobId: string, itemId: string, chancePct: number, min: number, max: number) {
@@ -244,5 +245,22 @@ export function getAllDropTables() {
     dr(m.fleshGolem, d.oozeResidue, 60, 2, 3), dr(m.fleshGolem, d.eldritchFragment, 40, 1, 2),
     // Eldritch Abomination
     dr(m.eldritchAbomination, d.eldritchFragment, 70, 3, 5), dr(m.eldritchAbomination, d.oozeResidue, 55, 3, 4), dr(m.eldritchAbomination, d.ancientRelic, 20, 1, 2), dr(m.eldritchAbomination, p.elixirOfPower, 12, 1, 1),
+
+    // ── Gem Drops ────────────────────────────────────────────────────────
+    // T1 zones (Forest Edge) — T1 raw gems, ~5%
+    dr(m.ratKing, g.roughRuby, 5, 1, 1), dr(m.broodMother, g.rawAmber, 5, 1, 1), dr(m.greatBoar, g.treeResin, 5, 1, 1),
+    // T2 zones (Deep Forest / Cave Entrance) — T1-T2 raw gems, ~5-8%
+    dr(m.alphaWolf, g.roughSapphire, 8, 1, 1), dr(m.banditCaptain, g.rawPearl, 6, 1, 1), dr(m.elderTreant, g.fossilizedSap, 6, 1, 1),
+    dr(m.batSwarmLord, g.roughRuby, 5, 1, 1), dr(m.goblinShaman, g.rawAmber, 5, 1, 1),
+    // T3 zones (Ancient Grove / Deep Mines / Whispering Plains) — T2-T3 raw gems, ~5-8%
+    dr(m.ancientSpirit, g.roughEmerald, 8, 1, 1), dr(m.faeQueen, g.rawJade, 8, 1, 1), dr(m.treantPatriarch, g.crystalBark, 6, 1, 1),
+    dr(m.goblinChieftain, g.roughSapphire, 6, 1, 1), dr(m.tunnelWyrm, g.fossilizedSap, 5, 1, 1),
+    dr(m.harpyMatriarch, g.rawJade, 6, 1, 1), dr(m.banditWarlord, g.crystalBark, 5, 1, 1),
+    // T4 zones (Haunted Marsh / Crystal Caverns) — T3-T4 raw gems, ~5-8%
+    dr(m.deathKnight, g.roughDiamond, 8, 1, 1), dr(m.covenMother, g.rawMoonstone, 8, 1, 1), dr(m.ancientCrocodile, g.heartwoodGem, 6, 1, 1),
+    dr(m.golemOverlord, g.roughEmerald, 6, 1, 1), dr(m.crystalTitan, g.roughDiamond, 8, 1, 1), dr(m.goblinKingMob, g.rawMoonstone, 6, 1, 1),
+    // T5 zones (Sunken Ruins) — T4-T5 raw gems, ~5-10%
+    dr(m.lich, g.roughOpal, 10, 1, 1), dr(m.nagaQueenMob, g.rawStarcrystal, 10, 1, 1), dr(m.eldritchAbomination, g.ancientAmber, 10, 1, 1),
+    dr(m.spectralCaptain, g.roughDiamond, 6, 1, 1), dr(m.tentacleHorror, g.heartwoodGem, 5, 1, 1),
   ];
 }
