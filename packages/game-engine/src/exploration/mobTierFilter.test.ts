@@ -198,4 +198,42 @@ describe('selectTierWithBleedthrough', () => {
     // tier 1 selected, roll for tier+2 → tier 3 doesn't exist → highest = tier 2
     expect(selectTierWithBleedthrough(1, custom, () => 0.95)).toBe(2);
   });
+
+  it('produces mobs from multiple tiers over 1000 rolls at tier 3', () => {
+    const tierCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    const defaultTiers = { '1': 0, '2': 25, '3': 50, '4': 75 };
+
+    for (let i = 0; i < 1000; i++) {
+      const tier = selectTierWithBleedthrough(3, defaultTiers);
+      tierCounts[tier]!++;
+    }
+
+    // With 10/15/50/15/10 split centered on tier 3:
+    // T1=10%, T2=15%, T3=50%, T4=25% (tier 5 overflow to T4)
+    // All tiers should appear over 1000 rolls
+    expect(tierCounts[1]).toBeGreaterThan(0);
+    expect(tierCounts[2]).toBeGreaterThan(0);
+    expect(tierCounts[3]).toBeGreaterThan(0);
+    expect(tierCounts[4]).toBeGreaterThan(0);
+
+    // Approximate distribution checks (with wide margins for randomness)
+    expect(tierCounts[3]).toBeGreaterThan(350); // ~50%, should be well above 350
+    expect(tierCounts[1]).toBeLessThan(200);    // ~10%, should be under 200
+  });
+
+  it('produces mobs from tiers 2-4 when selecting tier 4 over 1000 rolls', () => {
+    const tierCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    const defaultTiers = { '1': 0, '2': 25, '3': 50, '4': 75 };
+
+    for (let i = 0; i < 1000; i++) {
+      const tier = selectTierWithBleedthrough(4, defaultTiers);
+      tierCounts[tier]!++;
+    }
+
+    // Tier 4 selected: [0, 10, 15, 75]
+    expect(tierCounts[1]).toBe(0);              // T1 is outside ±2 of T4... wait, T4-2=T2, so T1 IS outside
+    expect(tierCounts[2]).toBeGreaterThan(0);   // ~10%
+    expect(tierCounts[3]).toBeGreaterThan(0);   // ~15%
+    expect(tierCounts[4]).toBeGreaterThan(500); // ~75%
+  });
 });
