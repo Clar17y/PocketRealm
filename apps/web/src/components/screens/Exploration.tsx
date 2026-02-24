@@ -7,7 +7,7 @@ import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { HpStatusBar } from '../common/HpStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
-import { Mountain, Play } from 'lucide-react';
+import { Loader2, Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, HP_CONSTANTS } from '@adventure/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import Image from 'next/image';
@@ -286,11 +286,20 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                 onStartExploration(turnInvestment[0]);
               }
             }}
-            disabled={isRecovering || turnInvestment[0] > availableTurns}
+            disabled={isRecovering || turnInvestment[0] > availableTurns || !!busyAction}
           >
             <div className="flex items-center justify-center gap-2">
-              <Play size={20} />
-              {isRecovering ? 'Recover First' : 'Start Exploration'}
+              {busyAction === 'exploration' ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Exploring...
+                </>
+              ) : (
+                <>
+                  <Play size={20} />
+                  {isRecovering ? 'Recover First' : 'Start Exploration'}
+                </>
+              )}
             </div>
           </PixelButton>
         </>
