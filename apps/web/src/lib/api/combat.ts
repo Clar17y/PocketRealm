@@ -23,6 +23,7 @@ export async function getZones() {
       } | null;
     }>;
     connections: Array<{ fromId: string; toId: string; explorationThreshold: number }>;
+    undiscoveredZones: Array<{ id: string; name: string; explorationThreshold: number; fromZoneId: string; discovered: false }>;
     currentZoneId: string;
   }>('/api/v1/zones');
 }

@@ -55,6 +55,7 @@ interface ZoneMapProps {
   onTravel: (zoneId: string) => void;
   onExploreCurrentZone: () => void;
   guildTaxRate?: number;
+  undiscoveredZones?: Array<{ id: string; name: string; explorationThreshold: number; fromZoneId: string }>;
 }
 
 /** BFS from the starter zone to compute shortest-path tier for each zone. */
@@ -115,6 +116,7 @@ export function ZoneMap({
   onTravel,
   onExploreCurrentZone,
   guildTaxRate = 0,
+  undiscoveredZones,
 }: ZoneMapProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
@@ -511,6 +513,36 @@ export function ZoneMap({
               })()}
             </PixelButton>
           )}
+        </div>
+      )}
+
+      {/* Undiscovered zone hints */}
+      {!travelPlaybackData && undiscoveredZones && undiscoveredZones.length > 0 && (
+        <div
+          style={{
+            background: 'var(--rpg-surface)',
+            border: '1px solid var(--rpg-border)',
+            borderRadius: 8,
+            padding: 12,
+          }}
+        >
+          <h3 className="text-sm font-semibold text-[var(--rpg-text-secondary)] mb-2">Undiscovered Paths</h3>
+          <div className="space-y-1.5">
+            {undiscoveredZones.map(uz => {
+              const fromZone = zones.find(z => z.id === uz.fromZoneId);
+              return (
+                <div key={uz.id} className="flex items-center gap-2 px-3 py-2 rounded border border-dashed border-[var(--rpg-border)] opacity-60">
+                  <Lock size={14} className="text-[var(--rpg-text-secondary)] flex-shrink-0" />
+                  <div className="flex-1">
+                    <span className="text-sm text-[var(--rpg-text-secondary)]">???</span>
+                    <span className="text-xs text-[var(--rpg-text-secondary)] ml-2">
+                      from {fromZone?.name ?? 'Unknown'} &mdash; {uz.explorationThreshold}% explored to discover
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

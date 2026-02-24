@@ -191,6 +191,7 @@ export default function GamePage() {
     zones,
     activeZoneId,
     zoneConnections,
+    undiscoveredZones,
     skills,
     characterProgression,
     inventory,
@@ -617,6 +618,7 @@ export default function GamePage() {
             onTravel={handleTravelToZone}
             onExploreCurrentZone={() => setActiveScreen('explore')}
             guildTaxRate={guildTaxRate}
+            undiscoveredZones={undiscoveredZones}
           />
         );
       case 'bestiary':
