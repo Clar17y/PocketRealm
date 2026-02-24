@@ -500,9 +500,11 @@ export const ZONE_EXPLORATION_CONSTANTS = {
 // =============================================================================
 
 export const TIER_BLEED_CONSTANTS = {
-  CURRENT_TIER_WEIGHT: 0.75,
-  PLUS_ONE_TIER_WEIGHT: 0.20,
-  PLUS_TWO_TIER_WEIGHT: 0.05,
+  TWO_BELOW: 0.10,
+  ONE_BELOW: 0.15,
+  SELECTED: 0.50,
+  ONE_ABOVE: 0.15,
+  TWO_ABOVE: 0.10,
 } as const;
 
 // =============================================================================

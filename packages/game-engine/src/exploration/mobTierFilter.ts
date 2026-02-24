@@ -43,24 +43,36 @@ export function filterAndWeightMobsByTier<T extends MobWithTier>(
 }
 
 export function selectTierWithBleedthrough(
-  currentTier: number,
+  selectedTier: number,
   zoneTiers: Record<string, number> | null,
   rng: () => number = Math.random,
 ): number {
   const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
-  const maxTier = Math.max(...Object.keys(tiers).map(Number).filter(n => !isNaN(n)), 0);
-  if (maxTier <= 0) return currentTier;
+  const tierNumbers = Object.keys(tiers).map(Number).filter(n => !isNaN(n));
+  const maxTier = Math.max(...tierNumbers, 0);
+  const minTier = Math.min(...tierNumbers, maxTier);
+  if (maxTier <= 0) return selectedTier;
 
+  const { TWO_BELOW, ONE_BELOW, SELECTED, ONE_ABOVE } = TIER_BLEED_CONSTANTS;
   const roll = rng();
-  let selectedTier: number;
 
-  if (roll < TIER_BLEED_CONSTANTS.CURRENT_TIER_WEIGHT) {
-    selectedTier = currentTier;
-  } else if (roll < TIER_BLEED_CONSTANTS.CURRENT_TIER_WEIGHT + TIER_BLEED_CONSTANTS.PLUS_ONE_TIER_WEIGHT) {
-    selectedTier = currentTier + 1;
+  let targetTier: number;
+  if (roll < TWO_BELOW) {
+    targetTier = selectedTier - 2;
+  } else if (roll < TWO_BELOW + ONE_BELOW) {
+    targetTier = selectedTier - 1;
+  } else if (roll < TWO_BELOW + ONE_BELOW + SELECTED) {
+    targetTier = selectedTier;
+  } else if (roll < TWO_BELOW + ONE_BELOW + SELECTED + ONE_ABOVE) {
+    targetTier = selectedTier + 1;
   } else {
-    selectedTier = currentTier + 2;
+    targetTier = selectedTier + 2;
   }
 
-  return Math.min(selectedTier, maxTier);
+  // Redistribute unavailable tiers:
+  // Below-range overflow → selected tier
+  // Above-range overflow → highest available tier
+  if (targetTier < minTier) return selectedTier;
+  if (targetTier > maxTier) return maxTier;
+  return targetTier;
 }
