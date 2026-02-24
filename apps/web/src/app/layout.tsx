@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Adventure RPG',
-  description: 'Turn-based async adventure RPG',
+  title: 'Adventure RPG — Turn-Based Async RPG',
+  description: 'A turn-based RPG that respects your time. Explore 11 zones, battle 80+ monsters, master 14 crafting skills, and raid world bosses. Play free or go Champion.',
   manifest: '/manifest.json',
 };
 

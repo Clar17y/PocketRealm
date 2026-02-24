@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { login } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import styles from './page.module.css';
+import { PixelButton } from '@/components/PixelButton';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,42 +43,64 @@ export default function LoginPage() {
   };
 
   return (
-    <main className={styles.main}>
-      <div className={styles.container}>
-        <h1 className={styles.title}>Login</h1>
+    <main className="relative min-h-screen flex items-center justify-center p-4">
+      <Image
+        src="/assets/zones/zone_forest_edge.png"
+        alt="Forest Edge"
+        fill
+        className="object-cover"
+        priority
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-[var(--rpg-background)]" />
 
-        <form onSubmit={handleSubmit} className={styles.form}>
-          <div className={styles.field}>
-            <label htmlFor="email">Email</label>
+      <div className="relative z-10 w-full max-w-sm bg-[var(--rpg-surface)]/90 border border-[var(--rpg-border)] rounded-xl p-6 md:p-8 backdrop-blur-sm">
+        <h1 className="text-2xl font-bold text-[var(--rpg-gold)] text-center mb-6">
+          Welcome Back
+        </h1>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="email" className="text-sm text-[var(--rpg-text-secondary)]">
+              Email
+            </label>
             <input
               type="email"
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              className="px-3 py-2.5 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-blue-light)] transition-colors"
             />
           </div>
 
-          <div className={styles.field}>
-            <label htmlFor="password">Password</label>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="password" className="text-sm text-[var(--rpg-text-secondary)]">
+              Password
+            </label>
             <input
               type="password"
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              className="px-3 py-2.5 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-blue-light)] transition-colors"
             />
           </div>
 
-          {error && <p className={styles.error}>{error}</p>}
+          {error && (
+            <p className="text-sm text-[var(--rpg-red)] text-center">{error}</p>
+          )}
 
-          <button type="submit" className={styles.button} disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
+          <PixelButton type="submit" variant="primary" disabled={loading} className="mt-2">
+            {loading ? 'Logging in...' : 'Enter World'}
+          </PixelButton>
         </form>
 
-        <p className={styles.link}>
-          Don&apos;t have an account? <a href="/register">Register</a>
+        <p className="mt-6 text-center text-sm text-[var(--rpg-text-secondary)]">
+          New here?{' '}
+          <a href="/register" className="text-[var(--rpg-blue-light)] hover:underline">
+            Create an account
+          </a>
         </p>
       </div>
     </main>
