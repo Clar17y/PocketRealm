@@ -2,6 +2,7 @@ import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
+import compression from 'compression';
 import helmet from 'helmet';
 import { authRouter } from './routes/auth';
 import { turnsRouter } from './routes/turns';
@@ -66,6 +67,7 @@ function isAllowedCorsOrigin(origin: string): boolean {
 }
 
 // Middleware
+app.use(compression());
 app.use(helmet());
 app.use(cors({
   origin: (origin, callback) => {
