@@ -8,6 +8,7 @@ import {
   buildPlayerCombatStats,
   calculateFleeResult,
   filterAndWeightMobsByTier,
+  getScaledZoneExitChance,
   mobToCombatantStats,
   rollMobPrefix,
   runCombat,
@@ -121,7 +122,10 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const zoneTiers = zone.explorationTiers as Record<string, number> | null;
 
     const undiscoveredNeighbors = await getUndiscoveredNeighborZones(playerId, body.zoneId);
-    const effectiveExitChance = undiscoveredNeighbors.length > 0 ? zone.zoneExitChance : null;
+    const rawExitChance = undiscoveredNeighbors.length > 0 ? zone.zoneExitChance : null;
+    const effectiveExitChance = rawExitChance != null && rawExitChance > 0
+      ? getScaledZoneExitChance(rawExitChance, explorationProgress.percent)
+      : null;
 
     // Pre-fetch connection thresholds for zone exit gating (used inside the loop)
     const connectionThresholds = undiscoveredNeighbors.length > 0
@@ -622,6 +626,26 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     await addExplorationTurns(playerId, body.zoneId, spentTurns);
     const explorationAfter = await getExplorationPercent(playerId, body.zoneId);
     const zoneJustFullyExplored = explorationBefore.percent < 100 && explorationAfter.percent >= 100;
+
+    // Auto-discover undiscovered neighbors when zone reaches 100%
+    if (zoneJustFullyExplored && undiscoveredNeighbors.length > 0) {
+      const autoDiscoverNeighbors = undiscoveredNeighbors.filter(n => {
+        const threshold = thresholdByToId.get(n.id) ?? 0;
+        return explorationAfter.percent >= threshold;
+      });
+      for (const neighbor of autoDiscoverNeighbors) {
+        await discoverZone(playerId, neighbor.id);
+        const idx = undiscoveredNeighbors.findIndex(n => n.id === neighbor.id);
+        if (idx !== -1) undiscoveredNeighbors.splice(idx, 1);
+        zoneExitDiscovered = true;
+        events.push({
+          turn: effectiveTurns,
+          type: 'zone_exit',
+          description: `Zone fully explored! You discovered ${neighbor.name}.`,
+          details: { zoneId: neighbor.id, zoneName: neighbor.name },
+        });
+      }
+    }
 
     const refundAmount = aborted && abortedAtTurn ? Math.max(0, effectiveTurns - abortedAtTurn) : 0;
     const refundedTurns = refundAmount > 0 ? await refundPlayerTurns(playerId, refundAmount) : null;
