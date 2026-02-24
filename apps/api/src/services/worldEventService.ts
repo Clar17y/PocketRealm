@@ -1,11 +1,12 @@
 import { prisma } from '@adventure/database';
-import type {
-  ActiveZoneModifiers,
-  WorldEventData,
-  WorldEventEffectType,
-  WorldEventScope,
-  WorldEventStatus,
-  WorldEventType,
+import {
+  WORLD_EVENT_CONSTANTS,
+  type ActiveZoneModifiers,
+  type WorldEventData,
+  type WorldEventEffectType,
+  type WorldEventScope,
+  type WorldEventStatus,
+  type WorldEventType,
 } from '@adventure/shared';
 
 function toWorldEventData(row: {
@@ -157,6 +158,14 @@ export async function spawnWorldEvent(params: {
   durationHours: number;
   createdBy?: 'system' | 'player_discovery';
 }): Promise<WorldEventData | null> {
+  // Per-zone total cap (applies to all spawn paths)
+  if (params.zoneId) {
+    const activeInZone = await prisma.worldEvent.count({
+      where: { zoneId: params.zoneId, status: 'active' },
+    });
+    if (activeInZone >= WORLD_EVENT_CONSTANTS.MAX_ZONE_EVENTS) return null;
+  }
+
   // Slot check: zone events — no duplicate effectType in the same zone
   if (params.zoneId) {
     const existing = await prisma.worldEvent.findFirst({

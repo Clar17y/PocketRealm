@@ -154,58 +154,78 @@ describe('worldEventService', () => {
   });
 
   describe('spawnWorldEvent', () => {
+    const baseParams = {
+      type: 'mob' as const,
+      zoneId: 'zone-1',
+      title: 'Test',
+      description: 'Desc',
+      effectType: 'damage_up' as const,
+      effectValue: 0.5,
+      durationHours: 6,
+    };
+
     it('creates a new event when no duplicate effect exists', async () => {
+      mockPrisma.worldEvent.count.mockResolvedValue(0);
       mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
       mockPrisma.worldEvent.create.mockResolvedValue(makeEventRow());
 
-      const result = await spawnWorldEvent({
-        type: 'mob',
-        zoneId: 'zone-1',
-        title: 'Test',
-        description: 'Desc',
-        effectType: 'damage_up',
-        effectValue: 0.5,
-        durationHours: 6,
-      });
+      const result = await spawnWorldEvent(baseParams);
 
       expect(result).not.toBeNull();
       expect(mockPrisma.worldEvent.create).toHaveBeenCalled();
     });
 
     it('returns null when duplicate effect exists in same zone', async () => {
+      mockPrisma.worldEvent.count.mockResolvedValue(0);
       mockPrisma.worldEvent.findFirst.mockResolvedValue({ id: 'existing' });
 
-      const result = await spawnWorldEvent({
-        type: 'mob',
-        zoneId: 'zone-1',
-        title: 'Test',
-        description: 'Desc',
-        effectType: 'damage_up',
-        effectValue: 0.5,
-        durationHours: 6,
-      });
+      const result = await spawnWorldEvent(baseParams);
 
       expect(result).toBeNull();
       expect(mockPrisma.worldEvent.create).not.toHaveBeenCalled();
     });
 
-    it('skips slot check for world-wide events (no zoneId)', async () => {
+    it('skips both checks for world-wide events (no zoneId)', async () => {
       mockPrisma.worldEvent.create.mockResolvedValue(
         makeEventRow({ zoneId: null, zone: null }),
       );
 
       const result = await spawnWorldEvent({
-        type: 'resource',
+        ...baseParams,
         zoneId: null,
-        title: 'World Event',
-        description: 'Desc',
+        type: 'resource',
         effectType: 'yield_up',
         effectValue: 0.3,
-        durationHours: 6,
       });
 
       expect(result).not.toBeNull();
+      expect(mockPrisma.worldEvent.count).not.toHaveBeenCalled();
       expect(mockPrisma.worldEvent.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('returns null when zone already has MAX_ZONE_EVENTS active', async () => {
+      mockPrisma.worldEvent.count.mockResolvedValue(2); // MAX_ZONE_EVENTS = 2
+
+      const result = await spawnWorldEvent(baseParams);
+
+      expect(result).toBeNull();
+      // Should short-circuit before effectType dedup or create
+      expect(mockPrisma.worldEvent.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.worldEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('allows spawn when zone has fewer than MAX_ZONE_EVENTS', async () => {
+      mockPrisma.worldEvent.count.mockResolvedValue(1);
+      mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
+      mockPrisma.worldEvent.create.mockResolvedValue(makeEventRow());
+
+      const result = await spawnWorldEvent(baseParams);
+
+      expect(result).not.toBeNull();
+      expect(mockPrisma.worldEvent.count).toHaveBeenCalledWith({
+        where: { zoneId: 'zone-1', status: 'active' },
+      });
+      expect(mockPrisma.worldEvent.create).toHaveBeenCalled();
     });
   });
 
