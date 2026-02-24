@@ -37,7 +37,7 @@ import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
 import { addExplorationTurns, calculateExplorationPercent, getExplorationPercent } from '../../services/zoneExplorationService';
-import { getActiveZoneModifiers, spawnWorldEvent } from '../../services/worldEventService';
+import { getActiveZoneModifiers, getSpawnRateModifiers, spawnWorldEvent } from '../../services/worldEventService';
 import { createBossEncounter } from '../../services/bossEncounterService';
 import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { getIo } from '../../socket';
@@ -56,6 +56,7 @@ import {
   type EncounterSiteSize,
   type NarrativeEvent,
   type ZoneFamilyRow,
+  type ZoneFamilyMember,
   type PendingResourceDiscovery,
   type PendingEncounterSiteDiscovery,
   type PendingAmbushCombatLog,
@@ -136,7 +137,10 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     await checkAndSpawnEvents(getIo());
 
     // Fetch zone modifiers from active world events
-    const zoneModifiers = await getActiveZoneModifiers(body.zoneId);
+    const [zoneModifiers, spawnMods] = await Promise.all([
+      getActiveZoneModifiers(body.zoneId),
+      getSpawnRateModifiers(body.zoneId),
+    ]);
 
     // Auto-potion setup + tutorial detection
     const playerRecord = await prismaAny.player.findUnique({
@@ -163,9 +167,20 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     // Guild tax reduces effective exploration turns
     const effectiveTurns = isTutorialExplore ? turnsToSpend : taxResult.postTaxAmount;
 
+    // Compute aggregate spawn rate multiplier from per-family and global event modifiers
+    let spawnRateMultiplier = 1;
+    if (zoneFamilies.length > 0) {
+      const baseTotal = zoneFamilies.reduce((sum: number, f: ZoneFamilyRow) => sum + f.discoveryWeight, 0);
+      const adjustedTotal = zoneFamilies.reduce((sum: number, f: ZoneFamilyRow) => {
+        const familyMod = spawnMods.byFamily.get(f.mobFamilyId) ?? 1;
+        return sum + f.discoveryWeight * familyMod * spawnMods.global;
+      }, 0);
+      spawnRateMultiplier = baseTotal > 0 ? adjustedTotal / baseTotal : 1;
+    }
+
     const outcomes = isTutorialExplore
       ? [{ turnOccurred: 50, type: 'ambush' as const }]
-      : simulateExploration(effectiveTurns, effectiveExitChance);
+      : simulateExploration(effectiveTurns, effectiveExitChance, spawnRateMultiplier);
 
     const pendingResources: PendingResourceDiscovery[] = [];
     const pendingSites: PendingEncounterSiteDiscovery[] = [];
@@ -214,7 +229,20 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           }
           if (candidates.length === 0) candidates = tieredMobs;
 
-          const mob = pickWeighted(candidates, 'encounterWeight') as typeof candidates[number] | null;
+          // Boost encounter weights for mobs in families affected by spawn rate events
+          const weightedCandidates = candidates.map(c => {
+            let weightMod = spawnMods.global;
+            for (const [familyId, mod] of spawnMods.byFamily) {
+              const family = zoneFamilies.find((f: ZoneFamilyRow) => f.mobFamilyId === familyId);
+              if (family?.mobFamily?.members?.some((m: ZoneFamilyMember) => m.mobTemplate.id === c.id)) {
+                weightMod *= mod;
+                break;
+              }
+            }
+            return weightMod !== 1 ? { ...c, encounterWeight: c.encounterWeight * weightMod } : c;
+          });
+
+          const mob = pickWeighted(weightedCandidates, 'encounterWeight') as typeof candidates[number] | null;
           if (!mob) continue;
 
           baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
@@ -407,7 +435,11 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       }
 
       if (outcome.type === 'encounter_site' && zoneFamilies.length > 0) {
-        const pickedFamily = pickWeighted(zoneFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
+        const adjustedFamilies = zoneFamilies.map((f: ZoneFamilyRow) => ({
+          ...f,
+          discoveryWeight: f.discoveryWeight * (spawnMods.byFamily.get(f.mobFamilyId) ?? 1) * spawnMods.global,
+        }));
+        const pickedFamily = pickWeighted(adjustedFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
         if (!pickedFamily) continue;
 
         const size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);
