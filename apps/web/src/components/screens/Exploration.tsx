@@ -49,6 +49,8 @@ interface ExplorationProps {
   onPushLog?: (...entries: Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'danger' }>) => void;
   combatSpeedMs?: number;
   explorationSpeedMs?: number;
+  autoSkipKnownCombat?: boolean;
+  bestiaryMobs?: Array<{ id: string; isDiscovered: boolean; prefixesEncountered: string[] }>;
   defaultTurns?: number;
   tutorialLocked?: boolean;
   lowHpWarning?: boolean;
@@ -59,7 +61,7 @@ interface ExplorationProps {
   guildTaxRate?: number;
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0 }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0 }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
 
@@ -149,6 +151,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           playerMaxHp={playbackData.playerMaxHp}
           combatSpeedMs={combatSpeedMs}
           explorationSpeedMs={explorationSpeedMs}
+          autoSkipKnownCombat={autoSkipKnownCombat}
+          bestiaryMobs={bestiaryMobs}
           onComplete={onPlaybackComplete!}
           onSkip={onPlaybackSkip!}
           onPushLog={onPushLog}

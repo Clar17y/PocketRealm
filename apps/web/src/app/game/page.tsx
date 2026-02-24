@@ -431,6 +431,8 @@ export default function GamePage() {
             onPushLog={pushLog}
             combatSpeedMs={combatLogSpeedMs}
             explorationSpeedMs={explorationSpeedMs}
+            autoSkipKnownCombat={autoSkipKnownCombat}
+            bestiaryMobs={bestiaryMobs.map(m => ({ id: m.id, isDiscovered: m.isDiscovered, prefixesEncountered: m.prefixesEncountered }))}
             defaultTurns={defaultExploreTurns}
             tutorialLocked={tutorialStep === TUTORIAL_STEP_EXPLORE}
             lowHpWarning={lowHpWarning}
@@ -613,6 +615,8 @@ export default function GamePage() {
             activityLog={activityLog}
             combatSpeedMs={combatLogSpeedMs}
             explorationSpeedMs={explorationSpeedMs}
+            autoSkipKnownCombat={autoSkipKnownCombat}
+            bestiaryMobs={bestiaryMobs.map(m => ({ id: m.id, isDiscovered: m.isDiscovered, prefixesEncountered: m.prefixesEncountered }))}
             onTravel={handleTravelToZone}
             onExploreCurrentZone={() => setActiveScreen('explore')}
             guildTaxRate={guildTaxRate}
