@@ -11,11 +11,13 @@ interface AppShellProps {
   username?: string;
   onSettings?: () => void;
   onLogout?: () => void;
+  onWhatsNew?: () => void;
+  hasUnseenChangelog?: boolean;
 }
 
-export function AppShell({ children, turns = 0, username, onSettings, onLogout }: AppShellProps) {
+export function AppShell({ children, turns = 0, username, onSettings, onLogout, onWhatsNew, hasUnseenChangelog }: AppShellProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const hasMenu = Boolean(onSettings || onLogout);
+  const hasMenu = Boolean(onSettings || onLogout || onWhatsNew);
 
   return (
     <div className="min-h-dvh w-full bg-[var(--rpg-background)] flex flex-col safe-area-top">
@@ -64,6 +66,18 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout }
                       onClick={() => setDropdownOpen(false)}
                     />
                     <div role="menu" className="absolute right-0 top-full mt-1 z-50 min-w-[120px] bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg shadow-lg overflow-hidden">
+                      {onWhatsNew && (
+                        <button
+                          role="menuitem"
+                          onClick={() => { setDropdownOpen(false); onWhatsNew(); }}
+                          className="w-full text-left px-4 py-2 text-sm text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-background)] transition-colors flex items-center justify-between"
+                        >
+                          What&apos;s New
+                          {hasUnseenChangelog && (
+                            <span className="w-2 h-2 rounded-full bg-[var(--rpg-gold)]" />
+                          )}
+                        </button>
+                      )}
                       {onSettings && (
                         <button
                           role="menuitem"

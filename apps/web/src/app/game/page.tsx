@@ -1076,6 +1076,8 @@ export default function GamePage() {
   username={player?.username}
   onSettings={() => handleNavigate('settings')}
   onLogout={() => { logout(); router.push('/'); }}
+  onWhatsNew={openChangelog}
+  hasUnseenChangelog={showChangelog}
 >
         {/* Broken gear warning banner */}
         {equipment.some((e) => {
