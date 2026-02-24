@@ -19,6 +19,8 @@ interface TurnPlaybackProps {
   onComplete: () => void;
   onSkip: () => void;
   onPushLog?: (...entries: Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'danger' }>) => void;
+  autoSkipKnownCombat?: boolean;
+  bestiaryMobs?: Array<{ id: string; isDiscovered: boolean; prefixesEncountered: string[] }>;
 }
 
 export function TurnPlayback({
@@ -34,6 +36,8 @@ export function TurnPlayback({
   onComplete,
   onSkip,
   onPushLog,
+  autoSkipKnownCombat,
+  bestiaryMobs,
 }: TurnPlaybackProps) {
   const [combatEvent, setCombatEvent] = useState<ExplorationPlaybackEvent | null>(null);
   const [resumeFromCombat, setResumeFromCombat] = useState(false);
@@ -86,7 +90,18 @@ export function TurnPlayback({
       </PixelCard>
 
       {/* Combat Playback — embedded combat animation during exploration/travel */}
-      {combatEvent && (
+      {combatEvent && (() => {
+          const shouldAutoSkip = autoSkipKnownCombat && (() => {
+            const mobTemplateId = combatEvent.details?.mobTemplateId as string | undefined;
+            if (!mobTemplateId || !bestiaryMobs) return false;
+            const mob = bestiaryMobs.find(m => m.id === mobTemplateId);
+            if (!mob?.isDiscovered) return false;
+            const prefix = combatEvent.details?.mobPrefix as string | undefined;
+            if (prefix) return mob.prefixesEncountered.includes(prefix);
+            return true;
+          })();
+
+          return (
         <PixelCard>
           <CombatPlayback
             key={combatEvent.turn}
@@ -128,6 +143,7 @@ export function TurnPlayback({
               effectsApplied?: Array<{ stat: string; modifier: number; duration: number; target: 'combatantA' | 'combatantB' }>;
               effectsExpired?: Array<{ name: string; target: 'combatantA' | 'combatantB' }>;
             }>) ?? []}
+            autoSkip={!!shouldAutoSkip}
             speedMs={combatSpeedMs}
             onComplete={() => {
               // Track player HP after this fight for the next combat
@@ -166,7 +182,8 @@ export function TurnPlayback({
             }}
           />
         </PixelCard>
-      )}
+          );
+      })()}
     </>
   );
 }
