@@ -135,6 +135,54 @@ describe('simulateTravelAmbushes', () => {
   });
 });
 
+describe('simulateExploration with spawnRateMultiplier', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('increases ambush frequency with spawnRateMultiplier > 1', () => {
+    // AMBUSH_CHANCE_PER_TURN is 0.005. With multiplier 2.0, effective chance is 0.01.
+    // Math.random returning 0.008: 0.008 < 0.01 -> ambush triggers
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.008) // ambush check -> hit (0.008 < 0.01)
+      .mockReturnValue(0.999);    // everything else -> miss
+    const outcomes = simulateExploration(1, null, 2.0);
+    expect(outcomes.some(o => o.type === 'ambush')).toBe(true);
+  });
+
+  it('does not increase ambush with multiplier 1.0 for same roll', () => {
+    // Same roll 0.008, but with multiplier 1.0, effective chance is 0.005 -> miss
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.008) // ambush: 0.008 > 0.005 -> miss
+      .mockReturnValue(0.999);
+    const outcomes = simulateExploration(1, null, 1.0);
+    expect(outcomes.some(o => o.type === 'ambush')).toBe(false);
+  });
+
+  it('defaults to multiplier 1 when not provided', () => {
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.008)
+      .mockReturnValue(0.999);
+    const outcomes = simulateExploration(1);
+    expect(outcomes.some(o => o.type === 'ambush')).toBe(false);
+  });
+});
+
+describe('estimateExploration with spawnRateMultiplier', () => {
+  it('scales ambush and encounter site expectations', () => {
+    const base = estimateExploration(100);
+    const boosted = estimateExploration(100, null, 1.5);
+    expect(boosted.expectedAmbushes).toBeCloseTo(base.expectedAmbushes * 1.5);
+    expect(boosted.expectedEncounterSites).toBeCloseTo(base.expectedEncounterSites * 1.5);
+  });
+
+  it('does not scale resource, cache, or zone exit chances', () => {
+    const base = estimateExploration(100, 0.01);
+    const boosted = estimateExploration(100, 0.01, 2.0);
+    expect(boosted.resourceNodeChance).toBeCloseTo(base.resourceNodeChance);
+    expect(boosted.hiddenCacheChance).toBeCloseTo(base.hiddenCacheChance);
+    expect(boosted.zoneExitChance).toBeCloseTo(base.zoneExitChance);
+  });
+});
+
 describe('validateExplorationTurns', () => {
   it('accepts valid turn count', () => {
     expect(validateExplorationTurns(100)).toEqual({ valid: true });
