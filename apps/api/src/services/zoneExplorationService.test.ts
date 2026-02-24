@@ -61,6 +61,8 @@ describe('calculateExplorationPercent', () => {
 
 describe('addExplorationTurns', () => {
   it('upserts with increment', async () => {
+    mockPrisma.zone.findUnique.mockResolvedValue({ turnsToExplore: 30000 });
+    mockPrisma.playerZoneExploration.findUnique.mockResolvedValue({ turnsExplored: 0 });
     mockPrisma.playerZoneExploration.upsert.mockResolvedValue({ turnsExplored: 500 });
 
     await addExplorationTurns('player1', 'zone1', 500);
@@ -80,6 +82,56 @@ describe('addExplorationTurns', () => {
   it('does nothing for negative turns', async () => {
     await addExplorationTurns('player1', 'zone1', -10);
     expect(mockPrisma.playerZoneExploration.upsert).not.toHaveBeenCalled();
+  });
+
+  it('should clamp turnsExplored to turnsToExplore cap', async () => {
+    mockPrisma.zone.findUnique.mockResolvedValue({ turnsToExplore: 30000 });
+    mockPrisma.playerZoneExploration.findUnique.mockResolvedValue({ turnsExplored: 29900 });
+    mockPrisma.playerZoneExploration.upsert.mockResolvedValue({ turnsExplored: 30000 });
+
+    await addExplorationTurns('player1', 'zone1', 500);
+
+    expect(mockPrisma.playerZoneExploration.upsert).toHaveBeenCalledWith({
+      where: { playerId_zoneId: { playerId: 'player1', zoneId: 'zone1' } },
+      create: { playerId: 'player1', zoneId: 'zone1', turnsExplored: 100 },
+      update: { turnsExplored: { increment: 100 } },
+    });
+  });
+
+  it('should not increment when already at cap', async () => {
+    mockPrisma.zone.findUnique.mockResolvedValue({ turnsToExplore: 30000 });
+    mockPrisma.playerZoneExploration.findUnique.mockResolvedValue({ turnsExplored: 30000 });
+
+    await addExplorationTurns('player1', 'zone1', 500);
+
+    expect(mockPrisma.playerZoneExploration.upsert).not.toHaveBeenCalled();
+  });
+
+  it('should skip clamping when turnsToExplore is null', async () => {
+    mockPrisma.zone.findUnique.mockResolvedValue({ turnsToExplore: null });
+    mockPrisma.playerZoneExploration.upsert.mockResolvedValue({ turnsExplored: 500 });
+
+    await addExplorationTurns('player1', 'zone1', 500);
+
+    expect(mockPrisma.playerZoneExploration.upsert).toHaveBeenCalledWith({
+      where: { playerId_zoneId: { playerId: 'player1', zoneId: 'zone1' } },
+      create: { playerId: 'player1', zoneId: 'zone1', turnsExplored: 500 },
+      update: { turnsExplored: { increment: 500 } },
+    });
+  });
+
+  it('should clamp on create when turns exceed cap', async () => {
+    mockPrisma.zone.findUnique.mockResolvedValue({ turnsToExplore: 1000 });
+    mockPrisma.playerZoneExploration.findUnique.mockResolvedValue(null);
+    mockPrisma.playerZoneExploration.upsert.mockResolvedValue({ turnsExplored: 1000 });
+
+    await addExplorationTurns('player1', 'zone1', 5000);
+
+    expect(mockPrisma.playerZoneExploration.upsert).toHaveBeenCalledWith({
+      where: { playerId_zoneId: { playerId: 'player1', zoneId: 'zone1' } },
+      create: { playerId: 'player1', zoneId: 'zone1', turnsExplored: 1000 },
+      update: { turnsExplored: { increment: 1000 } },
+    });
   });
 });
 
@@ -111,7 +163,8 @@ describe('getExplorationPercent edge cases', () => {
 });
 
 describe('addExplorationTurns edge cases', () => {
-  it('handles very large turn values', async () => {
+  it('handles very large turn values with no cap', async () => {
+    mockPrisma.zone.findUnique.mockResolvedValue({ turnsToExplore: null });
     mockPrisma.playerZoneExploration.upsert.mockResolvedValue({ turnsExplored: 1_000_000 });
 
     await addExplorationTurns('player1', 'zone1', 1_000_000);
