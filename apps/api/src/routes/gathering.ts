@@ -10,7 +10,7 @@ import { grantSkillXp } from '../services/xpService';
 import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
-import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
+import { getActiveZoneModifiers, getActiveEventSummaries, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
 import { applyResourceEventModifiers, rollGemCritBatch } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
@@ -154,6 +154,16 @@ gatheringRouter.get('/nodes', asyncHandler(async (req, res) => {
   const offset = (page - 1) * query.pageSize;
   const pageNodes = activeNodes.slice(offset, offset + query.pageSize);
 
+  const nodeBadgeCache = new Map<string, EventModifierBadge[]>();
+  for (const pn of pageNodes) {
+    const key = `${pn.resourceNode.zoneId}:${pn.resourceNode.resourceType}`;
+    if (!nodeBadgeCache.has(key)) {
+      nodeBadgeCache.set(key, await getEventModifiersForEntity(
+        pn.resourceNode.zoneId, { resourceType: pn.resourceNode.resourceType }
+      ));
+    }
+  }
+
   res.json({
     nodes: pageNodes.map((pn) => {
       const template = pn.resourceNode;
@@ -172,6 +182,7 @@ gatheringRouter.get('/nodes', asyncHandler(async (req, res) => {
         sizeName: getNodeSizeName(pn.effectiveCapacity, template.maxCapacity),
         discoveredAt: pn.discoveredAt.toISOString(),
         weathered: pn.decayedCapacity > 0,
+        eventModifiers: nodeBadgeCache.get(`${template.zoneId}:${template.resourceType}`) ?? [],
       };
     }),
     pagination: { ...pagination, page },
@@ -457,6 +468,14 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     xp: serializeXpGrant(xpGrant),
     gemCrit: gemCrit ?? undefined,
     activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
+    yieldBreakdown: zoneModifiers.resourceYieldMultiplier !== 1
+      ? {
+          baseYieldPerAction,
+          eventYieldPerAction: eventYield,
+          eventModifier: zoneModifiers.resourceYieldMultiplier,
+          eventTitle: activeEventEffects.find((e: { effectType: string }) => e.effectType === 'yield_up' || e.effectType === 'yield_down')?.title ?? null,
+        }
+      : undefined,
     tax: taxInfoFromResult(taxResult),
   });
 }));
