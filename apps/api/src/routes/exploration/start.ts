@@ -657,7 +657,10 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const explorationTurnsToAdd = selectedTier === maxUnlockedTier ? spentTurns : 0;
     const explorationBefore = await getExplorationPercent(playerId, body.zoneId);
     if (explorationTurnsToAdd > 0) {
-      await addExplorationTurns(playerId, body.zoneId, explorationTurnsToAdd);
+      await addExplorationTurns(playerId, body.zoneId, explorationTurnsToAdd, {
+        turnsToExplore: explorationBefore.turnsToExplore,
+        currentTurnsExplored: explorationBefore.turnsExplored,
+      });
     }
     const explorationAfter = explorationTurnsToAdd > 0
       ? await getExplorationPercent(playerId, body.zoneId)
