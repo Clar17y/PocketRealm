@@ -107,7 +107,7 @@ export function ExplorationPlayback({
 
         // All ambush types with combat log data trigger full combat playback
         const isAmbush = nextEvent.type === 'ambush_defeat' || nextEvent.type === 'ambush_victory';
-        if (isAmbush && nextEvent.details?.log) {
+        if (isAmbush && (nextEvent.details?.log || nextEvent.details?.combatLogId)) {
           setPhase('paused-combat');
           onCombatStart(nextEvent);
           return;

@@ -300,6 +300,7 @@ export default function GamePage() {
     loadAchievements,
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
+    combatLogPrefetch,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -439,6 +440,9 @@ export default function GamePage() {
             busyAction={busyAction}
             onNavigateToRest={() => handleNavigate('rest')}
             guildTaxRate={guildTaxRate}
+            fetchCombatLog={combatLogPrefetch.fetchLog}
+            prefetchCombatLog={combatLogPrefetch.prefetch}
+            getCachedCombatLog={combatLogPrefetch.getLog}
           />
         );
       case 'inventory':

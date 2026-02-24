@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { updateTutorialStep } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
@@ -438,6 +439,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
   const [achievementUnclaimedCount, setAchievementUnclaimedCount] = useState(0);
   const [activeTitle, setActiveTitleState] = useState<string | null>(null);
+  const combatLogPrefetch = useCombatLogPrefetch();
   const [playbackActive, setPlaybackActive] = useState(false);
   const [combatPlaybackQueue, setCombatPlaybackQueue] = useState<Array<{
     room?: number;
@@ -1829,6 +1831,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
     // Tutorial
     tutorialStep, skipTutorial, advanceTutorial,
+
+    // Combat log lazy loading
+    combatLogPrefetch,
 
     // Guild
     guildTaxRate,

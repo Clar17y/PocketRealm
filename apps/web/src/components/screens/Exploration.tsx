@@ -14,6 +14,7 @@ import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { CombatLogEntryResponse } from '@/lib/api/combat';
 
 interface ExplorationProps {
   currentZone: {
@@ -57,9 +58,12 @@ interface ExplorationProps {
   busyAction?: string | null;
   onNavigateToRest?: () => void;
   guildTaxRate?: number;
+  fetchCombatLog?: (id: string) => Promise<CombatLogEntryResponse[]>;
+  prefetchCombatLog?: (id: string) => void;
+  getCachedCombatLog?: (id: string) => CombatLogEntryResponse[] | null;
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0 }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, fetchCombatLog, prefetchCombatLog, getCachedCombatLog }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
 
@@ -152,6 +156,9 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           onComplete={onPlaybackComplete!}
           onSkip={onPlaybackSkip!}
           onPushLog={onPushLog}
+          fetchCombatLog={fetchCombatLog}
+          prefetchCombatLog={prefetchCombatLog}
+          getCachedCombatLog={getCachedCombatLog}
         />
       )}
 
