@@ -18,7 +18,7 @@ function decimalLikeToNumber(value: unknown): number {
   return 0;
 }
 
-function rollRarityWithLuck(luck: number): 'common' | 'uncommon' | 'rare' | 'epic' {
+export function rollRarityWithLuck(luck: number): 'common' | 'uncommon' | 'rare' | 'epic' {
   const { RARITY_WEIGHTS, LUCK_RARITY_SCALING } = HIDDEN_CACHE_CONSTANTS;
   // Luck shifts weight from common toward higher rarities
   const luckBonus = luck * LUCK_RARITY_SCALING;
