@@ -16,7 +16,7 @@
     "build:packages": "npm run build -w packages/shared && npm run build -w packages/game-engine && npm run build -w packages/database",
     "build": "npm run build -w packages/shared && npm run build -w packages/game-engine && npm run build -w packages/database && npm run build -w apps/api && npm run build -w apps/web",
     "build:api": "npm run build -w packages/shared && npm run build -w packages/game-engine && npm run build -w packages/database && npm run build -w apps/api",
-    "build:web": "npm run build -w packages/shared && npm run build -w apps/web",
+    "build:web": "npm run build -w packages/shared && npm run build -w packages/game-engine && npm run build -w apps/web",
     "start:api": "npm run start -w apps/api",
     "start:web": "npm run start -w apps/web",
     "typecheck": "tsc -b",
