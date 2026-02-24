@@ -489,6 +489,23 @@ export const WORLD_EVENT_CONSTANTS = {
 } as const;
 
 // =============================================================================
+// HIDDEN CACHE REWARDS
+// =============================================================================
+
+export const HIDDEN_CACHE_CONSTANTS = {
+  MATERIAL_ROLLS_MIN: 2,
+  MATERIAL_ROLLS_MAX: 4,
+  SOULBOUND_DROP_CHANCE: 0.15,
+  LUCK_RARITY_SCALING: 0.005,
+  RARITY_WEIGHTS: {
+    common: 50,
+    uncommon: 30,
+    rare: 15,
+    epic: 5,
+  },
+} as const;
+
+// =============================================================================
 // ZONE EXPLORATION PROGRESSION
 // =============================================================================
 

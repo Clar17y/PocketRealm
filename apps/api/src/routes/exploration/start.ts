@@ -46,6 +46,7 @@ import { getIo } from '../../socket';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
 import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
+import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import {
   startSchema,
@@ -184,9 +185,15 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       ? [{ turnOccurred: 50, type: 'ambush' as const }]
       : simulateExploration(effectiveTurns, effectiveExitChance);
 
+    interface PendingCacheLoot {
+      turnOccurred: number;
+      mobFamilyId: string;
+    }
+
     const pendingResources: PendingResourceDiscovery[] = [];
     const pendingSites: PendingEncounterSiteDiscovery[] = [];
     const pendingCombatLogs: PendingAmbushCombatLog[] = [];
+    const pendingCacheLoot: PendingCacheLoot[] = [];
     const events: NarrativeEvent[] = [];
 
     const hiddenCaches: Array<{ turnOccurred: number }> = [];
@@ -488,10 +495,23 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
       if (outcome.type === 'hidden_cache') {
         hiddenCaches.push({ turnOccurred: outcome.turnOccurred });
+
+        // Pick a mob family for cache loot (same pool as encounter sites)
+        const cacheFamily = zoneFamilies.length > 0
+          ? pickWeighted(zoneFamilies, 'discoveryWeight') as ZoneFamilyRow | null
+          : null;
+
+        if (cacheFamily) {
+          pendingCacheLoot.push({
+            turnOccurred: outcome.turnOccurred,
+            mobFamilyId: cacheFamily.mobFamilyId,
+          });
+        }
+
         events.push({
           turn: outcome.turnOccurred,
           type: 'hidden_cache',
-          description: 'You found a hidden cache.',
+          description: 'You found a hidden cache!',
           details: {},
         });
         continue;
@@ -747,6 +767,29 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             result: combatLog.result as Prisma.InputJsonValue,
           },
         });
+      }
+
+      // Grant hidden cache loot
+      for (const cache of pendingCacheLoot) {
+        const cacheLoot = await grantCacheLootTx(tx, {
+          playerId,
+          mobFamilyId: cache.mobFamilyId,
+          luck: progression.attributes.luck,
+        });
+
+        // Update the corresponding event's details
+        const cacheEvent = events.find(e => e.type === 'hidden_cache' && e.turn === cache.turnOccurred);
+        if (cacheEvent) {
+          cacheEvent.details = {
+            materials: cacheLoot.materials.map(m => ({ itemTemplateId: m.itemTemplateId, quantity: m.quantity })),
+            soulboundItem: cacheLoot.soulboundItem,
+          };
+          if (cacheLoot.soulboundItem) {
+            cacheEvent.description = `You found a hidden cache containing a ${cacheLoot.soulboundItem.rarity} ${cacheLoot.soulboundItem.name}!`;
+          } else {
+            cacheEvent.description = `You found a hidden cache with ${cacheLoot.materials.length} material${cacheLoot.materials.length === 1 ? '' : 's'}!`;
+          }
+        }
       }
 
       const explorationLog = await tx.activityLog.create({
