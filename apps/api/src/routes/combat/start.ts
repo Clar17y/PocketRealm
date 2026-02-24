@@ -32,7 +32,7 @@ import { setHp } from '../../services/hpService';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
-import { getActiveZoneModifiers, getActiveEventSummaries } from '../../services/worldEventService';
+import { getActiveZoneModifiers, getActiveEventSummaries, getEventModifiersForEntity } from '../../services/worldEventService';
 import {
   persistMobHp,
   checkPersistedMobReencounter,
@@ -502,6 +502,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     },
   });
 
+  // Fetch mob-specific event modifiers for appliedToThisMob flag
+  const siteMobBadges = await getEventModifiersForEntity(zoneId, { mobFamilyId: site.mobFamilyId as string });
+
   // --- Response with fights[] array ---
   const lastFightResult = fightResults[fightResults.length - 1]!;
   res.json({
@@ -572,7 +575,12 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       percent: explorationProgress.percent,
       turnsToExplore: explorationProgress.turnsToExplore,
     },
-    activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
+    activeEvents: activeEventEffects.length > 0
+      ? activeEventEffects.map((e: { title: string; effectType: string; effectValue: number }) => ({
+          ...e,
+          appliedToThisMob: siteMobBadges.some(m => m.effectType === e.effectType),
+        }))
+      : undefined,
   });
 }
 
@@ -811,6 +819,15 @@ export function registerStartRoutes(router: Router): void {
         await trackAchievements(playerId, {}, { statKeys: ['totalTurnsSpent'] });
       }
 
+      // Fetch mob-specific event modifiers for appliedToThisMob flag
+      const zoneMobFamilyMember = await prismaAny.mobFamilyMember.findFirst({
+        where: { mobTemplateId: prefixedMob.id },
+        select: { mobFamilyId: true },
+      });
+      const zoneMobBadges = zoneMobFamilyMember?.mobFamilyId
+        ? await getEventModifiersForEntity(zoneId, { mobFamilyId: zoneMobFamilyMember.mobFamilyId })
+        : [];
+
       const combatLog = await prisma.activityLog.create({
         data: {
           playerId,
@@ -889,7 +906,12 @@ export function registerStartRoutes(router: Router): void {
           percent: explorationProgress.percent,
           turnsToExplore: explorationProgress.turnsToExplore,
         },
-        activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
+        activeEvents: activeEventEffects.length > 0
+          ? activeEventEffects.map((e: { title: string; effectType: string; effectValue: number }) => ({
+              ...e,
+              appliedToThisMob: zoneMobBadges.some(m => m.effectType === e.effectType),
+            }))
+          : undefined,
       });
   }));
 }
