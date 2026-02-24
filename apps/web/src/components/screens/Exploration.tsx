@@ -26,9 +26,10 @@ interface ExplorationProps {
     turnsExplored: number;
     turnsToExplore: number | null;
     percent: number;
+    tiers: Record<string, number> | null;
   } | null;
   availableTurns: number;
-  onStartExploration: (turns: number) => void;
+  onStartExploration: (turns: number, tier?: number) => void;
   activityLog: ActivityLogEntry[];
   isRecovering?: boolean;
   recoveryCost?: number | null;
@@ -62,6 +63,16 @@ interface ExplorationProps {
 export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0 }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<number | null>(null);
+
+  const tierEntries = explorationProgress?.tiers
+    ? Object.entries(explorationProgress.tiers)
+        .map(([t, threshold]) => ({ tier: Number(t), threshold: threshold as number }))
+        .sort((a, b) => a.tier - b.tier)
+    : [];
+  const unlockedTiers = tierEntries.filter(t => (explorationProgress?.percent ?? 0) >= t.threshold);
+  const maxUnlockedTier = unlockedTiers.length > 0 ? Math.max(...unlockedTiers.map(t => t.tier)) : null;
+  const effectiveSelectedTier = selectedTier ?? maxUnlockedTier;
 
   const calculateProbabilities = (turns: number) => {
     const expectedAmbushes = turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN;
@@ -87,7 +98,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           maxHp={maxHp}
           onProceed={() => {
             setShowLowHpWarning(false);
-            onStartExploration(turnInvestment[0]);
+            onStartExploration(turnInvestment[0], effectiveSelectedTier ?? undefined);
           }}
           onCancel={() => setShowLowHpWarning(false)}
         />
@@ -170,6 +181,37 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                   className="h-full rounded-full bg-[var(--rpg-gold)] transition-all"
                   style={{ width: `${Math.min(100, explorationProgress.percent)}%` }}
                 />
+              </div>
+            </PixelCard>
+          )}
+
+          {/* Tier Selector */}
+          {unlockedTiers.length > 1 && !tutorialLocked && (
+            <PixelCard>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Exploration Tier</h3>
+                  {effectiveSelectedTier !== maxUnlockedTier && (
+                    <span className="text-xs text-[var(--rpg-text-secondary)]">
+                      No exploration progress at this tier
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {unlockedTiers.map(({ tier }) => (
+                    <button
+                      key={tier}
+                      onClick={() => setSelectedTier(tier)}
+                      className={`flex-1 px-3 py-1.5 text-sm rounded border transition-colors ${
+                        (effectiveSelectedTier === tier)
+                          ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] border-[var(--rpg-gold)] font-bold'
+                          : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
+                      }`}
+                    >
+                      Tier {tier}
+                    </button>
+                  ))}
+                </div>
               </div>
             </PixelCard>
           )}
@@ -283,7 +325,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               ) {
                 setShowLowHpWarning(true);
               } else {
-                onStartExploration(turnInvestment[0]);
+                onStartExploration(turnInvestment[0], effectiveSelectedTier ?? undefined);
               }
             }}
             disabled={isRecovering || turnInvestment[0] > availableTurns}

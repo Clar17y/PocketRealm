@@ -24,6 +24,7 @@ export const estimateQuerySchema = z.object({
 export const startSchema = z.object({
   zoneId: z.string().uuid(),
   turns: z.number().int(),
+  tier: z.number().int().min(1).optional(),
 });
 
 // --- Types ---
@@ -180,6 +181,7 @@ export function buildEncounterSiteMobs(
   zoneId: string,
   explorationPercent: number = 100,
   zoneTiers: Record<string, number> | null = null,
+  overrideTier?: number,
 ): EncounterMobSlot[] {
   const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
 
@@ -192,6 +194,10 @@ export function buildEncounterSiteMobs(
     }
   }
   if (currentTier === 0) return [];
+
+  if (overrideTier !== undefined && overrideTier >= 1) {
+    currentTier = overrideTier;
+  }
 
   // Get ALL zone members (not filtered by tier)
   const zoneMembers = family.members

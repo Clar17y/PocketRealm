@@ -416,6 +416,7 @@ export default function GamePage() {
               turnsExplored: currentZone.exploration.turnsExplored,
               turnsToExplore: currentZone.exploration.turnsToExplore,
               percent: currentZone.exploration.percent,
+              tiers: currentZone.exploration.tiers,
             } : null}
             availableTurns={turns}
             onStartExploration={handleStartExploration}

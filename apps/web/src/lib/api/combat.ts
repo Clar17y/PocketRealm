@@ -68,7 +68,7 @@ export async function estimateExploration(turns: number) {
   }>(`/api/v1/exploration/estimate?turns=${turns}`);
 }
 
-export async function startExploration(zoneId: string, turns: number) {
+export async function startExploration(zoneId: string, turns: number, tier?: number) {
   return fetchApi<{
     logId: string;
     zone: { id: string; name: string; difficulty: number };
@@ -108,7 +108,7 @@ export async function startExploration(zoneId: string, turns: number) {
     tax: TaxInfo | null;
   }>('/api/v1/exploration/start', {
     method: 'POST',
-    body: JSON.stringify({ zoneId, turns }),
+    body: JSON.stringify({ zoneId, turns, ...(tier !== undefined && { tier }) }),
   });
 }
 

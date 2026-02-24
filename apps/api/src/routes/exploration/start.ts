@@ -19,6 +19,7 @@ import {
 import {
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
+  ZONE_EXPLORATION_CONSTANTS,
   type Combatant,
   type CombatOptions,
   type MobTemplate,
@@ -121,6 +122,18 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const explorationProgress = await getExplorationPercent(playerId, body.zoneId);
     const zoneTiers = zone.explorationTiers as Record<string, number> | null;
 
+    // Determine unlocked tiers and selected tier
+    const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
+    const unlockedTiers = Object.entries(tiers)
+      .filter(([, threshold]) => explorationProgress.percent >= (threshold as number))
+      .map(([tier]) => Number(tier));
+    const maxUnlockedTier = Math.max(...unlockedTiers, 0);
+    const selectedTier = body.tier ?? maxUnlockedTier;
+
+    if (body.tier !== undefined && !unlockedTiers.includes(selectedTier)) {
+      throw new AppError(400, `Tier ${selectedTier} is not unlocked. Max unlocked: ${maxUnlockedTier}`, 'INVALID_TIER');
+    }
+
     const undiscoveredNeighbors = await getUndiscoveredNeighborZones(playerId, body.zoneId);
     const rawExitChance = undiscoveredNeighbors.length > 0 ? zone.zoneExitChance : null;
     const effectiveExitChance = rawExitChance != null && rawExitChance > 0
@@ -207,8 +220,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           if (tieredMobs.length === 0) continue;
 
           // Apply tier bleedthrough: select a target tier, filter to it, fall back to lower tiers
-          const highestUnlockedTier = Math.max(...tieredMobs.map(m => m.explorationTier));
-          const targetTier = selectTierWithBleedthrough(highestUnlockedTier, zoneTiers);
+          const targetTier = selectTierWithBleedthrough(selectedTier, zoneTiers);
           let candidates = tieredMobs.filter(m => m.explorationTier === targetTier);
           if (candidates.length === 0) {
             for (let t = targetTier - 1; t >= 1; t--) {
@@ -415,7 +427,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         if (!pickedFamily) continue;
 
         const size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);
-        const mobs = buildEncounterSiteMobs(pickedFamily.mobFamily, size, body.zoneId, explorationProgress.percent, zoneTiers);
+        const mobs = buildEncounterSiteMobs(pickedFamily.mobFamily, size, body.zoneId, explorationProgress.percent, zoneTiers, selectedTier);
         if (mobs.length === 0) continue;
 
         const siteName = getSiteName(pickedFamily.mobFamily.name, size, pickedFamily.mobFamily);
@@ -622,9 +634,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     await deductConsumedPotions(playerId, allPotionsConsumed);
 
     const spentTurns = aborted && abortedAtTurn ? abortedAtTurn : effectiveTurns;
+    const explorationTurnsToAdd = selectedTier === maxUnlockedTier ? spentTurns : 0;
     const explorationBefore = await getExplorationPercent(playerId, body.zoneId);
-    await addExplorationTurns(playerId, body.zoneId, spentTurns);
-    const explorationAfter = await getExplorationPercent(playerId, body.zoneId);
+    if (explorationTurnsToAdd > 0) {
+      await addExplorationTurns(playerId, body.zoneId, explorationTurnsToAdd);
+    }
+    const explorationAfter = explorationTurnsToAdd > 0
+      ? await getExplorationPercent(playerId, body.zoneId)
+      : explorationBefore;
     const zoneJustFullyExplored = explorationBefore.percent < 100 && explorationAfter.percent >= 100;
 
     // Auto-discover undiscovered neighbors when zone reaches 100%
@@ -827,8 +844,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       zoneExitDiscovered,
       ...(respawnedTo ? { respawnedTo } : {}),
       explorationProgress: {
-        turnsExplored: explorationProgress.turnsExplored + spentTurns,
-        percent: calculateExplorationPercent(explorationProgress.turnsExplored + spentTurns, explorationProgress.turnsToExplore),
+        turnsExplored: explorationProgress.turnsExplored + explorationTurnsToAdd,
+        percent: calculateExplorationPercent(explorationProgress.turnsExplored + explorationTurnsToAdd, explorationProgress.turnsToExplore),
         turnsToExplore: explorationProgress.turnsToExplore,
       },
       tax: taxInfoFromResult(taxResult),

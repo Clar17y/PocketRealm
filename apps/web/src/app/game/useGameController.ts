@@ -887,13 +887,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   };
 
-  const handleStartExploration = async (turnSpend: number) => {
+  const handleStartExploration = async (turnSpend: number, tier?: number) => {
     if (!currentZone) return;
 
     await runAction('exploration', async () => {
       const hpBefore = hpState.currentHp;
       const maxHpBefore = hpState.maxHp;
-      const res = await startExploration(currentZone.id, turnSpend);
+      const res = await startExploration(currentZone.id, turnSpend, tier);
       const data = res.data;
       if (!data) {
         setActionError(res.error?.message ?? 'Exploration failed');
