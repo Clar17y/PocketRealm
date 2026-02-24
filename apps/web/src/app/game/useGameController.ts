@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getLatestVersion } from '@/lib/changelog';
 import { updateTutorialStep } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
@@ -439,6 +440,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [achievementUnclaimedCount, setAchievementUnclaimedCount] = useState(0);
   const [activeTitle, setActiveTitleState] = useState<string | null>(null);
   const [playbackActive, setPlaybackActive] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   const [combatPlaybackQueue, setCombatPlaybackQueue] = useState<Array<{
     room?: number;
     mobName: string;
@@ -612,6 +614,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       void getActiveTitle().then((res) => {
         if (res.data) setActiveTitleState(res.data.activeTitle);
       });
+      // Auto-show changelog if unseen
+      const latestVer = getLatestVersion();
+      if (latestVer && localStorage.getItem('lastSeenChangelog') !== latestVer) {
+        setShowChangelog(true);
+      }
       const interval = setInterval(() => void loadTurnsAndHp(), 10000);
       // Poll PvP notifications less frequently (60s)
       const pvpInterval = setInterval(() => void loadPvpNotificationCount(), 60000);
@@ -1742,6 +1749,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   };
 
+  const dismissChangelog = useCallback(() => {
+    localStorage.setItem('lastSeenChangelog', getLatestVersion());
+    setShowChangelog(false);
+  }, []);
+
+  const openChangelog = useCallback(() => setShowChangelog(true), []);
+
   return {
     // Navigation
     activeScreen,
@@ -1832,6 +1846,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
     // Guild
     guildTaxRate,
+
+    // Changelog
+    showChangelog,
+    dismissChangelog,
+    openChangelog,
 
     // World Events
     activeEvents,
