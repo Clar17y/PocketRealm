@@ -92,6 +92,8 @@ export const changelog: ChangelogEntry[] = [
   },
 ];
 
+export const CHANGELOG_STORAGE_KEY = 'lastSeenChangelog';
+
 export function getLatestVersion(): string {
   return changelog[0]?.version ?? '';
 }

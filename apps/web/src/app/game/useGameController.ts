@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getLatestVersion } from '@/lib/changelog';
+import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { updateTutorialStep } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
@@ -616,7 +616,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       });
       // Auto-show changelog if unseen
       const latestVer = getLatestVersion();
-      if (latestVer && localStorage.getItem('lastSeenChangelog') !== latestVer) {
+      if (latestVer && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVer) {
         setShowChangelog(true);
       }
       const interval = setInterval(() => void loadTurnsAndHp(), 10000);
@@ -1750,7 +1750,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   };
 
   const dismissChangelog = useCallback(() => {
-    localStorage.setItem('lastSeenChangelog', getLatestVersion());
+    localStorage.setItem(CHANGELOG_STORAGE_KEY, getLatestVersion());
     setShowChangelog(false);
   }, []);
 
