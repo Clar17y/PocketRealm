@@ -141,6 +141,42 @@ export interface SpawnRateModifiers {
   global: number;
 }
 
+export interface EventModifierBadge {
+  title: string;
+  effectType: string;
+  effectValue: number;
+  isGlobal: boolean;
+}
+
+/** Return badge data for events affecting a specific entity (mob family or resource type) in a zone. */
+export async function getEventModifiersForEntity(
+  zoneId: string,
+  context: { mobFamilyId?: string; resourceType?: string },
+): Promise<EventModifierBadge[]> {
+  const [zoneEvents, worldEvents] = await Promise.all([
+    getActiveEventsForZone(zoneId),
+    getActiveWorldWideEvents(),
+  ]);
+
+  const badges: EventModifierBadge[] = [];
+
+  for (const event of zoneEvents) {
+    if (!eventAppliesToTarget(event, context)) continue;
+    if (context.mobFamilyId && event.type === 'resource') continue;
+    if (context.resourceType && event.type === 'mob') continue;
+    badges.push({ title: event.title, effectType: event.effectType, effectValue: event.effectValue, isGlobal: false });
+  }
+
+  for (const event of worldEvents) {
+    if (!eventAppliesToTarget(event, context)) continue;
+    if (context.mobFamilyId && event.type === 'resource') continue;
+    if (context.resourceType && event.type === 'mob') continue;
+    badges.push({ title: event.title, effectType: event.effectType, effectValue: event.effectValue, isGlobal: true });
+  }
+
+  return badges;
+}
+
 export async function getSpawnRateModifiers(zoneId: string): Promise<SpawnRateModifiers> {
   const [zoneEvents, worldEvents] = await Promise.all([
     getActiveEventsForZone(zoneId),

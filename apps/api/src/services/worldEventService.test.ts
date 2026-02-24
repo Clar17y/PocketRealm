@@ -4,6 +4,7 @@ import {
   getActiveEventsForZone,
   getActiveWorldWideEvents,
   getActiveZoneModifiers,
+  getEventModifiersForEntity,
   getSpawnRateModifiers,
   getAllActiveEvents,
   spawnWorldEvent,
@@ -293,6 +294,91 @@ describe('worldEventService', () => {
 
       const result = await getAllActiveEvents();
       expect(result).toHaveLength(2);
+    });
+  });
+
+  describe('getEventModifiersForEntity', () => {
+    it('returns mob-relevant events for a mob family context', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ type: 'mob', effectType: 'damage_up', effectValue: 0.5, targetFamily: 'wolves' }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { mobFamilyId: 'wolves' });
+      expect(badges).toHaveLength(1);
+      expect(badges[0]).toEqual({
+        title: 'Test Event',
+        effectType: 'damage_up',
+        effectValue: 0.5,
+        isGlobal: false,
+      });
+    });
+
+    it('returns resource-relevant events for a resource type context', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ type: 'resource', effectType: 'yield_up', effectValue: 0.3, targetResource: 'iron_ore' }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { resourceType: 'iron_ore' });
+      expect(badges).toHaveLength(1);
+      expect(badges[0]).toEqual({
+        title: 'Test Event',
+        effectType: 'yield_up',
+        effectValue: 0.3,
+        isGlobal: false,
+      });
+    });
+
+    it('includes untargeted zone-wide events', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ type: 'mob', effectType: 'hp_up', effectValue: 0.5, targetFamily: null, targetResource: null }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { mobFamilyId: 'wolves' });
+      expect(badges).toHaveLength(1);
+      expect(badges[0].effectType).toBe('hp_up');
+    });
+
+    it('excludes resource events when querying for mobs', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ type: 'resource', effectType: 'yield_up', effectValue: 0.3, targetFamily: null, targetResource: null }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { mobFamilyId: 'wolves' });
+      expect(badges).toHaveLength(0);
+    });
+
+    it('excludes mob events when querying for resources', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ type: 'mob', effectType: 'damage_up', effectValue: 0.5, targetFamily: null, targetResource: null }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { resourceType: 'iron_ore' });
+      expect(badges).toHaveLength(0);
+    });
+
+    it('marks zone events as isGlobal false and world events as isGlobal true', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ id: 'evt-zone', type: 'mob', effectType: 'damage_up', effectValue: 0.2 }),
+        ])
+        .mockResolvedValueOnce([
+          makeEventRow({ id: 'evt-world', zoneId: null, type: 'mob', effectType: 'hp_up', effectValue: 0.3 }),
+        ]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { mobFamilyId: 'wolves' });
+      expect(badges).toHaveLength(2);
+      expect(badges[0].isGlobal).toBe(false);
+      expect(badges[1].isGlobal).toBe(true);
     });
   });
 
