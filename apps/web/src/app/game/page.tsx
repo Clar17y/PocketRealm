@@ -818,6 +818,7 @@ export default function GamePage() {
         return (
           <CombatScreen
             hpState={hpState}
+            currentTurns={turns}
             currentZoneId={activeZoneId}
             pendingEncounters={pendingEncounters}
             pendingEncountersLoading={pendingEncountersLoading}

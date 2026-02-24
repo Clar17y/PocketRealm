@@ -384,6 +384,7 @@ export interface EncounterSitesResponse {
     currentRoom: number;
     totalRooms: number;
     roomMobCounts: Array<{ room: number; alive: number; total: number }>;
+    totalTurnCost: number;
   }>;
   pagination: {
     page: number;

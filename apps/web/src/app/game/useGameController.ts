@@ -104,6 +104,7 @@ export interface PendingEncounter {
   currentRoom: number;
   totalRooms: number;
   roomMobCounts: Array<{ room: number; alive: number; total: number }>;
+  totalTurnCost: number;
 }
 
 export interface LastCombatLogEntry {
@@ -699,6 +700,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           currentRoom: site.currentRoom,
           totalRooms: site.totalRooms,
           roomMobCounts: site.roomMobCounts,
+          totalTurnCost: site.totalTurnCost,
         }))
       );
       setPendingEncounterPagination(res.data.pagination);

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@adventure/database';
-import { getMobPrefixDefinition } from '@adventure/shared';
+import { getMobPrefixDefinition, COMBAT_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { buildPagination } from '../../utils/routeHelpers.js';
@@ -171,6 +171,7 @@ export function registerSiteRoutes(router: Router): void {
             currentRoom: site.currentRoom,
             totalRooms: site.totalRooms,
             roomMobCounts: site.roomMobCounts,
+            totalTurnCost: site.aliveMobs * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
           };
         }),
         pagination: buildPagination(query.page, query.pageSize, total),
