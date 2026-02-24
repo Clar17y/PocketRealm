@@ -52,6 +52,8 @@ interface ZoneMapProps {
   activityLog?: ActivityLogEntry[];
   combatSpeedMs?: number;
   explorationSpeedMs?: number;
+  autoSkipKnownCombat?: boolean;
+  bestiaryMobs?: Array<{ id: string; isDiscovered: boolean; prefixesEncountered: string[] }>;
   onTravel: (zoneId: string) => void;
   onExploreCurrentZone: () => void;
   guildTaxRate?: number;
@@ -112,6 +114,8 @@ export function ZoneMap({
   activityLog,
   combatSpeedMs,
   explorationSpeedMs,
+  autoSkipKnownCombat,
+  bestiaryMobs,
   onTravel,
   onExploreCurrentZone,
   guildTaxRate = 0,
@@ -534,6 +538,8 @@ export function ZoneMap({
             playerMaxHp={travelPlaybackData.playerMaxHp}
             combatSpeedMs={combatSpeedMs}
             explorationSpeedMs={explorationSpeedMs}
+            autoSkipKnownCombat={autoSkipKnownCombat}
+            bestiaryMobs={bestiaryMobs}
             onComplete={onTravelPlaybackComplete!}
             onSkip={onTravelPlaybackSkip!}
             onPushLog={onPushLog}
