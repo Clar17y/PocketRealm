@@ -63,4 +63,3 @@ packages/database/prisma/*.db-journal
 # Assets
 docs/assets/
 docs/design/
-apps/web/public/assets/
