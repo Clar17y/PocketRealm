@@ -9,8 +9,7 @@ import {
 } from '@adventure/game-engine';
 import { FULL_CLEAR_CONSTANTS, type LootDrop } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
-import { addStackableItemTx } from './inventoryService';
-import { pickWeighted } from '../utils/pickWeighted.js';
+import { rollAndGrantDropsTx, type DropTableEntry } from './dropRollingService';
 
 export interface RecipeUnlockReward {
   recipeId: string;
@@ -24,27 +23,6 @@ export interface EncounterSiteChestRewards {
   materialRolls: number;
   loot: LootDrop[];
   recipeUnlocked: RecipeUnlockReward | null;
-}
-
-function decimalLikeToNumber(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (value && typeof value === 'object' && 'toNumber' in (value as Record<string, unknown>)) {
-    const maybeNumber = (value as { toNumber: () => number }).toNumber();
-    return Number.isFinite(maybeNumber) ? maybeNumber : 0;
-  }
-  return 0;
-}
-
-interface ChestDropEntry {
-  itemTemplateId: string;
-  dropChance: unknown;
-  minQuantity: number;
-  maxQuantity: number;
-  itemTemplate: {
-    itemType: string;
-    stackable: boolean;
-    maxDurability: number;
-  };
 }
 
 export async function grantEncounterSiteChestRewardsTx(
@@ -81,47 +59,9 @@ export async function grantEncounterSiteChestRewardsTx(
         },
       },
     },
-  })) as ChestDropEntry[];
+  })) as DropTableEntry[];
 
-  const lootByTemplate = new Map<string, LootDrop>();
-  const addLoot = (drop: LootDrop): void => {
-    const existing = lootByTemplate.get(drop.itemTemplateId);
-    if (existing) {
-      existing.quantity += drop.quantity;
-      return;
-    }
-    lootByTemplate.set(drop.itemTemplateId, { ...drop });
-  };
-
-  for (let i = 0; i < materialRolls; i++) {
-    const picked = pickWeighted(dropEntries, e => Math.max(0, decimalLikeToNumber(e.dropChance)));
-    if (!picked) continue;
-
-    const quantity = Math.max(1, randomIntInclusive(picked.minQuantity, picked.maxQuantity));
-
-    if (picked.itemTemplate.stackable) {
-      await addStackableItemTx(tx, params.playerId, picked.itemTemplateId, quantity);
-      addLoot({ itemTemplateId: picked.itemTemplateId, quantity, rarity: 'common' });
-      continue;
-    }
-
-    const isEquipment = picked.itemTemplate.itemType === 'weapon' || picked.itemTemplate.itemType === 'armor';
-    const maxDurability = isEquipment ? picked.itemTemplate.maxDurability : null;
-
-    for (let q = 0; q < quantity; q++) {
-      await tx.item.create({
-        data: {
-          ownerId: params.playerId,
-          templateId: picked.itemTemplateId,
-          rarity: 'common',
-          quantity: 1,
-          maxDurability,
-          currentDurability: maxDurability,
-        } as any,
-      });
-    }
-    addLoot({ itemTemplateId: picked.itemTemplateId, quantity, rarity: 'common' });
-  }
+  const loot = await rollAndGrantDropsTx(tx, params.playerId, dropEntries, materialRolls);
 
   let recipeUnlocked: RecipeUnlockReward | null = null;
   const baseRecipeChance = getChestRecipeChanceForEncounterSize(effectiveSize);
@@ -185,7 +125,7 @@ export async function grantEncounterSiteChestRewardsTx(
   return {
     chestRarity,
     materialRolls,
-    loot: Array.from(lootByTemplate.values()),
+    loot,
     recipeUnlocked,
   };
 }

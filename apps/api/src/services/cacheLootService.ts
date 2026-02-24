@@ -1,21 +1,11 @@
 import { Prisma } from '@adventure/database';
 import { HIDDEN_CACHE_CONSTANTS, type LootDrop } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
-import { addStackableItemTx } from './inventoryService';
-import { pickWeighted } from '../utils/pickWeighted.js';
+import { rollAndGrantDropsTx, type DropTableEntry } from './dropRollingService';
 
 export interface CacheLootResult {
   materials: LootDrop[];
   soulboundItem: { itemTemplateId: string; name: string; rarity: string } | null;
-}
-
-function decimalLikeToNumber(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (value && typeof value === 'object' && 'toNumber' in (value as Record<string, unknown>)) {
-    const maybeNumber = (value as { toNumber: () => number }).toNumber();
-    return Number.isFinite(maybeNumber) ? maybeNumber : 0;
-  }
-  return 0;
 }
 
 export function rollRarityWithLuck(luck: number): 'common' | 'uncommon' | 'rare' | 'epic' {
@@ -34,19 +24,6 @@ export function rollRarityWithLuck(luck: number): 'common' | 'uncommon' | 'rare'
   if (roll < commonWeight + uncommonWeight) return 'uncommon';
   if (roll < commonWeight + uncommonWeight + rareWeight) return 'rare';
   return 'epic';
-}
-
-interface ChestDropEntry {
-  itemTemplateId: string;
-  dropChance: unknown;
-  minQuantity: number;
-  maxQuantity: number;
-  itemTemplate: {
-    itemType: string;
-    stackable: boolean;
-    maxDurability: number;
-    name: string;
-  };
 }
 
 export async function grantCacheLootTx(
@@ -73,47 +50,9 @@ export async function grantCacheLootTx(
         select: { itemType: true, stackable: true, maxDurability: true, name: true },
       },
     },
-  })) as ChestDropEntry[];
+  })) as DropTableEntry[];
 
-  const lootByTemplate = new Map<string, LootDrop>();
-  const addLoot = (drop: LootDrop): void => {
-    const existing = lootByTemplate.get(drop.itemTemplateId);
-    if (existing) {
-      existing.quantity += drop.quantity;
-      return;
-    }
-    lootByTemplate.set(drop.itemTemplateId, { ...drop });
-  };
-
-  for (let i = 0; i < materialRolls; i++) {
-    const picked = pickWeighted(dropEntries, (e) => Math.max(0, decimalLikeToNumber(e.dropChance)));
-    if (!picked) continue;
-
-    const quantity = Math.max(1, randomIntInclusive(picked.minQuantity, picked.maxQuantity));
-
-    if (picked.itemTemplate.stackable) {
-      await addStackableItemTx(tx, params.playerId, picked.itemTemplateId, quantity);
-      addLoot({ itemTemplateId: picked.itemTemplateId, quantity, rarity: 'common' });
-      continue;
-    }
-
-    const isEquipment = picked.itemTemplate.itemType === 'weapon' || picked.itemTemplate.itemType === 'armor';
-    const maxDurability = isEquipment ? picked.itemTemplate.maxDurability : null;
-
-    for (let q = 0; q < quantity; q++) {
-      await tx.item.create({
-        data: {
-          ownerId: params.playerId,
-          templateId: picked.itemTemplateId,
-          rarity: 'common',
-          quantity: 1,
-          maxDurability,
-          currentDurability: maxDurability,
-        } as any,
-      });
-    }
-    addLoot({ itemTemplateId: picked.itemTemplateId, quantity, rarity: 'common' });
-  }
+  const materials = await rollAndGrantDropsTx(tx, params.playerId, dropEntries, materialRolls);
 
   // Soulbound item roll
   let soulboundItem: CacheLootResult['soulboundItem'] = null;
@@ -159,5 +98,5 @@ export async function grantCacheLootTx(
     }
   }
 
-  return { materials: Array.from(lootByTemplate.values()), soulboundItem };
+  return { materials, soulboundItem };
 }
