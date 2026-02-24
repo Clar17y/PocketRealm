@@ -136,6 +136,38 @@ export async function getActiveZoneModifiers(
   return mods;
 }
 
+export interface SpawnRateModifiers {
+  byFamily: Map<string, number>;
+  global: number;
+}
+
+export async function getSpawnRateModifiers(zoneId: string): Promise<SpawnRateModifiers> {
+  const [zoneEvents, worldEvents] = await Promise.all([
+    getActiveEventsForZone(zoneId),
+    getActiveWorldWideEvents(),
+  ]);
+
+  const byFamily = new Map<string, number>();
+  let global = 1;
+
+  for (const event of [...zoneEvents, ...worldEvents]) {
+    if (event.effectType !== 'spawn_rate_up' && event.effectType !== 'spawn_rate_down') continue;
+
+    const multiplier = event.effectType === 'spawn_rate_up'
+      ? 1 + event.effectValue
+      : Math.max(0.1, 1 - event.effectValue);
+
+    if (event.targetFamily) {
+      const current = byFamily.get(event.targetFamily) ?? 1;
+      byFamily.set(event.targetFamily, current * multiplier);
+    } else {
+      global *= multiplier;
+    }
+  }
+
+  return { byFamily, global };
+}
+
 export async function getAllActiveEvents(): Promise<WorldEventData[]> {
   const rows = await prisma.worldEvent.findMany({
     where: { status: 'active' },

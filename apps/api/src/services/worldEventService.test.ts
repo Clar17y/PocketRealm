@@ -4,6 +4,7 @@ import {
   getActiveEventsForZone,
   getActiveWorldWideEvents,
   getActiveZoneModifiers,
+  getSpawnRateModifiers,
   getAllActiveEvents,
   spawnWorldEvent,
   expireStaleEvents,
@@ -292,6 +293,70 @@ describe('worldEventService', () => {
 
       const result = await getAllActiveEvents();
       expect(result).toHaveLength(2);
+    });
+  });
+
+  describe('getSpawnRateModifiers', () => {
+    it('returns global: 1 and empty byFamily when no active events', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([]) // zone events
+        .mockResolvedValueOnce([]); // world-wide events
+
+      const result = await getSpawnRateModifiers('zone-1');
+      expect(result.global).toBe(1);
+      expect(result.byFamily.size).toBe(0);
+    });
+
+    it('returns family-specific multiplier for targeted spawn_rate_up', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ effectType: 'spawn_rate_up', effectValue: 0.75, targetFamily: 'wolves' }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await getSpawnRateModifiers('zone-1');
+      expect(result.byFamily.get('wolves')).toBeCloseTo(1.75);
+      expect(result.global).toBe(1);
+    });
+
+    it('returns global multiplier for untargeted spawn_rate_up', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ effectType: 'spawn_rate_up', effectValue: 0.5, targetFamily: null }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await getSpawnRateModifiers('zone-1');
+      expect(result.global).toBeCloseTo(1.5);
+      expect(result.byFamily.size).toBe(0);
+    });
+
+    it('handles spawn_rate_down correctly', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ effectType: 'spawn_rate_down', effectValue: 0.5, targetFamily: null }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await getSpawnRateModifiers('zone-1');
+      expect(result.global).toBeCloseTo(0.5);
+    });
+
+    it('combines multiple events: stacks family + global multipliers', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ id: 'evt-1', effectType: 'spawn_rate_up', effectValue: 0.5, targetFamily: 'wolves' }),
+        ])
+        .mockResolvedValueOnce([
+          makeEventRow({ id: 'evt-2', zoneId: null, effectType: 'spawn_rate_up', effectValue: 0.25, targetFamily: 'wolves' }),
+          makeEventRow({ id: 'evt-3', zoneId: null, effectType: 'spawn_rate_up', effectValue: 0.5, targetFamily: null }),
+        ]);
+
+      const result = await getSpawnRateModifiers('zone-1');
+      // wolves: 1.5 * 1.25 = 1.875
+      expect(result.byFamily.get('wolves')).toBeCloseTo(1.875);
+      // global: 1.5
+      expect(result.global).toBeCloseTo(1.5);
     });
   });
 });
