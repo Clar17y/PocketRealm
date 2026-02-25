@@ -8,6 +8,7 @@ import { monsterImageSrc } from '@/lib/assets';
 import type { CombatLogEntryResponse } from '@/lib/api/combat';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { isAmbushWithCombatLog } from '@/lib/explorationUtils';
+import { isMobKnown, type BestiarySkipEntry } from '@/app/game/useGameController';
 
 interface TurnPlaybackProps {
   totalTurns: number;
@@ -23,6 +24,8 @@ interface TurnPlaybackProps {
   onSkip: () => void;
   onPushLog?: (...entries: Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'danger' }>) => void;
   combatLogPrefetch?: CombatLogPrefetch;
+  autoSkipKnownCombat?: boolean;
+  bestiaryMobs?: BestiarySkipEntry[];
 }
 
 export function TurnPlayback({
@@ -39,6 +42,8 @@ export function TurnPlayback({
   onSkip,
   onPushLog,
   combatLogPrefetch,
+  autoSkipKnownCombat,
+  bestiaryMobs,
 }: TurnPlaybackProps) {
   const [combatEvent, setCombatEvent] = useState<ExplorationPlaybackEvent | null>(null);
   const [resumeFromCombat, setResumeFromCombat] = useState(false);
@@ -84,6 +89,12 @@ export function TurnPlayback({
       });
     }
   }, [combatEvent, combatLogPrefetch]);
+
+  const shouldAutoSkip = autoSkipKnownCombat && combatEvent && (() => {
+    const mobTemplateId = combatEvent.details?.mobTemplateId as string | undefined;
+    if (!mobTemplateId || !bestiaryMobs) return false;
+    return isMobKnown(mobTemplateId, combatEvent.details?.mobPrefix as string | undefined, bestiaryMobs);
+  })();
 
   return (
     <>
@@ -150,6 +161,7 @@ export function TurnPlayback({
               playerStartHp={playerHpForNextCombat ?? playerHpBefore}
               mobMaxHp={(combatEvent.details?.mobMaxHp as number) ?? 100}
               log={loadedCombatLog}
+              autoSkip={!!shouldAutoSkip}
               speedMs={combatSpeedMs}
               onComplete={() => {
                 if (loadedCombatLog.length > 0) {

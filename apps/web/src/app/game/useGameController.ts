@@ -161,6 +161,23 @@ export interface LastCombat {
   };
 }
 
+export type BestiarySkipEntry = {
+  id: string;
+  isDiscovered: boolean;
+  prefixesEncountered: string[];
+};
+
+export function isMobKnown(
+  mobTemplateId: string,
+  prefix: string | null | undefined,
+  bestiary: BestiarySkipEntry[],
+): boolean {
+  const mob = bestiary.find(m => m.id === mobTemplateId);
+  if (!mob?.isDiscovered) return false;
+  if (prefix) return mob.prefixesEncountered.includes(prefix);
+  return true;
+}
+
 export type ActivityLogEntry = {
   timestamp: string;
   message: string;

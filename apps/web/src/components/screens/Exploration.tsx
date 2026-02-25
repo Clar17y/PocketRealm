@@ -13,7 +13,7 @@ import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/useGameController';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 
 interface ExplorationProps {
@@ -50,6 +50,8 @@ interface ExplorationProps {
   onPushLog?: (...entries: Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'danger' }>) => void;
   combatSpeedMs?: number;
   explorationSpeedMs?: number;
+  autoSkipKnownCombat?: boolean;
+  bestiaryMobs?: BestiarySkipEntry[];
   defaultTurns?: number;
   tutorialLocked?: boolean;
   lowHpWarning?: boolean;
@@ -61,7 +63,7 @@ interface ExplorationProps {
   combatLogPrefetch?: CombatLogPrefetch;
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
 
@@ -151,6 +153,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           playerMaxHp={playbackData.playerMaxHp}
           combatSpeedMs={combatSpeedMs}
           explorationSpeedMs={explorationSpeedMs}
+          autoSkipKnownCombat={autoSkipKnownCombat}
+          bestiaryMobs={bestiaryMobs}
           onComplete={onPlaybackComplete!}
           onSkip={onPlaybackSkip!}
           onPushLog={onPushLog}
