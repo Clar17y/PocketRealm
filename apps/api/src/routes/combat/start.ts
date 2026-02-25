@@ -479,6 +479,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       }
     : null;
 
+  // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
+  const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
+
   // --- Activity log ---
   const combatLog = await prisma.activityLog.create({
     data: {
@@ -511,12 +514,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
             ? serializeXpGrant(lastVictoryXpGrant)
             : null,
         },
+        eventModifiers: siteMobBadges,
       } as unknown as Prisma.InputJsonValue,
     },
   });
-
-  // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
-  const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
 
   // --- Per-fight activity logs (combat log stored individually) ---
   // Wrapped in try-catch: if log creation fails, response degrades gracefully
@@ -550,6 +551,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
               durabilityLost: fight.durabilityLost,
               skillXp: fight.skillXp ? serializeXpGrant(fight.skillXp) : null,
             },
+            eventModifiers: siteMobBadges,
           } as unknown as Prisma.InputJsonValue,
         },
         select: { id: true },
@@ -917,6 +919,7 @@ export function registerStartRoutes(router: Router): void {
                 ? serializeXpGrant(xpGrant)
                 : null,
             },
+            eventModifiers: zoneMobBadges,
           } as unknown as Prisma.InputJsonValue,
         },
       });

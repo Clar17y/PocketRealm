@@ -210,6 +210,7 @@ export interface CombatResultResponse {
   playerMaxHp: number;
   mobMaxHp: number;
   log: CombatLogEntryResponse[];
+  eventModifiers?: EventModifierBadge[];
   rewards: {
     xp: number;
     loot: Array<{

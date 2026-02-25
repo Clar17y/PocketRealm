@@ -364,6 +364,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 durabilityLost,
                 skillXp: skillXpReward,
               },
+              eventModifiers: ambushEventModifiers,
             } as unknown as Prisma.InputJsonValue,
           });
 
@@ -437,6 +438,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 durabilityLost,
                 skillXp: null,
               },
+              eventModifiers: ambushEventModifiers,
             } as unknown as Prisma.InputJsonValue,
           });
 

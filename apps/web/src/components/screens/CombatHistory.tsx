@@ -13,6 +13,7 @@ import { formatCombatShareText, resolveMobMaxHp, resolvePlayerMaxHp } from '@/li
 import { monsterImageSrc } from '@/lib/assets';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
+import { EventBadges } from '@/components/common/EventBadge';
 import { Pagination } from '@/components/common/Pagination';
 
 type OutcomeFilter = 'all' | CombatOutcomeResponse;
@@ -382,6 +383,10 @@ export function CombatHistory() {
               </div>
             </div>
           </div>
+
+          {selectedDetail?.eventModifiers && selectedDetail.eventModifiers.length > 0 && (
+            <EventBadges modifiers={selectedDetail.eventModifiers} />
+          )}
 
           <div className="text-xs text-[var(--rpg-text-secondary)]">
             {fullTimestamp(selectedEntry.createdAt)} | {selectedEntry.zoneName ?? 'Unknown Zone'} | {formatCombatSource(selectedEntry.source)}
