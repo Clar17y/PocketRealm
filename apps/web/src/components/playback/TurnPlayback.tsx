@@ -5,6 +5,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { ExplorationPlayback, type ExplorationPlaybackEvent } from '@/components/exploration/ExplorationPlayback';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { monsterImageSrc } from '@/lib/assets';
+import { isMobKnown, type BestiarySkipEntry } from '@/app/game/useGameController';
 
 interface TurnPlaybackProps {
   totalTurns: number;
@@ -20,7 +21,7 @@ interface TurnPlaybackProps {
   onSkip: () => void;
   onPushLog?: (...entries: Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'danger' }>) => void;
   autoSkipKnownCombat?: boolean;
-  bestiaryMobs?: Array<{ id: string; isDiscovered: boolean; prefixesEncountered: string[] }>;
+  bestiaryMobs?: BestiarySkipEntry[];
 }
 
 export function TurnPlayback({
@@ -51,11 +52,7 @@ export function TurnPlayback({
   const shouldAutoSkip = autoSkipKnownCombat && combatEvent && (() => {
     const mobTemplateId = combatEvent.details?.mobTemplateId as string | undefined;
     if (!mobTemplateId || !bestiaryMobs) return false;
-    const mob = bestiaryMobs.find(m => m.id === mobTemplateId);
-    if (!mob?.isDiscovered) return false;
-    const prefix = combatEvent.details?.mobPrefix as string | undefined;
-    if (prefix) return mob.prefixesEncountered.includes(prefix);
-    return true;
+    return isMobKnown(mobTemplateId, combatEvent.details?.mobPrefix as string | undefined, bestiaryMobs);
   })();
 
   return (

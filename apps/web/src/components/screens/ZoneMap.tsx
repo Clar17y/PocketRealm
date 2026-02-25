@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { PixelButton } from '@/components/PixelButton';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/useGameController';
 import { MapPin, Star, Hourglass, Lock } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';
 
@@ -53,7 +53,7 @@ interface ZoneMapProps {
   combatSpeedMs?: number;
   explorationSpeedMs?: number;
   autoSkipKnownCombat?: boolean;
-  bestiaryMobs?: Array<{ id: string; isDiscovered: boolean; prefixesEncountered: string[] }>;
+  bestiaryMobs?: BestiarySkipEntry[];
   onTravel: (zoneId: string) => void;
   onExploreCurrentZone: () => void;
   guildTaxRate?: number;

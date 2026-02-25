@@ -43,7 +43,7 @@ import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
 import { GuildScreen } from '@/components/screens/GuildScreen';
 import { CombatScreen } from './screens/CombatScreen';
-import { useGameController, type Screen } from './useGameController';
+import { useGameController, isMobKnown, type Screen } from './useGameController';
 import { useChat } from '@/hooks/useChat';
 import { ChatPanel } from '@/components/ChatPanel';
 
@@ -813,14 +813,8 @@ export default function GamePage() {
           </div>
         );
       case 'combat': {
-        const shouldAutoSkipCombat = autoSkipKnownCombat && combatPlaybackData && (() => {
-          const mob = bestiaryMobs.find(m => m.id === combatPlaybackData.mobTemplateId);
-          if (!mob?.isDiscovered) return false;
-          if (combatPlaybackData.mobPrefix) {
-            return mob.prefixesEncountered.includes(combatPlaybackData.mobPrefix);
-          }
-          return true;
-        })();
+        const shouldAutoSkipCombat = autoSkipKnownCombat && combatPlaybackData &&
+          isMobKnown(combatPlaybackData.mobTemplateId, combatPlaybackData.mobPrefix, bestiaryMobs);
         return (
           <CombatScreen
             hpState={hpState}

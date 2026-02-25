@@ -13,7 +13,7 @@ import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/useGameController';
 
 interface ExplorationProps {
   currentZone: {
@@ -50,7 +50,7 @@ interface ExplorationProps {
   combatSpeedMs?: number;
   explorationSpeedMs?: number;
   autoSkipKnownCombat?: boolean;
-  bestiaryMobs?: Array<{ id: string; isDiscovered: boolean; prefixesEncountered: string[] }>;
+  bestiaryMobs?: BestiarySkipEntry[];
   defaultTurns?: number;
   tutorialLocked?: boolean;
   lowHpWarning?: boolean;
