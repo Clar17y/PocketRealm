@@ -104,6 +104,7 @@ export interface PendingEncounter {
   currentRoom: number;
   totalRooms: number;
   roomMobCounts: Array<{ room: number; alive: number; total: number }>;
+  eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }>;
 }
 
 export interface LastCombatLogEntry {
@@ -326,6 +327,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     sizeName: string;
     discoveredAt: string;
     weathered: boolean;
+    eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }>;
   }>>([]);
   const [gatheringLoading, setGatheringLoading] = useState(false);
   const [gatheringError, setGatheringError] = useState<string | null>(null);
@@ -451,6 +453,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     combatantBMaxHp: number;
     log: LastCombatLogEntry[];
     rewards: LastCombat['rewards'];
+    activeEvents?: Array<{ title: string; effectType: string; effectValue: number; appliedToThisMob?: boolean }>;
   }> | null>(null);
   const [combatPlaybackIndex, setCombatPlaybackIndex] = useState(0);
   const [roomTransition, setRoomTransition] = useState<{ entering: number } | null>(null);
@@ -697,6 +700,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           currentRoom: site.currentRoom,
           totalRooms: site.totalRooms,
           roomMobCounts: site.roomMobCounts,
+          eventModifiers: site.eventModifiers,
         }))
       );
       setPendingEncounterPagination(res.data.pagination);
@@ -1045,6 +1049,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           playerStartHp: fight.playerStartHp,
           combatantBMaxHp: fight.mobMaxHp,
           log: fight.log as LastCombatLogEntry[],
+          activeEvents: data.activeEvents,
           rewards: {
             xp: fight.xp,
             loot: fight.loot,
@@ -1081,6 +1086,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           playerStartHp: hpBefore,
           combatantBMaxHp: data.combat.mobMaxHp,
           log: data.combat.log,
+          activeEvents: data.activeEvents,
           rewards,
         }]);
         setCombatPlaybackIndex(0);
@@ -1276,6 +1282,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
             newLogs.push({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
           }
         }
+      }
+
+      if (data.yieldBreakdown?.eventTitle && data.yieldBreakdown.eventModifier > 0) {
+        const bonusPct = Math.round(data.yieldBreakdown.eventModifier * 100);
+        newLogs.push({
+          timestamp: nowStamp(),
+          type: 'success',
+          message: `${data.yieldBreakdown.eventTitle}: +${bonusPct}% yield bonus (${data.yieldBreakdown.eventYieldPerAction} bonus/action)`,
+        });
       }
 
       if (data.gemCrit) {

@@ -10,6 +10,7 @@ import { titleCaseFromSnake } from '@/lib/format';
 import { Pickaxe, MapPin } from 'lucide-react';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { GATHERING_CONSTANTS } from '@adventure/shared';
+import { EventBadges } from '@/components/common/EventBadge';
 import { effectiveTurns as calcEffectiveTurns, inflateCost } from '@/lib/taxCalc';
 import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
@@ -28,6 +29,7 @@ interface ResourceNode {
   maxCapacity: number;
   sizeName: string;
   weathered?: boolean;
+  eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }>;
 }
 
 interface GatheringProps {
@@ -280,6 +282,7 @@ export function Gathering({
                         {!isInZone && ' (travel here to gather)'}
                       </span>
                     </div>
+                    <EventBadges modifiers={node.eventModifiers} />
                     {/* Capacity bar */}
                     <div className="mt-1.5 h-2 bg-[var(--rpg-background)] rounded-full overflow-hidden">
                       <div

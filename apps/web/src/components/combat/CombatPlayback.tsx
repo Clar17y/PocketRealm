@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { LastCombatLogEntry, LastCombat } from '@/app/game/useGameController';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
+import { EventBadges } from '@/components/common/EventBadge';
 import { PixelButton } from '@/components/PixelButton';
 
 type Phase = 'playing' | 'finished-auto' | 'finished-manual';
@@ -17,6 +18,7 @@ interface CombatPlaybackProps {
   mobMaxHp: number;
   log: LastCombatLogEntry[];
   rewards?: LastCombat['rewards'];
+  activeEvents?: Array<{ title: string; effectType: string; effectValue: number; appliedToThisMob?: boolean }>;
   playerLabel?: string;
   defeatButtonLabel?: string;
   speedMs?: number;
@@ -34,6 +36,7 @@ export function CombatPlayback({
   mobMaxHp,
   log,
   rewards,
+  activeEvents,
   playerLabel = 'You',
   defeatButtonLabel,
   speedMs = 800,
@@ -158,6 +161,13 @@ export function CombatPlayback({
         )}
         {mobDisplayName}
       </div>
+      {activeEvents && activeEvents.some(e => e.appliedToThisMob) && (
+        <div className="flex justify-center mt-1">
+          <EventBadges modifiers={activeEvents.filter(e => e.appliedToThisMob).map(e => ({
+            title: e.title, effectType: e.effectType, effectValue: e.effectValue, isGlobal: false,
+          }))} />
+        </div>
+      )}
 
       {/* HP Bars */}
       <div className="space-y-3 my-4">

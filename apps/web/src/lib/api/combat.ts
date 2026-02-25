@@ -289,7 +289,7 @@ export interface CombatResponse {
     durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
     skillXp: SkillXpGrantResponse | null;
   };
-  activeEvents?: Array<{ title: string; effectType: string; effectValue: number }>;
+  activeEvents?: Array<{ title: string; effectType: string; effectValue: number; appliedToThisMob?: boolean }>;
   explorationProgress?: {
     turnsExplored: number;
     percent: number;
@@ -383,6 +383,7 @@ export interface EncounterSitesResponse {
     currentRoom: number;
     totalRooms: number;
     roomMobCounts: Array<{ room: number; alive: number; total: number }>;
+    eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }>;
   }>;
   pagination: {
     page: number;

@@ -128,6 +128,7 @@ export interface GatheringNodesResponse {
     sizeName: string;
     discoveredAt: string;
     weathered: boolean;
+    eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }>;
   }>;
   pagination: {
     page: number;
@@ -188,6 +189,12 @@ export async function mine(playerNodeId: string, turns: number, currentZoneId: s
     };
     gemCrit?: { itemTemplateId: string; gemName: string; gemsFound: number };
     activeEvents?: Array<{ title: string; effectType: string; effectValue: number }>;
+    yieldBreakdown?: {
+      baseYieldPerAction: number;
+      eventYieldPerAction: number;
+      eventModifier: number;
+      eventTitle: string | null;
+    };
     tax: TaxInfo | null;
   }>('/api/v1/gathering/mine', {
     method: 'POST',

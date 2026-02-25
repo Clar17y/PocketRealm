@@ -10,6 +10,7 @@ import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { CombatHistory } from '@/components/screens/CombatHistory';
 import { BossHistory } from '@/components/screens/BossHistory';
 import { Pagination } from '@/components/common/Pagination';
+import { EventBadges } from '@/components/common/EventBadge';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { monsterImageSrc } from '@/lib/assets';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
@@ -56,6 +57,7 @@ interface CombatScreenProps {
     combatantBMaxHp: number;
     log: LastCombatLogEntry[];
     rewards: LastCombat['rewards'];
+    activeEvents?: Array<{ title: string; effectType: string; effectValue: number; appliedToThisMob?: boolean }>;
   } | null;
   combatSpeedMs?: number;
   autoSkipCombat?: boolean;
@@ -383,6 +385,7 @@ export function CombatScreen({
                               {e.clearStrategy === 'full_clear' ? 'Full Clear' : 'Room by Room'}
                             </span>
                           )}
+                          <EventBadges modifiers={e.eventModifiers} />
                           <div className="text-xs text-[var(--rpg-text-secondary)]">
                             Next monster: {nextMobLabel ?? 'None (site decayed)'}
                           </div>
@@ -459,6 +462,7 @@ export function CombatScreen({
                 mobMaxHp={combatPlaybackData.combatantBMaxHp}
                 log={combatPlaybackData.log}
                 rewards={combatPlaybackData.rewards}
+                activeEvents={combatPlaybackData.activeEvents}
                 speedMs={combatSpeedMs}
                 autoSkip={autoSkipCombat}
                 onComplete={onCombatPlaybackComplete ?? (() => {})}
