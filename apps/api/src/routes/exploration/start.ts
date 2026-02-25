@@ -160,6 +160,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents);
     const spawnMods = computeSpawnRateModifiers(cachedZoneEvents, cachedWorldEvents);
 
+    // Build mob → family lookup for per-mob event targeting
+    const mobToFamilyMap = new Map<string, string>();
+    for (const zf of zoneFamilies) {
+      for (const member of (zf as ZoneFamilyRow).mobFamily.members) {
+        mobToFamilyMap.set(member.mobTemplate.id, zf.mobFamilyId);
+      }
+    }
+
     // Auto-potion setup + tutorial detection
     const playerRecord = await prismaAny.player.findUnique({
       where: { id: playerId },
@@ -274,7 +282,11 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
           baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
 
-          const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
+          const ambushFamilyId = mobToFamilyMap.get(baseMob.id);
+          const ambushModifiers = ambushFamilyId
+            ? computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: ambushFamilyId })
+            : zoneModifiers;
+          const modifiedMob = applyMobEventModifiers(baseMob, ambushModifiers);
           prefixedMob = applyMobPrefix(modifiedMob, rollMobPrefix());
         }
         const playerStats = buildPlayerCombatStats(

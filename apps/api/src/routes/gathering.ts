@@ -11,7 +11,7 @@ import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecoverin
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
-import { applyResourceEventModifiers, rollGemCritBatch } from '@adventure/game-engine';
+import { rollGemCritBatch, computeEventMinActions } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
@@ -290,24 +290,33 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     getActiveEventsForZone(template.zoneId),
     getActiveWorldWideEvents(),
   ]);
-  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents);
+  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { resourceType: template.resourceType });
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
   const guildMods = await getPlayerGuildModifiers(playerId);
-  const eventYield = applyResourceEventModifiers(baseYieldPerAction, zoneModifiers);
-  const yieldPerAction = guildMods.gatheringYield > 0
-    ? Math.floor(eventYield * (1 + guildMods.gatheringYield))
-    : eventYield;
+
+  // Guild bonus applies per action (permanent infrastructure benefit)
+  const guildYieldPerAction = guildMods.gatheringYield > 0
+    ? Math.max(1, Math.floor(baseYieldPerAction * (1 + guildMods.gatheringYield)))
+    : baseYieldPerAction;
+
+  // Minimum batch size so yield events always produce a visible reduction.
+  const eventMultiplier = zoneModifiers.resourceYieldMultiplier;
+  const eventMinActions = computeEventMinActions(eventMultiplier);
 
   const resourceTemplateId = await getResourceTemplateId(template.resourceType);
-  const { turnSpend, taxResult, actions, totalYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
+  const { turnSpend, taxResult, actions, totalYield, rawTotalYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
     // Look up tax rate to calculate effective turns
     const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
     const effectiveTurns = calculateEffectiveTurns(body.turns, taxRate);
 
     const maxActionsByTurns = Math.floor(effectiveTurns / GATHERING_CONSTANTS.BASE_TURN_COST);
-    const maxActionsByCapacity = Math.ceil(effectiveCapacity / yieldPerAction);
+    const maxActionsByCapacity = Math.ceil(effectiveCapacity / guildYieldPerAction);
     const innerActions = Math.min(maxActionsByTurns, maxActionsByCapacity);
 
+    if (innerActions < eventMinActions) {
+      const minTurns = calculateInflatedCost(eventMinActions * GATHERING_CONSTANTS.BASE_TURN_COST, taxRate);
+      throw new AppError(400, `World events require at least ${minTurns} turns (${eventMinActions} actions) to gather here`, 'EVENT_MIN_ACTIONS');
+    }
     if (innerActions <= 0) {
       throw new AppError(400, 'Not enough turns after guild tax', 'INSUFFICIENT_TURNS');
     }
@@ -315,7 +324,11 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     const baseTurns = innerActions * GATHERING_CONSTANTS.BASE_TURN_COST;
     const actualTurns = calculateInflatedCost(baseTurns, taxRate);
 
-    const innerTotalYield = Math.min(innerActions * yieldPerAction, effectiveCapacity);
+    // Compute raw yield (before events), then apply event modifier to session total
+    const innerRawYield = Math.min(innerActions * guildYieldPerAction, effectiveCapacity);
+    const innerTotalYield = eventMultiplier !== 1
+      ? Math.max(1, Math.floor(innerRawYield * eventMultiplier))
+      : innerRawYield;
     const innerNewCapacity = effectiveCapacity - innerTotalYield;
     const innerNodeDepleted = innerNewCapacity <= 0;
 
@@ -358,6 +371,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       taxResult: tax,
       actions: innerActions,
       totalYield: innerTotalYield,
+      rawTotalYield: innerRawYield,
       newCapacity: innerNewCapacity,
       nodeDepleted: innerNodeDepleted,
       stack: minedStack,
@@ -460,7 +474,8 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     yieldBreakdown: zoneModifiers.resourceYieldMultiplier !== 1
       ? {
           baseYieldPerAction,
-          totalYieldPerAction: eventYield,
+          totalYieldPerAction: baseYieldPerAction, // deprecated; kept for client compat
+          rawTotalYield,
           eventModifier: zoneModifiers.resourceYieldMultiplier,
           eventTitle: activeEventEffects.find((e: { effectType: string }) => e.effectType === 'yield_up' || e.effectType === 'yield_down')?.title ?? null,
         }

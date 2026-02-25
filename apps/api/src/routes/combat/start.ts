@@ -187,7 +187,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     getActiveEventsForZone(zoneId),
     getActiveWorldWideEvents(),
   ]);
-  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents);
+  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
 
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
@@ -754,11 +754,16 @@ export function registerStartRoutes(router: Router): void {
       }
 
       const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
-      const [zoneCombatZoneEvents, zoneCombatWorldEvents] = await Promise.all([
+      const [zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyRow] = await Promise.all([
         getActiveEventsForZone(zoneId),
         getActiveWorldWideEvents(),
+        prismaAny.mobFamilyMember.findFirst({
+          where: { mobTemplateId: baseMob.id },
+          select: { mobFamilyId: true },
+        }),
       ]);
-      const zoneModifiers = computeZoneModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents);
+      const zoneMobFamilyId: string | undefined = zoneMobFamilyRow?.mobFamilyId ?? undefined;
+      const zoneModifiers = computeZoneModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyId ? { mobFamilyId: zoneMobFamilyId } : undefined);
       const activeEventEffects = computeEventSummaries(zoneCombatZoneEvents, zoneCombatWorldEvents);
       const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
       const prefixedMob = applyMobPrefix(modifiedMob, mobPrefix);
@@ -864,11 +869,7 @@ export function registerStartRoutes(router: Router): void {
 
       if (combatResult.outcome === 'victory') {
         const familyIds: string[] = [];
-        const familyMember = await prismaAny.mobFamilyMember.findFirst({
-          where: { mobTemplateId: prefixedMob.id },
-          select: { mobFamilyId: true },
-        });
-        if (familyMember?.mobFamilyId) familyIds.push(familyMember.mobFamilyId);
+        if (zoneMobFamilyId) familyIds.push(zoneMobFamilyId);
 
         const achievementKeys = ['totalKills', 'totalUniqueMonsterKills', 'totalTurnsSpent', 'totalBestiaryCompleted'];
         if (xpGrant?.newLevel) achievementKeys.push('highestSkillLevel');
@@ -879,13 +880,9 @@ export function registerStartRoutes(router: Router): void {
         await trackAchievements(playerId, {}, { statKeys: ['totalTurnsSpent'] });
       }
 
-      // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
-      const zoneMobFamilyMember = await prismaAny.mobFamilyMember.findFirst({
-        where: { mobTemplateId: prefixedMob.id },
-        select: { mobFamilyId: true },
-      });
-      const zoneMobBadges = zoneMobFamilyMember?.mobFamilyId
-        ? filterEventModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents, { mobFamilyId: zoneMobFamilyMember.mobFamilyId })
+      // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events + family lookup)
+      const zoneMobBadges = zoneMobFamilyId
+        ? filterEventModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents, { mobFamilyId: zoneMobFamilyId })
         : [];
 
       const combatLog = await prisma.activityLog.create({
