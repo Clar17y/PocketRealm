@@ -32,7 +32,7 @@ import { setHp } from '../../services/hpService';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
-import { getActiveZoneModifiers, getActiveEventSummaries, getEventModifiersForEntity, type EventModifierBadge } from '../../services/worldEventService';
+import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, type EventModifierBadge } from '../../services/worldEventService';
 
 function tagEventsWithApplicability(
   events: Array<{ title: string; effectType: string; effectValue: number }>,
@@ -182,9 +182,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const potionPool = autoPotionThreshold > 0 ? await buildPotionPool(playerId, hpState.maxHp) : [];
   const allPotionsConsumed: PotionConsumed[] = [];
 
-  // Zone modifiers
-  const zoneModifiers = await getActiveZoneModifiers(zoneId);
-  const activeEventEffects = await getActiveEventSummaries(zoneId);
+  // Zone modifiers — fetch events once, derive modifiers synchronously
+  const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
+    getActiveEventsForZone(zoneId),
+    getActiveWorldWideEvents(),
+  ]);
+  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents);
+  const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
 
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
   const fightResults: FightResult[] = [];
@@ -511,8 +515,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     },
   });
 
-  // Fetch mob-specific event modifiers for appliedToThisMob flag
-  const siteMobBadges = await getEventModifiersForEntity(zoneId, { mobFamilyId: site.mobFamilyId as string });
+  // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
+  const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
 
   // --- Per-fight activity logs (combat log stored individually) ---
   // Wrapped in try-catch: if log creation fails, response degrades gracefully
@@ -748,8 +752,12 @@ export function registerStartRoutes(router: Router): void {
       }
 
       const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
-      const zoneModifiers = await getActiveZoneModifiers(zoneId);
-      const activeEventEffects = await getActiveEventSummaries(zoneId);
+      const [zoneCombatZoneEvents, zoneCombatWorldEvents] = await Promise.all([
+        getActiveEventsForZone(zoneId),
+        getActiveWorldWideEvents(),
+      ]);
+      const zoneModifiers = computeZoneModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents);
+      const activeEventEffects = computeEventSummaries(zoneCombatZoneEvents, zoneCombatWorldEvents);
       const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
       const prefixedMob = applyMobPrefix(modifiedMob, mobPrefix);
       mobPrefix = prefixedMob.mobPrefix;
@@ -869,13 +877,13 @@ export function registerStartRoutes(router: Router): void {
         await trackAchievements(playerId, {}, { statKeys: ['totalTurnsSpent'] });
       }
 
-      // Fetch mob-specific event modifiers for appliedToThisMob flag
+      // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
       const zoneMobFamilyMember = await prismaAny.mobFamilyMember.findFirst({
         where: { mobTemplateId: prefixedMob.id },
         select: { mobFamilyId: true },
       });
       const zoneMobBadges = zoneMobFamilyMember?.mobFamilyId
-        ? await getEventModifiersForEntity(zoneId, { mobFamilyId: zoneMobFamilyMember.mobFamilyId })
+        ? filterEventModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents, { mobFamilyId: zoneMobFamilyMember.mobFamilyId })
         : [];
 
       const combatLog = await prisma.activityLog.create({

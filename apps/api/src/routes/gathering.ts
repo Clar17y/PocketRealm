@@ -10,7 +10,7 @@ import { grantSkillXp } from '../services/xpService';
 import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
-import { getActiveZoneModifiers, getActiveEventSummaries, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
+import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
 import { applyResourceEventModifiers, rollGemCritBatch } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
@@ -285,9 +285,13 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const baseYield = Math.max(template.baseYield, GATHERING_CONSTANTS.BASE_YIELD);
   const baseYieldPerAction = Math.floor(baseYield * yieldMultiplier);
 
-  // Apply world event resource modifiers + guild gathering yield
-  const zoneModifiers = await getActiveZoneModifiers(template.zoneId);
-  const activeEventEffects = await getActiveEventSummaries(template.zoneId);
+  // Apply world event resource modifiers + guild gathering yield — fetch events once
+  const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
+    getActiveEventsForZone(template.zoneId),
+    getActiveWorldWideEvents(),
+  ]);
+  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents);
+  const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
   const guildMods = await getPlayerGuildModifiers(playerId);
   const eventYield = applyResourceEventModifiers(baseYieldPerAction, zoneModifiers);
   const yieldPerAction = guildMods.gatheringYield > 0

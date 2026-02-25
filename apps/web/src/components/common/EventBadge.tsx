@@ -1,11 +1,6 @@
 'use client';
 
-interface EventModifier {
-  title: string;
-  effectType: string;
-  effectValue: number;
-  isGlobal?: boolean;
-}
+import type { EventModifierBadge } from '@/lib/api';
 
 function isPlayerBuff(effectType: string): boolean {
   return ['damage_down', 'hp_down', 'spawn_rate_down', 'yield_up', 'drop_rate_up'].includes(effectType);
@@ -22,7 +17,7 @@ function effectLabel(effectType: string): string {
   return labels[effectType] ?? effectType;
 }
 
-export function EventBadge({ modifier }: { modifier: EventModifier }) {
+export function EventBadge({ modifier }: { modifier: EventModifierBadge }) {
   const isBuff = isPlayerBuff(modifier.effectType);
   const sign = modifier.effectType.endsWith('_down') ? '-' : '+';
   const percent = Math.round(modifier.effectValue * 100);
@@ -44,7 +39,7 @@ export function EventBadge({ modifier }: { modifier: EventModifier }) {
   );
 }
 
-export function EventBadges({ modifiers }: { modifiers?: EventModifier[] }) {
+export function EventBadges({ modifiers }: { modifiers?: EventModifierBadge[] }) {
   if (!modifiers || modifiers.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1 mt-0.5">

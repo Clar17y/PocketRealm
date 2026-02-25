@@ -56,10 +56,13 @@ vi.mock('../../services/zoneExplorationService', () => ({
   getExplorationPercent: vi.fn().mockResolvedValue({ turnsExplored: 0, percent: 10, turnsToExplore: 10000 }),
 }));
 vi.mock('../../services/worldEventService', () => ({
-  getActiveZoneModifiers: vi.fn().mockResolvedValue([]),
+  computeZoneModifiers: vi.fn().mockReturnValue({
+    mobDamageMultiplier: 1, mobHpMultiplier: 1, mobSpawnRateMultiplier: 1,
+    resourceDropRateMultiplier: 1, resourceYieldMultiplier: 1,
+  }),
+  computeSpawnRateModifiers: vi.fn().mockReturnValue({ byFamily: new Map(), global: 1 }),
   getActiveEventsForZone: vi.fn().mockResolvedValue([]),
   getActiveWorldWideEvents: vi.fn().mockResolvedValue([]),
-  getSpawnRateModifiers: vi.fn().mockResolvedValue({ byFamily: new Map(), global: 1 }),
   filterEventModifiers: vi.fn().mockReturnValue([]),
   spawnWorldEvent: vi.fn(),
 }));

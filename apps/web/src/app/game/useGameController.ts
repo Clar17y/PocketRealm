@@ -855,6 +855,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setActivityLog((prev) => [...entries, ...prev].slice(0, 100));
   };
 
+  const logActiveEvents = (events: Array<{ title: string; effectType: string; effectValue: number }> | undefined) => {
+    if (!events?.length) return;
+    const now = Date.now();
+    if (now - lastEventLogTimeRef.current < 5 * 60 * 1000) return;
+    lastEventLogTimeRef.current = now;
+    for (const evt of events) {
+      const sign = evt.effectType.endsWith('_down') ? '-' : '+';
+      pushLog({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
+    }
+  };
+
   const logDurabilityWarnings = (
     losses: Array<{
       itemName?: string;
@@ -1134,16 +1145,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         siteJustClearedRef.current = true;
       }
 
-      if (data.activeEvents?.length) {
-        const now = Date.now();
-        if (now - lastEventLogTimeRef.current >= 5 * 60 * 1000) {
-          lastEventLogTimeRef.current = now;
-          for (const evt of data.activeEvents) {
-            const sign = evt.effectType.endsWith('_down') ? '-' : '+';
-            pushLog({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
-          }
-        }
-      }
+      logActiveEvents(data.activeEvents);
 
       if (data.rewards.siteCompletion) {
         const chest = data.rewards.siteCompletion;
@@ -1311,16 +1313,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
 
-      if (data.activeEvents?.length) {
-        const now = Date.now();
-        if (now - lastEventLogTimeRef.current >= 5 * 60 * 1000) {
-          lastEventLogTimeRef.current = now;
-          for (const evt of data.activeEvents) {
-            const sign = evt.effectType.endsWith('_down') ? '-' : '+';
-            newLogs.push({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
-          }
-        }
-      }
+      logActiveEvents(data.activeEvents);
 
       if (data.yieldBreakdown?.eventTitle && data.yieldBreakdown.eventModifier !== 1) {
         const isUp = data.yieldBreakdown.eventModifier > 1;

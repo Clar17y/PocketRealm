@@ -100,20 +100,12 @@ function applyModifier(mods: ActiveZoneModifiers, event: WorldEventData): void {
   }
 }
 
-/**
- * Compute zone modifiers from active zone-scoped AND world-wide events.
- * Pass `context` to filter targeted events (family/resource-specific).
- */
-export async function getActiveZoneModifiers(
-  zoneId: string,
+/** Compute zone modifiers from pre-fetched events (no DB calls). */
+export function computeZoneModifiers(
+  zoneEvents: WorldEventData[],
+  worldEvents: WorldEventData[],
   context?: { mobFamilyId?: string; resourceType?: string },
-): Promise<ActiveZoneModifiers> {
-  // Fetch zone events and world-wide events in parallel
-  const [zoneEvents, worldEvents] = await Promise.all([
-    getActiveEventsForZone(zoneId),
-    getActiveWorldWideEvents(),
-  ]);
-
+): ActiveZoneModifiers {
   const mods: ActiveZoneModifiers = {
     mobDamageMultiplier: 1,
     mobHpMultiplier: 1,
@@ -127,13 +119,27 @@ export async function getActiveZoneModifiers(
     applyModifier(mods, event);
   }
 
-  // World-wide events apply to every zone but still need target matching
   for (const event of worldEvents) {
     if (!eventAppliesToTarget(event, context)) continue;
     applyModifier(mods, event);
   }
 
   return mods;
+}
+
+/**
+ * Compute zone modifiers from active zone-scoped AND world-wide events.
+ * Pass `context` to filter targeted events (family/resource-specific).
+ */
+export async function getActiveZoneModifiers(
+  zoneId: string,
+  context?: { mobFamilyId?: string; resourceType?: string },
+): Promise<ActiveZoneModifiers> {
+  const [zoneEvents, worldEvents] = await Promise.all([
+    getActiveEventsForZone(zoneId),
+    getActiveWorldWideEvents(),
+  ]);
+  return computeZoneModifiers(zoneEvents, worldEvents, context);
 }
 
 export interface SpawnRateModifiers {
@@ -188,12 +194,11 @@ export async function getEventModifiersForEntity(
   return filterEventModifiers(zoneEvents, worldEvents, context);
 }
 
-export async function getSpawnRateModifiers(zoneId: string): Promise<SpawnRateModifiers> {
-  const [zoneEvents, worldEvents] = await Promise.all([
-    getActiveEventsForZone(zoneId),
-    getActiveWorldWideEvents(),
-  ]);
-
+/** Compute spawn rate modifiers from pre-fetched events (no DB calls). */
+export function computeSpawnRateModifiers(
+  zoneEvents: WorldEventData[],
+  worldEvents: WorldEventData[],
+): SpawnRateModifiers {
   const byFamily = new Map<string, number>();
   let global = 1;
 
@@ -213,6 +218,14 @@ export async function getSpawnRateModifiers(zoneId: string): Promise<SpawnRateMo
   }
 
   return { byFamily, global };
+}
+
+export async function getSpawnRateModifiers(zoneId: string): Promise<SpawnRateModifiers> {
+  const [zoneEvents, worldEvents] = await Promise.all([
+    getActiveEventsForZone(zoneId),
+    getActiveWorldWideEvents(),
+  ]);
+  return computeSpawnRateModifiers(zoneEvents, worldEvents);
 }
 
 export async function getAllActiveEvents(): Promise<WorldEventData[]> {
@@ -304,14 +317,25 @@ export async function expireStaleEvents(): Promise<WorldEventData[]> {
   return stale.map(toWorldEventData);
 }
 
+/** Extract compact event summaries from pre-fetched events (no DB calls). */
+export function computeEventSummaries(
+  zoneEvents: WorldEventData[],
+  worldEvents: WorldEventData[],
+): Array<{ title: string; effectType: string; effectValue: number }> {
+  return [...zoneEvents, ...worldEvents].map(e => ({
+    title: e.title,
+    effectType: e.effectType,
+    effectValue: e.effectValue,
+  }));
+}
+
 /** Compact summary of active events affecting a zone, for embedding in combat/gathering responses. */
 export async function getActiveEventSummaries(zoneId: string): Promise<Array<{ title: string; effectType: string; effectValue: number }>> {
   const [zoneEvents, worldEvents] = await Promise.all([
     getActiveEventsForZone(zoneId),
     getActiveWorldWideEvents(),
   ]);
-  const all = [...zoneEvents, ...worldEvents];
-  return all.map((e) => ({ title: e.title, effectType: e.effectType, effectValue: e.effectValue }));
+  return computeEventSummaries(zoneEvents, worldEvents);
 }
 
 export async function getEventById(id: string): Promise<WorldEventData | null> {
