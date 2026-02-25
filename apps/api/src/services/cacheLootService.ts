@@ -65,10 +65,11 @@ export async function grantCacheLootTx(
     if (!rawGemTemplate) continue;
 
     // Find the refining recipe that uses this raw gem as a material
+    // materials is a Json column storing [{ itemTemplateId, quantity }]
     const refiningRecipe = await (txAny as any).craftingRecipe.findFirst({
       where: {
         skillType: 'refining',
-        materials: { some: { itemTemplateId: rawGemTemplate.id } },
+        materials: { array_contains: [{ itemTemplateId: rawGemTemplate.id }] },
       },
       select: {
         resultTemplateId: true,
