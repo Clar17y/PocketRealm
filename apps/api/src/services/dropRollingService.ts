@@ -1,5 +1,5 @@
 import { Prisma } from '@adventure/database';
-import type { LootDrop } from '@adventure/shared';
+import type { LootDrop, ItemRarity } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
 import { pickWeighted } from '../utils/pickWeighted.js';
@@ -54,7 +54,7 @@ export async function rollAndGrantDropsTx(
   playerId: string,
   dropEntries: DropTableEntry[],
   rolls: number,
-  rarity: string = 'common',
+  rarity: ItemRarity = 'common',
 ): Promise<LootDrop[]> {
   const accumulator = createLootAccumulator();
 
