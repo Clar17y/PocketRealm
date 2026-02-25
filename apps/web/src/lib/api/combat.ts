@@ -234,7 +234,8 @@ export interface CombatFightResult {
   playerMaxHp: number;
   playerStartHp: number;
   mobMaxHp: number;
-  log: CombatLogEntryResponse[];
+  log?: CombatLogEntryResponse[];
+  combatLogId?: string;
   playerHpRemaining: number;
   potionsConsumed: Array<{ tier: number; healAmount: number; round: number; templateId?: string }>;
   xp: number;
@@ -257,7 +258,8 @@ export interface CombatResponse {
     outcome: CombatOutcomeResponse;
     playerMaxHp: number;
     mobMaxHp: number;
-    log: CombatLogEntryResponse[];
+    log?: CombatLogEntryResponse[];
+    combatLogId?: string;
     room?: {
       currentRoom: number;
       roomCleared: boolean;

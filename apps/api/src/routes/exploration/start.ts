@@ -763,15 +763,18 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         });
       }
 
+      const createdCombatLogIds: string[] = [];
       for (const combatLog of pendingCombatLogs) {
-        await tx.activityLog.create({
+        const created = await tx.activityLog.create({
           data: {
             playerId,
             activityType: 'combat',
             turnsSpent: combatLog.turnsSpent,
             result: combatLog.result as Prisma.InputJsonValue,
           },
+          select: { id: true },
         });
+        createdCombatLogIds.push(created.id);
       }
 
       // Grant hidden cache loot
@@ -815,6 +818,16 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         }
       }
 
+      // Strip combat logs from events stored in the exploration activity log
+      // (full logs are already stored in separate combat activity log records)
+      const cleanedEvents = events.map(ev => {
+        if ((ev.type === 'ambush_victory' || ev.type === 'ambush_defeat') && ev.details) {
+          const { log: _log, ...rest } = ev.details;
+          return { ...ev, details: rest };
+        }
+        return ev;
+      });
+
       const explorationLog = await tx.activityLog.create({
         data: {
           playerId,
@@ -826,7 +839,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             aborted,
             abortedAtTurn,
             refundedTurns: refundAmount,
-            events,
+            events: cleanedEvents,
             resourceDiscoveries: createdResourceDiscoveries,
             encounterSites: createdEncounterSites,
             hiddenCaches,
@@ -841,8 +854,18 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         logId: explorationLog.id,
         resourceDiscoveries: createdResourceDiscoveries,
         encounterSites: createdEncounterSites,
+        combatLogIds: createdCombatLogIds,
       };
     });
+
+    // Assign combatLogIds to ambush events and strip full combat logs from response
+    let combatLogIdx = 0;
+    for (const event of events) {
+      if ((event.type === 'ambush_victory' || event.type === 'ambush_defeat') && event.details) {
+        event.details.combatLogId = persisted.combatLogIds[combatLogIdx++];
+        delete event.details.log;
+      }
+    }
 
     // --- Achievement tracking (counter-only + derived checks) ---
     const explorationCounters: Record<string, number> = {};

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { updateTutorialStep } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
@@ -107,41 +108,8 @@ export interface PendingEncounter {
   totalTurnCost: number;
 }
 
-export interface LastCombatLogEntry {
-  round: number;
-  actor: 'combatantA' | 'combatantB';
-  actorName?: string;
-  action: string;
-  message: string;
-  roll?: number;
-  damage?: number;
-  evaded?: boolean;
-  attackModifier?: number;
-  accuracyModifier?: number;
-  targetDodge?: number;
-  targetEvasion?: number;
-  targetDefence?: number;
-  targetMagicDefence?: number;
-  rawDamage?: number;
-  armorReduction?: number;
-  magicDefenceReduction?: number;
-  isCritical?: boolean;
-  critMultiplier?: number;
-  combatantAHpAfter?: number;
-  combatantBHpAfter?: number;
-  spellName?: string;
-  healAmount?: number;
-  effectsApplied?: Array<{
-    stat: string;
-    modifier: number;
-    duration: number;
-    target: 'combatantA' | 'combatantB';
-  }>;
-  effectsExpired?: Array<{
-    name: string;
-    target: 'combatantA' | 'combatantB';
-  }>;
-}
+import type { CombatLogEntryResponse as LastCombatLogEntry } from '@/lib/api/combat';
+export type { LastCombatLogEntry };
 
 export interface LastCombat {
   mobTemplateId: string;
@@ -192,6 +160,23 @@ export interface LastCombat {
       characterLeveledUp: boolean;
     } | null;
   };
+}
+
+export type BestiarySkipEntry = {
+  id: string;
+  isDiscovered: boolean;
+  prefixesEncountered: string[];
+};
+
+export function isMobKnown(
+  mobTemplateId: string,
+  prefix: string | null | undefined,
+  bestiary: BestiarySkipEntry[],
+): boolean {
+  const mob = bestiary.find(m => m.id === mobTemplateId);
+  if (!mob?.isDiscovered) return false;
+  if (prefix) return mob.prefixesEncountered.includes(prefix);
+  return true;
 }
 
 export type ActivityLogEntry = {
@@ -440,6 +425,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
   const [achievementUnclaimedCount, setAchievementUnclaimedCount] = useState(0);
   const [activeTitle, setActiveTitleState] = useState<string | null>(null);
+  const combatLogPrefetch = useCombatLogPrefetch();
   const [playbackActive, setPlaybackActive] = useState(false);
   const [combatPlaybackQueue, setCombatPlaybackQueue] = useState<Array<{
     room?: number;
@@ -451,7 +437,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     combatantAMaxHp: number;
     playerStartHp: number;
     combatantBMaxHp: number;
-    log: LastCombatLogEntry[];
+    log: LastCombatLogEntry[] | null;
+    combatLogId?: string;
     rewards: LastCombat['rewards'];
   }> | null>(null);
   const [combatPlaybackIndex, setCombatPlaybackIndex] = useState(0);
@@ -461,6 +448,31 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const arrivedInTownRef = useRef(false);
   const lastEventLogTimeRef = useRef(0);
   const combatPlaybackData = combatPlaybackQueue?.[combatPlaybackIndex] ?? null;
+
+  // Lazy-load current fight's combat log and pre-fetch next fight
+  useEffect(() => {
+    if (!combatPlaybackQueue) return;
+    const currentFight = combatPlaybackQueue[combatPlaybackIndex];
+    if (!currentFight) return;
+
+    // Load current fight's log if not yet loaded
+    if (!currentFight.log && currentFight.combatLogId) {
+      void combatLogPrefetch.fetchLog(currentFight.combatLogId).then(log => {
+        setCombatPlaybackQueue(prev => {
+          if (!prev) return prev;
+          const updated = [...prev];
+          updated[combatPlaybackIndex] = { ...updated[combatPlaybackIndex], log: log as LastCombatLogEntry[] };
+          return updated;
+        });
+      });
+    }
+
+    // Pre-fetch next fight's log
+    const nextFight = combatPlaybackQueue[combatPlaybackIndex + 1];
+    if (nextFight?.combatLogId) {
+      combatLogPrefetch.prefetch(nextFight.combatLogId);
+    }
+  }, [combatPlaybackQueue, combatPlaybackIndex, combatLogPrefetch]);
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<{
     totalTurns: number;
     zoneName: string;
@@ -950,6 +962,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
     }
     setExplorationPlaybackData(null);
+    combatLogPrefetch.clear();
     setPlaybackActive(false);
     await advanceTutorial(TUTORIAL_STEP_EXPLORE);
     await loadAll();
@@ -1038,43 +1051,56 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       // Build playback queue from fights[] or single-element queue for zone combat
       if (data.combat.fights && data.combat.fights.length > 0) {
-        const queue = data.combat.fights.map((fight) => ({
-          room: fight.room,
-          mobName: fight.mobName ?? data.combat.mobName,
-          mobDisplayName: fight.mobDisplayName,
-          mobTemplateId: fight.mobTemplateId,
-          mobPrefix: fight.mobPrefix,
-          outcome: fight.outcome,
-          combatantAMaxHp: fight.playerMaxHp,
-          playerStartHp: fight.playerStartHp,
-          combatantBMaxHp: fight.mobMaxHp,
-          log: fight.log as LastCombatLogEntry[],
-          rewards: {
-            xp: fight.xp,
-            loot: fight.loot,
-            siteCompletion: null as LastCombat['rewards']['siteCompletion'],
-            skillXp: fight.skillXp
-              ? {
-                  skillType: fight.skillXp.skillType,
-                  xpGained: fight.skillXp.xpGained,
-                  xpAfterEfficiency: fight.skillXp.xpAfterEfficiency,
-                  efficiency: fight.skillXp.efficiency,
-                  leveledUp: fight.skillXp.leveledUp,
-                  newLevel: fight.skillXp.newLevel,
-                  characterXpGain: fight.skillXp.characterXpGain,
-                  characterXpAfter: fight.skillXp.characterXpAfter,
-                  characterLevelBefore: fight.skillXp.characterLevelBefore,
-                  characterLevelAfter: fight.skillXp.characterLevelAfter,
-                  attributePointsAfter: fight.skillXp.attributePointsAfter,
-                  characterLeveledUp: fight.skillXp.characterLeveledUp,
-                }
-              : null,
-          } satisfies LastCombat['rewards'],
-        }));
+        const queue = data.combat.fights.map((fight) => {
+          const fightLogId = fight.combatLogId;
+          return {
+            room: fight.room,
+            mobName: fight.mobName ?? data.combat.mobName,
+            mobDisplayName: fight.mobDisplayName,
+            mobTemplateId: fight.mobTemplateId,
+            mobPrefix: fight.mobPrefix,
+            outcome: fight.outcome,
+            combatantAMaxHp: fight.playerMaxHp,
+            playerStartHp: fight.playerStartHp,
+            combatantBMaxHp: fight.mobMaxHp,
+            log: fight.log?.length ? (fight.log as LastCombatLogEntry[]) : null,
+            combatLogId: fightLogId,
+            rewards: {
+              xp: fight.xp,
+              loot: fight.loot,
+              siteCompletion: null as LastCombat['rewards']['siteCompletion'],
+              skillXp: fight.skillXp
+                ? {
+                    skillType: fight.skillXp.skillType,
+                    xpGained: fight.skillXp.xpGained,
+                    xpAfterEfficiency: fight.skillXp.xpAfterEfficiency,
+                    efficiency: fight.skillXp.efficiency,
+                    leveledUp: fight.skillXp.leveledUp,
+                    newLevel: fight.skillXp.newLevel,
+                    characterXpGain: fight.skillXp.characterXpGain,
+                    characterXpAfter: fight.skillXp.characterXpAfter,
+                    characterLevelBefore: fight.skillXp.characterLevelBefore,
+                    characterLevelAfter: fight.skillXp.characterLevelAfter,
+                    attributePointsAfter: fight.skillXp.attributePointsAfter,
+                    characterLeveledUp: fight.skillXp.characterLeveledUp,
+                  }
+                : null,
+            } satisfies LastCombat['rewards'],
+          };
+        });
+
+        // Pre-fetch first two fights' logs
+        for (let i = 0; i < Math.min(2, queue.length); i++) {
+          if (queue[i].combatLogId) {
+            combatLogPrefetch.prefetch(queue[i].combatLogId!);
+          }
+        }
+
         pendingCombatRewardsRef.current = rewards;
         setCombatPlaybackQueue(queue);
         setCombatPlaybackIndex(0);
       } else {
+        const combatLogId = data.combat.combatLogId;
         setCombatPlaybackQueue([{
           mobName: data.combat.mobName,
           mobDisplayName: data.combat.mobDisplayName,
@@ -1084,11 +1110,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           combatantAMaxHp: data.combat.playerMaxHp,
           playerStartHp: hpBefore,
           combatantBMaxHp: data.combat.mobMaxHp,
-          log: data.combat.log,
+          log: data.combat.log?.length ? (data.combat.log as LastCombatLogEntry[]) : null,
+          combatLogId,
           rewards,
         }]);
         setCombatPlaybackIndex(0);
         pendingCombatRewardsRef.current = rewards;
+
+        if (combatLogId) combatLogPrefetch.prefetch(combatLogId);
       }
       setPlaybackActive(true);
 
@@ -1194,7 +1223,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         outcome: lastFight.outcome,
         combatantAMaxHp: lastFight.combatantAMaxHp,
         combatantBMaxHp: lastFight.combatantBMaxHp,
-        log: lastFight.log,
+        log: lastFight.log ?? [],
         rewards: aggregatedRewards,
       });
     }
@@ -1202,6 +1231,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setCombatPlaybackIndex(0);
     setRoomTransition(null);
     pendingCombatRewardsRef.current = null;
+    combatLogPrefetch.clear();
     setPlaybackActive(false);
 
     if (siteJustClearedRef.current) {
@@ -1229,7 +1259,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
             outcome: lastFight.outcome,
             combatantAMaxHp: lastFight.combatantAMaxHp,
             combatantBMaxHp: lastFight.combatantBMaxHp,
-            log: lastFight.log,
+            log: lastFight.log ?? [],
             rewards: aggregatedRewards,
           });
         }
@@ -1237,6 +1267,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         setCombatPlaybackIndex(0);
         setRoomTransition(null);
         pendingCombatRewardsRef.current = null;
+        combatLogPrefetch.clear();
       }
       if (travelPlaybackData) {
         handleTravelPlaybackSkip();
@@ -1834,6 +1865,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
     // Tutorial
     tutorialStep, skipTutorial, advanceTutorial,
+
+    // Combat log lazy loading
+    combatLogPrefetch,
 
     // Guild
     guildTaxRate,

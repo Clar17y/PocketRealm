@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
@@ -43,7 +43,7 @@ import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
 import { GuildScreen } from '@/components/screens/GuildScreen';
 import { CombatScreen } from './screens/CombatScreen';
-import { useGameController, type Screen } from './useGameController';
+import { useGameController, isMobKnown, type Screen } from './useGameController';
 import { useChat } from '@/hooks/useChat';
 import { ChatPanel } from '@/components/ChatPanel';
 
@@ -301,6 +301,7 @@ export default function GamePage() {
     loadAchievements,
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
+    combatLogPrefetch,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -327,6 +328,11 @@ export default function GamePage() {
     if (!stepDef?.pulseTab) return undefined;
     return new Set([stepDef.pulseTab]);
   }, [tutorialStep]);
+
+  const bestiaryMobsForPlayback = useMemo(
+    () => bestiaryMobs.map(m => ({ id: m.id, isDiscovered: m.isDiscovered, prefixesEncountered: m.prefixesEncountered })),
+    [bestiaryMobs],
+  );
 
   if (isLoading) {
     return (
@@ -433,6 +439,8 @@ export default function GamePage() {
             onPushLog={pushLog}
             combatSpeedMs={combatLogSpeedMs}
             explorationSpeedMs={explorationSpeedMs}
+            autoSkipKnownCombat={autoSkipKnownCombat}
+            bestiaryMobs={bestiaryMobsForPlayback}
             defaultTurns={defaultExploreTurns}
             tutorialLocked={tutorialStep === TUTORIAL_STEP_EXPLORE}
             lowHpWarning={lowHpWarning}
@@ -441,6 +449,7 @@ export default function GamePage() {
             busyAction={busyAction}
             onNavigateToRest={() => handleNavigate('rest')}
             guildTaxRate={guildTaxRate}
+            combatLogPrefetch={combatLogPrefetch}
           />
         );
       case 'inventory':
@@ -615,10 +624,13 @@ export default function GamePage() {
             activityLog={activityLog}
             combatSpeedMs={combatLogSpeedMs}
             explorationSpeedMs={explorationSpeedMs}
+            autoSkipKnownCombat={autoSkipKnownCombat}
+            bestiaryMobs={bestiaryMobsForPlayback}
             onTravel={handleTravelToZone}
             onExploreCurrentZone={() => setActiveScreen('explore')}
             guildTaxRate={guildTaxRate}
             undiscoveredZones={undiscoveredZones}
+            combatLogPrefetch={combatLogPrefetch}
           />
         );
       case 'bestiary':
@@ -807,14 +819,8 @@ export default function GamePage() {
           </div>
         );
       case 'combat': {
-        const shouldAutoSkipCombat = autoSkipKnownCombat && combatPlaybackData && (() => {
-          const mob = bestiaryMobs.find(m => m.id === combatPlaybackData.mobTemplateId);
-          if (!mob?.isDiscovered) return false;
-          if (combatPlaybackData.mobPrefix) {
-            return mob.prefixesEncountered.includes(combatPlaybackData.mobPrefix);
-          }
-          return true;
-        })();
+        const shouldAutoSkipCombat = autoSkipKnownCombat && combatPlaybackData &&
+          isMobKnown(combatPlaybackData.mobTemplateId, combatPlaybackData.mobPrefix, bestiaryMobs);
         return (
           <CombatScreen
             hpState={hpState}

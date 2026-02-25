@@ -4,7 +4,8 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { PixelButton } from '@/components/PixelButton';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/useGameController';
+import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { MapPin, Star, Hourglass, Lock } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';
 
@@ -52,10 +53,13 @@ interface ZoneMapProps {
   activityLog?: ActivityLogEntry[];
   combatSpeedMs?: number;
   explorationSpeedMs?: number;
+  autoSkipKnownCombat?: boolean;
+  bestiaryMobs?: BestiarySkipEntry[];
   onTravel: (zoneId: string) => void;
   onExploreCurrentZone: () => void;
   guildTaxRate?: number;
   undiscoveredZones?: Array<{ id: string; name: string; explorationThreshold: number; fromZoneId: string }>;
+  combatLogPrefetch?: CombatLogPrefetch;
 }
 
 /** BFS from the starter zone to compute shortest-path tier for each zone. */
@@ -113,10 +117,13 @@ export function ZoneMap({
   activityLog,
   combatSpeedMs,
   explorationSpeedMs,
+  autoSkipKnownCombat,
+  bestiaryMobs,
   onTravel,
   onExploreCurrentZone,
   guildTaxRate = 0,
   undiscoveredZones,
+  combatLogPrefetch,
 }: ZoneMapProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
@@ -566,9 +573,12 @@ export function ZoneMap({
             playerMaxHp={travelPlaybackData.playerMaxHp}
             combatSpeedMs={combatSpeedMs}
             explorationSpeedMs={explorationSpeedMs}
+            autoSkipKnownCombat={autoSkipKnownCombat}
+            bestiaryMobs={bestiaryMobs}
             onComplete={onTravelPlaybackComplete!}
             onSkip={onTravelPlaybackSkip!}
             onPushLog={onPushLog}
+            combatLogPrefetch={combatLogPrefetch}
           />
         </div>
       )}

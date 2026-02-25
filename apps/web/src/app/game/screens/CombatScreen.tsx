@@ -55,7 +55,7 @@ interface CombatScreenProps {
     combatantAMaxHp: number;
     playerStartHp: number;
     combatantBMaxHp: number;
-    log: LastCombatLogEntry[];
+    log: LastCombatLogEntry[] | null;
     rewards: LastCombat['rewards'];
   } | null;
   combatSpeedMs?: number;
@@ -454,23 +454,29 @@ export function CombatScreen({
                   }
                 </div>
               )}
-              <CombatPlayback
-                key={fightProgress ? fightProgress.current : 0}
-                mobDisplayName={combatPlaybackData.mobDisplayName}
-                mobImageSrc={monsterImageSrc(combatPlaybackData.mobName)}
-                outcome={combatPlaybackData.outcome}
-                playerMaxHp={combatPlaybackData.combatantAMaxHp}
-                playerStartHp={combatPlaybackData.playerStartHp}
-                mobMaxHp={combatPlaybackData.combatantBMaxHp}
-                log={combatPlaybackData.log}
-                rewards={combatPlaybackData.rewards}
-                speedMs={combatSpeedMs}
-                autoSkip={autoSkipCombat}
-                onComplete={onCombatPlaybackComplete ?? (() => {})}
-                onSkip={() => {
-                  onCombatPlaybackComplete?.();
-                }}
-              />
+              {combatPlaybackData.log ? (
+                <CombatPlayback
+                  key={fightProgress ? fightProgress.current : 0}
+                  mobDisplayName={combatPlaybackData.mobDisplayName}
+                  mobImageSrc={monsterImageSrc(combatPlaybackData.mobName)}
+                  outcome={combatPlaybackData.outcome}
+                  playerMaxHp={combatPlaybackData.combatantAMaxHp}
+                  playerStartHp={combatPlaybackData.playerStartHp}
+                  mobMaxHp={combatPlaybackData.combatantBMaxHp}
+                  log={combatPlaybackData.log}
+                  rewards={combatPlaybackData.rewards}
+                  speedMs={combatSpeedMs}
+                  autoSkip={autoSkipCombat}
+                  onComplete={onCombatPlaybackComplete ?? (() => {})}
+                  onSkip={() => {
+                    onCombatPlaybackComplete?.();
+                  }}
+                />
+              ) : (
+                <div className="text-center py-8 text-[var(--rpg-text-secondary)]">
+                  <div className="animate-pulse">Loading combat data...</div>
+                </div>
+              )}
             </div>
           )}
 
