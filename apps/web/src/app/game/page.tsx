@@ -300,6 +300,7 @@ export default function GamePage() {
     loadAchievements,
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
+    combatLogPrefetch,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -446,6 +447,7 @@ export default function GamePage() {
             busyAction={busyAction}
             onNavigateToRest={() => handleNavigate('rest')}
             guildTaxRate={guildTaxRate}
+            combatLogPrefetch={combatLogPrefetch}
           />
         );
       case 'inventory':
@@ -625,6 +627,7 @@ export default function GamePage() {
             onTravel={handleTravelToZone}
             onExploreCurrentZone={() => setActiveScreen('explore')}
             guildTaxRate={guildTaxRate}
+            combatLogPrefetch={combatLogPrefetch}
           />
         );
       case 'bestiary':

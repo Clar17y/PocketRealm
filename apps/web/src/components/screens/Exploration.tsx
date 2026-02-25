@@ -7,13 +7,14 @@ import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { HpStatusBar } from '../common/HpStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
-import { Mountain, Play } from 'lucide-react';
+import { Loader2, Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, HP_CONSTANTS } from '@adventure/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/useGameController';
+import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 
 interface ExplorationProps {
   currentZone: {
@@ -59,9 +60,10 @@ interface ExplorationProps {
   busyAction?: string | null;
   onNavigateToRest?: () => void;
   guildTaxRate?: number;
+  combatLogPrefetch?: CombatLogPrefetch;
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0 }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
 
@@ -156,6 +158,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           onComplete={onPlaybackComplete!}
           onSkip={onPlaybackSkip!}
           onPushLog={onPushLog}
+          combatLogPrefetch={combatLogPrefetch}
         />
       )}
 
@@ -290,11 +293,20 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                 onStartExploration(turnInvestment[0]);
               }
             }}
-            disabled={isRecovering || turnInvestment[0] > availableTurns}
+            disabled={isRecovering || turnInvestment[0] > availableTurns || !!busyAction}
           >
             <div className="flex items-center justify-center gap-2">
-              <Play size={20} />
-              {isRecovering ? 'Recover First' : 'Start Exploration'}
+              {busyAction === 'exploration' ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Exploring...
+                </>
+              ) : (
+                <>
+                  <Play size={20} />
+                  {isRecovering ? 'Recover First' : 'Start Exploration'}
+                </>
+              )}
             </div>
           </PixelButton>
         </>

@@ -485,7 +485,6 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         outcome: lastCombatResult?.outcome ?? 'defeat',
         playerMaxHp: lastCombatResult?.combatantAMaxHp ?? hpState.maxHp,
         mobMaxHp: lastCombatResult?.combatantBMaxHp ?? 0,
-        log: lastCombatResult?.log ?? [],
         potionsConsumed: allPotionsConsumed,
         fightCount: fightResults.length,
         rewards: {
@@ -501,6 +500,48 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       } as unknown as Prisma.InputJsonValue,
     },
   });
+
+  // --- Per-fight activity logs (combat log stored individually) ---
+  // Wrapped in try-catch: if log creation fails, response degrades gracefully
+  // (frontend handles missing combatLogId via backwards-compat inline log path)
+  let fightLogIds: string[] = [];
+  try {
+    for (const fight of fightResults) {
+      const fightLog = await prisma.activityLog.create({
+        data: {
+          playerId,
+          activityType: 'combat',
+          turnsSpent: 0,
+          result: {
+            zoneId,
+            zoneName: zone.name,
+            mobTemplateId: fight.mobTemplateId,
+            mobName: fight.mobName,
+            mobPrefix: fight.mobPrefix,
+            mobDisplayName: fight.mobDisplayName,
+            source: 'encounter_site_fight',
+            encounterSiteId,
+            attackSkill,
+            outcome: fight.outcome,
+            playerMaxHp: fight.playerMaxHp,
+            mobMaxHp: fight.mobMaxHp,
+            log: fight.log,
+            rewards: {
+              xp: fight.xp,
+              baseXp: fight.xp,
+              loot: fight.loot,
+              durabilityLost: fight.durabilityLost,
+              skillXp: fight.skillXp ? serializeXpGrant(fight.skillXp) : null,
+            },
+          } as unknown as Prisma.InputJsonValue,
+        },
+        select: { id: true },
+      });
+      fightLogIds.push(fightLog.id);
+    }
+  } catch {
+    fightLogIds = [];
+  }
 
   // --- Response with fights[] array ---
   const lastFightResult = fightResults[fightResults.length - 1]!;
@@ -518,7 +559,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       outcome: lastFightResult.outcome,
       playerMaxHp: lastFightResult.playerMaxHp,
       mobMaxHp: lastFightResult.mobMaxHp,
-      log: lastFightResult.log,
+      ...(fightLogIds.length > 0
+        ? { combatLogId: fightLogIds[fightLogIds.length - 1] }
+        : { log: lastFightResult.log }),
       playerHpRemaining: lastFightResult.playerHpRemaining,
       potionsConsumed: allPotionsConsumed,
       fleeResult: fleeResult
@@ -537,7 +580,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         siteStrategy,
         fullClearActive: siteFullClearActive,
       },
-      fights: fightResults.map(f => ({
+      fights: fightResults.map((f, i) => ({
         room: f.room,
         mobName: f.mobName,
         mobDisplayName: f.mobDisplayName,
@@ -547,7 +590,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         playerMaxHp: f.playerMaxHp,
         playerStartHp: f.playerStartHp,
         mobMaxHp: f.mobMaxHp,
-        log: f.log,
+        ...(fightLogIds[i] ? { combatLogId: fightLogIds[i] } : { log: f.log }),
         playerHpRemaining: f.playerHpRemaining,
         potionsConsumed: f.potionsConsumed,
         xp: f.xp,
