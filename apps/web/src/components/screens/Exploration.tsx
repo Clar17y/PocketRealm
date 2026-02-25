@@ -8,7 +8,7 @@ import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { HpStatusBar } from '../common/HpStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Mountain, Play } from 'lucide-react';
-import { EXPLORATION_CONSTANTS, HP_CONSTANTS } from '@adventure/shared';
+import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@adventure/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
@@ -65,13 +65,17 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
 
-  const tierEntries = explorationProgress?.tiers
-    ? Object.entries(explorationProgress.tiers)
-        .map(([t, threshold]) => ({ tier: Number(t), threshold: threshold as number }))
-        .sort((a, b) => a.tier - b.tier)
-    : [];
-  const unlockedTiers = tierEntries.filter(t => (explorationProgress?.percent ?? 0) >= t.threshold);
-  const maxUnlockedTier = unlockedTiers.length > 0 ? Math.max(...unlockedTiers.map(t => t.tier)) : null;
+  const unlockedTierNumbers = getUnlockedTiers(
+    explorationProgress?.percent ?? 0,
+    explorationProgress?.tiers ?? null,
+  );
+  const unlockedTiers = unlockedTierNumbers.map(tier => ({
+    tier,
+    threshold: (explorationProgress?.tiers ?? {})[String(tier)] ?? 0,
+  }));
+  const maxUnlockedTier = unlockedTierNumbers.length > 0
+    ? unlockedTierNumbers[unlockedTierNumbers.length - 1]!
+    : null;
   const effectiveSelectedTier = selectedTier ?? maxUnlockedTier;
 
   const calculateProbabilities = (turns: number) => {
@@ -208,7 +212,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                           : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
                       }`}
                     >
-                      Tier {tier}
+                      {getTierName(tier)}
                     </button>
                   ))}
                 </div>

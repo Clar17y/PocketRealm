@@ -9,10 +9,10 @@ import { MapPin, Star, Hourglass, Lock } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';
 
 function getMilestoneHint(percent: number): ReactNode {
-  if (percent >= 75) return <p className="text-xs text-amber-400 mt-1 italic">The apex predator stirs...</p>;
-  if (percent >= 50) return <p className="text-xs text-red-400 mt-1 italic">Dangerous creatures lurk ahead...</p>;
-  if (percent >= 25) return <p className="text-xs text-yellow-400 mt-1 italic">Larger creatures roam deeper in...</p>;
-  return <p className="text-xs text-[var(--rpg-text-secondary)] mt-1 italic">Only small creatures roam the outskirts.</p>;
+  if (percent >= 75) return <p className="text-xs text-amber-400 mt-1 italic">Apex — The apex predator stirs...</p>;
+  if (percent >= 50) return <p className="text-xs text-red-400 mt-1 italic">Depths — Dangerous creatures lurk ahead...</p>;
+  if (percent >= 25) return <p className="text-xs text-yellow-400 mt-1 italic">Interior — Larger creatures roam deeper in...</p>;
+  return <p className="text-xs text-[var(--rpg-text-secondary)] mt-1 italic">Outskirts — Only small creatures roam here.</p>;
 }
 
 interface ZoneMapProps {
