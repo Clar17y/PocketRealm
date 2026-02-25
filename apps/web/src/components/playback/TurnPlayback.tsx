@@ -124,8 +124,9 @@ export function TurnPlayback({
             });
           }}
           onCombatStart={(event) => {
-            // Auto-skip known mobs: bypass fetch entirely, resume exploration
-            if (autoSkipKnownCombat && bestiaryMobs) {
+            // Auto-skip known mob victories: bypass fetch, resume exploration
+            // Defeats always show the full combat log so the player can see what happened
+            if (autoSkipKnownCombat && bestiaryMobs && event.type !== 'ambush_defeat') {
               const mobId = event.details?.mobTemplateId as string | undefined;
               const prefix = event.details?.mobPrefix as string | undefined;
               if (mobId && isMobKnown(mobId, prefix, bestiaryMobs)) {
