@@ -48,6 +48,16 @@ export function TurnPlayback({
     setPlayerHpForNextCombat(null);
   }, [totalTurns, events]);
 
+  const shouldAutoSkip = autoSkipKnownCombat && combatEvent && (() => {
+    const mobTemplateId = combatEvent.details?.mobTemplateId as string | undefined;
+    if (!mobTemplateId || !bestiaryMobs) return false;
+    const mob = bestiaryMobs.find(m => m.id === mobTemplateId);
+    if (!mob?.isDiscovered) return false;
+    const prefix = combatEvent.details?.mobPrefix as string | undefined;
+    if (prefix) return mob.prefixesEncountered.includes(prefix);
+    return true;
+  })();
+
   return (
     <>
       {/* Exploration/Travel Playback — stays mounted during combat to preserve state */}
@@ -90,18 +100,7 @@ export function TurnPlayback({
       </PixelCard>
 
       {/* Combat Playback — embedded combat animation during exploration/travel */}
-      {combatEvent && (() => {
-          const shouldAutoSkip = autoSkipKnownCombat && (() => {
-            const mobTemplateId = combatEvent.details?.mobTemplateId as string | undefined;
-            if (!mobTemplateId || !bestiaryMobs) return false;
-            const mob = bestiaryMobs.find(m => m.id === mobTemplateId);
-            if (!mob?.isDiscovered) return false;
-            const prefix = combatEvent.details?.mobPrefix as string | undefined;
-            if (prefix) return mob.prefixesEncountered.includes(prefix);
-            return true;
-          })();
-
-          return (
+      {combatEvent && (
         <PixelCard>
           <CombatPlayback
             key={combatEvent.turn}
@@ -182,8 +181,7 @@ export function TurnPlayback({
             }}
           />
         </PixelCard>
-          );
-      })()}
+      )}
     </>
   );
 }

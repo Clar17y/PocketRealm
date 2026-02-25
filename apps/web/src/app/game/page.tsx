@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
@@ -342,6 +342,11 @@ export default function GamePage() {
   const filteredGatheringNodes = gatheringNodes.filter((n) => n.skillRequired === activeGatheringSkill);
   const filteredCraftingRecipes = craftingRecipes.filter((recipe) => recipe.skillType === activeCraftingSkill);
 
+  const bestiaryMobsForPlayback = useMemo(
+    () => bestiaryMobs.map(m => ({ id: m.id, isDiscovered: m.isDiscovered, prefixesEncountered: m.prefixesEncountered })),
+    [bestiaryMobs],
+  );
+
   const renderScreen = () => {
     switch (activeScreen) {
       case 'home':
@@ -432,7 +437,7 @@ export default function GamePage() {
             combatSpeedMs={combatLogSpeedMs}
             explorationSpeedMs={explorationSpeedMs}
             autoSkipKnownCombat={autoSkipKnownCombat}
-            bestiaryMobs={bestiaryMobs.map(m => ({ id: m.id, isDiscovered: m.isDiscovered, prefixesEncountered: m.prefixesEncountered }))}
+            bestiaryMobs={bestiaryMobsForPlayback}
             defaultTurns={defaultExploreTurns}
             tutorialLocked={tutorialStep === TUTORIAL_STEP_EXPLORE}
             lowHpWarning={lowHpWarning}
@@ -616,7 +621,7 @@ export default function GamePage() {
             combatSpeedMs={combatLogSpeedMs}
             explorationSpeedMs={explorationSpeedMs}
             autoSkipKnownCombat={autoSkipKnownCombat}
-            bestiaryMobs={bestiaryMobs.map(m => ({ id: m.id, isDiscovered: m.isDiscovered, prefixesEncountered: m.prefixesEncountered }))}
+            bestiaryMobs={bestiaryMobsForPlayback}
             onTravel={handleTravelToZone}
             onExploreCurrentZone={() => setActiveScreen('explore')}
             guildTaxRate={guildTaxRate}
