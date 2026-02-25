@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { isAmbushWithCombatLog } from '@/lib/explorationUtils';
 
 export interface ExplorationPlaybackEvent {
   turn: number;
@@ -105,9 +106,7 @@ export function ExplorationPlayback({
         onEventRevealed(nextEvent);
         setRevealedEventCount(prev => prev + 1);
 
-        // All ambush types with combat log data trigger full combat playback
-        const isAmbush = nextEvent.type === 'ambush_defeat' || nextEvent.type === 'ambush_victory';
-        if (isAmbush && (nextEvent.details?.log || nextEvent.details?.combatLogId)) {
+        if (isAmbushWithCombatLog(nextEvent)) {
           setPhase('paused-combat');
           onCombatStart(nextEvent);
           return;

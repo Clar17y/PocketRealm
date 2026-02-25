@@ -440,9 +440,7 @@ export default function GamePage() {
             busyAction={busyAction}
             onNavigateToRest={() => handleNavigate('rest')}
             guildTaxRate={guildTaxRate}
-            fetchCombatLog={combatLogPrefetch.fetchLog}
-            prefetchCombatLog={combatLogPrefetch.prefetch}
-            getCachedCombatLog={combatLogPrefetch.getLog}
+            combatLogPrefetch={combatLogPrefetch}
           />
         );
       case 'inventory':

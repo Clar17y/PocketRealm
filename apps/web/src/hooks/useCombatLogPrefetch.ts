@@ -43,3 +43,5 @@ export function useCombatLogPrefetch() {
 
   return { fetchLog, prefetch, getLog, clear };
 }
+
+export type CombatLogPrefetch = ReturnType<typeof useCombatLogPrefetch>;

@@ -107,41 +107,8 @@ export interface PendingEncounter {
   roomMobCounts: Array<{ room: number; alive: number; total: number }>;
 }
 
-export interface LastCombatLogEntry {
-  round: number;
-  actor: 'combatantA' | 'combatantB';
-  actorName?: string;
-  action: string;
-  message: string;
-  roll?: number;
-  damage?: number;
-  evaded?: boolean;
-  attackModifier?: number;
-  accuracyModifier?: number;
-  targetDodge?: number;
-  targetEvasion?: number;
-  targetDefence?: number;
-  targetMagicDefence?: number;
-  rawDamage?: number;
-  armorReduction?: number;
-  magicDefenceReduction?: number;
-  isCritical?: boolean;
-  critMultiplier?: number;
-  combatantAHpAfter?: number;
-  combatantBHpAfter?: number;
-  spellName?: string;
-  healAmount?: number;
-  effectsApplied?: Array<{
-    stat: string;
-    modifier: number;
-    duration: number;
-    target: 'combatantA' | 'combatantB';
-  }>;
-  effectsExpired?: Array<{
-    name: string;
-    target: 'combatantA' | 'combatantB';
-  }>;
-}
+import type { CombatLogEntryResponse as LastCombatLogEntry } from '@/lib/api/combat';
+export type { LastCombatLogEntry };
 
 export interface LastCombat {
   mobTemplateId: string;
@@ -1279,6 +1246,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         setCombatPlaybackIndex(0);
         setRoomTransition(null);
         pendingCombatRewardsRef.current = null;
+        combatLogPrefetch.clear();
       }
       if (travelPlaybackData) {
         handleTravelPlaybackSkip();

@@ -6,6 +6,8 @@ import { ExplorationPlayback, type ExplorationPlaybackEvent } from '@/components
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { monsterImageSrc } from '@/lib/assets';
 import type { CombatLogEntryResponse } from '@/lib/api/combat';
+import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
+import { isAmbushWithCombatLog } from '@/lib/explorationUtils';
 
 interface TurnPlaybackProps {
   totalTurns: number;
@@ -20,9 +22,7 @@ interface TurnPlaybackProps {
   onComplete: () => void;
   onSkip: () => void;
   onPushLog?: (...entries: Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'danger' }>) => void;
-  fetchCombatLog?: (id: string) => Promise<CombatLogEntryResponse[]>;
-  prefetchCombatLog?: (id: string) => void;
-  getCachedCombatLog?: (id: string) => CombatLogEntryResponse[] | null;
+  combatLogPrefetch?: CombatLogPrefetch;
 }
 
 export function TurnPlayback({
@@ -38,9 +38,7 @@ export function TurnPlayback({
   onComplete,
   onSkip,
   onPushLog,
-  fetchCombatLog,
-  prefetchCombatLog,
-  getCachedCombatLog,
+  combatLogPrefetch,
 }: TurnPlaybackProps) {
   const [combatEvent, setCombatEvent] = useState<ExplorationPlaybackEvent | null>(null);
   const [resumeFromCombat, setResumeFromCombat] = useState(false);
@@ -55,14 +53,14 @@ export function TurnPlayback({
 
   // Pre-fetch the first ambush's combat log on mount
   useEffect(() => {
-    if (!prefetchCombatLog) return;
+    if (!combatLogPrefetch) return;
     const firstAmbush = events.find(e =>
       (e.type === 'ambush_victory' || e.type === 'ambush_defeat') && e.details?.combatLogId
     );
     if (firstAmbush?.details?.combatLogId) {
-      prefetchCombatLog(firstAmbush.details.combatLogId as string);
+      combatLogPrefetch.prefetch(firstAmbush.details.combatLogId as string);
     }
-  }, [events, prefetchCombatLog]);
+  }, [events, combatLogPrefetch]);
 
   // Load combat log when combatEvent changes (inline or fetched)
   useEffect(() => {
@@ -70,24 +68,22 @@ export function TurnPlayback({
       setLoadedCombatLog(null);
       return;
     }
-    // Old format: log is inline
     if (combatEvent.details?.log) {
       setLoadedCombatLog(combatEvent.details.log as CombatLogEntryResponse[]);
       return;
     }
-    // New format: fetch by combatLogId
     const logId = combatEvent.details?.combatLogId as string | undefined;
-    if (logId && fetchCombatLog) {
-      const cached = getCachedCombatLog?.(logId);
+    if (logId && combatLogPrefetch) {
+      const cached = combatLogPrefetch.getLog(logId);
       if (cached) {
         setLoadedCombatLog(cached);
         return;
       }
-      void fetchCombatLog(logId).then(log => {
+      void combatLogPrefetch.fetchLog(logId).then(log => {
         setLoadedCombatLog(log);
       });
     }
-  }, [combatEvent, fetchCombatLog, getCachedCombatLog]);
+  }, [combatEvent, combatLogPrefetch]);
 
   return (
     <>
@@ -102,10 +98,7 @@ export function TurnPlayback({
           speedMs={explorationSpeedMs}
           resumeFromCombat={resumeFromCombat}
           onEventRevealed={(event) => {
-            // Skip logging ambush events here — they'll be logged after combat playback
-            const isAmbushWithCombat = (event.type === 'ambush_defeat' || event.type === 'ambush_victory')
-              && (event.details?.log || event.details?.combatLogId);
-            if (isAmbushWithCombat) return;
+            if (isAmbushWithCombatLog(event)) return;
 
             const typeMap: Record<string, 'info' | 'success' | 'danger'> = {
               ambush_defeat: 'danger',
@@ -121,14 +114,13 @@ export function TurnPlayback({
           }}
           onCombatStart={(event) => {
             setCombatEvent(event);
-            // Pre-fetch next ambush's combat log
-            if (prefetchCombatLog) {
+            if (combatLogPrefetch) {
               const currentIdx = events.findIndex(e => e === event);
               const nextAmbush = events.slice(currentIdx + 1).find(e =>
                 (e.type === 'ambush_victory' || e.type === 'ambush_defeat') && e.details?.combatLogId
               );
               if (nextAmbush?.details?.combatLogId) {
-                prefetchCombatLog(nextAmbush.details.combatLogId as string);
+                combatLogPrefetch.prefetch(nextAmbush.details.combatLogId as string);
               }
             }
           }}
@@ -160,7 +152,6 @@ export function TurnPlayback({
               log={loadedCombatLog}
               speedMs={combatSpeedMs}
               onComplete={() => {
-                // Track player HP after this fight for the next combat
                 if (loadedCombatLog.length > 0) {
                   const lastEntry = loadedCombatLog[loadedCombatLog.length - 1];
                   if (lastEntry.combatantAHpAfter !== undefined) {
@@ -168,7 +159,6 @@ export function TurnPlayback({
                   }
                 }
 
-                // Now that combat playback is done, log the ambush result
                 const typeMap: Record<string, 'info' | 'success' | 'danger'> = {
                   ambush_defeat: 'danger',
                   ambush_victory: 'success',
