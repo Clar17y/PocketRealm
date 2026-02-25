@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ModalOverlay } from './common/ModalOverlay';
 import {
   TUTORIAL_STEPS,
   TUTORIAL_STEP_WELCOME,
@@ -44,7 +45,7 @@ export function TutorialDialog({ tutorialStep, onDismiss }: TutorialDialogProps)
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <ModalOverlay opacity={60}>
       <div className="mx-4 w-full max-w-sm rounded-xl bg-[var(--rpg-surface)] border border-[var(--rpg-border)] p-5 shadow-xl">
         <h2 className="text-lg font-bold text-[var(--rpg-gold)] mb-2">
           {stepDef.dialog.title}
@@ -59,6 +60,6 @@ export function TutorialDialog({ tutorialStep, onDismiss }: TutorialDialogProps)
           Got it
         </button>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
