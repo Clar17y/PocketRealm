@@ -627,6 +627,7 @@ export default function GamePage() {
             onTravel={handleTravelToZone}
             onExploreCurrentZone={() => setActiveScreen('explore')}
             guildTaxRate={guildTaxRate}
+            combatLogPrefetch={combatLogPrefetch}
           />
         );
       case 'bestiary':

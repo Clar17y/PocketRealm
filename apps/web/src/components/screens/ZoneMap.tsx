@@ -5,6 +5,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/useGameController';
+import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { MapPin, Star, Hourglass, Lock } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';
 
@@ -57,6 +58,7 @@ interface ZoneMapProps {
   onTravel: (zoneId: string) => void;
   onExploreCurrentZone: () => void;
   guildTaxRate?: number;
+  combatLogPrefetch?: CombatLogPrefetch;
 }
 
 /** BFS from the starter zone to compute shortest-path tier for each zone. */
@@ -119,6 +121,7 @@ export function ZoneMap({
   onTravel,
   onExploreCurrentZone,
   guildTaxRate = 0,
+  combatLogPrefetch,
 }: ZoneMapProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
@@ -543,6 +546,7 @@ export function ZoneMap({
             onComplete={onTravelPlaybackComplete!}
             onSkip={onTravelPlaybackSkip!}
             onPushLog={onPushLog}
+            combatLogPrefetch={combatLogPrefetch}
           />
         </div>
       )}
