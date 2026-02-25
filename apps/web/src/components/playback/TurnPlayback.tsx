@@ -134,22 +134,14 @@ export function TurnPlayback({
                 const hpRemaining = event.details?.playerHpRemaining as number | undefined;
                 if (hpRemaining !== undefined) setPlayerHpForNextCombat(hpRemaining);
 
-                const typeMap: Record<string, 'info' | 'success' | 'danger'> = {
-                  ambush_defeat: 'danger',
-                  ambush_victory: 'success',
-                };
                 onPushLog?.({
                   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  type: typeMap[event.type] ?? 'info',
+                  type: 'success',
                   message: `Turn ${event.turn}: ${event.description}`,
                 });
 
-                if (event.type === 'ambush_defeat') {
-                  onComplete();
-                } else {
-                  setResumeFromCombat(true);
-                  setTimeout(() => setResumeFromCombat(false), 100);
-                }
+                setResumeFromCombat(true);
+                setTimeout(() => setResumeFromCombat(false), 100);
                 return;
               }
             }
