@@ -19,7 +19,8 @@ import {
 import {
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
-  ZONE_EXPLORATION_CONSTANTS,
+  getUnlockedTiers,
+  getHighestUnlockedTier,
   type Combatant,
   type CombatOptions,
   type MobTemplate,
@@ -124,11 +125,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const zoneTiers = zone.explorationTiers as Record<string, number> | null;
 
     // Determine unlocked tiers and selected tier
-    const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
-    const unlockedTiers = Object.entries(tiers)
-      .filter(([, threshold]) => explorationProgress.percent >= (threshold as number))
-      .map(([tier]) => Number(tier));
-    const maxUnlockedTier = Math.max(...unlockedTiers, 0);
+    const unlockedTiers = getUnlockedTiers(explorationProgress.percent, zoneTiers);
+    const maxUnlockedTier = getHighestUnlockedTier(explorationProgress.percent, zoneTiers);
     const selectedTier = body.tier ?? maxUnlockedTier;
 
     if (body.tier !== undefined && !unlockedTiers.includes(selectedTier)) {
@@ -655,11 +653,11 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
     const spentTurns = aborted && abortedAtTurn ? abortedAtTurn : effectiveTurns;
     const explorationTurnsToAdd = selectedTier === maxUnlockedTier ? spentTurns : 0;
-    const explorationBefore = await getExplorationPercent(playerId, body.zoneId);
+    const explorationBefore = explorationProgress;
     if (explorationTurnsToAdd > 0) {
       await addExplorationTurns(playerId, body.zoneId, explorationTurnsToAdd, {
-        turnsToExplore: explorationBefore.turnsToExplore,
-        currentTurnsExplored: explorationBefore.turnsExplored,
+        turnsToExplore: explorationProgress.turnsToExplore,
+        currentTurnsExplored: explorationProgress.turnsExplored,
       });
     }
     const explorationAfter = explorationTurnsToAdd > 0
