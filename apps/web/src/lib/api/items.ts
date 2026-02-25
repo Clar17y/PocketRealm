@@ -191,7 +191,7 @@ export async function mine(playerNodeId: string, turns: number, currentZoneId: s
     activeEvents?: Array<{ title: string; effectType: string; effectValue: number }>;
     yieldBreakdown?: {
       baseYieldPerAction: number;
-      eventYieldPerAction: number;
+      totalYieldPerAction: number;
       eventModifier: number;
       eventTitle: string | null;
     };

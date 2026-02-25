@@ -578,7 +578,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     activeEvents: activeEventEffects.length > 0
       ? activeEventEffects.map((e: { title: string; effectType: string; effectValue: number }) => ({
           ...e,
-          appliedToThisMob: siteMobBadges.some(m => m.effectType === e.effectType),
+          appliedToThisMob: siteMobBadges.some(m => m.effectType === e.effectType && m.title === e.title),
         }))
       : undefined,
   });
@@ -909,7 +909,7 @@ export function registerStartRoutes(router: Router): void {
         activeEvents: activeEventEffects.length > 0
           ? activeEventEffects.map((e: { title: string; effectType: string; effectValue: number }) => ({
               ...e,
-              appliedToThisMob: zoneMobBadges.some(m => m.effectType === e.effectType),
+              appliedToThisMob: zoneMobBadges.some(m => m.effectType === e.effectType && m.title === e.title),
             }))
           : undefined,
       });

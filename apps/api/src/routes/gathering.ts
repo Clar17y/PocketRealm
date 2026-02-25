@@ -471,7 +471,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     yieldBreakdown: zoneModifiers.resourceYieldMultiplier !== 1
       ? {
           baseYieldPerAction,
-          eventYieldPerAction: eventYield,
+          totalYieldPerAction: eventYield,
           eventModifier: zoneModifiers.resourceYieldMultiplier,
           eventTitle: activeEventEffects.find((e: { effectType: string }) => e.effectType === 'yield_up' || e.effectType === 'yield_down')?.title ?? null,
         }

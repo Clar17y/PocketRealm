@@ -287,6 +287,15 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         }
 
         const durabilityLost = await degradeEquippedDurability(playerId);
+
+        // Determine mob family once for event modifier badges (used in both victory and defeat paths)
+        const ambushMobFamily = zoneFamilies.find((f: ZoneFamilyRow) =>
+          f.mobFamily.members.some((m: ZoneFamilyMember) => m.mobTemplate.id === prefixedMob.id),
+        );
+        const ambushEventModifiers = ambushMobFamily
+          ? await getEventModifiersForEntity(body.zoneId, { mobFamilyId: ambushMobFamily.mobFamilyId })
+          : [];
+
         let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
         let xpGain = 0;
         let xpGrant: Awaited<ReturnType<typeof grantSkillXp>> | null = null;
@@ -331,11 +340,6 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             } as unknown as Prisma.InputJsonValue,
           });
 
-          // Determine mob family for event modifier badges
-          const victoryMobFamily = zoneFamilies.find((f: ZoneFamilyRow) =>
-            f.mobFamily.members.some((m: ZoneFamilyMember) => m.mobTemplate.id === prefixedMob.id),
-          );
-
           events.push({
             turn: outcome.turnOccurred,
             type: 'ambush_victory',
@@ -353,9 +357,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
               xp: xpGain,
               loot,
               durabilityLost,
-              eventModifiers: victoryMobFamily
-                ? await getEventModifiersForEntity(body.zoneId, { mobFamilyId: victoryMobFamily.mobFamilyId })
-                : [],
+              eventModifiers: ambushEventModifiers,
             },
           });
         } else {
@@ -411,11 +413,6 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             } as unknown as Prisma.InputJsonValue,
           });
 
-          // Determine mob family for event modifier badges
-          const defeatMobFamily = zoneFamilies.find((f: ZoneFamilyRow) =>
-            f.mobFamily.members.some((m: ZoneFamilyMember) => m.mobTemplate.id === prefixedMob.id),
-          );
-
           events.push({
             turn: outcome.turnOccurred,
             type: 'ambush_defeat',
@@ -437,9 +434,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 recoveryCost: fleeResult.recoveryCost,
               },
               durabilityLost,
-              eventModifiers: defeatMobFamily
-                ? await getEventModifiersForEntity(body.zoneId, { mobFamilyId: defeatMobFamily.mobFamilyId })
-                : [],
+              eventModifiers: ambushEventModifiers,
             },
           });
 

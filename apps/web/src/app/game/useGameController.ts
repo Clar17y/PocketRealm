@@ -1284,12 +1284,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         }
       }
 
-      if (data.yieldBreakdown?.eventTitle && data.yieldBreakdown.eventModifier > 0) {
-        const bonusPct = Math.round(data.yieldBreakdown.eventModifier * 100);
+      if (data.yieldBreakdown?.eventTitle && data.yieldBreakdown.eventModifier !== 1) {
+        const isUp = data.yieldBreakdown.eventModifier > 1;
+        const bonusPct = Math.round(Math.abs(data.yieldBreakdown.eventModifier - 1) * 100);
+        const bonusPerAction = data.yieldBreakdown.totalYieldPerAction - data.yieldBreakdown.baseYieldPerAction;
         newLogs.push({
           timestamp: nowStamp(),
-          type: 'success',
-          message: `${data.yieldBreakdown.eventTitle}: +${bonusPct}% yield bonus (${data.yieldBreakdown.eventYieldPerAction} bonus/action)`,
+          type: isUp ? 'success' : 'warning',
+          message: `${data.yieldBreakdown.eventTitle}: ${isUp ? '+' : '-'}${bonusPct}% yield ${isUp ? 'bonus' : 'penalty'} (${isUp ? '+' : ''}${bonusPerAction}/action)`,
         });
       }
 
