@@ -25,6 +25,7 @@ import { getEquipmentStats } from './equipmentService';
 import { getPlayerProgressionState } from './attributesService';
 import { getMainHandAttackSkill, getSkillLevel } from './combatStatsService';
 import { getHpState, setHp, enterRecoveringState } from './hpService';
+import { trackAchievements } from '../utils/routeHelpers.js';
 import { distributeBossLoot } from './bossLootService';
 
 function toBossEncounterData(row: {
@@ -475,6 +476,7 @@ export async function resolveBossRound(
         });
         if (fleeResult.outcome === 'knockout') {
           await enterRecoveringState(pd.signup.playerId, pd.hpState.maxHp);
+          await trackAchievements(pd.signup.playerId, { totalDeaths: 1 });
         } else {
           await setHp(pd.signup.playerId, fleeResult.remainingHp);
         }

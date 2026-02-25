@@ -56,7 +56,14 @@ vi.mock('../../services/zoneExplorationService', () => ({
   getExplorationPercent: vi.fn().mockResolvedValue({ turnsExplored: 0, percent: 10, turnsToExplore: 10000 }),
 }));
 vi.mock('../../services/worldEventService', () => ({
-  getActiveZoneModifiers: vi.fn().mockResolvedValue([]),
+  computeZoneModifiers: vi.fn().mockReturnValue({
+    mobDamageMultiplier: 1, mobHpMultiplier: 1, mobSpawnRateMultiplier: 1,
+    resourceDropRateMultiplier: 1, resourceYieldMultiplier: 1,
+  }),
+  computeSpawnRateModifiers: vi.fn().mockReturnValue({ byFamily: new Map(), global: 1 }),
+  getActiveEventsForZone: vi.fn().mockResolvedValue([]),
+  getActiveWorldWideEvents: vi.fn().mockResolvedValue([]),
+  filterEventModifiers: vi.fn().mockReturnValue([]),
   spawnWorldEvent: vi.fn(),
 }));
 vi.mock('../../services/bossEncounterService', () => ({
@@ -256,8 +263,8 @@ describe('exploration tutorial path', () => {
 
     // Should spend the requested turns, not 100 (called via transaction)
     expect(mockSpendPlayerTurnsTx).toHaveBeenCalledWith(expect.anything(), 'p1', 500);
-    // Should call simulateExploration (exitChance is null when no undiscovered neighbors)
-    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null);
+    // Should call simulateExploration (exitChance is null when no undiscovered neighbors, spawnRateMultiplier is 1 with no zone families)
+    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, 1);
   });
 
   it('combat victory during tutorial grants XP and loot normally', async () => {

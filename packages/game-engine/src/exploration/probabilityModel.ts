@@ -41,17 +41,17 @@ export function cumulativeProbability(perTurnChance: number, turns: number): num
 /**
  * Estimate outcomes for a given number of exploration turns.
  */
-export function estimateExploration(turns: number, zoneExitChance: number | null = null): ExplorationEstimate {
+export function estimateExploration(
+  turns: number,
+  zoneExitChance: number | null = null,
+  spawnRateMultiplier: number = 1,
+): ExplorationEstimate {
+  const ambushRate = EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * spawnRateMultiplier;
+  const siteRate = EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN * spawnRateMultiplier;
   return {
     turns,
-    ambushChance: cumulativeProbability(
-      EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN,
-      turns
-    ),
-    encounterSiteChance: cumulativeProbability(
-      EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN,
-      turns
-    ),
+    ambushChance: cumulativeProbability(ambushRate, turns),
+    encounterSiteChance: cumulativeProbability(siteRate, turns),
     resourceNodeChance: cumulativeProbability(
       EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE,
       turns
@@ -63,8 +63,8 @@ export function estimateExploration(turns: number, zoneExitChance: number | null
     zoneExitChance: zoneExitChance != null && zoneExitChance > 0
       ? cumulativeProbability(zoneExitChance, turns)
       : 0,
-    expectedAmbushes: turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN,
-    expectedEncounterSites: turns * EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN,
+    expectedAmbushes: turns * ambushRate,
+    expectedEncounterSites: turns * siteRate,
   };
 }
 
@@ -74,18 +74,21 @@ export function estimateExploration(turns: number, zoneExitChance: number | null
  */
 export function simulateExploration(
   turns: number,
-  zoneExitChance: number | null = null
+  zoneExitChance: number | null = null,
+  spawnRateMultiplier: number = 1,
 ): ExplorationOutcome[] {
   const outcomes: ExplorationOutcome[] = [];
   let canDiscoverZoneExit = zoneExitChance != null && zoneExitChance > 0;
-  let canDiscoverEvent = true; // max 1 event discovery per run
+  let canDiscoverEvent = true;
+  const ambushChance = EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * spawnRateMultiplier;
+  const siteChance = EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN * spawnRateMultiplier;
 
   for (let t = 1; t <= turns; t++) {
-    if (Math.random() < EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN) {
+    if (Math.random() < ambushChance) {
       outcomes.push({ type: 'ambush', turnOccurred: t });
     }
 
-    if (Math.random() < EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN) {
+    if (Math.random() < siteChance) {
       outcomes.push({ type: 'encounter_site', turnOccurred: t });
     }
 

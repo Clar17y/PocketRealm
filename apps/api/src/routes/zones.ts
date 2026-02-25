@@ -35,6 +35,7 @@ import { calculateExplorationPercent, getExplorationPercent } from '../services/
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTax, getPlayerTaxRate, calculateInflatedCost, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
+import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 
 
 export const zonesRouter = Router();
@@ -93,6 +94,25 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
       discoveredZoneIds.has(c.fromId) && discoveredZoneIds.has(c.toId),
   );
 
+  // Build undiscovered zone hints from connections leading to undiscovered zones
+  const seenUndiscovered = new Set<string>();
+  const undiscoveredHints = connections
+    .filter((c: { fromId: string; toId: string; explorationThreshold: number | null }) =>
+      discoveredZoneIds.has(c.fromId) && !discoveredZoneIds.has(c.toId)
+    )
+    .filter((c: { toId: string }) => {
+      if (seenUndiscovered.has(c.toId)) return false;
+      seenUndiscovered.add(c.toId);
+      return true;
+    })
+    .map((c: { fromId: string; toId: string; explorationThreshold: number | null }) => ({
+      id: c.toId,
+      name: '???',
+      explorationThreshold: c.explorationThreshold ?? 0,
+      fromZoneId: c.fromId,
+      discovered: false as const,
+    }));
+
   res.json({
     zones: zones.map((z: { id: string; name: string; description: string | null; difficulty: number; travelCost: number; isStarter: boolean; zoneType: string; zoneExitChance: number | null; maxCraftingLevel: number | null; turnsToExplore: number | null; explorationTiers: Record<string, number> | null }) => {
       const discovered = discoveredZoneIds.has(z.id);
@@ -120,6 +140,7 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
       toId: c.toId,
       explorationThreshold: c.explorationThreshold ?? 0,
     })),
+    undiscoveredZones: undiscoveredHints,
     currentZoneId,
   });
 }));
@@ -274,10 +295,12 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       // Get player combat stats (same pattern as combat route)
       const mainHandAttackSkill = await getMainHandAttackSkill(playerId);
       const attackSkill: AttackSkill = mainHandAttackSkill ?? 'melee';
-      const [attackLevel, progression, equipmentStats] = await Promise.all([
+      const [attackLevel, progression, equipmentStats, travelZoneEvents, travelWorldEvents] = await Promise.all([
         getSkillLevel(playerId, attackSkill),
         getPlayerProgressionState(playerId),
         getEquipmentStats(playerId),
+        getActiveEventsForZone(currentZoneId),
+        getActiveWorldWideEvents(),
       ]);
 
       // Get mob pool from current zone, filtered by exploration tier
@@ -329,6 +352,15 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
 
         const durabilityLost = await degradeEquippedDurability(playerId);
 
+        // Resolve mob family for event badges + achievement tracking
+        const familyMember = await prisma.mobFamilyMember.findFirst({
+          where: { mobTemplateId: prefixedMob.id },
+          select: { mobFamilyId: true },
+        });
+        const travelMobBadges = familyMember?.mobFamilyId
+          ? filterEventModifiers(travelZoneEvents, travelWorldEvents, { mobFamilyId: familyMember.mobFamilyId })
+          : [];
+
         if (combatResult.outcome === 'victory') {
           const loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
           const xpGrant = await grantSkillXp(playerId, attackSkill, prefixedMob.xpReward);
@@ -340,10 +372,6 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
 
           // Track ambush kill for achievement checks
           ambushKillCount++;
-          const familyMember = await prisma.mobFamilyMember.findFirst({
-            where: { mobTemplateId: prefixedMob.id },
-            select: { mobFamilyId: true },
-          });
           if (familyMember) {
             ambushMobFamilyIds.push(familyMember.mobFamilyId);
           }
@@ -374,6 +402,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                   durabilityLost,
                   skillXp: serializeXpGrant(xpGrant),
                 },
+                eventModifiers: travelMobBadges,
               } as unknown as Prisma.InputJsonValue,
             },
           });
@@ -434,6 +463,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                     durabilityLost,
                     skillXp: null,
                   },
+                  eventModifiers: travelMobBadges,
                 } as unknown as Prisma.InputJsonValue,
               },
             });
@@ -520,6 +550,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                     durabilityLost,
                     skillXp: null,
                   },
+                  eventModifiers: travelMobBadges,
                 } as unknown as Prisma.InputJsonValue,
               },
             });

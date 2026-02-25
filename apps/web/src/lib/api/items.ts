@@ -1,4 +1,5 @@
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
+import type { EventModifierBadge } from './combat';
 
 // Inventory
 
@@ -128,6 +129,7 @@ export interface GatheringNodesResponse {
     sizeName: string;
     discoveredAt: string;
     weathered: boolean;
+    eventModifiers?: EventModifierBadge[];
   }>;
   pagination: {
     page: number;
@@ -188,6 +190,13 @@ export async function mine(playerNodeId: string, turns: number, currentZoneId: s
     };
     gemCrit?: { itemTemplateId: string; gemName: string; gemsFound: number };
     activeEvents?: Array<{ title: string; effectType: string; effectValue: number }>;
+    yieldBreakdown?: {
+      baseYieldPerAction: number;
+      totalYieldPerAction: number;
+      rawTotalYield?: number;
+      eventModifier: number;
+      eventTitle: string | null;
+    };
     tax: TaxInfo | null;
   }>('/api/v1/gathering/mine', {
     method: 'POST',

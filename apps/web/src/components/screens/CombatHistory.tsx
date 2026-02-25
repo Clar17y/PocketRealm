@@ -13,6 +13,7 @@ import { formatCombatShareText, resolveMobMaxHp, resolvePlayerMaxHp } from '@/li
 import { monsterImageSrc } from '@/lib/assets';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
+import { EventBadges } from '@/components/common/EventBadge';
 import { Pagination } from '@/components/common/Pagination';
 
 type OutcomeFilter = 'all' | CombatOutcomeResponse;
@@ -357,7 +358,7 @@ export function CombatHistory() {
       {selectedEntry && (
         <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold">
+            <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold flex-wrap">
               {(selectedDetail?.mobName ?? selectedEntry.mobName) && (
                 <img
                   src={monsterImageSrc((selectedDetail?.mobName ?? selectedEntry.mobName)!)}
@@ -366,6 +367,9 @@ export function CombatHistory() {
                 />
               )}
               {selectedDetail?.mobDisplayName ?? selectedEntry.mobDisplayName ?? selectedEntry.mobName ?? 'Combat'} Log
+              {selectedDetail?.eventModifiers && selectedDetail.eventModifiers.length > 0 && (
+                <EventBadges inline modifiers={selectedDetail.eventModifiers} />
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button

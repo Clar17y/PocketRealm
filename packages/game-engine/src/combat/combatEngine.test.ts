@@ -297,9 +297,11 @@ describe('auto-potion system', () => {
       potions: makePotions(),
     };
 
-    const result = runCombat(makePotionPlayer(), makePotionMob(), options);
+    // Mob HP low enough that player kills it on round 2, preventing further
+    // potion use after Potion Sickness expires (mocks only cover 2 rounds).
+    const result = runCombat(makePotionPlayer(), makePotionMob({ hp: 10 }), options);
 
-    // Verify potion was consumed
+    // Verify potion was consumed exactly once
     expect(result.potionsConsumed).toHaveLength(1);
     expect(result.potionsConsumed[0].round).toBe(1);
 

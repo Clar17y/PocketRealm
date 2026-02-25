@@ -139,7 +139,6 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
       if (result.data) {
         setLastResult(result.data);
         setPvpPlaybackActive(true);
-        await loadArenaData();
       } else if (result.error) {
         setError(result.error.message);
       }
@@ -268,8 +267,8 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
         playerLabel={lastResult.attackerName}
         defeatButtonLabel="Continue"
         speedMs={combatSpeedMs}
-        onComplete={() => setPvpPlaybackActive(false)}
-        onSkip={() => setPvpPlaybackActive(false)}
+        onComplete={() => { setPvpPlaybackActive(false); void loadArenaData(); }}
+        onSkip={() => { setPvpPlaybackActive(false); void loadArenaData(); }}
       />
     ) : (
       <PixelCard className="mb-4">

@@ -19,3 +19,4 @@ export * from './constants/achievementDefinitions';
 
 // Utils
 export * from './utils/achievementChains';
+export * from './utils/tierUtils';

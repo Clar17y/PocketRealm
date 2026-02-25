@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma, prisma } from '@adventure/database';
-import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, type SkillType } from '@adventure/shared';
+import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONSTANTS, levelToGemTier, type SkillType } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
@@ -10,8 +10,8 @@ import { grantSkillXp } from '../services/xpService';
 import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
-import { getActiveZoneModifiers, getActiveEventSummaries } from '../services/worldEventService';
-import { applyResourceEventModifiers, rollGemCritBatch } from '@adventure/game-engine';
+import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
+import { rollGemCritBatch, computeEventMinActions } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
@@ -154,6 +154,16 @@ gatheringRouter.get('/nodes', asyncHandler(async (req, res) => {
   const offset = (page - 1) * query.pageSize;
   const pageNodes = activeNodes.slice(offset, offset + query.pageSize);
 
+  const nodeBadgeCache = new Map<string, EventModifierBadge[]>();
+  for (const pn of pageNodes) {
+    const key = `${pn.resourceNode.zoneId}:${pn.resourceNode.resourceType}`;
+    if (!nodeBadgeCache.has(key)) {
+      nodeBadgeCache.set(key, await getEventModifiersForEntity(
+        pn.resourceNode.zoneId, { resourceType: pn.resourceNode.resourceType }
+      ));
+    }
+  }
+
   res.json({
     nodes: pageNodes.map((pn) => {
       const template = pn.resourceNode;
@@ -172,6 +182,7 @@ gatheringRouter.get('/nodes', asyncHandler(async (req, res) => {
         sizeName: getNodeSizeName(pn.effectiveCapacity, template.maxCapacity),
         discoveredAt: pn.discoveredAt.toISOString(),
         weathered: pn.decayedCapacity > 0,
+        eventModifiers: nodeBadgeCache.get(`${template.zoneId}:${template.resourceType}`) ?? [],
       };
     }),
     pagination: { ...pagination, page },
@@ -192,23 +203,8 @@ function toResourceTemplateKey(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, '_');
 }
 
-// Gem template lookup: (gathering skill, tier) → raw gem name
-const GEM_BY_SKILL_TIER: Record<string, Record<number, string>> = {
-  mining: { 1: 'Rough Ruby', 2: 'Rough Sapphire', 3: 'Rough Emerald', 4: 'Rough Diamond', 5: 'Rough Opal' },
-  foraging: { 1: 'Raw Amber', 2: 'Raw Pearl', 3: 'Raw Jade', 4: 'Raw Moonstone', 5: 'Raw Starcrystal' },
-  woodcutting: { 1: 'Tree Resin', 2: 'Fossilized Sap', 3: 'Crystal Bark', 4: 'Heartwood Gem', 5: 'Ancient Amber' },
-};
-
-function levelToGemTier(levelRequired: number): number {
-  if (levelRequired >= 28) return 5;
-  if (levelRequired >= 20) return 4;
-  if (levelRequired >= 12) return 3;
-  if (levelRequired >= 5) return 2;
-  return 1;
-}
-
 async function getGemTemplateId(skill: string, tier: number): Promise<string | null> {
-  const gemName = GEM_BY_SKILL_TIER[skill]?.[tier];
+  const gemName = GEM_CONSTANTS.GEM_BY_SKILL_TIER[skill]?.[tier];
   if (!gemName) return null;
   const template = await prisma.itemTemplate.findFirst({
     where: { name: gemName, itemType: 'resource' },
@@ -289,25 +285,38 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const baseYield = Math.max(template.baseYield, GATHERING_CONSTANTS.BASE_YIELD);
   const baseYieldPerAction = Math.floor(baseYield * yieldMultiplier);
 
-  // Apply world event resource modifiers + guild gathering yield
-  const zoneModifiers = await getActiveZoneModifiers(template.zoneId);
-  const activeEventEffects = await getActiveEventSummaries(template.zoneId);
+  // Apply world event resource modifiers + guild gathering yield — fetch events once
+  const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
+    getActiveEventsForZone(template.zoneId),
+    getActiveWorldWideEvents(),
+  ]);
+  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { resourceType: template.resourceType });
+  const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
   const guildMods = await getPlayerGuildModifiers(playerId);
-  const eventYield = applyResourceEventModifiers(baseYieldPerAction, zoneModifiers);
-  const yieldPerAction = guildMods.gatheringYield > 0
-    ? Math.floor(eventYield * (1 + guildMods.gatheringYield))
-    : eventYield;
+
+  // Guild bonus applies per action (permanent infrastructure benefit)
+  const guildYieldPerAction = guildMods.gatheringYield > 0
+    ? Math.max(1, Math.floor(baseYieldPerAction * (1 + guildMods.gatheringYield)))
+    : baseYieldPerAction;
+
+  // Minimum batch size so yield events always produce a visible reduction.
+  const eventMultiplier = zoneModifiers.resourceYieldMultiplier;
+  const eventMinActions = computeEventMinActions(eventMultiplier);
 
   const resourceTemplateId = await getResourceTemplateId(template.resourceType);
-  const { turnSpend, taxResult, actions, totalYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
+  const { turnSpend, taxResult, actions, totalYield, rawTotalYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
     // Look up tax rate to calculate effective turns
     const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
     const effectiveTurns = calculateEffectiveTurns(body.turns, taxRate);
 
     const maxActionsByTurns = Math.floor(effectiveTurns / GATHERING_CONSTANTS.BASE_TURN_COST);
-    const maxActionsByCapacity = Math.ceil(effectiveCapacity / yieldPerAction);
+    const maxActionsByCapacity = Math.ceil(effectiveCapacity / guildYieldPerAction);
     const innerActions = Math.min(maxActionsByTurns, maxActionsByCapacity);
 
+    if (innerActions < eventMinActions) {
+      const minTurns = calculateInflatedCost(eventMinActions * GATHERING_CONSTANTS.BASE_TURN_COST, taxRate);
+      throw new AppError(400, `World events require at least ${minTurns} turns (${eventMinActions} actions) to gather here`, 'EVENT_MIN_ACTIONS');
+    }
     if (innerActions <= 0) {
       throw new AppError(400, 'Not enough turns after guild tax', 'INSUFFICIENT_TURNS');
     }
@@ -315,7 +324,11 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     const baseTurns = innerActions * GATHERING_CONSTANTS.BASE_TURN_COST;
     const actualTurns = calculateInflatedCost(baseTurns, taxRate);
 
-    const innerTotalYield = Math.min(innerActions * yieldPerAction, effectiveCapacity);
+    // Compute raw yield (before events), then apply event modifier to session total
+    const innerRawYield = Math.min(innerActions * guildYieldPerAction, effectiveCapacity);
+    const innerTotalYield = eventMultiplier !== 1
+      ? Math.max(1, Math.floor(innerRawYield * eventMultiplier))
+      : innerRawYield;
     const innerNewCapacity = effectiveCapacity - innerTotalYield;
     const innerNodeDepleted = innerNewCapacity <= 0;
 
@@ -358,6 +371,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       taxResult: tax,
       actions: innerActions,
       totalYield: innerTotalYield,
+      rawTotalYield: innerRawYield,
       newCapacity: innerNewCapacity,
       nodeDepleted: innerNodeDepleted,
       stack: minedStack,
@@ -392,7 +406,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       gemCrit = {
         itemTemplateId: gemTemplateId,
         itemId: gemStack.itemId,
-        gemName: GEM_BY_SKILL_TIER[skillRequired]?.[gemTier] ?? 'Unknown Gem',
+        gemName: GEM_CONSTANTS.GEM_BY_SKILL_TIER[skillRequired]?.[gemTier] ?? 'Unknown Gem',
         gemsFound: critResult.gemsFound,
         critChance: critResult.critChance,
       };
@@ -457,6 +471,15 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     xp: serializeXpGrant(xpGrant),
     gemCrit: gemCrit ?? undefined,
     activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
+    yieldBreakdown: zoneModifiers.resourceYieldMultiplier !== 1
+      ? {
+          baseYieldPerAction,
+          totalYieldPerAction: baseYieldPerAction, // deprecated; kept for client compat
+          rawTotalYield,
+          eventModifier: zoneModifiers.resourceYieldMultiplier,
+          eventTitle: activeEventEffects.find((e: { effectType: string }) => e.effectType === 'yield_up' || e.effectType === 'yield_down')?.title ?? null,
+        }
+      : undefined,
     tax: taxInfoFromResult(taxResult),
   });
 }));

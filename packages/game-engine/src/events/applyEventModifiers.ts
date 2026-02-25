@@ -36,3 +36,26 @@ export function applyResourceEventModifiers(
 ): number {
   return Math.max(1, Math.round(baseYield * modifiers.resourceYieldMultiplier));
 }
+
+/**
+ * Compute combined resource yield multiplier from a list of event effects.
+ * Works with any shape that has effectType + effectValue (badges, event data, etc).
+ */
+export function computeResourceYieldMultiplier(
+  effects: ReadonlyArray<{ effectType: string; effectValue: number }>,
+): number {
+  let m = 1;
+  for (const e of effects) {
+    if (e.effectType === 'yield_up') m *= (1 + e.effectValue);
+    if (e.effectType === 'yield_down') m *= Math.max(0.1, 1 - e.effectValue);
+  }
+  return m;
+}
+
+/**
+ * Minimum actions so a yield penalty always produces a visible integer reduction.
+ * Returns 1 when there is no penalty (multiplier >= 1).
+ */
+export function computeEventMinActions(yieldMultiplier: number): number {
+  return yieldMultiplier < 1 ? Math.ceil(1 / (1 - yieldMultiplier)) : 1;
+}

@@ -8,6 +8,7 @@ import {
   buildPlayerCombatStats,
   calculateFleeResult,
   filterAndWeightMobsByTier,
+  getScaledZoneExitChance,
   mobToCombatantStats,
   rollMobPrefix,
   runCombat,
@@ -18,6 +19,8 @@ import {
 import {
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
+  getUnlockedTiers,
+  getHighestUnlockedTier,
   type Combatant,
   type CombatOptions,
   type MobTemplate,
@@ -37,13 +40,14 @@ import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
 import { addExplorationTurns, calculateExplorationPercent, getExplorationPercent } from '../../services/zoneExplorationService';
-import { getActiveZoneModifiers, spawnWorldEvent } from '../../services/worldEventService';
+import { computeZoneModifiers, computeSpawnRateModifiers, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, spawnWorldEvent } from '../../services/worldEventService';
 import { createBossEncounter } from '../../services/bossEncounterService';
 import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { getIo } from '../../socket';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
 import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
+import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import {
   startSchema,
@@ -56,6 +60,7 @@ import {
   type EncounterSiteSize,
   type NarrativeEvent,
   type ZoneFamilyRow,
+  type ZoneFamilyMember,
   type PendingResourceDiscovery,
   type PendingEncounterSiteDiscovery,
   type PendingAmbushCombatLog,
@@ -120,8 +125,20 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const explorationProgress = await getExplorationPercent(playerId, body.zoneId);
     const zoneTiers = zone.explorationTiers as Record<string, number> | null;
 
+    // Determine unlocked tiers and selected tier
+    const unlockedTiers = getUnlockedTiers(explorationProgress.percent, zoneTiers);
+    const maxUnlockedTier = getHighestUnlockedTier(explorationProgress.percent, zoneTiers);
+    const selectedTier = body.tier ?? maxUnlockedTier;
+
+    if (body.tier !== undefined && !unlockedTiers.includes(selectedTier)) {
+      throw new AppError(400, `Tier ${selectedTier} is not unlocked. Max unlocked: ${maxUnlockedTier}`, 'INVALID_TIER');
+    }
+
     const undiscoveredNeighbors = await getUndiscoveredNeighborZones(playerId, body.zoneId);
-    const effectiveExitChance = undiscoveredNeighbors.length > 0 ? zone.zoneExitChance : null;
+    const rawExitChance = undiscoveredNeighbors.length > 0 ? zone.zoneExitChance : null;
+    const effectiveExitChance = rawExitChance != null && rawExitChance > 0
+      ? getScaledZoneExitChance(rawExitChance, explorationProgress.percent)
+      : null;
 
     // Pre-fetch connection thresholds for zone exit gating (used inside the loop)
     const connectionThresholds = undiscoveredNeighbors.length > 0
@@ -135,8 +152,21 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     // Trigger lazy event scheduler
     await checkAndSpawnEvents(getIo());
 
-    // Fetch zone modifiers from active world events
-    const zoneModifiers = await getActiveZoneModifiers(body.zoneId);
+    // Fetch raw events once; derive modifiers synchronously (avoids redundant DB queries)
+    const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
+      getActiveEventsForZone(body.zoneId),
+      getActiveWorldWideEvents(),
+    ]);
+    const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents);
+    const spawnMods = computeSpawnRateModifiers(cachedZoneEvents, cachedWorldEvents);
+
+    // Build mob → family lookup for per-mob event targeting
+    const mobToFamilyMap = new Map<string, string>();
+    for (const zf of zoneFamilies) {
+      for (const member of (zf as ZoneFamilyRow).mobFamily.members) {
+        mobToFamilyMap.set(member.mobTemplate.id, zf.mobFamilyId);
+      }
+    }
 
     // Auto-potion setup + tutorial detection
     const playerRecord = await prismaAny.player.findUnique({
@@ -163,16 +193,37 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     // Guild tax reduces effective exploration turns
     const effectiveTurns = isTutorialExplore ? turnsToSpend : taxResult.postTaxAmount;
 
+    // Compute aggregate spawn rate multiplier from per-family and global event modifiers
+    let spawnRateMultiplier = 1;
+    if (zoneFamilies.length > 0) {
+      const baseTotal = zoneFamilies.reduce((sum: number, f: ZoneFamilyRow) => sum + f.discoveryWeight, 0);
+      const adjustedTotal = zoneFamilies.reduce((sum: number, f: ZoneFamilyRow) => {
+        const familyMod = spawnMods.byFamily.get(f.mobFamilyId) ?? 1;
+        return sum + f.discoveryWeight * familyMod * spawnMods.global;
+      }, 0);
+      spawnRateMultiplier = baseTotal > 0 ? adjustedTotal / baseTotal : 1;
+    }
+
     const outcomes = isTutorialExplore
       ? [{ turnOccurred: 50, type: 'ambush' as const }]
-      : simulateExploration(effectiveTurns, effectiveExitChance);
+      : simulateExploration(effectiveTurns, effectiveExitChance, spawnRateMultiplier);
+
+    interface PendingCacheLoot {
+      turnOccurred: number;
+      mobFamilyId: string;
+    }
 
     const pendingResources: PendingResourceDiscovery[] = [];
     const pendingSites: PendingEncounterSiteDiscovery[] = [];
     const pendingCombatLogs: PendingAmbushCombatLog[] = [];
+    const pendingCacheLoot: PendingCacheLoot[] = [];
     const events: NarrativeEvent[] = [];
 
-    const hiddenCaches: Array<{ turnOccurred: number }> = [];
+    const hiddenCaches: Array<{
+      turnOccurred: number;
+      loot?: Array<{ itemTemplateId: string; name: string; quantity: number }>;
+      soulboundItem?: { itemTemplateId: string; name: string; rarity: string } | null;
+    }> = [];
     let zoneExitDiscovered = false;
     let wasKnockedOut = false;
 
@@ -203,8 +254,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           if (tieredMobs.length === 0) continue;
 
           // Apply tier bleedthrough: select a target tier, filter to it, fall back to lower tiers
-          const highestUnlockedTier = Math.max(...tieredMobs.map(m => m.explorationTier));
-          const targetTier = selectTierWithBleedthrough(highestUnlockedTier, zoneTiers);
+          const targetTier = selectTierWithBleedthrough(selectedTier, zoneTiers);
           let candidates = tieredMobs.filter(m => m.explorationTier === targetTier);
           if (candidates.length === 0) {
             for (let t = targetTier - 1; t >= 1; t--) {
@@ -214,12 +264,29 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           }
           if (candidates.length === 0) candidates = tieredMobs;
 
-          const mob = pickWeighted(candidates, 'encounterWeight') as typeof candidates[number] | null;
+          // Boost encounter weights for mobs in families affected by spawn rate events
+          const weightedCandidates = candidates.map(c => {
+            let weightMod = spawnMods.global;
+            for (const [familyId, mod] of spawnMods.byFamily) {
+              const family = zoneFamilies.find((f: ZoneFamilyRow) => f.mobFamilyId === familyId);
+              if (family?.mobFamily?.members?.some((m: ZoneFamilyMember) => m.mobTemplate.id === c.id)) {
+                weightMod *= mod;
+                break;
+              }
+            }
+            return weightMod !== 1 ? { ...c, encounterWeight: c.encounterWeight * weightMod } : c;
+          });
+
+          const mob = pickWeighted(weightedCandidates, 'encounterWeight') as typeof candidates[number] | null;
           if (!mob) continue;
 
           baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
 
-          const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
+          const ambushFamilyId = mobToFamilyMap.get(baseMob.id);
+          const ambushModifiers = ambushFamilyId
+            ? computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: ambushFamilyId })
+            : zoneModifiers;
+          const modifiedMob = applyMobEventModifiers(baseMob, ambushModifiers);
           prefixedMob = applyMobPrefix(modifiedMob, rollMobPrefix());
         }
         const playerStats = buildPlayerCombatStats(
@@ -259,6 +326,15 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         }
 
         const durabilityLost = await degradeEquippedDurability(playerId);
+
+        // Determine mob family once for event modifier badges (used in both victory and defeat paths)
+        const ambushMobFamily = zoneFamilies.find((f: ZoneFamilyRow) =>
+          f.mobFamily.members.some((m: ZoneFamilyMember) => m.mobTemplate.id === prefixedMob.id),
+        );
+        const ambushEventModifiers = ambushMobFamily
+          ? filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: ambushMobFamily.mobFamilyId })
+          : [];
+
         let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
         let xpGain = 0;
         let xpGrant: Awaited<ReturnType<typeof grantSkillXp>> | null = null;
@@ -300,6 +376,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 durabilityLost,
                 skillXp: skillXpReward,
               },
+              eventModifiers: ambushEventModifiers,
             } as unknown as Prisma.InputJsonValue,
           });
 
@@ -320,6 +397,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
               xp: xpGain,
               loot,
               durabilityLost,
+              eventModifiers: ambushEventModifiers,
             },
           });
         } else {
@@ -372,6 +450,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 durabilityLost,
                 skillXp: null,
               },
+              eventModifiers: ambushEventModifiers,
             } as unknown as Prisma.InputJsonValue,
           });
 
@@ -396,6 +475,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 recoveryCost: fleeResult.recoveryCost,
               },
               durabilityLost,
+              eventModifiers: ambushEventModifiers,
             },
           });
 
@@ -407,11 +487,15 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       }
 
       if (outcome.type === 'encounter_site' && zoneFamilies.length > 0) {
-        const pickedFamily = pickWeighted(zoneFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
+        const adjustedFamilies = zoneFamilies.map((f: ZoneFamilyRow) => ({
+          ...f,
+          discoveryWeight: f.discoveryWeight * (spawnMods.byFamily.get(f.mobFamilyId) ?? 1) * spawnMods.global,
+        }));
+        const pickedFamily = pickWeighted(adjustedFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
         if (!pickedFamily) continue;
 
         const size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);
-        const mobs = buildEncounterSiteMobs(pickedFamily.mobFamily, size, body.zoneId, explorationProgress.percent, zoneTiers);
+        const mobs = buildEncounterSiteMobs(pickedFamily.mobFamily, size, body.zoneId, explorationProgress.percent, zoneTiers, selectedTier);
         if (mobs.length === 0) continue;
 
         const siteName = getSiteName(pickedFamily.mobFamily.name, size, pickedFamily.mobFamily);
@@ -434,6 +518,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             siteName,
             size,
             totalMobs: mobs.length,
+            eventModifiers: filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: pickedFamily.mobFamilyId }),
           },
         });
 
@@ -472,10 +557,23 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
       if (outcome.type === 'hidden_cache') {
         hiddenCaches.push({ turnOccurred: outcome.turnOccurred });
+
+        // Pick a mob family for cache loot (same pool as encounter sites)
+        const cacheFamily = zoneFamilies.length > 0
+          ? pickWeighted(zoneFamilies, 'discoveryWeight') as ZoneFamilyRow | null
+          : null;
+
+        if (cacheFamily) {
+          pendingCacheLoot.push({
+            turnOccurred: outcome.turnOccurred,
+            mobFamilyId: cacheFamily.mobFamilyId,
+          });
+        }
+
         events.push({
           turn: outcome.turnOccurred,
           type: 'hidden_cache',
-          description: 'You found a hidden cache.',
+          description: 'You found a hidden cache!',
           details: {},
         });
         continue;
@@ -618,10 +716,38 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     await deductConsumedPotions(playerId, allPotionsConsumed);
 
     const spentTurns = aborted && abortedAtTurn ? abortedAtTurn : effectiveTurns;
-    const explorationBefore = await getExplorationPercent(playerId, body.zoneId);
-    await addExplorationTurns(playerId, body.zoneId, spentTurns);
-    const explorationAfter = await getExplorationPercent(playerId, body.zoneId);
+    const explorationTurnsToAdd = selectedTier === maxUnlockedTier ? spentTurns : 0;
+    const explorationBefore = explorationProgress;
+    if (explorationTurnsToAdd > 0) {
+      await addExplorationTurns(playerId, body.zoneId, explorationTurnsToAdd, {
+        turnsToExplore: explorationProgress.turnsToExplore,
+        currentTurnsExplored: explorationProgress.turnsExplored,
+      });
+    }
+    const explorationAfter = explorationTurnsToAdd > 0
+      ? await getExplorationPercent(playerId, body.zoneId)
+      : explorationBefore;
     const zoneJustFullyExplored = explorationBefore.percent < 100 && explorationAfter.percent >= 100;
+
+    // Auto-discover undiscovered neighbors when zone reaches 100%
+    if (zoneJustFullyExplored && undiscoveredNeighbors.length > 0) {
+      const autoDiscoverNeighbors = undiscoveredNeighbors.filter(n => {
+        const threshold = thresholdByToId.get(n.id) ?? 0;
+        return explorationAfter.percent >= threshold;
+      });
+      for (const neighbor of autoDiscoverNeighbors) {
+        await discoverZone(playerId, neighbor.id);
+        const idx = undiscoveredNeighbors.findIndex(n => n.id === neighbor.id);
+        if (idx !== -1) undiscoveredNeighbors.splice(idx, 1);
+        zoneExitDiscovered = true;
+        events.push({
+          turn: effectiveTurns,
+          type: 'zone_exit',
+          description: `Zone fully explored! You discovered ${neighbor.name}.`,
+          details: { zoneId: neighbor.id, zoneName: neighbor.name },
+        });
+      }
+    }
 
     const refundAmount = aborted && abortedAtTurn ? Math.max(0, effectiveTurns - abortedAtTurn) : 0;
     const refundedTurns = refundAmount > 0 ? await refundPlayerTurns(playerId, refundAmount) : null;
@@ -697,16 +823,70 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         });
       }
 
+      const createdCombatLogIds: string[] = [];
       for (const combatLog of pendingCombatLogs) {
-        await tx.activityLog.create({
+        const created = await tx.activityLog.create({
           data: {
             playerId,
             activityType: 'combat',
             turnsSpent: combatLog.turnsSpent,
             result: combatLog.result as Prisma.InputJsonValue,
           },
+          select: { id: true },
         });
+        createdCombatLogIds.push(created.id);
       }
+
+      // Grant hidden cache loot
+      for (const cache of pendingCacheLoot) {
+        const cacheLoot = await grantCacheLootTx(tx, {
+          playerId,
+          zoneId: body.zoneId,
+          mobFamilyId: cache.mobFamilyId,
+          luck: progression.attributes.luck,
+        });
+
+        const lootSummary = cacheLoot.materials.map(m => ({
+          itemTemplateId: m.itemTemplateId,
+          name: m.name,
+          quantity: m.quantity,
+        }));
+
+        // Build human-readable description listing actual items
+        const itemList = lootSummary.map(m => `${m.quantity}x ${m.name}`).join(', ');
+
+        // Update the corresponding event's details
+        const cacheEvent = events.find(e => e.type === 'hidden_cache' && e.turn === cache.turnOccurred);
+        if (cacheEvent) {
+          cacheEvent.details = {
+            materials: lootSummary,
+            soulboundItem: cacheLoot.soulboundItem,
+          };
+          if (cacheLoot.soulboundItem) {
+            const article = /^[aeiou]/i.test(cacheLoot.soulboundItem.rarity) ? 'an' : 'a';
+            cacheEvent.description = `You found a hidden cache containing ${article} ${cacheLoot.soulboundItem.rarity} ${cacheLoot.soulboundItem.name}! (${itemList})`;
+          } else {
+            cacheEvent.description = `You found a hidden cache: ${itemList}`;
+          }
+        }
+
+        // Enrich hiddenCaches response entry with loot details
+        const cacheEntry = hiddenCaches.find(h => h.turnOccurred === cache.turnOccurred);
+        if (cacheEntry) {
+          cacheEntry.loot = lootSummary;
+          cacheEntry.soulboundItem = cacheLoot.soulboundItem;
+        }
+      }
+
+      // Strip combat logs from events stored in the exploration activity log
+      // (full logs are already stored in separate combat activity log records)
+      const cleanedEvents = events.map(ev => {
+        if ((ev.type === 'ambush_victory' || ev.type === 'ambush_defeat') && ev.details) {
+          const { log: _log, ...rest } = ev.details;
+          return { ...ev, details: rest };
+        }
+        return ev;
+      });
 
       const explorationLog = await tx.activityLog.create({
         data: {
@@ -719,7 +899,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             aborted,
             abortedAtTurn,
             refundedTurns: refundAmount,
-            events,
+            events: cleanedEvents,
             resourceDiscoveries: createdResourceDiscoveries,
             encounterSites: createdEncounterSites,
             hiddenCaches,
@@ -734,8 +914,18 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         logId: explorationLog.id,
         resourceDiscoveries: createdResourceDiscoveries,
         encounterSites: createdEncounterSites,
+        combatLogIds: createdCombatLogIds,
       };
     });
+
+    // Assign combatLogIds to ambush events and strip full combat logs from response
+    let combatLogIdx = 0;
+    for (const event of events) {
+      if ((event.type === 'ambush_victory' || event.type === 'ambush_defeat') && event.details) {
+        event.details.combatLogId = persisted.combatLogIds[combatLogIdx++];
+        delete event.details.log;
+      }
+    }
 
     // --- Achievement tracking (counter-only + derived checks) ---
     const explorationCounters: Record<string, number> = {};
@@ -803,8 +993,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       zoneExitDiscovered,
       ...(respawnedTo ? { respawnedTo } : {}),
       explorationProgress: {
-        turnsExplored: explorationProgress.turnsExplored + spentTurns,
-        percent: calculateExplorationPercent(explorationProgress.turnsExplored + spentTurns, explorationProgress.turnsToExplore),
+        turnsExplored: explorationProgress.turnsExplored + explorationTurnsToAdd,
+        percent: calculateExplorationPercent(explorationProgress.turnsExplored + explorationTurnsToAdd, explorationProgress.turnsToExplore),
         turnsToExplore: explorationProgress.turnsToExplore,
       },
       tax: taxInfoFromResult(taxResult),

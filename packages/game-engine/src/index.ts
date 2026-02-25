@@ -16,6 +16,7 @@ export * from './exploration/probabilityModel';
 export * from './exploration/encounterChest';
 export * from './exploration/mobTierFilter';
 export * from './exploration/roomGenerator';
+export * from './exploration/zoneExitScaling';
 
 // HP
 export * from './hp/hpCalculator';

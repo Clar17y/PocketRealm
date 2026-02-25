@@ -1,5 +1,20 @@
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 
+// Shared event modifier types
+export interface EventModifierBadge {
+  title: string;
+  effectType: string;
+  effectValue: number;
+  isGlobal: boolean;
+}
+
+export interface CombatActiveEvent {
+  title: string;
+  effectType: string;
+  effectValue: number;
+  appliedToThisMob?: boolean;
+}
+
 // Zones
 
 export async function getZones() {
@@ -23,6 +38,7 @@ export async function getZones() {
       } | null;
     }>;
     connections: Array<{ fromId: string; toId: string; explorationThreshold: number }>;
+    undiscoveredZones: Array<{ id: string; name: string; explorationThreshold: number; fromZoneId: string; discovered: false }>;
     currentZoneId: string;
   }>('/api/v1/zones');
 }
@@ -68,7 +84,7 @@ export async function estimateExploration(turns: number) {
   }>(`/api/v1/exploration/estimate?turns=${turns}`);
 }
 
-export async function startExploration(zoneId: string, turns: number) {
+export async function startExploration(zoneId: string, turns: number, tier?: number) {
   return fetchApi<{
     logId: string;
     zone: { id: string; name: string; difficulty: number };
@@ -98,7 +114,11 @@ export async function startExploration(zoneId: string, turns: number) {
       capacity: number;
       sizeName: string;
     }>;
-    hiddenCaches: Array<{ turnOccurred: number }>;
+    hiddenCaches: Array<{
+      turnOccurred: number;
+      loot?: Array<{ itemTemplateId: string; name: string; quantity: number }>;
+      soulboundItem?: { itemTemplateId: string; name: string; rarity: string } | null;
+    }>;
     zoneExitDiscovered: boolean;
     explorationProgress: {
       turnsExplored: number;
@@ -108,7 +128,7 @@ export async function startExploration(zoneId: string, turns: number) {
     tax: TaxInfo | null;
   }>('/api/v1/exploration/start', {
     method: 'POST',
-    body: JSON.stringify({ zoneId, turns }),
+    body: JSON.stringify({ zoneId, turns, ...(tier !== undefined && { tier }) }),
   });
 }
 
@@ -190,6 +210,7 @@ export interface CombatResultResponse {
   playerMaxHp: number;
   mobMaxHp: number;
   log: CombatLogEntryResponse[];
+  eventModifiers?: EventModifierBadge[];
   rewards: {
     xp: number;
     loot: Array<{
@@ -229,7 +250,8 @@ export interface CombatFightResult {
   playerMaxHp: number;
   playerStartHp: number;
   mobMaxHp: number;
-  log: CombatLogEntryResponse[];
+  log?: CombatLogEntryResponse[];
+  combatLogId?: string;
   playerHpRemaining: number;
   potionsConsumed: Array<{ tier: number; healAmount: number; round: number; templateId?: string }>;
   xp: number;
@@ -252,7 +274,8 @@ export interface CombatResponse {
     outcome: CombatOutcomeResponse;
     playerMaxHp: number;
     mobMaxHp: number;
-    log: CombatLogEntryResponse[];
+    log?: CombatLogEntryResponse[];
+    combatLogId?: string;
     room?: {
       currentRoom: number;
       roomCleared: boolean;
@@ -289,7 +312,7 @@ export interface CombatResponse {
     durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
     skillXp: SkillXpGrantResponse | null;
   };
-  activeEvents?: Array<{ title: string; effectType: string; effectValue: number }>;
+  activeEvents?: CombatActiveEvent[];
   explorationProgress?: {
     turnsExplored: number;
     percent: number;
@@ -383,6 +406,8 @@ export interface EncounterSitesResponse {
     currentRoom: number;
     totalRooms: number;
     roomMobCounts: Array<{ room: number; alive: number; total: number }>;
+    eventModifiers?: EventModifierBadge[];
+    totalTurnCost: number;
   }>;
   pagination: {
     page: number;

@@ -7,7 +7,7 @@ import { BookOpen, X, MapPin, Sword, Shield, Heart, Lock } from 'lucide-react';
 import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
-import { getMobPrefixDefinition } from '@adventure/shared';
+import { getMobPrefixDefinition, getTierName } from '@adventure/shared';
 
 interface MonsterDrop {
   name: string;
@@ -251,7 +251,9 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         <div className="w-12 h-12 bg-[var(--rpg-surface)] rounded-lg mb-1 flex items-center justify-center">
                           <Lock size={20} color="var(--rpg-text-secondary)" className="opacity-40" />
                         </div>
-                        <span className="text-[10px] text-[var(--rpg-text-secondary)]">Locked</span>
+                        <span className="text-[10px] text-[var(--rpg-text-secondary)] text-center px-1 leading-tight">
+                          Locked — {getTierName(monster.explorationTier ?? 1)}
+                        </span>
                       </>
                     ) : (
                       <>
@@ -306,6 +308,11 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">{selectedMonster.name}</h3>
                         <div className="text-xs text-[var(--rpg-text-secondary)]">Level {selectedMonster.level}</div>
                         <div className="text-xs text-[var(--rpg-gold)] mt-1">Defeated {selectedMonster.killCount} times</div>
+                        {selectedMonster.explorationTier && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-[var(--rpg-background)] px-2 py-0.5 rounded mt-1">
+                            {getTierName(selectedMonster.explorationTier)}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button

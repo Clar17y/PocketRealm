@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import {
   EXPLORATION_CONSTANTS,
-  ZONE_EXPLORATION_CONSTANTS,
+  resolveZoneTiers,
+  getHighestUnlockedTier,
   type EncounterSiteSize,
   type EncounterMobRole,
   type EncounterMobStatus,
@@ -24,6 +25,7 @@ export const estimateQuerySchema = z.object({
 export const startSchema = z.object({
   zoneId: z.string().uuid(),
   turns: z.number().int(),
+  tier: z.number().int().min(1).optional(),
 });
 
 // --- Types ---
@@ -180,18 +182,16 @@ export function buildEncounterSiteMobs(
   zoneId: string,
   explorationPercent: number = 100,
   zoneTiers: Record<string, number> | null = null,
+  overrideTier?: number,
 ): EncounterMobSlot[] {
-  const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
+  const tiers = resolveZoneTiers(zoneTiers);
 
-  // Determine current unlocked tier
-  let currentTier = 0;
-  for (const [tierStr, threshold] of Object.entries(tiers)) {
-    const tier = Number(tierStr);
-    if (explorationPercent >= threshold && tier > currentTier) {
-      currentTier = tier;
-    }
-  }
+  let currentTier = getHighestUnlockedTier(explorationPercent, zoneTiers);
   if (currentTier === 0) return [];
+
+  if (overrideTier !== undefined && overrideTier >= 1) {
+    currentTier = overrideTier;
+  }
 
   // Get ALL zone members (not filtered by tier)
   const zoneMembers = family.members

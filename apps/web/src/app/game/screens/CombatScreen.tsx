@@ -11,6 +11,8 @@ import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { CombatHistory } from '@/components/screens/CombatHistory';
 import { BossHistory } from '@/components/screens/BossHistory';
 import { Pagination } from '@/components/common/Pagination';
+import { EventBadges } from '@/components/common/EventBadge';
+import type { CombatActiveEvent } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { monsterImageSrc } from '@/lib/assets';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
@@ -18,6 +20,7 @@ import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '
 
 interface CombatScreenProps {
   hpState: HpState;
+  currentTurns: number;
   currentZoneId: string | null;
   pendingEncounters: PendingEncounter[];
   pendingEncountersLoading: boolean;
@@ -55,8 +58,9 @@ interface CombatScreenProps {
     combatantAMaxHp: number;
     playerStartHp: number;
     combatantBMaxHp: number;
-    log: LastCombatLogEntry[];
+    log: LastCombatLogEntry[] | null;
     rewards: LastCombat['rewards'];
+    activeEvents?: CombatActiveEvent[];
   } | null;
   combatSpeedMs?: number;
   autoSkipCombat?: boolean;
@@ -71,6 +75,7 @@ interface CombatScreenProps {
 
 export function CombatScreen({
   hpState,
+  currentTurns,
   currentZoneId,
   pendingEncounters,
   pendingEncountersLoading,
@@ -370,14 +375,18 @@ export function CombatScreen({
                           />
                         )}
                         <div>
-                          <div className="text-[var(--rpg-text-primary)] font-semibold">
+                          <div className="flex items-center gap-1.5 flex-wrap text-[var(--rpg-text-primary)] font-semibold">
                             {e.siteName}
+                            <EventBadges inline modifiers={e.eventModifiers} />
                           </div>
                           <span className="text-xs text-[var(--rpg-text-secondary)]">
                             {e.totalRooms > 1
                               ? `Room ${e.currentRoom}/${e.totalRooms} · ${e.aliveMobs}/${e.totalMobs} mobs`
                               : `${e.aliveMobs}/${e.totalMobs} mobs`
                             }
+                          </span>
+                          <span className={`text-xs ${e.totalTurnCost > currentTurns ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
+                            {' · '}Cost: {e.totalTurnCost.toLocaleString()} turns
                           </span>
                           {e.clearStrategy && (
                             <span className="text-xs text-[var(--rpg-gold)] ml-2">
@@ -450,23 +459,30 @@ export function CombatScreen({
                   }
                 </div>
               )}
-              <CombatPlayback
-                key={fightProgress ? fightProgress.current : 0}
-                mobDisplayName={combatPlaybackData.mobDisplayName}
-                mobImageSrc={monsterImageSrc(combatPlaybackData.mobName)}
-                outcome={combatPlaybackData.outcome}
-                playerMaxHp={combatPlaybackData.combatantAMaxHp}
-                playerStartHp={combatPlaybackData.playerStartHp}
-                mobMaxHp={combatPlaybackData.combatantBMaxHp}
-                log={combatPlaybackData.log}
-                rewards={combatPlaybackData.rewards}
-                speedMs={combatSpeedMs}
-                autoSkip={autoSkipCombat}
-                onComplete={onCombatPlaybackComplete ?? (() => {})}
-                onSkip={() => {
-                  onCombatPlaybackComplete?.();
-                }}
-              />
+              {combatPlaybackData.log ? (
+                <CombatPlayback
+                  key={fightProgress ? fightProgress.current : 0}
+                  mobDisplayName={combatPlaybackData.mobDisplayName}
+                  mobImageSrc={monsterImageSrc(combatPlaybackData.mobName)}
+                  outcome={combatPlaybackData.outcome}
+                  playerMaxHp={combatPlaybackData.combatantAMaxHp}
+                  playerStartHp={combatPlaybackData.playerStartHp}
+                  mobMaxHp={combatPlaybackData.combatantBMaxHp}
+                  log={combatPlaybackData.log}
+                  rewards={combatPlaybackData.rewards}
+                  activeEvents={combatPlaybackData.activeEvents}
+                  speedMs={combatSpeedMs}
+                  autoSkip={autoSkipCombat}
+                  onComplete={onCombatPlaybackComplete ?? (() => {})}
+                  onSkip={() => {
+                    onCombatPlaybackComplete?.();
+                  }}
+                />
+              ) : (
+                <div className="text-center py-8 text-[var(--rpg-text-secondary)]">
+                  <div className="animate-pulse">Loading combat data...</div>
+                </div>
+              )}
             </div>
           )}
 
