@@ -57,6 +57,8 @@ vi.mock('../../services/zoneExplorationService', () => ({
 }));
 vi.mock('../../services/worldEventService', () => ({
   getActiveZoneModifiers: vi.fn().mockResolvedValue([]),
+  getSpawnRateModifiers: vi.fn().mockResolvedValue({ byFamily: new Map(), global: 1 }),
+  getEventModifiersForEntity: vi.fn().mockResolvedValue([]),
   spawnWorldEvent: vi.fn(),
 }));
 vi.mock('../../services/bossEncounterService', () => ({
@@ -256,8 +258,8 @@ describe('exploration tutorial path', () => {
 
     // Should spend the requested turns, not 100 (called via transaction)
     expect(mockSpendPlayerTurnsTx).toHaveBeenCalledWith(expect.anything(), 'p1', 500);
-    // Should call simulateExploration (exitChance is null when no undiscovered neighbors)
-    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null);
+    // Should call simulateExploration (exitChance is null when no undiscovered neighbors, spawnRateMultiplier is 1 with no zone families)
+    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, 1);
   });
 
   it('combat victory during tutorial grants XP and loot normally', async () => {
