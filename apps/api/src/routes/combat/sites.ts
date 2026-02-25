@@ -5,6 +5,7 @@ import { getMobPrefixDefinition, COMBAT_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { buildPagination } from '../../utils/routeHelpers.js';
+import { getEventModifiersForEntity, type EventModifierBadge } from '../../services/worldEventService';
 import {
   prismaAny,
   listEncounterSitesQuerySchema,
@@ -142,6 +143,14 @@ export function registerSiteRoutes(router: Router): void {
         .map(([id, name]) => ({ id, name }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
+      const badgeCache = new Map<string, EventModifierBadge[]>();
+      for (const site of pageItems) {
+        const key = `${site.zoneId}:${site.mobFamilyId}`;
+        if (!badgeCache.has(key)) {
+          badgeCache.set(key, await getEventModifiersForEntity(site.zoneId, { mobFamilyId: site.mobFamilyId }));
+        }
+      }
+
       res.json({
         encounterSites: pageItems.map((site) => {
           const nextMobName = site.nextMobTemplateId ? nextMobNameById.get(site.nextMobTemplateId) ?? null : null;
@@ -171,6 +180,7 @@ export function registerSiteRoutes(router: Router): void {
             currentRoom: site.currentRoom,
             totalRooms: site.totalRooms,
             roomMobCounts: site.roomMobCounts,
+            eventModifiers: badgeCache.get(`${site.zoneId}:${site.mobFamilyId}`) ?? [],
             totalTurnCost: site.aliveMobs * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
           };
         }),

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { EventBadges } from '@/components/common/EventBadge';
+import type { EventModifierBadge } from '@/lib/api';
 import { isAmbushWithCombatLog } from '@/lib/explorationUtils';
 
 export interface ExplorationPlaybackEvent {
@@ -58,7 +60,7 @@ export function ExplorationPlayback({
   const [currentTurn, setCurrentTurn] = useState(0);
   const [revealedEventCount, setRevealedEventCount] = useState(0);
   const [phase, setPhase] = useState<'running' | 'paused-event' | 'paused-combat' | 'complete'>('running');
-  const [activeEventLabel, setActiveEventLabel] = useState<{ icon: string; text: string; color: string } | null>(null);
+  const [activeEventLabel, setActiveEventLabel] = useState<{ icon: string; text: string; color: string; eventModifiers?: EventModifierBadge[] } | null>(null);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -102,7 +104,8 @@ export function ExplorationPlayback({
 
       const barTimer = addTimer(() => {
         const display = getEventDisplay(nextEvent.type);
-        setActiveEventLabel({ icon: display.icon, text: nextEvent.description, color: display.color });
+        const modifiers = nextEvent.details?.eventModifiers as EventModifierBadge[] | undefined;
+        setActiveEventLabel({ icon: display.icon, text: nextEvent.description, color: display.color, eventModifiers: modifiers });
         onEventRevealed(nextEvent);
         setRevealedEventCount(prev => prev + 1);
 
@@ -178,6 +181,11 @@ export function ExplorationPlayback({
             <span className={`text-sm font-semibold ${activeEventLabel.color}`}>
               {activeEventLabel.icon} {activeEventLabel.text}
             </span>
+            {activeEventLabel.eventModifiers && activeEventLabel.eventModifiers.length > 0 && (
+              <div className="flex justify-center mt-1">
+                <EventBadges modifiers={activeEventLabel.eventModifiers} />
+              </div>
+            )}
           </div>
         )}
       </div>

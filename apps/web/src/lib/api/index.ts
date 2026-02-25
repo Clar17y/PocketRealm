@@ -35,6 +35,8 @@ export {
   getCombatLogs,
 } from './combat';
 export type {
+  EventModifierBadge,
+  CombatActiveEvent,
   CombatLogEntryResponse,
   SkillXpGrantResponse,
   CombatOutcomeResponse,

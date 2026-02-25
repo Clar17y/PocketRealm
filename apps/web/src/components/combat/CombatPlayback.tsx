@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { LastCombatLogEntry, LastCombat } from '@/app/game/useGameController';
+import type { CombatActiveEvent } from '@/lib/api';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
+import { EventBadges } from '@/components/common/EventBadge';
 import { PixelButton } from '@/components/PixelButton';
 
 type Phase = 'playing' | 'finished-auto' | 'finished-manual';
@@ -17,6 +19,7 @@ interface CombatPlaybackProps {
   mobMaxHp: number;
   log: LastCombatLogEntry[];
   rewards?: LastCombat['rewards'];
+  activeEvents?: CombatActiveEvent[];
   playerLabel?: string;
   defeatButtonLabel?: string;
   speedMs?: number;
@@ -34,6 +37,7 @@ export function CombatPlayback({
   mobMaxHp,
   log,
   rewards,
+  activeEvents,
   playerLabel = 'You',
   defeatButtonLabel,
   speedMs = 800,
@@ -152,11 +156,16 @@ export function CombatPlayback({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-center gap-2 font-bold text-[var(--rpg-text-primary)]">
+      <div className="flex items-center justify-center gap-2 font-bold text-[var(--rpg-text-primary)] flex-wrap">
         {mobImageSrc && (
           <img src={mobImageSrc} alt={mobDisplayName} className="w-10 h-10 rounded object-cover" />
         )}
         {mobDisplayName}
+        {activeEvents && activeEvents.some(e => e.appliedToThisMob) && (
+          <EventBadges inline modifiers={activeEvents.filter(e => e.appliedToThisMob).map(e => ({
+            title: e.title, effectType: e.effectType, effectValue: e.effectValue, isGlobal: false,
+          }))} />
+        )}
       </div>
 
       {/* HP Bars */}

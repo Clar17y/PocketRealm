@@ -4,6 +4,8 @@ import {
   getActiveEventsForZone,
   getActiveWorldWideEvents,
   getActiveZoneModifiers,
+  getEventModifiersForEntity,
+  getSpawnRateModifiers,
   getAllActiveEvents,
   spawnWorldEvent,
   expireStaleEvents,
@@ -154,58 +156,78 @@ describe('worldEventService', () => {
   });
 
   describe('spawnWorldEvent', () => {
+    const baseParams = {
+      type: 'mob' as const,
+      zoneId: 'zone-1',
+      title: 'Test',
+      description: 'Desc',
+      effectType: 'damage_up' as const,
+      effectValue: 0.5,
+      durationHours: 6,
+    };
+
     it('creates a new event when no duplicate effect exists', async () => {
+      mockPrisma.worldEvent.count.mockResolvedValue(0);
       mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
       mockPrisma.worldEvent.create.mockResolvedValue(makeEventRow());
 
-      const result = await spawnWorldEvent({
-        type: 'mob',
-        zoneId: 'zone-1',
-        title: 'Test',
-        description: 'Desc',
-        effectType: 'damage_up',
-        effectValue: 0.5,
-        durationHours: 6,
-      });
+      const result = await spawnWorldEvent(baseParams);
 
       expect(result).not.toBeNull();
       expect(mockPrisma.worldEvent.create).toHaveBeenCalled();
     });
 
     it('returns null when duplicate effect exists in same zone', async () => {
+      mockPrisma.worldEvent.count.mockResolvedValue(0);
       mockPrisma.worldEvent.findFirst.mockResolvedValue({ id: 'existing' });
 
-      const result = await spawnWorldEvent({
-        type: 'mob',
-        zoneId: 'zone-1',
-        title: 'Test',
-        description: 'Desc',
-        effectType: 'damage_up',
-        effectValue: 0.5,
-        durationHours: 6,
-      });
+      const result = await spawnWorldEvent(baseParams);
 
       expect(result).toBeNull();
       expect(mockPrisma.worldEvent.create).not.toHaveBeenCalled();
     });
 
-    it('skips slot check for world-wide events (no zoneId)', async () => {
+    it('skips both checks for world-wide events (no zoneId)', async () => {
       mockPrisma.worldEvent.create.mockResolvedValue(
         makeEventRow({ zoneId: null, zone: null }),
       );
 
       const result = await spawnWorldEvent({
-        type: 'resource',
+        ...baseParams,
         zoneId: null,
-        title: 'World Event',
-        description: 'Desc',
+        type: 'resource',
         effectType: 'yield_up',
         effectValue: 0.3,
-        durationHours: 6,
       });
 
       expect(result).not.toBeNull();
+      expect(mockPrisma.worldEvent.count).not.toHaveBeenCalled();
       expect(mockPrisma.worldEvent.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('returns null when zone already has MAX_ZONE_EVENTS active', async () => {
+      mockPrisma.worldEvent.count.mockResolvedValue(2); // MAX_ZONE_EVENTS = 2
+
+      const result = await spawnWorldEvent(baseParams);
+
+      expect(result).toBeNull();
+      // Should short-circuit before effectType dedup or create
+      expect(mockPrisma.worldEvent.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.worldEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('allows spawn when zone has fewer than MAX_ZONE_EVENTS', async () => {
+      mockPrisma.worldEvent.count.mockResolvedValue(1);
+      mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
+      mockPrisma.worldEvent.create.mockResolvedValue(makeEventRow());
+
+      const result = await spawnWorldEvent(baseParams);
+
+      expect(result).not.toBeNull();
+      expect(mockPrisma.worldEvent.count).toHaveBeenCalledWith({
+        where: { zoneId: 'zone-1', status: 'active' },
+      });
+      expect(mockPrisma.worldEvent.create).toHaveBeenCalled();
     });
   });
 
@@ -272,6 +294,155 @@ describe('worldEventService', () => {
 
       const result = await getAllActiveEvents();
       expect(result).toHaveLength(2);
+    });
+  });
+
+  describe('getEventModifiersForEntity', () => {
+    it('returns mob-relevant events for a mob family context', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ type: 'mob', effectType: 'damage_up', effectValue: 0.5, targetFamily: 'wolves' }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { mobFamilyId: 'wolves' });
+      expect(badges).toHaveLength(1);
+      expect(badges[0]).toEqual({
+        title: 'Test Event',
+        effectType: 'damage_up',
+        effectValue: 0.5,
+        isGlobal: false,
+      });
+    });
+
+    it('returns resource-relevant events for a resource type context', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ type: 'resource', effectType: 'yield_up', effectValue: 0.3, targetResource: 'iron_ore' }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { resourceType: 'iron_ore' });
+      expect(badges).toHaveLength(1);
+      expect(badges[0]).toEqual({
+        title: 'Test Event',
+        effectType: 'yield_up',
+        effectValue: 0.3,
+        isGlobal: false,
+      });
+    });
+
+    it('includes untargeted zone-wide events', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ type: 'mob', effectType: 'hp_up', effectValue: 0.5, targetFamily: null, targetResource: null }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { mobFamilyId: 'wolves' });
+      expect(badges).toHaveLength(1);
+      expect(badges[0].effectType).toBe('hp_up');
+    });
+
+    it('excludes resource events when querying for mobs', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ type: 'resource', effectType: 'yield_up', effectValue: 0.3, targetFamily: null, targetResource: null }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { mobFamilyId: 'wolves' });
+      expect(badges).toHaveLength(0);
+    });
+
+    it('excludes mob events when querying for resources', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ type: 'mob', effectType: 'damage_up', effectValue: 0.5, targetFamily: null, targetResource: null }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { resourceType: 'iron_ore' });
+      expect(badges).toHaveLength(0);
+    });
+
+    it('marks zone events as isGlobal false and world events as isGlobal true', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ id: 'evt-zone', type: 'mob', effectType: 'damage_up', effectValue: 0.2 }),
+        ])
+        .mockResolvedValueOnce([
+          makeEventRow({ id: 'evt-world', zoneId: null, type: 'mob', effectType: 'hp_up', effectValue: 0.3 }),
+        ]);
+
+      const badges = await getEventModifiersForEntity('zone-1', { mobFamilyId: 'wolves' });
+      expect(badges).toHaveLength(2);
+      expect(badges[0].isGlobal).toBe(false);
+      expect(badges[1].isGlobal).toBe(true);
+    });
+  });
+
+  describe('getSpawnRateModifiers', () => {
+    it('returns global: 1 and empty byFamily when no active events', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([]) // zone events
+        .mockResolvedValueOnce([]); // world-wide events
+
+      const result = await getSpawnRateModifiers('zone-1');
+      expect(result.global).toBe(1);
+      expect(result.byFamily.size).toBe(0);
+    });
+
+    it('returns family-specific multiplier for targeted spawn_rate_up', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ effectType: 'spawn_rate_up', effectValue: 0.75, targetFamily: 'wolves' }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await getSpawnRateModifiers('zone-1');
+      expect(result.byFamily.get('wolves')).toBeCloseTo(1.75);
+      expect(result.global).toBe(1);
+    });
+
+    it('returns global multiplier for untargeted spawn_rate_up', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ effectType: 'spawn_rate_up', effectValue: 0.5, targetFamily: null }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await getSpawnRateModifiers('zone-1');
+      expect(result.global).toBeCloseTo(1.5);
+      expect(result.byFamily.size).toBe(0);
+    });
+
+    it('handles spawn_rate_down correctly', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ effectType: 'spawn_rate_down', effectValue: 0.5, targetFamily: null }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await getSpawnRateModifiers('zone-1');
+      expect(result.global).toBeCloseTo(0.5);
+    });
+
+    it('combines multiple events: stacks family + global multipliers', async () => {
+      mockPrisma.worldEvent.findMany
+        .mockResolvedValueOnce([
+          makeEventRow({ id: 'evt-1', effectType: 'spawn_rate_up', effectValue: 0.5, targetFamily: 'wolves' }),
+        ])
+        .mockResolvedValueOnce([
+          makeEventRow({ id: 'evt-2', zoneId: null, effectType: 'spawn_rate_up', effectValue: 0.25, targetFamily: 'wolves' }),
+          makeEventRow({ id: 'evt-3', zoneId: null, effectType: 'spawn_rate_up', effectValue: 0.5, targetFamily: null }),
+        ]);
+
+      const result = await getSpawnRateModifiers('zone-1');
+      // wolves: 1.5 * 1.25 = 1.875
+      expect(result.byFamily.get('wolves')).toBeCloseTo(1.875);
+      // global: 1.5
+      expect(result.global).toBeCloseTo(1.5);
     });
   });
 });

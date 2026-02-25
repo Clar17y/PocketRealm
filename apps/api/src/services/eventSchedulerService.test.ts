@@ -88,19 +88,27 @@ describe('eventSchedulerService', () => {
       vi.spyOn(Math, 'random').mockRestore();
     });
 
-    it('does not spawn zone events if cap reached (MAX_ZONE_EVENTS)', async () => {
+    it('zone event cap is enforced by spawnWorldEvent (per-zone)', async () => {
       mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
       vi.spyOn(Math, 'random').mockReturnValue(0.9);
-      // Zone cap already reached
-      mockPrisma.worldEvent.count.mockResolvedValue(2);
+      // Zone lookup succeeds; full flow runs but spawnWorldEvent returns null (cap enforced there)
+      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest Edge' }]);
+      mockPrisma.worldEvent.findMany.mockResolvedValue([]);
+      mockPrisma.bossEncounter.count.mockResolvedValue(0);
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
+      // resolveTarget queries — return data so it resolves
+      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([
+        { mobFamilyId: 'f1', mobFamily: { id: 'f1', name: 'Wolves' } },
+      ]);
+      mockPrisma.resourceNode.findMany.mockResolvedValue([
+        { resourceType: 'copper_ore' },
+      ]);
 
       await checkAndSpawnEvents(null);
 
-      expect(mockPrisma.worldEvent.count).toHaveBeenCalledWith({
-        where: { zoneId: { not: null }, status: 'active' },
-      });
-      // Cap hit — no zone lookup
-      expect(mockPrisma.zone.findMany).not.toHaveBeenCalled();
+      // trySpawnZoneEvent no longer has its own global cap check;
+      // spawnWorldEvent (mocked to return null) handles per-zone enforcement
+      expect(mockPrisma.zone.findMany).toHaveBeenCalled();
 
       vi.spyOn(Math, 'random').mockRestore();
     });

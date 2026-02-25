@@ -57,6 +57,8 @@ import {
   travelToZone,
   unequip,
   type AchievementsResponse,
+  type EventModifierBadge,
+  type CombatActiveEvent,
   type PlayerSettings,
   type WorldEventResponse,
 } from '@/lib/api';
@@ -105,6 +107,7 @@ export interface PendingEncounter {
   currentRoom: number;
   totalRooms: number;
   roomMobCounts: Array<{ room: number; alive: number; total: number }>;
+  eventModifiers?: EventModifierBadge[];
   totalTurnCost: number;
 }
 
@@ -313,6 +316,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     sizeName: string;
     discoveredAt: string;
     weathered: boolean;
+    eventModifiers?: EventModifierBadge[];
   }>>([]);
   const [gatheringLoading, setGatheringLoading] = useState(false);
   const [gatheringError, setGatheringError] = useState<string | null>(null);
@@ -440,6 +444,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     log: LastCombatLogEntry[] | null;
     combatLogId?: string;
     rewards: LastCombat['rewards'];
+    activeEvents?: CombatActiveEvent[];
   }> | null>(null);
   const [combatPlaybackIndex, setCombatPlaybackIndex] = useState(0);
   const [roomTransition, setRoomTransition] = useState<{ entering: number } | null>(null);
@@ -712,6 +717,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           currentRoom: site.currentRoom,
           totalRooms: site.totalRooms,
           roomMobCounts: site.roomMobCounts,
+          eventModifiers: site.eventModifiers,
           totalTurnCost: site.totalTurnCost,
         }))
       );
@@ -847,6 +853,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const pushLog = (...entries: ActivityLogEntry[]) => {
     setActivityLog((prev) => [...entries, ...prev].slice(0, 100));
+  };
+
+  const logActiveEvents = (events: Array<{ title: string; effectType: string; effectValue: number }> | undefined) => {
+    if (!events?.length) return;
+    const now = Date.now();
+    if (now - lastEventLogTimeRef.current < 5 * 60 * 1000) return;
+    lastEventLogTimeRef.current = now;
+    for (const evt of events) {
+      const sign = evt.effectType.endsWith('_down') ? '-' : '+';
+      pushLog({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
+    }
   };
 
   const logDurabilityWarnings = (
@@ -1065,6 +1082,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
             combatantBMaxHp: fight.mobMaxHp,
             log: fight.log?.length ? (fight.log as LastCombatLogEntry[]) : null,
             combatLogId: fightLogId,
+            activeEvents: data.activeEvents,
             rewards: {
               xp: fight.xp,
               loot: fight.loot,
@@ -1096,6 +1114,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           }
         }
 
+
         pendingCombatRewardsRef.current = rewards;
         setCombatPlaybackQueue(queue);
         setCombatPlaybackIndex(0);
@@ -1112,6 +1131,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           combatantBMaxHp: data.combat.mobMaxHp,
           log: data.combat.log?.length ? (data.combat.log as LastCombatLogEntry[]) : null,
           combatLogId,
+          activeEvents: data.activeEvents,
           rewards,
         }]);
         setCombatPlaybackIndex(0);
@@ -1125,16 +1145,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         siteJustClearedRef.current = true;
       }
 
-      if (data.activeEvents?.length) {
-        const now = Date.now();
-        if (now - lastEventLogTimeRef.current >= 5 * 60 * 1000) {
-          lastEventLogTimeRef.current = now;
-          for (const evt of data.activeEvents) {
-            const sign = evt.effectType.endsWith('_down') ? '-' : '+';
-            pushLog({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
-          }
-        }
-      }
+      logActiveEvents(data.activeEvents);
 
       if (data.rewards.siteCompletion) {
         const chest = data.rewards.siteCompletion;
@@ -1302,15 +1313,18 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
 
-      if (data.activeEvents?.length) {
-        const now = Date.now();
-        if (now - lastEventLogTimeRef.current >= 5 * 60 * 1000) {
-          lastEventLogTimeRef.current = now;
-          for (const evt of data.activeEvents) {
-            const sign = evt.effectType.endsWith('_down') ? '-' : '+';
-            newLogs.push({ timestamp: nowStamp(), type: 'info', message: `World event active: ${evt.title} (${sign}${Math.round(evt.effectValue * 100)}%)` });
-          }
-        }
+      logActiveEvents(data.activeEvents);
+
+      if (data.yieldBreakdown?.eventTitle && data.yieldBreakdown.eventModifier !== 1) {
+        const isUp = data.yieldBreakdown.eventModifier > 1;
+        const bonusPct = Math.round(Math.abs(data.yieldBreakdown.eventModifier - 1) * 100);
+        const rawTotal = data.yieldBreakdown.rawTotalYield;
+        const yieldDiff = rawTotal != null ? data.results.totalYield - rawTotal : null;
+        newLogs.push({
+          timestamp: nowStamp(),
+          type: isUp ? 'success' : 'warning',
+          message: `${data.yieldBreakdown.eventTitle}: ${isUp ? '+' : '-'}${bonusPct}% yield ${isUp ? 'bonus' : 'penalty'}${yieldDiff != null ? ` (${yieldDiff > 0 ? '+' : ''}${yieldDiff} items)` : ''}`,
+        });
       }
 
       if (data.gemCrit) {

@@ -797,6 +797,7 @@ export default function GamePage() {
                 maxCapacity: n.maxCapacity,
                 sizeName: n.sizeName,
                 weathered: n.weathered,
+                eventModifiers: n.eventModifiers,
               }))}
               currentZoneId={activeZoneId}
               availableTurns={turns}

@@ -10,9 +10,12 @@ import { titleCaseFromSnake } from '@/lib/format';
 import { Pickaxe, MapPin } from 'lucide-react';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { GATHERING_CONSTANTS } from '@adventure/shared';
+import { computeResourceYieldMultiplier, computeEventMinActions } from '@adventure/game-engine';
+import { EventBadges } from '@/components/common/EventBadge';
 import { effectiveTurns as calcEffectiveTurns, inflateCost } from '@/lib/taxCalc';
 import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { EventModifierBadge } from '@/lib/api';
 
 interface ResourceNode {
   id: string;
@@ -28,6 +31,7 @@ interface ResourceNode {
   maxCapacity: number;
   sizeName: string;
   weathered?: boolean;
+  eventModifiers?: EventModifierBadge[];
 }
 
 interface GatheringProps {
@@ -87,6 +91,12 @@ export function Gathering({
   recoveryCost,
   guildTaxRate = 0,
 }: GatheringProps) {
+  const getEventYieldMultiplier = (node: ResourceNode) =>
+    computeResourceYieldMultiplier(node.eventModifiers ?? []);
+
+  const getEventMinActions = (node: ResourceNode) =>
+    computeEventMinActions(getEventYieldMultiplier(node));
+
   const getNodeTurnsToDeplete = (node: ResourceNode) => {
     const levelsAbove = Math.max(0, skillLevel - node.levelRequired);
     const yieldMultiplier = 1 + levelsAbove * GATHERING_CONSTANTS.YIELD_MULTIPLIER_PER_LEVEL;
@@ -97,11 +107,17 @@ export function Gathering({
     return inflateCost(baseTurns, guildTaxRate);
   };
 
+  const getNodeMinTurns = (node: ResourceNode) => {
+    const minActions = getEventMinActions(node);
+    return inflateCost(minActions * GATHERING_CONSTANTS.BASE_TURN_COST, guildTaxRate);
+  };
+
   const [selectedNode, setSelectedNode] = useState<ResourceNode | null>(nodes[0] || null);
   const [turnInvestment, setTurnInvestment] = useState(() => {
     const node = nodes[0];
     if (!node) return [Math.min(100, availableTurns)];
-    return [Math.max(10, Math.min(getNodeTurnsToDeplete(node), availableTurns))];
+    const minTurns = getNodeMinTurns(node);
+    return [Math.max(minTurns, Math.min(getNodeTurnsToDeplete(node), availableTurns))];
   });
 
   // Sync selected node with updated data from props (e.g., after mining reduces capacity)
@@ -125,7 +141,8 @@ export function Gathering({
   useEffect(() => {
     if (!selectedNode) return;
     const ttd = getNodeTurnsToDeplete(selectedNode);
-    setTurnInvestment([Math.max(10, Math.min(ttd, availableTurns))]);
+    const minTurns = getNodeMinTurns(selectedNode);
+    setTurnInvestment([Math.max(minTurns, Math.min(ttd, availableTurns))]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNode?.id]);
 
@@ -141,18 +158,25 @@ export function Gathering({
     // Cap by remaining capacity
     const maxActionsByCapacity = Math.ceil(node.remainingCapacity / yieldPerAction);
     const actions = Math.min(maxActionsByTurns, maxActionsByCapacity);
-    const totalYield = Math.min(actions * yieldPerAction, node.remainingCapacity);
+    const rawTotalYield = Math.min(actions * yieldPerAction, node.remainingCapacity);
+
+    // Apply event modifiers to session total (matches backend)
+    const eventYieldMultiplier = getEventYieldMultiplier(node);
+    const totalYield = eventYieldMultiplier !== 1
+      ? Math.max(1, Math.floor(rawTotalYield * eventYieldMultiplier))
+      : rawTotalYield;
     const willDeplete = totalYield >= node.remainingCapacity;
 
-    return { actions, baseYield, yieldMultiplier, totalYield, willDeplete };
+    return { actions, baseYield, yieldMultiplier, totalYield, willDeplete, eventYieldMultiplier };
   };
 
   const yieldInfo = selectedNode ? calculateYield(selectedNode, turnInvestment[0]) : null;
 
   // Percentage-based presets for selected node
   const turnsToDeplete = selectedNode ? getNodeTurnsToDeplete(selectedNode) : 0;
+  const sliderMin = selectedNode ? getNodeMinTurns(selectedNode) : GATHERING_CONSTANTS.BASE_TURN_COST;
   const sliderMax = turnsToDeplete > 0
-    ? Math.max(10, Math.min(turnsToDeplete, availableTurns))
+    ? Math.max(sliderMin, Math.min(turnsToDeplete, availableTurns))
     : Math.min(1000, availableTurns);
 
   const gatheringPresets = selectedNode && turnsToDeplete > 0 ? [
@@ -169,7 +193,7 @@ export function Gathering({
     const actions = Math.ceil(targetYield / Math.max(1, yieldPerAction));
     const rawTurns = actions * GATHERING_CONSTANTS.BASE_TURN_COST;
     const inflated = inflateCost(rawTurns, guildTaxRate);
-    return { label, turns: Math.min(Math.max(GATHERING_CONSTANTS.BASE_TURN_COST, inflated), availableTurns) };
+    return { label, turns: Math.min(Math.max(sliderMin, inflated), availableTurns) };
   }) : null;
 
   return (
@@ -266,10 +290,13 @@ export function Gathering({
                     )}
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-baseline justify-between">
-                      <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm">
-                        {node.sizeName} {node.name}
-                      </h4>
+                    <div className="flex items-center justify-between gap-1 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm">
+                          {node.sizeName} {node.name}
+                        </h4>
+                        <EventBadges inline modifiers={node.eventModifiers} />
+                      </div>
                       <span className="text-xs text-[var(--rpg-text-secondary)]">Lv. {node.levelRequired}</span>
                     </div>
                     {/* Zone indicator */}
@@ -337,9 +364,9 @@ export function Gathering({
             <Slider
               value={turnInvestment}
               onValueChange={setTurnInvestment}
-              min={10}
+              min={sliderMin}
               max={sliderMax}
-              step={10}
+              step={GATHERING_CONSTANTS.BASE_TURN_COST}
               className="w-full"
             />
 
@@ -378,6 +405,11 @@ export function Gathering({
                 {yieldInfo.yieldMultiplier > 1 && (
                   <span className="text-[var(--rpg-green-light)]"> x {yieldInfo.yieldMultiplier.toFixed(1)}</span>
                 )}
+                {yieldInfo.eventYieldMultiplier !== 1 && (
+                  <span className={yieldInfo.eventYieldMultiplier < 1 ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-green-light)]'}>
+                    {' '}({yieldInfo.eventYieldMultiplier < 1 ? '' : '+'}{Math.round((yieldInfo.eventYieldMultiplier - 1) * 100)}% event)
+                  </span>
+                )}
               </div>
               {yieldInfo.willDeplete && (
                 <div className="text-xs text-[var(--rpg-red)] mt-1 font-semibold">
@@ -396,11 +428,11 @@ export function Gathering({
           size="lg"
           className="w-full"
           onClick={() => onStartGathering(selectedNode.id, turnInvestment[0])}
-          disabled={isRecovering || turnInvestment[0] > availableTurns || nodesLoading || Boolean(nodesError)}
+          disabled={isRecovering || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError)}
         >
           <div className="flex items-center justify-center gap-2">
             <Pickaxe size={20} />
-            {isRecovering ? 'Recover First' : `Start ${skillName}`}
+            {isRecovering ? 'Recover First' : availableTurns < sliderMin ? `Need ${sliderMin} turns` : `Start ${skillName}`}
           </div>
         </PixelButton>
       )}

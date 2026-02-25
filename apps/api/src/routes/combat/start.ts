@@ -32,7 +32,17 @@ import { setHp } from '../../services/hpService';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
-import { getActiveZoneModifiers, getActiveEventSummaries } from '../../services/worldEventService';
+import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, type EventModifierBadge } from '../../services/worldEventService';
+
+function tagEventsWithApplicability(
+  events: Array<{ title: string; effectType: string; effectValue: number }>,
+  entityBadges: EventModifierBadge[],
+) {
+  return events.map(e => ({
+    ...e,
+    appliedToThisMob: entityBadges.some(m => m.effectType === e.effectType && m.title === e.title),
+  }));
+}
 import {
   persistMobHp,
   checkPersistedMobReencounter,
@@ -172,9 +182,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const potionPool = autoPotionThreshold > 0 ? await buildPotionPool(playerId, hpState.maxHp) : [];
   const allPotionsConsumed: PotionConsumed[] = [];
 
-  // Zone modifiers
-  const zoneModifiers = await getActiveZoneModifiers(zoneId);
-  const activeEventEffects = await getActiveEventSummaries(zoneId);
+  // Zone modifiers — fetch events once, derive modifiers synchronously
+  const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
+    getActiveEventsForZone(zoneId),
+    getActiveWorldWideEvents(),
+  ]);
+  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
+  const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
 
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
   const fightResults: FightResult[] = [];
@@ -465,6 +479,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       }
     : null;
 
+  // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
+  const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
+
   // --- Activity log ---
   const combatLog = await prisma.activityLog.create({
     data: {
@@ -497,6 +514,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
             ? serializeXpGrant(lastVictoryXpGrant)
             : null,
         },
+        eventModifiers: siteMobBadges,
       } as unknown as Prisma.InputJsonValue,
     },
   });
@@ -533,6 +551,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
               durabilityLost: fight.durabilityLost,
               skillXp: fight.skillXp ? serializeXpGrant(fight.skillXp) : null,
             },
+            eventModifiers: siteMobBadges,
           } as unknown as Prisma.InputJsonValue,
         },
         select: { id: true },
@@ -615,7 +634,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       percent: explorationProgress.percent,
       turnsToExplore: explorationProgress.turnsToExplore,
     },
-    activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
+    activeEvents: activeEventEffects.length > 0
+      ? tagEventsWithApplicability(activeEventEffects, siteMobBadges)
+      : undefined,
   });
 }
 
@@ -733,8 +754,17 @@ export function registerStartRoutes(router: Router): void {
       }
 
       const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
-      const zoneModifiers = await getActiveZoneModifiers(zoneId);
-      const activeEventEffects = await getActiveEventSummaries(zoneId);
+      const [zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyRow] = await Promise.all([
+        getActiveEventsForZone(zoneId),
+        getActiveWorldWideEvents(),
+        prismaAny.mobFamilyMember.findFirst({
+          where: { mobTemplateId: baseMob.id },
+          select: { mobFamilyId: true },
+        }),
+      ]);
+      const zoneMobFamilyId: string | undefined = zoneMobFamilyRow?.mobFamilyId ?? undefined;
+      const zoneModifiers = computeZoneModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyId ? { mobFamilyId: zoneMobFamilyId } : undefined);
+      const activeEventEffects = computeEventSummaries(zoneCombatZoneEvents, zoneCombatWorldEvents);
       const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
       const prefixedMob = applyMobPrefix(modifiedMob, mobPrefix);
       mobPrefix = prefixedMob.mobPrefix;
@@ -839,11 +869,7 @@ export function registerStartRoutes(router: Router): void {
 
       if (combatResult.outcome === 'victory') {
         const familyIds: string[] = [];
-        const familyMember = await prismaAny.mobFamilyMember.findFirst({
-          where: { mobTemplateId: prefixedMob.id },
-          select: { mobFamilyId: true },
-        });
-        if (familyMember?.mobFamilyId) familyIds.push(familyMember.mobFamilyId);
+        if (zoneMobFamilyId) familyIds.push(zoneMobFamilyId);
 
         const achievementKeys = ['totalKills', 'totalUniqueMonsterKills', 'totalTurnsSpent', 'totalBestiaryCompleted'];
         if (xpGrant?.newLevel) achievementKeys.push('highestSkillLevel');
@@ -853,6 +879,11 @@ export function registerStartRoutes(router: Router): void {
       } else {
         await trackAchievements(playerId, {}, { statKeys: ['totalTurnsSpent'] });
       }
+
+      // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events + family lookup)
+      const zoneMobBadges = zoneMobFamilyId
+        ? filterEventModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents, { mobFamilyId: zoneMobFamilyId })
+        : [];
 
       const combatLog = await prisma.activityLog.create({
         data: {
@@ -885,6 +916,7 @@ export function registerStartRoutes(router: Router): void {
                 ? serializeXpGrant(xpGrant)
                 : null,
             },
+            eventModifiers: zoneMobBadges,
           } as unknown as Prisma.InputJsonValue,
         },
       });
@@ -932,7 +964,9 @@ export function registerStartRoutes(router: Router): void {
           percent: explorationProgress.percent,
           turnsToExplore: explorationProgress.turnsToExplore,
         },
-        activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
+        activeEvents: activeEventEffects.length > 0
+          ? tagEventsWithApplicability(activeEventEffects, zoneMobBadges)
+          : undefined,
       });
   }));
 }

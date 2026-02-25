@@ -246,11 +246,6 @@ async function trySpawnBoss(io: SocketServer | null, zoneId: string, zoneName: s
 
 /** Try to spawn a zone-scoped event. */
 async function trySpawnZoneEvent(io: SocketServer | null): Promise<void> {
-  const activeZoneCount = await prisma.worldEvent.count({
-    where: { zoneId: { not: null }, status: 'active' },
-  });
-  if (activeZoneCount >= WORLD_EVENT_CONSTANTS.MAX_ZONE_EVENTS) return;
-
   const wildZones = await prisma.zone.findMany({
     where: { zoneType: 'wild' },
     select: { id: true, name: true },

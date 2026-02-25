@@ -5,7 +5,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { ExplorationPlayback, type ExplorationPlaybackEvent } from '@/components/exploration/ExplorationPlayback';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { monsterImageSrc } from '@/lib/assets';
-import type { CombatLogEntryResponse } from '@/lib/api/combat';
+import type { CombatLogEntryResponse, EventModifierBadge } from '@/lib/api/combat';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { isAmbushWithCombatLog } from '@/lib/explorationUtils';
 import { isMobKnown, type BestiarySkipEntry } from '@/app/game/useGameController';
@@ -183,6 +183,9 @@ export function TurnPlayback({
               playerStartHp={playerHpForNextCombat ?? playerHpBefore}
               mobMaxHp={(combatEvent.details?.mobMaxHp as number) ?? 100}
               log={loadedCombatLog}
+              activeEvents={(combatEvent.details?.eventModifiers as EventModifierBadge[] | undefined)?.map(m => ({
+                ...m, appliedToThisMob: true,
+              }))}
               autoSkip={!!shouldAutoSkip}
               speedMs={combatSpeedMs}
               onComplete={() => {
