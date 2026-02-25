@@ -8,7 +8,7 @@ import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { HpStatusBar } from '../common/HpStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Loader2, Mountain, Play } from 'lucide-react';
-import { EXPLORATION_CONSTANTS, HP_CONSTANTS } from '@adventure/shared';
+import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@adventure/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
@@ -27,9 +27,10 @@ interface ExplorationProps {
     turnsExplored: number;
     turnsToExplore: number | null;
     percent: number;
+    tiers: Record<string, number> | null;
   } | null;
   availableTurns: number;
-  onStartExploration: (turns: number) => void;
+  onStartExploration: (turns: number, tier?: number) => void;
   activityLog: ActivityLogEntry[];
   isRecovering?: boolean;
   recoveryCost?: number | null;
@@ -66,6 +67,20 @@ interface ExplorationProps {
 export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<number | null>(null);
+
+  const unlockedTierNumbers = getUnlockedTiers(
+    explorationProgress?.percent ?? 0,
+    explorationProgress?.tiers ?? null,
+  );
+  const unlockedTiers = unlockedTierNumbers.map(tier => ({
+    tier,
+    threshold: (explorationProgress?.tiers ?? {})[String(tier)] ?? 0,
+  }));
+  const maxUnlockedTier = unlockedTierNumbers.length > 0
+    ? unlockedTierNumbers[unlockedTierNumbers.length - 1]!
+    : null;
+  const effectiveSelectedTier = selectedTier ?? maxUnlockedTier;
 
   const calculateProbabilities = (turns: number) => {
     const expectedAmbushes = turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN;
@@ -91,7 +106,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           maxHp={maxHp}
           onProceed={() => {
             setShowLowHpWarning(false);
-            onStartExploration(turnInvestment[0]);
+            onStartExploration(turnInvestment[0], effectiveSelectedTier ?? undefined);
           }}
           onCancel={() => setShowLowHpWarning(false)}
         />
@@ -177,6 +192,37 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                   className="h-full rounded-full bg-[var(--rpg-gold)] transition-all"
                   style={{ width: `${Math.min(100, explorationProgress.percent)}%` }}
                 />
+              </div>
+            </PixelCard>
+          )}
+
+          {/* Tier Selector */}
+          {unlockedTiers.length > 1 && !tutorialLocked && (
+            <PixelCard>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Exploration Tier</h3>
+                  {effectiveSelectedTier !== maxUnlockedTier && (
+                    <span className="text-xs text-[var(--rpg-text-secondary)]">
+                      No exploration progress at this tier
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {unlockedTiers.map(({ tier }) => (
+                    <button
+                      key={tier}
+                      onClick={() => setSelectedTier(tier)}
+                      className={`flex-1 px-3 py-1.5 text-sm rounded border transition-colors ${
+                        (effectiveSelectedTier === tier)
+                          ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] border-[var(--rpg-gold)] font-bold'
+                          : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
+                      }`}
+                    >
+                      {getTierName(tier)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </PixelCard>
           )}
@@ -290,7 +336,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               ) {
                 setShowLowHpWarning(true);
               } else {
-                onStartExploration(turnInvestment[0]);
+                onStartExploration(turnInvestment[0], effectiveSelectedTier ?? undefined);
               }
             }}
             disabled={isRecovering || turnInvestment[0] > availableTurns || !!busyAction}

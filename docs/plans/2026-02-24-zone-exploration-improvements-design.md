@@ -19,7 +19,7 @@
 New pure function `getScaledZoneExitChance(baseChance, explorationPercent)` in game-engine:
 - Flat at 1x until 50% explored
 - Exponential ramp from 50% to 99%: `baseChance * (1 + (MAX_MULT - 1) * ((percent - 50) / 50)^2)`
-- At 50%: 1x | 75%: ~4.75x | 90%: ~13.2x | 99%: ~19.2x
+- At 50%: 1x | 75%: ~5.75x | 90%: ~13.2x | 99%: ~19.2x
 
 ### Auto-unlock at 100%
 

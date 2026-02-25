@@ -105,6 +105,7 @@ export interface PendingEncounter {
   currentRoom: number;
   totalRooms: number;
   roomMobCounts: Array<{ room: number; alive: number; total: number }>;
+  totalTurnCost: number;
 }
 
 import type { CombatLogEntryResponse as LastCombatLogEntry } from '@/lib/api/combat';
@@ -248,6 +249,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }>>([]);
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
   const [zoneConnections, setZoneConnections] = useState<Array<{ fromId: string; toId: string; explorationThreshold: number }>>([]);
+  const [undiscoveredZones, setUndiscoveredZones] = useState<Array<{ id: string; name: string; explorationThreshold: number; fromZoneId: string; discovered: false }>>([]);
   const [skills, setSkills] = useState<Array<{ skillType: string; level: number; xp: number; dailyXpGained: number }>>([]);
   const [characterProgression, setCharacterProgression] = useState<CharacterProgression>(DEFAULT_CHARACTER_PROGRESSION);
   const [inventory, setInventory] = useState<Array<{
@@ -554,6 +556,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (zonesRes.data) {
       setZones(zonesRes.data.zones);
       setZoneConnections(zonesRes.data.connections);
+      setUndiscoveredZones(zonesRes.data.undiscoveredZones ?? []);
       setActiveZoneId(zonesRes.data.currentZoneId);
       if (zonesRes.data.currentZoneId) {
         getZoneEvents(zonesRes.data.currentZoneId).then((res) => {
@@ -709,6 +712,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           currentRoom: site.currentRoom,
           totalRooms: site.totalRooms,
           roomMobCounts: site.roomMobCounts,
+          totalTurnCost: site.totalTurnCost,
         }))
       );
       setPendingEncounterPagination(res.data.pagination);
@@ -899,13 +903,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   };
 
-  const handleStartExploration = async (turnSpend: number) => {
+  const handleStartExploration = async (turnSpend: number, tier?: number) => {
     if (!currentZone) return;
 
     await runAction('exploration', async () => {
       const hpBefore = hpState.currentHp;
       const maxHpBefore = hpState.maxHp;
-      const res = await startExploration(currentZone.id, turnSpend);
+      const res = await startExploration(currentZone.id, turnSpend, tier);
       const data = res.data;
       if (!data) {
         setActionError(res.error?.message ?? 'Exploration failed');
@@ -1788,6 +1792,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     activeZoneId,
     setActiveZoneId,
     zoneConnections,
+    undiscoveredZones,
     skills,
     characterProgression,
     inventory,

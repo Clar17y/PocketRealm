@@ -8,6 +8,7 @@ import {
   buildPlayerCombatStats,
   calculateFleeResult,
   filterAndWeightMobsByTier,
+  getScaledZoneExitChance,
   mobToCombatantStats,
   rollMobPrefix,
   runCombat,
@@ -18,6 +19,8 @@ import {
 import {
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
+  getUnlockedTiers,
+  getHighestUnlockedTier,
   type Combatant,
   type CombatOptions,
   type MobTemplate,
@@ -44,6 +47,7 @@ import { getIo } from '../../socket';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
 import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
+import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import {
   startSchema,
@@ -120,8 +124,20 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const explorationProgress = await getExplorationPercent(playerId, body.zoneId);
     const zoneTiers = zone.explorationTiers as Record<string, number> | null;
 
+    // Determine unlocked tiers and selected tier
+    const unlockedTiers = getUnlockedTiers(explorationProgress.percent, zoneTiers);
+    const maxUnlockedTier = getHighestUnlockedTier(explorationProgress.percent, zoneTiers);
+    const selectedTier = body.tier ?? maxUnlockedTier;
+
+    if (body.tier !== undefined && !unlockedTiers.includes(selectedTier)) {
+      throw new AppError(400, `Tier ${selectedTier} is not unlocked. Max unlocked: ${maxUnlockedTier}`, 'INVALID_TIER');
+    }
+
     const undiscoveredNeighbors = await getUndiscoveredNeighborZones(playerId, body.zoneId);
-    const effectiveExitChance = undiscoveredNeighbors.length > 0 ? zone.zoneExitChance : null;
+    const rawExitChance = undiscoveredNeighbors.length > 0 ? zone.zoneExitChance : null;
+    const effectiveExitChance = rawExitChance != null && rawExitChance > 0
+      ? getScaledZoneExitChance(rawExitChance, explorationProgress.percent)
+      : null;
 
     // Pre-fetch connection thresholds for zone exit gating (used inside the loop)
     const connectionThresholds = undiscoveredNeighbors.length > 0
@@ -167,12 +183,22 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       ? [{ turnOccurred: 50, type: 'ambush' as const }]
       : simulateExploration(effectiveTurns, effectiveExitChance);
 
+    interface PendingCacheLoot {
+      turnOccurred: number;
+      mobFamilyId: string;
+    }
+
     const pendingResources: PendingResourceDiscovery[] = [];
     const pendingSites: PendingEncounterSiteDiscovery[] = [];
     const pendingCombatLogs: PendingAmbushCombatLog[] = [];
+    const pendingCacheLoot: PendingCacheLoot[] = [];
     const events: NarrativeEvent[] = [];
 
-    const hiddenCaches: Array<{ turnOccurred: number }> = [];
+    const hiddenCaches: Array<{
+      turnOccurred: number;
+      loot?: Array<{ itemTemplateId: string; name: string; quantity: number }>;
+      soulboundItem?: { itemTemplateId: string; name: string; rarity: string } | null;
+    }> = [];
     let zoneExitDiscovered = false;
     let wasKnockedOut = false;
 
@@ -203,8 +229,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           if (tieredMobs.length === 0) continue;
 
           // Apply tier bleedthrough: select a target tier, filter to it, fall back to lower tiers
-          const highestUnlockedTier = Math.max(...tieredMobs.map(m => m.explorationTier));
-          const targetTier = selectTierWithBleedthrough(highestUnlockedTier, zoneTiers);
+          const targetTier = selectTierWithBleedthrough(selectedTier, zoneTiers);
           let candidates = tieredMobs.filter(m => m.explorationTier === targetTier);
           if (candidates.length === 0) {
             for (let t = targetTier - 1; t >= 1; t--) {
@@ -411,7 +436,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         if (!pickedFamily) continue;
 
         const size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);
-        const mobs = buildEncounterSiteMobs(pickedFamily.mobFamily, size, body.zoneId, explorationProgress.percent, zoneTiers);
+        const mobs = buildEncounterSiteMobs(pickedFamily.mobFamily, size, body.zoneId, explorationProgress.percent, zoneTiers, selectedTier);
         if (mobs.length === 0) continue;
 
         const siteName = getSiteName(pickedFamily.mobFamily.name, size, pickedFamily.mobFamily);
@@ -472,10 +497,23 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
       if (outcome.type === 'hidden_cache') {
         hiddenCaches.push({ turnOccurred: outcome.turnOccurred });
+
+        // Pick a mob family for cache loot (same pool as encounter sites)
+        const cacheFamily = zoneFamilies.length > 0
+          ? pickWeighted(zoneFamilies, 'discoveryWeight') as ZoneFamilyRow | null
+          : null;
+
+        if (cacheFamily) {
+          pendingCacheLoot.push({
+            turnOccurred: outcome.turnOccurred,
+            mobFamilyId: cacheFamily.mobFamilyId,
+          });
+        }
+
         events.push({
           turn: outcome.turnOccurred,
           type: 'hidden_cache',
-          description: 'You found a hidden cache.',
+          description: 'You found a hidden cache!',
           details: {},
         });
         continue;
@@ -618,10 +656,38 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     await deductConsumedPotions(playerId, allPotionsConsumed);
 
     const spentTurns = aborted && abortedAtTurn ? abortedAtTurn : effectiveTurns;
-    const explorationBefore = await getExplorationPercent(playerId, body.zoneId);
-    await addExplorationTurns(playerId, body.zoneId, spentTurns);
-    const explorationAfter = await getExplorationPercent(playerId, body.zoneId);
+    const explorationTurnsToAdd = selectedTier === maxUnlockedTier ? spentTurns : 0;
+    const explorationBefore = explorationProgress;
+    if (explorationTurnsToAdd > 0) {
+      await addExplorationTurns(playerId, body.zoneId, explorationTurnsToAdd, {
+        turnsToExplore: explorationProgress.turnsToExplore,
+        currentTurnsExplored: explorationProgress.turnsExplored,
+      });
+    }
+    const explorationAfter = explorationTurnsToAdd > 0
+      ? await getExplorationPercent(playerId, body.zoneId)
+      : explorationBefore;
     const zoneJustFullyExplored = explorationBefore.percent < 100 && explorationAfter.percent >= 100;
+
+    // Auto-discover undiscovered neighbors when zone reaches 100%
+    if (zoneJustFullyExplored && undiscoveredNeighbors.length > 0) {
+      const autoDiscoverNeighbors = undiscoveredNeighbors.filter(n => {
+        const threshold = thresholdByToId.get(n.id) ?? 0;
+        return explorationAfter.percent >= threshold;
+      });
+      for (const neighbor of autoDiscoverNeighbors) {
+        await discoverZone(playerId, neighbor.id);
+        const idx = undiscoveredNeighbors.findIndex(n => n.id === neighbor.id);
+        if (idx !== -1) undiscoveredNeighbors.splice(idx, 1);
+        zoneExitDiscovered = true;
+        events.push({
+          turn: effectiveTurns,
+          type: 'zone_exit',
+          description: `Zone fully explored! You discovered ${neighbor.name}.`,
+          details: { zoneId: neighbor.id, zoneName: neighbor.name },
+        });
+      }
+    }
 
     const refundAmount = aborted && abortedAtTurn ? Math.max(0, effectiveTurns - abortedAtTurn) : 0;
     const refundedTurns = refundAmount > 0 ? await refundPlayerTurns(playerId, refundAmount) : null;
@@ -709,6 +775,47 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           select: { id: true },
         });
         createdCombatLogIds.push(created.id);
+      }
+
+      // Grant hidden cache loot
+      for (const cache of pendingCacheLoot) {
+        const cacheLoot = await grantCacheLootTx(tx, {
+          playerId,
+          zoneId: body.zoneId,
+          mobFamilyId: cache.mobFamilyId,
+          luck: progression.attributes.luck,
+        });
+
+        const lootSummary = cacheLoot.materials.map(m => ({
+          itemTemplateId: m.itemTemplateId,
+          name: m.name,
+          quantity: m.quantity,
+        }));
+
+        // Build human-readable description listing actual items
+        const itemList = lootSummary.map(m => `${m.quantity}x ${m.name}`).join(', ');
+
+        // Update the corresponding event's details
+        const cacheEvent = events.find(e => e.type === 'hidden_cache' && e.turn === cache.turnOccurred);
+        if (cacheEvent) {
+          cacheEvent.details = {
+            materials: lootSummary,
+            soulboundItem: cacheLoot.soulboundItem,
+          };
+          if (cacheLoot.soulboundItem) {
+            const article = /^[aeiou]/i.test(cacheLoot.soulboundItem.rarity) ? 'an' : 'a';
+            cacheEvent.description = `You found a hidden cache containing ${article} ${cacheLoot.soulboundItem.rarity} ${cacheLoot.soulboundItem.name}! (${itemList})`;
+          } else {
+            cacheEvent.description = `You found a hidden cache: ${itemList}`;
+          }
+        }
+
+        // Enrich hiddenCaches response entry with loot details
+        const cacheEntry = hiddenCaches.find(h => h.turnOccurred === cache.turnOccurred);
+        if (cacheEntry) {
+          cacheEntry.loot = lootSummary;
+          cacheEntry.soulboundItem = cacheLoot.soulboundItem;
+        }
       }
 
       // Strip combat logs from events stored in the exploration activity log
@@ -826,8 +933,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       zoneExitDiscovered,
       ...(respawnedTo ? { respawnedTo } : {}),
       explorationProgress: {
-        turnsExplored: explorationProgress.turnsExplored + spentTurns,
-        percent: calculateExplorationPercent(explorationProgress.turnsExplored + spentTurns, explorationProgress.turnsToExplore),
+        turnsExplored: explorationProgress.turnsExplored + explorationTurnsToAdd,
+        percent: calculateExplorationPercent(explorationProgress.turnsExplored + explorationTurnsToAdd, explorationProgress.turnsToExplore),
         turnsToExplore: explorationProgress.turnsToExplore,
       },
       tax: taxInfoFromResult(taxResult),

@@ -191,6 +191,7 @@ export default function GamePage() {
     zones,
     activeZoneId,
     zoneConnections,
+    undiscoveredZones,
     skills,
     characterProgression,
     inventory,
@@ -422,6 +423,7 @@ export default function GamePage() {
               turnsExplored: currentZone.exploration.turnsExplored,
               turnsToExplore: currentZone.exploration.turnsToExplore,
               percent: currentZone.exploration.percent,
+              tiers: currentZone.exploration.tiers,
             } : null}
             availableTurns={turns}
             onStartExploration={handleStartExploration}
@@ -627,6 +629,7 @@ export default function GamePage() {
             onTravel={handleTravelToZone}
             onExploreCurrentZone={() => setActiveScreen('explore')}
             guildTaxRate={guildTaxRate}
+            undiscoveredZones={undiscoveredZones}
             combatLogPrefetch={combatLogPrefetch}
           />
         );
@@ -821,6 +824,7 @@ export default function GamePage() {
         return (
           <CombatScreen
             hpState={hpState}
+            currentTurns={turns}
             currentZoneId={activeZoneId}
             pendingEncounters={pendingEncounters}
             pendingEncountersLoading={pendingEncountersLoading}

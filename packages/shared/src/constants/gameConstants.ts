@@ -132,6 +132,8 @@ export const EXPLORATION_CONSTANTS = {
   ENCOUNTER_SIZE_LARGE: { min: 7, max: 10 },
   MIN_EXPLORATION_TURNS: 10,
   MAX_EXPLORATION_TURNS: 10_000,
+  ZONE_EXIT_SCALING_START: 50,
+  ZONE_EXIT_SCALING_MAX_MULTIPLIER: 20,
 } as const;
 
 export const CHEST_CONSTANTS = {
@@ -487,6 +489,49 @@ export const WORLD_EVENT_CONSTANTS = {
 } as const;
 
 // =============================================================================
+// GEM TIER MAPPING (gathering skill + node level → gem name)
+// =============================================================================
+
+export const GEM_CONSTANTS = {
+  GEM_BY_SKILL_TIER: {
+    mining: { 1: 'Rough Ruby', 2: 'Rough Sapphire', 3: 'Rough Emerald', 4: 'Rough Diamond', 5: 'Rough Opal' },
+    foraging: { 1: 'Raw Amber', 2: 'Raw Pearl', 3: 'Raw Jade', 4: 'Raw Moonstone', 5: 'Raw Starcrystal' },
+    woodcutting: { 1: 'Tree Resin', 2: 'Fossilized Sap', 3: 'Crystal Bark', 4: 'Heartwood Gem', 5: 'Ancient Amber' },
+  } as Record<string, Record<number, string>>,
+  LEVEL_TO_TIER_THRESHOLDS: [
+    { minLevel: 28, tier: 5 },
+    { minLevel: 20, tier: 4 },
+    { minLevel: 12, tier: 3 },
+    { minLevel: 5, tier: 2 },
+    { minLevel: 0, tier: 1 },
+  ],
+} as const;
+
+export function levelToGemTier(levelRequired: number): number {
+  for (const { minLevel, tier } of GEM_CONSTANTS.LEVEL_TO_TIER_THRESHOLDS) {
+    if (levelRequired >= minLevel) return tier;
+  }
+  return 1;
+}
+
+// =============================================================================
+// HIDDEN CACHE REWARDS
+// =============================================================================
+
+export const HIDDEN_CACHE_CONSTANTS = {
+  MATERIAL_ROLLS_MIN: 2,
+  MATERIAL_ROLLS_MAX: 4,
+  SOULBOUND_DROP_CHANCE: 0.15,
+  LUCK_RARITY_SCALING: 0.005,
+  RARITY_WEIGHTS: {
+    common: 50,
+    uncommon: 30,
+    rare: 15,
+    epic: 5,
+  },
+} as const;
+
+// =============================================================================
 // ZONE EXPLORATION PROGRESSION
 // =============================================================================
 
@@ -496,13 +541,23 @@ export const ZONE_EXPLORATION_CONSTANTS = {
 } as const;
 
 // =============================================================================
+// TIER NAMES
+// =============================================================================
+
+export const TIER_NAME_CONSTANTS = {
+  NAMES: { 1: 'Outskirts', 2: 'Interior', 3: 'Depths', 4: 'Apex' } as Record<number, string>,
+} as const;
+
+// =============================================================================
 // TIER BLEEDTHROUGH
 // =============================================================================
 
 export const TIER_BLEED_CONSTANTS = {
-  CURRENT_TIER_WEIGHT: 0.75,
-  PLUS_ONE_TIER_WEIGHT: 0.20,
-  PLUS_TWO_TIER_WEIGHT: 0.05,
+  TWO_BELOW: 0.10,
+  ONE_BELOW: 0.15,
+  SELECTED: 0.50,
+  ONE_ABOVE: 0.15,
+  TWO_ABOVE: 0.10,
 } as const;
 
 // =============================================================================

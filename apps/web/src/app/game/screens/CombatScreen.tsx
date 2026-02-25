@@ -17,6 +17,7 @@ import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '
 
 interface CombatScreenProps {
   hpState: HpState;
+  currentTurns: number;
   currentZoneId: string | null;
   pendingEncounters: PendingEncounter[];
   pendingEncountersLoading: boolean;
@@ -70,6 +71,7 @@ interface CombatScreenProps {
 
 export function CombatScreen({
   hpState,
+  currentTurns,
   currentZoneId,
   pendingEncounters,
   pendingEncountersLoading,
@@ -377,6 +379,9 @@ export function CombatScreen({
                               ? `Room ${e.currentRoom}/${e.totalRooms} · ${e.aliveMobs}/${e.totalMobs} mobs`
                               : `${e.aliveMobs}/${e.totalMobs} mobs`
                             }
+                          </span>
+                          <span className={`text-xs ${e.totalTurnCost > currentTurns ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
+                            {' · '}Cost: {e.totalTurnCost.toLocaleString()} turns
                           </span>
                           {e.clearStrategy && (
                             <span className="text-xs text-[var(--rpg-gold)] ml-2">

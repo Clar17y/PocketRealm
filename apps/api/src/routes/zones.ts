@@ -93,6 +93,25 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
       discoveredZoneIds.has(c.fromId) && discoveredZoneIds.has(c.toId),
   );
 
+  // Build undiscovered zone hints from connections leading to undiscovered zones
+  const seenUndiscovered = new Set<string>();
+  const undiscoveredHints = connections
+    .filter((c: { fromId: string; toId: string; explorationThreshold: number | null }) =>
+      discoveredZoneIds.has(c.fromId) && !discoveredZoneIds.has(c.toId)
+    )
+    .filter((c: { toId: string }) => {
+      if (seenUndiscovered.has(c.toId)) return false;
+      seenUndiscovered.add(c.toId);
+      return true;
+    })
+    .map((c: { fromId: string; toId: string; explorationThreshold: number | null }) => ({
+      id: c.toId,
+      name: '???',
+      explorationThreshold: c.explorationThreshold ?? 0,
+      fromZoneId: c.fromId,
+      discovered: false as const,
+    }));
+
   res.json({
     zones: zones.map((z: { id: string; name: string; description: string | null; difficulty: number; travelCost: number; isStarter: boolean; zoneType: string; zoneExitChance: number | null; maxCraftingLevel: number | null; turnsToExplore: number | null; explorationTiers: Record<string, number> | null }) => {
       const discovered = discoveredZoneIds.has(z.id);
@@ -120,6 +139,7 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
       toId: c.toId,
       explorationThreshold: c.explorationThreshold ?? 0,
     })),
+    undiscoveredZones: undiscoveredHints,
     currentZoneId,
   });
 }));
