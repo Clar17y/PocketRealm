@@ -14,6 +14,7 @@ import { EventBadges } from '@/components/common/EventBadge';
 import { effectiveTurns as calcEffectiveTurns, inflateCost } from '@/lib/taxCalc';
 import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { EventModifierBadge } from '@/lib/api';
 
 interface ResourceNode {
   id: string;
@@ -29,7 +30,7 @@ interface ResourceNode {
   maxCapacity: number;
   sizeName: string;
   weathered?: boolean;
-  eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }>;
+  eventModifiers?: EventModifierBadge[];
 }
 
 interface GatheringProps {

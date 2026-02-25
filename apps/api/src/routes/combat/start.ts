@@ -32,7 +32,17 @@ import { setHp } from '../../services/hpService';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
-import { getActiveZoneModifiers, getActiveEventSummaries, getEventModifiersForEntity } from '../../services/worldEventService';
+import { getActiveZoneModifiers, getActiveEventSummaries, getEventModifiersForEntity, type EventModifierBadge } from '../../services/worldEventService';
+
+function tagEventsWithApplicability(
+  events: Array<{ title: string; effectType: string; effectValue: number }>,
+  entityBadges: EventModifierBadge[],
+) {
+  return events.map(e => ({
+    ...e,
+    appliedToThisMob: entityBadges.some(m => m.effectType === e.effectType && m.title === e.title),
+  }));
+}
 import {
   persistMobHp,
   checkPersistedMobReencounter,
@@ -576,10 +586,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       turnsToExplore: explorationProgress.turnsToExplore,
     },
     activeEvents: activeEventEffects.length > 0
-      ? activeEventEffects.map((e: { title: string; effectType: string; effectValue: number }) => ({
-          ...e,
-          appliedToThisMob: siteMobBadges.some(m => m.effectType === e.effectType && m.title === e.title),
-        }))
+      ? tagEventsWithApplicability(activeEventEffects, siteMobBadges)
       : undefined,
   });
 }
@@ -907,10 +914,7 @@ export function registerStartRoutes(router: Router): void {
           turnsToExplore: explorationProgress.turnsToExplore,
         },
         activeEvents: activeEventEffects.length > 0
-          ? activeEventEffects.map((e: { title: string; effectType: string; effectValue: number }) => ({
-              ...e,
-              appliedToThisMob: zoneMobBadges.some(m => m.effectType === e.effectType && m.title === e.title),
-            }))
+          ? tagEventsWithApplicability(activeEventEffects, zoneMobBadges)
           : undefined,
       });
   }));

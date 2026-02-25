@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { EventBadges } from '@/components/common/EventBadge';
+import type { EventModifierBadge } from '@/lib/api';
 
 export interface ExplorationPlaybackEvent {
   turn: number;
@@ -58,7 +59,7 @@ export function ExplorationPlayback({
   const [currentTurn, setCurrentTurn] = useState(0);
   const [revealedEventCount, setRevealedEventCount] = useState(0);
   const [phase, setPhase] = useState<'running' | 'paused-event' | 'paused-combat' | 'complete'>('running');
-  const [activeEventLabel, setActiveEventLabel] = useState<{ icon: string; text: string; color: string; eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }> } | null>(null);
+  const [activeEventLabel, setActiveEventLabel] = useState<{ icon: string; text: string; color: string; eventModifiers?: EventModifierBadge[] } | null>(null);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -102,7 +103,7 @@ export function ExplorationPlayback({
 
       const barTimer = addTimer(() => {
         const display = getEventDisplay(nextEvent.type);
-        const modifiers = nextEvent.details?.eventModifiers as Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }> | undefined;
+        const modifiers = nextEvent.details?.eventModifiers as EventModifierBadge[] | undefined;
         setActiveEventLabel({ icon: display.icon, text: nextEvent.description, color: display.color, eventModifiers: modifiers });
         onEventRevealed(nextEvent);
         setRevealedEventCount(prev => prev + 1);

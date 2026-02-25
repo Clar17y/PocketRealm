@@ -1,4 +1,5 @@
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
+import type { EventModifierBadge } from './combat';
 
 // Inventory
 
@@ -128,7 +129,7 @@ export interface GatheringNodesResponse {
     sizeName: string;
     discoveredAt: string;
     weathered: boolean;
-    eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }>;
+    eventModifiers?: EventModifierBadge[];
   }>;
   pagination: {
     page: number;

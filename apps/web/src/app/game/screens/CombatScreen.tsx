@@ -11,6 +11,7 @@ import { CombatHistory } from '@/components/screens/CombatHistory';
 import { BossHistory } from '@/components/screens/BossHistory';
 import { Pagination } from '@/components/common/Pagination';
 import { EventBadges } from '@/components/common/EventBadge';
+import type { CombatActiveEvent } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { monsterImageSrc } from '@/lib/assets';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
@@ -57,7 +58,7 @@ interface CombatScreenProps {
     combatantBMaxHp: number;
     log: LastCombatLogEntry[];
     rewards: LastCombat['rewards'];
-    activeEvents?: Array<{ title: string; effectType: string; effectValue: number; appliedToThisMob?: boolean }>;
+    activeEvents?: CombatActiveEvent[];
   } | null;
   combatSpeedMs?: number;
   autoSkipCombat?: boolean;

@@ -57,8 +57,10 @@ vi.mock('../../services/zoneExplorationService', () => ({
 }));
 vi.mock('../../services/worldEventService', () => ({
   getActiveZoneModifiers: vi.fn().mockResolvedValue([]),
+  getActiveEventsForZone: vi.fn().mockResolvedValue([]),
+  getActiveWorldWideEvents: vi.fn().mockResolvedValue([]),
   getSpawnRateModifiers: vi.fn().mockResolvedValue({ byFamily: new Map(), global: 1 }),
-  getEventModifiersForEntity: vi.fn().mockResolvedValue([]),
+  filterEventModifiers: vi.fn().mockReturnValue([]),
   spawnWorldEvent: vi.fn(),
 }));
 vi.mock('../../services/bossEncounterService', () => ({

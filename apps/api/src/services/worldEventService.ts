@@ -148,16 +148,15 @@ export interface EventModifierBadge {
   isGlobal: boolean;
 }
 
-/** Return badge data for events affecting a specific entity (mob family or resource type) in a zone. */
-export async function getEventModifiersForEntity(
-  zoneId: string,
+/**
+ * Synchronous variant: filter pre-fetched events for a specific entity.
+ * Use when zone/world events are already loaded (e.g., in exploration loop).
+ */
+export function filterEventModifiers(
+  zoneEvents: WorldEventData[],
+  worldEvents: WorldEventData[],
   context: { mobFamilyId?: string; resourceType?: string },
-): Promise<EventModifierBadge[]> {
-  const [zoneEvents, worldEvents] = await Promise.all([
-    getActiveEventsForZone(zoneId),
-    getActiveWorldWideEvents(),
-  ]);
-
+): EventModifierBadge[] {
   const badges: EventModifierBadge[] = [];
 
   for (const event of zoneEvents) {
@@ -175,6 +174,18 @@ export async function getEventModifiersForEntity(
   }
 
   return badges;
+}
+
+/** Return badge data for events affecting a specific entity (mob family or resource type) in a zone. */
+export async function getEventModifiersForEntity(
+  zoneId: string,
+  context: { mobFamilyId?: string; resourceType?: string },
+): Promise<EventModifierBadge[]> {
+  const [zoneEvents, worldEvents] = await Promise.all([
+    getActiveEventsForZone(zoneId),
+    getActiveWorldWideEvents(),
+  ]);
+  return filterEventModifiers(zoneEvents, worldEvents, context);
 }
 
 export async function getSpawnRateModifiers(zoneId: string): Promise<SpawnRateModifiers> {

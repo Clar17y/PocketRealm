@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { LastCombatLogEntry, LastCombat } from '@/app/game/useGameController';
+import type { CombatActiveEvent } from '@/lib/api';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
@@ -18,7 +19,7 @@ interface CombatPlaybackProps {
   mobMaxHp: number;
   log: LastCombatLogEntry[];
   rewards?: LastCombat['rewards'];
-  activeEvents?: Array<{ title: string; effectType: string; effectValue: number; appliedToThisMob?: boolean }>;
+  activeEvents?: CombatActiveEvent[];
   playerLabel?: string;
   defeatButtonLabel?: string;
   speedMs?: number;

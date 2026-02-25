@@ -37,7 +37,7 @@ import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
 import { addExplorationTurns, calculateExplorationPercent, getExplorationPercent } from '../../services/zoneExplorationService';
-import { getActiveZoneModifiers, getSpawnRateModifiers, getEventModifiersForEntity, spawnWorldEvent } from '../../services/worldEventService';
+import { getActiveZoneModifiers, getActiveEventsForZone, getActiveWorldWideEvents, getSpawnRateModifiers, filterEventModifiers, spawnWorldEvent } from '../../services/worldEventService';
 import { createBossEncounter } from '../../services/bossEncounterService';
 import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { getIo } from '../../socket';
@@ -136,10 +136,12 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     // Trigger lazy event scheduler
     await checkAndSpawnEvents(getIo());
 
-    // Fetch zone modifiers from active world events
-    const [zoneModifiers, spawnMods] = await Promise.all([
+    // Fetch zone modifiers and raw events (pre-fetch for badge reuse in the loop)
+    const [zoneModifiers, spawnMods, cachedZoneEvents, cachedWorldEvents] = await Promise.all([
       getActiveZoneModifiers(body.zoneId),
       getSpawnRateModifiers(body.zoneId),
+      getActiveEventsForZone(body.zoneId),
+      getActiveWorldWideEvents(),
     ]);
 
     // Auto-potion setup + tutorial detection
@@ -293,7 +295,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           f.mobFamily.members.some((m: ZoneFamilyMember) => m.mobTemplate.id === prefixedMob.id),
         );
         const ambushEventModifiers = ambushMobFamily
-          ? await getEventModifiersForEntity(body.zoneId, { mobFamilyId: ambushMobFamily.mobFamilyId })
+          ? filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: ambushMobFamily.mobFamilyId })
           : [];
 
         let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
@@ -477,7 +479,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             siteName,
             size,
             totalMobs: mobs.length,
-            eventModifiers: await getEventModifiersForEntity(body.zoneId, { mobFamilyId: pickedFamily.mobFamilyId }),
+            eventModifiers: filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: pickedFamily.mobFamilyId }),
           },
         });
 

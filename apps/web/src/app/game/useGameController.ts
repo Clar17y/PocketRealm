@@ -56,6 +56,8 @@ import {
   travelToZone,
   unequip,
   type AchievementsResponse,
+  type EventModifierBadge,
+  type CombatActiveEvent,
   type PlayerSettings,
   type WorldEventResponse,
 } from '@/lib/api';
@@ -104,7 +106,7 @@ export interface PendingEncounter {
   currentRoom: number;
   totalRooms: number;
   roomMobCounts: Array<{ room: number; alive: number; total: number }>;
-  eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }>;
+  eventModifiers?: EventModifierBadge[];
 }
 
 export interface LastCombatLogEntry {
@@ -327,7 +329,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     sizeName: string;
     discoveredAt: string;
     weathered: boolean;
-    eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }>;
+    eventModifiers?: EventModifierBadge[];
   }>>([]);
   const [gatheringLoading, setGatheringLoading] = useState(false);
   const [gatheringError, setGatheringError] = useState<string | null>(null);
@@ -453,7 +455,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     combatantBMaxHp: number;
     log: LastCombatLogEntry[];
     rewards: LastCombat['rewards'];
-    activeEvents?: Array<{ title: string; effectType: string; effectValue: number; appliedToThisMob?: boolean }>;
+    activeEvents?: CombatActiveEvent[];
   }> | null>(null);
   const [combatPlaybackIndex, setCombatPlaybackIndex] = useState(0);
   const [roomTransition, setRoomTransition] = useState<{ entering: number } | null>(null);

@@ -1,5 +1,20 @@
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 
+// Shared event modifier types
+export interface EventModifierBadge {
+  title: string;
+  effectType: string;
+  effectValue: number;
+  isGlobal: boolean;
+}
+
+export interface CombatActiveEvent {
+  title: string;
+  effectType: string;
+  effectValue: number;
+  appliedToThisMob?: boolean;
+}
+
 // Zones
 
 export async function getZones() {
@@ -289,7 +304,7 @@ export interface CombatResponse {
     durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
     skillXp: SkillXpGrantResponse | null;
   };
-  activeEvents?: Array<{ title: string; effectType: string; effectValue: number; appliedToThisMob?: boolean }>;
+  activeEvents?: CombatActiveEvent[];
   explorationProgress?: {
     turnsExplored: number;
     percent: number;
@@ -383,7 +398,7 @@ export interface EncounterSitesResponse {
     currentRoom: number;
     totalRooms: number;
     roomMobCounts: Array<{ room: number; alive: number; total: number }>;
-    eventModifiers?: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }>;
+    eventModifiers?: EventModifierBadge[];
   }>;
   pagination: {
     page: number;
