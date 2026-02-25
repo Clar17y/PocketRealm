@@ -101,7 +101,7 @@ export async function startExploration(zoneId: string, turns: number, tier?: num
     }>;
     hiddenCaches: Array<{
       turnOccurred: number;
-      loot?: Array<{ itemTemplateId: string; quantity: number }>;
+      loot?: Array<{ itemTemplateId: string; name: string; quantity: number }>;
       soulboundItem?: { itemTemplateId: string; name: string; rarity: string } | null;
     }>;
     zoneExitDiscovered: boolean;

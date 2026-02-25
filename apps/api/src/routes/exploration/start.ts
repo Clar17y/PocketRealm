@@ -196,7 +196,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
     const hiddenCaches: Array<{
       turnOccurred: number;
-      loot?: Array<{ itemTemplateId: string; quantity: number }>;
+      loot?: Array<{ itemTemplateId: string; name: string; quantity: number }>;
       soulboundItem?: { itemTemplateId: string; name: string; rarity: string } | null;
     }> = [];
     let zoneExitDiscovered = false;
@@ -782,7 +782,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           luck: progression.attributes.luck,
         });
 
-        const lootSummary = cacheLoot.materials.map(m => ({ itemTemplateId: m.itemTemplateId, quantity: m.quantity }));
+        const lootSummary = cacheLoot.materials.map(m => ({
+          itemTemplateId: m.itemTemplateId,
+          name: m.name,
+          quantity: m.quantity,
+        }));
+
+        // Build human-readable description listing actual items
+        const itemList = lootSummary.map(m => `${m.quantity}x ${m.name}`).join(', ');
 
         // Update the corresponding event's details
         const cacheEvent = events.find(e => e.type === 'hidden_cache' && e.turn === cache.turnOccurred);
@@ -792,9 +799,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             soulboundItem: cacheLoot.soulboundItem,
           };
           if (cacheLoot.soulboundItem) {
-            cacheEvent.description = `You found a hidden cache containing a ${cacheLoot.soulboundItem.rarity} ${cacheLoot.soulboundItem.name}!`;
+            cacheEvent.description = `You found a hidden cache containing a ${cacheLoot.soulboundItem.rarity} ${cacheLoot.soulboundItem.name}! (${itemList})`;
           } else {
-            cacheEvent.description = `You found a hidden cache with ${cacheLoot.materials.length} material${cacheLoot.materials.length === 1 ? '' : 's'}!`;
+            cacheEvent.description = `You found a hidden cache: ${itemList}`;
           }
         }
 

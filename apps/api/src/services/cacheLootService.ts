@@ -3,8 +3,14 @@ import { HIDDEN_CACHE_CONSTANTS, type LootDrop } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantDropsTx, type DropTableEntry } from './dropRollingService';
 
+export interface CacheMaterialDrop {
+  itemTemplateId: string;
+  name: string;
+  quantity: number;
+}
+
 export interface CacheLootResult {
-  materials: LootDrop[];
+  materials: CacheMaterialDrop[];
   soulboundItem: { itemTemplateId: string; name: string; rarity: string } | null;
 }
 
@@ -52,7 +58,15 @@ export async function grantCacheLootTx(
     },
   })) as DropTableEntry[];
 
-  const materials = await rollAndGrantDropsTx(tx, params.playerId, dropEntries, materialRolls);
+  const rawMaterials = await rollAndGrantDropsTx(tx, params.playerId, dropEntries, materialRolls);
+
+  // Resolve item names from drop entries
+  const nameById = new Map(dropEntries.map(e => [e.itemTemplateId, (e.itemTemplate as { name?: string }).name ?? 'Unknown']));
+  const materials: CacheMaterialDrop[] = rawMaterials.map(m => ({
+    itemTemplateId: m.itemTemplateId,
+    name: nameById.get(m.itemTemplateId) ?? 'Unknown',
+    quantity: m.quantity,
+  }));
 
   // Soulbound item roll
   let soulboundItem: CacheLootResult['soulboundItem'] = null;
