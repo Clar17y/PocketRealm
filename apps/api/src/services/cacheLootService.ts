@@ -1,7 +1,7 @@
 import { Prisma } from '@adventure/database';
-import { HIDDEN_CACHE_CONSTANTS, type LootDrop } from '@adventure/shared';
+import { HIDDEN_CACHE_CONSTANTS, GEM_CONSTANTS, levelToGemTier } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
-import { rollAndGrantDropsTx, type DropTableEntry } from './dropRollingService';
+import { addStackableItemTx } from './inventoryService';
 
 export interface CacheMaterialDrop {
   itemTemplateId: string;
@@ -36,39 +36,77 @@ export async function grantCacheLootTx(
   tx: Prisma.TransactionClient,
   params: {
     playerId: string;
-    mobFamilyId: string;
+    zoneId: string;
+    mobFamilyId: string; // still needed for soulbound recipes
     luck: number;
   }
 ): Promise<CacheLootResult> {
   const txAny = tx as unknown as Record<string, unknown>;
   const { MATERIAL_ROLLS_MIN, MATERIAL_ROLLS_MAX, SOULBOUND_DROP_CHANCE } = HIDDEN_CACHE_CONSTANTS;
 
-  const materialRolls = randomIntInclusive(MATERIAL_ROLLS_MIN, MATERIAL_ROLLS_MAX);
+  // --- Refined gem materials from zone gathering nodes ---
+  const resourceNodes = await (txAny as any).resourceNode.findMany({
+    where: { zoneId: params.zoneId },
+    select: { skillRequired: true, levelRequired: true },
+  }) as Array<{ skillRequired: string; levelRequired: number }>;
 
-  // Use 'common' chest drop table for materials (same as encounter site chests)
-  const dropEntries = (await (txAny as any).chestDropTable.findMany({
-    where: {
-      mobFamilyId: params.mobFamilyId,
-      chestRarity: 'common',
-    },
-    include: {
-      itemTemplate: {
-        select: { itemType: true, stackable: true, maxDurability: true, name: true },
+  const cutGemTemplateIds: Array<{ templateId: string; name: string }> = [];
+
+  for (const node of resourceNodes) {
+    const gemTier = levelToGemTier(node.levelRequired);
+    const rawGemName = GEM_CONSTANTS.GEM_BY_SKILL_TIER[node.skillRequired]?.[gemTier];
+    if (!rawGemName) continue;
+
+    // Find the raw gem template
+    const rawGemTemplate = await (txAny as any).itemTemplate.findFirst({
+      where: { name: rawGemName, itemType: 'resource' },
+      select: { id: true },
+    }) as { id: string } | null;
+    if (!rawGemTemplate) continue;
+
+    // Find the refining recipe that uses this raw gem as a material
+    const refiningRecipe = await (txAny as any).craftingRecipe.findFirst({
+      where: {
+        skillType: 'refining',
+        materials: { some: { itemTemplateId: rawGemTemplate.id } },
       },
-    },
-  })) as DropTableEntry[];
+      select: {
+        resultTemplateId: true,
+        resultTemplate: { select: { name: true } },
+      },
+    }) as { resultTemplateId: string; resultTemplate: { name: string } } | null;
+    if (!refiningRecipe) continue;
 
-  const rawMaterials = await rollAndGrantDropsTx(tx, params.playerId, dropEntries, materialRolls);
+    cutGemTemplateIds.push({
+      templateId: refiningRecipe.resultTemplateId,
+      name: refiningRecipe.resultTemplate.name,
+    });
+  }
 
-  // Resolve item names from drop entries
-  const nameById = new Map(dropEntries.map(e => [e.itemTemplateId, (e.itemTemplate as { name?: string }).name ?? 'Unknown']));
-  const materials: CacheMaterialDrop[] = rawMaterials.map(m => ({
-    itemTemplateId: m.itemTemplateId,
-    name: nameById.get(m.itemTemplateId) ?? 'Unknown',
-    quantity: m.quantity,
-  }));
+  // Roll 2-4 cut gems from the available pool (random picks with replacement)
+  const materials: CacheMaterialDrop[] = [];
 
-  // Soulbound item roll
+  if (cutGemTemplateIds.length > 0) {
+    const materialRolls = randomIntInclusive(MATERIAL_ROLLS_MIN, MATERIAL_ROLLS_MAX);
+    const materialMap = new Map<string, CacheMaterialDrop>();
+
+    for (let i = 0; i < materialRolls; i++) {
+      const picked = cutGemTemplateIds[randomIntInclusive(0, cutGemTemplateIds.length - 1)]!;
+
+      await addStackableItemTx(tx, params.playerId, picked.templateId, 1);
+
+      const existing = materialMap.get(picked.templateId);
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        const drop: CacheMaterialDrop = { itemTemplateId: picked.templateId, name: picked.name, quantity: 1 };
+        materialMap.set(picked.templateId, drop);
+        materials.push(drop);
+      }
+    }
+  }
+
+  // --- Soulbound item roll (unchanged, uses mob family) ---
   let soulboundItem: CacheLootResult['soulboundItem'] = null;
 
   if (Math.random() < SOULBOUND_DROP_CHANCE) {

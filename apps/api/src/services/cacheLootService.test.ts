@@ -52,15 +52,11 @@ describe('rollRarityWithLuck', () => {
   });
 
   it('clamps common weight at minimum 5 even at very high luck', () => {
-    // At luck=1000, the common weight formula: max(5, 50 - 1000*0.005*100) = max(5, -450) = 5
-    // Common should still appear occasionally because its weight is clamped to 5
     const counts: Record<string, number> = { common: 0, uncommon: 0, rare: 0, epic: 0 };
     for (let i = 0; i < 5000; i++) {
       counts[rollRarityWithLuck(1000)]++;
     }
-    // Common should still appear (weight=5 out of total)
     expect(counts.common).toBeGreaterThan(0);
-    // But very rare compared to others
     expect(counts.common).toBeLessThan(counts.uncommon + counts.rare + counts.epic);
   });
 });
@@ -76,50 +72,45 @@ describe('grantCacheLootTx', () => {
 
   const params = {
     playerId: 'player-1',
+    zoneId: 'zone-1',
     mobFamilyId: 'family-1',
     luck: 0,
   };
 
   beforeEach(() => {
-    mockTxAny.chestDropTable = { findMany: vi.fn() };
-    mockTxAny.craftingRecipe = { findMany: vi.fn() };
+    mockTxAny.resourceNode = { findMany: vi.fn() };
+    mockTxAny.itemTemplate = { findFirst: vi.fn() };
+    mockTxAny.craftingRecipe = { findFirst: vi.fn(), findMany: vi.fn() };
     (mockTx.item.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
   });
 
-  it('grants 2-4 material drops when drop table has entries', async () => {
-    // Fix random so materialRolls = randomIntInclusive(2,4) and pickWeighted always picks
-    // We need Math.random calls: randomIntInclusive for materialRolls, then pickWeighted for each roll,
-    // then randomIntInclusive for quantity per roll, then the soulbound check.
-    // Use a real random but just ensure the drop table has entries.
+  it('grants 2-4 cut gem drops when zone has resource nodes with refining recipes', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
-    mockTxAny.chestDropTable.findMany.mockResolvedValue([
-      {
-        itemTemplateId: 'ore-1',
-        dropChance: 10,
-        minQuantity: 1,
-        maxQuantity: 1,
-        itemTemplate: { itemType: 'material', stackable: true, maxDurability: 0, name: 'Iron Ore' },
-      },
+    mockTxAny.resourceNode.findMany.mockResolvedValue([
+      { skillRequired: 'mining', levelRequired: 5 },
     ]);
+    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
+    mockTxAny.craftingRecipe.findFirst.mockResolvedValue({
+      resultTemplateId: 'cut-sapphire-id',
+      resultTemplate: { name: 'Cut Sapphire' },
+    });
     mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
 
     const result = await grantCacheLootTx(mockTx, params);
 
-    // Should have material loot
     expect(result.materials.length).toBeGreaterThan(0);
-    expect(result.materials[0]!.itemTemplateId).toBe('ore-1');
-    // addStackableItemTx should have been called
+    expect(result.materials[0]!.itemTemplateId).toBe('cut-sapphire-id');
+    expect(result.materials[0]!.name).toBe('Cut Sapphire');
     expect(addStackableItemTx).toHaveBeenCalled();
-    // quantity should be between MATERIAL_ROLLS_MIN(2) and MATERIAL_ROLLS_MAX(4)
     const totalQuantity = result.materials.reduce((sum, m) => sum + m.quantity, 0);
     expect(totalQuantity).toBeGreaterThanOrEqual(HIDDEN_CACHE_CONSTANTS.MATERIAL_ROLLS_MIN);
     expect(totalQuantity).toBeLessThanOrEqual(HIDDEN_CACHE_CONSTANTS.MATERIAL_ROLLS_MAX);
   });
 
-  it('returns empty materials when drop table has no entries', async () => {
+  it('returns empty materials when zone has no resource nodes', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999);
-    mockTxAny.chestDropTable.findMany.mockResolvedValue([]);
+    mockTxAny.resourceNode.findMany.mockResolvedValue([]);
     mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
 
     const result = await grantCacheLootTx(mockTx, params);
@@ -129,21 +120,69 @@ describe('grantCacheLootTx', () => {
     expect(addStackableItemTx).not.toHaveBeenCalled();
   });
 
+  it('returns empty materials when no raw gem template exists', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    mockTxAny.resourceNode.findMany.mockResolvedValue([
+      { skillRequired: 'mining', levelRequired: 5 },
+    ]);
+    mockTxAny.itemTemplate.findFirst.mockResolvedValue(null);
+    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
+
+    const result = await grantCacheLootTx(mockTx, params);
+
+    expect(result.materials).toEqual([]);
+    expect(addStackableItemTx).not.toHaveBeenCalled();
+  });
+
+  it('returns empty materials when no refining recipe exists for the raw gem', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    mockTxAny.resourceNode.findMany.mockResolvedValue([
+      { skillRequired: 'mining', levelRequired: 5 },
+    ]);
+    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
+    mockTxAny.craftingRecipe.findFirst.mockResolvedValue(null);
+    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
+
+    const result = await grantCacheLootTx(mockTx, params);
+
+    expect(result.materials).toEqual([]);
+    expect(addStackableItemTx).not.toHaveBeenCalled();
+  });
+
+  it('aggregates quantities when the same gem is picked multiple times', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    mockTxAny.resourceNode.findMany.mockResolvedValue([
+      { skillRequired: 'mining', levelRequired: 5 },
+    ]);
+    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
+    mockTxAny.craftingRecipe.findFirst.mockResolvedValue({
+      resultTemplateId: 'cut-sapphire-id',
+      resultTemplate: { name: 'Cut Sapphire' },
+    });
+    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
+
+    const result = await grantCacheLootTx(mockTx, params);
+
+    // With only one gem type, all rolls should aggregate into one entry
+    expect(result.materials.length).toBe(1);
+    expect(result.materials[0]!.itemTemplateId).toBe('cut-sapphire-id');
+    const totalQuantity = result.materials[0]!.quantity;
+    expect(totalQuantity).toBeGreaterThanOrEqual(HIDDEN_CACHE_CONSTANTS.MATERIAL_ROLLS_MIN);
+    expect(totalQuantity).toBeLessThanOrEqual(HIDDEN_CACHE_CONSTANTS.MATERIAL_ROLLS_MAX);
+  });
+
   it('grants soulbound item when Math.random < SOULBOUND_DROP_CHANCE', async () => {
-    // First random calls: materialRolls, then per-roll picks, then soulbound check
-    // We need the soulbound check (Math.random()) to be < 0.15
-    // Strategy: mock random to return 0.01 for everything
     vi.spyOn(Math, 'random').mockReturnValue(0.01);
 
-    mockTxAny.chestDropTable.findMany.mockResolvedValue([
-      {
-        itemTemplateId: 'ore-1',
-        dropChance: 10,
-        minQuantity: 1,
-        maxQuantity: 1,
-        itemTemplate: { itemType: 'material', stackable: true, maxDurability: 0, name: 'Iron Ore' },
-      },
+    mockTxAny.resourceNode.findMany.mockResolvedValue([
+      { skillRequired: 'mining', levelRequired: 5 },
     ]);
+    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
+    mockTxAny.craftingRecipe.findFirst.mockResolvedValue({
+      resultTemplateId: 'cut-sapphire-id',
+      resultTemplate: { name: 'Cut Sapphire' },
+    });
     mockTxAny.craftingRecipe.findMany.mockResolvedValue([
       {
         resultTemplateId: 'sword-soul-1',
@@ -156,23 +195,20 @@ describe('grantCacheLootTx', () => {
     expect(result.soulboundItem).not.toBeNull();
     expect(result.soulboundItem!.itemTemplateId).toBe('sword-soul-1');
     expect(result.soulboundItem!.name).toBe('Soulbound Sword');
-    // item.create should have been called for the soulbound item
     expect(mockTx.item.create).toHaveBeenCalled();
   });
 
   it('does not grant soulbound item when Math.random >= SOULBOUND_DROP_CHANCE', async () => {
-    // Return 0.99 so soulbound check fails (0.99 >= 0.15)
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
-    mockTxAny.chestDropTable.findMany.mockResolvedValue([
-      {
-        itemTemplateId: 'ore-1',
-        dropChance: 10,
-        minQuantity: 1,
-        maxQuantity: 1,
-        itemTemplate: { itemType: 'material', stackable: true, maxDurability: 0, name: 'Iron Ore' },
-      },
+    mockTxAny.resourceNode.findMany.mockResolvedValue([
+      { skillRequired: 'mining', levelRequired: 5 },
     ]);
+    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
+    mockTxAny.craftingRecipe.findFirst.mockResolvedValue({
+      resultTemplateId: 'cut-sapphire-id',
+      resultTemplate: { name: 'Cut Sapphire' },
+    });
     mockTxAny.craftingRecipe.findMany.mockResolvedValue([
       {
         resultTemplateId: 'sword-soul-1',
@@ -186,18 +222,16 @@ describe('grantCacheLootTx', () => {
   });
 
   it('does not grant soulbound item when no soulbound recipes exist', async () => {
-    // random < 0.15 so soulbound roll passes, but no recipes available
     vi.spyOn(Math, 'random').mockReturnValue(0.01);
 
-    mockTxAny.chestDropTable.findMany.mockResolvedValue([
-      {
-        itemTemplateId: 'ore-1',
-        dropChance: 10,
-        minQuantity: 1,
-        maxQuantity: 1,
-        itemTemplate: { itemType: 'material', stackable: true, maxDurability: 0, name: 'Iron Ore' },
-      },
+    mockTxAny.resourceNode.findMany.mockResolvedValue([
+      { skillRequired: 'mining', levelRequired: 5 },
     ]);
+    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
+    mockTxAny.craftingRecipe.findFirst.mockResolvedValue({
+      resultTemplateId: 'cut-sapphire-id',
+      resultTemplate: { name: 'Cut Sapphire' },
+    });
     mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
 
     const result = await grantCacheLootTx(mockTx, params);
@@ -205,26 +239,44 @@ describe('grantCacheLootTx', () => {
     expect(result.soulboundItem).toBeNull();
   });
 
-  it('creates non-stackable items via tx.item.create', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  it('handles multiple resource nodes producing different cut gems', async () => {
+    // Use alternating random values: first call = 0.5 (material rolls), then alternating for picks
+    let callCount = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => {
+      callCount++;
+      // Return 0.99 so soulbound check fails
+      if (callCount > 10) return 0.99;
+      return 0.5;
+    });
 
-    mockTxAny.chestDropTable.findMany.mockResolvedValue([
-      {
-        itemTemplateId: 'helm-1',
-        dropChance: 10,
-        minQuantity: 1,
-        maxQuantity: 1,
-        itemTemplate: { itemType: 'armor', stackable: false, maxDurability: 50, name: 'Iron Helm' },
-      },
+    mockTxAny.resourceNode.findMany.mockResolvedValue([
+      { skillRequired: 'mining', levelRequired: 5 },
+      { skillRequired: 'foraging', levelRequired: 1 },
     ]);
+
+    // First call: raw sapphire for mining tier 2, second call: raw amber for foraging tier 1
+    mockTxAny.itemTemplate.findFirst
+      .mockResolvedValueOnce({ id: 'raw-sapphire-id' })
+      .mockResolvedValueOnce({ id: 'raw-amber-id' });
+
+    mockTxAny.craftingRecipe.findFirst
+      .mockResolvedValueOnce({
+        resultTemplateId: 'cut-sapphire-id',
+        resultTemplate: { name: 'Cut Sapphire' },
+      })
+      .mockResolvedValueOnce({
+        resultTemplateId: 'polished-amber-id',
+        resultTemplate: { name: 'Polished Amber' },
+      });
+
     mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
 
     const result = await grantCacheLootTx(mockTx, params);
 
-    // Non-stackable armor items should use tx.item.create, not addStackableItemTx
-    expect(mockTx.item.create).toHaveBeenCalled();
-    expect(addStackableItemTx).not.toHaveBeenCalled();
     expect(result.materials.length).toBeGreaterThan(0);
-    expect(result.materials[0]!.itemTemplateId).toBe('helm-1');
+    expect(addStackableItemTx).toHaveBeenCalled();
+    const totalQuantity = result.materials.reduce((sum, m) => sum + m.quantity, 0);
+    expect(totalQuantity).toBeGreaterThanOrEqual(HIDDEN_CACHE_CONSTANTS.MATERIAL_ROLLS_MIN);
+    expect(totalQuantity).toBeLessThanOrEqual(HIDDEN_CACHE_CONSTANTS.MATERIAL_ROLLS_MAX);
   });
 });

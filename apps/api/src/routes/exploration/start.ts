@@ -778,6 +778,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       for (const cache of pendingCacheLoot) {
         const cacheLoot = await grantCacheLootTx(tx, {
           playerId,
+          zoneId: body.zoneId,
           mobFamilyId: cache.mobFamilyId,
           luck: progression.attributes.luck,
         });

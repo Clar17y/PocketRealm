@@ -489,6 +489,32 @@ export const WORLD_EVENT_CONSTANTS = {
 } as const;
 
 // =============================================================================
+// GEM TIER MAPPING (gathering skill + node level → gem name)
+// =============================================================================
+
+export const GEM_CONSTANTS = {
+  GEM_BY_SKILL_TIER: {
+    mining: { 1: 'Rough Ruby', 2: 'Rough Sapphire', 3: 'Rough Emerald', 4: 'Rough Diamond', 5: 'Rough Opal' },
+    foraging: { 1: 'Raw Amber', 2: 'Raw Pearl', 3: 'Raw Jade', 4: 'Raw Moonstone', 5: 'Raw Starcrystal' },
+    woodcutting: { 1: 'Tree Resin', 2: 'Fossilized Sap', 3: 'Crystal Bark', 4: 'Heartwood Gem', 5: 'Ancient Amber' },
+  } as Record<string, Record<number, string>>,
+  LEVEL_TO_TIER_THRESHOLDS: [
+    { minLevel: 28, tier: 5 },
+    { minLevel: 20, tier: 4 },
+    { minLevel: 12, tier: 3 },
+    { minLevel: 5, tier: 2 },
+    { minLevel: 0, tier: 1 },
+  ],
+} as const;
+
+export function levelToGemTier(levelRequired: number): number {
+  for (const { minLevel, tier } of GEM_CONSTANTS.LEVEL_TO_TIER_THRESHOLDS) {
+    if (levelRequired >= minLevel) return tier;
+  }
+  return 1;
+}
+
+// =============================================================================
 // HIDDEN CACHE REWARDS
 // =============================================================================
 
