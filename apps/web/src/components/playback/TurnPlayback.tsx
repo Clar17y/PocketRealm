@@ -124,6 +124,35 @@ export function TurnPlayback({
             });
           }}
           onCombatStart={(event) => {
+            // Auto-skip known mobs: bypass fetch entirely, resume exploration
+            if (autoSkipKnownCombat && bestiaryMobs) {
+              const mobId = event.details?.mobTemplateId as string | undefined;
+              const prefix = event.details?.mobPrefix as string | undefined;
+              if (mobId && isMobKnown(mobId, prefix, bestiaryMobs)) {
+                // Track HP from event summary (no log needed)
+                const hpRemaining = event.details?.playerHpRemaining as number | undefined;
+                if (hpRemaining !== undefined) setPlayerHpForNextCombat(hpRemaining);
+
+                const typeMap: Record<string, 'info' | 'success' | 'danger'> = {
+                  ambush_defeat: 'danger',
+                  ambush_victory: 'success',
+                };
+                onPushLog?.({
+                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  type: typeMap[event.type] ?? 'info',
+                  message: `Turn ${event.turn}: ${event.description}`,
+                });
+
+                if (event.type === 'ambush_defeat') {
+                  onComplete();
+                } else {
+                  setResumeFromCombat(true);
+                  setTimeout(() => setResumeFromCombat(false), 100);
+                }
+                return;
+              }
+            }
+
             setCombatEvent(event);
             if (combatLogPrefetch) {
               const currentIdx = events.findIndex(e => e === event);
