@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { HpStatusBar } from '@/components/common/HpStatusBar';
+import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { LowHpWarningDialog } from '@/components/common/LowHpWarningDialog';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
@@ -188,7 +189,7 @@ export function CombatScreen({
     <div className="space-y-4">
       {/* Strategy Selection Modal */}
       {strategyModalSite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+        <ModalOverlay>
           <div className="bg-[var(--rpg-bg-dark,#1a1a2e)] border border-[var(--rpg-gold,#c8a84e)] rounded-lg p-6 max-w-sm w-full mx-4">
             <h3 className="text-[var(--rpg-gold,#c8a84e)] font-bold text-lg mb-1">Choose Strategy</h3>
             <p className="text-[var(--rpg-light-dim,#a0a0b0)] text-sm mb-4">
@@ -233,7 +234,7 @@ export function CombatScreen({
               </button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
 
       {/* Low HP Warning Dialog */}

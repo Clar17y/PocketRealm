@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
 import { AppShell } from '@/components/AppShell';
+import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
 import { Exploration } from '@/components/screens/Exploration';
@@ -289,6 +290,9 @@ export default function GamePage() {
     handleSetLowHpWarning,
     handleQuickRest,
     guildTaxRate,
+    showChangelog,
+    dismissChangelog,
+    openChangelog,
     zoneCraftingLevel,
     zoneCraftingName,
     loadTurnsAndHp,
@@ -1077,11 +1081,14 @@ export default function GamePage() {
 
   return (
     <>
+      {showChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
       <AppShell
   turns={turns}
   username={player?.username}
   onSettings={() => handleNavigate('settings')}
   onLogout={() => { logout(); router.push('/'); }}
+  onWhatsNew={openChangelog}
+  hasUnseenChangelog={showChangelog}
 >
         {/* Broken gear warning banner */}
         {equipment.some((e) => {

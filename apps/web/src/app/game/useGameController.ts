@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { updateTutorialStep } from '@/lib/api';
 import {
@@ -431,6 +432,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [activeTitle, setActiveTitleState] = useState<string | null>(null);
   const combatLogPrefetch = useCombatLogPrefetch();
   const [playbackActive, setPlaybackActive] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   const [combatPlaybackQueue, setCombatPlaybackQueue] = useState<Array<{
     room?: number;
     mobName: string;
@@ -632,6 +634,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       void getActiveTitle().then((res) => {
         if (res.data) setActiveTitleState(res.data.activeTitle);
       });
+      // Auto-show changelog if unseen
+      const latestVer = getLatestVersion();
+      if (latestVer && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVer) {
+        setShowChangelog(true);
+      }
       const interval = setInterval(() => void loadTurnsAndHp(), 10000);
       // Poll PvP notifications less frequently (60s)
       const pvpInterval = setInterval(() => void loadPvpNotificationCount(), 60000);
@@ -1791,6 +1798,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   };
 
+  const dismissChangelog = useCallback(() => {
+    localStorage.setItem(CHANGELOG_STORAGE_KEY, getLatestVersion());
+    setShowChangelog(false);
+  }, []);
+
+  const openChangelog = useCallback(() => setShowChangelog(true), []);
+
   return {
     // Navigation
     activeScreen,
@@ -1885,6 +1899,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
     // Guild
     guildTaxRate,
+
+    // Changelog
+    showChangelog,
+    dismissChangelog,
+    openChangelog,
 
     // World Events
     activeEvents,
