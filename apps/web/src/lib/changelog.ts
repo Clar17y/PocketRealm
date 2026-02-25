@@ -7,6 +7,27 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.15',
+    date: '2026-02-25',
+    title: 'World Events Overhaul',
+    summary:
+      'World events are now much more visible — event badges appear on gathering nodes, encounter sites, and combat logs so you always know what modifiers are active. Spawn rate events affect exploration ambush and encounter site rates. Per-zone event caps keep things balanced.',
+  },
+  {
+    version: '0.14',
+    date: '2026-02-25',
+    title: 'Zone Exploration Upgrades',
+    summary:
+      'Choose which mob tier to hunt when exploring. Zone exit chance scales with your exploration progress and auto-unlocks at 100%. Undiscovered zone connections appear as mysterious \'???\' hints. Hidden caches now drop materials and soulbound items. Thematic tier names in the bestiary and exploration UI.',
+  },
+  {
+    version: '0.13',
+    date: '2026-02-25',
+    title: 'Performance & Quality of Life',
+    summary:
+      'Combat logs now load lazily — exploration and encounter site responses are much lighter, with logs fetched on demand during playback. HTTP compression reduces API payload sizes. Auto-skip works on travel and exploration ambushes. Double-click protection on the explore button. Death tracking for boss and PvP knockouts.',
+  },
+  {
     version: '0.12',
     date: '2026-02-24',
     title: 'Game Assets & Visual Polish',
