@@ -67,8 +67,8 @@ function isAllowedCorsOrigin(origin: string): boolean {
 }
 
 // Middleware
-app.use(compression());
 app.use(helmet());
+app.use(compression());
 app.use(cors({
   origin: (origin, callback) => {
     // Allow non-browser or same-origin requests without Origin header.

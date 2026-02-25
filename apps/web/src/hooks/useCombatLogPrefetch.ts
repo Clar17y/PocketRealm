@@ -19,6 +19,9 @@ export function useCombatLogPrefetch() {
       cacheRef.current.set(combatLogId, log);
       inflightRef.current.delete(combatLogId);
       return log;
+    }).catch(() => {
+      inflightRef.current.delete(combatLogId);
+      return [] as CombatLogEntryResponse[];
     });
 
     inflightRef.current.set(combatLogId, promise);

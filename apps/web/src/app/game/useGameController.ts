@@ -974,6 +974,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
     }
     setExplorationPlaybackData(null);
+    combatLogPrefetch.clear();
     setPlaybackActive(false);
     await advanceTutorial(TUTORIAL_STEP_EXPLORE);
     await loadAll();
@@ -1063,7 +1064,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       // Build playback queue from fights[] or single-element queue for zone combat
       if (data.combat.fights && data.combat.fights.length > 0) {
         const queue = data.combat.fights.map((fight) => {
-          const fightLogId = (fight as unknown as Record<string, unknown>).combatLogId as string | undefined;
+          const fightLogId = fight.combatLogId;
           return {
             room: fight.room,
             mobName: fight.mobName ?? data.combat.mobName,
@@ -1111,7 +1112,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         setCombatPlaybackQueue(queue);
         setCombatPlaybackIndex(0);
       } else {
-        const combatLogId = (data.combat as unknown as Record<string, unknown>).combatLogId as string | undefined;
+        const combatLogId = data.combat.combatLogId;
         setCombatPlaybackQueue([{
           mobName: data.combat.mobName,
           mobDisplayName: data.combat.mobDisplayName,
@@ -1242,6 +1243,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setCombatPlaybackIndex(0);
     setRoomTransition(null);
     pendingCombatRewardsRef.current = null;
+    combatLogPrefetch.clear();
     setPlaybackActive(false);
 
     if (siteJustClearedRef.current) {
