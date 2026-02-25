@@ -800,7 +800,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             soulboundItem: cacheLoot.soulboundItem,
           };
           if (cacheLoot.soulboundItem) {
-            cacheEvent.description = `You found a hidden cache containing a ${cacheLoot.soulboundItem.rarity} ${cacheLoot.soulboundItem.name}! (${itemList})`;
+            const article = /^[aeiou]/i.test(cacheLoot.soulboundItem.rarity) ? 'an' : 'a';
+            cacheEvent.description = `You found a hidden cache containing ${article} ${cacheLoot.soulboundItem.rarity} ${cacheLoot.soulboundItem.name}! (${itemList})`;
           } else {
             cacheEvent.description = `You found a hidden cache: ${itemList}`;
           }

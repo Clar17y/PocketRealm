@@ -41,7 +41,6 @@ describe('rollRarityWithLuck', () => {
       highLuckCounts[rollRarityWithLuck(100)]++;
     }
 
-    // At high luck, epic should be more common and common should be less common
     const lowEpicRate = lowLuckCounts.epic / 5000;
     const highEpicRate = highLuckCounts.epic / 5000;
     expect(highEpicRate).toBeGreaterThan(lowEpicRate);
@@ -79,23 +78,34 @@ describe('grantCacheLootTx', () => {
 
   beforeEach(() => {
     mockTxAny.resourceNode = { findMany: vi.fn() };
-    mockTxAny.itemTemplate = { findFirst: vi.fn() };
-    mockTxAny.craftingRecipe = { findFirst: vi.fn(), findMany: vi.fn() };
+    mockTxAny.itemTemplate = { findMany: vi.fn() };
+    mockTxAny.craftingRecipe = { findMany: vi.fn() };
     (mockTx.item.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
   });
 
-  it('grants 2-4 cut gem drops when zone has resource nodes with refining recipes', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
-
+  // Helper: set up mocks for a zone with mining nodes that produce Cut Sapphire
+  function setupMiningZone() {
     mockTxAny.resourceNode.findMany.mockResolvedValue([
       { skillRequired: 'mining', levelRequired: 5 },
     ]);
-    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
-    mockTxAny.craftingRecipe.findFirst.mockResolvedValue({
-      resultTemplateId: 'cut-sapphire-id',
-      resultTemplate: { name: 'Cut Sapphire' },
-    });
-    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
+    mockTxAny.itemTemplate.findMany.mockResolvedValue([
+      { id: 'raw-sapphire-id', name: 'Rough Sapphire' },
+    ]);
+    // craftingRecipe.findMany is called twice:
+    // 1st: refining recipes (skillType: 'refining')
+    // 2nd: soulbound recipes (soulbound: true, mobFamilyId: ...)
+    mockTxAny.craftingRecipe.findMany
+      .mockResolvedValueOnce([{
+        resultTemplateId: 'cut-sapphire-id',
+        resultTemplate: { name: 'Cut Sapphire' },
+        materials: [{ templateId: 'raw-sapphire-id', quantity: 2 }],
+      }])
+      .mockResolvedValueOnce([]); // no soulbound recipes
+  }
+
+  it('grants 2-4 cut gem drops when zone has resource nodes with refining recipes', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    setupMiningZone();
 
     const result = await grantCacheLootTx(mockTx, params);
 
@@ -111,7 +121,7 @@ describe('grantCacheLootTx', () => {
   it('returns empty materials when zone has no resource nodes', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999);
     mockTxAny.resourceNode.findMany.mockResolvedValue([]);
-    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
+    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]); // soulbound query
 
     const result = await grantCacheLootTx(mockTx, params);
 
@@ -125,8 +135,10 @@ describe('grantCacheLootTx', () => {
     mockTxAny.resourceNode.findMany.mockResolvedValue([
       { skillRequired: 'mining', levelRequired: 5 },
     ]);
-    mockTxAny.itemTemplate.findFirst.mockResolvedValue(null);
-    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
+    mockTxAny.itemTemplate.findMany.mockResolvedValue([]); // no templates found
+    mockTxAny.craftingRecipe.findMany
+      .mockResolvedValueOnce([]) // refining recipes (empty since no gems)
+      .mockResolvedValueOnce([]); // soulbound
 
     const result = await grantCacheLootTx(mockTx, params);
 
@@ -139,9 +151,12 @@ describe('grantCacheLootTx', () => {
     mockTxAny.resourceNode.findMany.mockResolvedValue([
       { skillRequired: 'mining', levelRequired: 5 },
     ]);
-    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
-    mockTxAny.craftingRecipe.findFirst.mockResolvedValue(null);
-    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
+    mockTxAny.itemTemplate.findMany.mockResolvedValue([
+      { id: 'raw-sapphire-id', name: 'Rough Sapphire' },
+    ]);
+    mockTxAny.craftingRecipe.findMany
+      .mockResolvedValueOnce([]) // no refining recipes
+      .mockResolvedValueOnce([]); // soulbound
 
     const result = await grantCacheLootTx(mockTx, params);
 
@@ -151,16 +166,7 @@ describe('grantCacheLootTx', () => {
 
   it('aggregates quantities when the same gem is picked multiple times', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
-
-    mockTxAny.resourceNode.findMany.mockResolvedValue([
-      { skillRequired: 'mining', levelRequired: 5 },
-    ]);
-    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
-    mockTxAny.craftingRecipe.findFirst.mockResolvedValue({
-      resultTemplateId: 'cut-sapphire-id',
-      resultTemplate: { name: 'Cut Sapphire' },
-    });
-    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
+    setupMiningZone();
 
     const result = await grantCacheLootTx(mockTx, params);
 
@@ -178,17 +184,19 @@ describe('grantCacheLootTx', () => {
     mockTxAny.resourceNode.findMany.mockResolvedValue([
       { skillRequired: 'mining', levelRequired: 5 },
     ]);
-    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
-    mockTxAny.craftingRecipe.findFirst.mockResolvedValue({
-      resultTemplateId: 'cut-sapphire-id',
-      resultTemplate: { name: 'Cut Sapphire' },
-    });
-    mockTxAny.craftingRecipe.findMany.mockResolvedValue([
-      {
+    mockTxAny.itemTemplate.findMany.mockResolvedValue([
+      { id: 'raw-sapphire-id', name: 'Rough Sapphire' },
+    ]);
+    mockTxAny.craftingRecipe.findMany
+      .mockResolvedValueOnce([{
+        resultTemplateId: 'cut-sapphire-id',
+        resultTemplate: { name: 'Cut Sapphire' },
+        materials: [{ templateId: 'raw-sapphire-id', quantity: 2 }],
+      }])
+      .mockResolvedValueOnce([{
         resultTemplateId: 'sword-soul-1',
         resultTemplate: { name: 'Soulbound Sword', itemType: 'weapon', stackable: false, maxDurability: 100 },
-      },
-    ]);
+      }]);
 
     const result = await grantCacheLootTx(mockTx, params);
 
@@ -200,21 +208,7 @@ describe('grantCacheLootTx', () => {
 
   it('does not grant soulbound item when Math.random >= SOULBOUND_DROP_CHANCE', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-
-    mockTxAny.resourceNode.findMany.mockResolvedValue([
-      { skillRequired: 'mining', levelRequired: 5 },
-    ]);
-    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
-    mockTxAny.craftingRecipe.findFirst.mockResolvedValue({
-      resultTemplateId: 'cut-sapphire-id',
-      resultTemplate: { name: 'Cut Sapphire' },
-    });
-    mockTxAny.craftingRecipe.findMany.mockResolvedValue([
-      {
-        resultTemplateId: 'sword-soul-1',
-        resultTemplate: { name: 'Soulbound Sword', itemType: 'weapon', stackable: false, maxDurability: 100 },
-      },
-    ]);
+    setupMiningZone();
 
     const result = await grantCacheLootTx(mockTx, params);
 
@@ -223,28 +217,18 @@ describe('grantCacheLootTx', () => {
 
   it('does not grant soulbound item when no soulbound recipes exist', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.01);
-
-    mockTxAny.resourceNode.findMany.mockResolvedValue([
-      { skillRequired: 'mining', levelRequired: 5 },
-    ]);
-    mockTxAny.itemTemplate.findFirst.mockResolvedValue({ id: 'raw-sapphire-id' });
-    mockTxAny.craftingRecipe.findFirst.mockResolvedValue({
-      resultTemplateId: 'cut-sapphire-id',
-      resultTemplate: { name: 'Cut Sapphire' },
-    });
-    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
+    setupMiningZone();
 
     const result = await grantCacheLootTx(mockTx, params);
 
+    // setupMiningZone returns [] for soulbound recipes
     expect(result.soulboundItem).toBeNull();
   });
 
   it('handles multiple resource nodes producing different cut gems', async () => {
-    // Use alternating random values: first call = 0.5 (material rolls), then alternating for picks
     let callCount = 0;
     vi.spyOn(Math, 'random').mockImplementation(() => {
       callCount++;
-      // Return 0.99 so soulbound check fails
       if (callCount > 10) return 0.99;
       return 0.5;
     });
@@ -253,23 +237,24 @@ describe('grantCacheLootTx', () => {
       { skillRequired: 'mining', levelRequired: 5 },
       { skillRequired: 'foraging', levelRequired: 1 },
     ]);
-
-    // First call: raw sapphire for mining tier 2, second call: raw amber for foraging tier 1
-    mockTxAny.itemTemplate.findFirst
-      .mockResolvedValueOnce({ id: 'raw-sapphire-id' })
-      .mockResolvedValueOnce({ id: 'raw-amber-id' });
-
-    mockTxAny.craftingRecipe.findFirst
-      .mockResolvedValueOnce({
-        resultTemplateId: 'cut-sapphire-id',
-        resultTemplate: { name: 'Cut Sapphire' },
-      })
-      .mockResolvedValueOnce({
-        resultTemplateId: 'polished-amber-id',
-        resultTemplate: { name: 'Polished Amber' },
-      });
-
-    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]);
+    mockTxAny.itemTemplate.findMany.mockResolvedValue([
+      { id: 'raw-sapphire-id', name: 'Rough Sapphire' },
+      { id: 'raw-amber-id', name: 'Raw Amber' },
+    ]);
+    mockTxAny.craftingRecipe.findMany
+      .mockResolvedValueOnce([
+        {
+          resultTemplateId: 'cut-sapphire-id',
+          resultTemplate: { name: 'Cut Sapphire' },
+          materials: [{ templateId: 'raw-sapphire-id', quantity: 2 }],
+        },
+        {
+          resultTemplateId: 'polished-amber-id',
+          resultTemplate: { name: 'Polished Amber' },
+          materials: [{ templateId: 'raw-amber-id', quantity: 2 }],
+        },
+      ])
+      .mockResolvedValueOnce([]); // soulbound
 
     const result = await grantCacheLootTx(mockTx, params);
 

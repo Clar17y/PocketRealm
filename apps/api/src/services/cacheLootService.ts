@@ -50,38 +50,48 @@ export async function grantCacheLootTx(
     select: { skillRequired: true, levelRequired: true },
   }) as Array<{ skillRequired: string; levelRequired: number }>;
 
-  const cutGemTemplateIds: Array<{ templateId: string; name: string }> = [];
-
+  // Determine which raw gems this zone produces
+  const rawGemNames: string[] = [];
   for (const node of resourceNodes) {
     const gemTier = levelToGemTier(node.levelRequired);
     const rawGemName = GEM_CONSTANTS.GEM_BY_SKILL_TIER[node.skillRequired]?.[gemTier];
-    if (!rawGemName) continue;
+    if (rawGemName) rawGemNames.push(rawGemName);
+  }
 
-    // Find the raw gem template
-    const rawGemTemplate = await (txAny as any).itemTemplate.findFirst({
-      where: { name: rawGemName, itemType: 'resource' },
-      select: { id: true },
-    }) as { id: string } | null;
-    if (!rawGemTemplate) continue;
+  const cutGemTemplateIds: Array<{ templateId: string; name: string }> = [];
 
-    // Find the refining recipe that uses this raw gem as a material
-    // materials is a Json column storing [{ itemTemplateId, quantity }]
-    const refiningRecipe = await (txAny as any).craftingRecipe.findFirst({
-      where: {
-        skillType: 'refining',
-        materials: { array_contains: [{ itemTemplateId: rawGemTemplate.id }] },
-      },
+  if (rawGemNames.length > 0) {
+    // Find all raw gem template IDs in one query
+    const rawGemTemplates = await (txAny as any).itemTemplate.findMany({
+      where: { name: { in: rawGemNames }, itemType: 'resource' },
+      select: { id: true, name: true },
+    }) as Array<{ id: string; name: string }>;
+    const rawGemIdSet = new Set(rawGemTemplates.map(t => t.id));
+
+    // Fetch all refining recipes and filter by raw gem materials in JS
+    // (materials is a Json column storing { templateId, quantity } — can't use relational filters)
+    const refiningRecipes = await (txAny as any).craftingRecipe.findMany({
+      where: { skillType: 'refining' },
       select: {
         resultTemplateId: true,
         resultTemplate: { select: { name: true } },
+        materials: true,
       },
-    }) as { resultTemplateId: string; resultTemplate: { name: string } } | null;
-    if (!refiningRecipe) continue;
+    }) as Array<{
+      resultTemplateId: string;
+      resultTemplate: { name: string };
+      materials: Array<{ templateId: string; quantity: number }>;
+    }>;
 
-    cutGemTemplateIds.push({
-      templateId: refiningRecipe.resultTemplateId,
-      name: refiningRecipe.resultTemplate.name,
-    });
+    for (const recipe of refiningRecipes) {
+      const usesZoneGem = recipe.materials.some(m => rawGemIdSet.has(m.templateId));
+      if (!usesZoneGem) continue;
+
+      cutGemTemplateIds.push({
+        templateId: recipe.resultTemplateId,
+        name: recipe.resultTemplate.name,
+      });
+    }
   }
 
   // Roll 2-4 cut gems from the available pool (random picks with replacement)
