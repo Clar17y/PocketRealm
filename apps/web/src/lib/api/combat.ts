@@ -99,7 +99,11 @@ export async function startExploration(zoneId: string, turns: number, tier?: num
       capacity: number;
       sizeName: string;
     }>;
-    hiddenCaches: Array<{ turnOccurred: number }>;
+    hiddenCaches: Array<{
+      turnOccurred: number;
+      loot?: Array<{ itemTemplateId: string; quantity: number }>;
+      soulboundItem?: { itemTemplateId: string; name: string; rarity: string } | null;
+    }>;
     zoneExitDiscovered: boolean;
     explorationProgress: {
       turnsExplored: number;

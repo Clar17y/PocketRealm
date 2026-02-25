@@ -194,7 +194,11 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const pendingCacheLoot: PendingCacheLoot[] = [];
     const events: NarrativeEvent[] = [];
 
-    const hiddenCaches: Array<{ turnOccurred: number }> = [];
+    const hiddenCaches: Array<{
+      turnOccurred: number;
+      loot?: Array<{ itemTemplateId: string; quantity: number }>;
+      soulboundItem?: { itemTemplateId: string; name: string; rarity: string } | null;
+    }> = [];
     let zoneExitDiscovered = false;
     let wasKnockedOut = false;
 
@@ -778,11 +782,13 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           luck: progression.attributes.luck,
         });
 
+        const lootSummary = cacheLoot.materials.map(m => ({ itemTemplateId: m.itemTemplateId, quantity: m.quantity }));
+
         // Update the corresponding event's details
         const cacheEvent = events.find(e => e.type === 'hidden_cache' && e.turn === cache.turnOccurred);
         if (cacheEvent) {
           cacheEvent.details = {
-            materials: cacheLoot.materials.map(m => ({ itemTemplateId: m.itemTemplateId, quantity: m.quantity })),
+            materials: lootSummary,
             soulboundItem: cacheLoot.soulboundItem,
           };
           if (cacheLoot.soulboundItem) {
@@ -790,6 +796,13 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           } else {
             cacheEvent.description = `You found a hidden cache with ${cacheLoot.materials.length} material${cacheLoot.materials.length === 1 ? '' : 's'}!`;
           }
+        }
+
+        // Enrich hiddenCaches response entry with loot details
+        const cacheEntry = hiddenCaches.find(h => h.turnOccurred === cache.turnOccurred);
+        if (cacheEntry) {
+          cacheEntry.loot = lootSummary;
+          cacheEntry.soulboundItem = cacheLoot.soulboundItem;
         }
       }
 
