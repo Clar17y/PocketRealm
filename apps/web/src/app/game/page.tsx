@@ -327,6 +327,11 @@ export default function GamePage() {
     return new Set([stepDef.pulseTab]);
   }, [tutorialStep]);
 
+  const bestiaryMobsForPlayback = useMemo(
+    () => bestiaryMobs.map(m => ({ id: m.id, isDiscovered: m.isDiscovered, prefixesEncountered: m.prefixesEncountered })),
+    [bestiaryMobs],
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[var(--rpg-background)] flex items-center justify-center">
@@ -341,11 +346,6 @@ export default function GamePage() {
   const activeCraftingSkillData = skills.find((s) => s.skillType === activeCraftingSkill);
   const filteredGatheringNodes = gatheringNodes.filter((n) => n.skillRequired === activeGatheringSkill);
   const filteredCraftingRecipes = craftingRecipes.filter((recipe) => recipe.skillType === activeCraftingSkill);
-
-  const bestiaryMobsForPlayback = useMemo(
-    () => bestiaryMobs.map(m => ({ id: m.id, isDiscovered: m.isDiscovered, prefixesEncountered: m.prefixesEncountered })),
-    [bestiaryMobs],
-  );
 
   const renderScreen = () => {
     switch (activeScreen) {
