@@ -358,7 +358,7 @@ export function CombatHistory() {
       {selectedEntry && (
         <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold">
+            <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold flex-wrap">
               {(selectedDetail?.mobName ?? selectedEntry.mobName) && (
                 <img
                   src={monsterImageSrc((selectedDetail?.mobName ?? selectedEntry.mobName)!)}
@@ -367,6 +367,9 @@ export function CombatHistory() {
                 />
               )}
               {selectedDetail?.mobDisplayName ?? selectedEntry.mobDisplayName ?? selectedEntry.mobName ?? 'Combat'} Log
+              {selectedDetail?.eventModifiers && selectedDetail.eventModifiers.length > 0 && (
+                <EventBadges inline modifiers={selectedDetail.eventModifiers} />
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -383,10 +386,6 @@ export function CombatHistory() {
               </div>
             </div>
           </div>
-
-          {selectedDetail?.eventModifiers && selectedDetail.eventModifiers.length > 0 && (
-            <EventBadges modifiers={selectedDetail.eventModifiers} />
-          )}
 
           <div className="text-xs text-[var(--rpg-text-secondary)]">
             {fullTimestamp(selectedEntry.createdAt)} | {selectedEntry.zoneName ?? 'Unknown Zone'} | {formatCombatSource(selectedEntry.source)}

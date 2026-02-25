@@ -269,10 +269,13 @@ export function Gathering({
                     )}
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-baseline justify-between">
-                      <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm">
-                        {node.sizeName} {node.name}
-                      </h4>
+                    <div className="flex items-center justify-between gap-1 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm">
+                          {node.sizeName} {node.name}
+                        </h4>
+                        <EventBadges inline modifiers={node.eventModifiers} />
+                      </div>
                       <span className="text-xs text-[var(--rpg-text-secondary)]">Lv. {node.levelRequired}</span>
                     </div>
                     {/* Zone indicator */}
@@ -283,7 +286,6 @@ export function Gathering({
                         {!isInZone && ' (travel here to gather)'}
                       </span>
                     </div>
-                    <EventBadges modifiers={node.eventModifiers} />
                     {/* Capacity bar */}
                     <div className="mt-1.5 h-2 bg-[var(--rpg-background)] rounded-full overflow-hidden">
                       <div

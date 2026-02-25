@@ -156,19 +156,17 @@ export function CombatPlayback({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-center gap-2 font-bold text-[var(--rpg-text-primary)]">
+      <div className="flex items-center justify-center gap-2 font-bold text-[var(--rpg-text-primary)] flex-wrap">
         {mobImageSrc && (
           <img src={mobImageSrc} alt={mobDisplayName} className="w-10 h-10 rounded object-cover" />
         )}
         {mobDisplayName}
-      </div>
-      {activeEvents && activeEvents.some(e => e.appliedToThisMob) && (
-        <div className="flex justify-center mt-1">
-          <EventBadges modifiers={activeEvents.filter(e => e.appliedToThisMob).map(e => ({
+        {activeEvents && activeEvents.some(e => e.appliedToThisMob) && (
+          <EventBadges inline modifiers={activeEvents.filter(e => e.appliedToThisMob).map(e => ({
             title: e.title, effectType: e.effectType, effectValue: e.effectValue, isGlobal: false,
           }))} />
-        </div>
-      )}
+        )}
+      </div>
 
       {/* HP Bars */}
       <div className="space-y-3 my-4">

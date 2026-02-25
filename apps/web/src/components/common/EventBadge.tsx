@@ -21,28 +21,31 @@ export function EventBadge({ modifier }: { modifier: EventModifierBadge }) {
   const isBuff = isPlayerBuff(modifier.effectType);
   const sign = modifier.effectType.endsWith('_down') ? '-' : '+';
   const percent = Math.round(modifier.effectValue * 100);
+  const tooltipText = modifier.title + (modifier.isGlobal ? ' (Global)' : '');
 
   return (
     <span
-      className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-semibold"
+      title={tooltipText}
+      className="inline-flex items-center gap-1 text-[10px] leading-none px-2 py-1 rounded-full font-bold cursor-default select-none whitespace-nowrap transition-opacity hover:opacity-80"
       style={{
-        background: isBuff ? 'rgba(76, 175, 80, 0.15)' : 'rgba(244, 67, 54, 0.15)',
+        background: isBuff
+          ? 'linear-gradient(135deg, rgba(76, 175, 80, 0.25), rgba(76, 175, 80, 0.15))'
+          : 'linear-gradient(135deg, rgba(244, 67, 54, 0.25), rgba(244, 67, 54, 0.15))',
         color: isBuff ? 'var(--rpg-green-light)' : 'var(--rpg-red)',
-        border: `1px solid ${isBuff ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)'}`,
+        border: `1px solid ${isBuff ? 'rgba(76, 175, 80, 0.4)' : 'rgba(244, 67, 54, 0.4)'}`,
+        boxShadow: `0 1px 2px ${isBuff ? 'rgba(76, 175, 80, 0.15)' : 'rgba(244, 67, 54, 0.15)'}`,
       }}
     >
-      {modifier.isGlobal && (
-        <span className="opacity-60">GLOBAL</span>
-      )}
       <span>{sign}{percent}% {effectLabel(modifier.effectType)}</span>
     </span>
   );
 }
 
-export function EventBadges({ modifiers }: { modifiers?: EventModifierBadge[] }) {
+/** Render inline badges. Use `inline` prop to display in a flex row (e.g., next to a mob name). */
+export function EventBadges({ modifiers, inline }: { modifiers?: EventModifierBadge[]; inline?: boolean }) {
   if (!modifiers || modifiers.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-1 mt-0.5">
+    <div className={`flex flex-wrap gap-1 ${inline ? 'items-center' : 'mt-0.5'}`}>
       {modifiers.map((mod, i) => (
         <EventBadge key={`${mod.effectType}-${i}`} modifier={mod} />
       ))}

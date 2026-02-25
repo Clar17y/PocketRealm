@@ -374,8 +374,9 @@ export function CombatScreen({
                           />
                         )}
                         <div>
-                          <div className="text-[var(--rpg-text-primary)] font-semibold">
+                          <div className="flex items-center gap-1.5 flex-wrap text-[var(--rpg-text-primary)] font-semibold">
                             {e.siteName}
+                            <EventBadges inline modifiers={e.eventModifiers} />
                           </div>
                           <span className="text-xs text-[var(--rpg-text-secondary)]">
                             {e.totalRooms > 1
@@ -391,7 +392,6 @@ export function CombatScreen({
                               {e.clearStrategy === 'full_clear' ? 'Full Clear' : 'Room by Room'}
                             </span>
                           )}
-                          <EventBadges modifiers={e.eventModifiers} />
                           <div className="text-xs text-[var(--rpg-text-secondary)]">
                             Next monster: {nextMobLabel ?? 'None (site decayed)'}
                           </div>
