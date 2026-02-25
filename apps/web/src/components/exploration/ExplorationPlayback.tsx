@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { EventBadges } from '@/components/common/EventBadge';
 import type { EventModifierBadge } from '@/lib/api';
+import { isAmbushWithCombatLog } from '@/lib/explorationUtils';
 
 export interface ExplorationPlaybackEvent {
   turn: number;
@@ -108,9 +109,7 @@ export function ExplorationPlayback({
         onEventRevealed(nextEvent);
         setRevealedEventCount(prev => prev + 1);
 
-        // All ambush types with combat log data trigger full combat playback
-        const isAmbush = nextEvent.type === 'ambush_defeat' || nextEvent.type === 'ambush_victory';
-        if (isAmbush && nextEvent.details?.log) {
+        if (isAmbushWithCombatLog(nextEvent)) {
           setPhase('paused-combat');
           onCombatStart(nextEvent);
           return;

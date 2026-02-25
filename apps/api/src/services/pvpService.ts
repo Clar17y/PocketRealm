@@ -2,7 +2,7 @@ import { Prisma, prisma } from '@adventure/database';
 import { buildPlayerCombatStats, calculateFleeResult, calculateMaxHp, runCombat } from '@adventure/game-engine';
 import { PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, type Combatant, type CombatResult, type SkillType } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
-import { buildPagination } from '../utils/routeHelpers.js';
+import { buildPagination, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from './combatStatsService.js';
 import { calculateEloChange } from './eloService';
 import { getEquipmentStats } from './equipmentService';
@@ -459,6 +459,7 @@ export async function challenge(
     if (fleeResult.outcome === 'knockout') {
       await enterRecoveringState(attackerId, attackerMaxHp);
       attackerKnockedOut = true;
+      await trackAchievements(attackerId, { totalDeaths: 1 });
     } else {
       await setHp(attackerId, fleeResult.remainingHp);
     }
