@@ -1,4 +1,4 @@
-import { TIER_BLEED_CONSTANTS, ZONE_EXPLORATION_CONSTANTS } from '@adventure/shared';
+import { TIER_BLEED_CONSTANTS, ZONE_EXPLORATION_CONSTANTS, resolveZoneTiers, getHighestUnlockedTier } from '@adventure/shared';
 
 interface MobWithTier {
   id: string;
@@ -12,16 +12,8 @@ export function filterAndWeightMobsByTier<T extends MobWithTier>(
   explorationPercent: number,
   zoneTiers: Record<string, number> | null,
 ): (T & { encounterWeight: number })[] {
-  const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
-
-  let highestUnlockedTier = 0;
-  for (const [tierStr, threshold] of Object.entries(tiers)) {
-    const tier = Number(tierStr);
-    if (explorationPercent >= threshold && tier > highestUnlockedTier) {
-      highestUnlockedTier = tier;
-    }
-  }
-
+  const tiers = resolveZoneTiers(zoneTiers);
+  const highestUnlockedTier = getHighestUnlockedTier(explorationPercent, zoneTiers);
   if (highestUnlockedTier === 0) return [];
 
   const filtered = mobs.filter(m => {
@@ -47,7 +39,7 @@ export function selectTierWithBleedthrough(
   zoneTiers: Record<string, number> | null,
   rng: () => number = Math.random,
 ): number {
-  const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
+  const tiers = resolveZoneTiers(zoneTiers);
   const tierNumbers = Object.keys(tiers).map(Number).filter(n => !isNaN(n));
   const maxTier = Math.max(...tierNumbers, 0);
   const minTier = Math.min(...tierNumbers, maxTier);

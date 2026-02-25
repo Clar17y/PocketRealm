@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import {
   EXPLORATION_CONSTANTS,
-  ZONE_EXPLORATION_CONSTANTS,
+  resolveZoneTiers,
+  getHighestUnlockedTier,
   type EncounterSiteSize,
   type EncounterMobRole,
   type EncounterMobStatus,
@@ -183,16 +184,9 @@ export function buildEncounterSiteMobs(
   zoneTiers: Record<string, number> | null = null,
   overrideTier?: number,
 ): EncounterMobSlot[] {
-  const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
+  const tiers = resolveZoneTiers(zoneTiers);
 
-  // Determine current unlocked tier
-  let currentTier = 0;
-  for (const [tierStr, threshold] of Object.entries(tiers)) {
-    const tier = Number(tierStr);
-    if (explorationPercent >= threshold && tier > currentTier) {
-      currentTier = tier;
-    }
-  }
+  let currentTier = getHighestUnlockedTier(explorationPercent, zoneTiers);
   if (currentTier === 0) return [];
 
   if (overrideTier !== undefined && overrideTier >= 1) {
