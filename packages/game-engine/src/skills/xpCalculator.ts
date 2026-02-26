@@ -63,12 +63,6 @@ export function calculateEfficiency(
 ): number {
   const cap = getWindowCap(skillType);
 
-  // Combat skills have hard cap (efficiency goes to 0 at cap)
-  if (COMBAT_SKILLS.includes(skillType)) {
-    return windowXpGained >= cap ? 0 : 1;
-  }
-
-  // Other skills have diminishing returns
   if (windowXpGained >= cap) return 0;
 
   const ratio = windowXpGained / cap;

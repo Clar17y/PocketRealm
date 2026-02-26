@@ -158,31 +158,46 @@ describe('getWindowCap', () => {
 describe('calculateEfficiency', () => {
   it('returns 1 when no XP has been gained', () => {
     expect(calculateEfficiency(0, 'mining')).toBe(1);
+    expect(calculateEfficiency(0, 'melee')).toBe(1);
   });
 
-  it('returns 0 when at or above cap for combat skills', () => {
+  it('returns 0 when at or above cap', () => {
+    const combatCap = getWindowCap('melee');
+    expect(calculateEfficiency(combatCap, 'melee')).toBe(0);
+    expect(calculateEfficiency(combatCap + 100, 'melee')).toBe(0);
+
+    const gatherCap = getWindowCap('mining');
+    expect(calculateEfficiency(gatherCap, 'mining')).toBe(0);
+    expect(calculateEfficiency(gatherCap + 100, 'mining')).toBe(0);
+  });
+
+  it('all skills have diminishing returns (quadratic decay)', () => {
+    // Combat skill
+    const combatCap = getWindowCap('melee');
+    const combatHalf = Math.floor(combatCap / 2);
+    const combatEff = calculateEfficiency(combatHalf, 'melee');
+    expect(combatEff).toBeGreaterThan(0);
+    expect(combatEff).toBeLessThan(1);
+    // At 50% of cap, quadratic decay: 1 - 0.5^2 = 0.75
+    expect(combatEff).toBeCloseTo(0.75, 1);
+
+    // Gathering skill
+    const gatherCap = getWindowCap('mining');
+    const gatherHalf = Math.floor(gatherCap / 2);
+    const gatherEff = calculateEfficiency(gatherHalf, 'mining');
+    expect(gatherEff).toBeGreaterThan(0);
+    expect(gatherEff).toBeLessThan(1);
+    expect(gatherEff).toBeCloseTo(0.75, 1);
+  });
+
+  it('efficiency decreases as XP gained increases', () => {
     const cap = getWindowCap('melee');
-    expect(calculateEfficiency(cap, 'melee')).toBe(0);
-    expect(calculateEfficiency(cap + 100, 'melee')).toBe(0);
-  });
-
-  it('combat skills have hard cutoff (1 then 0, no gradual decay)', () => {
-    const cap = getWindowCap('melee');
-    expect(calculateEfficiency(cap - 1, 'melee')).toBe(1);
-    expect(calculateEfficiency(cap, 'melee')).toBe(0);
-  });
-
-  it('non-combat skills have diminishing returns', () => {
-    const cap = getWindowCap('mining');
-    const halfCap = Math.floor(cap / 2);
-    const eff = calculateEfficiency(halfCap, 'mining');
-    expect(eff).toBeGreaterThan(0);
-    expect(eff).toBeLessThan(1);
-  });
-
-  it('non-combat skills return 0 at cap', () => {
-    const cap = getWindowCap('mining');
-    expect(calculateEfficiency(cap, 'mining')).toBe(0);
+    const eff25 = calculateEfficiency(Math.floor(cap * 0.25), 'melee');
+    const eff50 = calculateEfficiency(Math.floor(cap * 0.50), 'melee');
+    const eff75 = calculateEfficiency(Math.floor(cap * 0.75), 'melee');
+    expect(eff25).toBeGreaterThan(eff50);
+    expect(eff50).toBeGreaterThan(eff75);
+    expect(eff75).toBeGreaterThan(0);
   });
 });
 
@@ -215,9 +230,10 @@ describe('applyXpGain', () => {
   });
 
   it('reports atDailyCap when window becomes exhausted', () => {
-    const cap = getWindowCap('melee');
-    const result = applyXpGain(0, 1, cap - 50, 50, 'melee');
+    const cap = getWindowCap('mining');
+    const result = applyXpGain(0, 1, cap, 50, 'mining');
     expect(result.atDailyCap).toBe(true);
+    expect(result.xpAfterEfficiency).toBe(0);
   });
 
   it('diminishing returns reduce XP for non-combat skills', () => {
