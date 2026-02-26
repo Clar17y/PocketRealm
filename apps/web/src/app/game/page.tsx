@@ -347,16 +347,21 @@ export default function GamePage() {
   );
 
   const primaryCombatXpRate = useMemo(() => {
-    const combatSkills = skills
-      .filter((s) => ['melee', 'ranged', 'magic'].includes(s.skillType))
-      .sort((a, b) => b.level - a.level || a.skillType.localeCompare(b.skillType));
-    const primary = combatSkills[0];
-    if (!primary) return { skillName: 'Melee', rate: 100 };
+    const mainHand = equipment.find((e) => e.slot === 'main_hand');
+    const requiredSkill = mainHand?.item?.template?.requiredSkill;
+    const attackSkill: 'melee' | 'ranged' | 'magic' =
+      requiredSkill === 'melee' || requiredSkill === 'ranged' || requiredSkill === 'magic'
+        ? requiredSkill
+        : 'melee';
+    const skillData = skills.find((s) => s.skillType === attackSkill);
+    const rate = skillData
+      ? Math.round(calculateEfficiency(skillData.dailyXpGained, attackSkill as SkillType) * 100)
+      : 100;
     return {
-      skillName: primary.skillType.charAt(0).toUpperCase() + primary.skillType.slice(1),
-      rate: Math.round(calculateEfficiency(primary.dailyXpGained, primary.skillType as SkillType) * 100),
+      skillName: attackSkill.charAt(0).toUpperCase() + attackSkill.slice(1),
+      rate,
     };
-  }, [skills]);
+  }, [skills, equipment]);
 
   const lowestXpRate = useMemo(() => {
     let lowest = { skillName: '', rate: 100 };
