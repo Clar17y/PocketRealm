@@ -1,56 +1,51 @@
 import { test, expect } from '../fixtures/game.fixture.js';
 
 test.describe('Crafting', () => {
-  test.beforeEach(async ({ gamePage: page }) => {
-    await page.getByRole('button', { name: 'Craft' }).click();
+  test.beforeEach(async ({ gamePage: page, gameApi: api }) => {
+    // Teleport to Millbrook (town) so crafting facilities are available
+    await api.adminDiscoverAllZones();
+    const zones = await api.adminGetZones();
+    const millbrook = zones.zones.find((z: { name: string }) => z.name === 'Millbrook');
+    if (millbrook) await api.adminTeleport(millbrook.id);
+
+    await page.reload();
+    await page.waitForSelector('text=Available Turns');
+    await page.getByRole('navigation').getByText('Explore').click();
+    await page.getByRole('button', { name: 'Crafting', exact: true }).click();
   });
 
-  test('displays skill level header', async ({ gamePage: page }) => {
-    await expect(page.getByText(/Lv\./)).toBeVisible();
+  test('displays crafting skill name and level', async ({ gamePage: page }) => {
+    await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible();
+    await expect(page.getByText(/Lv\.\s*\d+/).first()).toBeVisible();
   });
 
-  test('displays recipe list', async ({ gamePage: page }) => {
-    // Should show recipes or "no recipes" state
-    await page.waitForTimeout(1_000);
+  test('displays recipe list with entries', async ({ gamePage: page }) => {
+    await expect(page.getByRole('heading', { name: 'Recipes' })).toBeVisible();
   });
 
-  test('shows recipe detail when selecting a recipe', async ({ gamePage: page }) => {
-    // Click first recipe in the list
-    const recipeCards = page.locator('[class*="cursor-pointer"]');
-    if (await recipeCards.count() > 0) {
-      await recipeCards.first().click();
-      // Should show materials, turn cost, XP reward
-      await expect(page.getByText('Required Materials').or(page.getByText('Turn Cost'))).toBeVisible();
-    }
+  test('selecting a recipe shows turn cost', async ({ gamePage: page }) => {
+    // Recipes are buttons — click the first one
+    const recipeButton = page.getByRole('button', { name: /Lv\.\s*\d+/ }).first();
+    await expect(recipeButton).toBeVisible({ timeout: 5_000 });
+    await recipeButton.click();
+    await expect(page.getByText(/Turn Cost|turns/).first()).toBeVisible();
   });
 
-  test('shows material requirements with owned vs needed', async ({ gamePage: page }) => {
-    const recipeCards = page.locator('[class*="cursor-pointer"]');
-    if (await recipeCards.count() > 0) {
-      await recipeCards.first().click();
-      // Should show X / Y format for materials
-      await expect(page.getByText(/\d+ \/ \d+/).first()).toBeVisible({ timeout: 5_000 });
-    }
+  test('recipe shows material requirements', async ({ gamePage: page }) => {
+    const recipeButton = page.getByRole('button', { name: /Lv\.\s*\d+/ }).first();
+    await expect(recipeButton).toBeVisible({ timeout: 5_000 });
+    await recipeButton.click();
+    // Should show material list with owned/needed counts
+    await expect(page.getByText(/\d+ \/ \d+/).first()).toBeVisible({ timeout: 5_000 });
   });
 
-  test('craft button disabled when missing materials', async ({ gamePage: page }) => {
-    const recipeCards = page.locator('[class*="cursor-pointer"]');
-    if (await recipeCards.count() > 0) {
-      await recipeCards.first().click();
-      const craftButton = page.getByRole('button', { name: /^Craft |Missing/ });
-      if (await craftButton.isVisible()) {
-        // Should be disabled if player lacks materials
-        await page.waitForTimeout(500);
-      }
-    }
-  });
-
-  test('craft button shows level requirement for locked recipes', async ({ gamePage: page }) => {
-    // Look for a recipe that requires higher level
-    const lockedRecipe = page.getByText(/Unlocks at Lv\./);
-    if (await lockedRecipe.count() > 0) {
-      await lockedRecipe.first().click();
-      await expect(page.getByRole('button', { name: /Requires Lv\./ })).toBeVisible();
-    }
+  test('craft button shows disabled state when missing materials', async ({ gamePage: page }) => {
+    const recipeButton = page.getByRole('button', { name: /Lv\.\s*\d+/ }).first();
+    await expect(recipeButton).toBeVisible({ timeout: 5_000 });
+    await recipeButton.click();
+    // New player lacks materials — the "Craft <item>" submit button should be disabled
+    const craftButton = page.getByRole('button', { name: /^Craft \w/ }).last();
+    await expect(craftButton).toBeVisible();
+    await expect(craftButton).toBeDisabled();
   });
 });

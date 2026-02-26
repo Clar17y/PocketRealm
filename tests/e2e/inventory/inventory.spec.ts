@@ -2,113 +2,87 @@ import { test, expect } from '../fixtures/game.fixture.js';
 
 test.describe('Inventory', () => {
   test.beforeEach(async ({ gamePage: page }) => {
-    await page.getByRole('button', { name: /inventory/i }).click();
+    await page.getByRole('navigation').getByText('Inventory').click();
   });
 
-  test('displays inventory grid', async ({ gamePage: page }) => {
-    // Should see the grid (even if empty for new player)
-    await page.waitForTimeout(500);
-    // Grid should be visible
+  test('displays inventory screen', async ({ gamePage: page }) => {
+    // Inventory tab should be active and show item grid or empty state
+    await expect(page.getByRole('navigation').getByText('Inventory')).toBeVisible();
     await expect(page.locator('[class*="grid"]').first()).toBeVisible();
   });
 
-  test('shows empty slots for new player', async ({ gamePage: page }) => {
-    // New player starts with some items or empty inventory
-    await page.waitForTimeout(500);
-  });
-
-  test('shows item detail modal when clicking an item', async ({ gamePage: page, gameApi: api }) => {
-    // Grant an item first
+  test('granted item appears in inventory', async ({ gamePage: page, gameApi: api }) => {
     const res = await api.adminSearchItems('', 'weapon');
-    if (res.templates.length > 0) {
-      await api.adminGrantItem(res.templates[0].id, 'common');
-      await page.reload();
-      await page.getByRole('button', { name: /inventory/i }).click();
-      await page.waitForTimeout(1_000);
+    expect(res.templates.length).toBeGreaterThan(0);
 
-      // Click the first non-empty item slot
-      const items = page.locator('[class*="grid"] button').first();
-      if (await items.isVisible()) {
-        await items.click();
-        // Modal should appear with item details
-        await page.waitForTimeout(500);
-      }
-    }
+    await api.adminGrantItem(res.templates[0].id, 'common');
+    await page.reload();
+    await page.getByRole('navigation').getByText('Inventory').click();
+
+    // The granted item should appear as a clickable grid cell
+    const items = page.locator('[class*="grid"] button').first();
+    await expect(items).toBeVisible({ timeout: 5_000 });
   });
 
-  test('drop action removes item from inventory', async ({ gamePage: page, gameApi: api }) => {
-    const res = await api.adminSearchItems('', 'resource');
-    if (res.templates.length > 0) {
-      await api.adminGrantItem(res.templates[0].id, 'common', 1);
-      await page.reload();
-      await page.getByRole('button', { name: /inventory/i }).click();
-      await page.waitForTimeout(1_000);
-
-      // Click item to open modal, then drop
-      const items = page.locator('[class*="grid"] button').first();
-      if (await items.isVisible()) {
-        await items.click();
-        const dropButton = page.getByRole('button', { name: 'Drop' });
-        if (await dropButton.isVisible()) {
-          await dropButton.click();
-          await page.waitForTimeout(500);
-        }
-      }
-    }
-  });
-
-  test('equip action on equipment item', async ({ gamePage: page, gameApi: api }) => {
+  test('clicking item opens detail modal with stats', async ({ gamePage: page, gameApi: api }) => {
     const res = await api.adminSearchItems('', 'weapon');
-    if (res.templates.length > 0) {
-      await api.adminGrantItem(res.templates[0].id, 'common');
-      await page.reload();
-      await page.getByRole('button', { name: /inventory/i }).click();
-      await page.waitForTimeout(1_000);
+    expect(res.templates.length).toBeGreaterThan(0);
 
-      const items = page.locator('[class*="grid"] button').first();
-      if (await items.isVisible()) {
-        await items.click();
-        const equipButton = page.getByRole('button', { name: 'Equip', exact: true });
-        if (await equipButton.isVisible()) {
-          await equipButton.click();
-          await page.waitForTimeout(500);
-        }
-      }
-    }
+    await api.adminGrantItem(res.templates[0].id, 'common');
+    await page.reload();
+    await page.getByRole('navigation').getByText('Inventory').click();
+
+    const items = page.locator('[class*="grid"] button').first();
+    await expect(items).toBeVisible({ timeout: 5_000 });
+    await items.click();
+
+    // Modal should show item stats (Attack, Durability, etc.)
+    await expect(page.getByText(/Attack|Durability|Defence/).first()).toBeVisible({ timeout: 3_000 });
   });
 
-  test('repair action on damaged equipment', async ({ gamePage: page, gameApi: api }) => {
-    // Grant a weapon item — it starts at full durability, so repair may be disabled
-    // This test verifies the repair button exists in the modal
+  test('equip button visible in item detail', async ({ gamePage: page, gameApi: api }) => {
     const res = await api.adminSearchItems('', 'weapon');
-    if (res.templates.length > 0) {
-      await api.adminGrantItem(res.templates[0].id, 'common');
-      await page.reload();
-      await page.getByRole('button', { name: /inventory/i }).click();
-      await page.waitForTimeout(1_000);
+    expect(res.templates.length).toBeGreaterThan(0);
 
-      const items = page.locator('[class*="grid"] button').first();
-      if (await items.isVisible()) {
-        await items.click();
-        // Repair button should be visible (possibly disabled if at full durability)
-        await expect(page.getByRole('button', { name: /Repair|Fix/ })).toBeVisible();
-      }
-    }
+    await api.adminGrantItem(res.templates[0].id, 'common');
+    await page.reload();
+    await page.getByRole('navigation').getByText('Inventory').click();
+
+    const items = page.locator('[class*="grid"] button').first();
+    await expect(items).toBeVisible({ timeout: 5_000 });
+    await items.click();
+
+    await expect(page.getByRole('button', { name: 'Equip', exact: true })).toBeVisible();
   });
 
-  test('salvage action on equipment item', async ({ gamePage: page, gameApi: api }) => {
+  test('repair button visible in item detail', async ({ gamePage: page, gameApi: api }) => {
     const res = await api.adminSearchItems('', 'weapon');
-    if (res.templates.length > 0) {
-      await api.adminGrantItem(res.templates[0].id, 'common');
-      await page.reload();
-      await page.getByRole('button', { name: /inventory/i }).click();
-      await page.waitForTimeout(1_000);
+    expect(res.templates.length).toBeGreaterThan(0);
 
-      const items = page.locator('[class*="grid"] button').first();
-      if (await items.isVisible()) {
-        await items.click();
-        await expect(page.getByRole('button', { name: /Salvage|No Facility/ })).toBeVisible();
-      }
-    }
+    await api.adminGrantItem(res.templates[0].id, 'common');
+    await page.reload();
+    await page.getByRole('navigation').getByText('Inventory').click();
+
+    const items = page.locator('[class*="grid"] button').first();
+    await expect(items).toBeVisible({ timeout: 5_000 });
+    await items.click();
+
+    await expect(page.getByRole('button', { name: /Repair/ })).toBeVisible();
+  });
+
+  test('salvage button visible in item detail', async ({ gamePage: page, gameApi: api }) => {
+    const res = await api.adminSearchItems('', 'weapon');
+    expect(res.templates.length).toBeGreaterThan(0);
+
+    await api.adminGrantItem(res.templates[0].id, 'common');
+    await page.reload();
+    await page.getByRole('navigation').getByText('Inventory').click();
+
+    const items = page.locator('[class*="grid"] button').first();
+    await expect(items).toBeVisible({ timeout: 5_000 });
+    await items.click();
+
+    // Salvage requires a town zone — may show "No Facility" if not in town
+    await expect(page.getByRole('button', { name: /Salvage|No Facility/ })).toBeVisible();
   });
 });

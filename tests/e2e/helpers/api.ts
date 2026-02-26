@@ -1,6 +1,8 @@
 import { APIRequestContext, request } from '@playwright/test';
+import pg from 'pg';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:4000';
+const DATABASE_URL = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5433/adventure_fix_e2e_tests';
 
 interface AuthTokens {
   accessToken: string;
@@ -39,6 +41,8 @@ export class ApiHelper {
     return { Authorization: `Bearer ${this.tokens.accessToken}` };
   }
 
+  // --- Auth ---
+
   async register(username: string, email: string, password: string): Promise<AuthTokens> {
     const ctx = await this.getContext();
     const res = await ctx.post('/api/v1/auth/register', {
@@ -61,12 +65,43 @@ export class ApiHelper {
     return body;
   }
 
+  // --- Player ---
+
   async getPlayer() {
     const ctx = await this.getContext();
     const res = await ctx.get('/api/v1/player', { headers: this.authHeaders() });
     if (!res.ok()) throw new Error(`getPlayer failed: ${res.status()}`);
     return res.json();
   }
+
+  async getPlayerSkills() {
+    const ctx = await this.getContext();
+    const res = await ctx.get('/api/v1/player/skills', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getPlayerSkills failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async skipTutorial() {
+    const ctx = await this.getContext();
+    const res = await ctx.patch('/api/v1/player/tutorial', {
+      headers: this.authHeaders(),
+      data: { step: -1 },
+    });
+    if (!res.ok()) throw new Error(`skipTutorial failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async updatePlayerSettings(settings: Record<string, unknown>) {
+    const ctx = await this.getContext();
+    const res = await ctx.patch('/api/v1/player/settings', {
+      headers: this.authHeaders(),
+      data: settings,
+    });
+    if (!res.ok()) throw new Error(`updatePlayerSettings failed: ${res.status()}`);
+    return res.json();
+  }
+
+  // --- Turns ---
 
   async getTurns() {
     const ctx = await this.getContext();
@@ -75,12 +110,33 @@ export class ApiHelper {
     return res.json();
   }
 
+  // --- HP ---
+
   async getHp() {
     const ctx = await this.getContext();
     const res = await ctx.get('/api/v1/hp', { headers: this.authHeaders() });
     if (!res.ok()) throw new Error(`getHp failed: ${res.status()}`);
     return res.json();
   }
+
+  async rest(turns: number) {
+    const ctx = await this.getContext();
+    const res = await ctx.post('/api/v1/hp/rest', {
+      headers: this.authHeaders(),
+      data: { turns },
+    });
+    if (!res.ok()) throw new Error(`rest failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async recover() {
+    const ctx = await this.getContext();
+    const res = await ctx.post('/api/v1/hp/recover', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`recover failed: ${res.status()}`);
+    return res.json();
+  }
+
+  // --- Zones ---
 
   async getZones() {
     const ctx = await this.getContext();
@@ -99,6 +155,8 @@ export class ApiHelper {
     return res.json();
   }
 
+  // --- Exploration ---
+
   async explore(turns: number) {
     const ctx = await this.getContext();
     const res = await ctx.post('/api/v1/exploration/start', {
@@ -109,15 +167,7 @@ export class ApiHelper {
     return res.json();
   }
 
-  async startCombat(siteId: string) {
-    const ctx = await this.getContext();
-    const res = await ctx.post('/api/v1/combat/start', {
-      headers: this.authHeaders(),
-      data: { siteId },
-    });
-    if (!res.ok()) throw new Error(`startCombat failed: ${res.status()}`);
-    return res.json();
-  }
+  // --- Combat ---
 
   async getCombatSites() {
     const ctx = await this.getContext();
@@ -126,6 +176,50 @@ export class ApiHelper {
     return res.json();
   }
 
+  async selectStrategy(siteId: string, strategy: 'full_clear' | 'room_by_room' = 'full_clear') {
+    const ctx = await this.getContext();
+    const res = await ctx.post(`/api/v1/combat/sites/${siteId}/strategy`, {
+      headers: this.authHeaders(),
+      data: { strategy },
+    });
+    if (!res.ok()) throw new Error(`selectStrategy failed: ${res.status()} ${await res.text()}`);
+    return res.json();
+  }
+
+  async startCombat(encounterSiteId: string) {
+    const ctx = await this.getContext();
+    const res = await ctx.post('/api/v1/combat/start', {
+      headers: this.authHeaders(),
+      data: { encounterSiteId },
+    });
+    if (!res.ok()) throw new Error(`startCombat failed: ${res.status()} ${await res.text()}`);
+    return res.json();
+  }
+
+  /** Select strategy and start combat in one call */
+  async fightEncounter(siteId: string) {
+    await this.selectStrategy(siteId, 'full_clear');
+    return this.startCombat(siteId);
+  }
+
+  async getCombatLogs(page = 1, pageSize = 20) {
+    const ctx = await this.getContext();
+    const res = await ctx.get(`/api/v1/combat/logs?page=${page}&pageSize=${pageSize}`, {
+      headers: this.authHeaders(),
+    });
+    if (!res.ok()) throw new Error(`getCombatLogs failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async getCombatLog(id: string) {
+    const ctx = await this.getContext();
+    const res = await ctx.get(`/api/v1/combat/logs/${id}`, { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getCombatLog failed: ${res.status()}`);
+    return res.json();
+  }
+
+  // --- Inventory ---
+
   async getInventory() {
     const ctx = await this.getContext();
     const res = await ctx.get('/api/v1/inventory', { headers: this.authHeaders() });
@@ -133,20 +227,180 @@ export class ApiHelper {
     return res.json();
   }
 
-  async rest(turns: number) {
+  // --- Achievements ---
+
+  async getAchievements() {
     const ctx = await this.getContext();
-    const res = await ctx.post('/api/v1/hp/rest', {
-      headers: this.authHeaders(),
-      data: { turns },
-    });
-    if (!res.ok()) throw new Error(`rest failed: ${res.status()}`);
+    const res = await ctx.get('/api/v1/achievements', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getAchievements failed: ${res.status()}`);
     return res.json();
   }
 
-  async recover() {
+  async claimAchievement(id: string) {
     const ctx = await this.getContext();
-    const res = await ctx.post('/api/v1/hp/recover', { headers: this.authHeaders() });
-    if (!res.ok()) throw new Error(`recover failed: ${res.status()}`);
+    const res = await ctx.post(`/api/v1/achievements/${id}/claim`, {
+      headers: this.authHeaders(),
+    });
+    if (!res.ok()) throw new Error(`claimAchievement failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async setTitle(achievementId: string | null) {
+    const ctx = await this.getContext();
+    const res = await ctx.put('/api/v1/achievements/title', {
+      headers: this.authHeaders(),
+      data: { achievementId },
+    });
+    if (!res.ok()) throw new Error(`setTitle failed: ${res.status()}`);
+    return res.json();
+  }
+
+  // --- Leaderboard ---
+
+  async getLeaderboardCategories() {
+    const ctx = await this.getContext();
+    const res = await ctx.get('/api/v1/leaderboard/categories', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getLeaderboardCategories failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async getLeaderboard(category: string) {
+    const ctx = await this.getContext();
+    const res = await ctx.get(`/api/v1/leaderboard/${category}`, { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getLeaderboard failed: ${res.status()}`);
+    return res.json();
+  }
+
+  // --- World Events ---
+
+  async getWorldEvents() {
+    const ctx = await this.getContext();
+    const res = await ctx.get('/api/v1/events', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getWorldEvents failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async getZoneEvents(zoneId: string) {
+    const ctx = await this.getContext();
+    const res = await ctx.get(`/api/v1/events/zone/${zoneId}`, { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getZoneEvents failed: ${res.status()}`);
+    return res.json();
+  }
+
+  // --- PvP ---
+
+  async getPvpLadder() {
+    const ctx = await this.getContext();
+    const res = await ctx.get('/api/v1/pvp/ladder', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getPvpLadder failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async getPvpRating() {
+    const ctx = await this.getContext();
+    const res = await ctx.get('/api/v1/pvp/rating', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getPvpRating failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async scoutOpponent(targetId: string) {
+    const ctx = await this.getContext();
+    const res = await ctx.post('/api/v1/pvp/scout', {
+      headers: this.authHeaders(),
+      data: { targetId },
+    });
+    if (!res.ok()) throw new Error(`scoutOpponent failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async challengeOpponent(targetId: string) {
+    const ctx = await this.getContext();
+    const res = await ctx.post('/api/v1/pvp/challenge', {
+      headers: this.authHeaders(),
+      data: { targetId },
+    });
+    if (!res.ok()) throw new Error(`challengeOpponent failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async getPvpHistory(page = 1) {
+    const ctx = await this.getContext();
+    const res = await ctx.get(`/api/v1/pvp/history?page=${page}`, {
+      headers: this.authHeaders(),
+    });
+    if (!res.ok()) throw new Error(`getPvpHistory failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async getPvpNotifications() {
+    const ctx = await this.getContext();
+    const res = await ctx.get('/api/v1/pvp/notifications', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getPvpNotifications failed: ${res.status()}`);
+    return res.json();
+  }
+
+  // --- Guild ---
+
+  async createGuild(name: string, tag: string) {
+    const ctx = await this.getContext();
+    const res = await ctx.post('/api/v1/guild', {
+      headers: this.authHeaders(),
+      data: { name, tag },
+    });
+    if (!res.ok()) throw new Error(`createGuild failed: ${res.status()} ${await res.text()}`);
+    return res.json();
+  }
+
+  async getGuild() {
+    const ctx = await this.getContext();
+    const res = await ctx.get('/api/v1/guild', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getGuild failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async searchGuilds(query = '') {
+    const ctx = await this.getContext();
+    const params = query ? `?search=${encodeURIComponent(query)}` : '';
+    const res = await ctx.get(`/api/v1/guild/search${params}`, {
+      headers: this.authHeaders(),
+    });
+    if (!res.ok()) throw new Error(`searchGuilds failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async leaveGuild(guildId: string) {
+    const ctx = await this.getContext();
+    const res = await ctx.post(`/api/v1/guild/${guildId}/leave`, {
+      headers: this.authHeaders(),
+    });
+    if (!res.ok()) throw new Error(`leaveGuild failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async joinGuild(guildId: string) {
+    const ctx = await this.getContext();
+    const res = await ctx.post(`/api/v1/guild/${guildId}/join`, {
+      headers: this.authHeaders(),
+    });
+    if (!res.ok()) throw new Error(`joinGuild failed: ${res.status()}`);
+    return res.json();
+  }
+
+  // --- Boss ---
+
+  async getBossActive() {
+    const ctx = await this.getContext();
+    const res = await ctx.get('/api/v1/boss/active', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`getBossActive failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async getBossHistory(page = 1) {
+    const ctx = await this.getContext();
+    const res = await ctx.get(`/api/v1/boss/history?page=${page}`, {
+      headers: this.authHeaders(),
+    });
+    if (!res.ok()) throw new Error(`getBossHistory failed: ${res.status()}`);
     return res.json();
   }
 
@@ -311,6 +565,33 @@ export class ApiHelper {
     });
     if (!res.ok()) throw new Error(`adminCancelEvent failed: ${res.status()}`);
     return res.json();
+  }
+
+  async adminSpawnBoss(mobTemplateId: string, zoneId: string) {
+    const ctx = await this.getContext();
+    const res = await ctx.post('/api/v1/admin/boss/spawn', {
+      headers: this.authHeaders(),
+      data: { mobTemplateId, zoneId },
+    });
+    if (!res.ok()) throw new Error(`adminSpawnBoss failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async adminGetMobs() {
+    const ctx = await this.getContext();
+    const res = await ctx.get('/api/v1/admin/mobs', { headers: this.authHeaders() });
+    if (!res.ok()) throw new Error(`adminGetMobs failed: ${res.status()}`);
+    return res.json();
+  }
+
+  async promoteToAdmin() {
+    const client = new pg.Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      await client.query(`UPDATE players SET role = 'admin' WHERE id = $1`, [this.playerId]);
+    } finally {
+      await client.end();
+    }
   }
 
   async dispose() {

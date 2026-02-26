@@ -9,12 +9,11 @@ interface GameFixtures {
 
 export const test = authTest.extend<GameFixtures>({
   gameApi: async ({ api }, use) => {
-    // api is already authenticated from auth fixture
     await use(api);
   },
 
-  gamePage: async ({ authedPage, api }, use) => {
-    // Wait for game page to fully load (dashboard renders turns)
+  gamePage: async ({ authedPage }, use) => {
+    // Tutorial is already skipped via API in auth fixture
     await authedPage.waitForSelector('text=Available Turns', { timeout: 10_000 });
     await use(authedPage);
   },

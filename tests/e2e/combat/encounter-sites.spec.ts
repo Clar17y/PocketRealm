@@ -2,51 +2,47 @@ import { test, expect } from '../fixtures/game.fixture.js';
 
 test.describe('Encounter Sites', () => {
   test.beforeEach(async ({ gamePage: page }) => {
-    // Navigate to combat screen via bottom nav
-    await page.getByRole('button', { name: /combat/i }).click();
+    await page.getByRole('navigation').getByText('Combat').click();
   });
 
-  test('displays encounter site list (empty for new player)', async ({ gamePage: page }) => {
-    // New player has no encounter sites — should show empty state or list
-    await expect(page.getByText(/No encounter|No pending|encounters/i)).toBeVisible();
+  test('new player sees encounter list', async ({ gamePage: page }) => {
+    // Combat tab should show either encounters or "No pending" message
+    await expect(page.getByText(/No pending|Encounter|Pending|encounter/i).first()).toBeVisible({ timeout: 5_000 });
   });
 
-  test('displays encounter sites after exploration', async ({ gamePage: page, gameApi: api }) => {
-    // Setup: travel to wild zone, spawn encounter
+  test('spawned encounter appears in list', async ({ gamePage: page, gameApi: api }) => {
     await api.adminDiscoverAllZones();
     const zones = await api.adminGetZones();
     const forestEdge = zones.zones.find((z: { name: string }) => z.name === 'Forest Edge');
-    if (!forestEdge) return;
+    expect(forestEdge).toBeTruthy();
 
     await api.adminTeleport(forestEdge.id);
     const familiesRes = await api.adminGetMobFamilies(forestEdge.id);
-    if (familiesRes.families.length > 0) {
-      await api.adminSpawnEncounter(familiesRes.families[0].id, forestEdge.id, 'small');
-    }
+    expect(familiesRes.families.length).toBeGreaterThan(0);
 
+    await api.adminSpawnEncounter(familiesRes.families[0].id, forestEdge.id, 'small');
     await page.reload();
-    await page.getByRole('button', { name: /combat/i }).click();
+    await page.getByRole('navigation').getByText('Combat').click();
 
-    // Should now see at least one encounter site
-    await expect(page.getByText(/encounter|site/i).first()).toBeVisible();
+    // Should show at least one encounter with a fight/start button
+    await expect(page.getByRole('button', { name: /Start Combat|Fight/i }).first()).toBeVisible({ timeout: 5_000 });
   });
 
-  test('shows mob count and room progress on encounter card', async ({ gamePage: page, gameApi: api }) => {
+  test('encounter card shows room info', async ({ gamePage: page, gameApi: api }) => {
     await api.adminDiscoverAllZones();
     const zones = await api.adminGetZones();
     const forestEdge = zones.zones.find((z: { name: string }) => z.name === 'Forest Edge');
-    if (!forestEdge) return;
+    expect(forestEdge).toBeTruthy();
 
     await api.adminTeleport(forestEdge.id);
     const familiesRes = await api.adminGetMobFamilies(forestEdge.id);
-    if (familiesRes.families.length > 0) {
-      await api.adminSpawnEncounter(familiesRes.families[0].id, forestEdge.id, 'small');
-    }
+    expect(familiesRes.families.length).toBeGreaterThan(0);
 
+    await api.adminSpawnEncounter(familiesRes.families[0].id, forestEdge.id, 'small');
     await page.reload();
-    await page.getByRole('button', { name: /combat/i }).click();
+    await page.getByRole('navigation').getByText('Combat').click();
 
-    // Encounter card should show mob/room info
-    await page.waitForTimeout(1_000);
+    // Encounter card should show mob count (e.g., "3/3 mobs")
+    await expect(page.getByText(/\d+\/\d+ mobs/).first()).toBeVisible({ timeout: 5_000 });
   });
 });

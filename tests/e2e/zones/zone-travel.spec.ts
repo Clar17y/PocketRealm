@@ -2,76 +2,55 @@ import { test, expect } from '../fixtures/game.fixture.js';
 
 test.describe('Zone Travel', () => {
   test.beforeEach(async ({ gamePage: page }) => {
-    await page.getByRole('button', { name: 'Map' }).click();
+    await page.getByRole('button', { name: 'Map', exact: true }).click();
   });
 
-  test('displays world map header', async ({ gamePage: page }) => {
-    await expect(page.getByText('World Map')).toBeVisible();
+  test('displays world map heading', async ({ gamePage: page }) => {
+    await expect(page.getByRole('heading', { name: 'World Map' })).toBeVisible();
   });
 
-  test('shows starter zone (Millbrook) as current', async ({ gamePage: page }) => {
-    await expect(page.getByText('Millbrook')).toBeVisible();
-    await expect(page.getByText('HERE')).toBeVisible();
+  test('current zone shows HERE badge', async ({ gamePage: page }) => {
+    await expect(page.locator('span:text-is("HERE")')).toBeVisible();
   });
 
-  test('clicking a zone shows detail panel', async ({ gamePage: page }) => {
-    await page.getByText('Millbrook').click();
-    await expect(page.getByText(/Town/)).toBeVisible();
-  });
-
-  test('shows travel cost for connected zones', async ({ gamePage: page, gameApi: api }) => {
+  test('shows travel cost after discovering zones', async ({ gamePage: page, gameApi: api }) => {
     await api.adminDiscoverAllZones();
     await page.reload();
-    await page.getByRole('button', { name: 'Map' }).click();
+    await page.getByRole('button', { name: 'Map', exact: true }).click();
 
-    // Forest Edge should be visible and show travel cost
-    const forestEdge = page.getByText('Forest Edge');
-    if (await forestEdge.isVisible()) {
-      await forestEdge.click();
-      await expect(page.getByText(/turns/)).toBeVisible();
-    }
+    // After discovering all zones, Millbrook should be clickable
+    const millbrook = page.getByText('Millbrook').first();
+    await expect(millbrook).toBeVisible();
+    await millbrook.click();
+    // Travel panel should show turn cost
+    await expect(page.getByText(/turns/).first()).toBeVisible();
   });
 
-  test('travel to another zone', async ({ gamePage: page, gameApi: api }) => {
+  test('travel to Millbrook changes current zone', async ({ gamePage: page, gameApi: api }) => {
     await api.adminDiscoverAllZones();
     await page.reload();
-    await page.getByRole('button', { name: 'Map' }).click();
+    await page.getByRole('button', { name: 'Map', exact: true }).click();
 
-    const forestEdge = page.getByText('Forest Edge');
-    if (await forestEdge.isVisible()) {
-      await forestEdge.click();
-      const travelButton = page.getByRole('button', { name: /Travel to Forest Edge/ });
-      if (await travelButton.isVisible() && await travelButton.isEnabled()) {
-        await travelButton.click();
-        // Should trigger travel — wait for completion
-        await page.waitForTimeout(3_000);
-      }
-    }
+    const millbrook = page.getByText('Millbrook').first();
+    await expect(millbrook).toBeVisible();
+    await millbrook.click();
+
+    const travelButton = page.getByRole('button', { name: /Travel to Millbrook/ });
+    await expect(travelButton).toBeVisible();
+    await travelButton.click();
+
+    // After travel, current zone should change
+    await expect(page.getByText(/Millbrook|Traveling/).first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test('shows exploration progress for zones', async ({ gamePage: page, gameApi: api }) => {
+  test('zone detail shows exploration progress', async ({ gamePage: page, gameApi: api }) => {
     await api.adminDiscoverAllZones();
     await page.reload();
-    await page.getByRole('button', { name: 'Map' }).click();
+    await page.getByRole('button', { name: 'Map', exact: true }).click();
 
-    await page.getByText('Forest Edge').click();
-    await expect(page.getByText(/% Explored|Explored/)).toBeVisible();
-  });
-
-  test('shows locked zone exits with exploration threshold', async ({ gamePage: page, gameApi: api }) => {
-    await api.adminDiscoverAllZones();
-    await page.reload();
-    await page.getByRole('button', { name: 'Map' }).click();
-
-    // Some zones have locked exits requiring exploration %
-    // Check for lock icon or "requires X% explored" text
-    await page.waitForTimeout(1_000);
-  });
-
-  test('undiscovered zones show as ???', async ({ gamePage: page }) => {
-    // New player only knows Millbrook — other zones should be hidden or shown as ???
-    const unknowns = page.getByText('???');
-    // May or may not be visible depending on map rendering
-    await page.waitForTimeout(500);
+    const forestEdge = page.getByText('Forest Edge').first();
+    await expect(forestEdge).toBeVisible();
+    await forestEdge.click();
+    await expect(page.getByText(/Explored|%/).first()).toBeVisible();
   });
 });

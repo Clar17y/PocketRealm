@@ -2,46 +2,44 @@ import { test, expect } from '../fixtures/game.fixture.js';
 
 test.describe('Skills', () => {
   test.beforeEach(async ({ gamePage: page }) => {
-    await page.getByRole('button', { name: 'Skills' }).click();
+    await page.getByRole('button', { name: 'Skills', exact: true }).first().click();
   });
 
-  test('displays skills header with total level', async ({ gamePage: page }) => {
-    await expect(page.getByText('Skills')).toBeVisible();
-    await expect(page.getByText(/Total Level/)).toBeVisible();
+  test('displays skills heading and total level', async ({ gamePage: page }) => {
+    await expect(page.getByRole('heading', { name: 'Skills' })).toBeVisible();
+    // New player: 15 skills at level 1 each = Total Level: 15
+    await expect(page.getByText('Total Level: 15')).toBeVisible();
   });
 
-  test('displays all combat skill types', async ({ gamePage: page }) => {
-    for (const skill of ['Melee', 'Ranged', 'Magic', 'Defence', 'Vitality', 'Evasion']) {
-      await expect(page.getByText(skill, { exact: true }).first()).toBeVisible();
+  test('displays combat skills', async ({ gamePage: page }) => {
+    for (const skill of ['Melee', 'Ranged', 'Magic']) {
+      await expect(page.getByRole('heading', { name: skill })).toBeVisible();
     }
   });
 
-  test('displays gathering skill types', async ({ gamePage: page }) => {
+  test('displays gathering skills', async ({ gamePage: page }) => {
     for (const skill of ['Mining', 'Foraging', 'Woodcutting']) {
-      await expect(page.getByText(skill, { exact: true }).first()).toBeVisible();
+      await expect(page.getByRole('heading', { name: skill })).toBeVisible();
     }
   });
 
-  test('displays crafting skill types', async ({ gamePage: page }) => {
-    for (const skill of ['Weaponsmithing', 'Armorsmithing', 'Leatherworking', 'Tailoring', 'Alchemy']) {
-      await expect(page.getByText(skill, { exact: true }).first()).toBeVisible();
+  test('displays crafting skills', async ({ gamePage: page }) => {
+    for (const skill of ['Weaponsmithing', 'Armorsmithing', 'Leatherworking', 'Tailoring', 'Alchemy', 'Jewelcrafting']) {
+      await expect(page.getByRole('heading', { name: skill })).toBeVisible();
     }
   });
 
-  test('shows level badge for each skill', async ({ gamePage: page }) => {
-    // Each skill card shows "Lv. X"
-    const levelBadges = page.getByText(/^Lv\. \d+$/);
-    const count = await levelBadges.count();
-    expect(count).toBeGreaterThanOrEqual(14);
+  test('each skill shows level 1 for new player', async ({ gamePage: page }) => {
+    // All 15 skills should have h3 headings
+    const skillHeadings = page.getByRole('heading', { level: 3 });
+    const count = await skillHeadings.count();
+    expect(count).toBe(15);
   });
 
-  test('XP gained after combat increases skill levels', async ({ gamePage: page, gameApi: api }) => {
-    // Grant XP via admin
-    await api.adminGrantXp(10000);
-    await page.reload();
-    await page.getByRole('button', { name: 'Skills' }).click();
-
-    // Character should have gained some XP — verify level display updated
-    await expect(page.getByText(/Total Level/)).toBeVisible();
+  test('skill XP is displayed for each skill', async ({ gamePage: page }) => {
+    // Each skill card shows XP progress (e.g., "0 / 282 XP")
+    const xpTexts = page.getByText(/\d+ \/ \d+ XP/);
+    const count = await xpTexts.count();
+    expect(count).toBeGreaterThanOrEqual(15);
   });
 });

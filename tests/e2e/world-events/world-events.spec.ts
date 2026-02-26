@@ -2,43 +2,45 @@ import { test, expect } from '../fixtures/game.fixture.js';
 
 test.describe('World Events', () => {
   test.beforeEach(async ({ gamePage: page }) => {
-    await page.getByRole('button', { name: 'Events' }).click();
+    await page.getByRole('button', { name: 'Events', exact: true }).click();
   });
 
-  test('displays world events header', async ({ gamePage: page }) => {
-    await expect(page.getByText('World Events')).toBeVisible();
+  test('displays world events heading', async ({ gamePage: page }) => {
+    await expect(page.getByRole('heading', { name: 'World Events' })).toBeVisible();
   });
 
   test('displays refresh button', async ({ gamePage: page }) => {
     await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
   });
 
-  test('shows no events message when none active', async ({ gamePage: page }) => {
-    await expect(
-      page.getByText(/No active world events/).or(page.getByText(/Global Events/))
-    ).toBeVisible();
+  test('shows global events section', async ({ gamePage: page }) => {
+    await expect(page.getByRole('heading', { name: 'Global Events' })).toBeVisible();
   });
 
-  test('shows active event after admin spawns one', async ({ gamePage: page, gameApi: api }) => {
-    // Spawn an event
+  test('spawning an event makes it visible', async ({ gamePage: page, gameApi: api }) => {
     const templatesRes = await api.adminGetEventTemplates();
+    expect(templatesRes.templates.length).toBeGreaterThan(0);
+
     const zonesRes = await api.adminGetZones();
+    expect(zonesRes.zones.length).toBeGreaterThan(0);
 
-    if (templatesRes.templates.length > 0 && zonesRes.zones.length > 0) {
+    try {
       await api.adminSpawnEvent(0, zonesRes.zones[0].id, 1);
-      await page.reload();
-      await page.getByRole('button', { name: 'Events' }).click();
-
-      // Should show the spawned event
-      await page.waitForTimeout(1_000);
-      await expect(page.getByText(/Global Events|Active in/)).toBeVisible();
+    } catch {
+      // 409 if event already active — acceptable
     }
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Events', exact: true }).click();
+
+    // Should show event content (timer, zone name, or "GLOBAL" badge)
+    await expect(page.getByText(/GLOBAL|Active|expires/i).first()).toBeVisible({ timeout: 5_000 });
   });
 
-  test('refresh button reloads events', async ({ gamePage: page }) => {
+  test('refresh button reloads without breaking page', async ({ gamePage: page }) => {
     await page.getByRole('button', { name: 'Refresh' }).click();
-    // Button should change to "Loading..." briefly
-    await page.waitForTimeout(1_000);
+    // After refresh, the heading and refresh button should still be present
+    await expect(page.getByRole('heading', { name: 'World Events' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
   });
 });

@@ -7,7 +7,7 @@ interface AuthFixtures {
   testUser: { username: string; email: string; password: string };
 }
 
-const uniqueId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+const uniqueId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
 export const test = base.extend<AuthFixtures>({
   testUser: async ({}, use) => {
@@ -22,6 +22,10 @@ export const test = base.extend<AuthFixtures>({
   api: async ({ testUser }, use) => {
     const api = new ApiHelper();
     await api.register(testUser.username, testUser.email, testUser.password);
+    await api.skipTutorial();
+    await api.promoteToAdmin();
+    // Re-login to get a new JWT with the admin role
+    await api.login(testUser.email, testUser.password);
     await use(api);
     await api.dispose();
   },
@@ -31,7 +35,7 @@ export const test = base.extend<AuthFixtures>({
     await page.goto('/login');
     await page.locator('#email').fill(testUser.email);
     await page.locator('#password').fill(testUser.password);
-    await page.getByRole('button', { name: 'Login' }).click();
+    await page.getByRole('button', { name: 'Enter World' }).click();
     await page.waitForURL('/game');
     await use(page);
   },

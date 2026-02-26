@@ -1,34 +1,22 @@
 import { test, expect } from '../fixtures/game.fixture.js';
 
 test.describe('Knockout & Recovery', () => {
-  test('shows knocked out state when HP reaches 0', async ({ gamePage: page, gameApi: api }) => {
-    // Set HP to 0 via combat — need to fight a strong mob at low level
-    // This is hard to guarantee, so we check the UI conditionally
+  test('rest screen shows HP state', async ({ gamePage: page }) => {
     await page.getByRole('button', { name: /^(Rest|Recover)$/ }).click();
-
-    // If player is knocked out, should see "Knocked Out" text
-    const knockedOut = page.getByText('Knocked Out');
-    // Just verify the rest screen loads — knockout state depends on game state
-    await expect(page.getByText('Current HP').or(knockedOut)).toBeVisible();
+    // New player should show "Current HP" (not knocked out)
+    await expect(page.getByText('Current HP')).toBeVisible();
   });
 
-  test('recovery button visible when knocked out', async ({ gamePage: page }) => {
+  test('full HP player does not see recover button', async ({ gamePage: page }) => {
     await page.getByRole('button', { name: /^(Rest|Recover)$/ }).click();
-
+    // At full HP, the recover button should not be visible
     const recoverButton = page.getByRole('button', { name: 'Recover', exact: true });
-    // Only visible if actually knocked out
-    if (await recoverButton.isVisible()) {
-      await expect(recoverButton).toBeEnabled();
-    }
+    await expect(recoverButton).not.toBeVisible();
   });
 
-  test('recovery cost displayed when knocked out', async ({ gamePage: page }) => {
-    await page.getByRole('button', { name: /^(Rest|Recover)$/ }).click();
-
-    const knockedOut = page.getByText('Knocked Out');
-    if (await knockedOut.isVisible()) {
-      // Should show recovery cost in turns
-      await expect(page.getByText(/turns/)).toBeVisible();
-    }
+  test('rest button shows correct label based on HP state', async ({ gamePage: page }) => {
+    // Dashboard should show "Rest" for healthy player (not "Recover")
+    const restButton = page.getByRole('button', { name: 'Rest', exact: true });
+    await expect(restButton).toBeVisible();
   });
 });

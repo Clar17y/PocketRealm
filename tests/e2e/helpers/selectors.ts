@@ -6,16 +6,25 @@ export const auth = {
   emailInput: (page: Page) => page.locator('#email'),
   passwordInput: (page: Page) => page.locator('#password'),
   usernameInput: (page: Page) => page.locator('#username'),
-  loginButton: (page: Page) => page.getByRole('button', { name: 'Login' }),
-  registerButton: (page: Page) => page.getByRole('button', { name: 'Register' }),
+  loginButton: (page: Page) => page.getByRole('button', { name: 'Enter World' }),
+  registerButton: (page: Page) => page.getByRole('button', { name: 'Begin Adventure' }),
   errorMessage: (page: Page) => page.locator('[class*="error"]'),
 };
 
 /* ---- Game navigation ---- */
 
 export const nav = {
-  tab: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
-  screenButton: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
+  /** Bottom nav tab (Home, Explore, Inventory, Combat, Guild) */
+  bottomTab: (page: Page, name: string) => page.getByRole('button', { name }).first(),
+  /** Sub-tab within a section (e.g. Dashboard, Map, Skills under Home) */
+  subTab: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
+  /** Username dropdown trigger in header */
+  userMenu: (page: Page, username: string) =>
+    page.getByText(`${username} ▾`),
+  /** Logout item inside the username dropdown */
+  logoutButton: (page: Page) => page.getByRole('menuitem', { name: 'Logout' }),
+  /** Settings item inside the username dropdown */
+  settingsButton: (page: Page) => page.getByRole('menuitem', { name: 'Settings' }),
 };
 
 /* ---- Dashboard ---- */
@@ -38,6 +47,13 @@ export const common = {
   slider: (page: Page) => page.locator('input[type="range"]'),
   selectDropdown: (page: Page, label?: string) =>
     label ? page.getByLabel(label) : page.locator('select').first(),
+};
+
+/* ---- Tutorial ---- */
+
+export const tutorial = {
+  gotItButton: (page: Page) => page.getByRole('button', { name: 'Got it' }),
+  skipButton: (page: Page) => page.getByRole('button', { name: 'Skip' }),
 };
 
 /* ---- Exploration ---- */

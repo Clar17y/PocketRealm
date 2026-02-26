@@ -2,81 +2,79 @@ import { test, expect } from '../fixtures/game.fixture.js';
 
 test.describe('Gathering', () => {
   test.beforeEach(async ({ gamePage: page }) => {
-    await page.getByRole('button', { name: 'Mine' }).click();
+    await page.getByRole('navigation').getByText('Explore').click();
+    await page.getByRole('button', { name: 'Gathering', exact: true }).click();
   });
 
-  test('displays skill tabs (mining, foraging, woodcutting)', async ({ gamePage: page }) => {
-    // Should show skill name and level in header
-    await expect(page.getByText(/Lv\./)).toBeVisible();
+  test('displays gathering skill name and level', async ({ gamePage: page }) => {
+    await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible();
+    await expect(page.getByText(/Lv\.\s*\d+/).first()).toBeVisible();
   });
 
   test('displays discovered nodes section', async ({ gamePage: page }) => {
     await expect(page.getByText('Discovered Nodes')).toBeVisible();
   });
 
-  test('shows empty state when no nodes discovered', async ({ gamePage: page }) => {
-    // New player may not have any gathering nodes
-    await page.waitForTimeout(500);
-  });
-
-  test('shows node details with level and capacity', async ({ gamePage: page, gameApi: api }) => {
-    // Spawn a resource node for the player
+  test('spawned node shows level and capacity', async ({ gamePage: page, gameApi: api }) => {
+    // Teleport to Forest Edge first (where resource nodes exist)
+    await api.adminDiscoverAllZones();
     const zonesRes = await api.adminGetZones();
-    const starter = zonesRes.zones.find((z: { name: string }) => z.name === 'Millbrook');
-    if (!starter) return;
+    const millbrook = zonesRes.zones.find((z: { name: string }) => z.name === 'Forest Edge');
+    expect(millbrook).toBeTruthy();
+    await api.adminTeleport(millbrook.id);
 
-    const nodesRes = await api.adminGetResourceNodes(starter.id);
-    if (nodesRes.nodes.length > 0) {
-      await api.adminSpawnResourceNode(nodesRes.nodes[0].id);
-      await page.reload();
-      await page.getByRole('button', { name: 'Mine' }).click();
-      await page.waitForTimeout(1_000);
+    const nodesRes = await api.adminGetResourceNodes(millbrook.id);
+    expect(nodesRes.nodes.length).toBeGreaterThan(0);
 
-      // Should show node with level and capacity
-      await expect(page.getByText(/Lv\. \d+/).first()).toBeVisible();
-      await expect(page.getByText(/remaining/).first()).toBeVisible();
-    }
+    await api.adminSpawnResourceNode(nodesRes.nodes[0].id);
+    await page.reload();
+    await page.getByRole('navigation').getByText('Explore').click();
+    await page.getByRole('button', { name: 'Gathering', exact: true }).click();
+
+    await expect(page.getByText(/remaining/).first()).toBeVisible({ timeout: 5_000 });
   });
 
-  test('start gathering triggers playback', async ({ gamePage: page, gameApi: api }) => {
+  test('start gathering produces results', async ({ gamePage: page, gameApi: api }) => {
+    await api.adminDiscoverAllZones();
     const zonesRes = await api.adminGetZones();
-    const starter = zonesRes.zones.find((z: { name: string }) => z.name === 'Millbrook');
-    if (!starter) return;
+    const millbrook = zonesRes.zones.find((z: { name: string }) => z.name === 'Forest Edge');
+    expect(millbrook).toBeTruthy();
+    await api.adminTeleport(millbrook.id);
 
-    const nodesRes = await api.adminGetResourceNodes(starter.id);
-    if (nodesRes.nodes.length > 0) {
-      await api.adminSpawnResourceNode(nodesRes.nodes[0].id);
-      await page.reload();
-      await page.getByRole('button', { name: 'Mine' }).click();
-      await page.waitForTimeout(1_000);
+    const nodesRes = await api.adminGetResourceNodes(millbrook.id);
+    expect(nodesRes.nodes.length).toBeGreaterThan(0);
 
-      // Select a node and start gathering
-      const startButton = page.getByRole('button', { name: /^Start / });
-      if (await startButton.isVisible()) {
-        await startButton.click();
-        await page.waitForTimeout(2_000);
-      }
-    }
+    await api.adminSpawnResourceNode(nodesRes.nodes[0].id);
+    await page.reload();
+    await page.getByRole('navigation').getByText('Explore').click();
+    await page.getByRole('button', { name: 'Gathering', exact: true }).click();
+
+    const startButton = page.getByRole('button', { name: /^Start / });
+    await expect(startButton).toBeVisible({ timeout: 5_000 });
+    await startButton.click();
+    await expect(page.getByText(/Gathering|Results|Complete|yield/i).first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test('displays zone and type filter dropdowns', async ({ gamePage: page }) => {
-    await expect(page.locator('select').first()).toBeVisible();
+  test('displays zone filter dropdown', async ({ gamePage: page }) => {
+    const select = page.locator('select').first();
+    await expect(select).toBeVisible();
   });
 
-  test('displays turn investment slider when node selected', async ({ gamePage: page, gameApi: api }) => {
+  test('turn investment section visible with spawned node', async ({ gamePage: page, gameApi: api }) => {
+    await api.adminDiscoverAllZones();
     const zonesRes = await api.adminGetZones();
-    const starter = zonesRes.zones.find((z: { name: string }) => z.name === 'Millbrook');
-    if (!starter) return;
+    const millbrook = zonesRes.zones.find((z: { name: string }) => z.name === 'Forest Edge');
+    expect(millbrook).toBeTruthy();
+    await api.adminTeleport(millbrook.id);
 
-    const nodesRes = await api.adminGetResourceNodes(starter.id);
-    if (nodesRes.nodes.length > 0) {
-      await api.adminSpawnResourceNode(nodesRes.nodes[0].id);
-      await page.reload();
-      await page.getByRole('button', { name: 'Mine' }).click();
-      await page.waitForTimeout(1_000);
+    const nodesRes = await api.adminGetResourceNodes(millbrook.id);
+    expect(nodesRes.nodes.length).toBeGreaterThan(0);
 
-      // Click on a node to select it — check for Turn Investment section
-      await expect(page.getByText('Turn Investment')).toBeVisible();
-    }
+    await api.adminSpawnResourceNode(nodesRes.nodes[0].id);
+    await page.reload();
+    await page.getByRole('navigation').getByText('Explore').click();
+    await page.getByRole('button', { name: 'Gathering', exact: true }).click();
+
+    await expect(page.getByText('Turn Investment')).toBeVisible({ timeout: 5_000 });
   });
 });
