@@ -732,6 +732,7 @@ export default function GamePage() {
             <Crafting
               skillName={activeCraftingSkillMeta?.name ?? 'Crafting'}
               skillLevel={activeCraftingSkillData?.level ?? 1}
+              xpRate={Math.round(calculateEfficiency(activeCraftingSkillData?.dailyXpGained ?? 0, activeCraftingSkill as SkillType) * 100)}
               recipes={filteredCraftingRecipes.map((r) => ({
                 id: r.id,
                 name: r.resultTemplate.name,
