@@ -14,8 +14,7 @@ import { Pagination } from '@/components/common/Pagination';
 import { EventBadges } from '@/components/common/EventBadge';
 import type { CombatActiveEvent } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
-import { xpRateColor } from '@/lib/format';
-import { XpRateTooltip } from '@/components/common/XpRateTooltip';
+import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../useGameController';
@@ -305,13 +304,7 @@ export function CombatScreen({
             <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Encounter Sites</h2>
 
             {combatXpRate && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-[var(--rpg-text-secondary)]">{combatXpRate.skillName} XP Rate:</span>
-                <span className="font-bold" style={{ color: xpRateColor(combatXpRate.rate) }}>
-                  {combatXpRate.rate}%
-                </span>
-                <XpRateTooltip />
-              </div>
+              <XpRateBadge skillName={combatXpRate.skillName} rate={combatXpRate.rate} />
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

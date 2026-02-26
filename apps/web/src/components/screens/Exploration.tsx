@@ -10,8 +10,7 @@ import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Loader2, Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@adventure/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
-import { xpRateColor } from '@/lib/format';
-import { XpRateTooltip } from '@/components/common/XpRateTooltip';
+import { XpRateBadge } from '@/components/common/XpRateBadge';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
@@ -251,13 +250,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               </div>
 
               {combatXpRate && (
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-[var(--rpg-text-secondary)]">{combatXpRate.skillName} XP Rate:</span>
-                  <span className="font-bold" style={{ color: xpRateColor(combatXpRate.rate) }}>
-                    {combatXpRate.rate}%
-                  </span>
-                  <XpRateTooltip />
-                </div>
+                <XpRateBadge skillName={combatXpRate.skillName} rate={combatXpRate.rate} />
               )}
 
               <Slider
