@@ -338,6 +338,18 @@ export default function GamePage() {
     [bestiaryMobs],
   );
 
+  const primaryCombatXpRate = useMemo(() => {
+    const combatSkills = skills
+      .filter((s) => ['melee', 'ranged', 'magic'].includes(s.skillType))
+      .sort((a, b) => b.level - a.level || a.skillType.localeCompare(b.skillType));
+    const primary = combatSkills[0];
+    if (!primary) return { skillName: 'Melee', rate: 100 };
+    return {
+      skillName: primary.skillType.charAt(0).toUpperCase() + primary.skillType.slice(1),
+      rate: Math.round(calculateEfficiency(primary.dailyXpGained, primary.skillType as SkillType) * 100),
+    };
+  }, [skills]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[var(--rpg-background)] flex items-center justify-center">
@@ -454,6 +466,7 @@ export default function GamePage() {
             onNavigateToRest={() => handleNavigate('rest')}
             guildTaxRate={guildTaxRate}
             combatLogPrefetch={combatLogPrefetch}
+            combatXpRate={primaryCombatXpRate}
           />
         );
       case 'inventory':
@@ -867,6 +880,7 @@ export default function GamePage() {
             onQuickRest={handleQuickRest}
             quickRestPercent={quickRestHealPercent}
             onNavigateToRest={() => handleNavigate('rest')}
+            combatXpRate={primaryCombatXpRate}
           />
         );
       }
