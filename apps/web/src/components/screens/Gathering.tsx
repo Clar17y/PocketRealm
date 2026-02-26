@@ -6,7 +6,8 @@ import { PixelButton } from '@/components/PixelButton';
 import { Pagination } from '@/components/common/Pagination';
 import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
-import { titleCaseFromSnake } from '@/lib/format';
+import { titleCaseFromSnake, xpRateColor } from '@/lib/format';
+import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 import { Pickaxe, MapPin } from 'lucide-react';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { GATHERING_CONSTANTS } from '@adventure/shared';
@@ -37,7 +38,7 @@ interface ResourceNode {
 interface GatheringProps {
   skillName: string;
   skillLevel: number;
-  efficiency: number;
+  xpRate: number;
   nodes: ResourceNode[];
   currentZoneId: string | null;
   availableTurns: number;
@@ -71,7 +72,7 @@ interface GatheringProps {
 export function Gathering({
   skillName,
   skillLevel,
-  efficiency,
+  xpRate,
   nodes,
   currentZoneId,
   availableTurns,
@@ -112,7 +113,9 @@ export function Gathering({
     return inflateCost(minActions * GATHERING_CONSTANTS.BASE_TURN_COST, guildTaxRate);
   };
 
-  const [selectedNode, setSelectedNode] = useState<ResourceNode | null>(nodes[0] || null);
+  const [selectedNode, setSelectedNode] = useState<ResourceNode | null>(() => {
+    return nodes.find((n) => skillLevel >= n.levelRequired && currentZoneId === n.zoneId) ?? null;
+  });
   const [turnInvestment, setTurnInvestment] = useState(() => {
     const node = nodes[0];
     if (!node) return [Math.min(100, availableTurns)];
@@ -212,8 +215,11 @@ export function Gathering({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-[var(--rpg-text-secondary)]">Efficiency</div>
-          <div className="text-sm font-bold text-[var(--rpg-green-light)]">{efficiency}%</div>
+          <div className="text-xs text-[var(--rpg-text-secondary)] flex items-center justify-end gap-1">
+            XP Rate
+            <XpRateTooltip />
+          </div>
+          <div className="text-sm font-bold" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>
 
@@ -428,7 +434,7 @@ export function Gathering({
           size="lg"
           className="w-full"
           onClick={() => onStartGathering(selectedNode.id, turnInvestment[0])}
-          disabled={isRecovering || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError)}
+          disabled={isRecovering || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
         >
           <div className="flex items-center justify-center gap-2">
             <Pickaxe size={20} />

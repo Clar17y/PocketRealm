@@ -10,6 +10,7 @@ import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Loader2, Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@adventure/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
+import { XpRateBadge } from '@/components/common/XpRateBadge';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
@@ -62,9 +63,10 @@ interface ExplorationProps {
   onNavigateToRest?: () => void;
   guildTaxRate?: number;
   combatLogPrefetch?: CombatLogPrefetch;
+  combatXpRate?: { skillName: string; rate: number };
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
@@ -246,6 +248,10 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                   </div>
                 </div>
               </div>
+
+              {combatXpRate && (
+                <XpRateBadge skillName={combatXpRate.skillName} rate={combatXpRate.rate} />
+              )}
 
               <Slider
                 value={tutorialLocked ? [100] : turnInvestment}

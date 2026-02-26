@@ -378,8 +378,10 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     };
   });
 
-  // XP: 5 XP per action
-  const rawXp = actions * 5;
+  // XP: scaled by node level requirement
+  const xpPerAction = GATHERING_CONSTANTS.XP_PER_ACTION_BASE
+    + Math.floor(template.levelRequired / GATHERING_CONSTANTS.XP_LEVEL_SCALING_DIVISOR);
+  const rawXp = actions * xpPerAction;
   const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp, undefined, guildMods.xpBoost || undefined);
 
   // Guild contract progress for gathering

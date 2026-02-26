@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.16',
+    date: '2026-02-26',
+    title: 'XP Rate & Efficiency Balance',
+    summary:
+      'The old "efficiency" system has been renamed to "XP Rate" and is now visible on every screen where you earn XP — Skills, Gathering, Crafting, Exploration, and Combat. Higher-level gathering nodes now award more XP per action. All skills (including combat) use a gradual decay curve instead of the old all-or-nothing cutoff. A one-time tutorial explains the mechanic the first time your rate drops. Error messages now auto-scroll into view so you never miss them.',
+  },
+  {
     version: '0.15',
     date: '2026-02-25',
     title: 'World Events Overhaul',

@@ -5,7 +5,19 @@ const config: Config = {
     './src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      keyframes: {
+        'error-flash': {
+          '0%, 100%': { opacity: '1' },
+          '25%': { opacity: '0.4' },
+          '50%': { opacity: '1' },
+          '75%': { opacity: '0.4' },
+        },
+      },
+      animation: {
+        'error-flash': 'error-flash 1s ease-in-out',
+      },
+    },
   },
   plugins: [],
 };

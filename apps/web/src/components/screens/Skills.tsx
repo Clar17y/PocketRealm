@@ -11,7 +11,7 @@ interface Skill {
   level: number;
   currentXP: number;
   nextLevelXP: number;
-  efficiency: number;
+  xpRate: number;
   color: string;
 }
 
@@ -39,7 +39,7 @@ export function Skills({ skills }: SkillsProps) {
             level={skill.level}
             currentXP={skill.currentXP}
             nextLevelXP={skill.nextLevelXP}
-            efficiency={skill.efficiency}
+            xpRate={skill.xpRate}
             iconColor={skill.color}
           />
         ))}

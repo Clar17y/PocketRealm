@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
 import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
+import { XpRateTutorial } from '@/components/common/XpRateTutorial';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
 import { Exploration } from '@/components/screens/Exploration';
@@ -107,14 +108,14 @@ const mockSkills = [
 ];
 
 const mockDetailedSkills = [
-  { id: '1', name: 'Melee', icon: Sword, level: 15, currentXP: 12500, nextLevelXP: 15000, efficiency: 85, color: 'var(--rpg-red)' },
-  { id: '2', name: 'Defence', icon: Shield, level: 12, currentXP: 8200, nextLevelXP: 10000, efficiency: 78, color: 'var(--rpg-blue-light)' },
-  { id: '3', name: 'Ranged', icon: Crosshair, level: 8, currentXP: 3500, nextLevelXP: 5000, efficiency: 72, color: 'var(--rpg-green-light)' },
-  { id: '4', name: 'Vitality', icon: Heart, level: 10, currentXP: 5800, nextLevelXP: 7500, efficiency: 80, color: 'var(--rpg-green-light)' },
-  { id: '5', name: 'Magic', icon: Sparkles, level: 5, currentXP: 1200, nextLevelXP: 2000, efficiency: 65, color: 'var(--rpg-purple)' },
-  { id: '6', name: 'Evasion', icon: Zap, level: 7, currentXP: 2800, nextLevelXP: 4000, efficiency: 70, color: 'var(--rpg-gold)' },
-  { id: '7', name: 'Mining', icon: Pickaxe, level: 20, currentXP: 18500, nextLevelXP: 22000, efficiency: 92, color: 'var(--rpg-text-secondary)' },
-  { id: '8', name: 'Smithing', icon: Hammer, level: 14, currentXP: 11200, nextLevelXP: 14000, efficiency: 88, color: 'var(--rpg-gold)' },
+  { id: '1', name: 'Melee', icon: Sword, level: 15, currentXP: 12500, nextLevelXP: 15000, xpRate: 85, color: 'var(--rpg-red)' },
+  { id: '2', name: 'Defence', icon: Shield, level: 12, currentXP: 8200, nextLevelXP: 10000, xpRate: 78, color: 'var(--rpg-blue-light)' },
+  { id: '3', name: 'Ranged', icon: Crosshair, level: 8, currentXP: 3500, nextLevelXP: 5000, xpRate: 72, color: 'var(--rpg-green-light)' },
+  { id: '4', name: 'Vitality', icon: Heart, level: 10, currentXP: 5800, nextLevelXP: 7500, xpRate: 80, color: 'var(--rpg-green-light)' },
+  { id: '5', name: 'Magic', icon: Sparkles, level: 5, currentXP: 1200, nextLevelXP: 2000, xpRate: 65, color: 'var(--rpg-purple)' },
+  { id: '6', name: 'Evasion', icon: Zap, level: 7, currentXP: 2800, nextLevelXP: 4000, xpRate: 70, color: 'var(--rpg-gold)' },
+  { id: '7', name: 'Mining', icon: Pickaxe, level: 20, currentXP: 18500, nextLevelXP: 22000, xpRate: 92, color: 'var(--rpg-text-secondary)' },
+  { id: '8', name: 'Smithing', icon: Hammer, level: 14, currentXP: 11200, nextLevelXP: 14000, xpRate: 88, color: 'var(--rpg-gold)' },
 ];
 
 const mockInventory = [
@@ -310,6 +311,13 @@ export default function GamePage() {
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
   const chat = useChat({ isAuthenticated, currentZoneId: activeZoneId });
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (actionError && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [actionError]);
 
   useEffect(() => {
     if (activeScreen === 'achievements') {
@@ -337,6 +345,35 @@ export default function GamePage() {
     () => bestiaryMobs.map(m => ({ id: m.id, isDiscovered: m.isDiscovered, prefixesEncountered: m.prefixesEncountered })),
     [bestiaryMobs],
   );
+
+  const primaryCombatXpRate = useMemo(() => {
+    const mainHand = equipment.find((e) => e.slot === 'main_hand');
+    const requiredSkill = mainHand?.item?.template?.requiredSkill;
+    const attackSkill: 'melee' | 'ranged' | 'magic' =
+      requiredSkill === 'melee' || requiredSkill === 'ranged' || requiredSkill === 'magic'
+        ? requiredSkill
+        : 'melee';
+    const skillData = skills.find((s) => s.skillType === attackSkill);
+    const rate = skillData
+      ? Math.round(calculateEfficiency(skillData.dailyXpGained, attackSkill as SkillType) * 100)
+      : 100;
+    return {
+      skillName: attackSkill.charAt(0).toUpperCase() + attackSkill.slice(1),
+      rate,
+    };
+  }, [skills, equipment]);
+
+  const lowestXpRate = useMemo(() => {
+    let lowest = { skillName: '', rate: 100 };
+    for (const s of skills) {
+      const rate = Math.round(calculateEfficiency(s.dailyXpGained, s.skillType as SkillType) * 100);
+      if (rate < lowest.rate) {
+        const meta = SKILL_META[s.skillType];
+        lowest = { skillName: meta?.name ?? s.skillType, rate };
+      }
+    }
+    return lowest;
+  }, [skills]);
 
   if (isLoading) {
     return (
@@ -454,6 +491,7 @@ export default function GamePage() {
             onNavigateToRest={() => handleNavigate('rest')}
             guildTaxRate={guildTaxRate}
             combatLogPrefetch={combatLogPrefetch}
+            combatXpRate={primaryCombatXpRate}
           />
         );
       case 'inventory':
@@ -595,7 +633,7 @@ export default function GamePage() {
                   level: s.level,
                   currentXP: s.xp,
                   nextLevelXP: xpForLevel(s.level + 1),
-                  efficiency: Math.round(calculateEfficiency(s.dailyXpGained, s.skillType as SkillType) * 100),
+                  xpRate: Math.round(calculateEfficiency(s.dailyXpGained, s.skillType as SkillType) * 100),
                   color: meta.color,
                 };
               })
@@ -694,6 +732,7 @@ export default function GamePage() {
             <Crafting
               skillName={activeCraftingSkillMeta?.name ?? 'Crafting'}
               skillLevel={activeCraftingSkillData?.level ?? 1}
+              xpRate={Math.round(calculateEfficiency(activeCraftingSkillData?.dailyXpGained ?? 0, activeCraftingSkill as SkillType) * 100)}
               recipes={filteredCraftingRecipes.map((r) => ({
                 id: r.id,
                 name: r.resultTemplate.name,
@@ -787,7 +826,7 @@ export default function GamePage() {
             <Gathering
               skillName={activeGatheringSkillMeta?.name ?? 'Gathering'}
               skillLevel={activeGatheringSkillData?.level ?? 1}
-              efficiency={Math.round(calculateEfficiency(activeGatheringSkillData?.dailyXpGained ?? 0, activeGatheringSkill as SkillType) * 100)}
+              xpRate={Math.round(calculateEfficiency(activeGatheringSkillData?.dailyXpGained ?? 0, activeGatheringSkill as SkillType) * 100)}
               nodes={filteredGatheringNodes.map((n) => ({
                 id: n.id,
                 name: titleCaseFromSnake(n.resourceType),
@@ -867,6 +906,7 @@ export default function GamePage() {
             onQuickRest={handleQuickRest}
             quickRestPercent={quickRestHealPercent}
             onNavigateToRest={() => handleNavigate('rest')}
+            combatXpRate={primaryCombatXpRate}
           />
         );
       }
@@ -1221,12 +1261,16 @@ export default function GamePage() {
         )}
 
         {actionError && (
-          <div className="mb-4 p-3 rounded bg-[var(--rpg-background)] border border-[var(--rpg-red)] text-[var(--rpg-red)]">
+          <div
+            ref={errorRef}
+            className="mb-4 p-3 rounded bg-[var(--rpg-background)] border border-[var(--rpg-red)] text-[var(--rpg-red)] animate-error-flash"
+          >
             {actionError}
           </div>
         )}
 
         {renderScreen()}
+        <XpRateTutorial skillName={lowestXpRate.skillName} rate={lowestXpRate.rate} />
       </AppShell>
       <ChatPanel
         isOpen={chat.isOpen}

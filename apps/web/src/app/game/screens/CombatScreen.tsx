@@ -14,6 +14,7 @@ import { Pagination } from '@/components/common/Pagination';
 import { EventBadges } from '@/components/common/EventBadge';
 import type { CombatActiveEvent } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
+import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../useGameController';
@@ -71,6 +72,7 @@ interface CombatScreenProps {
   onQuickRest?: () => Promise<void>;
   quickRestPercent?: number;
   onNavigateToRest?: () => void;
+  combatXpRate?: { skillName: string; rate: number };
 }
 
 export function CombatScreen({
@@ -106,6 +108,7 @@ export function CombatScreen({
   onQuickRest,
   quickRestPercent,
   onNavigateToRest,
+  combatXpRate,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
@@ -299,6 +302,10 @@ export function CombatScreen({
         <>
           <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
             <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Encounter Sites</h2>
+
+            {combatXpRate && (
+              <XpRateBadge skillName={combatXpRate.skillName} rate={combatXpRate.rate} />
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <select

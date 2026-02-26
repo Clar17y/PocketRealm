@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
-import { Hammer, Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } from 'lucide-react';
+import { Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ActivityLog } from '@/components/ActivityLog';
 import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
 import { STAT_ORDER, prettyStatName, formatStatValue } from '@/lib/statFormat';
+import { xpRateColor } from '@/lib/format';
+import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 
 interface Material {
   name: string;
@@ -40,6 +42,7 @@ interface Recipe {
 interface CraftingProps {
   skillName: string;
   skillLevel: number;
+  xpRate: number;
   recipes: Recipe[];
   onCraft: (recipeId: string, quantity: number) => void;
   activityLog: ActivityLogEntry[];
@@ -64,7 +67,7 @@ function statEntries(stats: Record<string, unknown> | undefined): Array<[string,
     });
 }
 
-export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0 }: CraftingProps) {
+export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0 }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
@@ -131,7 +134,13 @@ export function Crafting({ skillName, skillLevel, recipes, onCraft, activityLog,
             Lv. {skillLevel}
           </div>
         </div>
-        <Hammer size={20} color="var(--rpg-gold)" />
+        <div className="text-right">
+          <div className="text-xs text-[var(--rpg-text-secondary)] flex items-center justify-end gap-1">
+            XP Rate
+            <XpRateTooltip />
+          </div>
+          <div className="text-sm font-bold" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
+        </div>
       </div>
 
       {/* Recipe List */}
