@@ -182,6 +182,12 @@ export const GATHERING_CONSTANTS = {
 
   /** Yield multiplier bonus per level above requirement (0.1 = +10% per level) */
   YIELD_MULTIPLIER_PER_LEVEL: 0.1,
+
+  /** Base XP awarded per gathering action */
+  XP_PER_ACTION_BASE: 5,
+
+  /** Divisor for node level → bonus XP (total = base + floor(level / divisor)) */
+  XP_LEVEL_SCALING_DIVISOR: 4,
 } as const;
 
 // =============================================================================
