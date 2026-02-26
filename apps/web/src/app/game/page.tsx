@@ -108,14 +108,14 @@ const mockSkills = [
 ];
 
 const mockDetailedSkills = [
-  { id: '1', name: 'Melee', icon: Sword, level: 15, currentXP: 12500, nextLevelXP: 15000, efficiency: 85, color: 'var(--rpg-red)' },
-  { id: '2', name: 'Defence', icon: Shield, level: 12, currentXP: 8200, nextLevelXP: 10000, efficiency: 78, color: 'var(--rpg-blue-light)' },
-  { id: '3', name: 'Ranged', icon: Crosshair, level: 8, currentXP: 3500, nextLevelXP: 5000, efficiency: 72, color: 'var(--rpg-green-light)' },
-  { id: '4', name: 'Vitality', icon: Heart, level: 10, currentXP: 5800, nextLevelXP: 7500, efficiency: 80, color: 'var(--rpg-green-light)' },
-  { id: '5', name: 'Magic', icon: Sparkles, level: 5, currentXP: 1200, nextLevelXP: 2000, efficiency: 65, color: 'var(--rpg-purple)' },
-  { id: '6', name: 'Evasion', icon: Zap, level: 7, currentXP: 2800, nextLevelXP: 4000, efficiency: 70, color: 'var(--rpg-gold)' },
-  { id: '7', name: 'Mining', icon: Pickaxe, level: 20, currentXP: 18500, nextLevelXP: 22000, efficiency: 92, color: 'var(--rpg-text-secondary)' },
-  { id: '8', name: 'Smithing', icon: Hammer, level: 14, currentXP: 11200, nextLevelXP: 14000, efficiency: 88, color: 'var(--rpg-gold)' },
+  { id: '1', name: 'Melee', icon: Sword, level: 15, currentXP: 12500, nextLevelXP: 15000, xpRate: 85, color: 'var(--rpg-red)' },
+  { id: '2', name: 'Defence', icon: Shield, level: 12, currentXP: 8200, nextLevelXP: 10000, xpRate: 78, color: 'var(--rpg-blue-light)' },
+  { id: '3', name: 'Ranged', icon: Crosshair, level: 8, currentXP: 3500, nextLevelXP: 5000, xpRate: 72, color: 'var(--rpg-green-light)' },
+  { id: '4', name: 'Vitality', icon: Heart, level: 10, currentXP: 5800, nextLevelXP: 7500, xpRate: 80, color: 'var(--rpg-green-light)' },
+  { id: '5', name: 'Magic', icon: Sparkles, level: 5, currentXP: 1200, nextLevelXP: 2000, xpRate: 65, color: 'var(--rpg-purple)' },
+  { id: '6', name: 'Evasion', icon: Zap, level: 7, currentXP: 2800, nextLevelXP: 4000, xpRate: 70, color: 'var(--rpg-gold)' },
+  { id: '7', name: 'Mining', icon: Pickaxe, level: 20, currentXP: 18500, nextLevelXP: 22000, xpRate: 92, color: 'var(--rpg-text-secondary)' },
+  { id: '8', name: 'Smithing', icon: Hammer, level: 14, currentXP: 11200, nextLevelXP: 14000, xpRate: 88, color: 'var(--rpg-gold)' },
 ];
 
 const mockInventory = [
