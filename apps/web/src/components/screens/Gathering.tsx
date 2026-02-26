@@ -113,7 +113,9 @@ export function Gathering({
     return inflateCost(minActions * GATHERING_CONSTANTS.BASE_TURN_COST, guildTaxRate);
   };
 
-  const [selectedNode, setSelectedNode] = useState<ResourceNode | null>(nodes[0] || null);
+  const [selectedNode, setSelectedNode] = useState<ResourceNode | null>(() => {
+    return nodes.find((n) => skillLevel >= n.levelRequired && currentZoneId === n.zoneId) ?? null;
+  });
   const [turnInvestment, setTurnInvestment] = useState(() => {
     const node = nodes[0];
     if (!node) return [Math.min(100, availableTurns)];
@@ -432,7 +434,7 @@ export function Gathering({
           size="lg"
           className="w-full"
           onClick={() => onStartGathering(selectedNode.id, turnInvestment[0])}
-          disabled={isRecovering || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError)}
+          disabled={isRecovering || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
         >
           <div className="flex items-center justify-center gap-2">
             <Pickaxe size={20} />
