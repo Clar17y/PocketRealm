@@ -278,7 +278,7 @@ export function Gathering({
               key={node.id}
               onClick={() => canSelect && setSelectedNode(node)}
               disabled={!canSelect}
-              className={`w-full text-left transition-all ${!canSelect ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`w-full text-left transition-all ${!canSelect ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
             >
               <PixelCard padding="sm" className={isSelected ? 'border-[var(--rpg-gold)]' : ''}>
                 <div className="flex items-center gap-3">

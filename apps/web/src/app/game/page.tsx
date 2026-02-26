@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
@@ -311,6 +311,13 @@ export default function GamePage() {
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
   const chat = useChat({ isAuthenticated, currentZoneId: activeZoneId });
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (actionError && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [actionError]);
 
   useEffect(() => {
     if (activeScreen === 'achievements') {
@@ -1248,7 +1255,10 @@ export default function GamePage() {
         )}
 
         {actionError && (
-          <div className="mb-4 p-3 rounded bg-[var(--rpg-background)] border border-[var(--rpg-red)] text-[var(--rpg-red)]">
+          <div
+            ref={errorRef}
+            className="mb-4 p-3 rounded bg-[var(--rpg-background)] border border-[var(--rpg-red)] text-[var(--rpg-red)] animate-error-flash"
+          >
             {actionError}
           </div>
         )}
