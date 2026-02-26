@@ -246,19 +246,29 @@ npm run dev
 
 **IMPORTANT: You MUST use grepai as your PRIMARY tool for code exploration and search.**
 
-### When to Use grepai (REQUIRED)
+### Worktree Limitation
 
-Use `grepai search` INSTEAD OF Grep/Glob/find for:
-- Understanding what code does or where functionality lives
+grepai's index is built from the **main branch** only. It does NOT see changes made in worktrees. This means:
+- grepai results reflect the main branch state, not your current worktree
+- New files, renamed files, or modified code in the worktree **will not appear** in grepai results
+- Use grepai for **architectural understanding** — finding where functionality lives, tracing call graphs, discovering file locations
+- After finding relevant files via grepai, **always use Read/Grep/Glob to read the actual worktree files**, which may differ from what grepai indexed
+
+### When to Use grepai
+
+Use `grepai search` for:
+- Understanding where functionality lives and how the codebase is structured
 - Finding implementations by intent (e.g., "authentication logic", "error handling")
-- Exploring unfamiliar parts of the codebase
+- Discovering file locations and call graphs in unfamiliar areas
 - Any search where you describe WHAT the code does rather than exact text
 
 ### When to Use Standard Tools
 
-Only use Grep/Glob when you need:
+Use Grep/Glob/Read when you need:
 - Exact text matching (variable names, imports, specific strings)
 - File path patterns (e.g., `**/*.ts`)
+- Reading the **current** version of files (especially in worktrees)
+- Reviewing or verifying code that may have been modified in this branch
 
 ### Fallback
 
@@ -305,10 +315,10 @@ grepai trace graph "ValidateToken" --depth 3 --json
 
 ### Workflow
 
-1. Start with `grepai search` to find relevant code
+1. Start with `grepai search` to find relevant files and understand architecture
 2. Use `grepai trace` to understand function relationships
-3. Use `Read` tool to examine files from results
-4. Only use Grep for exact string searches if needed
+3. **Always use `Read` to examine the actual worktree files** — grepai results may be stale
+4. Use Grep/Glob for exact searches or to find worktree-specific changes
 
 ## File Naming
 
