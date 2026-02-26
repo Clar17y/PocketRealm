@@ -7,6 +7,7 @@ import { Pagination } from '@/components/common/Pagination';
 import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { titleCaseFromSnake, xpRateColor } from '@/lib/format';
+import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 import { Pickaxe, MapPin } from 'lucide-react';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { GATHERING_CONSTANTS } from '@adventure/shared';
@@ -212,7 +213,10 @@ export function Gathering({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-[var(--rpg-text-secondary)]">XP Rate</div>
+          <div className="text-xs text-[var(--rpg-text-secondary)] flex items-center justify-end gap-1">
+            XP Rate
+            <XpRateTooltip />
+          </div>
           <div className="text-sm font-bold" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>

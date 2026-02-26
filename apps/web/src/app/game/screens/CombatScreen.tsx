@@ -15,6 +15,7 @@ import { EventBadges } from '@/components/common/EventBadge';
 import type { CombatActiveEvent } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { xpRateColor } from '@/lib/format';
+import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 import { monsterImageSrc } from '@/lib/assets';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../useGameController';
@@ -309,6 +310,7 @@ export function CombatScreen({
                 <span className="font-bold" style={{ color: xpRateColor(combatXpRate.rate) }}>
                   {combatXpRate.rate}%
                 </span>
+                <XpRateTooltip />
               </div>
             )}
 

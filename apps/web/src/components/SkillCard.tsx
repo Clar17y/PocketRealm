@@ -1,5 +1,6 @@
 import { PixelCard } from '@/components/PixelCard';
 import { StatBar } from '@/components/StatBar';
+import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 import { xpRateColor } from '@/lib/format';
 import Image from 'next/image';
 import type { LucideIcon } from 'lucide-react';
@@ -57,8 +58,9 @@ export function SkillCard({
           <span className="text-xs text-[var(--rpg-text-secondary)]">
             {currentXP.toLocaleString()} / {nextLevelXP.toLocaleString()} XP
           </span>
-          <span className="text-xs" style={{ color: xpRateColor(xpRate) }}>
+          <span className="text-xs flex items-center gap-1" style={{ color: xpRateColor(xpRate) }}>
             XP Rate: {xpRate}%
+            <XpRateTooltip />
           </span>
         </div>
       </div>

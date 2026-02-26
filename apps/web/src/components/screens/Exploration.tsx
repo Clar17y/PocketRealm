@@ -11,6 +11,7 @@ import { Loader2, Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@adventure/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import { xpRateColor } from '@/lib/format';
+import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
@@ -255,6 +256,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                   <span className="font-bold" style={{ color: xpRateColor(combatXpRate.rate) }}>
                     {combatXpRate.rate}%
                   </span>
+                  <XpRateTooltip />
                 </div>
               )}
 
