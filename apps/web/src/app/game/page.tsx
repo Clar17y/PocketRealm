@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
 import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
+import { XpRateTutorial } from '@/components/common/XpRateTutorial';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
 import { Exploration } from '@/components/screens/Exploration';
@@ -348,6 +349,18 @@ export default function GamePage() {
       skillName: primary.skillType.charAt(0).toUpperCase() + primary.skillType.slice(1),
       rate: Math.round(calculateEfficiency(primary.dailyXpGained, primary.skillType as SkillType) * 100),
     };
+  }, [skills]);
+
+  const lowestXpRate = useMemo(() => {
+    let lowest = { skillName: '', rate: 100 };
+    for (const s of skills) {
+      const rate = Math.round(calculateEfficiency(s.dailyXpGained, s.skillType as SkillType) * 100);
+      if (rate < lowest.rate) {
+        const meta = SKILL_META[s.skillType];
+        lowest = { skillName: meta?.name ?? s.skillType, rate };
+      }
+    }
+    return lowest;
   }, [skills]);
 
   if (isLoading) {
@@ -1241,6 +1254,7 @@ export default function GamePage() {
         )}
 
         {renderScreen()}
+        <XpRateTutorial skillName={lowestXpRate.skillName} rate={lowestXpRate.rate} />
       </AppShell>
       <ChatPanel
         isOpen={chat.isOpen}
