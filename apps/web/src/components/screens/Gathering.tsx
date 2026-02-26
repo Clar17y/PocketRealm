@@ -6,7 +6,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { Pagination } from '@/components/common/Pagination';
 import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
-import { titleCaseFromSnake } from '@/lib/format';
+import { titleCaseFromSnake, xpRateColor } from '@/lib/format';
 import { Pickaxe, MapPin } from 'lucide-react';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { GATHERING_CONSTANTS } from '@adventure/shared';
@@ -37,7 +37,7 @@ interface ResourceNode {
 interface GatheringProps {
   skillName: string;
   skillLevel: number;
-  efficiency: number;
+  xpRate: number;
   nodes: ResourceNode[];
   currentZoneId: string | null;
   availableTurns: number;
@@ -71,7 +71,7 @@ interface GatheringProps {
 export function Gathering({
   skillName,
   skillLevel,
-  efficiency,
+  xpRate,
   nodes,
   currentZoneId,
   availableTurns,
@@ -212,8 +212,8 @@ export function Gathering({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-[var(--rpg-text-secondary)]">Efficiency</div>
-          <div className="text-sm font-bold text-[var(--rpg-green-light)]">{efficiency}%</div>
+          <div className="text-xs text-[var(--rpg-text-secondary)]">XP Rate</div>
+          <div className="text-sm font-bold" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { PixelCard } from '@/components/PixelCard';
 import { StatBar } from '@/components/StatBar';
+import { xpRateColor } from '@/lib/format';
 import Image from 'next/image';
 import type { LucideIcon } from 'lucide-react';
 
@@ -10,7 +11,7 @@ interface SkillCardProps {
   level: number;
   currentXP: number;
   nextLevelXP: number;
-  efficiency: number;
+  xpRate: number;
   iconColor?: string;
 }
 
@@ -21,7 +22,7 @@ export function SkillCard({
   level,
   currentXP,
   nextLevelXP,
-  efficiency,
+  xpRate,
   iconColor = 'var(--rpg-gold)',
 }: SkillCardProps) {
   return (
@@ -56,8 +57,8 @@ export function SkillCard({
           <span className="text-xs text-[var(--rpg-text-secondary)]">
             {currentXP.toLocaleString()} / {nextLevelXP.toLocaleString()} XP
           </span>
-          <span className="text-xs text-[var(--rpg-green-light)]">
-            {efficiency}% efficiency
+          <span className="text-xs" style={{ color: xpRateColor(xpRate) }}>
+            XP Rate: {xpRate}%
           </span>
         </div>
       </div>

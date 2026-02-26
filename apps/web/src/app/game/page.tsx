@@ -595,7 +595,7 @@ export default function GamePage() {
                   level: s.level,
                   currentXP: s.xp,
                   nextLevelXP: xpForLevel(s.level + 1),
-                  efficiency: Math.round(calculateEfficiency(s.dailyXpGained, s.skillType as SkillType) * 100),
+                  xpRate: Math.round(calculateEfficiency(s.dailyXpGained, s.skillType as SkillType) * 100),
                   color: meta.color,
                 };
               })
@@ -787,7 +787,7 @@ export default function GamePage() {
             <Gathering
               skillName={activeGatheringSkillMeta?.name ?? 'Gathering'}
               skillLevel={activeGatheringSkillData?.level ?? 1}
-              efficiency={Math.round(calculateEfficiency(activeGatheringSkillData?.dailyXpGained ?? 0, activeGatheringSkill as SkillType) * 100)}
+              xpRate={Math.round(calculateEfficiency(activeGatheringSkillData?.dailyXpGained ?? 0, activeGatheringSkill as SkillType) * 100)}
               nodes={filteredGatheringNodes.map((n) => ({
                 id: n.id,
                 name: titleCaseFromSnake(n.resourceType),

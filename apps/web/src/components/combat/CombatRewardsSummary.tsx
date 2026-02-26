@@ -1,6 +1,7 @@
 'use client';
 
 import type { LastCombat } from '@/app/game/useGameController';
+import { xpRateColor } from '@/lib/format';
 
 interface CombatRewardsSummaryProps {
   rewards: LastCombat['rewards'];
@@ -33,8 +34,8 @@ export function CombatRewardsSummary({ rewards, outcome }: CombatRewardsSummaryP
             +{skillXp.xpAfterEfficiency} XP
           </span>
           {skillXp.efficiency < 1 && (
-            <span className="text-[var(--rpg-text-secondary)] text-xs">
-              ({Math.round(skillXp.efficiency * 100)}%)
+            <span className="text-xs" style={{ color: xpRateColor(Math.round(skillXp.efficiency * 100)) }}>
+              (XP Rate: {Math.round(skillXp.efficiency * 100)}%)
             </span>
           )}
           {skillXp.leveledUp && (
