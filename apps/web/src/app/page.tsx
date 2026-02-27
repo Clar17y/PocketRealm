@@ -12,9 +12,10 @@ export default function Home() {
       {/* Hero */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <Image
-          src="/assets/zones/zone_ancient_grove.png"
+          src="/assets/zones/zone_ancient_grove.webp"
           alt="Ancient Grove"
           fill
+          sizes="100vw"
           className="object-cover"
           priority
         />
@@ -42,22 +43,22 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
-                icon: '/assets/ui/ui_attack-pixelated-128.png',
+                icon: '/assets/ui/ui_attack-pixelated-128.webp',
                 title: 'Fight',
                 desc: 'Battle 80+ monsters across 11 zones. D&D-style combat with crits, spells, and boss raids.',
               },
               {
-                icon: '/assets/ui/ui_explore-pixelated-128.png',
+                icon: '/assets/ui/ui_explore-pixelated-128.webp',
                 title: 'Explore',
                 desc: 'Discover hidden caches, encounter sites, and zone exits. Every turn spent is a roll of the dice.',
               },
               {
-                icon: '/assets/ui/ui_inventory-pixelated-128.png',
+                icon: '/assets/ui/ui_inventory-pixelated-128.webp',
                 title: 'Craft',
                 desc: 'Forge weapons, brew potions, salvage loot. 14 skills to master from weaponsmithing to alchemy.',
               },
               {
-                icon: '/assets/ui/ui_turn-pixelated-128.png',
+                icon: '/assets/ui/ui_turn-pixelated-128.webp',
                 title: 'Play Your Way',
                 desc: 'Turns regenerate in real-time. Play in bursts or binge your bank — no energy walls, no waiting rooms.',
               },
@@ -89,11 +90,11 @@ export default function Home() {
           </h2>
           <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
             {[
-              { src: '/assets/zones/zone_ancient_grove.png', name: 'Ancient Grove' },
-              { src: '/assets/zones/zone_crystal_caverns.png', name: 'Crystal Caverns' },
-              { src: '/assets/zones/zone_haunted_marsh.png', name: 'Haunted Marsh' },
-              { src: '/assets/zones/zone_sunken_ruins.png', name: 'Sunken Ruins' },
-              { src: '/assets/zones/zone_deep_forest.png', name: 'Deep Forest' },
+              { src: '/assets/zones/zone_ancient_grove.webp', name: 'Ancient Grove' },
+              { src: '/assets/zones/zone_crystal_caverns.webp', name: 'Crystal Caverns' },
+              { src: '/assets/zones/zone_haunted_marsh.webp', name: 'Haunted Marsh' },
+              { src: '/assets/zones/zone_sunken_ruins.webp', name: 'Sunken Ruins' },
+              { src: '/assets/zones/zone_deep_forest.webp', name: 'Deep Forest' },
             ].map((zone) => (
               <div
                 key={zone.name}
@@ -125,12 +126,12 @@ export default function Home() {
           </h2>
           <div className="flex justify-center items-end gap-6 md:gap-10 flex-wrap">
             {[
-              { src: '/assets/monsters/monster_goblin_king-pixelated-128.png', name: 'Goblin King', size: 96 },
-              { src: '/assets/monsters/monster_crystal_titan-pixelated-128.png', name: 'Crystal Titan', size: 120 },
-              { src: '/assets/monsters/monster_alpha_wolf-pixelated-128.png', name: 'Alpha Wolf', size: 112 },
-              { src: '/assets/monsters/monster_ancient_spirit-pixelated-128.png', name: 'Ancient Spirit', size: 128 },
-              { src: '/assets/monsters/monster_fae_queen-pixelated-128.png', name: 'Fae Queen', size: 104 },
-              { src: '/assets/monsters/monster_death_knight-pixelated-128.png', name: 'Death Knight', size: 116 },
+              { src: '/assets/monsters/monster_goblin_king-pixelated-128.webp', name: 'Goblin King', size: 96 },
+              { src: '/assets/monsters/monster_crystal_titan-pixelated-128.webp', name: 'Crystal Titan', size: 120 },
+              { src: '/assets/monsters/monster_alpha_wolf-pixelated-128.webp', name: 'Alpha Wolf', size: 112 },
+              { src: '/assets/monsters/monster_ancient_spirit-pixelated-128.webp', name: 'Ancient Spirit', size: 128 },
+              { src: '/assets/monsters/monster_fae_queen-pixelated-128.webp', name: 'Fae Queen', size: 104 },
+              { src: '/assets/monsters/monster_death_knight-pixelated-128.webp', name: 'Death Knight', size: 116 },
             ].map((monster) => (
               <div key={monster.name} className="flex flex-col items-center gap-2">
                 <Image

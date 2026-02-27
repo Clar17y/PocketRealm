@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.17',
+    date: '2026-02-27',
+    title: 'Atmospheric Backgrounds & WebP Migration',
+    summary:
+      'Every gameplay screen now has a subtle atmospheric background. Zone art appears behind Exploration, Combat, Gathering, Rest, and the Dashboard. Screen-specific pixel art backgrounds have been added for the Arena, Forge, Guild, Inventory, and all 9 crafting skills. Backgrounds crossfade smoothly when you change zones or switch screens. All game assets have been migrated from PNG to WebP for faster load times.',
+  },
+  {
     version: '0.16',
     date: '2026-02-26',
     title: 'XP Rate & Efficiency Balance',

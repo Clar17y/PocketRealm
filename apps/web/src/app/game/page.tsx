@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { itemImageSrc, monsterImageSrc, resourceImageSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
+import { itemImageSrc, monsterImageSrc, resourceImageSrc, screenBackgroundSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
 import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
@@ -1129,6 +1129,12 @@ export default function GamePage() {
   onLogout={() => { logout(); router.push('/'); }}
   onWhatsNew={openChangelog}
   hasUnseenChangelog={showChangelog}
+  backgroundSrc={
+    screenBackgroundSrc(activeScreen, activeCraftingSkill)
+    ?? (['home', 'explore', 'combat', 'gathering', 'rest'].includes(activeScreen) && currentZone?.name && currentZone.name !== '???'
+      ? zoneImageSrc(currentZone.name)
+      : undefined)
+  }
 >
         {/* Broken gear warning banner */}
         {equipment.some((e) => {

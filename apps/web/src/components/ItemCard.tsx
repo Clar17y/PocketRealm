@@ -26,7 +26,7 @@ export function ItemCard({ name, icon, imageSrc, quantity, rarity = 'common', du
       <div className="w-full h-full flex items-center justify-center p-2">
         {imageSrc ? (
           <div className="relative w-full h-full">
-            <Image src={imageSrc} alt={name} fill className="object-contain image-rendering-pixelated" />
+            <Image src={imageSrc} alt={name} fill sizes="96px" className="object-contain image-rendering-pixelated" />
           </div>
         ) : (
           <span className="text-4xl">{icon ?? '❓'}</span>

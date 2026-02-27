@@ -46,9 +46,10 @@ export default function RegisterPage() {
   return (
     <main className="relative min-h-screen flex items-center justify-center p-4">
       <Image
-        src="/assets/zones/zone_millbrook.png"
+        src="/assets/zones/zone_millbrook.webp"
         alt="Millbrook"
         fill
+        sizes="100vw"
         className="object-cover"
         priority
       />

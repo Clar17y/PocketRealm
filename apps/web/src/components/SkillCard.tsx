@@ -39,6 +39,7 @@ export function SkillCard({
               alt={name}
               fill
               sizes="48px"
+              loading="eager"
               className="object-contain image-rendering-pixelated"
             />
           </div>
