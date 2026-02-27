@@ -23,7 +23,7 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
   const hasMenu = Boolean(onSettings || onLogout || onWhatsNew);
 
   return (
-    <div className="min-h-dvh w-full bg-[var(--rpg-background)] flex flex-col safe-area-top">
+    <div className="min-h-dvh w-full bg-[var(--rpg-background)]/95 flex flex-col safe-area-top">
       <ZoneBackground imageSrc={zoneImageSrc} activeScreen={activeScreen} />
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 bg-[var(--rpg-surface)] border-b border-[var(--rpg-border)] z-40 pt-[env(safe-area-inset-top)]">

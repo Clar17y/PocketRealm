@@ -1129,6 +1129,8 @@ export default function GamePage() {
   onLogout={() => { logout(); router.push('/'); }}
   onWhatsNew={openChangelog}
   hasUnseenChangelog={showChangelog}
+  zoneImageSrc={currentZone?.name && currentZone.name !== '???' ? zoneImageSrc(currentZone.name) : undefined}
+  activeScreen={activeScreen}
 >
         {/* Broken gear warning banner */}
         {equipment.some((e) => {
