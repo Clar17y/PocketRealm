@@ -36,6 +36,9 @@ interface CombatHistoryListRow {
   source: string | null;
   xpGained: number;
   roundCount: number;
+  fightCount: number;
+  encounterSiteId: string | null;
+  mobFamilyName: string | null;
 }
 
 interface CombatHistoryFilterRow {
@@ -63,6 +66,7 @@ export function registerLogRoutes(router: Router): void {
       const whereParts: Prisma.Sql[] = [
         Prisma.sql`"player_id" = ${playerId}`,
         Prisma.sql`"activity_type" = 'combat'`,
+        Prisma.sql`COALESCE(("result"->>'source'), '') <> 'encounter_site_fight'`,
       ];
 
       if (query.outcome) {
@@ -115,7 +119,10 @@ export function registerLogRoutes(router: Router): void {
                   END
                 )
                 FROM jsonb_array_elements(COALESCE("result"->'log', '[]'::jsonb)) AS log_entry
-              ), 0) AS "roundCount"
+              ), 0) AS "roundCount",
+              COALESCE(("result"->>'fightCount')::int, 1) AS "fightCount",
+              ("result"->>'encounterSiteId') AS "encounterSiteId",
+              ("result"->>'mobFamilyName') AS "mobFamilyName"
             FROM "activity_logs"
             ${whereClause}
             ORDER BY COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) DESC, "created_at" DESC
@@ -149,7 +156,10 @@ export function registerLogRoutes(router: Router): void {
                   END
                 )
                 FROM jsonb_array_elements(COALESCE("result"->'log', '[]'::jsonb)) AS log_entry
-              ), 0) AS "roundCount"
+              ), 0) AS "roundCount",
+              COALESCE(("result"->>'fightCount')::int, 1) AS "fightCount",
+              ("result"->>'encounterSiteId') AS "encounterSiteId",
+              ("result"->>'mobFamilyName') AS "mobFamilyName"
             FROM "activity_logs"
             ${whereClause}
             ORDER BY "created_at" DESC
@@ -176,6 +186,7 @@ export function registerLogRoutes(router: Router): void {
               AND "activity_type" = 'combat'
               AND ("result"->>'zoneId') IS NOT NULL
               AND ("result"->>'zoneName') IS NOT NULL
+              AND COALESCE(("result"->>'source'), '') <> 'encounter_site_fight'
             ORDER BY "name" ASC
           `
         ),
@@ -189,6 +200,7 @@ export function registerLogRoutes(router: Router): void {
               AND "activity_type" = 'combat'
               AND ("result"->>'mobTemplateId') IS NOT NULL
               AND ("result"->>'mobName') IS NOT NULL
+              AND COALESCE(("result"->>'source'), '') <> 'encounter_site_fight'
             ORDER BY "name" ASC
           `
         ),
@@ -209,6 +221,9 @@ export function registerLogRoutes(router: Router): void {
           source: row.source,
           roundCount: row.roundCount,
           xpGained: row.xpGained,
+          fightCount: row.fightCount,
+          encounterSiteId: row.encounterSiteId ?? null,
+          mobFamilyName: row.mobFamilyName ?? null,
         })),
         pagination: buildPagination(query.page, query.pageSize, total),
         filters: {
