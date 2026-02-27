@@ -177,64 +177,50 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
         <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
           Backpack ({backpackItems.length}/24)
         </div>
-        {salvageMode ? (
-          <div className="space-y-1 max-h-96 overflow-y-auto">
-            {salvageableBackpackItems.length === 0 ? (
-              <div className="text-sm text-[var(--rpg-text-secondary)] p-2">No salvageable items.</div>
-            ) : (
-              salvageableBackpackItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => toggleSalvageItem(item.id)}
-                  className={`w-full text-left rounded border px-3 py-2 flex items-center gap-3 transition-colors ${
-                    salvageSelection.has(item.id)
-                      ? 'border-[var(--rpg-gold)] bg-[var(--rpg-background)]'
-                      : 'border-[var(--rpg-border)] bg-[var(--rpg-surface)]'
-                  }`}
-                >
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                    salvageSelection.has(item.id)
-                      ? 'border-[var(--rpg-gold)] bg-[var(--rpg-gold)]'
-                      : 'border-[var(--rpg-border)]'
-                  }`}>
-                    {salvageSelection.has(item.id) && (
-                      <span className="text-[var(--rpg-background)] text-xs font-bold">✓</span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-[var(--rpg-text-primary)] truncate">{item.name}</div>
-                    <div className="text-xs text-[var(--rpg-text-secondary)]">
-                      {item.salvageCost === 0 ? 'Free' : `${item.salvageCost} turns`}
-                    </div>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        ) : (
           <div className="grid grid-cols-6 gap-2">
-            {backpackItems.map((item) => (
-              <ItemCard
-                key={item.id}
-                name={item.name}
-                icon={item.icon}
-                imageSrc={item.imageSrc}
-                quantity={item.quantity}
-                rarity={item.rarity}
-                durability={item.durability}
-                onClick={() => setSelectedItem(item)}
-              />
-            ))}
-            {/* Empty slots */}
-            {Array.from({ length: Math.max(0, 24 - backpackItems.length) }).map((_, idx) => (
-              <div
-                key={`empty-${idx}`}
-                className="aspect-square bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg opacity-30"
-              />
-            ))}
-          </div>
-        )}
+          {backpackItems.map((item) => {
+            const isSalvageable = salvageMode && item.salvageCost !== null;
+            const isSelected = salvageMode && salvageSelection.has(item.id);
+            return (
+              <div key={item.id} className="relative">
+                <ItemCard
+                  name={item.name}
+                  icon={item.icon}
+                  imageSrc={item.imageSrc}
+                  quantity={item.quantity}
+                  rarity={item.rarity}
+                  durability={item.durability}
+                  onClick={() => {
+                    if (salvageMode) {
+                      if (isSalvageable) toggleSalvageItem(item.id);
+                    } else {
+                      setSelectedItem(item);
+                    }
+                  }}
+                />
+                {salvageMode && isSalvageable && (
+                  <div className={`absolute top-0.5 right-0.5 w-5 h-5 rounded border-2 flex items-center justify-center pointer-events-none ${
+                    isSelected
+                      ? 'border-[var(--rpg-gold)] bg-[var(--rpg-gold)]'
+                      : 'border-[var(--rpg-text-secondary)] bg-[var(--rpg-surface)]'
+                  }`}>
+                    {isSelected && <span className="text-[var(--rpg-background)] text-xs font-bold">✓</span>}
+                  </div>
+                )}
+                {salvageMode && !isSalvageable && (
+                  <div className="absolute inset-0 bg-black/50 rounded-lg pointer-events-none" />
+                )}
+              </div>
+            );
+          })}
+          {/* Empty slots */}
+          {Array.from({ length: Math.max(0, 24 - backpackItems.length) }).map((_, idx) => (
+            <div
+              key={`empty-${idx}`}
+              className="aspect-square bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg opacity-30"
+            />
+          ))}
+        </div>
       </div>
 
       {/* Salvage Summary Bar */}
