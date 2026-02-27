@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getCombatLog,
   getCombatLogs,
+  getEncounterSiteFights,
   type CombatHistoryListItemResponse,
   type CombatHistoryResponse,
   type CombatOutcomeResponse,
   type CombatResultResponse,
+  type EncounterSiteFightSummary,
 } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp, resolvePlayerMaxHp } from '@/lib/combatShare';
 import { monsterImageSrc } from '@/lib/assets';
@@ -74,6 +76,10 @@ export function CombatHistory() {
   const [selectedLoading, setSelectedLoading] = useState(false);
   const [selectedError, setSelectedError] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [siteFights, setSiteFights] = useState<EncounterSiteFightSummary[] | null>(null);
+  const [siteFightIndex, setSiteFightIndex] = useState(0);
+  const [siteFightsLoading, setSiteFightsLoading] = useState(false);
+  const [summaryRewards, setSummaryRewards] = useState<CombatResultResponse['rewards'] | null>(null);
   const latestDetailRequestRef = useRef(0);
   const selectedLogIdRef = useRef<string | null>(null);
 
@@ -113,6 +119,9 @@ export function CombatHistory() {
         setHistory(null);
         setSelectedEntry(null);
         setSelectedLogId(null);
+        setSiteFights(null);
+        setSiteFightIndex(0);
+        setSummaryRewards(null);
         return;
       }
 
@@ -133,6 +142,9 @@ export function CombatHistory() {
 
         setSelectedEntry(null);
         setSelectedDetail(null);
+        setSiteFights(null);
+        setSiteFightIndex(0);
+        setSummaryRewards(null);
         return null;
       });
     };
@@ -153,10 +165,13 @@ export function CombatHistory() {
     }
   }, [selectedLogId]);
 
-  const loadDetail = useCallback(async (logId: string) => {
+  const loadDetail = useCallback(async (logId: string, entry: CombatHistoryListItemResponse) => {
     const requestId = ++latestDetailRequestRef.current;
     setSelectedLoading(true);
     setSelectedError(null);
+    setSiteFights(null);
+    setSiteFightIndex(0);
+    setSummaryRewards(null);
 
     const { data, error } = await getCombatLog(logId);
     const isStale = latestDetailRequestRef.current !== requestId || selectedLogIdRef.current !== logId;
@@ -169,14 +184,64 @@ export function CombatHistory() {
       return;
     }
 
-    setSelectedDetail(data.combat);
-    setSelectedLoading(false);
+    // For encounter site entries with multiple fights, fetch fights list and show first fight
+    if (entry.source === 'encounter_site' && entry.fightCount > 1) {
+      setSummaryRewards(data.combat.rewards);
+      setSiteFightsLoading(true);
+      try {
+        const fightsData = await getEncounterSiteFights(logId);
+        const stillValid = latestDetailRequestRef.current === requestId && selectedLogIdRef.current === logId;
+        if (!stillValid) return;
+
+        setSiteFights(fightsData.fights);
+        setSiteFightIndex(0);
+        if (fightsData.fights.length > 0) {
+          const firstFightRes = await getCombatLog(fightsData.fights[0].logId);
+          const stillValid2 = latestDetailRequestRef.current === requestId && selectedLogIdRef.current === logId;
+          if (!stillValid2) return;
+          if (firstFightRes.data) {
+            setSelectedDetail(firstFightRes.data.combat);
+          }
+        } else {
+          setSelectedDetail(data.combat);
+        }
+      } catch {
+        setSiteFights(null);
+        setSelectedDetail(data.combat);
+      } finally {
+        setSiteFightsLoading(false);
+        setSelectedLoading(false);
+      }
+    } else {
+      setSelectedDetail(data.combat);
+      setSelectedLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!selectedLogId) return;
-    void loadDetail(selectedLogId);
+    if (!selectedLogId || !selectedEntry) return;
+    void loadDetail(selectedLogId, selectedEntry);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLogId, loadDetail]);
+
+  const handleSiteFightNavigate = useCallback(async (newIndex: number) => {
+    if (!siteFights || !siteFights[newIndex]) return;
+    setSiteFightIndex(newIndex);
+    setSelectedLoading(true);
+    setSelectedError(null);
+    try {
+      const { data, error } = await getCombatLog(siteFights[newIndex].logId);
+      if (!data) {
+        setSelectedError(error?.message ?? 'Failed to load fight log');
+      } else {
+        setSelectedDetail(data.combat);
+      }
+    } catch (err) {
+      setSelectedError((err as Error).message);
+    } finally {
+      setSelectedLoading(false);
+    }
+  }, [siteFights]);
 
   const playerMaxHp = useMemo(
     () => selectedDetail ? resolvePlayerMaxHp(selectedDetail.log, selectedDetail.playerMaxHp) : undefined,
@@ -388,10 +453,41 @@ export function CombatHistory() {
           </div>
 
           {selectedError && <div className="text-sm text-[var(--rpg-red)]">{selectedError}</div>}
-          {selectedLoading && <div className="text-sm text-[var(--rpg-text-secondary)]">Loading combat log...</div>}
+          {(selectedLoading || siteFightsLoading) && <div className="text-sm text-[var(--rpg-text-secondary)]">Loading combat log...</div>}
 
-          {!selectedLoading && selectedDetail && (
+          {!selectedLoading && !siteFightsLoading && selectedDetail && (
             <>
+              {siteFights && siteFights.length > 1 && (
+                <div className="flex items-center justify-between border-b border-[var(--rpg-border)] pb-2 mb-2">
+                  <button
+                    type="button"
+                    disabled={siteFightIndex === 0}
+                    onClick={() => void handleSiteFightNavigate(siteFightIndex - 1)}
+                    className="px-2 py-1 rounded text-sm border border-[var(--rpg-border)] text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Prev
+                  </button>
+                  <div className="text-sm text-[var(--rpg-text-secondary)]">
+                    <span className="text-[var(--rpg-gold)] font-semibold">
+                      Fight {siteFightIndex + 1}/{siteFights.length}
+                    </span>
+                    {siteFights[siteFightIndex] && (
+                      <span className="ml-2">
+                        — {siteFights[siteFightIndex].mobDisplayName}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={siteFightIndex === siteFights.length - 1}
+                    onClick={() => void handleSiteFightNavigate(siteFightIndex + 1)}
+                    className="px-2 py-1 rounded text-sm border border-[var(--rpg-border)] text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+
               <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
                 {selectedDetail.log.map((entry, index) => (
                   <CombatLogEntry
@@ -404,7 +500,10 @@ export function CombatHistory() {
               </div>
 
               <div className="border-t border-[var(--rpg-border)] pt-2">
-                <CombatRewardsSummary rewards={selectedDetail.rewards} outcome={selectedDetail.outcome} />
+                <CombatRewardsSummary
+                  rewards={summaryRewards ?? selectedDetail.rewards}
+                  outcome={selectedDetail.outcome}
+                />
               </div>
             </>
           )}
