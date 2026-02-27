@@ -261,6 +261,7 @@ export default function GamePage() {
     handlePendingEncounterSortChange,
     handleCraft,
     handleSalvageItem,
+    handleSalvageBatch,
     handleForgeUpgrade,
     handleForgeReroll,
     handleDestroyItem,
@@ -531,6 +532,7 @@ export default function GamePage() {
             })}
             onDrop={handleDestroyItem}
             onSalvage={handleSalvageItem}
+            onSalvageBatch={handleSalvageBatch}
             onRepair={handleRepairItem}
             onEquip={handleEquipItem}
             onUnequip={handleUnequipSlot}
