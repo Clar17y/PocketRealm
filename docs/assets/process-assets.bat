@@ -19,11 +19,11 @@ REM 2) Extract alpha to mpr:mask
 REM 3) Quantize/remap RGB to palette (with alpha off)
 REM 4) Re-apply alpha mask and output as WebP
 
-REM Process skills
+REM Process skills (higher fuzz to catch near-white edge artifacts)
 echo Processing skills...
 for %%f in (skills\*-pixelated.png) do (
     echo   %%f
-    magick "%%f" %BG_REMOVE% -filter point -resize 128x128 ^
+    magick "%%f" -alpha set -fuzz 8%% -transparent white -filter point -resize 128x128 ^
       ^( +clone -alpha extract -write mpr:mask +delete ^) ^
       -alpha off -dither None -remap palette.png mpr:mask -alpha off -compose CopyOpacity -composite ^
       -quality 80 "skills\%%~nf-128.webp"
