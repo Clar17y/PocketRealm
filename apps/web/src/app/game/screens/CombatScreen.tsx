@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { HpStatusBar } from '@/components/common/HpStatusBar';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
@@ -115,6 +115,13 @@ export function CombatScreen({
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [strategyModalSite, setStrategyModalSite] = useState<PendingEncounter | null>(null);
   const [lowHpPendingSite, setLowHpPendingSite] = useState<PendingEncounter | null>(null);
+  const [lastCombatFightIndex, setLastCombatFightIndex] = useState(0);
+
+  useEffect(() => {
+    setLastCombatFightIndex(0);
+  }, [lastCombat]);
+
+  const displayedFight = lastCombat?.fights?.[lastCombatFightIndex] ?? lastCombat;
 
   const handleFightClick = (site: PendingEncounter) => {
     if (
@@ -144,22 +151,22 @@ export function CombatScreen({
   // Player max HP should be the player's real max HP.
   // Mob max HP comes from combat payload (supports wounded monster starts later).
   const playerMaxHp = hpState.maxHp;
-  const mobMaxHp = lastCombat ? resolveMobMaxHp(lastCombat.log, lastCombat.combatantBMaxHp) : undefined;
-  const isLastCombatMobDiscovered = lastCombat
-    ? bestiaryMobs.find((mob) => mob.id === lastCombat.mobTemplateId)?.isDiscovered ?? false
+  const mobMaxHp = displayedFight ? resolveMobMaxHp(displayedFight.log, displayedFight.combatantBMaxHp) : undefined;
+  const isLastCombatMobDiscovered = displayedFight
+    ? bestiaryMobs.find((mob) => mob.id === displayedFight.mobTemplateId)?.isDiscovered ?? false
     : false;
 
-  const outcomeLabel = lastCombat?.outcome === 'victory'
+  const outcomeLabel = displayedFight?.outcome === 'victory'
     ? 'Victory'
-    : lastCombat?.outcome === 'defeat'
+    : displayedFight?.outcome === 'defeat'
       ? 'Defeat'
-      : lastCombat?.outcome === 'fled'
+      : displayedFight?.outcome === 'fled'
         ? 'Fled'
-        : lastCombat?.outcome;
+        : displayedFight?.outcome;
 
-  const outcomeColor = lastCombat?.outcome === 'victory'
+  const outcomeColor = displayedFight?.outcome === 'victory'
     ? 'text-[var(--rpg-green-light)]'
-    : lastCombat?.outcome === 'defeat'
+    : displayedFight?.outcome === 'defeat'
       ? 'text-[var(--rpg-red)]'
       : 'text-[var(--rpg-gold)]';
 
@@ -354,14 +361,38 @@ export function CombatScreen({
           {/* Last Combat (detailed log — shown after playback completes) */}
           {!combatPlaybackData && lastCombat && (
             <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
+              {lastCombat.fights && lastCombat.fights.length > 1 && (
+                <div className="flex items-center justify-between border-b border-[var(--rpg-border)] pb-2 mb-2">
+                  <button
+                    type="button"
+                    disabled={lastCombatFightIndex === 0}
+                    onClick={() => setLastCombatFightIndex(prev => prev - 1)}
+                    className="px-2 py-1 rounded text-sm border border-[var(--rpg-border)] text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-sm text-[var(--rpg-gold)] font-semibold">
+                    Fight {lastCombatFightIndex + 1}/{lastCombat.fights.length}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={lastCombatFightIndex === lastCombat.fights.length - 1}
+                    onClick={() => setLastCombatFightIndex(prev => prev + 1)}
+                    className="px-2 py-1 rounded text-sm border border-[var(--rpg-border)] text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold">
                   <img
-                    src={monsterImageSrc(lastCombat.mobName)}
-                    alt={lastCombat.mobDisplayName}
+                    src={monsterImageSrc(displayedFight?.mobName ?? lastCombat.mobName)}
+                    alt={displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
                     className="w-8 h-8 rounded object-cover"
                   />
-                  Last Combat: {lastCombat.mobDisplayName}
+                  Last Combat: {displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -377,15 +408,21 @@ export function CombatScreen({
               </div>
 
               <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
-                {lastCombat.log.map((entry, idx) => (
-                  <CombatLogEntry
-                    key={idx}
-                    entry={entry}
-                    playerMaxHp={playerMaxHp}
-                    mobMaxHp={mobMaxHp}
-                    showDetailedBreakdown={isLastCombatMobDiscovered}
-                  />
-                ))}
+                {displayedFight && displayedFight.log.length > 0 ? (
+                  displayedFight.log.map((entry, idx) => (
+                    <CombatLogEntry
+                      key={idx}
+                      entry={entry}
+                      playerMaxHp={playerMaxHp}
+                      mobMaxHp={mobMaxHp}
+                      showDetailedBreakdown={isLastCombatMobDiscovered}
+                    />
+                  ))
+                ) : (
+                  <div className="text-sm text-[var(--rpg-text-secondary)] py-2">
+                    Combat log not available for this fight.
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-[var(--rpg-border)] pt-2">

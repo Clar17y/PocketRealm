@@ -124,6 +124,17 @@ export interface LastCombat {
   combatantAMaxHp: number;
   combatantBMaxHp: number;
   log: LastCombatLogEntry[];
+  fights?: Array<{
+    mobName: string;
+    mobDisplayName: string;
+    mobTemplateId: string;
+    mobPrefix: string | null;
+    outcome: string;
+    combatantAMaxHp: number;
+    combatantBMaxHp: number;
+    log: LastCombatLogEntry[];
+    combatLogId?: string;
+  }> | null;
   rewards: {
     xp: number;
     loot: Array<{
@@ -1233,6 +1244,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const lastFight = combatPlaybackQueue?.[combatPlaybackQueue.length - 1];
     if (lastFight) {
       const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
+      const allFights = combatPlaybackQueue && combatPlaybackQueue.length > 1
+        ? combatPlaybackQueue.map(f => ({
+            mobName: f.mobName,
+            mobDisplayName: f.mobDisplayName,
+            mobTemplateId: f.mobTemplateId,
+            mobPrefix: f.mobPrefix,
+            outcome: f.outcome,
+            combatantAMaxHp: f.combatantAMaxHp,
+            combatantBMaxHp: f.combatantBMaxHp,
+            log: f.log ?? [],
+            combatLogId: f.combatLogId,
+          }))
+        : null;
       setLastCombat({
         mobTemplateId: lastFight.mobTemplateId,
         mobPrefix: lastFight.mobPrefix,
@@ -1242,6 +1266,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         combatantAMaxHp: lastFight.combatantAMaxHp,
         combatantBMaxHp: lastFight.combatantBMaxHp,
         log: lastFight.log ?? [],
+        fights: allFights,
         rewards: aggregatedRewards,
       });
     }
@@ -1270,6 +1295,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         const lastFight = combatPlaybackQueue[combatPlaybackQueue.length - 1];
         if (lastFight) {
           const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
+          const allFights = combatPlaybackQueue.length > 1
+            ? combatPlaybackQueue.map(f => ({
+                mobName: f.mobName,
+                mobDisplayName: f.mobDisplayName,
+                mobTemplateId: f.mobTemplateId,
+                mobPrefix: f.mobPrefix,
+                outcome: f.outcome,
+                combatantAMaxHp: f.combatantAMaxHp,
+                combatantBMaxHp: f.combatantBMaxHp,
+                log: f.log ?? [],
+                combatLogId: f.combatLogId,
+              }))
+            : null;
           setLastCombat({
             mobTemplateId: '',
             mobPrefix: null,
@@ -1279,6 +1317,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
             combatantAMaxHp: lastFight.combatantAMaxHp,
             combatantBMaxHp: lastFight.combatantBMaxHp,
             log: lastFight.log ?? [],
+            fights: allFights,
             rewards: aggregatedRewards,
           });
         }
