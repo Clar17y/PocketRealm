@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@adventure/database';
 import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID } from '@adventure/shared';
+import { shouldResetWindowCap } from '@adventure/game-engine';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { ensureEquipmentSlots } from '../services/equipmentService';
@@ -86,11 +87,17 @@ playerRouter.get('/skills', asyncHandler(async (req, res) => {
     },
   });
 
-  // Convert BigInt to number for JSON serialization
-  const serializedSkills = skills.map((skill: typeof skills[number]) => ({
-    ...skill,
-    xp: Number(skill.xp),
-  }));
+  const now = new Date();
+
+  // Convert BigInt to number and reset stale window XP for display
+  const serializedSkills = skills.map((skill: typeof skills[number]) => {
+    const windowExpired = shouldResetWindowCap(skill.lastXpResetAt, now);
+    return {
+      ...skill,
+      xp: Number(skill.xp),
+      dailyXpGained: windowExpired ? 0 : skill.dailyXpGained,
+    };
+  });
 
   res.json({ skills: serializedSkills });
 }));
