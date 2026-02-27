@@ -84,6 +84,10 @@ describe('screenBackgroundSrc', () => {
     expect(screenBackgroundSrc('guild')).toBe('/assets/screens/screen_guild.webp');
   });
 
+  it('returns equipment background', () => {
+    expect(screenBackgroundSrc('equipment')).toBe('/assets/screens/screen_equipment.webp');
+  });
+
   it('returns inventory background', () => {
     expect(screenBackgroundSrc('inventory')).toBe('/assets/screens/screen_inventory.webp');
   });
@@ -98,7 +102,6 @@ describe('screenBackgroundSrc', () => {
     expect(screenBackgroundSrc('skills')).toBeUndefined();
     expect(screenBackgroundSrc('bestiary')).toBeUndefined();
     expect(screenBackgroundSrc('zones')).toBeUndefined();
-    expect(screenBackgroundSrc('equipment')).toBeUndefined();
     expect(screenBackgroundSrc('settings')).toBeUndefined();
   });
 
