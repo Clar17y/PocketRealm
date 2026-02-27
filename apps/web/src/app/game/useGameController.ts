@@ -142,6 +142,25 @@ function buildFightsList(queue: CombatPlaybackItem[]): LastCombat['fights'] {
   }));
 }
 
+function buildLastCombat(
+  queue: CombatPlaybackItem[],
+  rewards: LastCombat['rewards'],
+): LastCombat {
+  const lastFight = queue[queue.length - 1]!;
+  return {
+    mobTemplateId: lastFight.mobTemplateId,
+    mobPrefix: lastFight.mobPrefix,
+    mobName: lastFight.mobName,
+    mobDisplayName: lastFight.mobDisplayName,
+    outcome: lastFight.outcome,
+    combatantAMaxHp: lastFight.combatantAMaxHp,
+    combatantBMaxHp: lastFight.combatantBMaxHp,
+    log: lastFight.log ?? [],
+    fights: buildFightsList(queue),
+    rewards,
+  };
+}
+
 export interface LastCombat {
   mobTemplateId: string;
   mobPrefix: string | null;
@@ -1271,18 +1290,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const lastFight = combatPlaybackQueue?.[combatPlaybackQueue.length - 1];
     if (lastFight) {
       const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
-      setLastCombat({
-        mobTemplateId: lastFight.mobTemplateId,
-        mobPrefix: lastFight.mobPrefix,
-        mobName: lastFight.mobName,
-        mobDisplayName: lastFight.mobDisplayName,
-        outcome: lastFight.outcome,
-        combatantAMaxHp: lastFight.combatantAMaxHp,
-        combatantBMaxHp: lastFight.combatantBMaxHp,
-        log: lastFight.log ?? [],
-        fights: buildFightsList(combatPlaybackQueue ?? []),
-        rewards: aggregatedRewards,
-      });
+      setLastCombat(buildLastCombat(combatPlaybackQueue!, aggregatedRewards));
     }
     setCombatPlaybackQueue(null);
     setCombatPlaybackIndex(0);
@@ -1309,18 +1317,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         const lastFight = combatPlaybackQueue[combatPlaybackQueue.length - 1];
         if (lastFight) {
           const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
-          setLastCombat({
-            mobTemplateId: '',
-            mobPrefix: null,
-            mobName: lastFight.mobName,
-            mobDisplayName: lastFight.mobDisplayName,
-            outcome: lastFight.outcome,
-            combatantAMaxHp: lastFight.combatantAMaxHp,
-            combatantBMaxHp: lastFight.combatantBMaxHp,
-            log: lastFight.log ?? [],
-            fights: buildFightsList(combatPlaybackQueue),
-            rewards: aggregatedRewards,
-          });
+          setLastCombat(buildLastCombat(combatPlaybackQueue, aggregatedRewards));
         }
         setCombatPlaybackQueue(null);
         setCombatPlaybackIndex(0);
