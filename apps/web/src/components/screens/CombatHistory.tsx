@@ -316,8 +316,15 @@ export function CombatHistory() {
                     <span className="truncate">
                       <span className={outcomeColor(entry.outcome)}>{outcomeIcon(entry.outcome)}</span>
                       {' '}
-                      {entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob'}
+                      {entry.source === 'encounter_site' && entry.fightCount > 1
+                        ? (entry.mobFamilyName ?? entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')
+                        : (entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')}
                     </span>
+                    {entry.source === 'encounter_site' && entry.fightCount > 1 && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)]">
+                        {entry.fightCount} fights
+                      </span>
+                    )}
                   </div>
                   <div className={`text-xs font-semibold ${outcomeColor(entry.outcome)}`}>
                     {formatOutcome(entry.outcome)}
