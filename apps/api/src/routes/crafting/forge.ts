@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
 import type { EquipmentSlot, ItemStats } from '@adventure/shared';
 import {
+  calculateCraftingTurnDiscount,
   calculateForgeUpgradeSuccessChance,
   getEligibleBonusStats,
   getForgeRerollCost,
@@ -17,8 +18,10 @@ import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxServic
 import { assertNotRecovering, getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   isItemType,
+  isSkillType,
   parseItemRarity,
   normalizeBonusStats,
+  getSkillLevel,
   getZoneCraftingLevel,
   assertZoneAllowsCrafting,
   getValidatedSacrificialItem,
@@ -49,10 +52,37 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
 
     const currentRarity = parseItemRarity(item.rarity);
     const nextRarity = getNextRarity(currentRarity);
-    const upgradeCost = getForgeUpgradeCost(currentRarity);
-    if (!nextRarity || upgradeCost === null) {
+
+    // Look up crafting recipe for this item to determine skill-based turn discount
+    const recipe = await prisma.craftingRecipe.findFirst({
+      where: { resultTemplateId: item.templateId },
+      select: { id: true, skillType: true, requiredLevel: true },
+    });
+
+    let hasRecipe = false;
+    let recipeSkillLevel = 0;
+    let recipeRequiredLevel = 0;
+
+    if (recipe) {
+      const learned = await prisma.playerRecipe.findUnique({
+        where: { playerId_recipeId: { playerId, recipeId: recipe.id } },
+        select: { recipeId: true },
+      });
+      if (learned && isSkillType(recipe.skillType)) {
+        hasRecipe = true;
+        recipeSkillLevel = await getSkillLevel(playerId, recipe.skillType);
+        recipeRequiredLevel = recipe.requiredLevel;
+      }
+    }
+
+    const baseUpgradeCost = getForgeUpgradeCost(currentRarity);
+    if (!nextRarity || baseUpgradeCost === null) {
       throw new AppError(400, 'Legendary items cannot be upgraded', 'MAX_RARITY');
     }
+
+    const upgradeCost = hasRecipe
+      ? calculateCraftingTurnDiscount(baseUpgradeCost, recipeSkillLevel, recipeRequiredLevel)
+      : baseUpgradeCost;
 
     const sacrificial = await getValidatedSacrificialItem({
       playerId,
