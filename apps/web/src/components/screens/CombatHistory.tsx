@@ -81,6 +81,7 @@ export function CombatHistory() {
   const [siteFightsLoading, setSiteFightsLoading] = useState(false);
   const [summaryRewards, setSummaryRewards] = useState<CombatResultResponse['rewards'] | null>(null);
   const latestDetailRequestRef = useRef(0);
+  const latestFightRequestRef = useRef(0);
   const selectedLogIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -226,20 +227,25 @@ export function CombatHistory() {
 
   const handleSiteFightNavigate = useCallback(async (newIndex: number) => {
     if (!siteFights || !siteFights[newIndex]) return;
+    const requestId = ++latestFightRequestRef.current;
     setSiteFightIndex(newIndex);
     setSelectedLoading(true);
     setSelectedError(null);
     try {
       const { data, error } = await getCombatLog(siteFights[newIndex].logId);
+      if (latestFightRequestRef.current !== requestId) return;
       if (!data) {
         setSelectedError(error?.message ?? 'Failed to load fight log');
       } else {
         setSelectedDetail(data.combat);
       }
     } catch (err) {
+      if (latestFightRequestRef.current !== requestId) return;
       setSelectedError((err as Error).message);
     } finally {
-      setSelectedLoading(false);
+      if (latestFightRequestRef.current === requestId) {
+        setSelectedLoading(false);
+      }
     }
   }, [siteFights]);
 

@@ -115,6 +115,33 @@ export interface PendingEncounter {
 import type { CombatLogEntryResponse as LastCombatLogEntry } from '@/lib/api/combat';
 export type { LastCombatLogEntry };
 
+type CombatPlaybackItem = {
+  mobName: string;
+  mobDisplayName: string;
+  mobTemplateId: string;
+  mobPrefix: string | null;
+  outcome: string;
+  combatantAMaxHp: number;
+  combatantBMaxHp: number;
+  log: LastCombatLogEntry[] | null;
+  combatLogId?: string;
+};
+
+function buildFightsList(queue: CombatPlaybackItem[]): LastCombat['fights'] {
+  if (queue.length <= 1) return null;
+  return queue.map(f => ({
+    mobName: f.mobName,
+    mobDisplayName: f.mobDisplayName,
+    mobTemplateId: f.mobTemplateId,
+    mobPrefix: f.mobPrefix,
+    outcome: f.outcome,
+    combatantAMaxHp: f.combatantAMaxHp,
+    combatantBMaxHp: f.combatantBMaxHp,
+    log: f.log ?? [],
+    combatLogId: f.combatLogId,
+  }));
+}
+
 export interface LastCombat {
   mobTemplateId: string;
   mobPrefix: string | null;
@@ -1244,19 +1271,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const lastFight = combatPlaybackQueue?.[combatPlaybackQueue.length - 1];
     if (lastFight) {
       const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
-      const allFights = combatPlaybackQueue && combatPlaybackQueue.length > 1
-        ? combatPlaybackQueue.map(f => ({
-            mobName: f.mobName,
-            mobDisplayName: f.mobDisplayName,
-            mobTemplateId: f.mobTemplateId,
-            mobPrefix: f.mobPrefix,
-            outcome: f.outcome,
-            combatantAMaxHp: f.combatantAMaxHp,
-            combatantBMaxHp: f.combatantBMaxHp,
-            log: f.log ?? [],
-            combatLogId: f.combatLogId,
-          }))
-        : null;
       setLastCombat({
         mobTemplateId: lastFight.mobTemplateId,
         mobPrefix: lastFight.mobPrefix,
@@ -1266,7 +1280,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         combatantAMaxHp: lastFight.combatantAMaxHp,
         combatantBMaxHp: lastFight.combatantBMaxHp,
         log: lastFight.log ?? [],
-        fights: allFights,
+        fights: buildFightsList(combatPlaybackQueue ?? []),
         rewards: aggregatedRewards,
       });
     }
@@ -1295,19 +1309,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         const lastFight = combatPlaybackQueue[combatPlaybackQueue.length - 1];
         if (lastFight) {
           const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
-          const allFights = combatPlaybackQueue.length > 1
-            ? combatPlaybackQueue.map(f => ({
-                mobName: f.mobName,
-                mobDisplayName: f.mobDisplayName,
-                mobTemplateId: f.mobTemplateId,
-                mobPrefix: f.mobPrefix,
-                outcome: f.outcome,
-                combatantAMaxHp: f.combatantAMaxHp,
-                combatantBMaxHp: f.combatantBMaxHp,
-                log: f.log ?? [],
-                combatLogId: f.combatLogId,
-              }))
-            : null;
           setLastCombat({
             mobTemplateId: '',
             mobPrefix: null,
@@ -1317,7 +1318,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
             combatantAMaxHp: lastFight.combatantAMaxHp,
             combatantBMaxHp: lastFight.combatantBMaxHp,
             log: lastFight.log ?? [],
-            fights: allFights,
+            fights: buildFightsList(combatPlaybackQueue),
             rewards: aggregatedRewards,
           });
         }
