@@ -83,6 +83,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   const site = await prismaAny.encounterSite.findFirst({
     where: { id: encounterSiteId, playerId },
+    include: { mobFamily: { select: { name: true } } },
   });
   if (!site) throw new AppError(404, 'Encounter site not found', 'NOT_FOUND');
   if (!site.clearStrategy) throw new AppError(400, 'Select a clearing strategy before fighting', 'STRATEGY_NOT_SET');
@@ -494,12 +495,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
   const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
 
-  // Look up mob family name for activity log metadata
-  const mobFamilyRow = await prisma.mobFamily.findUnique({
-    where: { id: site.mobFamilyId as string },
-    select: { name: true },
-  });
-  const mobFamilyName = mobFamilyRow?.name ?? null;
+  // Mob family name from the initial encounter site query (includes mobFamily relation)
+  const mobFamilyName: string | null = site.mobFamily?.name ?? null;
 
   // --- Activity log ---
   const combatLog = await prisma.activityLog.create({
