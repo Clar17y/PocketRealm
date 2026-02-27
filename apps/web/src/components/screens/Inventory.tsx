@@ -146,37 +146,83 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
         </div>
       )}
 
-      {/* Salvage Mode Toggle */}
+      {/* Salvage Mode Toggle + Actions */}
       {onSalvageBatch && !noFacility && (
-        <div className="flex items-center justify-end gap-3">
-          {salvageMode && salvageableBackpackItems.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                const allSelected = salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT);
-                if (allSelected) {
+        salvageMode ? (
+          <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-[var(--rpg-text-primary)]">
+                {selectedSalvageCount}/{SALVAGE_BATCH_LIMIT} selected
+                {selectedSalvageCount > 0 && (
+                  totalSalvageCost > 0
+                    ? ` (${totalSalvageCost} turns)`
+                    : ' (Free)'
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSalvageMode(false);
                   setSalvageSelection(new Set());
-                } else {
-                  setSalvageSelection(new Set(salvageableBackpackItems.slice(0, SALVAGE_BATCH_LIMIT).map((i) => i.id)));
-                }
+                }}
+                className="text-xs text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="flex gap-2">
+              {salvageableBackpackItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allSelected = salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT);
+                    if (allSelected) {
+                      setSalvageSelection(new Set());
+                    } else {
+                      setSalvageSelection(new Set(salvageableBackpackItems.slice(0, SALVAGE_BATCH_LIMIT).map((i) => i.id)));
+                    }
+                  }}
+                  className="text-xs text-[var(--rpg-gold)] hover:underline"
+                >
+                  {salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT) ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
+              <div className="flex-1" />
+              <PixelButton
+                variant="primary"
+                size="sm"
+                disabled={selectedSalvageCount === 0 || salvageBusy}
+                onClick={async () => {
+                  if (!onSalvageBatch) return;
+                  setSalvageBusy(true);
+                  try {
+                    await onSalvageBatch([...salvageSelection]);
+                    setSalvageMode(false);
+                    setSalvageSelection(new Set());
+                  } finally {
+                    setSalvageBusy(false);
+                  }
+                }}
+              >
+                Salvage All
+              </PixelButton>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-end">
+            <PixelButton
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setSalvageMode(true);
+                setSalvageSelection(new Set());
+                setSelectedItem(null);
               }}
-              className="text-xs text-[var(--rpg-gold)] hover:underline"
             >
-              {salvageSelection.size === salvageableBackpackItems.length ? 'Deselect All' : 'Select All'}
-            </button>
-          )}
-          <PixelButton
-            variant={salvageMode ? 'secondary' : 'primary'}
-            size="sm"
-            onClick={() => {
-              setSalvageMode(!salvageMode);
-              setSalvageSelection(new Set());
-              setSelectedItem(null);
-            }}
-          >
-            {salvageMode ? 'Exit Salvage Mode' : 'Salvage Mode'}
-          </PixelButton>
-        </div>
+              Salvage Mode
+            </PixelButton>
+          </div>
+        )
       )}
 
       {/* Backpack Items */}
@@ -229,38 +275,6 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
           ))}
         </div>
       </div>
-
-      {/* Salvage Summary Bar */}
-      {salvageMode && (
-        <div className="flex items-center justify-between bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 mt-2">
-          <div className="text-sm text-[var(--rpg-text-primary)]">
-            {selectedSalvageCount}/{SALVAGE_BATCH_LIMIT} selected
-            {selectedSalvageCount > 0 && (
-              totalSalvageCost > 0
-                ? ` (${totalSalvageCost} turns)`
-                : ' (Free)'
-            )}
-          </div>
-          <PixelButton
-            variant="primary"
-            size="sm"
-            disabled={selectedSalvageCount === 0 || salvageBusy}
-            onClick={async () => {
-              if (!onSalvageBatch) return;
-              setSalvageBusy(true);
-              try {
-                await onSalvageBatch([...salvageSelection]);
-                setSalvageMode(false);
-                setSalvageSelection(new Set());
-              } finally {
-                setSalvageBusy(false);
-              }
-            }}
-          >
-            Salvage All
-          </PixelButton>
-        </div>
-      )}
 
       {/* Item Detail Modal */}
       {!salvageMode && selectedItem && (
