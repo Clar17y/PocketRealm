@@ -11,7 +11,7 @@ import {
   mobToCombatantStats,
   filterAndWeightMobsByTier,
 } from '@adventure/game-engine';
-import type { Combatant, MobTemplate, SkillType } from '@adventure/shared';
+import type { Combatant, CombatOptions, MobTemplate, PotionConsumed, SkillType } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
@@ -24,6 +24,7 @@ import { serializeXpGrant, toMobTemplate, recordBestiaryKill, trackAchievements 
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
+import { buildPotionPool, deductConsumedPotions } from '../services/potionService';
 import {
   ensureStarterDiscoveries,
   getDiscoveredZoneIds,
@@ -292,6 +293,17 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     const ambushes = simulateTravelAmbushes(travelCost);
 
     if (ambushes.length > 0) {
+      // Auto-potion setup
+      const playerRecord = await prismaAny.player.findUnique({
+        where: { id: playerId },
+        select: { autoPotionThreshold: true },
+      });
+      const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
+      const potionPool = autoPotionThreshold > 0
+        ? await buildPotionPool(playerId, hpState.maxHp)
+        : [];
+      const allPotionsConsumed: PotionConsumed[] = [];
+
       // Get player combat stats (same pattern as combat route)
       const mainHandAttackSkill = await getMainHandAttackSkill(playerId);
       const attackSkill: AttackSkill = mainHandAttackSkill ?? 'melee';
@@ -317,6 +329,15 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       );
 
       let currentHp = hpState.currentHp;
+      let ambushAbort: {
+        type: 'knockout';
+        respawn: Awaited<ReturnType<typeof respawnToHomeTown>>;
+        refundAmount: number;
+        newDiscoveries: Array<{ id: string; name: string }>;
+      } | {
+        type: 'flee';
+        refundAmount: number;
+      } | null = null;
 
       for (const ambush of ambushes) {
         if (tieredMobs.length === 0) break;
@@ -347,8 +368,19 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           stats: mobToCombatantStats(prefixedMob),
           spells: prefixedMob.spellPattern,
         };
-        const combatResult = runCombat(combatantA, combatantB);
+        let combatOptions: CombatOptions | undefined;
+        if (autoPotionThreshold > 0 && potionPool.length > 0) {
+          combatOptions = { autoPotionThreshold, potions: [...potionPool] };
+        }
+        const combatResult = runCombat(combatantA, combatantB, combatOptions);
         currentHp = combatResult.combatantAHpRemaining;
+
+        // Remove consumed potions from the shared pool
+        for (const consumed of combatResult.potionsConsumed) {
+          const idx = potionPool.findIndex(p => p.templateId === consumed.templateId);
+          if (idx !== -1) potionPool.splice(idx, 1);
+          allPotionsConsumed.push(consumed);
+        }
 
         const durabilityLost = await degradeEquippedDurability(playerId);
 
@@ -484,7 +516,6 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
               },
             });
 
-            // Refund remaining turns
             const refundAmount = travelCost - ambush.turnOccurred;
             if (refundAmount > 0) {
               await refundPlayerTurns(playerId, refundAmount);
@@ -506,19 +537,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
             if (discoveredZones.length > 0) koAchievementKeys.push('totalZonesDiscovered');
             await trackAchievements(playerId, koCounters, { statKeys: koAchievementKeys, familyIds: ambushMobFamilyIds });
 
-            res.json({
-              zone: { id: respawn.townId, name: respawn.townName, zoneType: 'town' },
-              turns: await getTurnSnapshot(),
-              travelCost,
-              breadcrumbReturn: false,
-              events,
-              aborted: true,
-              refundedTurns: refundAmount,
-              respawnedTo: respawn,
-              newDiscoveries: discoveredZones,
-              tax: taxInfoFromResult(taxResult),
-            });
-            return;
+            ambushAbort = { type: 'knockout', respawn, refundAmount, newDiscoveries: discoveredZones };
+            break;
           } else {
             // Fled — abort travel, stay in current zone
             currentHp = fleeResult.remainingHp;
@@ -572,7 +592,6 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
               },
             });
 
-            // Refund remaining turns
             const refundAmount = travelCost - ambush.turnOccurred;
             if (refundAmount > 0) {
               await refundPlayerTurns(playerId, refundAmount);
@@ -590,21 +609,45 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
               await trackAchievements(playerId, fleeCounters, { statKeys: fleeAchKeys, familyIds: ambushMobFamilyIds });
             }
 
-            res.json({
-              zone: { id: currentZoneId, name: currentZone.name, zoneType: currentZone.zoneType },
-              turns: await getTurnSnapshot(),
-              travelCost,
-              breadcrumbReturn: false,
-              events,
-              aborted: true,
-              refundedTurns: refundAmount,
-              respawnedTo: null,
-              newDiscoveries: [],
-              tax: taxInfoFromResult(taxResult),
-            });
-            return;
+            ambushAbort = { type: 'flee', refundAmount };
+            break;
           }
         }
+      }
+
+      // Single deduction point for all exit paths
+      await deductConsumedPotions(playerId, allPotionsConsumed);
+
+      if (ambushAbort?.type === 'knockout') {
+        res.json({
+          zone: { id: ambushAbort.respawn.townId, name: ambushAbort.respawn.townName, zoneType: 'town' },
+          turns: await getTurnSnapshot(),
+          travelCost,
+          breadcrumbReturn: false,
+          events,
+          aborted: true,
+          refundedTurns: ambushAbort.refundAmount,
+          respawnedTo: ambushAbort.respawn,
+          newDiscoveries: ambushAbort.newDiscoveries,
+          tax: taxInfoFromResult(taxResult),
+        });
+        return;
+      }
+
+      if (ambushAbort?.type === 'flee') {
+        res.json({
+          zone: { id: currentZoneId, name: currentZone.name, zoneType: currentZone.zoneType },
+          turns: await getTurnSnapshot(),
+          travelCost,
+          breadcrumbReturn: false,
+          events,
+          aborted: true,
+          refundedTurns: ambushAbort.refundAmount,
+          respawnedTo: null,
+          newDiscoveries: [],
+          tax: taxInfoFromResult(taxResult),
+        });
+        return;
       }
     }
   }
