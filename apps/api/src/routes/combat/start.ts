@@ -459,14 +459,26 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   }
 
   // --- Build aggregated rewards ---
-  const aggregatedLoot: LootDropWithName[] = [];
+  const rawLoot: LootDropWithName[] = [];
   const aggregatedDurabilityLost: Awaited<ReturnType<typeof degradeEquippedDurability>> = [];
   let aggregatedXp = 0;
   for (const fight of fightResults) {
     aggregatedXp += fight.xp;
-    aggregatedLoot.push(...fight.loot);
+    rawLoot.push(...fight.loot);
     aggregatedDurabilityLost.push(...fight.durabilityLost);
   }
+
+  // Combine loot by itemTemplateId so "Rat Pelt x1" + "Rat Pelt x2" becomes "Rat Pelt x3"
+  const lootMap = new Map<string, LootDropWithName>();
+  for (const drop of rawLoot) {
+    const existing = lootMap.get(drop.itemTemplateId);
+    if (existing) {
+      existing.quantity += drop.quantity;
+    } else {
+      lootMap.set(drop.itemTemplateId, { ...drop });
+    }
+  }
+  const aggregatedLoot = [...lootMap.values()];
   const lastVictoryXpGrant = [...fightResults].reverse().find(f => f.skillXp)?.skillXp ?? null;
 
   const siteCompletionWithNames = siteCompletionRewards
