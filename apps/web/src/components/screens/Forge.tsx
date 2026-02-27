@@ -262,7 +262,7 @@ export function Forge({
                 Cost: {upgradeCost === 0
                   ? <span className="text-[var(--rpg-green-light)]">Free</span>
                   : inflatedUpgradeCost !== null && inflatedUpgradeCost !== upgradeCost
-                    ? `${inflatedUpgradeCost} turns (${inflatedUpgradeCost - upgradeCost!} tax)`
+                    ? <>{inflatedUpgradeCost} turns ({inflatedUpgradeCost - upgradeCost!} tax){baseUpgradeCost !== null && baseUpgradeCost !== upgradeCost && <> <span className="line-through opacity-50">({baseUpgradeCost})</span></>}</>
                     : baseUpgradeCost !== null && upgradeCost !== null && baseUpgradeCost !== upgradeCost
                       ? <>{upgradeCost} turns <span className="line-through opacity-50">({baseUpgradeCost})</span></>
                       : `${upgradeCost ?? '-'} turns`
