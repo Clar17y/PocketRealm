@@ -14,17 +14,16 @@ interface AppShellProps {
   onLogout?: () => void;
   onWhatsNew?: () => void;
   hasUnseenChangelog?: boolean;
-  zoneImageSrc?: string;
-  activeScreen?: string;
+  backgroundSrc?: string;
 }
 
-export function AppShell({ children, turns = 0, username, onSettings, onLogout, onWhatsNew, hasUnseenChangelog, zoneImageSrc, activeScreen }: AppShellProps) {
+export function AppShell({ children, turns = 0, username, onSettings, onLogout, onWhatsNew, hasUnseenChangelog, backgroundSrc }: AppShellProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const hasMenu = Boolean(onSettings || onLogout || onWhatsNew);
 
   return (
     <div className="min-h-dvh w-full bg-[var(--rpg-background)]/95 flex flex-col safe-area-top">
-      <ZoneBackground imageSrc={zoneImageSrc} activeScreen={activeScreen} />
+      <ZoneBackground imageSrc={backgroundSrc} />
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 bg-[var(--rpg-surface)] border-b border-[var(--rpg-border)] z-40 pt-[env(safe-area-inset-top)]">
         <div className="max-w-lg mx-auto h-14 px-4 flex items-center justify-between">
