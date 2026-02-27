@@ -332,6 +332,26 @@ export interface CombatHistoryListItemResponse {
   source: CombatSourceResponse | null;
   roundCount: number;
   xpGained: number;
+  fightCount: number;
+  encounterSiteId: string | null;
+  mobFamilyName: string | null;
+}
+
+export interface EncounterSiteFightSummary {
+  logId: string;
+  createdAt: string;
+  mobTemplateId: string | null;
+  mobName: string | null;
+  mobDisplayName: string | null;
+  mobPrefix: string | null;
+  outcome: string | null;
+  room: number | null;
+  xpGained: number;
+}
+
+export interface EncounterSiteFightsResponse {
+  summaryLogId: string;
+  fights: EncounterSiteFightSummary[];
 }
 
 export interface CombatHistoryResponse {
@@ -472,4 +492,10 @@ export async function getCombatLogs(query: CombatHistoryQuery = {}) {
 
   const suffix = params.toString();
   return fetchApi<CombatHistoryResponse>(`/api/v1/combat/logs${suffix ? `?${suffix}` : ''}`);
+}
+
+export async function getEncounterSiteFights(summaryLogId: string): Promise<EncounterSiteFightsResponse> {
+  const res = await fetchApi<EncounterSiteFightsResponse>(`/api/v1/combat/logs/${summaryLogId}/fights`);
+  if (!res.data) throw new Error(res.error?.message ?? 'Failed to fetch encounter site fights');
+  return res.data;
 }

@@ -33,6 +33,7 @@ export {
   abandonEncounterSites,
   getCombatLog,
   getCombatLogs,
+  getEncounterSiteFights,
 } from './combat';
 export type {
   EventModifierBadge,
@@ -49,6 +50,8 @@ export type {
   CombatHistoryQuery,
   EncounterSitesQuery,
   EncounterSitesResponse,
+  EncounterSiteFightSummary,
+  EncounterSiteFightsResponse,
 } from './combat';
 
 export {
