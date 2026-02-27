@@ -63,3 +63,22 @@ export function monsterImageSrc(monsterName: string): string {
   const key = slugify(monsterName);
   return `/assets/monsters/monster_${key}-pixelated-128.png`;
 }
+
+const SCREEN_BACKGROUNDS = new Set([
+  'arena', 'forge', 'guild', 'inventory',
+]);
+
+const CRAFTING_SKILLS = new Set([
+  'weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring',
+  'alchemy', 'refining', 'tanning', 'weaving', 'jewelcrafting',
+]);
+
+export function screenBackgroundSrc(screen: string, activeCraftingSkill?: string): string | undefined {
+  if (screen === 'crafting' && activeCraftingSkill && CRAFTING_SKILLS.has(activeCraftingSkill)) {
+    return `/assets/screens/screen_${activeCraftingSkill}.png`;
+  }
+  if (SCREEN_BACKGROUNDS.has(screen)) {
+    return `/assets/screens/screen_${screen}.png`;
+  }
+  return undefined;
+}

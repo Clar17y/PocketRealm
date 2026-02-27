@@ -6,6 +6,7 @@ import {
   resourceImageSrc,
   itemImageSrc,
   monsterImageSrc,
+  screenBackgroundSrc,
 } from './assets';
 
 describe('uiIconSrc', () => {
@@ -67,5 +68,45 @@ describe('itemImageSrc', () => {
 describe('monsterImageSrc', () => {
   it('slugifies monster name', () => {
     expect(monsterImageSrc('Forest Spider')).toBe('/assets/monsters/monster_forest_spider-pixelated-128.png');
+  });
+});
+
+describe('screenBackgroundSrc', () => {
+  it('returns arena background', () => {
+    expect(screenBackgroundSrc('arena')).toBe('/assets/screens/screen_arena.png');
+  });
+
+  it('returns forge background', () => {
+    expect(screenBackgroundSrc('forge')).toBe('/assets/screens/screen_forge.png');
+  });
+
+  it('returns guild background', () => {
+    expect(screenBackgroundSrc('guild')).toBe('/assets/screens/screen_guild.png');
+  });
+
+  it('returns inventory background', () => {
+    expect(screenBackgroundSrc('inventory')).toBe('/assets/screens/screen_inventory.png');
+  });
+
+  it('returns crafting background for active skill', () => {
+    expect(screenBackgroundSrc('crafting', 'weaponsmithing')).toBe('/assets/screens/screen_weaponsmithing.png');
+    expect(screenBackgroundSrc('crafting', 'alchemy')).toBe('/assets/screens/screen_alchemy.png');
+    expect(screenBackgroundSrc('crafting', 'jewelcrafting')).toBe('/assets/screens/screen_jewelcrafting.png');
+  });
+
+  it('returns undefined for screens without specific backgrounds', () => {
+    expect(screenBackgroundSrc('skills')).toBeUndefined();
+    expect(screenBackgroundSrc('bestiary')).toBeUndefined();
+    expect(screenBackgroundSrc('zones')).toBeUndefined();
+    expect(screenBackgroundSrc('equipment')).toBeUndefined();
+    expect(screenBackgroundSrc('settings')).toBeUndefined();
+  });
+
+  it('returns undefined for zone-art screens (handled separately)', () => {
+    expect(screenBackgroundSrc('explore')).toBeUndefined();
+    expect(screenBackgroundSrc('combat')).toBeUndefined();
+    expect(screenBackgroundSrc('home')).toBeUndefined();
+    expect(screenBackgroundSrc('gathering')).toBeUndefined();
+    expect(screenBackgroundSrc('rest')).toBeUndefined();
   });
 });
