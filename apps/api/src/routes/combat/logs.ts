@@ -219,6 +219,73 @@ export function registerLogRoutes(router: Router): void {
   }));
 
   /**
+   * GET /api/v1/combat/logs/:id/fights
+   * Returns per-fight log summaries for an encounter site summary log.
+   */
+  router.get('/logs/:id/fights', asyncHandler(async (req, res) => {
+    const playerId = req.player!.playerId;
+    const params = logParamsSchema.parse(req.params);
+
+    const summaryLog = await prisma.activityLog.findFirst({
+      where: { id: params.id, playerId, activityType: 'combat' },
+      select: { id: true, result: true },
+    });
+
+    if (!summaryLog) {
+      throw new AppError(404, 'Combat log not found', 'NOT_FOUND');
+    }
+
+    const result = summaryLog.result as Record<string, unknown>;
+    if (result.source !== 'encounter_site') {
+      throw new AppError(400, 'Not an encounter site summary log', 'INVALID_SOURCE');
+    }
+
+    const fights = await prisma.$queryRaw<Array<{
+      id: string;
+      createdAt: Date;
+      mobTemplateId: string | null;
+      mobName: string | null;
+      mobDisplayName: string | null;
+      mobPrefix: string | null;
+      outcome: string | null;
+      room: number | null;
+      xpGained: number;
+    }>>(Prisma.sql`
+      SELECT
+        "id",
+        "created_at" AS "createdAt",
+        ("result"->>'mobTemplateId') AS "mobTemplateId",
+        ("result"->>'mobName') AS "mobName",
+        COALESCE(("result"->>'mobDisplayName'), ("result"->>'mobName')) AS "mobDisplayName",
+        ("result"->>'mobPrefix') AS "mobPrefix",
+        ("result"->>'outcome') AS "outcome",
+        ("result"->>'room')::int AS "room",
+        COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) AS "xpGained"
+      FROM "activity_logs"
+      WHERE "player_id" = ${playerId}
+        AND "activity_type" = 'combat'
+        AND ("result"->>'source') = 'encounter_site_fight'
+        AND ("result"->>'summaryLogId') = ${params.id}
+      ORDER BY "created_at" ASC
+    `);
+
+    res.json({
+      summaryLogId: params.id,
+      fights: fights.map((f) => ({
+        logId: f.id,
+        createdAt: f.createdAt.toISOString(),
+        mobTemplateId: f.mobTemplateId,
+        mobName: f.mobName,
+        mobDisplayName: f.mobDisplayName ?? f.mobName,
+        mobPrefix: f.mobPrefix,
+        outcome: f.outcome,
+        room: f.room,
+        xpGained: f.xpGained,
+      })),
+    });
+  }));
+
+  /**
    * GET /api/v1/combat/logs/:id
    * Fetch combat playback data for a previous encounter.
    */
