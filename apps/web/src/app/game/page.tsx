@@ -261,6 +261,7 @@ export default function GamePage() {
     handlePendingEncounterSortChange,
     handleCraft,
     handleSalvageItem,
+    handleSalvageBatch,
     handleForgeUpgrade,
     handleForgeReroll,
     handleDestroyItem,
@@ -501,7 +502,8 @@ export default function GamePage() {
           <Inventory
             items={inventory.map((item) => {
               const isEquip = ['weapon', 'armor'].includes(item.template.itemType);
-              const salvageCost = isEquip
+              const hasSalvageRecipe = isEquip && discountLookup.recipeByTemplateId.has(item.template.id);
+              const salvageCost = hasSalvageRecipe
                 ? getDiscountedCost(discountLookup, item.template.id, CRAFTING_CONSTANTS.SALVAGE_TURN_COST)
                 : null;
               return {
@@ -531,6 +533,7 @@ export default function GamePage() {
             })}
             onDrop={handleDestroyItem}
             onSalvage={handleSalvageItem}
+            onSalvageBatch={handleSalvageBatch}
             onRepair={handleRepairItem}
             onEquip={handleEquipItem}
             onUnequip={handleUnequipSlot}

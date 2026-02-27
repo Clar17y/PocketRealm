@@ -264,6 +264,9 @@ export const CRAFTING_CONSTANTS = {
 
   /** Minimum quantity returned for at least one material */
   SALVAGE_MIN_PRIMARY_RETURN: 1,
+
+  /** Max items per batch salvage request */
+  SALVAGE_BATCH_LIMIT: 50,
 } as const;
 
 // =============================================================================

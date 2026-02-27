@@ -242,6 +242,10 @@ export const salvageSchema = z.object({
   itemId: z.string().uuid(),
 });
 
+export const salvageBatchSchema = z.object({
+  itemIds: z.array(z.string().uuid()).min(1).max(CRAFTING_CONSTANTS.SALVAGE_BATCH_LIMIT),
+});
+
 export const forgeUpgradeSchema = z.object({
   itemId: z.string().uuid(),
   sacrificialItemId: z.string().uuid(),

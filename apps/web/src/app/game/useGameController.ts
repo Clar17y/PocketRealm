@@ -50,6 +50,7 @@ import {
   rest,
   restEstimate,
   salvage,
+  salvageBatch,
   selectSiteStrategy,
   useItem,
   updatePlayerSettings,
@@ -1466,6 +1467,28 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
+  const handleSalvageBatch = async (itemIds: string[]) => {
+    await runAction('salvage_batch', async () => {
+      const res = await salvageBatch(itemIds);
+      const data = res.data;
+      if (!data) {
+        setActionError(res.error?.message ?? 'Batch salvage failed');
+        return;
+      }
+
+      setTurns(data.turns.currentTurns);
+      const materialSummary = data.returnedMaterials
+        .map((entry) => `${entry.name} x${entry.quantity}`)
+        .join(', ');
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'success',
+        message: `Salvaged ${data.salvaged.length} items (${data.totalTurnCost} turns). Recovered: ${materialSummary}`,
+      });
+      await loadAll();
+    });
+  };
+
   const handleForgeUpgrade = async (itemId: string, sacrificialItemId: string) => {
     await runAction('forge_upgrade', async () => {
       const res = await forgeUpgrade(itemId, sacrificialItemId);
@@ -1931,6 +1954,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handlePendingEncounterSortChange,
     handleCraft,
     handleSalvageItem,
+    handleSalvageBatch,
     handleForgeUpgrade,
     handleForgeReroll,
     handleDestroyItem,

@@ -12,7 +12,9 @@ import {
   parseMaterials,
   calculateSalvageMaterials,
   getRecipeDiscountedCost,
+  prismaAny,
   salvageSchema,
+  salvageBatchSchema,
 } from './helpers';
 
 export const salvageRouter = Router();
@@ -159,6 +161,173 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
           quantity: entry.quantity,
         })),
       },
+      tax: taxInfoFromResult(taxResult),
+    });
+}));
+
+/**
+ * POST /api/v1/crafting/salvage/batch
+ * Salvage multiple items in one transaction.
+ */
+salvageRouter.post('/batch', asyncHandler(async (req, res) => {
+    const playerId = req.player!.playerId;
+    const body = salvageBatchSchema.parse(req.body);
+
+    const zone = await getZoneCraftingLevel(playerId);
+    assertZoneAllowsCrafting(zone);
+
+    // Fetch all items with templates
+    const items = await prismaAny.item.findMany({
+      where: {
+        id: { in: body.itemIds },
+        ownerId: playerId,
+        quantity: 1,
+      },
+      include: { template: true },
+    });
+
+    // Filter to weapon/armor only and not equipped
+    const equippedItemIds = new Set(
+      (await prisma.playerEquipment.findMany({
+        where: { playerId, itemId: { in: items.map((i: any) => i.id) } },
+        select: { itemId: true },
+      })).map((e) => e.itemId),
+    );
+
+    const salvageableItems = items.filter((item: any) =>
+      (item.template.itemType === 'weapon' || item.template.itemType === 'armor')
+      && !equippedItemIds.has(item.id)
+    );
+
+    if (salvageableItems.length === 0) {
+      throw new AppError(400, 'No salvageable items in selection', 'NO_SALVAGEABLE_ITEMS');
+    }
+
+    // Get unique template IDs and find recipes
+    const uniqueTemplateIds = [...new Set<string>(salvageableItems.map((i: any) => i.templateId as string))];
+    const recipes = await prisma.craftingRecipe.findMany({
+      where: { resultTemplateId: { in: uniqueTemplateIds } },
+      select: { id: true, resultTemplateId: true, materials: true },
+    });
+    const recipeByTemplateId = new Map(recipes.map((r) => [r.resultTemplateId, r]));
+
+    // Build per-item salvage plan
+    type SalvagePlan = {
+      item: any;
+      recipe: typeof recipes[number];
+      turnCost: number;
+      refundedMaterials: Array<{ templateId: string; quantity: number }>;
+    };
+    const plans: SalvagePlan[] = [];
+
+    for (const item of salvageableItems) {
+      const recipe = recipeByTemplateId.get(item.templateId);
+      if (!recipe) continue;
+
+      const recipeMaterials = parseMaterials(recipe.materials);
+      const refunded = calculateSalvageMaterials(recipeMaterials);
+      if (refunded.length === 0) continue;
+
+      const turnCost = await getRecipeDiscountedCost(playerId, item.templateId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
+      plans.push({ item, recipe, turnCost, refundedMaterials: refunded });
+    }
+
+    if (plans.length === 0) {
+      throw new AppError(400, 'No salvageable items in selection', 'NO_SALVAGEABLE_ITEMS');
+    }
+
+    const totalTurnCost = plans.reduce((sum, p) => sum + p.turnCost, 0);
+
+    // Aggregate all materials across all items
+    const materialTotals = new Map<string, number>();
+    for (const plan of plans) {
+      for (const mat of plan.refundedMaterials) {
+        materialTotals.set(mat.templateId, (materialTotals.get(mat.templateId) ?? 0) + mat.quantity);
+      }
+    }
+
+    // Fetch material templates
+    const materialTemplates = await prisma.itemTemplate.findMany({
+      where: { id: { in: [...materialTotals.keys()] } },
+      select: { id: true, name: true, itemType: true, stackable: true, maxDurability: true },
+    });
+    const templateById = new Map(materialTemplates.map((t) => [t.id, t]));
+
+    // Single transaction: spend turns, delete items, mint materials
+    const { turnSpend, taxResult, returned } = await prisma.$transaction(async (tx) => {
+      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, totalTurnCost);
+
+      const deleted = await tx.item.deleteMany({
+        where: {
+          id: { in: plans.map((p) => p.item.id) },
+          ownerId: playerId,
+        },
+      });
+      if (deleted.count !== plans.length) {
+        throw new AppError(409, 'Some items are no longer available', 'SALVAGE_ITEMS_UNAVAILABLE');
+      }
+
+      const minted: Array<{ templateId: string; name: string; quantity: number }> = [];
+      for (const [templateId, quantity] of materialTotals) {
+        const template = templateById.get(templateId);
+        if (!template) {
+          throw new AppError(400, 'Recipe references invalid material template', 'INVALID_RECIPE');
+        }
+
+        if (template.stackable) {
+          await addStackableItemTx(tx, playerId, templateId, quantity);
+        } else {
+          const needsDurability = template.itemType === 'weapon' || template.itemType === 'armor';
+          const maxDurability = needsDurability ? template.maxDurability : null;
+          for (let i = 0; i < quantity; i++) {
+            await tx.item.create({
+              data: {
+                ownerId: playerId,
+                templateId,
+                rarity: 'common',
+                quantity: 1,
+                maxDurability,
+                currentDurability: maxDurability,
+              } as any,
+            });
+          }
+        }
+
+        minted.push({ templateId, name: template.name, quantity });
+      }
+
+      return { turnSpend: spent, taxResult: tax, returned: minted };
+    });
+
+    await trackAchievements(playerId, { totalSalvages: plans.length });
+
+    const log = await prisma.activityLog.create({
+      data: {
+        playerId,
+        activityType: 'salvage_batch',
+        turnsSpent: turnSpend.spent,
+        result: {
+          itemCount: plans.length,
+          salvaged: plans.map((p) => ({
+            itemId: p.item.id,
+            templateId: p.item.templateId,
+            turnCost: p.turnCost,
+          })),
+          returnedMaterials: returned,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    res.json({
+      logId: log.id,
+      turns: turnSpend,
+      salvaged: plans.map((p) => ({
+        itemId: p.item.id,
+        templateName: p.item.template.name,
+        turnCost: p.turnCost,
+      })),
+      returnedMaterials: returned,
+      totalTurnCost,
       tax: taxInfoFromResult(taxResult),
     });
 }));

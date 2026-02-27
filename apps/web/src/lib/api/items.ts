@@ -291,6 +291,20 @@ export async function salvage(itemId: string) {
   });
 }
 
+export async function salvageBatch(itemIds: string[]) {
+  return fetchApi<{
+    logId: string;
+    turns: TurnStateResponse;
+    salvaged: Array<{ itemId: string; templateName: string; turnCost: number }>;
+    returnedMaterials: Array<{ templateId: string; name: string; quantity: number }>;
+    totalTurnCost: number;
+    tax: TaxInfo | null;
+  }>('/api/v1/crafting/salvage/batch', {
+    method: 'POST',
+    body: JSON.stringify({ itemIds }),
+  });
+}
+
 export async function forgeUpgrade(itemId: string, sacrificialItemId: string) {
   return fetchApi<{
     logId: string;

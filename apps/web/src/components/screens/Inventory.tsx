@@ -6,6 +6,7 @@ import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { Crosshair, Heart, Shield, Sword, X, Zap } from 'lucide-react';
+import { CRAFTING_CONSTANTS } from '@adventure/shared';
 import { titleCaseFromSnake } from '@/lib/format';
 import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass } from '@/lib/statFormat';
 
@@ -33,6 +34,7 @@ interface InventoryProps {
   items: Item[];
   onDrop?: (itemId: string) => void | Promise<void>;
   onSalvage?: (itemId: string) => void | Promise<void>;
+  onSalvageBatch?: (itemIds: string[]) => void | Promise<void>;
   onRepair?: (itemId: string) => void | Promise<void>;
   onEquip?: (itemId: string, slot: string) => void | Promise<void>;
   onUnequip?: (slot: string) => void | Promise<void>;
@@ -56,12 +58,35 @@ function statDisplay(stat: string) {
   return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: prettyStatName(stat) };
 }
 
-export function Inventory({ items, onDrop, onSalvage, onRepair, onEquip, onUnequip, onUse, zoneCraftingLevel }: InventoryProps) {
+export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, onEquip, onUnequip, onUse, zoneCraftingLevel }: InventoryProps) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
+  const [salvageMode, setSalvageMode] = useState(false);
+  const [salvageSelection, setSalvageSelection] = useState<Set<string>>(new Set());
+  const [salvageBusy, setSalvageBusy] = useState(false);
+
+  const SALVAGE_BATCH_LIMIT = CRAFTING_CONSTANTS.SALVAGE_BATCH_LIMIT;
+
+  const toggleSalvageItem = (id: string) => {
+    setSalvageSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (next.size < SALVAGE_BATCH_LIMIT) {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const equippedItems = items.filter((item) => item.equippedSlot);
   const backpackItems = items.filter((item) => !item.equippedSlot);
+
+  const salvageableBackpackItems = backpackItems.filter((i) => i.salvageCost !== null && !i.equippedSlot);
+  const selectedSalvageCount = salvageSelection.size;
+  const totalSalvageCost = backpackItems
+    .filter((i) => salvageSelection.has(i.id))
+    .reduce((sum, i) => sum + (i.salvageCost ?? 0), 0);
 
   const stats = selectedItem?.baseStats ?? {};
   const attack = numStat(stats.attack);
@@ -122,24 +147,126 @@ export function Inventory({ items, onDrop, onSalvage, onRepair, onEquip, onUnequ
         </div>
       )}
 
+      {/* Salvage Mode Toggle + Actions */}
+      {onSalvageBatch && !noFacility && (
+        salvageMode ? (
+          <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-[var(--rpg-text-primary)]">
+                {selectedSalvageCount}/{SALVAGE_BATCH_LIMIT} selected
+                {selectedSalvageCount > 0 && (
+                  totalSalvageCost > 0
+                    ? ` (${totalSalvageCost} turns)`
+                    : ' (Free)'
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSalvageMode(false);
+                  setSalvageSelection(new Set());
+                }}
+                className="text-xs text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="flex gap-2">
+              {salvageableBackpackItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allSelected = salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT);
+                    if (allSelected) {
+                      setSalvageSelection(new Set());
+                    } else {
+                      setSalvageSelection(new Set(salvageableBackpackItems.slice(0, SALVAGE_BATCH_LIMIT).map((i) => i.id)));
+                    }
+                  }}
+                  className="text-xs text-[var(--rpg-gold)] hover:underline"
+                >
+                  {salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT) ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
+              <div className="flex-1" />
+              <PixelButton
+                variant="primary"
+                size="sm"
+                disabled={selectedSalvageCount === 0 || salvageBusy}
+                onClick={async () => {
+                  if (!onSalvageBatch) return;
+                  setSalvageBusy(true);
+                  try {
+                    await onSalvageBatch([...salvageSelection]);
+                    setSalvageMode(false);
+                    setSalvageSelection(new Set());
+                  } finally {
+                    setSalvageBusy(false);
+                  }
+                }}
+              >
+                Salvage All
+              </PixelButton>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-end">
+            <PixelButton
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setSalvageMode(true);
+                setSalvageSelection(new Set());
+                setSelectedItem(null);
+              }}
+            >
+              Salvage Mode
+            </PixelButton>
+          </div>
+        )
+      )}
+
       {/* Backpack Items */}
       <div className="space-y-2">
         <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
           Backpack ({backpackItems.length}/24)
         </div>
-        <div className="grid grid-cols-6 gap-2">
-          {backpackItems.map((item) => (
-            <ItemCard
-              key={item.id}
-              name={item.name}
-              icon={item.icon}
-              imageSrc={item.imageSrc}
-              quantity={item.quantity}
-              rarity={item.rarity}
-              durability={item.durability}
-              onClick={() => setSelectedItem(item)}
-            />
-          ))}
+          <div className="grid grid-cols-6 gap-2">
+          {backpackItems.map((item) => {
+            const isSalvageable = salvageMode && item.salvageCost !== null;
+            const isSelected = salvageMode && salvageSelection.has(item.id);
+            return (
+              <div key={item.id} className="relative">
+                <ItemCard
+                  name={item.name}
+                  icon={item.icon}
+                  imageSrc={item.imageSrc}
+                  quantity={item.quantity}
+                  rarity={item.rarity}
+                  durability={item.durability}
+                  onClick={() => {
+                    if (salvageMode) {
+                      if (isSalvageable) toggleSalvageItem(item.id);
+                    } else {
+                      setSelectedItem(item);
+                    }
+                  }}
+                />
+                {salvageMode && isSalvageable && (
+                  <div className={`absolute top-0.5 right-0.5 w-5 h-5 rounded border-2 flex items-center justify-center pointer-events-none ${
+                    isSelected
+                      ? 'border-[var(--rpg-gold)] bg-[var(--rpg-gold)]'
+                      : 'border-[var(--rpg-text-secondary)] bg-[var(--rpg-surface)]'
+                  }`}>
+                    {isSelected && <span className="text-[var(--rpg-background)] text-xs font-bold">✓</span>}
+                  </div>
+                )}
+                {salvageMode && !isSalvageable && (
+                  <div className="absolute inset-0 bg-black/50 rounded-lg pointer-events-none" />
+                )}
+              </div>
+            );
+          })}
           {/* Empty slots */}
           {Array.from({ length: Math.max(0, 24 - backpackItems.length) }).map((_, idx) => (
             <div
@@ -151,7 +278,7 @@ export function Inventory({ items, onDrop, onSalvage, onRepair, onEquip, onUnequ
       </div>
 
       {/* Item Detail Modal */}
-      {selectedItem && (
+      {!salvageMode && selectedItem && (
         <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
           onClick={() => setSelectedItem(null)}
