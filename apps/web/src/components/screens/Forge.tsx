@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ITEM_RARITY_CONSTANTS } from '@adventure/shared';
-import { calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@adventure/game-engine';
+import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@adventure/game-engine';
 import { Anvil, Sparkles, TrendingUp } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -23,6 +23,8 @@ interface ForgeItem {
   equippedSlot: string | null;
   baseStats?: Record<string, unknown>;
   bonusStats?: Record<string, unknown> | null;
+  recipeSkillLevel: number | null;   // null = no recipe owned → full price
+  recipeRequiredLevel: number | null;
 }
 
 interface ForgeProps {
@@ -133,7 +135,10 @@ export function Forge({
   const canUseForge = Boolean(selected && !selected.equippedSlot);
   const hasUpgradeSacrifice = upgradeSacrifices.length > 0;
   const hasRerollSacrifice = rerollSacrifices.length > 0;
-  const upgradeCost = selected ? getForgeUpgradeCost(selected.rarity) : null;
+  const baseUpgradeCost = selected ? getForgeUpgradeCost(selected.rarity) : null;
+  const upgradeCost = baseUpgradeCost !== null && selected?.recipeSkillLevel != null && selected?.recipeRequiredLevel != null
+    ? calculateCraftingTurnDiscount(baseUpgradeCost, selected.recipeSkillLevel, selected.recipeRequiredLevel)
+    : baseUpgradeCost;
   const rerollCost = selected ? getForgeRerollCost(selected.rarity) : null;
   const inflatedUpgradeCost = upgradeCost !== null ? inflateCost(upgradeCost, guildTaxRate) : null;
   const inflatedRerollCost = rerollCost !== null ? inflateCost(rerollCost, guildTaxRate) : null;
@@ -254,9 +259,13 @@ export function Forge({
                 Success keeps existing bonus stats and adds one new bonus roll.
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
-                Cost: {inflatedUpgradeCost !== null && inflatedUpgradeCost !== upgradeCost
-                  ? `${inflatedUpgradeCost} turns (${inflatedUpgradeCost - upgradeCost!} tax)`
-                  : `${upgradeCost ?? '-'} turns`
+                Cost: {upgradeCost === 0
+                  ? <span className="text-[var(--rpg-green-light)]">Free</span>
+                  : inflatedUpgradeCost !== null && inflatedUpgradeCost !== upgradeCost
+                    ? `${inflatedUpgradeCost} turns (${inflatedUpgradeCost - upgradeCost!} tax)`
+                    : baseUpgradeCost !== null && upgradeCost !== null && baseUpgradeCost !== upgradeCost
+                      ? <>{upgradeCost} turns <span className="line-through opacity-50">({baseUpgradeCost})</span></>
+                      : `${upgradeCost ?? '-'} turns`
                 } + 1 sacrificial {selected?.rarity ?? ''} {selected?.type ?? 'item'}
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">

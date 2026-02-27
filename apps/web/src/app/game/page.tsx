@@ -770,22 +770,34 @@ export default function GamePage() {
             />
           </div>
         );
-      case 'forge':
+      case 'forge': {
+        const recipeByTemplateId = new Map(
+          craftingRecipes
+            .filter((r) => r.isDiscovered)
+            .map((r) => [r.resultTemplate.id, { skillType: r.skillType, requiredLevel: r.requiredLevel }])
+        );
+        const skillByType = new Map(skills.map((s) => [s.skillType, s.level]));
+
         return (
           <Forge
             items={inventory
               .filter((item) => ['weapon', 'armor'].includes(item.template.itemType) && item.quantity === 1)
-              .map((item) => ({
-                id: item.id,
-                templateId: item.template.id,
-                name: item.template.name,
-                imageSrc: itemImageSrc(item.template.name, item.template.itemType),
-                rarity: item.rarity,
-                type: item.template.itemType,
-                equippedSlot: item.equippedSlot,
-                baseStats: item.template.baseStats,
-                bonusStats: item.bonusStats ?? null,
-              }))}
+              .map((item) => {
+                const recipe = recipeByTemplateId.get(item.template.id);
+                return {
+                  id: item.id,
+                  templateId: item.template.id,
+                  name: item.template.name,
+                  imageSrc: itemImageSrc(item.template.name, item.template.itemType),
+                  rarity: item.rarity,
+                  type: item.template.itemType,
+                  equippedSlot: item.equippedSlot,
+                  baseStats: item.template.baseStats,
+                  bonusStats: item.bonusStats ?? null,
+                  recipeSkillLevel: recipe ? (skillByType.get(recipe.skillType) ?? 1) : null,
+                  recipeRequiredLevel: recipe ? recipe.requiredLevel : null,
+                };
+              })}
             equippedLuck={equipment.reduce((sum, slot) => {
               const base = slot.item?.template?.baseStats as Record<string, unknown> | undefined;
               const bonus = slot.item?.bonusStats as Record<string, unknown> | undefined;
@@ -802,6 +814,7 @@ export default function GamePage() {
             guildTaxRate={guildTaxRate}
           />
         );
+      }
       case 'gathering':
         return (
           <div className="space-y-3">
