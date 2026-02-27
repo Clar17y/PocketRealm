@@ -16,6 +16,7 @@ import type { CombatActiveEvent } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
+import { relativeTime } from '@/lib/format';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../useGameController';
 
@@ -405,7 +406,7 @@ export function CombatScreen({
                           </div>
                         <div className="text-xs text-[var(--rpg-text-secondary)]">
                           Zone: {e.zoneName} | Decayed {e.decayedMobs} | Found{' '}
-                          {Math.max(0, Math.ceil((pendingClockMs - new Date(e.discoveredAt).getTime()) / 60000))}m ago
+                          {relativeTime(pendingClockMs - new Date(e.discoveredAt).getTime())}
                         </div>
                         </div>
                       </div>

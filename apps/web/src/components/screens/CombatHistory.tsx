@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp, resolvePlayerMaxHp } from '@/lib/combatShare';
 import { monsterImageSrc } from '@/lib/assets';
+import { relativeTime } from '@/lib/format';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
@@ -47,18 +48,6 @@ function formatCombatSource(source: string | null | undefined): string {
   if (source === 'travel_ambush') return 'Ambush (Travel)';
   if (source === 'zone_combat') return 'Direct Encounter';
   return 'Unknown Source';
-}
-
-function relativeTime(iso: string): string {
-  const deltaMs = Date.now() - new Date(iso).getTime();
-  const seconds = Math.max(0, Math.floor(deltaMs / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 }
 
 function fullTimestamp(iso: string): string {
