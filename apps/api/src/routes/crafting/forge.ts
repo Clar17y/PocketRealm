@@ -21,6 +21,7 @@ import {
   normalizeBonusStats,
   getZoneCraftingLevel,
   assertZoneAllowsCrafting,
+  getRecipeDiscountedCost,
   getValidatedSacrificialItem,
   forgeUpgradeSchema,
   forgeRerollSchema,
@@ -49,10 +50,13 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
 
     const currentRarity = parseItemRarity(item.rarity);
     const nextRarity = getNextRarity(currentRarity);
-    const upgradeCost = getForgeUpgradeCost(currentRarity);
-    if (!nextRarity || upgradeCost === null) {
+
+    const baseUpgradeCost = getForgeUpgradeCost(currentRarity);
+    if (!nextRarity || baseUpgradeCost === null) {
       throw new AppError(400, 'Legendary items cannot be upgraded', 'MAX_RARITY');
     }
+
+    const upgradeCost = await getRecipeDiscountedCost(playerId, item.templateId, baseUpgradeCost);
 
     const sacrificial = await getValidatedSacrificialItem({
       playerId,

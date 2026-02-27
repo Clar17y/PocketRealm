@@ -29,7 +29,8 @@ import { Slider } from '@/components/ui/Slider';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { rarityFromTier } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
-import { TURN_CONSTANTS, type SkillType } from '@adventure/shared';
+import { buildRecipeDiscountLookup, getDiscountedCost, getRecipeSkillInfo } from '@/lib/recipeDiscount';
+import { CRAFTING_CONSTANTS, TURN_CONSTANTS, type SkillType } from '@adventure/shared';
 import { calculateEfficiency, xpForLevel } from '@adventure/game-engine';
 import { Sword, Shield, Crosshair, Sparkles, Pickaxe, Hammer, Leaf, FlaskConical, Axe, Scissors, Anvil, Gem } from 'lucide-react';
 import { TutorialBanner } from '@/components/TutorialBanner';
@@ -494,32 +495,40 @@ export default function GamePage() {
             combatXpRate={primaryCombatXpRate}
           />
         );
-      case 'inventory':
+      case 'inventory': {
+        const discountLookup = buildRecipeDiscountLookup(craftingRecipes, skills);
         return (
           <Inventory
-            items={inventory.map((item) => ({
-              id: item.id,
-              name: item.template.name,
-              imageSrc: itemImageSrc(item.template.name, item.template.itemType),
-              quantity: item.quantity,
-              rarity: item.rarity,
-              description: item.template.itemType,
-              type: item.template.itemType,
-              weightClass: item.template.weightClass ?? null,
-              slot: item.template.slot,
-              equippedSlot: item.equippedSlot,
-              durability: (() => {
-                const templateMax = item.template.maxDurability ?? 0;
-                const max = item.maxDurability ?? templateMax;
-                if (!['weapon', 'armor'].includes(item.template.itemType) || max <= 0) return null;
-                const cur = item.currentDurability ?? max;
-                return { current: cur, max };
-              })(),
-              baseStats: item.template.baseStats,
-              bonusStats: item.bonusStats ?? null,
-              requiredSkill: item.template.requiredSkill ?? null,
-              requiredLevel: item.template.requiredLevel ?? 1,
-            }))}
+            items={inventory.map((item) => {
+              const isEquip = ['weapon', 'armor'].includes(item.template.itemType);
+              const salvageCost = isEquip
+                ? getDiscountedCost(discountLookup, item.template.id, CRAFTING_CONSTANTS.SALVAGE_TURN_COST)
+                : null;
+              return {
+                id: item.id,
+                name: item.template.name,
+                imageSrc: itemImageSrc(item.template.name, item.template.itemType),
+                quantity: item.quantity,
+                rarity: item.rarity,
+                description: item.template.itemType,
+                type: item.template.itemType,
+                weightClass: item.template.weightClass ?? null,
+                slot: item.template.slot,
+                equippedSlot: item.equippedSlot,
+                durability: (() => {
+                  const templateMax = item.template.maxDurability ?? 0;
+                  const max = item.maxDurability ?? templateMax;
+                  if (!['weapon', 'armor'].includes(item.template.itemType) || max <= 0) return null;
+                  const cur = item.currentDurability ?? max;
+                  return { current: cur, max };
+                })(),
+                baseStats: item.template.baseStats,
+                bonusStats: item.bonusStats ?? null,
+                requiredSkill: item.template.requiredSkill ?? null,
+                requiredLevel: item.template.requiredLevel ?? 1,
+                salvageCost,
+              };
+            })}
             onDrop={handleDestroyItem}
             onSalvage={handleSalvageItem}
             onRepair={handleRepairItem}
@@ -529,6 +538,7 @@ export default function GamePage() {
             zoneCraftingLevel={zoneCraftingLevel}
           />
         );
+      }
       case 'equipment':
         return (
           <Equipment
@@ -770,22 +780,29 @@ export default function GamePage() {
             />
           </div>
         );
-      case 'forge':
+      case 'forge': {
+        const lookup = buildRecipeDiscountLookup(craftingRecipes, skills);
+
         return (
           <Forge
             items={inventory
               .filter((item) => ['weapon', 'armor'].includes(item.template.itemType) && item.quantity === 1)
-              .map((item) => ({
-                id: item.id,
-                templateId: item.template.id,
-                name: item.template.name,
-                imageSrc: itemImageSrc(item.template.name, item.template.itemType),
-                rarity: item.rarity,
-                type: item.template.itemType,
-                equippedSlot: item.equippedSlot,
-                baseStats: item.template.baseStats,
-                bonusStats: item.bonusStats ?? null,
-              }))}
+              .map((item) => {
+                const info = getRecipeSkillInfo(lookup, item.template.id);
+                return {
+                  id: item.id,
+                  templateId: item.template.id,
+                  name: item.template.name,
+                  imageSrc: itemImageSrc(item.template.name, item.template.itemType),
+                  rarity: item.rarity,
+                  type: item.template.itemType,
+                  equippedSlot: item.equippedSlot,
+                  baseStats: item.template.baseStats,
+                  bonusStats: item.bonusStats ?? null,
+                  recipeSkillLevel: info?.recipeSkillLevel ?? null,
+                  recipeRequiredLevel: info?.recipeRequiredLevel ?? null,
+                };
+              })}
             equippedLuck={equipment.reduce((sum, slot) => {
               const base = slot.item?.template?.baseStats as Record<string, unknown> | undefined;
               const bonus = slot.item?.bonusStats as Record<string, unknown> | undefined;
@@ -802,6 +819,7 @@ export default function GamePage() {
             guildTaxRate={guildTaxRate}
           />
         );
+      }
       case 'gathering':
         return (
           <div className="space-y-3">

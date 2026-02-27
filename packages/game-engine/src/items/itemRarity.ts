@@ -65,6 +65,14 @@ export function getForgeRerollCost(rarity: ItemRarity): number | null {
   return ITEM_RARITY_CONSTANTS.REROLL_TURN_COST_BY_RARITY[rarity];
 }
 
+export function calculateCraftingTurnDiscount(baseCost: number, skillLevel: number, requiredLevel: number): number {
+  const levelsAbove = Math.max(0, skillLevel - requiredLevel);
+  if (levelsAbove >= ITEM_RARITY_CONSTANTS.FORGE_DISCOUNT_MAX_LEVELS) return 0;
+  const discount = levelsAbove * ITEM_RARITY_CONSTANTS.FORGE_DISCOUNT_PER_LEVEL_ABOVE;
+  // Epsilon guards against IEEE 754 rounding (e.g. 3*0.20 = 0.6000000000000001)
+  return Math.floor(baseCost * (1 - discount) + 1e-9);
+}
+
 export function calculateForgeUpgradeSuccessChance(rarity: ItemRarity, luckStat: number): number | null {
   if (rarity === 'legendary') return null;
 

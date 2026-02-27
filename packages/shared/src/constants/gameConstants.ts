@@ -321,6 +321,11 @@ export const ITEM_RARITY_CONSTANTS = {
 
   FORGE_LUCK_SUCCESS_BONUS_PER_POINT: 0.001,
   FORGE_LUCK_SUCCESS_BONUS_CAP: 0.1,
+
+  /** Turn cost discount per skill level above recipe requirement (20% per level) */
+  FORGE_DISCOUNT_PER_LEVEL_ABOVE: 0.20,
+  /** Max skill levels above recipe for full (free) discount */
+  FORGE_DISCOUNT_MAX_LEVELS: 5,
 } as const;
 
 // =============================================================================

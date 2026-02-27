@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calculateCraftingTurnDiscount,
   calculateDropRarityWeights,
   calculateForgeUpgradeSuccessChance,
   getBonusSlotCount,
@@ -227,5 +228,37 @@ describe('itemRarity', () => {
     expect(rolled).not.toBeNull();
     expect(rolled!.critChance).toBeUndefined();
     expect(rolled!.critDamage).toBeUndefined();
+  });
+
+  it('calculates crafting turn discount based on skill level above recipe', () => {
+    // Same level = full price
+    expect(calculateCraftingTurnDiscount(100, 5, 5)).toBe(100);
+    // 1 level above = 80%
+    expect(calculateCraftingTurnDiscount(100, 6, 5)).toBe(80);
+    // 2 levels above = 60%
+    expect(calculateCraftingTurnDiscount(100, 7, 5)).toBe(60);
+    // 3 levels above = 40%
+    expect(calculateCraftingTurnDiscount(100, 8, 5)).toBe(40);
+    // 4 levels above = 20%
+    expect(calculateCraftingTurnDiscount(100, 9, 5)).toBe(20);
+    // 5+ levels above = free
+    expect(calculateCraftingTurnDiscount(100, 10, 5)).toBe(0);
+    expect(calculateCraftingTurnDiscount(100, 99, 5)).toBe(0);
+  });
+
+  it('floors fractional discount results', () => {
+    expect(calculateCraftingTurnDiscount(250, 6, 5)).toBe(200);
+    expect(calculateCraftingTurnDiscount(50, 6, 5)).toBe(40);
+    expect(calculateCraftingTurnDiscount(50, 7, 5)).toBe(30);
+    expect(calculateCraftingTurnDiscount(75, 7, 5)).toBe(45);
+  });
+
+  it('returns full price when skill level is below recipe level', () => {
+    expect(calculateCraftingTurnDiscount(100, 3, 5)).toBe(100);
+    expect(calculateCraftingTurnDiscount(100, 1, 10)).toBe(100);
+  });
+
+  it('returns 0 for 0 base cost', () => {
+    expect(calculateCraftingTurnDiscount(0, 99, 1)).toBe(0);
   });
 });

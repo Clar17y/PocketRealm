@@ -11,6 +11,7 @@ import {
   assertZoneAllowsCrafting,
   parseMaterials,
   calculateSalvageMaterials,
+  getRecipeDiscountedCost,
   salvageSchema,
 } from './helpers';
 
@@ -42,6 +43,8 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
       throw new AppError(400, 'This item cannot be salvaged', 'NOT_SALVAGEABLE');
     }
 
+    const salvageTurnCost = await getRecipeDiscountedCost(playerId, item.templateId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
+
     const recipeMaterials = parseMaterials(recipe.materials);
     const refundedMaterials = calculateSalvageMaterials(recipeMaterials);
     if (refundedMaterials.length === 0) {
@@ -55,7 +58,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
     const templateById = new Map(materialTemplates.map((template) => [template.id, template]));
 
     const { turnSpend, taxResult, returned } = await prisma.$transaction(async (tx) => {
-      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
+      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, salvageTurnCost);
 
       const consumed = await tx.item.deleteMany({
         where: {

@@ -1,5 +1,7 @@
 import { Prisma, prisma } from '@adventure/database';
 import type { TaxInfo } from '@adventure/shared';
+import { calculateCurrentTurns, calculateTimeToCapMs } from '@adventure/game-engine';
+import { AppError } from '../middleware/errorHandler';
 import { calculateTreasuryCap } from './guildService';
 import { spendPlayerTurnsTx, type SpendTurnsResult } from './turnBankService';
 
@@ -60,6 +62,20 @@ export async function spendWithTaxTx(
   playerId: string,
   baseCost: number,
 ): Promise<{ turnSpend: SpendTurnsResult; taxResult: TaxResult }> {
+  if (baseCost <= 0) {
+    const bank = await tx.turnBank.findUnique({ where: { playerId } });
+    if (!bank) throw new AppError(404, 'Turn bank not found', 'NOT_FOUND');
+    const current = calculateCurrentTurns(bank.currentTurns, bank.lastRegenAt, new Date());
+    return {
+      turnSpend: {
+        previousTurns: current, spent: 0, currentTurns: current,
+        lastRegenAt: bank.lastRegenAt.toISOString(),
+        timeToCapMs: calculateTimeToCapMs(current),
+      },
+      taxResult: NO_TAX(0),
+    };
+  }
+
   const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
   const actualCost = calculateInflatedCost(baseCost, taxRate);
   const turnSpend = await spendPlayerTurnsTx(tx, playerId, actualCost);

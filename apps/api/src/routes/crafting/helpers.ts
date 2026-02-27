@@ -9,6 +9,7 @@ import {
   type ItemType,
   type SkillType,
 } from '@adventure/shared';
+import { calculateCraftingTurnDiscount } from '@adventure/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { getSkillLevel } from '../../services/combatStatsService.js';
 
@@ -53,6 +54,32 @@ export async function getZoneCraftingLevel(playerId: string): Promise<{ maxCraft
     throw new AppError(400, 'Current zone not found', 'NO_ZONE');
   }
   return { maxCraftingLevel: zone.maxCraftingLevel, zoneName: zone.name };
+}
+
+/**
+ * Look up the crafting recipe for an item template, check if the player
+ * has learned it, and return the discounted turn cost. Returns baseCost
+ * unchanged when no recipe exists or the player hasn't learned it.
+ */
+export async function getRecipeDiscountedCost(playerId: string, templateId: string, baseCost: number): Promise<number> {
+  const recipe = await prisma.craftingRecipe.findFirst({
+    where: { resultTemplateId: templateId },
+    select: { id: true, skillType: true, requiredLevel: true, isAdvanced: true },
+  });
+  if (!recipe || !isSkillType(recipe.skillType)) return baseCost;
+
+  // Standard recipes are known by all players with sufficient skill level.
+  // Only advanced (soulbound) recipes require a PlayerRecipe row.
+  if (recipe.isAdvanced) {
+    const learned = await prisma.playerRecipe.findUnique({
+      where: { playerId_recipeId: { playerId, recipeId: recipe.id } },
+      select: { recipeId: true },
+    });
+    if (!learned) return baseCost;
+  }
+
+  const skillLevel = await getSkillLevel(playerId, recipe.skillType);
+  return calculateCraftingTurnDiscount(baseCost, skillLevel, recipe.requiredLevel);
 }
 
 // ── Zone assertions ──────────────────────────────────────────────────
