@@ -1190,7 +1190,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
 
-      await Promise.all([loadAll(), loadTurnsAndHp(), refreshPendingEncounters(), loadBestiary()]);
+      await Promise.all([loadAll(), loadTurnsAndHp(), loadBestiary()]);
     });
   };
 
@@ -1251,6 +1251,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     pendingCombatRewardsRef.current = null;
     combatLogPrefetch.clear();
     setPlaybackActive(false);
+    void refreshPendingEncounters();
 
     if (siteJustClearedRef.current) {
       siteJustClearedRef.current = false;
@@ -1286,6 +1287,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         setRoomTransition(null);
         pendingCombatRewardsRef.current = null;
         combatLogPrefetch.clear();
+        void refreshPendingEncounters();
       }
       if (travelPlaybackData) {
         handleTravelPlaybackSkip();
