@@ -120,7 +120,7 @@ export function CombatScreen({
   const [lastCombatCollapsed, setLastCombatCollapsed] = useState(false);
 
   useEffect(() => {
-    setLastCombatFightIndex(0);
+    setLastCombatFightIndex(lastCombat?.fights ? lastCombat.fights.length - 1 : 0);
     setLastCombatCollapsed(false);
   }, [lastCombat]);
 
