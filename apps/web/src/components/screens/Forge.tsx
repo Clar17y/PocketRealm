@@ -12,6 +12,7 @@ import { ActivityLog } from '@/components/ActivityLog';
 import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/useGameController';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
+import { ForgeTutorial } from '@/components/common/ForgeTutorial';
 
 interface ForgeItem {
   id: string;
@@ -149,6 +150,7 @@ export function Forge({
 
   return (
     <div className="space-y-4">
+      <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 
       <div className="flex items-center justify-between">
