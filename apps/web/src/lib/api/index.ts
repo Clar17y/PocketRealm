@@ -64,6 +64,7 @@ export {
   getCraftingRecipes,
   craft,
   salvage,
+  salvageBatch,
   forgeUpgrade,
   forgeReroll,
 } from './items';
