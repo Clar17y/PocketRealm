@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
 import { CRAFTING_CONSTANTS } from '@adventure/shared';
-import { calculateCraftingTurnDiscount } from '@adventure/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
@@ -12,9 +11,8 @@ import {
   assertZoneAllowsCrafting,
   parseMaterials,
   calculateSalvageMaterials,
+  getRecipeDiscountedCost,
   salvageSchema,
-  getSkillLevel,
-  isSkillType,
 } from './helpers';
 
 export const salvageRouter = Router();
@@ -38,25 +36,14 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
 
     const recipe = await prisma.craftingRecipe.findFirst({
       where: { resultTemplateId: item.templateId },
-      select: { id: true, materials: true, resultTemplateId: true, skillType: true, requiredLevel: true },
+      select: { id: true, materials: true, resultTemplateId: true },
     });
 
     if (!recipe) {
       throw new AppError(400, 'This item cannot be salvaged', 'NOT_SALVAGEABLE');
     }
 
-    let salvageTurnCost: number = CRAFTING_CONSTANTS.SALVAGE_TURN_COST;
-
-    if (isSkillType(recipe.skillType)) {
-      const learned = await prisma.playerRecipe.findUnique({
-        where: { playerId_recipeId: { playerId, recipeId: recipe.id } },
-        select: { recipeId: true },
-      });
-      if (learned) {
-        const skillLevel = await getSkillLevel(playerId, recipe.skillType);
-        salvageTurnCost = calculateCraftingTurnDiscount(CRAFTING_CONSTANTS.SALVAGE_TURN_COST, skillLevel, recipe.requiredLevel);
-      }
-    }
+    const salvageTurnCost = await getRecipeDiscountedCost(playerId, item.templateId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
 
     const recipeMaterials = parseMaterials(recipe.materials);
     const refundedMaterials = calculateSalvageMaterials(recipeMaterials);
