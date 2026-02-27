@@ -117,9 +117,11 @@ export function CombatScreen({
   const [strategyModalSite, setStrategyModalSite] = useState<PendingEncounter | null>(null);
   const [lowHpPendingSite, setLowHpPendingSite] = useState<PendingEncounter | null>(null);
   const [lastCombatFightIndex, setLastCombatFightIndex] = useState(0);
+  const [lastCombatCollapsed, setLastCombatCollapsed] = useState(false);
 
   useEffect(() => {
     setLastCombatFightIndex(0);
+    setLastCombatCollapsed(false);
   }, [lastCombat]);
 
   const displayedFight = lastCombat?.fights?.[lastCombatFightIndex] ?? lastCombat;
@@ -371,7 +373,11 @@ export function CombatScreen({
                 />
               )}
 
-              <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setLastCombatCollapsed(prev => !prev)}
+                className="flex items-center justify-between w-full text-left"
+              >
                 <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold">
                   <img
                     src={monsterImageSrc(displayedFight?.mobName ?? lastCombat.mobName)}
@@ -381,42 +387,52 @@ export function CombatScreen({
                   Last Combat: {displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleCopyShare()}
-                    className="px-2.5 py-1.5 rounded border border-[var(--rpg-border)] text-xs text-[var(--rpg-text-primary)]"
-                    title="Copy formatted log for sharing"
-                  >
-                    {copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'Copy Log'}
-                  </button>
                   <div className={`text-sm font-semibold ${outcomeColor}`}>{outcomeLabel}</div>
+                  <span className="text-[var(--rpg-text-secondary)] text-xs">
+                    {lastCombatCollapsed ? '▶' : '▼'}
+                  </span>
                 </div>
-              </div>
+              </button>
 
-              <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
-                {displayedFight && displayedFight.log.length > 0 ? (
-                  displayedFight.log.map((entry, idx) => (
-                    <CombatLogEntry
-                      key={idx}
-                      entry={entry}
-                      playerMaxHp={playerMaxHp}
-                      mobMaxHp={mobMaxHp}
-                      showDetailedBreakdown={isLastCombatMobDiscovered}
-                    />
-                  ))
-                ) : (
-                  <div className="text-sm text-[var(--rpg-text-secondary)] py-2">
-                    Combat log not available for this fight.
+              {!lastCombatCollapsed && (
+                <>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyShare()}
+                      className="px-2.5 py-1.5 rounded border border-[var(--rpg-border)] text-xs text-[var(--rpg-text-primary)]"
+                      title="Copy formatted log for sharing"
+                    >
+                      {copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'Copy Log'}
+                    </button>
                   </div>
-                )}
-              </div>
 
-              <div className="border-t border-[var(--rpg-border)] pt-2">
-                <CombatRewardsSummary
-                  rewards={lastCombat.rewards}
-                  outcome={lastCombat.outcome}
-                />
-              </div>
+                  <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
+                    {displayedFight && displayedFight.log.length > 0 ? (
+                      displayedFight.log.map((entry, idx) => (
+                        <CombatLogEntry
+                          key={idx}
+                          entry={entry}
+                          playerMaxHp={playerMaxHp}
+                          mobMaxHp={mobMaxHp}
+                          showDetailedBreakdown={isLastCombatMobDiscovered}
+                        />
+                      ))
+                    ) : (
+                      <div className="text-sm text-[var(--rpg-text-secondary)] py-2">
+                        Combat log not available for this fight.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-[var(--rpg-border)] pt-2">
+                    <CombatRewardsSummary
+                      rewards={lastCombat.rewards}
+                      outcome={lastCombat.outcome}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
 

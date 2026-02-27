@@ -1330,6 +1330,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         handleTravelPlaybackSkip();
       }
     }
+    // Clear last combat log when leaving the combat screen — it's in history if needed
+    if (activeScreen === 'combat' && screen !== 'combat') {
+      setLastCombat(null);
+    }
     setActiveScreen(screen as Screen);
   };
 
