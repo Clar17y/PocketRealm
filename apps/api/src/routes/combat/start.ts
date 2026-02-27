@@ -494,6 +494,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
   const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
 
+  // Look up mob family name for activity log metadata
+  const mobFamilyRow = await prisma.mobFamily.findUnique({
+    where: { id: site.mobFamilyId as string },
+    select: { name: true },
+  });
+  const mobFamilyName = mobFamilyRow?.name ?? null;
+
   // --- Activity log ---
   const combatLog = await prisma.activityLog.create({
     data: {
@@ -510,6 +517,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         source: 'encounter_site',
         encounterSiteId,
         encounterSiteCleared,
+        mobFamilyName,
         attackSkill,
         outcome: lastCombatResult?.outcome ?? 'defeat',
         playerMaxHp: lastCombatResult?.combatantAMaxHp ?? hpState.maxHp,
@@ -551,6 +559,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
             mobDisplayName: fight.mobDisplayName,
             source: 'encounter_site_fight',
             encounterSiteId,
+            summaryLogId: combatLog.id,
+            room: fight.room,
             attackSkill,
             outcome: fight.outcome,
             playerMaxHp: fight.playerMaxHp,
