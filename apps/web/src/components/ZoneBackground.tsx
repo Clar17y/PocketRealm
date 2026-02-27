@@ -18,20 +18,31 @@ export function ZoneBackground({ imageSrc }: ZoneBackgroundProps) {
     if (!imageSrc || imageSrc === prevSrc.current) return;
     prevSrc.current = imageSrc;
 
-    // Load new image into inactive layer, then swap
     const inactiveLayer = activeLayer === 0 ? 1 : 0;
-    setLayers((prev) => {
-      const next: [string | null, string | null] = [...prev];
-      next[inactiveLayer] = imageSrc;
-      return next;
-    });
 
-    // Small delay to let the browser paint the new image at opacity 0 before transitioning
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setActiveLayer(inactiveLayer as 0 | 1);
+    // Preload the image before triggering the crossfade
+    const img = new Image();
+    let cancelled = false;
+
+    img.onload = () => {
+      if (cancelled) return;
+      setLayers((prev) => {
+        const next: [string | null, string | null] = [...prev];
+        next[inactiveLayer] = imageSrc;
+        return next;
       });
-    });
+
+      // Let the browser paint the new image at opacity 0 before transitioning
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!cancelled) setActiveLayer(inactiveLayer as 0 | 1);
+        });
+      });
+    };
+
+    img.src = imageSrc;
+
+    return () => { cancelled = true; };
   }, [imageSrc, activeLayer]);
 
   return (
