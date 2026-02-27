@@ -12,6 +12,7 @@ import {
   parseMaterials,
   calculateSalvageMaterials,
   getRecipeDiscountedCost,
+  prismaAny,
   salvageSchema,
   salvageBatchSchema,
 } from './helpers';
@@ -176,7 +177,7 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
     assertZoneAllowsCrafting(zone);
 
     // Fetch all items with templates
-    const items = await (prisma as any).item.findMany({
+    const items = await prismaAny.item.findMany({
       where: {
         id: { in: body.itemIds },
         ownerId: playerId,
