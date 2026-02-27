@@ -64,15 +64,19 @@ export async function getZoneCraftingLevel(playerId: string): Promise<{ maxCraft
 export async function getRecipeDiscountedCost(playerId: string, templateId: string, baseCost: number): Promise<number> {
   const recipe = await prisma.craftingRecipe.findFirst({
     where: { resultTemplateId: templateId },
-    select: { id: true, skillType: true, requiredLevel: true },
+    select: { id: true, skillType: true, requiredLevel: true, isAdvanced: true },
   });
   if (!recipe || !isSkillType(recipe.skillType)) return baseCost;
 
-  const learned = await prisma.playerRecipe.findUnique({
-    where: { playerId_recipeId: { playerId, recipeId: recipe.id } },
-    select: { recipeId: true },
-  });
-  if (!learned) return baseCost;
+  // Standard recipes are known by all players with sufficient skill level.
+  // Only advanced (soulbound) recipes require a PlayerRecipe row.
+  if (recipe.isAdvanced) {
+    const learned = await prisma.playerRecipe.findUnique({
+      where: { playerId_recipeId: { playerId, recipeId: recipe.id } },
+      select: { recipeId: true },
+    });
+    if (!learned) return baseCost;
+  }
 
   const skillLevel = await getSkillLevel(playerId, recipe.skillType);
   return calculateCraftingTurnDiscount(baseCost, skillLevel, recipe.requiredLevel);
