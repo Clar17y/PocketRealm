@@ -9,6 +9,7 @@ import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { CombatHistory } from '@/components/screens/CombatHistory';
+import { FightNavigationBar } from '@/components/common/FightNavigationBar';
 import { BossHistory } from '@/components/screens/BossHistory';
 import { Pagination } from '@/components/common/Pagination';
 import { EventBadges } from '@/components/common/EventBadge';
@@ -362,27 +363,12 @@ export function CombatScreen({
           {!combatPlaybackData && lastCombat && (
             <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
               {lastCombat.fights && lastCombat.fights.length > 1 && (
-                <div className="flex items-center justify-between border-b border-[var(--rpg-border)] pb-2 mb-2">
-                  <button
-                    type="button"
-                    disabled={lastCombatFightIndex === 0}
-                    onClick={() => setLastCombatFightIndex(prev => prev - 1)}
-                    className="px-2 py-1 rounded text-sm border border-[var(--rpg-border)] text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    Prev
-                  </button>
-                  <span className="text-sm text-[var(--rpg-gold)] font-semibold">
-                    Fight {lastCombatFightIndex + 1}/{lastCombat.fights.length}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={lastCombatFightIndex === lastCombat.fights.length - 1}
-                    onClick={() => setLastCombatFightIndex(prev => prev + 1)}
-                    className="px-2 py-1 rounded text-sm border border-[var(--rpg-border)] text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
+                <FightNavigationBar
+                  currentIndex={lastCombatFightIndex}
+                  total={lastCombat.fights.length}
+                  onPrev={() => setLastCombatFightIndex(prev => prev - 1)}
+                  onNext={() => setLastCombatFightIndex(prev => prev + 1)}
+                />
               )}
 
               <div className="flex items-center justify-between">
