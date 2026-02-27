@@ -40,7 +40,7 @@ export function ForgeTutorial() {
           </p>
           <p className="text-[var(--rpg-green-light)]">
             <strong>Skill discount:</strong> If you&apos;ve learned the crafting recipe for an item,
-            forge and salvage costs are reduced by 20% for each crafting level above the recipe
+            forge upgrade and salvage costs are reduced by 20% for each crafting level above the recipe
             requirement. At 5+ levels above, it&apos;s free!
           </p>
         </div>
