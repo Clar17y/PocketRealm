@@ -70,6 +70,8 @@ export function Forge({
   const [selectedUpgradeSacrificeId, setSelectedUpgradeSacrificeId] = useState<string | null>(null);
   const [selectedRerollSacrificeId, setSelectedRerollSacrificeId] = useState<string | null>(null);
   const [busy, setBusy] = useState<'upgrade' | 'reroll' | null>(null);
+  const [upgradePickerOpen, setUpgradePickerOpen] = useState(false);
+  const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
   const noFacility = zoneCraftingLevel === 0;
 
   useEffect(() => {
@@ -132,6 +134,9 @@ export function Forge({
       setSelectedRerollSacrificeId(rerollSacrifices[0]?.id ?? null);
     }
   }, [rerollSacrifices, selectedRerollSacrificeId]);
+
+  const selectedUpgradeSacrifice = upgradeSacrifices.find((i) => i.id === selectedUpgradeSacrificeId) ?? null;
+  const selectedRerollSacrifice = rerollSacrifices.find((i) => i.id === selectedRerollSacrificeId) ?? null;
 
   const canUseForge = Boolean(selected && !selected.equippedSlot);
   const hasUpgradeSacrifice = upgradeSacrifices.length > 0;
@@ -275,27 +280,52 @@ export function Forge({
               </div>
 
               <div className="space-y-1">
-                <div className="text-xs text-[var(--rpg-text-secondary)]">Select sacrificial item:</div>
                 {upgradeSacrifices.length === 0 ? (
                   <div className="text-xs text-[var(--rpg-red)]">Missing sacrificial item.</div>
-                ) : (
-                  <div className="space-y-1 max-h-36 overflow-y-auto">
-                    {upgradeSacrifices.map((item) => (
+                ) : upgradePickerOpen ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-[var(--rpg-text-secondary)]">Select sacrificial item:</div>
                       <button
-                        key={`upgrade-sac-${item.id}`}
                         type="button"
-                        onClick={() => setSelectedUpgradeSacrificeId(item.id)}
-                        className={`w-full rounded border px-2 py-1.5 text-left ${
-                          selectedUpgradeSacrificeId === item.id
-                            ? 'border-[var(--rpg-gold)] bg-[var(--rpg-background)]'
-                            : 'border-[var(--rpg-border)] bg-[var(--rpg-surface)]'
-                        }`}
+                        onClick={() => setUpgradePickerOpen(false)}
+                        className="text-xs text-[var(--rpg-gold)] hover:underline"
                       >
-                        <div className="text-xs font-semibold text-[var(--rpg-text-primary)] truncate">{item.name}</div>
-                        <div className="text-[11px] text-[var(--rpg-green-light)]">{formatBonusSummary(item.bonusStats)}</div>
+                        Collapse
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                    <div className="space-y-1 max-h-36 overflow-y-auto">
+                      {upgradeSacrifices.map((item) => (
+                        <button
+                          key={`upgrade-sac-${item.id}`}
+                          type="button"
+                          onClick={() => {
+                            setSelectedUpgradeSacrificeId(item.id);
+                            setUpgradePickerOpen(false);
+                          }}
+                          className={`w-full rounded border px-2 py-1.5 text-left ${
+                            selectedUpgradeSacrificeId === item.id
+                              ? 'border-[var(--rpg-gold)] bg-[var(--rpg-background)]'
+                              : 'border-[var(--rpg-border)] bg-[var(--rpg-surface)]'
+                          }`}
+                        >
+                          <div className="text-xs font-semibold text-[var(--rpg-text-primary)] truncate">{item.name}</div>
+                          <div className="text-[11px] text-[var(--rpg-green-light)]">{formatBonusSummary(item.bonusStats)}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setUpgradePickerOpen(true)}
+                    className="w-full text-left text-xs text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                  >
+                    Sacrifice: <span className="text-[var(--rpg-text-primary)] font-semibold">
+                      {selectedUpgradeSacrifice?.name ?? 'None'}
+                    </span>
+                    {' '}<span className="text-[var(--rpg-gold)]">Change</span>
+                  </button>
                 )}
               </div>
 
@@ -343,27 +373,52 @@ export function Forge({
               </div>
 
               <div className="space-y-1">
-                <div className="text-xs text-[var(--rpg-text-secondary)]">Select sacrificial duplicate:</div>
                 {rerollSacrifices.length === 0 ? (
                   <div className="text-xs text-[var(--rpg-red)]">Missing sacrificial duplicate.</div>
-                ) : (
-                  <div className="space-y-1 max-h-36 overflow-y-auto">
-                    {rerollSacrifices.map((item) => (
+                ) : rerollPickerOpen ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-[var(--rpg-text-secondary)]">Select sacrificial duplicate:</div>
                       <button
-                        key={`reroll-sac-${item.id}`}
                         type="button"
-                        onClick={() => setSelectedRerollSacrificeId(item.id)}
-                        className={`w-full rounded border px-2 py-1.5 text-left ${
-                          selectedRerollSacrificeId === item.id
-                            ? 'border-[var(--rpg-gold)] bg-[var(--rpg-background)]'
-                            : 'border-[var(--rpg-border)] bg-[var(--rpg-surface)]'
-                        }`}
+                        onClick={() => setRerollPickerOpen(false)}
+                        className="text-xs text-[var(--rpg-gold)] hover:underline"
                       >
-                        <div className="text-xs font-semibold text-[var(--rpg-text-primary)] truncate">{item.name}</div>
-                        <div className="text-[11px] text-[var(--rpg-green-light)]">{formatBonusSummary(item.bonusStats)}</div>
+                        Collapse
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                    <div className="space-y-1 max-h-36 overflow-y-auto">
+                      {rerollSacrifices.map((item) => (
+                        <button
+                          key={`reroll-sac-${item.id}`}
+                          type="button"
+                          onClick={() => {
+                            setSelectedRerollSacrificeId(item.id);
+                            setRerollPickerOpen(false);
+                          }}
+                          className={`w-full rounded border px-2 py-1.5 text-left ${
+                            selectedRerollSacrificeId === item.id
+                              ? 'border-[var(--rpg-gold)] bg-[var(--rpg-background)]'
+                              : 'border-[var(--rpg-border)] bg-[var(--rpg-surface)]'
+                          }`}
+                        >
+                          <div className="text-xs font-semibold text-[var(--rpg-text-primary)] truncate">{item.name}</div>
+                          <div className="text-[11px] text-[var(--rpg-green-light)]">{formatBonusSummary(item.bonusStats)}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setRerollPickerOpen(true)}
+                    className="w-full text-left text-xs text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                  >
+                    Sacrifice: <span className="text-[var(--rpg-text-primary)] font-semibold">
+                      {selectedRerollSacrifice?.name ?? 'None'}
+                    </span>
+                    {' '}<span className="text-[var(--rpg-gold)]">Change</span>
+                  </button>
                 )}
               </div>
 
