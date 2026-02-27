@@ -270,7 +270,9 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
       const minted: Array<{ templateId: string; name: string; quantity: number }> = [];
       for (const [templateId, quantity] of materialTotals) {
         const template = templateById.get(templateId);
-        if (!template) continue;
+        if (!template) {
+          throw new AppError(400, 'Recipe references invalid material template', 'INVALID_RECIPE');
+        }
 
         if (template.stackable) {
           await addStackableItemTx(tx, playerId, templateId, quantity);
