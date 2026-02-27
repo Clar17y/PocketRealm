@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.18',
+    date: '2026-02-27',
+    title: 'Forge & Salvage Discounts',
+    summary:
+      'Forge upgrade and salvage costs now scale with your crafting skill. If you know the recipe, costs drop 20% per level above the requirement — and at 5+ levels above, it\'s free. The Forge screen shows your discounted costs, and the Salvage button displays the actual turn cost. A new tutorial popup explains the mechanic on your first forge visit.',
+  },
+  {
     version: '0.17',
     date: '2026-02-27',
     title: 'Atmospheric Backgrounds & WebP Migration',
