@@ -6,6 +6,7 @@ import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { Crosshair, Heart, Shield, Sword, X, Zap } from 'lucide-react';
+import { CRAFTING_CONSTANTS } from '@adventure/shared';
 import { titleCaseFromSnake } from '@/lib/format';
 import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass } from '@/lib/statFormat';
 
@@ -64,7 +65,7 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
   const [salvageSelection, setSalvageSelection] = useState<Set<string>>(new Set());
   const [salvageBusy, setSalvageBusy] = useState(false);
 
-  const SALVAGE_BATCH_LIMIT = 50;
+  const SALVAGE_BATCH_LIMIT = CRAFTING_CONSTANTS.SALVAGE_BATCH_LIMIT;
 
   const toggleSalvageItem = (id: string) => {
     setSalvageSelection((prev) => {
