@@ -2,15 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-const CONTEXT_SCREENS = new Set(['explore', 'combat', 'gathering', 'rest']);
-
 interface ZoneBackgroundProps {
   imageSrc?: string;
-  activeScreen?: string;
 }
 
-export function ZoneBackground({ imageSrc, activeScreen }: ZoneBackgroundProps) {
-  const visible = Boolean(imageSrc && activeScreen && CONTEXT_SCREENS.has(activeScreen));
+export function ZoneBackground({ imageSrc }: ZoneBackgroundProps) {
+  const visible = Boolean(imageSrc);
 
   // Track two layers for crossfade
   const [layers, setLayers] = useState<[string | null, string | null]>([null, null]);
