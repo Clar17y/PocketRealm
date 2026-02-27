@@ -64,10 +64,16 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
   const [salvageSelection, setSalvageSelection] = useState<Set<string>>(new Set());
   const [salvageBusy, setSalvageBusy] = useState(false);
 
+  const SALVAGE_BATCH_LIMIT = 50;
+
   const toggleSalvageItem = (id: string) => {
     setSalvageSelection((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (next.size < SALVAGE_BATCH_LIMIT) {
+        next.add(id);
+      }
       return next;
     });
   };
@@ -147,10 +153,11 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
             <button
               type="button"
               onClick={() => {
-                if (salvageSelection.size === salvageableBackpackItems.length) {
+                const allSelected = salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT);
+                if (allSelected) {
                   setSalvageSelection(new Set());
                 } else {
-                  setSalvageSelection(new Set(salvageableBackpackItems.map((i) => i.id)));
+                  setSalvageSelection(new Set(salvageableBackpackItems.slice(0, SALVAGE_BATCH_LIMIT).map((i) => i.id)));
                 }
               }}
               className="text-xs text-[var(--rpg-gold)] hover:underline"
@@ -227,7 +234,7 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
       {salvageMode && (
         <div className="flex items-center justify-between bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 mt-2">
           <div className="text-sm text-[var(--rpg-text-primary)]">
-            {selectedSalvageCount} item{selectedSalvageCount !== 1 ? 's' : ''} selected
+            {selectedSalvageCount}/{SALVAGE_BATCH_LIMIT} selected
             {selectedSalvageCount > 0 && (
               totalSalvageCost > 0
                 ? ` (${totalSalvageCost} turns)`
