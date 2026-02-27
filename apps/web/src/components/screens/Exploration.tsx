@@ -138,6 +138,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                 width={56}
                 height={56}
                 className="object-contain image-rendering-pixelated"
+                style={{ width: 56, height: 'auto' }}
               />
             ) : (
               <Mountain size={32} color="var(--rpg-purple)" />

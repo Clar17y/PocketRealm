@@ -45,9 +45,10 @@ export default function LoginPage() {
   return (
     <main className="relative min-h-screen flex items-center justify-center p-4">
       <Image
-        src="/assets/zones/zone_forest_edge.png"
+        src="/assets/zones/zone_forest_edge.webp"
         alt="Forest Edge"
         fill
+        sizes="100vw"
         className="object-cover"
         priority
       />
