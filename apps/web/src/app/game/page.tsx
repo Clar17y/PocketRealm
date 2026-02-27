@@ -29,6 +29,7 @@ import { Slider } from '@/components/ui/Slider';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { rarityFromTier } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
+import { buildRecipeDiscountLookup, getRecipeSkillInfo } from '@/lib/recipeDiscount';
 import { TURN_CONSTANTS, type SkillType } from '@adventure/shared';
 import { calculateEfficiency, xpForLevel } from '@adventure/game-engine';
 import { Sword, Shield, Crosshair, Sparkles, Pickaxe, Hammer, Leaf, FlaskConical, Axe, Scissors, Anvil, Gem } from 'lucide-react';
@@ -771,19 +772,14 @@ export default function GamePage() {
           </div>
         );
       case 'forge': {
-        const recipeByTemplateId = new Map(
-          craftingRecipes
-            .filter((r) => r.isDiscovered)
-            .map((r) => [r.resultTemplate.id, { skillType: r.skillType, requiredLevel: r.requiredLevel }])
-        );
-        const skillByType = new Map(skills.map((s) => [s.skillType, s.level]));
+        const lookup = buildRecipeDiscountLookup(craftingRecipes, skills);
 
         return (
           <Forge
             items={inventory
               .filter((item) => ['weapon', 'armor'].includes(item.template.itemType) && item.quantity === 1)
               .map((item) => {
-                const recipe = recipeByTemplateId.get(item.template.id);
+                const info = getRecipeSkillInfo(lookup, item.template.id);
                 return {
                   id: item.id,
                   templateId: item.template.id,
@@ -794,8 +790,8 @@ export default function GamePage() {
                   equippedSlot: item.equippedSlot,
                   baseStats: item.template.baseStats,
                   bonusStats: item.bonusStats ?? null,
-                  recipeSkillLevel: recipe ? (skillByType.get(recipe.skillType) ?? 1) : null,
-                  recipeRequiredLevel: recipe ? recipe.requiredLevel : null,
+                  recipeSkillLevel: info?.recipeSkillLevel ?? null,
+                  recipeRequiredLevel: info?.recipeRequiredLevel ?? null,
                 };
               })}
             equippedLuck={equipment.reduce((sum, slot) => {
