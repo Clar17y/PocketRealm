@@ -9,9 +9,9 @@ export const changelog: ChangelogEntry[] = [
   {
     version: '0.18',
     date: '2026-02-27',
-    title: 'Forge & Salvage Discounts',
+    title: 'Forge & Salvage Overhaul',
     summary:
-      'Forge upgrade and salvage costs now scale with your crafting skill. If you know the recipe, costs drop 20% per level above the requirement — and at 5+ levels above, it\'s free. The Forge screen shows your discounted costs, and the Salvage button displays the actual turn cost. A new tutorial popup explains the mechanic on your first forge visit.',
+      'Forge upgrade and salvage costs now scale with your crafting skill — costs drop 20% per level above the recipe requirement, and at 5+ levels above it\'s free. A new Salvage Mode lets you multi-select items and salvage them all in one batch. The Forge sacrifice picker is now collapsed by default for a smoother mobile experience. The Salvage button shows the actual turn cost, and a tutorial popup explains the forge on your first visit.',
   },
   {
     version: '0.17',
