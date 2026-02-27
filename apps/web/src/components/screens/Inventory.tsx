@@ -26,6 +26,7 @@ interface Item {
   bonusStats?: Record<string, unknown> | null;
   requiredSkill?: string | null;
   requiredLevel?: number | null;
+  salvageCost: number | null;
 }
 
 interface InventoryProps {
@@ -387,7 +388,13 @@ export function Inventory({ items, onDrop, onSalvage, onRepair, onEquip, onUnequ
                     }
                   }}
                 >
-                  {noFacility ? 'No Facility' : 'Salvage'}
+                  {noFacility
+                    ? 'No Facility'
+                    : selectedItem.salvageCost === 0
+                      ? 'Salvage (Free)'
+                      : selectedItem.salvageCost != null
+                        ? `Salvage (${selectedItem.salvageCost})`
+                        : 'Salvage'}
                 </PixelButton>
 
                 <PixelButton
