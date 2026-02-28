@@ -68,6 +68,8 @@ export const prisma = {
   guildProjectContribution: mockModel(),
   guildContract: mockModel(),
   guildLog: mockModel(),
+  combatTemplate: mockModel(),
+  skillPointAllocation: mockModel(),
   $transaction: vi.fn((fnOrArray: ((tx: any) => Promise<any>) | any[]) => {
     if (typeof fnOrArray === 'function') return fnOrArray(prisma);
     return Promise.all(fnOrArray);
