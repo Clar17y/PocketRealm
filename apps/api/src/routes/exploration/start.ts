@@ -32,7 +32,7 @@ import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildId } from '../../services/guildService';
 import { incrementContractProgress } from '../../services/guildContractService';
-import { rollAndGrantLoot } from '../../services/lootService';
+import { rollAndGrantLootWithCapacity } from '../../services/lootService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements } from '../../utils/routeHelpers.js';
@@ -343,7 +343,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           currentHp = combatResult.combatantAHpRemaining;
           await setHp(playerId, currentHp);
 
-          loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+          const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+          loot = lootResult.drops;
           xpGrant = await grantSkillXp(playerId, attackSkill, prefixedMob.xpReward);
           xpGain = xpGrant.xpResult.xpAfterEfficiency;
 

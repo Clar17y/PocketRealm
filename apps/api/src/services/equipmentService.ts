@@ -15,6 +15,7 @@ export interface EquipmentStats {
   luck: number;
   critChance: number;
   critDamage: number;
+  inventorySlots: number;
 }
 
 export function isSkillType(value: string): value is SkillType {
@@ -57,6 +58,7 @@ export async function getEquipmentStats(playerId: string): Promise<EquipmentStat
   let luck = 0;
   let critChance = 0;
   let critDamage = 0;
+  let inventorySlots = 0;
 
   for (const slot of equipped) {
     // Broken gear contributes zero stats
@@ -80,10 +82,11 @@ export async function getEquipmentStats(playerId: string): Promise<EquipmentStat
       if (typeof stats.luck === 'number') luck += stats.luck;
       if (typeof stats.critChance === 'number') critChance += stats.critChance;
       if (typeof stats.critDamage === 'number') critDamage += stats.critDamage;
+      if (typeof stats.inventorySlots === 'number') inventorySlots += stats.inventorySlots;
     }
   }
 
-  return { attack, rangedPower, magicPower, accuracy, armor, magicDefence, health, dodge, luck, critChance, critDamage };
+  return { attack, rangedPower, magicPower, accuracy, armor, magicDefence, health, dodge, luck, critChance, critDamage, inventorySlots };
 }
 
 export async function equipItem(

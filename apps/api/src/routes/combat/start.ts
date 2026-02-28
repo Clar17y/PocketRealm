@@ -23,7 +23,7 @@ import {
   type PotionConsumed,
 } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
-import { rollAndGrantLoot, enrichLootWithNames } from '../../services/lootService';
+import { rollAndGrantLoot, rollAndGrantLootWithCapacity, enrichLootWithNames } from '../../services/lootService';
 import type { LootDropWithName } from '../../services/lootService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { grantSkillXp } from '../../services/xpService';
@@ -192,6 +192,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
 
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
+  let sitePendingLootSessionId: string | null = null;
   const fightResults: FightResult[] = [];
   let lastCombatResult: ReturnType<typeof runCombat> | null = null;
   let lastPrefixedMob: (MobTemplate & { mobPrefix: string | null; mobDisplayName: string | null }) | null = null;
@@ -261,8 +262,11 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
       if (combatResult.outcome === 'victory') {
         await setHp(playerId, combatResult.combatantAHpRemaining);
-        const rawLoot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
-        mobLoot = await enrichLootWithNames(rawLoot);
+        const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+        mobLoot = await enrichLootWithNames(lootResult.drops);
+        if (lootResult.pendingLootSessionId && !sitePendingLootSessionId) {
+          sitePendingLootSessionId = lootResult.pendingLootSessionId;
+        }
         mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded, undefined, guildMods.xpBoost || undefined);
 
         // Bestiary
@@ -648,6 +652,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         ? serializeXpGrant(lastVictoryXpGrant)
         : null,
     },
+    pendingLootSessionId: sitePendingLootSessionId,
     explorationProgress: {
       turnsExplored: explorationProgress.turnsExplored,
       percent: explorationProgress.percent,
@@ -826,6 +831,7 @@ export function registerStartRoutes(router: Router): void {
       });
 
       let loot: LootDrop[] = [];
+      let pendingLootSessionId: string | null = null;
       let xpGrant = null as null | Awaited<ReturnType<typeof grantSkillXp>>;
       const durabilityLost = await degradeEquippedDurability(playerId);
       let fleeResult = null as null | ReturnType<typeof calculateFleeResult>;
@@ -836,7 +842,9 @@ export function registerStartRoutes(router: Router): void {
 
       if (combatResult.outcome === 'victory') {
         await setHp(playerId, combatResult.combatantAHpRemaining);
-        loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+        const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+        loot = lootResult.drops;
+        pendingLootSessionId = lootResult.pendingLootSessionId;
         xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded, undefined, guildMods.xpBoost || undefined);
 
         // Guild XP and contract progress
@@ -978,6 +986,7 @@ export function registerStartRoutes(router: Router): void {
             ? serializeXpGrant(xpGrant)
             : null,
         },
+        pendingLootSessionId,
         explorationProgress: {
           turnsExplored: explorationProgress.turnsExplored,
           percent: explorationProgress.percent,

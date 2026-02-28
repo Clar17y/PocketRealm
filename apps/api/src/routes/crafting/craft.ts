@@ -15,7 +15,7 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from '../../services/inventoryService';
+import { consumeItemsByTemplateTx, getTotalQuantityByTemplate, getUsedSlots, getPlayerCapacity } from '../../services/inventoryService';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
@@ -103,6 +103,30 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       const available = await getTotalQuantityByTemplate(playerId, mat.templateId);
       if (available < needed) {
         throw new AppError(400, 'Insufficient materials', 'INSUFFICIENT_ITEMS');
+      }
+    }
+
+    // Check backpack capacity before spending turns
+    if (recipe.resultTemplate.stackable) {
+      const existingStack = await prisma.item.findFirst({
+        where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
+      });
+      if (!existingStack) {
+        const [usedSlots, capacity] = await Promise.all([
+          getUsedSlots(playerId),
+          getPlayerCapacity(playerId),
+        ]);
+        if (usedSlots + 1 > capacity) {
+          throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
+        }
+      }
+    } else {
+      const [usedSlots, capacity] = await Promise.all([
+        getUsedSlots(playerId),
+        getPlayerCapacity(playerId),
+      ]);
+      if (usedSlots + quantity > capacity) {
+        throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
       }
     }
 

@@ -23,7 +23,7 @@ vi.mock('../../services/hpService', () => ({
   enterRecoveringState: vi.fn(),
 }));
 vi.mock('../../services/lootService', () => ({
-  rollAndGrantLoot: vi.fn().mockResolvedValue([]),
+  rollAndGrantLootWithCapacity: vi.fn().mockResolvedValue({ drops: [], pendingLootSessionId: null }),
 }));
 vi.mock('../../services/xpService', () => ({
   grantSkillXp: vi.fn().mockResolvedValue({
