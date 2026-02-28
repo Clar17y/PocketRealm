@@ -185,7 +185,7 @@ describe('restStamina', () => {
       preTaxAmount: 6, taxAmount: 1, postTaxAmount: 5, taxRatePercent: 10, guildId: 'g1',
     });
     // calculateEffectiveTurns mock: with 10% tax, 100 turns → 90 effective
-    const { calculateEffectiveTurns: mockEffective, calculateInflatedCost: mockInflated } = await import('./guildTaxService');
+    const { calculateEffectiveTurns: mockEffective, calculateInflatedCost: mockInflated } = await import('./guildTaxService.js');
     vi.mocked(mockEffective).mockReturnValueOnce(90);
     vi.mocked(mockInflated).mockReturnValueOnce(6);
 

@@ -58,7 +58,7 @@ export async function getActiveTemplate(playerId: string): Promise<CombatTemplat
     return [{ actionId: SKILL_POINT_CONSTANTS.DEFAULT_ACTION_ID }];
   }
 
-  return record.actions as CombatTemplateAction[];
+  return record.actions as unknown as CombatTemplateAction[];
 }
 
 export async function setActiveTemplate(playerId: string, templateId: string): Promise<void> {
