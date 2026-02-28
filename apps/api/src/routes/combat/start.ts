@@ -5,17 +5,21 @@ import {
   applyMobEventModifiers,
   applyMobPrefix,
   buildPlayerCombatStats,
-  runCombat,
+  runTemplateCombat,
+  mobToTemplateCombatant,
   calculateFleeResult,
   rollMobPrefix,
   mobToCombatantStats,
   filterAndWeightMobsByTier,
   selectTierWithBleedthrough,
 } from '@adventure/game-engine';
+import type { TemplateCombatant } from '@adventure/game-engine';
 import {
+  BASE_ACTION_DEFINITIONS,
   COMBAT_CONSTANTS,
   GUILD_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
+  type CombatTemplateAction,
   type Combatant,
   type CombatOptions,
   type LootDrop,
@@ -29,6 +33,8 @@ import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { setHp } from '../../services/hpService';
+import { getActiveTemplate } from '../../services/combatTemplateService';
+import { getResourceState, setAllResources } from '../../services/resourceService';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
@@ -71,6 +77,33 @@ import {
   applyEncounterSiteDecayInMemory,
   type FightResult,
 } from './helpers';
+
+function buildPlayerTemplateCombatant(
+  playerId: string,
+  username: string,
+  playerStats: ReturnType<typeof buildPlayerCombatStats>,
+  template: CombatTemplateAction[],
+  currentStamina: number,
+  maxStamina: number,
+  staminaRegenPerRound: number,
+  currentMana: number,
+  maxMana: number,
+  manaRegenPerRound: number,
+): TemplateCombatant {
+  return {
+    id: playerId,
+    name: username,
+    stats: playerStats,
+    template,
+    stamina: currentStamina,
+    maxStamina,
+    staminaRegenPerRound,
+    mana: currentMana,
+    maxMana,
+    manaRegenPerRound,
+    actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
+  };
+}
 
 /**
  * Handle encounter site room combat: fight ALL alive mobs in the current room sequentially.
@@ -183,6 +216,16 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const potionPool = autoPotionThreshold > 0 ? await buildPotionPool(playerId, hpState.maxHp) : [];
   const allPotionsConsumed: PotionConsumed[] = [];
 
+  // Fetch player's active template and resource state
+  const playerTemplate = await getActiveTemplate(playerId);
+  const resourceState = await getResourceState(playerId);
+  let currentStamina = resourceState.stamina.current;
+  let currentMana = resourceState.mana.current;
+  const maxStamina = resourceState.stamina.max;
+  const maxMana = resourceState.mana.max;
+  const staminaRegenPerRound = resourceState.stamina.regenPerRound;
+  const manaRegenPerRound = resourceState.mana.regenPerRound;
+
   // Zone modifiers — fetch events once, derive modifiers synchronously
   const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
     getActiveEventsForZone(zoneId),
@@ -193,7 +236,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
   const fightResults: FightResult[] = [];
-  let lastCombatResult: ReturnType<typeof runCombat> | null = null;
+  let lastCombatResult: ReturnType<typeof runTemplateCombat> | null = null;
   let lastPrefixedMob: (MobTemplate & { mobPrefix: string | null; mobDisplayName: string | null }) | null = null;
   let lastBaseMob: MobTemplate | null = null;
   let defeatedInRoom = currentRoom;
@@ -233,18 +276,21 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         combatOptions = { autoPotionThreshold, potions: [...potionPool] };
       }
 
-      const combatantA: Combatant = { id: playerId, name: req.player!.username, stats: playerStats };
-      const combatantB: Combatant = {
-        id: prefixedMob.id,
-        name: prefixedMob.mobDisplayName ?? prefixedMob.name,
-        stats: mobToCombatantStats(prefixedMob),
-        spells: prefixedMob.spellPattern,
-      };
+      const playerCombatant = buildPlayerTemplateCombatant(
+        playerId, req.player!.username, playerStats, playerTemplate,
+        currentStamina, maxStamina, staminaRegenPerRound,
+        currentMana, maxMana, manaRegenPerRound,
+      );
+      const mobCombatant = mobToTemplateCombatant(prefixedMob);
 
-      const combatResult = runCombat(combatantA, combatantB, combatOptions);
+      const combatResult = runTemplateCombat(playerCombatant, mobCombatant, combatOptions);
       lastCombatResult = combatResult;
       lastPrefixedMob = prefixedMob;
       lastBaseMob = baseMob;
+
+      // Carry stamina/mana between encounter site fights
+      currentStamina = combatResult.combatantAStaminaRemaining;
+      currentMana = combatResult.combatantAManaRemaining;
 
       // Remove consumed potions from shared pool
       for (const consumed of combatResult.potionsConsumed) {
@@ -260,7 +306,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       const mobDurabilityLost = await degradeEquippedDurability(playerId);
 
       if (combatResult.outcome === 'victory') {
-        await setHp(playerId, combatResult.combatantAHpRemaining);
+        await setAllResources(playerId, combatResult.combatantAHpRemaining, currentStamina, currentMana);
         const rawLoot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
         mobLoot = await enrichLootWithNames(rawLoot);
         mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded, undefined, guildMods.xpBoost || undefined);
@@ -810,14 +856,19 @@ export function registerStartRoutes(router: Router): void {
       }
 
       const finalMob = mobHpOverride ? { ...prefixedMob, ...mobHpOverride } : prefixedMob;
-      const combatantA: Combatant = { id: playerId, name: req.player!.username, stats: playerStats };
-      const combatantB: Combatant = {
-        id: finalMob.id,
-        name: finalMob.mobDisplayName ?? finalMob.name,
-        stats: mobToCombatantStats(finalMob),
-        spells: finalMob.spellPattern,
-      };
-      const combatResult = runCombat(combatantA, combatantB, combatOptions);
+
+      // Fetch player's active template and resource state
+      const playerTemplate = await getActiveTemplate(playerId);
+      const resourceState = await getResourceState(playerId);
+
+      const playerCombatant = buildPlayerTemplateCombatant(
+        playerId, req.player!.username, playerStats, playerTemplate,
+        resourceState.stamina.current, resourceState.stamina.max, resourceState.stamina.regenPerRound,
+        resourceState.mana.current, resourceState.mana.max, resourceState.mana.regenPerRound,
+      );
+      const mobCombatant = mobToTemplateCombatant(finalMob);
+
+      const combatResult = runTemplateCombat(playerCombatant, mobCombatant, combatOptions);
 
       const turnSpend = await prisma.$transaction(async (tx) => {
         const spent = await spendPlayerTurnsTx(tx, playerId, COMBAT_CONSTANTS.ENCOUNTER_TURN_COST);
@@ -835,7 +886,12 @@ export function registerStartRoutes(router: Router): void {
       const xpAwarded = Math.max(0, baseXp);
 
       if (combatResult.outcome === 'victory') {
-        await setHp(playerId, combatResult.combatantAHpRemaining);
+        await setAllResources(
+          playerId,
+          combatResult.combatantAHpRemaining,
+          combatResult.combatantAStaminaRemaining,
+          combatResult.combatantAManaRemaining,
+        );
         loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
         xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded, undefined, guildMods.xpBoost || undefined);
 
