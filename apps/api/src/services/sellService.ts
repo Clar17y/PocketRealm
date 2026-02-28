@@ -3,6 +3,20 @@ import { calculateSellPrice } from '@adventure/game-engine';
 import type { ItemRarity } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 
+function itemSellPrice(item: {
+  rarity: string;
+  currentDurability: number | null;
+  maxDurability: number | null;
+  template: { sellPrice: number | null };
+}): number {
+  return calculateSellPrice({
+    baseSellPrice: item.template.sellPrice,
+    rarity: item.rarity as ItemRarity,
+    currentDurability: item.currentDurability,
+    maxDurability: item.maxDurability,
+  });
+}
+
 export async function sellItem(
   playerId: string,
   itemId: string,
@@ -20,12 +34,7 @@ export async function sellItem(
     const sellQty = quantity ?? item.quantity;
     if (sellQty > item.quantity || sellQty <= 0) throw new AppError(400, 'Invalid quantity', 'INVALID_QUANTITY');
 
-    const unitPrice = calculateSellPrice({
-      baseSellPrice: item.template.sellPrice,
-      rarity: item.rarity as ItemRarity,
-      currentDurability: item.currentDurability,
-      maxDurability: item.maxDurability,
-    });
+    const unitPrice = itemSellPrice(item);
     const goldEarned = unitPrice * sellQty;
 
     if (sellQty >= item.quantity) {

@@ -1,6 +1,48 @@
-import { prisma } from '@adventure/database';
+import { prisma, Prisma } from '@adventure/database';
 import { AppError } from '../middleware/errorHandler';
 import { getUsedSlots, getPlayerCapacity } from './inventoryService';
+
+// Shared logic for moving stackable items between backpack (inStash=false) and stash (inStash=true)
+async function moveStackableItem(
+  tx: Prisma.TransactionClient,
+  item: { id: string; ownerId: string; templateId: string; rarity: string; quantity: number; template: { stackable: boolean } },
+  moveQty: number,
+  targetInStash: boolean
+): Promise<void> {
+  if (!item.template.stackable || moveQty >= item.quantity) {
+    await tx.item.update({ where: { id: item.id }, data: { inStash: targetInStash } });
+    return;
+  }
+
+  // Partial stack split: reduce source, merge into or create target
+  await tx.item.update({
+    where: { id: item.id },
+    data: { quantity: item.quantity - moveQty },
+  });
+
+  const existingTarget = await tx.item.findFirst({
+    where: { ownerId: item.ownerId, templateId: item.templateId, inStash: targetInStash },
+  });
+
+  if (existingTarget) {
+    await tx.item.update({
+      where: { id: existingTarget.id },
+      data: { quantity: existingTarget.quantity + moveQty },
+    });
+  } else {
+    await tx.item.create({
+      data: {
+        ownerId: item.ownerId,
+        templateId: item.templateId,
+        rarity: item.rarity,
+        quantity: moveQty,
+        maxDurability: null,
+        currentDurability: null,
+        inStash: targetInStash,
+      } as any,
+    });
+  }
+}
 
 export async function depositItem(
   playerId: string,
@@ -21,40 +63,7 @@ export async function depositItem(
       throw new AppError(400, 'Invalid quantity', 'INVALID_QUANTITY');
     }
 
-    if (!item.template.stackable || depositQty >= item.quantity) {
-      // Move entire item to stash
-      await tx.item.update({ where: { id: itemId }, data: { inStash: true } });
-    } else {
-      // Split: reduce original stack, create new stash stack (or merge into existing)
-      await tx.item.update({
-        where: { id: itemId },
-        data: { quantity: item.quantity - depositQty },
-      });
-
-      // Check for existing stash stack of same template
-      const existingStash = await tx.item.findFirst({
-        where: { ownerId: playerId, templateId: item.templateId, inStash: true },
-      });
-
-      if (existingStash) {
-        await tx.item.update({
-          where: { id: existingStash.id },
-          data: { quantity: existingStash.quantity + depositQty },
-        });
-      } else {
-        await tx.item.create({
-          data: {
-            ownerId: playerId,
-            templateId: item.templateId,
-            rarity: item.rarity,
-            quantity: depositQty,
-            maxDurability: null,
-            currentDurability: null,
-            inStash: true,
-          } as any,
-        });
-      }
-    }
+    await moveStackableItem(tx, item, depositQty, true);
   }) as unknown as void;
 }
 
@@ -63,6 +72,7 @@ export async function withdrawItem(
   itemId: string,
   quantity?: number
 ): Promise<void> {
+  // Capacity check before transaction (low-concurrency single-player context)
   const [usedSlots, capacity] = await Promise.all([
     getUsedSlots(playerId),
     getPlayerCapacity(playerId),
@@ -85,39 +95,7 @@ export async function withdrawItem(
       throw new AppError(400, 'Invalid quantity', 'INVALID_QUANTITY');
     }
 
-    if (!item.template.stackable || withdrawQty >= item.quantity) {
-      // Move entire item out of stash
-      await tx.item.update({ where: { id: itemId }, data: { inStash: false } });
-    } else {
-      // Split: reduce stash stack, add to backpack stack (or create new)
-      await tx.item.update({
-        where: { id: itemId },
-        data: { quantity: item.quantity - withdrawQty },
-      });
-
-      const existingBackpack = await tx.item.findFirst({
-        where: { ownerId: playerId, templateId: item.templateId, inStash: false },
-      });
-
-      if (existingBackpack) {
-        await tx.item.update({
-          where: { id: existingBackpack.id },
-          data: { quantity: existingBackpack.quantity + withdrawQty },
-        });
-      } else {
-        await tx.item.create({
-          data: {
-            ownerId: playerId,
-            templateId: item.templateId,
-            rarity: item.rarity,
-            quantity: withdrawQty,
-            maxDurability: null,
-            currentDurability: null,
-            inStash: false,
-          } as any,
-        });
-      }
-    }
+    await moveStackableItem(tx, item, withdrawQty, false);
   }) as unknown as void;
 }
 
