@@ -174,6 +174,18 @@ inventoryRouter.post('/use', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+// --- Town zone guard ---
+
+async function assertInTown(playerId: string): Promise<void> {
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { currentZone: { select: { zoneType: true } } },
+  });
+  if (player?.currentZone?.zoneType !== 'town') {
+    throw new AppError(400, 'Must be in a town', 'NOT_IN_TOWN');
+  }
+}
+
 // --- Sell endpoints ---
 
 const sellSchema = z.object({
@@ -184,15 +196,7 @@ const sellSchema = z.object({
 inventoryRouter.post('/sell', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = sellSchema.parse(req.body);
-
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { currentZone: { select: { zoneType: true } } },
-  });
-  if (player?.currentZone?.zoneType !== 'town') {
-    throw new AppError(400, 'Must be in a town to sell items', 'NOT_IN_TOWN');
-  }
-
+  await assertInTown(playerId);
   const result = await sellItem(playerId, body.itemId, body.quantity);
   res.json(result);
 }));
@@ -204,15 +208,7 @@ const sellBulkSchema = z.object({
 inventoryRouter.post('/sell/bulk', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = sellBulkSchema.parse(req.body);
-
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { currentZone: { select: { zoneType: true } } },
-  });
-  if (player?.currentZone?.zoneType !== 'town') {
-    throw new AppError(400, 'Must be in a town to sell items', 'NOT_IN_TOWN');
-  }
-
+  await assertInTown(playerId);
   const result = await sellBulk(playerId, body.itemIds);
   res.json(result);
 }));
@@ -233,15 +229,7 @@ const stashSchema = z.object({
 inventoryRouter.post('/stash/deposit', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = stashSchema.parse(req.body);
-
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { currentZone: { select: { zoneType: true } } },
-  });
-  if (player?.currentZone?.zoneType !== 'town') {
-    throw new AppError(400, 'Must be in a town to access stash', 'NOT_IN_TOWN');
-  }
-
+  await assertInTown(playerId);
   await depositItem(playerId, body.itemId, body.quantity);
   res.json({ success: true });
 }));
@@ -249,15 +237,7 @@ inventoryRouter.post('/stash/deposit', asyncHandler(async (req, res) => {
 inventoryRouter.post('/stash/withdraw', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = stashSchema.parse(req.body);
-
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { currentZone: { select: { zoneType: true } } },
-  });
-  if (player?.currentZone?.zoneType !== 'town') {
-    throw new AppError(400, 'Must be in a town to access stash', 'NOT_IN_TOWN');
-  }
-
+  await assertInTown(playerId);
   await withdrawItem(playerId, body.itemId, body.quantity);
   res.json({ success: true });
 }));

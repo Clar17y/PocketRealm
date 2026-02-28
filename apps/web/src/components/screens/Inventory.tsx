@@ -445,7 +445,7 @@ export function Inventory({
                 );
               })}
               {/* Empty slots */}
-              {Array.from({ length: Math.max(0, capacity - backpackItems.length) }).map((_, idx) => (
+              {Array.from({ length: Math.max(0, capacity - usedSlots) }).map((_, idx) => (
                 <div
                   key={`empty-${idx}`}
                   className="aspect-square bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg opacity-30"
