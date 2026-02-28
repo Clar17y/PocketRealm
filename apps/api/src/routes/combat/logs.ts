@@ -36,6 +36,9 @@ interface CombatHistoryListRow {
   source: string | null;
   xpGained: number;
   roundCount: number;
+  fightCount: number;
+  encounterSiteId: string | null;
+  mobFamilyName: string | null;
 }
 
 interface CombatHistoryFilterRow {
@@ -63,6 +66,7 @@ export function registerLogRoutes(router: Router): void {
       const whereParts: Prisma.Sql[] = [
         Prisma.sql`"player_id" = ${playerId}`,
         Prisma.sql`"activity_type" = 'combat'`,
+        Prisma.sql`COALESCE(("result"->>'source'), '') <> 'encounter_site_fight'`,
       ];
 
       if (query.outcome) {
@@ -115,7 +119,10 @@ export function registerLogRoutes(router: Router): void {
                   END
                 )
                 FROM jsonb_array_elements(COALESCE("result"->'log', '[]'::jsonb)) AS log_entry
-              ), 0) AS "roundCount"
+              ), 0) AS "roundCount",
+              COALESCE(("result"->>'fightCount')::int, 1) AS "fightCount",
+              ("result"->>'encounterSiteId') AS "encounterSiteId",
+              ("result"->>'mobFamilyName') AS "mobFamilyName"
             FROM "activity_logs"
             ${whereClause}
             ORDER BY COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) DESC, "created_at" DESC
@@ -149,7 +156,10 @@ export function registerLogRoutes(router: Router): void {
                   END
                 )
                 FROM jsonb_array_elements(COALESCE("result"->'log', '[]'::jsonb)) AS log_entry
-              ), 0) AS "roundCount"
+              ), 0) AS "roundCount",
+              COALESCE(("result"->>'fightCount')::int, 1) AS "fightCount",
+              ("result"->>'encounterSiteId') AS "encounterSiteId",
+              ("result"->>'mobFamilyName') AS "mobFamilyName"
             FROM "activity_logs"
             ${whereClause}
             ORDER BY "created_at" DESC
@@ -176,6 +186,7 @@ export function registerLogRoutes(router: Router): void {
               AND "activity_type" = 'combat'
               AND ("result"->>'zoneId') IS NOT NULL
               AND ("result"->>'zoneName') IS NOT NULL
+              AND COALESCE(("result"->>'source'), '') <> 'encounter_site_fight'
             ORDER BY "name" ASC
           `
         ),
@@ -189,6 +200,7 @@ export function registerLogRoutes(router: Router): void {
               AND "activity_type" = 'combat'
               AND ("result"->>'mobTemplateId') IS NOT NULL
               AND ("result"->>'mobName') IS NOT NULL
+              AND COALESCE(("result"->>'source'), '') <> 'encounter_site_fight'
             ORDER BY "name" ASC
           `
         ),
@@ -209,6 +221,9 @@ export function registerLogRoutes(router: Router): void {
           source: row.source,
           roundCount: row.roundCount,
           xpGained: row.xpGained,
+          fightCount: row.fightCount,
+          encounterSiteId: row.encounterSiteId ?? null,
+          mobFamilyName: row.mobFamilyName ?? null,
         })),
         pagination: buildPagination(query.page, query.pageSize, total),
         filters: {
@@ -216,6 +231,73 @@ export function registerLogRoutes(router: Router): void {
           mobs: mobRows.filter((row) => row.id && row.name).map((row) => ({ id: row.id!, name: row.name! })),
         },
       });
+  }));
+
+  /**
+   * GET /api/v1/combat/logs/:id/fights
+   * Returns per-fight log summaries for an encounter site summary log.
+   */
+  router.get('/logs/:id/fights', asyncHandler(async (req, res) => {
+    const playerId = req.player!.playerId;
+    const params = logParamsSchema.parse(req.params);
+
+    const summaryLog = await prisma.activityLog.findFirst({
+      where: { id: params.id, playerId, activityType: 'combat' },
+      select: { id: true, result: true },
+    });
+
+    if (!summaryLog) {
+      throw new AppError(404, 'Combat log not found', 'NOT_FOUND');
+    }
+
+    const result = summaryLog.result as Record<string, unknown>;
+    if (result.source !== 'encounter_site') {
+      throw new AppError(400, 'Not an encounter site summary log', 'INVALID_SOURCE');
+    }
+
+    const fights = await prisma.$queryRaw<Array<{
+      id: string;
+      createdAt: Date;
+      mobTemplateId: string | null;
+      mobName: string | null;
+      mobDisplayName: string | null;
+      mobPrefix: string | null;
+      outcome: string | null;
+      room: number | null;
+      xpGained: number;
+    }>>(Prisma.sql`
+      SELECT
+        "id",
+        "created_at" AS "createdAt",
+        ("result"->>'mobTemplateId') AS "mobTemplateId",
+        ("result"->>'mobName') AS "mobName",
+        COALESCE(("result"->>'mobDisplayName'), ("result"->>'mobName')) AS "mobDisplayName",
+        ("result"->>'mobPrefix') AS "mobPrefix",
+        ("result"->>'outcome') AS "outcome",
+        ("result"->>'room')::int AS "room",
+        COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) AS "xpGained"
+      FROM "activity_logs"
+      WHERE "player_id" = ${playerId}
+        AND "activity_type" = 'combat'
+        AND ("result"->>'source') = 'encounter_site_fight'
+        AND ("result"->>'summaryLogId') = ${params.id}
+      ORDER BY "created_at" ASC
+    `);
+
+    res.json({
+      summaryLogId: params.id,
+      fights: fights.map((f) => ({
+        logId: f.id,
+        createdAt: f.createdAt.toISOString(),
+        mobTemplateId: f.mobTemplateId,
+        mobName: f.mobName,
+        mobDisplayName: f.mobDisplayName ?? f.mobName,
+        mobPrefix: f.mobPrefix,
+        outcome: f.outcome,
+        room: f.room,
+        xpGained: f.xpGained,
+      })),
+    });
   }));
 
   /**

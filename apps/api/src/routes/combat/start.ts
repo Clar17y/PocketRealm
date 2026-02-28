@@ -83,6 +83,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   const site = await prismaAny.encounterSite.findFirst({
     where: { id: encounterSiteId, playerId },
+    include: { mobFamily: { select: { name: true } } },
   });
   if (!site) throw new AppError(404, 'Encounter site not found', 'NOT_FOUND');
   if (!site.clearStrategy) throw new AppError(400, 'Select a clearing strategy before fighting', 'STRATEGY_NOT_SET');
@@ -459,14 +460,26 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   }
 
   // --- Build aggregated rewards ---
-  const aggregatedLoot: LootDropWithName[] = [];
+  const rawLoot: LootDropWithName[] = [];
   const aggregatedDurabilityLost: Awaited<ReturnType<typeof degradeEquippedDurability>> = [];
   let aggregatedXp = 0;
   for (const fight of fightResults) {
     aggregatedXp += fight.xp;
-    aggregatedLoot.push(...fight.loot);
+    rawLoot.push(...fight.loot);
     aggregatedDurabilityLost.push(...fight.durabilityLost);
   }
+
+  // Combine loot by itemTemplateId so "Rat Pelt x1" + "Rat Pelt x2" becomes "Rat Pelt x3"
+  const lootMap = new Map<string, LootDropWithName>();
+  for (const drop of rawLoot) {
+    const existing = lootMap.get(drop.itemTemplateId);
+    if (existing) {
+      existing.quantity += drop.quantity;
+    } else {
+      lootMap.set(drop.itemTemplateId, { ...drop });
+    }
+  }
+  const aggregatedLoot = [...lootMap.values()];
   const lastVictoryXpGrant = [...fightResults].reverse().find(f => f.skillXp)?.skillXp ?? null;
 
   const siteCompletionWithNames = siteCompletionRewards
@@ -481,6 +494,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
   const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
+
+  // Mob family name from the initial encounter site query (includes mobFamily relation)
+  const mobFamilyName: string | null = site.mobFamily?.name ?? null;
 
   // --- Activity log ---
   const combatLog = await prisma.activityLog.create({
@@ -498,6 +514,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         source: 'encounter_site',
         encounterSiteId,
         encounterSiteCleared,
+        mobFamilyName,
         attackSkill,
         outcome: lastCombatResult?.outcome ?? 'defeat',
         playerMaxHp: lastCombatResult?.combatantAMaxHp ?? hpState.maxHp,
@@ -539,6 +556,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
             mobDisplayName: fight.mobDisplayName,
             source: 'encounter_site_fight',
             encounterSiteId,
+            summaryLogId: combatLog.id,
+            room: fight.room,
             attackSkill,
             outcome: fight.outcome,
             playerMaxHp: fight.playerMaxHp,

@@ -4,16 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getCombatLog,
   getCombatLogs,
+  getEncounterSiteFights,
   type CombatHistoryListItemResponse,
   type CombatHistoryResponse,
   type CombatOutcomeResponse,
   type CombatResultResponse,
+  type EncounterSiteFightSummary,
 } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp, resolvePlayerMaxHp } from '@/lib/combatShare';
 import { monsterImageSrc } from '@/lib/assets';
+import { relativeTime } from '@/lib/format';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
+import { FightNavigationBar } from '@/components/common/FightNavigationBar';
 import { Pagination } from '@/components/common/Pagination';
 
 type OutcomeFilter = 'all' | CombatOutcomeResponse;
@@ -49,18 +53,6 @@ function formatCombatSource(source: string | null | undefined): string {
   return 'Unknown Source';
 }
 
-function relativeTime(iso: string): string {
-  const deltaMs = Date.now() - new Date(iso).getTime();
-  const seconds = Math.max(0, Math.floor(deltaMs / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
 function fullTimestamp(iso: string): string {
   const date = new Date(iso);
   return date.toLocaleString();
@@ -85,7 +77,12 @@ export function CombatHistory() {
   const [selectedLoading, setSelectedLoading] = useState(false);
   const [selectedError, setSelectedError] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [siteFights, setSiteFights] = useState<EncounterSiteFightSummary[] | null>(null);
+  const [siteFightIndex, setSiteFightIndex] = useState(0);
+  const [siteFightsLoading, setSiteFightsLoading] = useState(false);
+  const [summaryRewards, setSummaryRewards] = useState<CombatResultResponse['rewards'] | null>(null);
   const latestDetailRequestRef = useRef(0);
+  const latestFightRequestRef = useRef(0);
   const selectedLogIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -124,6 +121,9 @@ export function CombatHistory() {
         setHistory(null);
         setSelectedEntry(null);
         setSelectedLogId(null);
+        setSiteFights(null);
+        setSiteFightIndex(0);
+        setSummaryRewards(null);
         return;
       }
 
@@ -144,6 +144,9 @@ export function CombatHistory() {
 
         setSelectedEntry(null);
         setSelectedDetail(null);
+        setSiteFights(null);
+        setSiteFightIndex(0);
+        setSummaryRewards(null);
         return null;
       });
     };
@@ -164,10 +167,13 @@ export function CombatHistory() {
     }
   }, [selectedLogId]);
 
-  const loadDetail = useCallback(async (logId: string) => {
+  const loadDetail = useCallback(async (logId: string, entry: CombatHistoryListItemResponse) => {
     const requestId = ++latestDetailRequestRef.current;
     setSelectedLoading(true);
     setSelectedError(null);
+    setSiteFights(null);
+    setSiteFightIndex(0);
+    setSummaryRewards(null);
 
     const { data, error } = await getCombatLog(logId);
     const isStale = latestDetailRequestRef.current !== requestId || selectedLogIdRef.current !== logId;
@@ -180,14 +186,76 @@ export function CombatHistory() {
       return;
     }
 
-    setSelectedDetail(data.combat);
-    setSelectedLoading(false);
+    // For encounter site entries with multiple fights, fetch fights list and show first fight
+    if (entry.source === 'encounter_site' && entry.fightCount > 1) {
+      setSummaryRewards(data.combat.rewards);
+      setSiteFightsLoading(true);
+      try {
+        const fightsData = await getEncounterSiteFights(logId);
+        const stillValid = latestDetailRequestRef.current === requestId && selectedLogIdRef.current === logId;
+        if (!stillValid) return;
+
+        setSiteFights(fightsData.fights);
+        setSiteFightIndex(0);
+        if (fightsData.fights.length > 0) {
+          const firstFightRes = await getCombatLog(fightsData.fights[0].logId);
+          const stillValid2 = latestDetailRequestRef.current === requestId && selectedLogIdRef.current === logId;
+          if (!stillValid2) return;
+          if (firstFightRes.data) {
+            setSelectedDetail(firstFightRes.data.combat);
+          }
+        } else {
+          setSelectedDetail(data.combat);
+        }
+      } catch {
+        if (latestDetailRequestRef.current === requestId && selectedLogIdRef.current === logId) {
+          setSiteFights(null);
+          setSelectedDetail(data.combat);
+        }
+      } finally {
+        if (latestDetailRequestRef.current === requestId && selectedLogIdRef.current === logId) {
+          setSiteFightsLoading(false);
+          setSelectedLoading(false);
+        }
+      }
+    } else {
+      setSelectedDetail(data.combat);
+      setSelectedLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!selectedLogId) return;
-    void loadDetail(selectedLogId);
+    if (!selectedLogId || !selectedEntry) return;
+    void loadDetail(selectedLogId, selectedEntry);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLogId, loadDetail]);
+
+  const handleSiteFightNavigate = useCallback(async (newIndex: number) => {
+    if (!siteFights || !siteFights[newIndex]) return;
+    const fightReqId = ++latestFightRequestRef.current;
+    const detailReqId = latestDetailRequestRef.current;
+    setSiteFightIndex(newIndex);
+    setSelectedLoading(true);
+    setSelectedError(null);
+    const isStale = () =>
+      latestFightRequestRef.current !== fightReqId || latestDetailRequestRef.current !== detailReqId;
+    try {
+      const { data, error } = await getCombatLog(siteFights[newIndex].logId);
+      if (isStale()) return;
+      if (!data) {
+        setSelectedError(error?.message ?? 'Failed to load fight log');
+      } else {
+        setSelectedDetail(data.combat);
+      }
+    } catch (err) {
+      if (isStale()) return;
+      setSelectedError((err as Error).message);
+    } finally {
+      if (!isStale()) {
+        setSelectedLoading(false);
+      }
+    }
+  }, [siteFights]);
 
   const playerMaxHp = useMemo(
     () => selectedDetail ? resolvePlayerMaxHp(selectedDetail.log, selectedDetail.playerMaxHp) : undefined,
@@ -327,8 +395,15 @@ export function CombatHistory() {
                     <span className="truncate">
                       <span className={outcomeColor(entry.outcome)}>{outcomeIcon(entry.outcome)}</span>
                       {' '}
-                      {entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob'}
+                      {entry.source === 'encounter_site' && entry.fightCount > 1
+                        ? (entry.mobFamilyName ?? entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')
+                        : (entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')}
                     </span>
+                    {entry.source === 'encounter_site' && entry.fightCount > 1 && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)]">
+                        {entry.fightCount} fights
+                      </span>
+                    )}
                   </div>
                   <div className={`text-xs font-semibold ${outcomeColor(entry.outcome)}`}>
                     {formatOutcome(entry.outcome)}
@@ -392,10 +467,20 @@ export function CombatHistory() {
           </div>
 
           {selectedError && <div className="text-sm text-[var(--rpg-red)]">{selectedError}</div>}
-          {selectedLoading && <div className="text-sm text-[var(--rpg-text-secondary)]">Loading combat log...</div>}
+          {(selectedLoading || siteFightsLoading) && <div className="text-sm text-[var(--rpg-text-secondary)]">Loading combat log...</div>}
 
-          {!selectedLoading && selectedDetail && (
+          {!selectedLoading && !siteFightsLoading && selectedDetail && (
             <>
+              {siteFights && siteFights.length > 1 && (
+                <FightNavigationBar
+                  currentIndex={siteFightIndex}
+                  total={siteFights.length}
+                  onPrev={() => void handleSiteFightNavigate(siteFightIndex - 1)}
+                  onNext={() => void handleSiteFightNavigate(siteFightIndex + 1)}
+                  subtitle={siteFights[siteFightIndex]?.mobDisplayName ?? undefined}
+                />
+              )}
+
               <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
                 {selectedDetail.log.map((entry, index) => (
                   <CombatLogEntry
@@ -408,7 +493,10 @@ export function CombatHistory() {
               </div>
 
               <div className="border-t border-[var(--rpg-border)] pt-2">
-                <CombatRewardsSummary rewards={selectedDetail.rewards} outcome={selectedDetail.outcome} />
+                <CombatRewardsSummary
+                  rewards={summaryRewards ?? selectedDetail.rewards}
+                  outcome={selectedDetail.outcome}
+                />
               </div>
             </>
           )}

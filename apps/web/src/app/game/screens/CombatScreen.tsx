@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { HpStatusBar } from '@/components/common/HpStatusBar';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
@@ -9,6 +9,7 @@ import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { CombatHistory } from '@/components/screens/CombatHistory';
+import { FightNavigationBar } from '@/components/common/FightNavigationBar';
 import { BossHistory } from '@/components/screens/BossHistory';
 import { Pagination } from '@/components/common/Pagination';
 import { EventBadges } from '@/components/common/EventBadge';
@@ -16,6 +17,7 @@ import type { CombatActiveEvent } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
+import { relativeTime } from '@/lib/format';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../useGameController';
 
@@ -114,6 +116,15 @@ export function CombatScreen({
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [strategyModalSite, setStrategyModalSite] = useState<PendingEncounter | null>(null);
   const [lowHpPendingSite, setLowHpPendingSite] = useState<PendingEncounter | null>(null);
+  const [lastCombatFightIndex, setLastCombatFightIndex] = useState(0);
+  const [lastCombatCollapsed, setLastCombatCollapsed] = useState(false);
+
+  useEffect(() => {
+    setLastCombatFightIndex(lastCombat?.fights ? lastCombat.fights.length - 1 : 0);
+    setLastCombatCollapsed(false);
+  }, [lastCombat]);
+
+  const displayedFight = lastCombat?.fights?.[lastCombatFightIndex] ?? lastCombat;
 
   const handleFightClick = (site: PendingEncounter) => {
     if (
@@ -143,36 +154,36 @@ export function CombatScreen({
   // Player max HP should be the player's real max HP.
   // Mob max HP comes from combat payload (supports wounded monster starts later).
   const playerMaxHp = hpState.maxHp;
-  const mobMaxHp = lastCombat ? resolveMobMaxHp(lastCombat.log, lastCombat.combatantBMaxHp) : undefined;
-  const isLastCombatMobDiscovered = lastCombat
-    ? bestiaryMobs.find((mob) => mob.id === lastCombat.mobTemplateId)?.isDiscovered ?? false
+  const mobMaxHp = displayedFight ? resolveMobMaxHp(displayedFight.log, displayedFight.combatantBMaxHp) : undefined;
+  const isLastCombatMobDiscovered = displayedFight
+    ? bestiaryMobs.find((mob) => mob.id === displayedFight.mobTemplateId)?.isDiscovered ?? false
     : false;
 
-  const outcomeLabel = lastCombat?.outcome === 'victory'
+  const outcomeLabel = displayedFight?.outcome === 'victory'
     ? 'Victory'
-    : lastCombat?.outcome === 'defeat'
+    : displayedFight?.outcome === 'defeat'
       ? 'Defeat'
-      : lastCombat?.outcome === 'fled'
+      : displayedFight?.outcome === 'fled'
         ? 'Fled'
-        : lastCombat?.outcome;
+        : displayedFight?.outcome;
 
-  const outcomeColor = lastCombat?.outcome === 'victory'
+  const outcomeColor = displayedFight?.outcome === 'victory'
     ? 'text-[var(--rpg-green-light)]'
-    : lastCombat?.outcome === 'defeat'
+    : displayedFight?.outcome === 'defeat'
       ? 'text-[var(--rpg-red)]'
       : 'text-[var(--rpg-gold)]';
 
   const buildShareText = useCallback((): string => {
-    if (!lastCombat) return '';
+    if (!lastCombat || !displayedFight) return '';
     return formatCombatShareText({
       outcome: outcomeLabel ?? 'Unknown',
       playerMaxHp,
-      mobMaxHp: lastCombat.combatantBMaxHp,
-      mobName: lastCombat.mobDisplayName,
-      log: lastCombat.log,
+      mobMaxHp: displayedFight.combatantBMaxHp,
+      mobName: displayedFight.mobDisplayName,
+      log: displayedFight.log,
       rewards: lastCombat.rewards,
     });
-  }, [lastCombat, mobMaxHp, outcomeLabel, playerMaxHp]);
+  }, [lastCombat, displayedFight, mobMaxHp, outcomeLabel, playerMaxHp]);
 
   const handleCopyShare = useCallback(async () => {
     const text = buildShareText();
@@ -300,6 +311,131 @@ export function CombatScreen({
         <BossHistory />
       ) : activeView === 'encounters' ? (
         <>
+          {/* Room transition interstitial */}
+          {roomTransition && (
+            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)]/30 rounded-lg p-6 text-center">
+              <div className="text-lg font-bold text-[var(--rpg-gold)] mb-1">
+                Entering Room {roomTransition.entering}
+              </div>
+              <div className="text-sm text-[var(--rpg-text-secondary)]">
+                Prepare for the next fight...
+              </div>
+            </div>
+          )}
+
+          {/* Combat Playback (animated) */}
+          {combatPlaybackData && !roomTransition && (
+            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3">
+              {fightProgress && fightProgress.total > 1 && (
+                <div className="text-sm text-[var(--rpg-gold)] font-semibold mb-2">
+                  {fightProgress.room
+                    ? `Room ${fightProgress.room} — Fight ${fightProgress.current}/${fightProgress.total}`
+                    : `Fight ${fightProgress.current}/${fightProgress.total}`
+                  }
+                </div>
+              )}
+              {combatPlaybackData.log ? (
+                <CombatPlayback
+                  key={fightProgress ? fightProgress.current : 0}
+                  mobDisplayName={combatPlaybackData.mobDisplayName}
+                  mobImageSrc={monsterImageSrc(combatPlaybackData.mobName)}
+                  outcome={combatPlaybackData.outcome}
+                  playerMaxHp={combatPlaybackData.combatantAMaxHp}
+                  playerStartHp={combatPlaybackData.playerStartHp}
+                  mobMaxHp={combatPlaybackData.combatantBMaxHp}
+                  log={combatPlaybackData.log}
+                  rewards={combatPlaybackData.rewards}
+                  activeEvents={combatPlaybackData.activeEvents}
+                  speedMs={combatSpeedMs}
+                  autoSkip={autoSkipCombat}
+                  onComplete={onCombatPlaybackComplete ?? (() => {})}
+                  onSkip={() => {
+                    onCombatPlaybackComplete?.();
+                  }}
+                />
+              ) : (
+                <div className="text-center py-8 text-[var(--rpg-text-secondary)]">
+                  <div className="animate-pulse">Loading combat data...</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Last Combat (detailed log — shown after playback completes) */}
+          {!combatPlaybackData && lastCombat && (
+            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
+              {lastCombat.fights && lastCombat.fights.length > 1 && (
+                <FightNavigationBar
+                  currentIndex={lastCombatFightIndex}
+                  total={lastCombat.fights.length}
+                  onPrev={() => setLastCombatFightIndex(prev => prev - 1)}
+                  onNext={() => setLastCombatFightIndex(prev => prev + 1)}
+                />
+              )}
+
+              <button
+                type="button"
+                onClick={() => setLastCombatCollapsed(prev => !prev)}
+                className="flex items-center justify-between w-full text-left"
+              >
+                <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold">
+                  <img
+                    src={monsterImageSrc(displayedFight?.mobName ?? lastCombat.mobName)}
+                    alt={displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
+                    className="w-8 h-8 rounded object-cover"
+                  />
+                  Last Combat: {displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`text-sm font-semibold ${outcomeColor}`}>{outcomeLabel}</div>
+                  <span className="text-[var(--rpg-text-secondary)] text-xs">
+                    {lastCombatCollapsed ? '▶' : '▼'}
+                  </span>
+                </div>
+              </button>
+
+              {!lastCombatCollapsed && (
+                <>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyShare()}
+                      className="px-2.5 py-1.5 rounded border border-[var(--rpg-border)] text-xs text-[var(--rpg-text-primary)]"
+                      title="Copy formatted log for sharing"
+                    >
+                      {copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'Copy Log'}
+                    </button>
+                  </div>
+
+                  <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
+                    {displayedFight && displayedFight.log.length > 0 ? (
+                      displayedFight.log.map((entry, idx) => (
+                        <CombatLogEntry
+                          key={idx}
+                          entry={entry}
+                          playerMaxHp={playerMaxHp}
+                          mobMaxHp={mobMaxHp}
+                          showDetailedBreakdown={isLastCombatMobDiscovered}
+                        />
+                      ))
+                    ) : (
+                      <div className="text-sm text-[var(--rpg-text-secondary)] py-2">
+                        Combat log not available for this fight.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-[var(--rpg-border)] pt-2">
+                    <CombatRewardsSummary
+                      rewards={lastCombat.rewards}
+                      outcome={lastCombat.outcome}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
             <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Encounter Sites</h2>
 
@@ -405,7 +541,7 @@ export function CombatScreen({
                           </div>
                         <div className="text-xs text-[var(--rpg-text-secondary)]">
                           Zone: {e.zoneName} | Decayed {e.decayedMobs} | Found{' '}
-                          {Math.max(0, Math.ceil((pendingClockMs - new Date(e.discoveredAt).getTime()) / 60000))}m ago
+                          {relativeTime(pendingClockMs - new Date(e.discoveredAt).getTime())}
                         </div>
                         </div>
                       </div>
@@ -442,102 +578,6 @@ export function CombatScreen({
               />
             )}
           </div>
-
-          {/* Room transition interstitial */}
-          {roomTransition && (
-            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)]/30 rounded-lg p-6 text-center">
-              <div className="text-lg font-bold text-[var(--rpg-gold)] mb-1">
-                Entering Room {roomTransition.entering}
-              </div>
-              <div className="text-sm text-[var(--rpg-text-secondary)]">
-                Prepare for the next fight...
-              </div>
-            </div>
-          )}
-
-          {/* Combat Playback (animated) */}
-          {combatPlaybackData && !roomTransition && (
-            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3">
-              {fightProgress && fightProgress.total > 1 && (
-                <div className="text-sm text-[var(--rpg-gold)] font-semibold mb-2">
-                  {fightProgress.room
-                    ? `Room ${fightProgress.room} — Fight ${fightProgress.current}/${fightProgress.total}`
-                    : `Fight ${fightProgress.current}/${fightProgress.total}`
-                  }
-                </div>
-              )}
-              {combatPlaybackData.log ? (
-                <CombatPlayback
-                  key={fightProgress ? fightProgress.current : 0}
-                  mobDisplayName={combatPlaybackData.mobDisplayName}
-                  mobImageSrc={monsterImageSrc(combatPlaybackData.mobName)}
-                  outcome={combatPlaybackData.outcome}
-                  playerMaxHp={combatPlaybackData.combatantAMaxHp}
-                  playerStartHp={combatPlaybackData.playerStartHp}
-                  mobMaxHp={combatPlaybackData.combatantBMaxHp}
-                  log={combatPlaybackData.log}
-                  rewards={combatPlaybackData.rewards}
-                  activeEvents={combatPlaybackData.activeEvents}
-                  speedMs={combatSpeedMs}
-                  autoSkip={autoSkipCombat}
-                  onComplete={onCombatPlaybackComplete ?? (() => {})}
-                  onSkip={() => {
-                    onCombatPlaybackComplete?.();
-                  }}
-                />
-              ) : (
-                <div className="text-center py-8 text-[var(--rpg-text-secondary)]">
-                  <div className="animate-pulse">Loading combat data...</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Last Combat (detailed log — shown after playback completes) */}
-          {!combatPlaybackData && lastCombat && (
-            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold">
-                  <img
-                    src={monsterImageSrc(lastCombat.mobName)}
-                    alt={lastCombat.mobDisplayName}
-                    className="w-8 h-8 rounded object-cover"
-                  />
-                  Last Combat: {lastCombat.mobDisplayName}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleCopyShare()}
-                    className="px-2.5 py-1.5 rounded border border-[var(--rpg-border)] text-xs text-[var(--rpg-text-primary)]"
-                    title="Copy formatted log for sharing"
-                  >
-                    {copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'Copy Log'}
-                  </button>
-                  <div className={`text-sm font-semibold ${outcomeColor}`}>{outcomeLabel}</div>
-                </div>
-              </div>
-
-              <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
-                {lastCombat.log.map((entry, idx) => (
-                  <CombatLogEntry
-                    key={idx}
-                    entry={entry}
-                    playerMaxHp={playerMaxHp}
-                    mobMaxHp={mobMaxHp}
-                    showDetailedBreakdown={isLastCombatMobDiscovered}
-                  />
-                ))}
-              </div>
-
-              <div className="border-t border-[var(--rpg-border)] pt-2">
-                <CombatRewardsSummary
-                  rewards={lastCombat.rewards}
-                  outcome={lastCombat.outcome}
-                />
-              </div>
-            </div>
-          )}
         </>
       ) : (
         <CombatHistory />

@@ -116,6 +116,52 @@ export interface PendingEncounter {
 import type { CombatLogEntryResponse as LastCombatLogEntry } from '@/lib/api/combat';
 export type { LastCombatLogEntry };
 
+type CombatPlaybackItem = {
+  mobName: string;
+  mobDisplayName: string;
+  mobTemplateId: string;
+  mobPrefix: string | null;
+  outcome: string;
+  combatantAMaxHp: number;
+  combatantBMaxHp: number;
+  log: LastCombatLogEntry[] | null;
+  combatLogId?: string;
+};
+
+function buildFightsList(queue: CombatPlaybackItem[]): LastCombat['fights'] {
+  if (queue.length <= 1) return null;
+  return queue.map(f => ({
+    mobName: f.mobName,
+    mobDisplayName: f.mobDisplayName,
+    mobTemplateId: f.mobTemplateId,
+    mobPrefix: f.mobPrefix,
+    outcome: f.outcome,
+    combatantAMaxHp: f.combatantAMaxHp,
+    combatantBMaxHp: f.combatantBMaxHp,
+    log: f.log ?? [],
+    combatLogId: f.combatLogId,
+  }));
+}
+
+function buildLastCombat(
+  queue: CombatPlaybackItem[],
+  rewards: LastCombat['rewards'],
+): LastCombat {
+  const lastFight = queue[queue.length - 1]!;
+  return {
+    mobTemplateId: lastFight.mobTemplateId,
+    mobPrefix: lastFight.mobPrefix,
+    mobName: lastFight.mobName,
+    mobDisplayName: lastFight.mobDisplayName,
+    outcome: lastFight.outcome,
+    combatantAMaxHp: lastFight.combatantAMaxHp,
+    combatantBMaxHp: lastFight.combatantBMaxHp,
+    log: lastFight.log ?? [],
+    fights: buildFightsList(queue),
+    rewards,
+  };
+}
+
 export interface LastCombat {
   mobTemplateId: string;
   mobPrefix: string | null;
@@ -125,6 +171,17 @@ export interface LastCombat {
   combatantAMaxHp: number;
   combatantBMaxHp: number;
   log: LastCombatLogEntry[];
+  fights?: Array<{
+    mobName: string;
+    mobDisplayName: string;
+    mobTemplateId: string;
+    mobPrefix: string | null;
+    outcome: string;
+    combatantAMaxHp: number;
+    combatantBMaxHp: number;
+    log: LastCombatLogEntry[];
+    combatLogId?: string;
+  }> | null;
   rewards: {
     xp: number;
     loot: Array<{
@@ -1191,7 +1248,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
 
-      await Promise.all([loadAll(), loadTurnsAndHp(), refreshPendingEncounters(), loadBestiary()]);
+      await Promise.all([loadAll(), loadTurnsAndHp(), loadBestiary()]);
     });
   };
 
@@ -1234,17 +1291,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const lastFight = combatPlaybackQueue?.[combatPlaybackQueue.length - 1];
     if (lastFight) {
       const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
-      setLastCombat({
-        mobTemplateId: lastFight.mobTemplateId,
-        mobPrefix: lastFight.mobPrefix,
-        mobName: lastFight.mobName,
-        mobDisplayName: lastFight.mobDisplayName,
-        outcome: lastFight.outcome,
-        combatantAMaxHp: lastFight.combatantAMaxHp,
-        combatantBMaxHp: lastFight.combatantBMaxHp,
-        log: lastFight.log ?? [],
-        rewards: aggregatedRewards,
-      });
+      setLastCombat(buildLastCombat(combatPlaybackQueue!, aggregatedRewards));
     }
     setCombatPlaybackQueue(null);
     setCombatPlaybackIndex(0);
@@ -1252,6 +1299,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     pendingCombatRewardsRef.current = null;
     combatLogPrefetch.clear();
     setPlaybackActive(false);
+    void refreshPendingEncounters();
 
     if (siteJustClearedRef.current) {
       siteJustClearedRef.current = false;
@@ -1270,27 +1318,22 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         const lastFight = combatPlaybackQueue[combatPlaybackQueue.length - 1];
         if (lastFight) {
           const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
-          setLastCombat({
-            mobTemplateId: '',
-            mobPrefix: null,
-            mobName: lastFight.mobName,
-            mobDisplayName: lastFight.mobDisplayName,
-            outcome: lastFight.outcome,
-            combatantAMaxHp: lastFight.combatantAMaxHp,
-            combatantBMaxHp: lastFight.combatantBMaxHp,
-            log: lastFight.log ?? [],
-            rewards: aggregatedRewards,
-          });
+          setLastCombat(buildLastCombat(combatPlaybackQueue, aggregatedRewards));
         }
         setCombatPlaybackQueue(null);
         setCombatPlaybackIndex(0);
         setRoomTransition(null);
         pendingCombatRewardsRef.current = null;
         combatLogPrefetch.clear();
+        void refreshPendingEncounters();
       }
       if (travelPlaybackData) {
         handleTravelPlaybackSkip();
       }
+    }
+    // Clear last combat log when leaving the combat screen — it's in history if needed
+    if (activeScreen === 'combat' && screen !== 'combat') {
+      setLastCombat(null);
     }
     setActiveScreen(screen as Screen);
   };
