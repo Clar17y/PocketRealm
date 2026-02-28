@@ -468,12 +468,22 @@ export async function resolveBossRound(
     // M3: batch flee rolls in parallel (reuse participantData from above)
     await Promise.all(
       participantData.map(async (pd) => {
+        const pGold = await prisma.player.findUnique({
+          where: { id: pd.signup.playerId },
+          select: { gold: true },
+        });
         const fleeResult = calculateFleeResult({
           evasionLevel: pd.progression.attributes.evasion,
           mobLevel: encounter.mobTemplate.level ?? 1,
           maxHp: pd.hpState.maxHp,
-          currentGold: 0,
+          currentGold: pGold?.gold ?? 0,
         });
+        if (fleeResult.goldLost > 0) {
+          await prisma.player.update({
+            where: { id: pd.signup.playerId },
+            data: { gold: { decrement: fleeResult.goldLost } },
+          });
+        }
         if (fleeResult.outcome === 'knockout') {
           await enterRecoveringState(pd.signup.playerId, pd.hpState.maxHp);
           await trackAchievements(pd.signup.playerId, { totalDeaths: 1 });

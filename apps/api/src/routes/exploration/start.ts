@@ -401,12 +401,23 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             },
           });
         } else {
+          const playerGold = await prisma.player.findUnique({
+            where: { id: playerId },
+            select: { gold: true },
+          });
           const fleeResult = calculateFleeResult({
             evasionLevel: progression.attributes.evasion,
             mobLevel: prefixedMob.level,
             maxHp: hpState.maxHp,
-            currentGold: 0, // TODO: wire gold when economy is implemented
+            currentGold: playerGold?.gold ?? 0,
           });
+
+          if (fleeResult.goldLost > 0) {
+            await prisma.player.update({
+              where: { id: playerId },
+              data: { gold: { decrement: fleeResult.goldLost } },
+            });
+          }
 
           if (fleeResult.outcome === 'knockout') {
             currentHp = 0;

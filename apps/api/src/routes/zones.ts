@@ -173,6 +173,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       currentZoneId: true,
       lastTravelledFromZoneId: true,
       homeTownId: true,
+      gold: true,
     },
   });
 
@@ -461,8 +462,16 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
             evasionLevel: progression.attributes.evasion,
             mobLevel: prefixedMob.level,
             maxHp: hpState.maxHp,
-            currentGold: 0,
+            currentGold: player.gold,
           });
+
+          // Deduct gold loss
+          if (fleeResult.goldLost > 0) {
+            await prisma.player.update({
+              where: { id: playerId },
+              data: { gold: { decrement: fleeResult.goldLost } },
+            });
+          }
 
           if (fleeResult.outcome === 'knockout') {
             currentHp = 0;

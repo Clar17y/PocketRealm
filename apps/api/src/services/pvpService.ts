@@ -449,12 +449,22 @@ export async function challenge(
   let fleeOutcome: string | null = null;
   if (combatResult.combatantAHpRemaining <= 0) {
     // Defeated: roll flee check (evasion vs defender level)
+    const attackerGold = await prisma.player.findUnique({
+      where: { id: attackerId },
+      select: { gold: true },
+    });
     const fleeResult = calculateFleeResult({
       evasionLevel: attackerAttributes.evasion,
       mobLevel: target.characterLevel,
       maxHp: attackerMaxHp,
-      currentGold: 0,
+      currentGold: attackerGold?.gold ?? 0,
     });
+    if (fleeResult.goldLost > 0) {
+      await prisma.player.update({
+        where: { id: attackerId },
+        data: { gold: { decrement: fleeResult.goldLost } },
+      });
+    }
     fleeOutcome = fleeResult.outcome;
     if (fleeResult.outcome === 'knockout') {
       await enterRecoveringState(attackerId, attackerMaxHp);
