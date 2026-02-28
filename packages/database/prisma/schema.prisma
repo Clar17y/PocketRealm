@@ -26,6 +26,7 @@ model Player {
   characterLevel  Int    @default(1) @map("character_level")
   attributePoints Int    @default(0) @map("attribute_points")
   attributes      Json   @default("{\"vitality\":0,\"strength\":0,\"dexterity\":0,\"intelligence\":0,\"luck\":0,\"evasion\":0}")
+  gold            Int    @default(0)
 
   // HP System
   currentHp     Int      @default(100) @map("current_hp")
@@ -165,6 +166,7 @@ model ItemTemplate {
   maxDurability  Int     @default(100) @map("max_durability")
   stackable        Boolean @default(false)
   consumableEffect Json?   @map("consumable_effect")
+  sellPrice       Int?    @map("sell_price")
 
   items           Item[]
   dropTables      DropTable[]
@@ -184,6 +186,7 @@ model Item {
   quantity          Int      @default(1)
   bonusStats        Json?    @map("bonus_stats")
   createdAt         DateTime @default(now()) @map("created_at")
+  inStash           Boolean  @default(false) @map("in_stash")
 
   template  ItemTemplate      @relation(fields: [templateId], references: [id])
   owner     Player            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
