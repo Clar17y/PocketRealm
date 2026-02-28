@@ -394,6 +394,91 @@ export const FLEE_CONSTANTS = {
   GOLD_LOSS_SEVERE: 0.3,
 } as const;
 
+// =============================================================================
+// STAMINA
+// =============================================================================
+
+export const STAMINA_CONSTANTS = {
+  /** Base stamina pool for all players */
+  BASE_POOL: 100,
+  /** Additional stamina per average of (melee, ranged, evasion) levels */
+  POOL_PER_SKILL_LEVEL: 3,
+  /** Base stamina regen per combat round */
+  BASE_REGEN_PER_ROUND: 10,
+  /** Additional regen per average combat skill level */
+  REGEN_PER_SKILL_LEVEL: 0.2,
+  /** Out-of-combat regen rate (per second, like HP) */
+  PASSIVE_REGEN_PER_SECOND: 1.0,
+  /** Heal per turn when resting */
+  REST_HEAL_PER_TURN: 5,
+} as const;
+
+// =============================================================================
+// MANA
+// =============================================================================
+
+export const MANA_CONSTANTS = {
+  /** Base mana pool for all players */
+  BASE_POOL: 50,
+  /** Additional mana per magic skill level */
+  POOL_PER_MAGIC_LEVEL: 3,
+  /** Base mana regen per combat round */
+  BASE_REGEN_PER_ROUND: 5,
+  /** Additional regen per magic skill level */
+  REGEN_PER_MAGIC_LEVEL: 0.15,
+  /** Out-of-combat regen rate (per second) */
+  PASSIVE_REGEN_PER_SECOND: 0.5,
+  /** Heal per turn when resting */
+  REST_HEAL_PER_TURN: 3,
+} as const;
+
+// =============================================================================
+// COMBAT ACTIONS
+// =============================================================================
+
+export const COMBAT_ACTION_CONSTANTS = {
+  /** Defend: free fallback */
+  DEFEND_DAMAGE_REDUCTION: 0.35,
+  /** Counter/Ward costs */
+  COUNTER_STAMINA_COST: 35,
+  WARD_MANA_COST: 30,
+  /** Light attack: stamina-neutral (cost = base regen) */
+  LIGHT_ATTACK_STAMINA: 10,
+  NORMAL_ATTACK_STAMINA: 20,
+  HEAVY_ATTACK_STAMINA: 40,
+  /** Spell base stamina cost (all actions cost stamina) */
+  SPELL_BASE_STAMINA: 15,
+  /** Use potion stamina cost */
+  USE_POTION_STAMINA: 5,
+  /** Buff stamina cost */
+  BUFF_BASE_STAMINA: 10,
+  /** Taunt stamina cost */
+  TAUNT_STAMINA: 20,
+  /** Heal stamina cost */
+  HEAL_BASE_STAMINA: 10,
+  /** Bonus damage multiplier when hitting a channeling target */
+  CHANNELING_BONUS_DAMAGE: 1.5,
+  /** Max active buffs simultaneously */
+  MAX_ACTIVE_BUFFS: 3,
+  /** Potion sickness duration (rounds) — shared across HP/Stam/Mana potions */
+  POTION_SICKNESS_ROUNDS: 4,
+} as const;
+
+// =============================================================================
+// SKILL POINTS
+// =============================================================================
+
+export const SKILL_POINT_CONSTANTS = {
+  /** Skill points earned per skill level-up (all 14 skills) */
+  POINTS_PER_LEVEL: 1,
+  /** Turn cost to respec all skill points */
+  RESPEC_TURN_COST: 50_000,
+  /** Max saved combat templates */
+  MAX_TEMPLATES: 10,
+  /** Default template action (light attack ID) */
+  DEFAULT_ACTION_ID: 'light_attack',
+} as const;
+
 export const POTION_CONSTANTS = {
   /** HP restored by Minor Health Potion */
   MINOR_HEALTH_HEAL: 50,
