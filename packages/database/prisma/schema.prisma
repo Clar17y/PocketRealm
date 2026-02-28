@@ -33,6 +33,12 @@ model Player {
   isRecovering  Boolean  @default(false) @map("is_recovering")
   recoveryCost  Int?     @map("recovery_cost")
 
+  // Stamina & Mana
+  currentStamina      Int      @default(100) @map("current_stamina")
+  lastStaminaRegenAt  DateTime @default(now()) @map("last_stamina_regen_at")
+  currentMana         Int      @default(50) @map("current_mana")
+  lastManaRegenAt     DateTime @default(now()) @map("last_mana_regen_at")
+
   // Auto-Potion
   autoPotionThreshold Int @default(0) @map("auto_potion_threshold")
 
@@ -82,6 +88,8 @@ model Player {
   achievements       PlayerAchievement[]
   guildMember        GuildMember?
   guildJoinRequests  GuildJoinRequest[]
+  combatTemplates      CombatTemplate[]
+  skillPointAllocation SkillPointAllocation?
 
   @@map("players")
 }
@@ -869,4 +877,39 @@ model GuildJoinRequest {
   @@unique([guildId, playerId])
   @@index([guildId, status])
   @@map("guild_join_requests")
+}
+
+// =============================================================================
+// COMBAT TEMPLATES
+// =============================================================================
+
+model CombatTemplate {
+  id        String   @id @default(uuid())
+  playerId  String   @map("player_id")
+  name      String   @db.VarChar(64)
+  isActive  Boolean  @default(false) @map("is_active")
+  actions   Json     // CombatTemplateAction[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, isActive])
+  @@map("combat_templates")
+}
+
+// =============================================================================
+// SKILL POINTS
+// =============================================================================
+
+model SkillPointAllocation {
+  id          String   @id @default(uuid())
+  playerId    String   @unique @map("player_id")
+  allocations Json     @default("{}") // Record<nodeId, pointCost>
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@map("skill_point_allocations")
 }
