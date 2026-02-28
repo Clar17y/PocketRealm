@@ -5,6 +5,7 @@ export * from './combat/mobPrefixes';
 export * from './combat/persistedMobRegen';
 export * from './combat/bossRoundResolver';
 export * from './combat/actionResolver';
+export * from './combat/templateCombatEngine';
 
 // Turns
 export * from './turns/turnCalculator';
