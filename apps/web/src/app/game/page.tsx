@@ -23,6 +23,8 @@ import { WorldEvents } from '@/components/screens/WorldEvents';
 import { Achievements } from '@/components/screens/Achievements';
 import { AchievementToast } from '@/components/AchievementToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
+import { Casino } from '@/components/screens/Casino';
+import { TrainingGrounds } from '@/components/screens/TrainingGrounds';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
@@ -309,6 +311,12 @@ export default function GamePage() {
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
     combatLogPrefetch,
+    gold,
+    setGold,
+    trainingCooldown,
+    setTrainingCooldown,
+    handleExchangeGold,
+    handlePlaceBet,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -405,7 +413,7 @@ export default function GamePage() {
               turns,
               maxTurns: TURN_CONSTANTS.BANK_CAP,
               turnsRegenRate: TURN_CONSTANTS.REGEN_RATE * 60,
-              gold: 0,
+              gold,
               currentXP: characterProgression.characterXp,
               nextLevelXP: nextLevelTotalXp,
               currentLevelXp,
@@ -1133,6 +1141,35 @@ export default function GamePage() {
             onTurnsChanged={() => void loadTurnsAndHp()}
           />
         );
+      case 'casino':
+        return (
+          <Casino
+            gold={gold}
+            turns={turns}
+            onExchangeGold={handleExchangeGold}
+            onPlaceBet={handlePlaceBet}
+            onGoldUpdate={setGold}
+            onTurnsUpdate={setTurns}
+            isInTown={currentZone?.zoneType === 'town'}
+          />
+        );
+      case 'training':
+        return (
+          <TrainingGrounds
+            bestiary={bestiaryMobs
+              .filter((m) => m.isDiscovered)
+              .map((m) => ({
+                id: m.id,
+                name: m.name,
+                level: m.level,
+                prefixesEncountered: m.prefixesEncountered,
+              }))}
+            cooldownSeconds={trainingCooldown}
+            onCooldownUpdate={setTrainingCooldown}
+            isInTown={currentZone?.zoneType === 'town'}
+            combatLogSpeedMs={combatLogSpeedMs}
+          />
+        );
       case 'admin':
         return <AdminScreen onAction={loadAll} />;
       default:
@@ -1184,6 +1221,10 @@ export default function GamePage() {
               { id: 'leaderboard', label: 'Rankings', badge: 0 },
               { id: 'bestiary', label: 'Bestiary', badge: 0 },
               { id: 'skills', label: 'Skills', badge: 0 },
+              ...(currentZone?.zoneType === 'town' ? [
+                { id: 'casino', label: 'Casino', badge: 0 },
+                { id: 'training', label: 'Training', badge: 0 },
+              ] : []),
             ].map((tab) => (
               <button
                 key={tab.id}

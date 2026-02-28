@@ -20,6 +20,7 @@ export async function getPlayer() {
       quickRestHealPercent: number;
       defaultRefiningMax: boolean;
       lowHpWarning: boolean;
+      gold: number;
       attributes: {
         vitality: number;
         strength: number;
