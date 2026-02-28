@@ -3,33 +3,40 @@ import type { EventModifierBadge } from './combat';
 
 // Inventory
 
+export interface InventoryItemTemplate {
+  id: string;
+  name: string;
+  itemType: string;
+  weightClass: 'heavy' | 'medium' | 'light' | null;
+  slot: string | null;
+  tier: number;
+  baseStats: Record<string, unknown>;
+  requiredSkill: string | null;
+  requiredLevel: number;
+  maxDurability: number;
+  stackable: boolean;
+  sellPrice: number | null;
+}
+
+export interface InventoryItem {
+  id: string;
+  templateId: string;
+  ownerId: string;
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+  currentDurability: number | null;
+  maxDurability: number | null;
+  quantity: number;
+  bonusStats: Record<string, number> | null;
+  createdAt: string;
+  template: InventoryItemTemplate;
+  equippedSlot: string | null;
+}
+
 export async function getInventory() {
   return fetchApi<{
-    items: Array<{
-      id: string;
-      templateId: string;
-      ownerId: string;
-      rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-      currentDurability: number | null;
-      maxDurability: number | null;
-      quantity: number;
-      bonusStats: Record<string, number> | null;
-      createdAt: string;
-        template: {
-          id: string;
-          name: string;
-          itemType: string;
-          weightClass: 'heavy' | 'medium' | 'light' | null;
-          slot: string | null;
-          tier: number;
-          baseStats: Record<string, unknown>;
-        requiredSkill: string | null;
-        requiredLevel: number;
-        maxDurability: number;
-        stackable: boolean;
-      };
-      equippedSlot: string | null;
-    }>;
+    items: InventoryItem[];
+    capacity: number;
+    usedSlots: number;
   }>('/api/v1/inventory');
 }
 
@@ -344,5 +351,52 @@ export async function forgeReroll(itemId: string, sacrificialItemId: string) {
   }>('/api/v1/crafting/forge/reroll', {
     method: 'POST',
     body: JSON.stringify({ itemId, sacrificialItemId }),
+  });
+}
+
+// Sell
+
+export async function sellItem(itemId: string, quantity?: number) {
+  return fetchApi<{ goldEarned: number; newGold: number }>('/api/v1/inventory/sell', {
+    method: 'POST',
+    body: JSON.stringify({ itemId, quantity }),
+  });
+}
+
+export async function sellBulk(itemIds: string[]) {
+  return fetchApi<{ totalGoldEarned: number; newGold: number; soldCount: number }>('/api/v1/inventory/sell/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ itemIds }),
+  });
+}
+
+// Stash
+
+export async function getStash() {
+  return fetchApi<{
+    items: InventoryItem[];
+  }>('/api/v1/inventory/stash');
+}
+
+export async function depositToStash(itemId: string, quantity?: number) {
+  return fetchApi<{ success: true }>('/api/v1/inventory/stash/deposit', {
+    method: 'POST',
+    body: JSON.stringify({ itemId, quantity }),
+  });
+}
+
+export async function withdrawFromStash(itemId: string, quantity?: number) {
+  return fetchApi<{ success: true }>('/api/v1/inventory/stash/withdraw', {
+    method: 'POST',
+    body: JSON.stringify({ itemId, quantity }),
+  });
+}
+
+// Loot
+
+export async function claimLoot(sessionId: string, selectedIndices: number[]) {
+  return fetchApi<{ success: true }>('/api/v1/inventory/loot/claim', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId, selectedIndices }),
   });
 }

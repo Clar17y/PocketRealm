@@ -50,6 +50,7 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       defaultRefiningMax: true,
       lowHpWarning: true,
       activeTitle: true,
+      gold: true,
     },
   });
 

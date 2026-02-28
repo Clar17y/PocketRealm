@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
-import { Crosshair, Heart, Shield, Sword, X, Zap } from 'lucide-react';
+import { Crosshair, Heart, Shield, Sword, X, Zap, Coins } from 'lucide-react';
 import { CRAFTING_CONSTANTS } from '@adventure/shared';
 import { titleCaseFromSnake } from '@/lib/format';
 import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass } from '@/lib/statFormat';
+import { getStash } from '@/lib/api/items';
+import type { Rarity } from '@/lib/rarity';
 
 interface Item {
   id: string;
@@ -28,10 +30,25 @@ interface Item {
   requiredSkill?: string | null;
   requiredLevel?: number | null;
   salvageCost: number | null;
+  sellPrice?: number | null;
+}
+
+interface StashItem {
+  id: string;
+  name: string;
+  imageSrc?: string;
+  quantity: number;
+  rarity: Rarity;
+  type: string;
+  durability?: { current: number; max: number } | null;
 }
 
 interface InventoryProps {
   items: Item[];
+  capacity: number;
+  usedSlots: number;
+  gold: number;
+  isInTown: boolean;
   onDrop?: (itemId: string) => void | Promise<void>;
   onSalvage?: (itemId: string) => void | Promise<void>;
   onSalvageBatch?: (itemIds: string[]) => void | Promise<void>;
@@ -39,6 +56,9 @@ interface InventoryProps {
   onEquip?: (itemId: string, slot: string) => void | Promise<void>;
   onUnequip?: (slot: string) => void | Promise<void>;
   onUse?: (itemId: string) => void | Promise<void>;
+  onSell?: (itemId: string) => void | Promise<void>;
+  onDeposit?: (itemId: string) => void | Promise<void>;
+  onWithdraw?: (itemId: string) => void | Promise<void>;
   zoneCraftingLevel?: number | null;
 }
 
@@ -58,12 +78,20 @@ function statDisplay(stat: string) {
   return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: prettyStatName(stat) };
 }
 
-export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, onEquip, onUnequip, onUse, zoneCraftingLevel }: InventoryProps) {
+export function Inventory({
+  items, capacity, usedSlots, gold, isInTown,
+  onDrop, onSalvage, onSalvageBatch, onRepair, onEquip, onUnequip, onUse, onSell, onDeposit, onWithdraw,
+  zoneCraftingLevel,
+}: InventoryProps) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
   const [salvageMode, setSalvageMode] = useState(false);
   const [salvageSelection, setSalvageSelection] = useState<Set<string>>(new Set());
   const [salvageBusy, setSalvageBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState<'backpack' | 'stash'>('backpack');
+  const [stashItems, setStashItems] = useState<StashItem[]>([]);
+  const [stashLoading, setStashLoading] = useState(false);
+  const [selectedStashItem, setSelectedStashItem] = useState<StashItem | null>(null);
 
   const SALVAGE_BATCH_LIMIT = CRAFTING_CONSTANTS.SALVAGE_BATCH_LIMIT;
 
@@ -78,6 +106,44 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
       return next;
     });
   };
+
+  const loadStash = useCallback(async () => {
+    setStashLoading(true);
+    try {
+      const res = await getStash();
+      if (res.data) {
+        setStashItems(res.data.items.map((item) => {
+          const templateMax = item.template.maxDurability ?? 0;
+          const max = item.maxDurability ?? templateMax;
+          const isEquip = ['weapon', 'armor'].includes(item.template.itemType);
+          return {
+            id: item.id,
+            name: item.template.name,
+            quantity: item.quantity,
+            rarity: item.rarity,
+            type: item.template.itemType,
+            durability: isEquip && max > 0 ? { current: item.currentDurability ?? max, max } : null,
+          };
+        }));
+      }
+    } finally {
+      setStashLoading(false);
+    }
+  }, []);
+
+  // Load stash when stash tab is selected
+  useEffect(() => {
+    if (activeTab === 'stash' && isInTown) {
+      void loadStash();
+    }
+  }, [activeTab, isInTown, loadStash]);
+
+  // Reset stash tab when leaving town
+  useEffect(() => {
+    if (!isInTown && activeTab === 'stash') {
+      setActiveTab('backpack');
+    }
+  }, [isInTown, activeTab]);
 
   const equippedItems = items.filter((item) => item.equippedSlot);
   const backpackItems = items.filter((item) => !item.equippedSlot);
@@ -116,12 +182,20 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
   const canSalvage = Boolean(onSalvage && isEquipment && !isEquipped && !noFacility);
   const canDrop = Boolean(onDrop && !isEquipped);
   const canUse = Boolean(onUse && isConsumable);
+  const canSell = Boolean(onSell && isInTown && !isEquipped && selectedItem?.sellPrice && selectedItem.sellPrice > 0);
+  const canDeposit = Boolean(onDeposit && isInTown && !isEquipped);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Inventory</h2>
-        <div className="text-sm text-[var(--rpg-text-secondary)]">{items.length} items</div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 text-sm">
+            <Coins size={14} className="text-[var(--rpg-gold)]" />
+            <span className="font-mono text-[var(--rpg-gold)]">{gold.toLocaleString()}</span>
+          </div>
+          <div className="text-sm text-[var(--rpg-text-secondary)]">{items.length} items</div>
+        </div>
       </div>
 
       {/* Equipped Items */}
@@ -147,138 +221,243 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
         </div>
       )}
 
-      {/* Salvage Mode Toggle + Actions */}
-      {onSalvageBatch && !noFacility && (
-        salvageMode ? (
-          <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-[var(--rpg-text-primary)]">
-                {selectedSalvageCount}/{SALVAGE_BATCH_LIMIT} selected
-                {selectedSalvageCount > 0 && (
-                  totalSalvageCost > 0
-                    ? ` (${totalSalvageCost} turns)`
-                    : ' (Free)'
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSalvageMode(false);
-                  setSalvageSelection(new Set());
-                }}
-                className="text-xs text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
-              >
-                Cancel
-              </button>
-            </div>
-            <div className="flex gap-2">
-              {salvageableBackpackItems.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const allSelected = salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT);
-                    if (allSelected) {
-                      setSalvageSelection(new Set());
-                    } else {
-                      setSalvageSelection(new Set(salvageableBackpackItems.slice(0, SALVAGE_BATCH_LIMIT).map((i) => i.id)));
-                    }
-                  }}
-                  className="text-xs text-[var(--rpg-gold)] hover:underline"
-                >
-                  {salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT) ? 'Deselect All' : 'Select All'}
-                </button>
-              )}
-              <div className="flex-1" />
-              <PixelButton
-                variant="primary"
-                size="sm"
-                disabled={selectedSalvageCount === 0 || salvageBusy}
-                onClick={async () => {
-                  if (!onSalvageBatch) return;
-                  setSalvageBusy(true);
-                  try {
-                    await onSalvageBatch([...salvageSelection]);
-                    setSalvageMode(false);
-                    setSalvageSelection(new Set());
-                  } finally {
-                    setSalvageBusy(false);
-                  }
-                }}
-              >
-                Salvage All
-              </PixelButton>
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-end">
-            <PixelButton
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setSalvageMode(true);
-                setSalvageSelection(new Set());
-                setSelectedItem(null);
-              }}
-            >
-              Salvage Mode
-            </PixelButton>
-          </div>
-        )
+      {/* Tab switcher (Backpack / Stash) */}
+      {isInTown && (
+        <div className="flex gap-2 border-b border-[var(--rpg-border)]">
+          <button
+            type="button"
+            onClick={() => { setActiveTab('backpack'); setSelectedStashItem(null); }}
+            className={`px-3 py-1.5 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'backpack'
+                ? 'text-[var(--rpg-gold)] border-[var(--rpg-gold)]'
+                : 'text-[var(--rpg-text-secondary)] border-transparent hover:text-[var(--rpg-text-primary)]'
+            }`}
+          >
+            Backpack
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab('stash'); setSalvageMode(false); }}
+            className={`px-3 py-1.5 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'stash'
+                ? 'text-[var(--rpg-gold)] border-[var(--rpg-gold)]'
+                : 'text-[var(--rpg-text-secondary)] border-transparent hover:text-[var(--rpg-text-primary)]'
+            }`}
+          >
+            Stash
+          </button>
+        </div>
       )}
 
-      {/* Backpack Items */}
-      <div className="space-y-2">
-        <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
-          Backpack ({backpackItems.length}/24)
-        </div>
-          <div className="grid grid-cols-6 gap-2">
-          {backpackItems.map((item) => {
-            const isSalvageable = salvageMode && item.salvageCost !== null;
-            const isSelected = salvageMode && salvageSelection.has(item.id);
-            return (
-              <div key={item.id} className="relative">
+      {/* Stash Tab */}
+      {activeTab === 'stash' && isInTown && (
+        <div className="space-y-2">
+          <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
+            Stash ({stashItems.length} items)
+          </div>
+          {stashLoading ? (
+            <div className="text-sm text-[var(--rpg-text-secondary)]">Loading stash...</div>
+          ) : stashItems.length === 0 ? (
+            <div className="text-sm text-[var(--rpg-text-secondary)]">Your stash is empty. Deposit items from your backpack.</div>
+          ) : (
+            <div className="grid grid-cols-6 gap-2">
+              {stashItems.map((item) => (
                 <ItemCard
+                  key={item.id}
                   name={item.name}
-                  icon={item.icon}
-                  imageSrc={item.imageSrc}
                   quantity={item.quantity}
                   rarity={item.rarity}
                   durability={item.durability}
-                  onClick={() => {
-                    if (salvageMode) {
-                      if (isSalvageable) toggleSalvageItem(item.id);
-                    } else {
-                      setSelectedItem(item);
+                  onClick={() => setSelectedStashItem(item)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Stash item withdraw modal */}
+          {selectedStashItem && (
+            <div
+              className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+              onClick={() => setSelectedStashItem(null)}
+            >
+              <PixelCard className="max-w-sm w-full" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">{selectedStashItem.name}</h3>
+                    <div className="text-xs text-[var(--rpg-text-secondary)] capitalize">
+                      {selectedStashItem.rarity} {selectedStashItem.type}
+                      {selectedStashItem.quantity > 1 && ` x${selectedStashItem.quantity}`}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedStashItem(null)}
+                    className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <PixelButton
+                  variant="primary"
+                  size="sm"
+                  className="w-full"
+                  disabled={busy || usedSlots >= capacity}
+                  onClick={async () => {
+                    if (!onWithdraw) return;
+                    setBusy(true);
+                    try {
+                      await onWithdraw(selectedStashItem.id);
+                      setSelectedStashItem(null);
+                      await loadStash();
+                    } finally {
+                      setBusy(false);
                     }
                   }}
-                />
-                {salvageMode && isSalvageable && (
-                  <div className={`absolute top-0.5 right-0.5 w-5 h-5 rounded border-2 flex items-center justify-center pointer-events-none ${
-                    isSelected
-                      ? 'border-[var(--rpg-gold)] bg-[var(--rpg-gold)]'
-                      : 'border-[var(--rpg-text-secondary)] bg-[var(--rpg-surface)]'
-                  }`}>
-                    {isSelected && <span className="text-[var(--rpg-background)] text-xs font-bold">✓</span>}
-                  </div>
-                )}
-                {salvageMode && !isSalvageable && (
-                  <div className="absolute inset-0 bg-black/50 rounded-lg pointer-events-none" />
-                )}
-              </div>
-            );
-          })}
-          {/* Empty slots */}
-          {Array.from({ length: Math.max(0, 24 - backpackItems.length) }).map((_, idx) => (
-            <div
-              key={`empty-${idx}`}
-              className="aspect-square bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg opacity-30"
-            />
-          ))}
+                >
+                  {usedSlots >= capacity ? 'Backpack Full' : 'Withdraw'}
+                </PixelButton>
+              </PixelCard>
+            </div>
+          )}
         </div>
-      </div>
+      )}
+
+      {/* Backpack Tab */}
+      {activeTab === 'backpack' && (
+        <>
+          {/* Salvage Mode Toggle + Actions */}
+          {onSalvageBatch && !noFacility && (
+            salvageMode ? (
+              <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-[var(--rpg-text-primary)]">
+                    {selectedSalvageCount}/{SALVAGE_BATCH_LIMIT} selected
+                    {selectedSalvageCount > 0 && (
+                      totalSalvageCost > 0
+                        ? ` (${totalSalvageCost} turns)`
+                        : ' (Free)'
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSalvageMode(false);
+                      setSalvageSelection(new Set());
+                    }}
+                    className="text-xs text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  {salvageableBackpackItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allSelected = salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT);
+                        if (allSelected) {
+                          setSalvageSelection(new Set());
+                        } else {
+                          setSalvageSelection(new Set(salvageableBackpackItems.slice(0, SALVAGE_BATCH_LIMIT).map((i) => i.id)));
+                        }
+                      }}
+                      className="text-xs text-[var(--rpg-gold)] hover:underline"
+                    >
+                      {salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT) ? 'Deselect All' : 'Select All'}
+                    </button>
+                  )}
+                  <div className="flex-1" />
+                  <PixelButton
+                    variant="primary"
+                    size="sm"
+                    disabled={selectedSalvageCount === 0 || salvageBusy}
+                    onClick={async () => {
+                      if (!onSalvageBatch) return;
+                      setSalvageBusy(true);
+                      try {
+                        await onSalvageBatch([...salvageSelection]);
+                        setSalvageMode(false);
+                        setSalvageSelection(new Set());
+                      } finally {
+                        setSalvageBusy(false);
+                      }
+                    }}
+                  >
+                    Salvage All
+                  </PixelButton>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-end">
+                <PixelButton
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setSalvageMode(true);
+                    setSalvageSelection(new Set());
+                    setSelectedItem(null);
+                  }}
+                >
+                  Salvage Mode
+                </PixelButton>
+              </div>
+            )
+          )}
+
+          {/* Backpack Items */}
+          <div className="space-y-2">
+            <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
+              Backpack ({usedSlots}/{capacity})
+            </div>
+            <div className="grid grid-cols-6 gap-2">
+              {backpackItems.map((item) => {
+                const isSalvageable = salvageMode && item.salvageCost !== null;
+                const isSelected = salvageMode && salvageSelection.has(item.id);
+                return (
+                  <div key={item.id} className="relative">
+                    <ItemCard
+                      name={item.name}
+                      icon={item.icon}
+                      imageSrc={item.imageSrc}
+                      quantity={item.quantity}
+                      rarity={item.rarity}
+                      durability={item.durability}
+                      onClick={() => {
+                        if (salvageMode) {
+                          if (isSalvageable) toggleSalvageItem(item.id);
+                        } else {
+                          setSelectedItem(item);
+                        }
+                      }}
+                    />
+                    {salvageMode && isSalvageable && (
+                      <div className={`absolute top-0.5 right-0.5 w-5 h-5 rounded border-2 flex items-center justify-center pointer-events-none ${
+                        isSelected
+                          ? 'border-[var(--rpg-gold)] bg-[var(--rpg-gold)]'
+                          : 'border-[var(--rpg-text-secondary)] bg-[var(--rpg-surface)]'
+                      }`}>
+                        {isSelected && <span className="text-[var(--rpg-background)] text-xs font-bold">&#10003;</span>}
+                      </div>
+                    )}
+                    {salvageMode && !isSalvageable && (
+                      <div className="absolute inset-0 bg-black/50 rounded-lg pointer-events-none" />
+                    )}
+                  </div>
+                );
+              })}
+              {/* Empty slots */}
+              {Array.from({ length: Math.max(0, capacity - backpackItems.length) }).map((_, idx) => (
+                <div
+                  key={`empty-${idx}`}
+                  className="aspect-square bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg opacity-30"
+                />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Item Detail Modal */}
-      {!salvageMode && selectedItem && (
+      {!salvageMode && selectedItem && activeTab === 'backpack' && (
         <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
           onClick={() => setSelectedItem(null)}
@@ -319,7 +498,7 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
                     </div>
                   )}
                   <div className="text-xs text-[var(--rpg-text-secondary)] capitalize">
-                    {selectedItem.rarity} • {selectedItem.type}
+                    {selectedItem.rarity} &bull; {selectedItem.type}
                   </div>
                   {selectedItem.weightClass && (
                     <div className="text-xs text-[var(--rpg-gold)]">
@@ -453,6 +632,14 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
               </div>
             )}
 
+            {/* Sell price display */}
+            {canSell && selectedItem.sellPrice != null && selectedItem.sellPrice > 0 && (
+              <div className="flex items-center gap-1 text-xs text-[var(--rpg-text-secondary)] mb-3">
+                <Coins size={12} className="text-[var(--rpg-gold)]" />
+                <span>Sell value: <span className="text-[var(--rpg-gold)] font-mono">{selectedItem.sellPrice}</span> gold</span>
+              </div>
+            )}
+
             {/* Context-sensitive action buttons */}
             {isEquipment && (
               <div className="grid grid-cols-4 gap-2">
@@ -545,6 +732,50 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
               </div>
             )}
 
+            {/* Sell + Deposit row for equipment */}
+            {isEquipment && (canSell || canDeposit) && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {canSell && (
+                  <PixelButton
+                    variant="gold"
+                    size="sm"
+                    disabled={busy}
+                    onClick={async () => {
+                      if (!onSell) return;
+                      setBusy(true);
+                      try {
+                        await onSell(selectedItem.id);
+                        setSelectedItem(null);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Sell
+                  </PixelButton>
+                )}
+                {canDeposit && (
+                  <PixelButton
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy}
+                    onClick={async () => {
+                      if (!onDeposit) return;
+                      setBusy(true);
+                      try {
+                        await onDeposit(selectedItem.id);
+                        setSelectedItem(null);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Stash
+                  </PixelButton>
+                )}
+              </div>
+            )}
+
             {isConsumable && (
               <div className="grid grid-cols-2 gap-2">
                 <PixelButton
@@ -587,7 +818,51 @@ export function Inventory({ items, onDrop, onSalvage, onSalvageBatch, onRepair, 
               </div>
             )}
 
-            {!isEquipment && !isConsumable && (
+            {/* Sell + Deposit row for consumables / materials */}
+            {!isEquipment && (canSell || canDeposit) && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {canSell && (
+                  <PixelButton
+                    variant="gold"
+                    size="sm"
+                    disabled={busy}
+                    onClick={async () => {
+                      if (!onSell) return;
+                      setBusy(true);
+                      try {
+                        await onSell(selectedItem.id);
+                        setSelectedItem(null);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Sell
+                  </PixelButton>
+                )}
+                {canDeposit && (
+                  <PixelButton
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy}
+                    onClick={async () => {
+                      if (!onDeposit) return;
+                      setBusy(true);
+                      try {
+                        await onDeposit(selectedItem.id);
+                        setSelectedItem(null);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Stash
+                  </PixelButton>
+                )}
+              </div>
+            )}
+
+            {!isEquipment && !isConsumable && !canSell && !canDeposit && (
               <div className="grid grid-cols-1 gap-2">
                 <PixelButton
                   variant="secondary"

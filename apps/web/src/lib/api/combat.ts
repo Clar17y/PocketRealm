@@ -312,6 +312,8 @@ export interface CombatResponse {
     durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
     skillXp: SkillXpGrantResponse | null;
   };
+  pendingLootSessionId?: string | null;
+  pendingLootItems?: Array<{ templateName: string; rarity: string; quantity: number }>;
   activeEvents?: CombatActiveEvent[];
   explorationProgress?: {
     turnsExplored: number;

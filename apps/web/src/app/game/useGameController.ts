@@ -58,6 +58,10 @@ import {
   startExploration,
   travelToZone,
   unequip,
+  sellItem,
+  depositToStash,
+  withdrawFromStash,
+  claimLoot,
   type AchievementsResponse,
   type EventModifierBadge,
   type CombatActiveEvent,
@@ -334,8 +338,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       requiredLevel?: number;
       maxDurability?: number;
       stackable?: boolean;
+      sellPrice?: number | null;
     };
   }>>([]);
+  const [inventoryCapacity, setInventoryCapacity] = useState(24);
+  const [inventoryUsedSlots, setInventoryUsedSlots] = useState(0);
+  const [gold, setGold] = useState(0);
+  const [pendingLootSession, setPendingLootSession] = useState<{
+    sessionId: string;
+    items: Array<{ templateName: string; rarity: string; quantity: number }>;
+  } | null>(null);
   const [equipment, setEquipment] = useState<Array<{
     slot: string;
     itemId: string | null;
@@ -615,6 +627,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setQuickRestHealPercent(playerRes.data.player.quickRestHealPercent ?? 100);
       setDefaultRefiningMax(playerRes.data.player.defaultRefiningMax ?? false);
       setLowHpWarning(playerRes.data.player.lowHpWarning ?? true);
+      setGold(playerRes.data.player.gold ?? 0);
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
     if (hpRes.data) setHpState(hpRes.data);
@@ -629,7 +642,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
     }
-    if (invRes.data) setInventory(invRes.data.items);
+    if (invRes.data) {
+      setInventory(invRes.data.items);
+      setInventoryCapacity(invRes.data.capacity ?? 24);
+      setInventoryUsedSlots(invRes.data.usedSlots ?? 0);
+    }
     if (equipRes.data) {
       setEquipment(
         equipRes.data.equipment.map((e) => ({
@@ -1248,6 +1265,20 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
 
+      // Detect pending loot overflow
+      if (data.pendingLootSessionId && data.pendingLootItems?.length) {
+        setPendingLootSession({
+          sessionId: data.pendingLootSessionId,
+          items: data.pendingLootItems,
+        });
+      } else if (data.pendingLootSessionId) {
+        pushLog({
+          timestamp: nowStamp(),
+          type: 'warning',
+          message: 'Your backpack was full! Some loot could not be collected.',
+        });
+      }
+
       await Promise.all([loadAll(), loadTurnsAndHp(), loadBestiary()]);
     });
   };
@@ -1656,6 +1687,76 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
+  const handleSellItem = async (itemId: string) => {
+    await runAction('sell', async () => {
+      const res = await sellItem(itemId);
+      if (!res.data) {
+        setActionError(res.error?.message ?? 'Sell failed');
+        return;
+      }
+      setGold(res.data.newGold);
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'success',
+        message: `Sold item for ${res.data.goldEarned} gold`,
+      });
+      await loadAll();
+    });
+  };
+
+  const handleDepositItem = async (itemId: string) => {
+    await runAction('deposit', async () => {
+      const res = await depositToStash(itemId);
+      if (!res.data) {
+        setActionError(res.error?.message ?? 'Deposit failed');
+        return;
+      }
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'success',
+        message: 'Item deposited to stash',
+      });
+      await loadAll();
+    });
+  };
+
+  const handleWithdrawItem = async (itemId: string) => {
+    await runAction('withdraw', async () => {
+      const res = await withdrawFromStash(itemId);
+      if (!res.data) {
+        setActionError(res.error?.message ?? 'Withdraw failed');
+        return;
+      }
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'success',
+        message: 'Item withdrawn from stash',
+      });
+      await loadAll();
+    });
+  };
+
+  const handleClaimLoot = async (sessionId: string, selectedIndices: number[]) => {
+    await runAction('claim_loot', async () => {
+      const res = await claimLoot(sessionId, selectedIndices);
+      if (!res.data) {
+        setActionError(res.error?.message ?? 'Loot claim failed');
+        return;
+      }
+      setPendingLootSession(null);
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'success',
+        message: `Claimed ${selectedIndices.length} loot items`,
+      });
+      await loadAll();
+    });
+  };
+
+  const handleDismissLoot = () => {
+    setPendingLootSession(null);
+  };
+
   const handleTravelToZone = async (id: string) => {
     const hpBefore = hpState.currentHp;
 
@@ -2018,6 +2119,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetQuickRestHealPercent,
     handleSetDefaultRefiningMax,
     handleQuickRest,
+
+    // Inventory & backpack
+    inventoryCapacity,
+    inventoryUsedSlots,
+    gold,
+    pendingLootSession,
+    handleSellItem,
+    handleDepositItem,
+    handleWithdrawItem,
+    handleClaimLoot,
+    handleDismissLoot,
   };
 }
 

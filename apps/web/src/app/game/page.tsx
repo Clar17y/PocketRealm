@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, screenBackgroundSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
 import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
+import { LootPicker } from '@/components/common/LootPicker';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
@@ -309,6 +310,15 @@ export default function GamePage() {
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
     combatLogPrefetch,
+    inventoryCapacity,
+    inventoryUsedSlots,
+    gold,
+    pendingLootSession,
+    handleSellItem,
+    handleDepositItem,
+    handleWithdrawItem,
+    handleClaimLoot,
+    handleDismissLoot,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -529,8 +539,13 @@ export default function GamePage() {
                 requiredSkill: item.template.requiredSkill ?? null,
                 requiredLevel: item.template.requiredLevel ?? 1,
                 salvageCost,
+                sellPrice: item.template.sellPrice ?? null,
               };
             })}
+            capacity={inventoryCapacity}
+            usedSlots={inventoryUsedSlots}
+            gold={gold}
+            isInTown={currentZone?.zoneType === 'town'}
             onDrop={handleDestroyItem}
             onSalvage={handleSalvageItem}
             onSalvageBatch={handleSalvageBatch}
@@ -538,6 +553,9 @@ export default function GamePage() {
             onEquip={handleEquipItem}
             onUnequip={handleUnequipSlot}
             onUse={handleUseItem}
+            onSell={handleSellItem}
+            onDeposit={handleDepositItem}
+            onWithdraw={handleWithdrawItem}
             zoneCraftingLevel={zoneCraftingLevel}
           />
         );
@@ -1143,6 +1161,15 @@ export default function GamePage() {
   return (
     <>
       {showChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
+      {pendingLootSession && (
+        <LootPicker
+          sessionId={pendingLootSession.sessionId}
+          items={pendingLootSession.items}
+          availableSlots={Math.max(0, inventoryCapacity - inventoryUsedSlots)}
+          onClaim={handleClaimLoot}
+          onDismiss={handleDismissLoot}
+        />
+      )}
       <AppShell
   turns={turns}
   username={player?.username}

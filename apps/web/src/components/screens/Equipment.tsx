@@ -91,6 +91,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
     legs: { gridColumn: '2', gridRow: '5', label: 'Legs' },
     boots: { gridColumn: '2', gridRow: '6', label: 'Boots' },
     charm: { gridColumn: '3', gridRow: '6', label: 'Charm' },
+    backpack: { gridColumn: '1', gridRow: '6', label: 'Backpack' },
   };
 
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);

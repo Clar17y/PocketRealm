@@ -70,10 +70,18 @@ export {
   salvageBatch,
   forgeUpgrade,
   forgeReroll,
+  sellItem,
+  sellBulk,
+  getStash,
+  depositToStash,
+  withdrawFromStash,
+  claimLoot,
 } from './items';
 export type {
   GatheringNodesQuery,
   GatheringNodesResponse,
+  InventoryItem,
+  InventoryItemTemplate,
 } from './items';
 
 export {
