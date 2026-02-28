@@ -561,7 +561,7 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b, {
         potions: [
-          { name: 'Health Potion', healAmount: 30, templateId: 'hp-1' },
+          { name: 'Health Potion', healAmount: 30, templateId: 'hp-1', potionType: 'hp' },
         ],
       });
 
@@ -585,9 +585,9 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b, {
         potions: [
-          { name: 'Potion A', healAmount: 10, templateId: 'a' },
-          { name: 'Potion B', healAmount: 10, templateId: 'b' },
-          { name: 'Potion C', healAmount: 10, templateId: 'c' },
+          { name: 'Potion A', healAmount: 10, templateId: 'a', potionType: 'hp' },
+          { name: 'Potion B', healAmount: 10, templateId: 'b', potionType: 'hp' },
+          { name: 'Potion C', healAmount: 10, templateId: 'c', potionType: 'hp' },
         ],
       });
 
@@ -607,6 +607,180 @@ describe('runTemplateCombat', () => {
         (e) => e.actor === 'combatantA' && e.message.includes('still sick'),
       );
       expect(sicknessEntries.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('stamina and mana potions', () => {
+    it('stamina potion restores stamina during combat', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Player', {
+        template: templateOf('use_stamina_potion', 'light_attack'),
+        stats: makeStats({ hp: 100, maxHp: 100, damageMin: 200, damageMax: 200 }),
+        stamina: 20,
+        maxStamina: 100,
+        staminaRegenPerRound: 0,
+      });
+      const b = makeCombatant('Goblin', {
+        stats: makeStats({ hp: 10, maxHp: 10, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Stamina Potion', healAmount: 60, templateId: 'stam-1', potionType: 'stamina' },
+        ],
+      });
+
+      expect(result.potionsConsumed).toHaveLength(1);
+      expect(result.potionsConsumed[0].name).toBe('Stamina Potion');
+      expect(result.potionsConsumed[0].healAmount).toBe(60);
+      // Stamina should have increased
+      const potionEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'potion',
+      );
+      expect(potionEntry).toBeDefined();
+      expect(potionEntry?.message).toContain('Stamina');
+    });
+
+    it('mana potion restores mana during combat', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Player', {
+        template: templateOf('use_mana_potion', 'light_attack'),
+        stats: makeStats({ hp: 100, maxHp: 100, damageMin: 200, damageMax: 200 }),
+        mana: 5,
+        maxMana: 100,
+        manaRegenPerRound: 0,
+      });
+      const b = makeCombatant('Goblin', {
+        stats: makeStats({ hp: 10, maxHp: 10, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Mana Potion', healAmount: 40, templateId: 'mana-1', potionType: 'mana' },
+        ],
+      });
+
+      expect(result.potionsConsumed).toHaveLength(1);
+      expect(result.potionsConsumed[0].name).toBe('Mana Potion');
+      expect(result.potionsConsumed[0].healAmount).toBe(40);
+      const potionEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'potion',
+      );
+      expect(potionEntry).toBeDefined();
+      expect(potionEntry?.message).toContain('Mana');
+    });
+
+    it('potion type matching only uses matching potion from pool', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Player', {
+        template: templateOf('use_stamina_potion', 'light_attack'),
+        stats: makeStats({ hp: 50, maxHp: 100, damageMin: 200, damageMax: 200 }),
+        stamina: 20,
+        maxStamina: 100,
+        staminaRegenPerRound: 0,
+      });
+      const b = makeCombatant('Goblin', {
+        stats: makeStats({ hp: 10, maxHp: 10, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Health Potion', healAmount: 50, templateId: 'hp-1', potionType: 'hp' },
+          { name: 'Stamina Potion', healAmount: 30, templateId: 'stam-1', potionType: 'stamina' },
+        ],
+      });
+
+      // Should have used the stamina potion, not the health potion
+      expect(result.potionsConsumed).toHaveLength(1);
+      expect(result.potionsConsumed[0].name).toBe('Stamina Potion');
+      expect(result.potionsConsumed[0].templateId).toBe('stam-1');
+    });
+
+    it('potion sickness is shared across all potion types', () => {
+      mockCombatRandom();
+
+      // Use HP potion first, then try stamina potion on the next round
+      const a = makeCombatant('Player', {
+        template: templateOf('use_hp_potion', 'use_stamina_potion', 'light_attack', 'light_attack', 'light_attack'),
+        stats: makeStats({ hp: 50, maxHp: 100, damageMin: 5, damageMax: 5 }),
+        stamina: 50,
+        maxStamina: 100,
+        staminaRegenPerRound: 10,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Health Potion', healAmount: 20, templateId: 'hp-1', potionType: 'hp' },
+          { name: 'Stamina Potion', healAmount: 30, templateId: 'stam-1', potionType: 'stamina' },
+        ],
+      });
+
+      // HP potion consumed round 1
+      expect(result.potionsConsumed.length).toBeGreaterThanOrEqual(1);
+      expect(result.potionsConsumed[0].name).toBe('Health Potion');
+
+      // Round 2: Stamina potion should be blocked by potion sickness from HP potion
+      const sicknessEntry = result.log.find(
+        (e) => e.round === 2 && e.actor === 'combatantA' && e.message.includes('still sick'),
+      );
+      expect(sicknessEntry).toBeDefined();
+    });
+
+    it('mana potion is capped at max mana', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Player', {
+        template: templateOf('use_mana_potion', 'light_attack'),
+        stats: makeStats({ hp: 100, maxHp: 100, damageMin: 200, damageMax: 200 }),
+        mana: 45,
+        maxMana: 50,
+        manaRegenPerRound: 0,
+      });
+      const b = makeCombatant('Goblin', {
+        stats: makeStats({ hp: 10, maxHp: 10, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Mana Potion', healAmount: 40, templateId: 'mana-1', potionType: 'mana' },
+        ],
+      });
+
+      // Only 5 mana can be restored (45 + 40 capped at 50)
+      expect(result.potionsConsumed).toHaveLength(1);
+      expect(result.potionsConsumed[0].healAmount).toBe(5);
+    });
+
+    it('no matching potion type results in wasted action', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Player', {
+        template: templateOf('use_mana_potion', 'light_attack'),
+        stats: makeStats({ hp: 100, maxHp: 100, damageMin: 200, damageMax: 200 }),
+      });
+      const b = makeCombatant('Goblin', {
+        stats: makeStats({ hp: 10, maxHp: 10, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Health Potion', healAmount: 50, templateId: 'hp-1', potionType: 'hp' },
+        ],
+      });
+
+      // No mana potions available, so the mana potion action is wasted
+      expect(result.potionsConsumed).toHaveLength(0);
+      const wasteEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.message.includes('has none left'),
+      );
+      expect(wasteEntry).toBeDefined();
     });
   });
 

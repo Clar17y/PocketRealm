@@ -411,23 +411,48 @@ function executeSupportiveAction(
     healAmount = applyHeal(state, actorKey, flatHeal + percentHeal);
   }
 
-  // Apply buff/debuff effect
+  // Apply buff/debuff effect (enforce MAX_ACTIVE_BUFFS for non-debuff effects)
   if (action.effect) {
     const effect = action.effect;
     const target = effect.isDebuff ? opponent(actorKey) : actorKey;
-    state.activeEffects.push({
-      name: effect.name,
-      target,
-      stat: effect.stat,
-      modifier: effect.modifier,
-      remainingRounds: effect.duration,
-    });
-    appliedEffects.push({
-      stat: effect.stat,
-      modifier: effect.modifier,
-      duration: effect.duration,
-      target,
-    });
+
+    if (!effect.isDebuff) {
+      const activeBufCount = state.activeEffects.filter(
+        (e) => e.target === actorKey && e.stat !== 'potionSickness' && e.modifier >= 0,
+      ).length;
+      if (activeBufCount >= COMBAT_ACTION_CONSTANTS.MAX_ACTIVE_BUFFS) {
+        // At buff cap — skip applying the new buff
+      } else {
+        state.activeEffects.push({
+          name: effect.name,
+          target,
+          stat: effect.stat,
+          modifier: effect.modifier,
+          remainingRounds: effect.duration,
+        });
+        appliedEffects.push({
+          stat: effect.stat,
+          modifier: effect.modifier,
+          duration: effect.duration,
+          target,
+        });
+      }
+    } else {
+      // Debuffs are always applied (no cap)
+      state.activeEffects.push({
+        name: effect.name,
+        target,
+        stat: effect.stat,
+        modifier: effect.modifier,
+        remainingRounds: effect.duration,
+      });
+      appliedEffects.push({
+        stat: effect.stat,
+        modifier: effect.modifier,
+        duration: effect.duration,
+        target,
+      });
+    }
   }
 
   const parts: string[] = [];
@@ -461,6 +486,30 @@ function executeSupportiveAction(
   });
 }
 
+function getMaxStamina(state: TemplateCombatState, actor: CombatActor): number {
+  return actor === 'combatantA' ? state.combatantAMaxStamina : state.combatantBMaxStamina;
+}
+
+function getMaxMana(state: TemplateCombatState, actor: CombatActor): number {
+  return actor === 'combatantA' ? state.combatantAMaxMana : state.combatantBMaxMana;
+}
+
+function setStamina(state: TemplateCombatState, actor: CombatActor, value: number): void {
+  if (actor === 'combatantA') {
+    state.combatantAStamina = value;
+  } else {
+    state.combatantBStamina = value;
+  }
+}
+
+function setMana(state: TemplateCombatState, actor: CombatActor, value: number): void {
+  if (actor === 'combatantA') {
+    state.combatantAMana = value;
+  } else {
+    state.combatantBMana = value;
+  }
+}
+
 function executePotionAction(
   state: TemplateCombatState,
   actorKey: CombatActor,
@@ -473,17 +522,16 @@ function executePotionAction(
   availablePotions: import('@adventure/shared').CombatPotion[],
   potionsConsumed: PotionConsumed[],
 ): void {
+  const potionType = action.potionType ?? 'hp';
+
   // Check potion sickness
-  if (hasPotionSickness(state, actorKey) || availablePotions.length === 0) {
-    // Can't use potion — waste the action, log it
+  if (hasPotionSickness(state, actorKey)) {
     state.log.push({
       round: state.round,
       actor: actorKey,
       actorName,
       action: 'potion',
-      message: hasPotionSickness(state, actorKey)
-        ? `${actorName} tries to drink a potion but is still sick!`
-        : `${actorName} tries to drink a potion but has none left!`,
+      message: `${actorName} tries to drink a potion but is still sick!`,
       combatantAAction,
       combatantBAction,
       wasExhausted,
@@ -494,31 +542,67 @@ function executePotionAction(
     return;
   }
 
-  // Pick the first available potion
-  const potion = availablePotions[0];
-  const hpBefore = getHp(state, actorKey);
-  const maxHp = actorKey === 'combatantA' ? state.combatantAMaxHp : state.combatantBMaxHp;
-
-  if (actorKey === 'combatantA') {
-    state.combatantAHp = Math.min(maxHp, state.combatantAHp + potion.healAmount);
-  } else {
-    state.combatantBHp = Math.min(maxHp, state.combatantBHp + potion.healAmount);
+  // Find a matching potion by type
+  const potionIndex = availablePotions.findIndex(p => p.potionType === potionType);
+  if (potionIndex === -1) {
+    state.log.push({
+      round: state.round,
+      actor: actorKey,
+      actorName,
+      action: 'potion',
+      message: `${actorName} tries to drink a potion but has none left!`,
+      combatantAAction,
+      combatantBAction,
+      wasExhausted,
+      interactionResult,
+      ...hpSnapshot(state),
+      ...resourceSnapshot(state),
+    });
+    return;
   }
 
-  const actualHeal = getHp(state, actorKey) - hpBefore;
+  const potion = availablePotions[potionIndex];
+  let actualRestore = 0;
+  let resourceLabel: string;
+
+  if (potionType === 'hp') {
+    const hpBefore = getHp(state, actorKey);
+    const maxHp = actorKey === 'combatantA' ? state.combatantAMaxHp : state.combatantBMaxHp;
+    if (actorKey === 'combatantA') {
+      state.combatantAHp = Math.min(maxHp, state.combatantAHp + potion.healAmount);
+    } else {
+      state.combatantBHp = Math.min(maxHp, state.combatantBHp + potion.healAmount);
+    }
+    actualRestore = getHp(state, actorKey) - hpBefore;
+    resourceLabel = 'HP';
+  } else if (potionType === 'stamina') {
+    const before = getStamina(state, actorKey);
+    const maxStam = getMaxStamina(state, actorKey);
+    const newStam = Math.min(before + potion.healAmount, maxStam);
+    setStamina(state, actorKey, newStam);
+    actualRestore = newStam - before;
+    resourceLabel = 'Stamina';
+  } else {
+    const before = getMana(state, actorKey);
+    const maxM = getMaxMana(state, actorKey);
+    const newMana = Math.min(before + potion.healAmount, maxM);
+    setMana(state, actorKey, newMana);
+    actualRestore = newMana - before;
+    resourceLabel = 'Mana';
+  }
 
   // Remove from pool
-  availablePotions.splice(0, 1);
+  availablePotions.splice(potionIndex, 1);
 
   // Record consumption
   potionsConsumed.push({
     templateId: potion.templateId,
     name: potion.name,
-    healAmount: actualHeal,
+    healAmount: actualRestore,
     round: state.round,
   });
 
-  // Apply potion sickness
+  // Apply potion sickness (shared across all potion types)
   const sicknessEffect: ActiveEffect = {
     name: 'Potion Sickness',
     target: actorKey,
@@ -534,14 +618,14 @@ function executePotionAction(
     actorName,
     action: 'potion',
     spellName: potion.name,
-    healAmount: actualHeal,
+    healAmount: actualRestore,
     effectsApplied: [{
       stat: 'potionSickness',
       modifier: 0,
       duration: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS,
       target: actorKey,
     }],
-    message: `${actorName} drinks a ${potion.name}! +${actualHeal} HP`,
+    message: `${actorName} drinks a ${potion.name}! +${actualRestore} ${resourceLabel}`,
     combatantAAction,
     combatantBAction,
     wasExhausted,

@@ -500,6 +500,16 @@ export const POTION_CONSTANTS = {
 
   /** Rounds of Potion Sickness cooldown after auto-potion use */
   AUTO_POTION_SICKNESS_DURATION: 5,
+
+  // Stamina potions
+  MINOR_STAMINA_RESTORE: 30,
+  STAMINA_RESTORE: 60,
+  GREATER_STAMINA_RESTORE: 100,
+
+  // Mana potions
+  MINOR_MANA_RESTORE: 20,
+  MANA_RESTORE: 40,
+  GREATER_MANA_RESTORE: 70,
 } as const;
 
 // =============================================================================

@@ -215,6 +215,11 @@ export const IDS = {
     resistPotion: randomUUID(),
     manaPotion: randomUUID(),
     elixirOfPower: randomUUID(),
+    minorStaminaPotion: randomUUID(),
+    staminaPotion: randomUUID(),
+    greaterStaminaPotion: randomUUID(),
+    minorManaPotion: randomUUID(),
+    greaterManaPotion: randomUUID(),
   },
 
   // ── Item Templates: Weapons ───────────────────────────────────────────────

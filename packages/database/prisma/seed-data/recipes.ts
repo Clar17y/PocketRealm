@@ -91,6 +91,13 @@ function processingRecipes() {
     recipe({ skillType: 'alchemy', requiredLevel: 20, resultTemplateId: pots.resistPotion, turnCost: 18, xpReward: 30, materials: [{ itemTemplateId: res.gravemoss, quantity: 2 }] }),
     recipe({ skillType: 'alchemy', requiredLevel: 20, resultTemplateId: pots.manaPotion, turnCost: 18, xpReward: 30, materials: [{ itemTemplateId: res.shimmerFern, quantity: 2 }] }),
     recipe({ skillType: 'alchemy', requiredLevel: 30, resultTemplateId: pots.elixirOfPower, turnCost: 25, xpReward: 42, materials: [{ itemTemplateId: res.abyssalKelp, quantity: 3 }] }),
+    // Stamina potions
+    recipe({ skillType: 'alchemy', requiredLevel: 1, resultTemplateId: pots.minorStaminaPotion, turnCost: 5, xpReward: 6, materials: [{ itemTemplateId: res.forestSage, quantity: 2 }] }),
+    recipe({ skillType: 'alchemy', requiredLevel: 8, resultTemplateId: pots.staminaPotion, turnCost: 10, xpReward: 15, materials: [{ itemTemplateId: res.moonpetal, quantity: 3 }] }),
+    recipe({ skillType: 'alchemy', requiredLevel: 18, resultTemplateId: pots.greaterStaminaPotion, turnCost: 15, xpReward: 25, materials: [{ itemTemplateId: res.starbloom, quantity: 3 }] }),
+    // Mana potions
+    recipe({ skillType: 'alchemy', requiredLevel: 1, resultTemplateId: pots.minorManaPotion, turnCost: 5, xpReward: 6, materials: [{ itemTemplateId: res.caveMoss, quantity: 2 }] }),
+    recipe({ skillType: 'alchemy', requiredLevel: 25, resultTemplateId: pots.greaterManaPotion, turnCost: 20, xpReward: 35, materials: [{ itemTemplateId: res.abyssalKelp, quantity: 2 }] }),
   ];
 }
 

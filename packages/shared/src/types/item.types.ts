@@ -16,7 +16,7 @@ export interface ItemTemplate {
   consumableEffect: ConsumableEffect | null;
 }
 
-export type ConsumableEffectType = 'heal_flat' | 'heal_percent';
+export type ConsumableEffectType = 'heal_flat' | 'heal_percent' | 'restore_stamina' | 'restore_mana';
 
 export interface ConsumableEffect {
   type: ConsumableEffectType;

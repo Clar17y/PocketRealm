@@ -13,7 +13,6 @@ import {
 } from '@adventure/game-engine';
 import type { ResourceState } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
-import { getEquipmentStats } from './equipmentService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import {
   applyGuildTaxTx,
@@ -75,7 +74,6 @@ export async function getResourceState(
   if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
 
   const skills = await getSkillLevels(playerId);
-  const equipment = await getEquipmentStats(playerId);
 
   // Stamina
   const maxStamina = calculateMaxStamina({

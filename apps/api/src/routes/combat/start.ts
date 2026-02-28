@@ -444,6 +444,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   let respawnedTo: { townId: string; townName: string } | null = null;
 
   if (lastFight && lastFight.outcome === 'defeat') {
+    // Persist post-combat resource state on defeat
+    await setAllResources(playerId, currentPlayerHp, currentStamina, currentMana);
+
     const defeatResult = await handleCombatDefeat(playerId, {
       evasionLevel: progression.attributes.evasion,
       mobLevel: lastPrefixedMob!.level,
@@ -904,6 +907,12 @@ export function registerStartRoutes(router: Router): void {
           void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
         }
       } else if (combatResult.outcome === 'defeat') {
+        await setAllResources(
+          playerId,
+          combatResult.combatantAHpRemaining,
+          combatResult.combatantAStaminaRemaining,
+          combatResult.combatantAManaRemaining,
+        );
         const defeatResult = await handleCombatDefeat(playerId, {
           evasionLevel: progression.attributes.evasion,
           mobLevel: prefixedMob.level,
