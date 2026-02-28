@@ -208,11 +208,15 @@ export function CombatHistory() {
           setSelectedDetail(data.combat);
         }
       } catch {
-        setSiteFights(null);
-        setSelectedDetail(data.combat);
+        if (latestDetailRequestRef.current === requestId && selectedLogIdRef.current === logId) {
+          setSiteFights(null);
+          setSelectedDetail(data.combat);
+        }
       } finally {
-        setSiteFightsLoading(false);
-        setSelectedLoading(false);
+        if (latestDetailRequestRef.current === requestId && selectedLogIdRef.current === logId) {
+          setSiteFightsLoading(false);
+          setSelectedLoading(false);
+        }
       }
     } else {
       setSelectedDetail(data.combat);
@@ -228,23 +232,26 @@ export function CombatHistory() {
 
   const handleSiteFightNavigate = useCallback(async (newIndex: number) => {
     if (!siteFights || !siteFights[newIndex]) return;
-    const requestId = ++latestFightRequestRef.current;
+    const fightReqId = ++latestFightRequestRef.current;
+    const detailReqId = latestDetailRequestRef.current;
     setSiteFightIndex(newIndex);
     setSelectedLoading(true);
     setSelectedError(null);
+    const isStale = () =>
+      latestFightRequestRef.current !== fightReqId || latestDetailRequestRef.current !== detailReqId;
     try {
       const { data, error } = await getCombatLog(siteFights[newIndex].logId);
-      if (latestFightRequestRef.current !== requestId) return;
+      if (isStale()) return;
       if (!data) {
         setSelectedError(error?.message ?? 'Failed to load fight log');
       } else {
         setSelectedDetail(data.combat);
       }
     } catch (err) {
-      if (latestFightRequestRef.current !== requestId) return;
+      if (isStale()) return;
       setSelectedError((err as Error).message);
     } finally {
-      if (latestFightRequestRef.current === requestId) {
+      if (!isStale()) {
         setSelectedLoading(false);
       }
     }

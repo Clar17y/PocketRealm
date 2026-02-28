@@ -174,16 +174,16 @@ export function CombatScreen({
       : 'text-[var(--rpg-gold)]';
 
   const buildShareText = useCallback((): string => {
-    if (!lastCombat) return '';
+    if (!lastCombat || !displayedFight) return '';
     return formatCombatShareText({
       outcome: outcomeLabel ?? 'Unknown',
       playerMaxHp,
-      mobMaxHp: lastCombat.combatantBMaxHp,
-      mobName: lastCombat.mobDisplayName,
-      log: lastCombat.log,
+      mobMaxHp: displayedFight.combatantBMaxHp,
+      mobName: displayedFight.mobDisplayName,
+      log: displayedFight.log,
       rewards: lastCombat.rewards,
     });
-  }, [lastCombat, mobMaxHp, outcomeLabel, playerMaxHp]);
+  }, [lastCombat, displayedFight, mobMaxHp, outcomeLabel, playerMaxHp]);
 
   const handleCopyShare = useCallback(async () => {
     const text = buildShareText();
