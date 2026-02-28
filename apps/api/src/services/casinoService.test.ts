@@ -73,7 +73,7 @@ describe('exchangeTurnsForGold', () => {
   });
 
   it('propagates error from turnBankService', async () => {
-    const { spendPlayerTurnsTx } = await import('./turnBankService');
+    const { spendPlayerTurnsTx } = await import('./turnBankService.js');
     (spendPlayerTurnsTx as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error('Insufficient turns')
     );
