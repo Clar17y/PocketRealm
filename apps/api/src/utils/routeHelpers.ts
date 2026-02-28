@@ -163,13 +163,38 @@ export function toMobTemplate(raw: Record<string, unknown>): MobTemplate {
   } as MobTemplate;
 }
 
-// ── Combat defeat handling ───────────────────────────────────────────
+// ── Flee with gold loss ──────────────────────────────────────────────
 
-export interface CombatDefeatParams {
+export interface FleeWithGoldParams {
   evasionLevel: number;
   mobLevel: number;
   maxHp: number;
 }
+
+export async function calculateFleeWithGold(
+  playerId: string,
+  params: FleeWithGoldParams,
+): Promise<ReturnType<typeof calculateFleeResult>> {
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { gold: true },
+  });
+  const fleeResult = calculateFleeResult({
+    ...params,
+    currentGold: player?.gold ?? 0,
+  });
+  if (fleeResult.goldLost > 0) {
+    await prisma.player.update({
+      where: { id: playerId },
+      data: { gold: { decrement: fleeResult.goldLost } },
+    });
+  }
+  return fleeResult;
+}
+
+// ── Combat defeat handling ───────────────────────────────────────────
+
+export type CombatDefeatParams = FleeWithGoldParams;
 
 export interface CombatDefeatResult {
   fleeResult: ReturnType<typeof calculateFleeResult>;
@@ -180,28 +205,9 @@ export async function handleCombatDefeat(
   playerId: string,
   params: CombatDefeatParams,
 ): Promise<CombatDefeatResult> {
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { gold: true },
-  });
-  const currentGold = player?.gold ?? 0;
-
-  const fleeResult = calculateFleeResult({
-    evasionLevel: params.evasionLevel,
-    mobLevel: params.mobLevel,
-    maxHp: params.maxHp,
-    currentGold,
-  });
+  const fleeResult = await calculateFleeWithGold(playerId, params);
 
   let respawnedTo: { townId: string; townName: string } | null = null;
-
-  // Deduct gold loss from defeat
-  if (fleeResult.goldLost > 0) {
-    await prisma.player.update({
-      where: { id: playerId },
-      data: { gold: { decrement: fleeResult.goldLost } },
-    });
-  }
 
   if (fleeResult.outcome === 'knockout') {
     await enterRecoveringState(playerId, params.maxHp);

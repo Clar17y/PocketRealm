@@ -13,7 +13,6 @@ import {
 import {
   resolveBossRoundLogic,
   buildPlayerCombatStats,
-  calculateFleeResult,
   type BossRoundAttacker,
   type BossRoundHealer,
   type BossRoundResult,
@@ -25,7 +24,7 @@ import { getEquipmentStats } from './equipmentService';
 import { getPlayerProgressionState } from './attributesService';
 import { getMainHandAttackSkill, getSkillLevel } from './combatStatsService';
 import { getHpState, setHp, enterRecoveringState } from './hpService';
-import { trackAchievements } from '../utils/routeHelpers.js';
+import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { distributeBossLoot } from './bossLootService';
 
 function toBossEncounterData(row: {
@@ -468,22 +467,11 @@ export async function resolveBossRound(
     // M3: batch flee rolls in parallel (reuse participantData from above)
     await Promise.all(
       participantData.map(async (pd) => {
-        const pGold = await prisma.player.findUnique({
-          where: { id: pd.signup.playerId },
-          select: { gold: true },
-        });
-        const fleeResult = calculateFleeResult({
+        const fleeResult = await calculateFleeWithGold(pd.signup.playerId, {
           evasionLevel: pd.progression.attributes.evasion,
           mobLevel: encounter.mobTemplate.level ?? 1,
           maxHp: pd.hpState.maxHp,
-          currentGold: pGold?.gold ?? 0,
         });
-        if (fleeResult.goldLost > 0) {
-          await prisma.player.update({
-            where: { id: pd.signup.playerId },
-            data: { gold: { decrement: fleeResult.goldLost } },
-          });
-        }
         if (fleeResult.outcome === 'knockout') {
           await enterRecoveringState(pd.signup.playerId, pd.hpState.maxHp);
           await trackAchievements(pd.signup.playerId, { totalDeaths: 1 });

@@ -6,7 +6,6 @@ import {
   applyMobEventModifiers,
   applyMobPrefix,
   buildPlayerCombatStats,
-  calculateFleeResult,
   filterAndWeightMobsByTier,
   getScaledZoneExitChance,
   mobToCombatantStats,
@@ -35,7 +34,7 @@ import { incrementContractProgress } from '../../services/guildContractService';
 import { rollAndGrantLoot } from '../../services/lootService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
@@ -401,23 +400,11 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             },
           });
         } else {
-          const playerGold = await prisma.player.findUnique({
-            where: { id: playerId },
-            select: { gold: true },
-          });
-          const fleeResult = calculateFleeResult({
+          const fleeResult = await calculateFleeWithGold(playerId, {
             evasionLevel: progression.attributes.evasion,
             mobLevel: prefixedMob.level,
             maxHp: hpState.maxHp,
-            currentGold: playerGold?.gold ?? 0,
           });
-
-          if (fleeResult.goldLost > 0) {
-            await prisma.player.update({
-              where: { id: playerId },
-              data: { gold: { decrement: fleeResult.goldLost } },
-            });
-          }
 
           if (fleeResult.outcome === 'knockout') {
             currentHp = 0;

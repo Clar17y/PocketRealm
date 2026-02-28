@@ -1,8 +1,8 @@
 import { Prisma, prisma } from '@adventure/database';
-import { buildPlayerCombatStats, calculateFleeResult, calculateMaxHp, runCombat } from '@adventure/game-engine';
+import { buildPlayerCombatStats, calculateMaxHp, runCombat } from '@adventure/game-engine';
 import { PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, type Combatant, type CombatResult, type SkillType } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
-import { buildPagination, trackAchievements } from '../utils/routeHelpers.js';
+import { buildPagination, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { getSkillLevel } from './combatStatsService.js';
 import { calculateEloChange } from './eloService';
 import { getEquipmentStats } from './equipmentService';
@@ -449,22 +449,11 @@ export async function challenge(
   let fleeOutcome: string | null = null;
   if (combatResult.combatantAHpRemaining <= 0) {
     // Defeated: roll flee check (evasion vs defender level)
-    const attackerGold = await prisma.player.findUnique({
-      where: { id: attackerId },
-      select: { gold: true },
-    });
-    const fleeResult = calculateFleeResult({
+    const fleeResult = await calculateFleeWithGold(attackerId, {
       evasionLevel: attackerAttributes.evasion,
       mobLevel: target.characterLevel,
       maxHp: attackerMaxHp,
-      currentGold: attackerGold?.gold ?? 0,
     });
-    if (fleeResult.goldLost > 0) {
-      await prisma.player.update({
-        where: { id: attackerId },
-        data: { gold: { decrement: fleeResult.goldLost } },
-      });
-    }
     fleeOutcome = fleeResult.outcome;
     if (fleeResult.outcome === 'knockout') {
       await enterRecoveringState(attackerId, attackerMaxHp);

@@ -7,7 +7,6 @@ import {
   applyMobPrefix,
   rollMobPrefix,
   simulateTravelAmbushes,
-  calculateFleeResult,
   mobToCombatantStats,
   filterAndWeightMobsByTier,
 } from '@adventure/game-engine';
@@ -20,7 +19,7 @@ import { getEquipmentStats } from '../services/equipmentService';
 import { getPlayerProgressionState } from '../services/attributesService';
 import { grantSkillXp } from '../services/xpService';
 import { rollAndGrantLoot } from '../services/lootService';
-import { serializeXpGrant, toMobTemplate, recordBestiaryKill, trackAchievements } from '../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, recordBestiaryKill, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
@@ -173,7 +172,6 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       currentZoneId: true,
       lastTravelledFromZoneId: true,
       homeTownId: true,
-      gold: true,
     },
   });
 
@@ -457,21 +455,12 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
             },
           });
         } else {
-          // Player lost — calculate flee result
-          const fleeResult = calculateFleeResult({
+          // Player lost — calculate flee result and deduct gold loss
+          const fleeResult = await calculateFleeWithGold(playerId, {
             evasionLevel: progression.attributes.evasion,
             mobLevel: prefixedMob.level,
             maxHp: hpState.maxHp,
-            currentGold: player.gold,
           });
-
-          // Deduct gold loss
-          if (fleeResult.goldLost > 0) {
-            await prisma.player.update({
-              where: { id: playerId },
-              data: { gold: { decrement: fleeResult.goldLost } },
-            });
-          }
 
           if (fleeResult.outcome === 'knockout') {
             currentHp = 0;

@@ -6,9 +6,8 @@ import { PixelButton } from '@/components/PixelButton';
 import { Coins, Clock, History, Users } from 'lucide-react';
 import * as api from '@/lib/api';
 import {
-  ROULETTE_RED_NUMBERS,
-  ROULETTE_BLACK_NUMBERS,
   CASINO_CONSTANTS,
+  getNumberColor,
 } from '@adventure/shared';
 import type {
   RouletteBetType,
@@ -27,16 +26,6 @@ interface CasinoProps {
 }
 
 // Helpers
-
-const redSet = new Set<number>(ROULETTE_RED_NUMBERS);
-const blackSet = new Set<number>(ROULETTE_BLACK_NUMBERS);
-
-function getNumberColor(n: number): 'red' | 'black' | 'green' {
-  if (n === 0) return 'green';
-  if (redSet.has(n)) return 'red';
-  if (blackSet.has(n)) return 'black';
-  return 'black';
-}
 
 function colorClass(color: 'red' | 'black' | 'green'): string {
   switch (color) {

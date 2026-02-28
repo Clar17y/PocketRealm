@@ -1,12 +1,9 @@
-import { CASINO_CONSTANTS, ROULETTE_RED_NUMBERS } from '@adventure/shared';
+import { CASINO_CONSTANTS, ROULETTE_RED_NUMBERS, getNumberColor } from '@adventure/shared';
 import type { RouletteBetType } from '@adventure/shared';
 
-const RED_SET = new Set<number>(ROULETTE_RED_NUMBERS);
+export { getNumberColor };
 
-export function getNumberColor(n: number): 'red' | 'black' | 'green' {
-  if (n === 0) return 'green';
-  return RED_SET.has(n) ? 'red' : 'black';
-}
+const RED_SET = new Set<number>(ROULETTE_RED_NUMBERS);
 
 export function isWinningBet(betType: RouletteBetType, betValue: string, result: number): boolean {
   switch (betType) {
