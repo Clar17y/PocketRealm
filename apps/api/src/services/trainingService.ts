@@ -8,6 +8,7 @@ import { getEquipmentStats } from './equipmentService';
 import { getPlayerProgressionState } from './attributesService';
 import { getHpState } from './hpService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from './combatStatsService';
+import { toMobTemplate } from '../utils/routeHelpers.js';
 
 function cooldownKey(playerId: string): string {
   return `training:cooldown:${playerId}`;
@@ -69,13 +70,14 @@ export async function simulateFight(
   );
 
   // Apply prefix if specified
-  const finalMob = prefix ? applyMobPrefix(mob as any, prefix) : mob;
+  const mobTemplate = toMobTemplate(mob as Record<string, unknown>);
+  const finalMob = prefix ? applyMobPrefix(mobTemplate, prefix) : mobTemplate;
 
   const combatantA: Combatant = { id: playerId, name: 'You', stats: playerStats };
   const combatantB: Combatant = {
     id: mob.id,
     name: prefix ? `${prefix} ${mob.name}` : mob.name,
-    stats: mobToCombatantStats(finalMob as any),
+    stats: mobToCombatantStats(finalMob),
   };
 
   const combatResult = runCombat(combatantA, combatantB);

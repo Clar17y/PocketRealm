@@ -78,6 +78,18 @@ async function getOrCreateRound(): Promise<{ roundId: string; startedAt: number;
 }
 
 async function resolveRound(roundId: string): Promise<number> {
+  // Acquire lock to prevent concurrent resolution
+  const lockKey = `roulette:lock:${roundId}`;
+  const acquired = await redis.set(lockKey, '1', 'EX', 30, 'NX');
+  if (!acquired) {
+    // Another process is resolving — wait and fetch result from DB
+    const round = await prisma.rouletteRound.findUnique({
+      where: { id: roundId },
+      select: { result: true },
+    });
+    return round?.result ?? 0;
+  }
+
   const result = generateSpinResult();
 
   const bets = await prisma.rouletteBet.findMany({ where: { roundId } });

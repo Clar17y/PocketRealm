@@ -328,9 +328,9 @@ export function Casino({
               {[1, 2, 3].map((col) => (
                 <button
                   key={`col-${col}`}
-                  onClick={() => handleOutsideBet('column', String(col))}
+                  onClick={() => handleOutsideBet('column', `col${col}`)}
                   className={`h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-border)] transition-all ${
-                    selectedBetType === 'column' && selectedBetValue === String(col)
+                    selectedBetType === 'column' && selectedBetValue === `col${col}`
                       ? 'ring-2 ring-[var(--rpg-gold)] ring-inset'
                       : ''
                   }`}
@@ -343,9 +343,9 @@ export function Casino({
             {/* Dozen bets */}
             <div className="grid grid-cols-3 gap-px bg-[var(--rpg-border)] mt-px">
               {[
-                { label: '1st 12', value: '1' },
-                { label: '2nd 12', value: '2' },
-                { label: '3rd 12', value: '3' },
+                { label: '1st 12', value: '1-12' },
+                { label: '2nd 12', value: '13-24' },
+                { label: '3rd 12', value: '25-36' },
               ].map(({ label, value }) => (
                 <button
                   key={`dozen-${value}`}
@@ -556,8 +556,8 @@ function formatBet(type: RouletteBetType, value: string): string {
     case 'odd': return 'Odd';
     case 'even': return 'Even';
     case 'dozen':
-      return value === '1' ? '1st 12' : value === '2' ? '2nd 12' : '3rd 12';
-    case 'column': return `Column ${value}`;
+      return value === '1-12' ? '1st 12' : value === '13-24' ? '2nd 12' : '3rd 12';
+    case 'column': return `Column ${value.replace('col', '')}`;
     case 'split': return `Split ${value}`;
     default: return `${type} ${value}`;
   }

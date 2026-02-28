@@ -135,6 +135,7 @@ describe('getCurrentRound', () => {
       JSON.stringify({ roundId: 'round-1', startedAt })
     );
     mockGenerateSpinResult.mockReturnValue(7);
+    mockRedis.set.mockResolvedValue('OK'); // lock acquisition
     mockPrisma.rouletteBet.findMany
       .mockResolvedValueOnce([]) // findMany for bets in resolveRound
       .mockResolvedValueOnce([]); // findMany for getPublicBets

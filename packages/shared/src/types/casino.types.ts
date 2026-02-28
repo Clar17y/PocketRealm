@@ -8,12 +8,6 @@ export type RouletteBetType =
   | 'dozen'
   | 'column';
 
-export interface RouletteBetPlacement {
-  betType: RouletteBetType;
-  betValue: string;
-  amount: number;
-}
-
 export interface RouletteRoundState {
   roundId: string;
   phase: 'betting' | 'spinning' | 'result' | 'idle';
@@ -28,23 +22,6 @@ export interface RoulettePublicBet {
   betType: RouletteBetType;
   betValue: string;
   amount: number;
-}
-
-export interface RouletteBetResult {
-  betType: RouletteBetType;
-  betValue: string;
-  amount: number;
-  payout: number;
-  won: boolean;
-}
-
-export interface RouletteSpinResult {
-  roundId: string;
-  result: number;
-  bets: RouletteBetResult[];
-  totalWagered: number;
-  totalPayout: number;
-  goldAfter: number;
 }
 
 export interface RouletteHistoryEntry {
