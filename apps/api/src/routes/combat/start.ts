@@ -101,6 +101,7 @@ function buildPlayerTemplateCombatant(
     mana: currentMana,
     maxMana,
     manaRegenPerRound,
+    // TODO: merge talent-unlocked action definitions when they are implemented
     actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
   };
 }

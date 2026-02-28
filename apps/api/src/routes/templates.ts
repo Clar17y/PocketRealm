@@ -9,6 +9,7 @@ import {
   updateTemplate,
   deleteTemplate,
 } from '../services/combatTemplateService';
+import { getUnlockedActions } from '../services/skillPointService';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const templatesRouter = Router();
@@ -41,7 +42,8 @@ templatesRouter.get('/', asyncHandler(async (req, res) => {
 templatesRouter.post('/', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = createSchema.parse(req.body);
-  const template = await createTemplate(playerId, body.name, body.actions);
+  const unlockedActions = await getUnlockedActions(playerId);
+  const template = await createTemplate(playerId, body.name, body.actions, unlockedActions);
   res.status(201).json(template);
 }));
 
@@ -57,7 +59,8 @@ templatesRouter.patch('/:id', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { id } = req.params;
   const body = updateSchema.parse(req.body);
-  const template = await updateTemplate(playerId, id, body.name, body.actions);
+  const unlockedActions = await getUnlockedActions(playerId);
+  const template = await updateTemplate(playerId, id, body.name, body.actions, unlockedActions);
   res.json(template);
 }));
 
