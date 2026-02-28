@@ -5,6 +5,8 @@ import {
   addStackableItem,
   getTotalQuantityByTemplate,
   consumeItemsByTemplate,
+  getUsedSlots,
+  getPlayerCapacity,
 } from './inventoryService';
 
 beforeEach(() => {
@@ -138,5 +140,84 @@ describe('consumeItemsByTemplate', () => {
     await expect(consumeItemsByTemplate('p1', 'tpl-1', 5)).rejects.toThrow(
       'Insufficient materials'
     );
+  });
+});
+
+describe('getUsedSlots', () => {
+  it('counts non-stackable items as 1 slot each', async () => {
+    mockPrisma.item.findMany.mockResolvedValue([
+      { templateId: 't1', template: { stackable: false } },
+      { templateId: 't2', template: { stackable: false } },
+      { templateId: 't3', template: { stackable: false } },
+    ]);
+    const result = await getUsedSlots('p1');
+    expect(result).toBe(3);
+  });
+
+  it('counts each stackable template as 1 slot', async () => {
+    mockPrisma.item.findMany.mockResolvedValue([
+      { templateId: 'stack-a', template: { stackable: true } },
+      { templateId: 'stack-a', template: { stackable: true } },
+      { templateId: 'stack-b', template: { stackable: true } },
+    ]);
+    const result = await getUsedSlots('p1');
+    expect(result).toBe(2);
+  });
+
+  it('counts mixed stackable and non-stackable correctly', async () => {
+    mockPrisma.item.findMany.mockResolvedValue([
+      { templateId: 'stack-a', template: { stackable: true } },
+      { templateId: 'stack-a', template: { stackable: true } },
+      { templateId: 'non-stack-1', template: { stackable: false } },
+      { templateId: 'non-stack-2', template: { stackable: false } },
+    ]);
+    const result = await getUsedSlots('p1');
+    expect(result).toBe(3); // 1 stackable group + 2 non-stackable
+  });
+
+  it('returns 0 when no items', async () => {
+    mockPrisma.item.findMany.mockResolvedValue([]);
+    expect(await getUsedSlots('p1')).toBe(0);
+  });
+});
+
+describe('getPlayerCapacity', () => {
+  it('returns base capacity with no equipment', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
+    // BASE_CAPACITY = 24
+    expect(await getPlayerCapacity('p1')).toBe(24);
+  });
+
+  it('includes backpack tier bonus', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([
+      { slot: 'backpack', item: { rarity: 'common', template: { tier: 2 }, bonusStats: null } },
+    ]);
+    // 24 base + 2*8 tier = 40
+    expect(await getPlayerCapacity('p1')).toBe(40);
+  });
+
+  it('includes backpack rarity bonus', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([
+      { slot: 'backpack', item: { rarity: 'rare', template: { tier: 1 }, bonusStats: null } },
+    ]);
+    // 24 base + 1*8 tier + 2*2 rarity(rare=index 2) = 36
+    expect(await getPlayerCapacity('p1')).toBe(36);
+  });
+
+  it('includes belt slot bonus', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([
+      { slot: 'belt', item: { rarity: 'common', template: { tier: 1 }, bonusStats: { inventorySlots: 4 } } },
+    ]);
+    // 24 base + 4 belt bonus = 28
+    expect(await getPlayerCapacity('p1')).toBe(28);
+  });
+
+  it('combines backpack and belt bonuses', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([
+      { slot: 'backpack', item: { rarity: 'common', template: { tier: 1 }, bonusStats: null } },
+      { slot: 'belt', item: { rarity: 'common', template: { tier: 1 }, bonusStats: { inventorySlots: 6 } } },
+    ]);
+    // 24 base + 1*8 tier + 6 belt = 38
+    expect(await getPlayerCapacity('p1')).toBe(38);
   });
 });
