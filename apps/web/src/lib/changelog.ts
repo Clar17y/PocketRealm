@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.19',
+    date: '2026-02-28',
+    title: 'Combat Log Improvements',
+    summary:
+      'Encounter site loot now aggregates properly instead of showing duplicates. Combat playback appears above the site list so you never have to scroll to find it. The Combat History tab groups encounter site fights into a single entry with 1/N navigation between individual fights. After a multi-fight encounter, the last combat panel lets you browse all fight logs with Prev/Next buttons (defaulting to the last fight). The panel is now collapsible and clears when you leave the screen. Encounter site timestamps show human-readable durations like "3d ago" instead of raw minutes.',
+  },
+  {
     version: '0.18',
     date: '2026-02-27',
     title: 'Forge & Salvage Overhaul',
