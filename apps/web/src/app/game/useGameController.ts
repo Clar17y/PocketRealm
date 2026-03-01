@@ -1856,6 +1856,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   };
 
   const handleTravelToZone = async (id: string) => {
+    // Warn about pending loot being abandoned
+    if (pendingLootSession) {
+      const ok = window.confirm('You have unclaimed loot! Travelling will abandon it. Continue?');
+      if (!ok) return;
+      // Clear the pending loot — claim nothing, Redis key deleted
+      await claimLoot(pendingLootSession.sessionId, []).catch(() => {});
+      setPendingLootSession(null);
+    }
+
     const hpBefore = hpState.currentHp;
 
     await runAction('travel', async () => {
