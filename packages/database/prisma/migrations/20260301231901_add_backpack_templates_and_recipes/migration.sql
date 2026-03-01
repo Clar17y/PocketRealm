@@ -17,8 +17,8 @@ VALUES
     (SELECT id FROM item_templates WHERE name = 'Cloth Satchel'),
     false, false, 20,
     json_build_array(
-      json_build_object('itemTemplateId', (SELECT id FROM item_templates WHERE name = 'Silk Cloth'), 'quantity', 6),
-      json_build_object('itemTemplateId', (SELECT id FROM item_templates WHERE name = 'Rat Leather'), 'quantity', 3)
+      json_build_object('templateId', (SELECT id FROM item_templates WHERE name = 'Silk Cloth'), 'quantity', 6),
+      json_build_object('templateId', (SELECT id FROM item_templates WHERE name = 'Rat Leather'), 'quantity', 3)
     ),
     25),
 
@@ -27,8 +27,8 @@ VALUES
     (SELECT id FROM item_templates WHERE name = 'Reinforced Pack'),
     false, false, 35,
     json_build_array(
-      json_build_object('itemTemplateId', (SELECT id FROM item_templates WHERE name = 'Woven Cloth'), 'quantity', 6),
-      json_build_object('itemTemplateId', (SELECT id FROM item_templates WHERE name = 'Wolf Leather'), 'quantity', 4)
+      json_build_object('templateId', (SELECT id FROM item_templates WHERE name = 'Woven Cloth'), 'quantity', 6),
+      json_build_object('templateId', (SELECT id FROM item_templates WHERE name = 'Wolf Leather'), 'quantity', 4)
     ),
     45),
 
@@ -37,8 +37,8 @@ VALUES
     (SELECT id FROM item_templates WHERE name = 'Traveller''s Rucksack'),
     false, false, 55,
     json_build_array(
-      json_build_object('itemTemplateId', (SELECT id FROM item_templates WHERE name = 'Fae Fabric'), 'quantity', 6),
-      json_build_object('itemTemplateId', (SELECT id FROM item_templates WHERE name = 'Warg Leather'), 'quantity', 4)
+      json_build_object('templateId', (SELECT id FROM item_templates WHERE name = 'Fae Fabric'), 'quantity', 6),
+      json_build_object('templateId', (SELECT id FROM item_templates WHERE name = 'Warg Leather'), 'quantity', 4)
     ),
     70),
 
@@ -47,8 +47,8 @@ VALUES
     (SELECT id FROM item_templates WHERE name = 'Ranger''s Haversack'),
     false, false, 80,
     json_build_array(
-      json_build_object('itemTemplateId', (SELECT id FROM item_templates WHERE name = 'Cursed Fabric'), 'quantity', 6),
-      json_build_object('itemTemplateId', (SELECT id FROM item_templates WHERE name = 'Croc Leather'), 'quantity', 4)
+      json_build_object('templateId', (SELECT id FROM item_templates WHERE name = 'Cursed Fabric'), 'quantity', 6),
+      json_build_object('templateId', (SELECT id FROM item_templates WHERE name = 'Croc Leather'), 'quantity', 4)
     ),
     100),
 
@@ -57,7 +57,7 @@ VALUES
     (SELECT id FROM item_templates WHERE name = 'Adventurer''s Expedition Pack'),
     false, false, 110,
     json_build_array(
-      json_build_object('itemTemplateId', (SELECT id FROM item_templates WHERE name = 'Spectral Fabric'), 'quantity', 6),
-      json_build_object('itemTemplateId', (SELECT id FROM item_templates WHERE name = 'Naga Leather'), 'quantity', 4)
+      json_build_object('templateId', (SELECT id FROM item_templates WHERE name = 'Spectral Fabric'), 'quantity', 6),
+      json_build_object('templateId', (SELECT id FROM item_templates WHERE name = 'Naga Leather'), 'quantity', 4)
     ),
     140);
