@@ -15,13 +15,13 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { consumeItemsByTemplateTx, getTotalQuantityByTemplate } from '../../services/inventoryService';
+import { consumeItemsByTemplateTx, getTotalQuantityByTemplate, getUsedSlots, getPlayerCapacity } from '../../services/inventoryService';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { incrementContractProgress } from '../../services/guildContractService';
-import { serializeXpGrant, assertNotRecovering, trackAchievements } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
   isSkillType,
@@ -44,8 +44,8 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = craftSchema.parse(req.body);
 
-    // Check if player is recovering
-    await assertNotRecovering(playerId);
+    // Pre-flight: not recovering, not over-encumbered
+    await assertCanAct(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);
@@ -106,6 +106,30 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       }
     }
 
+    // Check backpack capacity before spending turns
+    if (recipe.resultTemplate.stackable) {
+      const existingStack = await prisma.item.findFirst({
+        where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
+      });
+      if (!existingStack) {
+        const [usedSlots, capacity] = await Promise.all([
+          getUsedSlots(playerId),
+          getPlayerCapacity(playerId),
+        ]);
+        if (usedSlots + 1 > capacity) {
+          throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
+        }
+      }
+    } else {
+      const [usedSlots, capacity] = await Promise.all([
+        getUsedSlots(playerId),
+        getPlayerCapacity(playerId),
+      ]);
+      if (usedSlots + quantity > capacity) {
+        throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
+      }
+    }
+
     const baseTurnCost = recipe.turnCost * quantity;
     const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
       const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, baseTurnCost);
@@ -133,7 +157,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
 
     if (recipe.resultTemplate.stackable) {
       const existing = await prisma.item.findFirst({
-        where: { ownerId: playerId, templateId: recipe.resultTemplateId },
+        where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
         select: { id: true, quantity: true },
       });
 

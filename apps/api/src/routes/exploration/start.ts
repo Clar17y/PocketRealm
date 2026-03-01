@@ -32,10 +32,10 @@ import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildId } from '../../services/guildService';
 import { incrementContractProgress } from '../../services/guildContractService';
-import { rollAndGrantLoot } from '../../services/lootService';
+import { rollAndGrantLootWithCapacity } from '../../services/lootService';
 import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertCanAct, recordBestiaryKill, trackAchievements } from '../../utils/routeHelpers.js';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
@@ -48,6 +48,8 @@ import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
 import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
 import { grantCacheLootTx } from '../../services/cacheLootService';
+import { getUsedSlots, getPlayerCapacity } from '../../services/inventoryService';
+import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import {
   startSchema,
@@ -77,7 +79,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = startSchema.parse(req.body);
 
-    const hpState = await assertNotRecovering(playerId);
+    const hpState = await assertCanAct(playerId);
     if (hpState.currentHp <= 0) {
       throw new AppError(400, 'Cannot explore with 0 HP. Rest before exploring.', 'NO_HP');
     }
@@ -182,6 +184,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       ? await buildPotionPool(playerId, hpState.maxHp)
       : [];
     const allPotionsConsumed: PotionConsumed[] = [];
+    const ambushPendingLootSessionIds: string[] = [];
 
     // Spend turns and apply guild tax atomically
     const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
@@ -343,7 +346,11 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           currentHp = combatResult.combatantAHpRemaining;
           await setHp(playerId, currentHp);
 
-          loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+          const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+          loot = lootResult.drops;
+          if (lootResult.pendingLootSessionId) {
+            ambushPendingLootSessionIds.push(lootResult.pendingLootSessionId);
+          }
           xpGrant = await grantSkillXp(playerId, attackSkill, prefixedMob.xpReward);
           xpGain = xpGrant.xpResult.xpAfterEfficiency;
 
@@ -752,6 +759,13 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const refundAmount = aborted && abortedAtTurn ? Math.max(0, effectiveTurns - abortedAtTurn) : 0;
     const refundedTurns = refundAmount > 0 ? await refundPlayerTurns(playerId, refundAmount) : null;
 
+    // Compute available slots for capacity-aware cache loot
+    const [usedSlots, capacity] = await Promise.all([
+      getUsedSlots(playerId),
+      getPlayerCapacity(playerId),
+    ]);
+    let availableSlots = Math.max(0, capacity - usedSlots);
+
     const persisted = await prisma.$transaction(async (tx) => {
       const txAny = tx as unknown as any;
       const createdResourceDiscoveries: Array<{
@@ -837,14 +851,18 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         createdCombatLogIds.push(created.id);
       }
 
-      // Grant hidden cache loot
+      // Grant hidden cache loot (capacity-aware)
+      const allCacheOverflow: PendingLootItem[] = [];
       for (const cache of pendingCacheLoot) {
         const cacheLoot = await grantCacheLootTx(tx, {
           playerId,
           zoneId: body.zoneId,
           mobFamilyId: cache.mobFamilyId,
           luck: progression.attributes.luck,
+          availableSlots,
         });
+        availableSlots = Math.max(0, availableSlots - cacheLoot.slotsConsumed);
+        allCacheOverflow.push(...cacheLoot.overflow);
 
         const lootSummary = cacheLoot.materials.map(m => ({
           itemTemplateId: m.itemTemplateId,
@@ -915,8 +933,21 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         resourceDiscoveries: createdResourceDiscoveries,
         encounterSites: createdEncounterSites,
         combatLogIds: createdCombatLogIds,
+        cacheOverflow: allCacheOverflow,
       };
     });
+
+    // Store cache overflow as pending loot (if any)
+    let cachePendingLootSessionId: string | null = null;
+    if (persisted.cacheOverflow.length > 0) {
+      cachePendingLootSessionId = await storePendingLoot(playerId, persisted.cacheOverflow);
+    }
+
+    // Collect all pending loot session IDs from both ambush and cache overflow
+    const pendingLootSessionIds = [
+      ...ambushPendingLootSessionIds,
+      ...(cachePendingLootSessionId ? [cachePendingLootSessionId] : []),
+    ];
 
     // Assign combatLogIds to ambush events and strip full combat logs from response
     let combatLogIdx = 0;
@@ -992,6 +1023,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       hiddenCaches,
       zoneExitDiscovered,
       ...(respawnedTo ? { respawnedTo } : {}),
+      ...(pendingLootSessionIds.length > 0 ? { pendingLootSessionIds } : {}),
       explorationProgress: {
         turnsExplored: explorationProgress.turnsExplored + explorationTurnsToAdd,
         percent: calculateExplorationPercent(explorationProgress.turnsExplored + explorationTurnsToAdd, explorationProgress.turnsToExplore),

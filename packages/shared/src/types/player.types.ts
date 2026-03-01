@@ -8,6 +8,7 @@ export interface Player {
   characterLevel: number;
   attributePoints: number;
   attributes: PlayerAttributes;
+  gold: number;
 }
 
 export interface TurnBank {
@@ -100,7 +101,8 @@ export type EquipmentSlot =
   | 'main_hand'
   | 'off_hand'
   | 'ring'
-  | 'charm';
+  | 'charm'
+  | 'backpack';
 
 export const ALL_EQUIPMENT_SLOTS: EquipmentSlot[] = [
   'head',
@@ -114,4 +116,5 @@ export const ALL_EQUIPMENT_SLOTS: EquipmentSlot[] = [
   'off_hand',
   'ring',
   'charm',
+  'backpack',
 ];

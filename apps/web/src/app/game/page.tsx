@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, screenBackgroundSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
 import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { LootPicker } from '@/components/common/LootPicker';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
@@ -291,6 +293,8 @@ export default function GamePage() {
     handleSetDefaultRefiningMax,
     lowHpWarning,
     handleSetLowHpWarning,
+    confirmRarity,
+    handleSetConfirmRarity,
     handleQuickRest,
     guildTaxRate,
     showChangelog,
@@ -309,6 +313,23 @@ export default function GamePage() {
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
     combatLogPrefetch,
+    inventoryCapacity,
+    inventoryUsedSlots,
+    isOverEncumbered,
+    gold,
+    pendingLootSession,
+    handleSellItem,
+    handleSellBatch,
+    handleDepositItem,
+    handleDepositBatch,
+    handleWithdrawItem,
+    handleWithdrawBatch,
+    handleClaimLoot,
+    handleDismissLoot,
+    handleReopenLoot,
+    confirmAbandonLoot,
+    abandonLootAndTravel,
+    cancelAbandonLoot,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -405,7 +426,7 @@ export default function GamePage() {
               turns,
               maxTurns: TURN_CONSTANTS.BANK_CAP,
               turnsRegenRate: TURN_CONSTANTS.REGEN_RATE * 60,
-              gold: 0,
+              gold,
               currentXP: characterProgression.characterXp,
               nextLevelXP: nextLevelTotalXp,
               currentLevelXp,
@@ -415,6 +436,7 @@ export default function GamePage() {
               maxHp: hpState.maxHp,
               hpRegenRate: hpState.regenPerSecond,
               isRecovering: hpState.isRecovering,
+              isOverEncumbered,
               recoveryCost: hpState.recoveryCost,
             }}
             characterProgression={characterProgression}
@@ -472,6 +494,7 @@ export default function GamePage() {
             onStartExploration={handleStartExploration}
             activityLog={activityLog}
             isRecovering={hpState.isRecovering}
+            isOverEncumbered={isOverEncumbered}
             recoveryCost={hpState.recoveryCost}
             currentHp={hpState.currentHp}
             maxHp={hpState.maxHp}
@@ -529,8 +552,13 @@ export default function GamePage() {
                 requiredSkill: item.template.requiredSkill ?? null,
                 requiredLevel: item.template.requiredLevel ?? 1,
                 salvageCost,
+                sellPrice: item.template.sellPrice ?? null,
               };
             })}
+            capacity={inventoryCapacity}
+            usedSlots={inventoryUsedSlots}
+            gold={gold}
+            isInTown={currentZone?.zoneType === 'town'}
             onDrop={handleDestroyItem}
             onSalvage={handleSalvageItem}
             onSalvageBatch={handleSalvageBatch}
@@ -538,7 +566,14 @@ export default function GamePage() {
             onEquip={handleEquipItem}
             onUnequip={handleUnequipSlot}
             onUse={handleUseItem}
+            onSell={handleSellItem}
+            onSellBatch={handleSellBatch}
+            onDeposit={handleDepositItem}
+            onDepositBatch={handleDepositBatch}
+            onWithdraw={handleWithdrawItem}
+            onWithdrawBatch={handleWithdrawBatch}
             zoneCraftingLevel={zoneCraftingLevel}
+            confirmRarity={confirmRarity}
           />
         );
       }
@@ -671,6 +706,7 @@ export default function GamePage() {
             currentZoneId={activeZoneId ?? ''}
             availableTurns={turns}
             isRecovering={hpState.isRecovering}
+            isOverEncumbered={isOverEncumbered}
             playbackActive={playbackActive}
             travelPlaybackData={travelPlaybackData}
             onTravelPlaybackComplete={handleTravelPlaybackComplete}
@@ -775,11 +811,13 @@ export default function GamePage() {
               onCraft={handleCraft}
               activityLog={activityLog}
               isRecovering={hpState.isRecovering}
+              isOverEncumbered={isOverEncumbered}
               recoveryCost={hpState.recoveryCost}
               zoneCraftingLevel={zoneCraftingLevel}
               zoneName={zoneCraftingName}
               defaultMaxQuantity={activeCraftingSkill === 'refining' && defaultRefiningMax}
               guildTaxRate={guildTaxRate}
+              backpackFull={inventoryUsedSlots >= inventoryCapacity}
             />
           </div>
         );
@@ -878,6 +916,8 @@ export default function GamePage() {
               onResourceTypeFilterChange={handleGatheringResourceTypeFilterChange}
               onStartGathering={handleMine}
               isRecovering={hpState.isRecovering}
+              isOverEncumbered={isOverEncumbered}
+              backpackFull={inventoryUsedSlots >= inventoryCapacity}
               recoveryCost={hpState.recoveryCost}
               guildTaxRate={guildTaxRate}
             />
@@ -889,6 +929,7 @@ export default function GamePage() {
         return (
           <CombatScreen
             hpState={hpState}
+            isOverEncumbered={isOverEncumbered}
             currentTurns={turns}
             currentZoneId={activeZoneId}
             pendingEncounters={pendingEncounters}
@@ -1092,6 +1133,32 @@ export default function GamePage() {
               </div>
             </PixelCard>
 
+            {/* Inventory */}
+            <PixelCard>
+              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Inventory</h3>
+              <div>
+                <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Confirm Before Drop / Salvage / Sell</p>
+                <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
+                  Show a confirmation dialog when destroying items at or above this rarity.
+                </p>
+                <div className="flex gap-2">
+                  {(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary'] as const).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => handleSetConfirmRarity(r)}
+                      className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors capitalize ${
+                        confirmRarity === r
+                          ? 'bg-[var(--rpg-gold)] text-black'
+                          : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-border)]'
+                      }`}
+                    >
+                      {r === 'none' ? 'Off' : r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </PixelCard>
+
             {/* Account */}
             <button
               onClick={() => { logout(); router.push('/'); }}
@@ -1143,6 +1210,26 @@ export default function GamePage() {
   return (
     <>
       {showChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
+      {confirmAbandonLoot && (
+        <ConfirmModal
+          title="Abandon Loot?"
+          message="You have unclaimed overflow loot. Travelling to another zone will leave it behind forever."
+          confirmLabel="Travel Anyway"
+          cancelLabel="Stay"
+          variant="warning"
+          onConfirm={abandonLootAndTravel}
+          onCancel={cancelAbandonLoot}
+        />
+      )}
+      {pendingLootSession && !pendingLootSession.minimized && (
+        <LootPicker
+          sessionId={pendingLootSession.sessionId}
+          items={pendingLootSession.items}
+          availableSlots={Math.max(0, inventoryCapacity - inventoryUsedSlots)}
+          onClaim={handleClaimLoot}
+          onDismiss={handleDismissLoot}
+        />
+      )}
       <AppShell
   turns={turns}
   username={player?.username}
@@ -1160,12 +1247,23 @@ export default function GamePage() {
         {/* Broken gear warning banner */}
         {equipment.some((e) => {
           if (!e.item) return false;
-          const cur = e.item.currentDurability ?? e.item.template?.maxDurability ?? 1;
+          const maxDur = e.item.template?.maxDurability ?? 0;
+          if (maxDur <= 0) return false; // no durability system (e.g. backpacks)
+          const cur = e.item.currentDurability ?? maxDur;
           return cur <= 0;
         }) && (
           <div className="mb-3 p-2 rounded-lg bg-[var(--rpg-red)]/10 border border-[var(--rpg-red)] text-[var(--rpg-red)] text-sm text-center">
             You have broken equipment! Broken gear provides no stats. Visit your inventory to repair.
           </div>
+        )}
+
+        {pendingLootSession?.minimized && (
+          <button
+            onClick={handleReopenLoot}
+            className="mb-3 w-full p-2 rounded-lg bg-[var(--rpg-gold)]/10 border border-[var(--rpg-gold)] text-[var(--rpg-gold)] text-sm text-center hover:bg-[var(--rpg-gold)]/20 transition-colors"
+          >
+            You have unclaimed loot! Tap to pick up items.
+          </button>
         )}
 
         <TutorialBanner

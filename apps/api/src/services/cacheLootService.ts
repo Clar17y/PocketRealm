@@ -2,6 +2,7 @@ import { Prisma } from '@adventure/database';
 import { HIDDEN_CACHE_CONSTANTS, GEM_CONSTANTS, levelToGemTier } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
+import type { PendingLootItem } from './pendingLootService';
 
 export interface CacheMaterialDrop {
   itemTemplateId: string;
@@ -12,6 +13,8 @@ export interface CacheMaterialDrop {
 export interface CacheLootResult {
   materials: CacheMaterialDrop[];
   soulboundItem: { itemTemplateId: string; name: string; rarity: string } | null;
+  overflow: PendingLootItem[];
+  slotsConsumed: number;
 }
 
 export function rollRarityWithLuck(luck: number): 'common' | 'uncommon' | 'rare' | 'epic' {
@@ -37,8 +40,9 @@ export async function grantCacheLootTx(
   params: {
     playerId: string;
     zoneId: string;
-    mobFamilyId: string; // still needed for soulbound recipes
+    mobFamilyId: string;
     luck: number;
+    availableSlots?: number;
   }
 ): Promise<CacheLootResult> {
   const txAny = tx as unknown as Record<string, unknown>;
@@ -96,6 +100,20 @@ export async function grantCacheLootTx(
 
   // Roll 2-4 cut gems from the available pool (random picks with replacement)
   const materials: CacheMaterialDrop[] = [];
+  const overflow: PendingLootItem[] = [];
+  const initialSlots = params.availableSlots ?? Infinity;
+  let remainingSlots = initialSlots;
+
+  // Track which stackable templates already exist in player's backpack
+  // (merging into an existing stack doesn't consume a new slot)
+  const existingStacks = new Set<string>();
+  if (params.availableSlots != null) {
+    const playerItems = await (txAny as any).item.findMany({
+      where: { ownerId: params.playerId, inStash: false },
+      select: { templateId: true },
+    }) as Array<{ templateId: string }>;
+    for (const item of playerItems) existingStacks.add(item.templateId);
+  }
 
   if (cutGemTemplateIds.length > 0) {
     const materialRolls = randomIntInclusive(MATERIAL_ROLLS_MIN, MATERIAL_ROLLS_MAX);
@@ -103,21 +121,43 @@ export async function grantCacheLootTx(
 
     for (let i = 0; i < materialRolls; i++) {
       const picked = cutGemTemplateIds[randomIntInclusive(0, cutGemTemplateIds.length - 1)]!;
+      const alreadyGranted = materialMap.has(picked.templateId);
+      const hasExistingStack = existingStacks.has(picked.templateId) || alreadyGranted;
+      const needsNewSlot = !hasExistingStack;
 
-      await addStackableItemTx(tx, params.playerId, picked.templateId, 1);
-
-      const existing = materialMap.get(picked.templateId);
-      if (existing) {
-        existing.quantity += 1;
+      if (needsNewSlot && remainingSlots <= 0) {
+        // Overflow — add to pending loot instead
+        const existing = overflow.find(o => o.templateId === picked.templateId);
+        if (existing) {
+          existing.quantity += 1;
+        } else {
+          overflow.push({
+            templateId: picked.templateId,
+            templateName: picked.name,
+            rarity: 'common',
+            quantity: 1,
+            bonusStats: null,
+            currentDurability: null,
+            maxDurability: null,
+          });
+        }
       } else {
-        const drop: CacheMaterialDrop = { itemTemplateId: picked.templateId, name: picked.name, quantity: 1 };
-        materialMap.set(picked.templateId, drop);
-        materials.push(drop);
+        if (needsNewSlot) remainingSlots--;
+        await addStackableItemTx(tx, params.playerId, picked.templateId, 1);
+
+        const existing = materialMap.get(picked.templateId);
+        if (existing) {
+          existing.quantity += 1;
+        } else {
+          const drop: CacheMaterialDrop = { itemTemplateId: picked.templateId, name: picked.name, quantity: 1 };
+          materialMap.set(picked.templateId, drop);
+          materials.push(drop);
+        }
       }
     }
   }
 
-  // --- Soulbound item roll (unchanged, uses mob family) ---
+  // --- Soulbound item roll (uses mob family) ---
   let soulboundItem: CacheLootResult['soulboundItem'] = null;
 
   if (Math.random() < SOULBOUND_DROP_CHANCE) {
@@ -142,24 +182,45 @@ export async function grantCacheLootTx(
       const isEquipment = picked.resultTemplate.itemType === 'weapon' || picked.resultTemplate.itemType === 'armor';
       const maxDurability = isEquipment ? picked.resultTemplate.maxDurability : null;
 
-      await tx.item.create({
-        data: {
-          ownerId: params.playerId,
+      if (remainingSlots > 0) {
+        remainingSlots--;
+        await tx.item.create({
+          data: {
+            ownerId: params.playerId,
+            templateId: picked.resultTemplateId,
+            rarity,
+            quantity: 1,
+            maxDurability,
+            currentDurability: maxDurability,
+          } as any,
+        });
+
+        soulboundItem = {
+          itemTemplateId: picked.resultTemplateId,
+          name: picked.resultTemplate.name,
+          rarity,
+        };
+      } else {
+        // Soulbound overflow
+        overflow.push({
           templateId: picked.resultTemplateId,
+          templateName: picked.resultTemplate.name,
           rarity,
           quantity: 1,
-          maxDurability,
+          bonusStats: null,
           currentDurability: maxDurability,
-        } as any,
-      });
+          maxDurability,
+        });
 
-      soulboundItem = {
-        itemTemplateId: picked.resultTemplateId,
-        name: picked.resultTemplate.name,
-        rarity,
-      };
+        soulboundItem = {
+          itemTemplateId: picked.resultTemplateId,
+          name: picked.resultTemplate.name,
+          rarity,
+        };
+      }
     }
   }
 
-  return { materials, soulboundItem };
+  const slotsConsumed = initialSlots === Infinity ? 0 : Math.max(0, initialSlots - remainingSlots);
+  return { materials, soulboundItem, overflow, slotsConsumed };
 }
