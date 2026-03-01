@@ -349,6 +349,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }>>([]);
   const [inventoryCapacity, setInventoryCapacity] = useState(24);
   const [inventoryUsedSlots, setInventoryUsedSlots] = useState(0);
+  const [materialTotals, setMaterialTotals] = useState<Record<string, number>>({});
   const [gold, setGold] = useState(0);
   const [pendingLootSession, setPendingLootSession] = useState<{
     sessionId: string;
@@ -659,6 +660,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setInventory(invRes.data.items);
       setInventoryCapacity(invRes.data.capacity ?? 24);
       setInventoryUsedSlots(invRes.data.usedSlots ?? 0);
+      if (invRes.data.materialTotals) setMaterialTotals(invRes.data.materialTotals);
     }
     if (equipRes.data) {
       setEquipment(
@@ -998,8 +1000,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const ownedByTemplateId = (() => {
     const map = new Map<string, number>();
-    for (const item of inventory) {
-      map.set(item.template.id, (map.get(item.template.id) ?? 0) + item.quantity);
+    // Use materialTotals (backpack + stash combined) so crafting sees all owned materials
+    for (const [templateId, qty] of Object.entries(materialTotals)) {
+      map.set(templateId, qty);
     }
     return map;
   })();

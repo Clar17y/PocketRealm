@@ -37,6 +37,7 @@ export async function getInventory() {
     items: InventoryItem[];
     capacity: number;
     usedSlots: number;
+    materialTotals?: Record<string, number>;
   }>('/api/v1/inventory');
 }
 

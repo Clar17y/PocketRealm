@@ -25,7 +25,7 @@ inventoryRouter.use(authenticate);
 inventoryRouter.get('/', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
 
-  const [items, equipped, capacity, usedSlots] = await Promise.all([
+  const [items, equipped, capacity, usedSlots, materialRows] = await Promise.all([
     prisma.item.findMany({
       where: { ownerId: playerId, inStash: false },
       include: { template: true },
@@ -37,11 +37,21 @@ inventoryRouter.get('/', asyncHandler(async (req, res) => {
     }),
     getPlayerCapacity(playerId),
     getUsedSlots(playerId),
+    prisma.item.groupBy({
+      by: ['templateId'],
+      where: { ownerId: playerId },
+      _sum: { quantity: true },
+    }),
   ]);
 
   const equippedByItemId = new Map<string, string>();
   for (const e of equipped) {
     if (e.itemId) equippedByItemId.set(e.itemId, e.slot);
+  }
+
+  const materialTotals: Record<string, number> = {};
+  for (const row of materialRows) {
+    materialTotals[row.templateId] = row._sum.quantity ?? 0;
   }
 
   res.json({
@@ -51,6 +61,7 @@ inventoryRouter.get('/', asyncHandler(async (req, res) => {
     })),
     capacity,
     usedSlots,
+    materialTotals,
   });
 }));
 
