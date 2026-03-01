@@ -59,6 +59,9 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
                 ? 'Your backpack is full! Free up space to claim these items.'
                 : 'Your backpack was full! Select items to claim.'}
             </div>
+            <div className="text-xs text-[var(--rpg-red)] mt-0.5">
+              Unclaimed loot expires after 10 minutes.
+            </div>
           </div>
           <button
             onClick={onDismiss}

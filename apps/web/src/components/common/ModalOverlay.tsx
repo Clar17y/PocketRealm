@@ -7,7 +7,10 @@ interface ModalOverlayProps {
 
 export function ModalOverlay({ children, opacity = 70 }: ModalOverlayProps) {
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center ${opacity === 60 ? 'bg-black/60' : 'bg-black/70'}`}>
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center ${opacity === 60 ? 'bg-black/60' : 'bg-black/70'}`}
+      onClick={(e) => e.stopPropagation()}
+    >
       {children}
     </div>
   );
