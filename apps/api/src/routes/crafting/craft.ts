@@ -157,7 +157,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
 
     if (recipe.resultTemplate.stackable) {
       const existing = await prisma.item.findFirst({
-        where: { ownerId: playerId, templateId: recipe.resultTemplateId },
+        where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
         select: { id: true, quantity: true },
       });
 

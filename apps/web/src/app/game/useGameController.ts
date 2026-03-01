@@ -531,6 +531,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const pendingCombatRewardsRef = useRef<LastCombat['rewards'] | null>(null);
   const siteJustClearedRef = useRef(false);
   const combatPendingLootRef = useRef<string | null>(null);
+  const pendingLootQueueRef = useRef<string[]>([]);
   const arrivedInTownRef = useRef(false);
   const lastEventLogTimeRef = useRef(0);
   const combatPlaybackData = combatPlaybackQueue?.[combatPlaybackIndex] ?? null;
@@ -1084,6 +1085,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     await advanceTutorial(TUTORIAL_STEP_EXPLORE);
     await loadAll();
     if (pendingIds?.length) {
+      pendingLootQueueRef.current = pendingIds.slice(1);
       await activatePendingLoot(pendingIds[0]);
     }
   };
@@ -1798,9 +1800,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
-  const clearExpiredLoot = () => {
+  const activateNextQueuedLoot = async () => {
+    const next = pendingLootQueueRef.current.shift();
+    if (next) {
+      await activatePendingLoot(next);
+    }
+  };
+
+  const clearExpiredLoot = async () => {
     setPendingLootSession(null);
     pushLog({ timestamp: nowStamp(), type: 'warning', message: 'Overflow loot expired — unclaimed items were lost.' });
+    await activateNextQueuedLoot();
   };
 
   const activatePendingLoot = async (sessionId: string) => {
@@ -1836,6 +1846,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         message: `Claimed ${selectedIndices.length} loot items`,
       });
       await loadAll();
+      await activateNextQueuedLoot();
     });
   };
 
@@ -1863,6 +1874,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       await claimLoot(pendingLootSession.sessionId, []).catch(() => {});
       setPendingLootSession(null);
     }
+    pendingLootQueueRef.current = [];
     setConfirmAbandonLoot(null);
     await doTravel(zoneId);
   };

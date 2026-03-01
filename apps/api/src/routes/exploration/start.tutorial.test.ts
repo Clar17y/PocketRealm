@@ -96,6 +96,17 @@ vi.mock('../../services/combatStatsService', () => ({
 vi.mock('../../services/statsService', () => ({
   incrementStats: vi.fn(),
 }));
+vi.mock('../../services/cacheLootService', () => ({
+  grantCacheLootTx: vi.fn().mockResolvedValue({ materials: [], soulboundItem: null, slotsConsumed: 0, overflow: [] }),
+}));
+vi.mock('../../services/inventoryService', () => ({
+  getUsedSlots: vi.fn().mockResolvedValue(5),
+  getPlayerCapacity: vi.fn().mockResolvedValue(24),
+  assertNotOverEncumbered: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../services/pendingLootService', () => ({
+  storePendingLoot: vi.fn().mockResolvedValue('mock-session-id'),
+}));
 vi.mock('../../utils/routeHelpers.js', () => ({
   serializeXpGrant: vi.fn((grant: any) => ({
     skillType: grant.skillType, ...grant.xpResult,
@@ -109,6 +120,7 @@ vi.mock('../../utils/routeHelpers.js', () => ({
     spellPattern: Array.isArray(raw.spellPattern) ? raw.spellPattern : [],
   })),
   assertNotRecovering: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
+  assertCanAct: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
   recordBestiaryKill: vi.fn().mockResolvedValue(undefined),
   trackAchievements: vi.fn().mockResolvedValue(undefined),
 }));
@@ -130,6 +142,7 @@ vi.mock('@adventure/game-engine', () => ({
     log: [],
     potionsConsumed: [],
   })),
+  getScaledZoneExitChance: vi.fn(() => 0.01),
   selectTierWithBleedthrough: vi.fn(() => 1),
   simulateExploration: vi.fn(() => []),
   validateExplorationTurns: vi.fn(() => ({ valid: true })),

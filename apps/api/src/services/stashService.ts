@@ -130,9 +130,6 @@ export async function withdrawBatch(
   ]);
 
   let availableSlots = capacity - usedSlots;
-  if (availableSlots <= 0) {
-    return { withdrawnCount: 0 };
-  }
 
   return prisma.$transaction(async (tx) => {
     let withdrawnCount = 0;

@@ -65,7 +65,7 @@ describe('storePendingLoot', () => {
       expect.stringContaining('pending_loot:p1:'),
       JSON.stringify(sampleLoot),
       'EX',
-      300 // PENDING_LOOT_TTL_SECONDS
+      600 // INVENTORY_CONSTANTS.PENDING_LOOT_TTL_SECONDS
     );
   });
 });

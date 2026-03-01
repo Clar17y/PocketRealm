@@ -69,6 +69,7 @@ export async function sellBulk(
       });
       if (!item || item.ownerId !== playerId) continue;
       if (item.equipment.length > 0) continue;
+      if (item.inStash) continue;
       if (!item.template.sellPrice) continue;
 
       const unitPrice = calculateSellPrice({
