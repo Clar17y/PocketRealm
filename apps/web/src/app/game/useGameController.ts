@@ -1851,16 +1851,28 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   };
 
-  const handleTravelToZone = async (id: string) => {
-    // Warn about pending loot being abandoned
+  const [confirmAbandonLoot, setConfirmAbandonLoot] = useState<{ travelZoneId: string } | null>(null);
+
+  const abandonLootAndTravel = async () => {
+    if (!confirmAbandonLoot) return;
+    const zoneId = confirmAbandonLoot.travelZoneId;
     if (pendingLootSession) {
-      const ok = window.confirm('You have unclaimed loot! Travelling will abandon it. Continue?');
-      if (!ok) return;
-      // Clear the pending loot — claim nothing, Redis key deleted
       await claimLoot(pendingLootSession.sessionId, []).catch(() => {});
       setPendingLootSession(null);
     }
+    setConfirmAbandonLoot(null);
+    await doTravel(zoneId);
+  };
 
+  const handleTravelToZone = async (id: string) => {
+    if (pendingLootSession) {
+      setConfirmAbandonLoot({ travelZoneId: id });
+      return;
+    }
+    await doTravel(id);
+  };
+
+  const doTravel = async (id: string) => {
     const hpBefore = hpState.currentHp;
 
     await runAction('travel', async () => {
@@ -2085,6 +2097,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleNavigate,
     getActiveTab,
     handleTravelToZone,
+    confirmAbandonLoot,
+    abandonLootAndTravel,
+    cancelAbandonLoot: () => setConfirmAbandonLoot(null),
 
     // Core state
     turns,

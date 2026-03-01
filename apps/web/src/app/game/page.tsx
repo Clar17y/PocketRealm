@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, screenBackgroundSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
 import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { LootPicker } from '@/components/common/LootPicker';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
 import { BottomNav } from '@/components/BottomNav';
@@ -324,6 +325,9 @@ export default function GamePage() {
     handleClaimLoot,
     handleDismissLoot,
     handleReopenLoot,
+    confirmAbandonLoot,
+    abandonLootAndTravel,
+    cancelAbandonLoot,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -1177,6 +1181,17 @@ export default function GamePage() {
   return (
     <>
       {showChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
+      {confirmAbandonLoot && (
+        <ConfirmModal
+          title="Abandon Loot?"
+          message="You have unclaimed overflow loot. Travelling to another zone will leave it behind forever."
+          confirmLabel="Travel Anyway"
+          cancelLabel="Stay"
+          variant="warning"
+          onConfirm={abandonLootAndTravel}
+          onCancel={cancelAbandonLoot}
+        />
+      )}
       {pendingLootSession && !pendingLootSession.minimized && (
         <LootPicker
           sessionId={pendingLootSession.sessionId}
