@@ -1,6 +1,11 @@
 import { Prisma, prisma } from '@adventure/database';
-import { buildPlayerCombatStats, calculateFleeResult, calculateMaxHp, runCombat } from '@adventure/game-engine';
-import { PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, type Combatant, type CombatResult, type SkillType } from '@adventure/shared';
+import {
+  buildPlayerCombatStats, calculateFleeResult, calculateMaxHp,
+  runTemplateCombat, calculateMaxStamina, calculateStaminaRegenPerRound,
+  calculateMaxMana, calculateManaRegenPerRound,
+} from '@adventure/game-engine';
+import type { TemplateCombatant } from '@adventure/game-engine';
+import { PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, BASE_ACTION_DEFINITIONS, type SkillType } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { buildPagination, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from './combatStatsService.js';
@@ -10,6 +15,8 @@ import { spendPlayerTurnsTx } from './turnBankService';
 import { degradeEquippedDurability } from './durabilityService';
 import { normalizePlayerAttributes } from './attributesService';
 import { getHpState, setHp, enterRecoveringState } from './hpService';
+import { getActiveTemplate } from './combatTemplateService';
+import { getResourceState, setAllResources } from './resourceService';
 
 type AttackStyle = 'melee' | 'ranged' | 'magic';
 
@@ -302,7 +309,32 @@ export async function challenge(
     attackerEquipStats,
   );
 
-  // Build defender combatant
+  // Attacker template + resources
+  const attackerTemplate = await getActiveTemplate(attackerId);
+  const attackerResources = await getResourceState(attackerId);
+
+  const [attackerMeleeLevel, attackerRangedLevel, attackerEvasionLevel, attackerMagicLevel] = await Promise.all([
+    getSkillLevel(attackerId, 'melee'),
+    getSkillLevel(attackerId, 'ranged'),
+    getSkillLevel(attackerId, 'evasion' as SkillType),
+    getSkillLevel(attackerId, 'magic'),
+  ]);
+
+  const attackerCombatant: TemplateCombatant = {
+    id: attackerId,
+    name: attackerUsername,
+    stats: attackerStats,
+    template: attackerTemplate,
+    stamina: attackerResources.stamina.current,
+    maxStamina: attackerResources.stamina.max,
+    staminaRegenPerRound: calculateStaminaRegenPerRound(attackerMeleeLevel, attackerRangedLevel, attackerEvasionLevel),
+    mana: attackerResources.mana.current,
+    maxMana: attackerResources.mana.max,
+    manaRegenPerRound: calculateManaRegenPerRound(attackerMagicLevel),
+    actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
+  };
+
+  // Build defender combatant (ghost — max everything)
   const defenderAttributes = normalizePlayerAttributes(target.attributes);
   const defenderEquipStats = await getEquipmentStats(targetId);
   const defenderStyle = await getAttackStyleFromEquipment(targetId);
@@ -318,18 +350,42 @@ export async function challenge(
     defenderEquipStats,
   );
 
-  const combatantA: Combatant = {
-    id: attackerId,
-    name: attackerUsername,
-    stats: attackerStats,
-  };
-  const combatantB: Combatant = {
+  // Defender template + max resources
+  const defenderTemplate = await getActiveTemplate(targetId);
+
+  const [defenderMeleeLevel, defenderRangedLevel, defenderEvasionLevel, defenderMagicLevel] = await Promise.all([
+    getSkillLevel(targetId, 'melee'),
+    getSkillLevel(targetId, 'ranged'),
+    getSkillLevel(targetId, 'evasion' as SkillType),
+    getSkillLevel(targetId, 'magic'),
+  ]);
+
+  const defenderMaxStamina = calculateMaxStamina({
+    meleeLevel: defenderMeleeLevel,
+    rangedLevel: defenderRangedLevel,
+    evasionLevel: defenderEvasionLevel,
+    equipmentStaminaBonus: 0,
+  });
+  const defenderMaxMana = calculateMaxMana({
+    magicLevel: defenderMagicLevel,
+    equipmentManaBonus: 0,
+  });
+
+  const defenderCombatant: TemplateCombatant = {
     id: targetId,
     name: target.username,
     stats: defenderStats,
+    template: defenderTemplate,
+    stamina: defenderMaxStamina,
+    maxStamina: defenderMaxStamina,
+    staminaRegenPerRound: calculateStaminaRegenPerRound(defenderMeleeLevel, defenderRangedLevel, defenderEvasionLevel),
+    mana: defenderMaxMana,
+    maxMana: defenderMaxMana,
+    manaRegenPerRound: calculateManaRegenPerRound(defenderMagicLevel),
+    actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
   };
 
-  const combatResult: CombatResult = runCombat(combatantA, combatantB);
+  const combatResult = runTemplateCombat(attackerCombatant, defenderCombatant);
 
   const isDraw = combatResult.outcome === 'draw';
   const attackerWon = combatResult.outcome === 'victory';
@@ -444,11 +500,16 @@ export async function challenge(
     target.isBot ? [] : degradeEquippedDurability(targetId),
   ]);
 
-  // Persist attacker HP after combat
+  // Persist attacker resources after combat
   let attackerKnockedOut = false;
   let fleeOutcome: string | null = null;
   if (combatResult.combatantAHpRemaining <= 0) {
-    // Defeated: roll flee check (evasion vs defender level)
+    await setAllResources(
+      attackerId,
+      combatResult.combatantAHpRemaining,
+      combatResult.combatantAStaminaRemaining,
+      combatResult.combatantAManaRemaining,
+    );
     const fleeResult = calculateFleeResult({
       evasionLevel: attackerAttributes.evasion,
       mobLevel: target.characterLevel,
@@ -464,7 +525,12 @@ export async function challenge(
       await setHp(attackerId, fleeResult.remainingHp);
     }
   } else {
-    await setHp(attackerId, combatResult.combatantAHpRemaining);
+    await setAllResources(
+      attackerId,
+      combatResult.combatantAHpRemaining,
+      combatResult.combatantAStaminaRemaining,
+      combatResult.combatantAManaRemaining,
+    );
   }
 
   return {
