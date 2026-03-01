@@ -19,10 +19,35 @@ function lootKey(playerId: string, sessionId: string): string {
   return `pending_loot:${playerId}:${sessionId}`;
 }
 
+function aggregateOverflow(items: PendingLootItem[]): PendingLootItem[] {
+  const merged = new Map<string, PendingLootItem>();
+  const result: PendingLootItem[] = [];
+
+  for (const item of items) {
+    // Only merge stackable-like items (no bonus stats, no durability = materials)
+    const isStackable = !item.bonusStats && item.maxDurability == null;
+    if (isStackable) {
+      const key = `${item.templateId}:${item.rarity}`;
+      const existing = merged.get(key);
+      if (existing) {
+        existing.quantity += item.quantity;
+        continue;
+      }
+      const copy = { ...item };
+      merged.set(key, copy);
+      result.push(copy);
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
+}
+
 export async function storePendingLoot(playerId: string, items: PendingLootItem[]): Promise<string> {
   const sessionId = randomUUID();
   const key = lootKey(playerId, sessionId);
-  await redis.set(key, JSON.stringify(items), 'EX', INVENTORY_CONSTANTS.PENDING_LOOT_TTL_SECONDS);
+  const aggregated = aggregateOverflow(items);
+  await redis.set(key, JSON.stringify(aggregated), 'EX', INVENTORY_CONSTANTS.PENDING_LOOT_TTL_SECONDS);
   return sessionId;
 }
 

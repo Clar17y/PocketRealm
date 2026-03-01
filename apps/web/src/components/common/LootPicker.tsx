@@ -118,6 +118,12 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
           })}
         </div>
 
+        {!noSpace && selected.size < items.length && (
+          <div className="text-xs text-[var(--rpg-text-secondary)] mb-2 text-center">
+            Unclaimed items will be lost.
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-2">
           <PixelButton
             variant="secondary"
@@ -125,7 +131,7 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
             disabled={busy}
             onClick={onDismiss}
           >
-            {noSpace ? 'Close' : 'Leave All'}
+            {noSpace ? 'Make Space' : 'Discard All'}
           </PixelButton>
           <PixelButton
             variant="primary"
@@ -140,7 +146,7 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
               }
             }}
           >
-            Claim Selected
+            {selected.size === items.length ? 'Claim All' : `Claim ${selected.size} / Discard ${items.length - selected.size}`}
           </PixelButton>
         </div>
       </PixelCard>

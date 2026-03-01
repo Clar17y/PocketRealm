@@ -528,6 +528,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [roomTransition, setRoomTransition] = useState<{ entering: number } | null>(null);
   const pendingCombatRewardsRef = useRef<LastCombat['rewards'] | null>(null);
   const siteJustClearedRef = useRef(false);
+  const combatPendingLootRef = useRef<string | null>(null);
   const arrivedInTownRef = useRef(false);
   const lastEventLogTimeRef = useRef(0);
   const combatPlaybackData = combatPlaybackQueue?.[combatPlaybackIndex] ?? null;
@@ -1283,10 +1284,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
 
-      // Detect pending loot overflow
-      if (data.pendingLootSessionId) {
-        await activatePendingLoot(data.pendingLootSessionId);
-      }
+      // Store pending loot session ID for activation after playback
+      combatPendingLootRef.current = data.pendingLootSessionId ?? null;
 
       await Promise.all([loadAll(), loadTurnsAndHp(), loadBestiary()]);
     });
@@ -1344,6 +1343,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (siteJustClearedRef.current) {
       siteJustClearedRef.current = false;
       advanceTutorial(TUTORIAL_STEP_COMBAT);
+    }
+
+    const pendingId = combatPendingLootRef.current;
+    combatPendingLootRef.current = null;
+    if (pendingId) {
+      void activatePendingLoot(pendingId);
     }
   };
 
