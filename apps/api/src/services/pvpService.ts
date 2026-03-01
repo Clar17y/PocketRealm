@@ -8,7 +8,7 @@ import type { TemplateCombatant } from '@adventure/game-engine';
 import {
   PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, BASE_ACTION_DEFINITIONS,
   TALENT_TREE_DEFINITIONS,
-  type SkillType, type ActionCategory,
+  type SkillType, type ActionDefinition,
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { buildPagination, trackAchievements } from '../utils/routeHelpers.js';
@@ -166,7 +166,7 @@ export async function scoutOpponent(attackerId: string, targetId: string) {
   const targetTemplate = await getActiveTemplate(targetId);
   const categoryBreakdown = computeTemplateCategoryBreakdown(
     targetTemplate,
-    BASE_ACTION_DEFINITIONS as Record<string, { category: ActionCategory }>,
+    BASE_ACTION_DEFINITIONS,
   );
 
   // Resource profile
@@ -256,7 +256,7 @@ async function calculatePowerRating(playerId: string): Promise<number> {
 
 function computeTemplateCategoryBreakdown(
   template: Array<{ actionId: string }>,
-  actionDefs: Record<string, { category: ActionCategory }>,
+  actionDefs: Record<string, ActionDefinition>,
 ): { offensiveCount: number; defensiveCount: number; supportiveCount: number } {
   let offensiveCount = 0;
   let defensiveCount = 0;
@@ -378,7 +378,17 @@ export async function challenge(
   const attackStyle = await getAttackStyleFromEquipment(attackerId);
   const attackerAttributes = normalizePlayerAttributes(attacker.attributes);
   const attackerEquipStats = await getEquipmentStats(attackerId);
-  const attackerSkillLevel = await getSkillLevel(attackerId, attackStyle);
+
+  const [attackerMeleeLevel, attackerRangedLevel, attackerEvasionLevel, attackerMagicLevel] = await Promise.all([
+    getSkillLevel(attackerId, 'melee'),
+    getSkillLevel(attackerId, 'ranged'),
+    getSkillLevel(attackerId, 'evasion' as SkillType),
+    getSkillLevel(attackerId, 'magic'),
+  ]);
+  const attackerSkillLevel = attackStyle === 'ranged' ? attackerRangedLevel
+    : attackStyle === 'magic' ? attackerMagicLevel
+    : attackerMeleeLevel;
+
   const attackerMaxHp = calculateMaxHp({
     vitalityLevel: attackerAttributes.vitality,
     equipmentHealthBonus: attackerEquipStats.health,
@@ -393,13 +403,6 @@ export async function challenge(
   // Attacker template + resources
   const attackerTemplate = await getActiveTemplate(attackerId);
   const attackerResources = await getResourceState(attackerId);
-
-  const [attackerMeleeLevel, attackerRangedLevel, attackerEvasionLevel, attackerMagicLevel] = await Promise.all([
-    getSkillLevel(attackerId, 'melee'),
-    getSkillLevel(attackerId, 'ranged'),
-    getSkillLevel(attackerId, 'evasion' as SkillType),
-    getSkillLevel(attackerId, 'magic'),
-  ]);
 
   const attackerCombatant: TemplateCombatant = {
     id: attackerId,
@@ -419,7 +422,17 @@ export async function challenge(
   const defenderAttributes = normalizePlayerAttributes(target.attributes);
   const defenderEquipStats = await getEquipmentStats(targetId);
   const defenderStyle = await getAttackStyleFromEquipment(targetId);
-  const defenderSkillLevel = await getSkillLevel(targetId, defenderStyle);
+
+  const [defenderMeleeLevel, defenderRangedLevel, defenderEvasionLevel, defenderMagicLevel] = await Promise.all([
+    getSkillLevel(targetId, 'melee'),
+    getSkillLevel(targetId, 'ranged'),
+    getSkillLevel(targetId, 'evasion' as SkillType),
+    getSkillLevel(targetId, 'magic'),
+  ]);
+  const defenderSkillLevel = defenderStyle === 'ranged' ? defenderRangedLevel
+    : defenderStyle === 'magic' ? defenderMagicLevel
+    : defenderMeleeLevel;
+
   const defenderMaxHp = calculateMaxHp({
     vitalityLevel: defenderAttributes.vitality,
     equipmentHealthBonus: defenderEquipStats.health,
@@ -433,13 +446,6 @@ export async function challenge(
 
   // Defender template + max resources
   const defenderTemplate = await getActiveTemplate(targetId);
-
-  const [defenderMeleeLevel, defenderRangedLevel, defenderEvasionLevel, defenderMagicLevel] = await Promise.all([
-    getSkillLevel(targetId, 'melee'),
-    getSkillLevel(targetId, 'ranged'),
-    getSkillLevel(targetId, 'evasion' as SkillType),
-    getSkillLevel(targetId, 'magic'),
-  ]);
 
   const defenderMaxStamina = calculateMaxStamina({
     meleeLevel: defenderMeleeLevel,
