@@ -1070,7 +1070,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         if (Array.isArray(losses)) logDurabilityWarnings(losses);
       }
     }
-    // Show loot picker for first pending overflow session
+    await finalizeExplorationPlayback();
+  };
+
+  const finalizeExplorationPlayback = async () => {
     const pendingIds = explorationPlaybackData?.pendingLootSessionIds;
     setExplorationPlaybackData(null);
     combatLogPrefetch.clear();
@@ -1113,14 +1116,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
     }
-    const pendingIds = explorationPlaybackData?.pendingLootSessionIds;
-    setExplorationPlaybackData(null);
-    setPlaybackActive(false);
-    await advanceTutorial(TUTORIAL_STEP_EXPLORE);
-    await loadAll();
-    if (pendingIds?.length) {
-      await activatePendingLoot(pendingIds[0]);
-    }
+    await finalizeExplorationPlayback();
   };
 
   const handleStartCombat = async (encounterSiteId: string) => {
@@ -1947,6 +1943,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         if (Array.isArray(losses)) logDurabilityWarnings(losses);
       }
     }
+    await finalizeTravelPlayback();
+  };
+
+  const finalizeTravelPlayback = async () => {
     const travelPendingId = travelPlaybackData?.pendingLootSessionId;
     setTravelPlaybackData(null);
     setPlaybackActive(false);
@@ -1994,19 +1994,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
     }
-    const travelPendingId = travelPlaybackData?.pendingLootSessionId;
-    setTravelPlaybackData(null);
-    setPlaybackActive(false);
-    await loadAll();
-
-    if (arrivedInTownRef.current) {
-      arrivedInTownRef.current = false;
-      advanceTutorial(TUTORIAL_STEP_TRAVEL);
-    }
-
-    if (travelPendingId) {
-      await activatePendingLoot(travelPendingId);
-    }
+    await finalizeTravelPlayback();
   };
 
   const handleAllocateAttribute = async (attribute: AttributeType, points = 1) => {
