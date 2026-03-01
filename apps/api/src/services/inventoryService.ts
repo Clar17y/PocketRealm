@@ -1,4 +1,6 @@
 import { Prisma, prisma } from '@adventure/database';
+import { getInventoryCapacity } from '@adventure/game-engine';
+import type { ItemRarity } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 
 interface InventoryClient {
@@ -141,5 +143,71 @@ export async function consumeItemsByTemplateTx(
   quantity: number
 ): Promise<void> {
   await consumeItemsByTemplateWithClient(tx, playerId, itemTemplateId, quantity);
+}
+
+/** Throws if player's used slots exceed capacity (over-encumbered). */
+export async function assertNotOverEncumbered(playerId: string): Promise<void> {
+  const [usedSlots, capacity] = await Promise.all([
+    getUsedSlots(playerId),
+    getPlayerCapacity(playerId),
+  ]);
+  if (usedSlots > capacity) {
+    throw new AppError(
+      400,
+      'Over-encumbered! Drop, sell, stash, or salvage items to make space.',
+      'OVER_ENCUMBERED',
+    );
+  }
+}
+
+/** Count occupied backpack slots (excludes equipped and stashed items). */
+export async function getUsedSlots(playerId: string): Promise<number> {
+  const items = await prisma.item.findMany({
+    where: {
+      ownerId: playerId,
+      inStash: false,
+      equipment: { none: {} },
+    },
+    select: { templateId: true, template: { select: { stackable: true } } },
+  });
+
+  const stackableTemplates = new Set<string>();
+  let count = 0;
+  for (const item of items) {
+    if (item.template.stackable) {
+      if (!stackableTemplates.has(item.templateId)) {
+        stackableTemplates.add(item.templateId);
+        count++;
+      }
+    } else {
+      count++;
+    }
+  }
+  return count;
+}
+
+/** Compute inventory capacity from equipped backpack + belt bonus. */
+export async function getPlayerCapacity(playerId: string): Promise<number> {
+  const equipped = await prisma.playerEquipment.findMany({
+    where: { playerId, itemId: { not: null } },
+    include: { item: { include: { template: true } } },
+  });
+
+  let backpackTier = 0;
+  let backpackRarity: ItemRarity = 'common';
+  let beltSlotBonus = 0;
+
+  for (const slot of equipped) {
+    if (slot.slot === 'backpack' && slot.item) {
+      backpackTier = slot.item.template.tier;
+      backpackRarity = slot.item.rarity as ItemRarity;
+    }
+    if (slot.slot === 'belt' && slot.item) {
+      const bonus = slot.item.bonusStats as Record<string, number> | null;
+      beltSlotBonus = bonus?.inventorySlots ?? 0;
+    }
+  }
+
+  return getInventoryCapacity({ backpackTier, backpackRarity, beltSlotBonus, isChampion: false });
 }
 

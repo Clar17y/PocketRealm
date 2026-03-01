@@ -18,7 +18,8 @@ import { getHpState, enterRecoveringState, setHp } from '../services/hpService';
 import { getEquipmentStats } from '../services/equipmentService';
 import { getPlayerProgressionState } from '../services/attributesService';
 import { grantSkillXp } from '../services/xpService';
-import { rollAndGrantLoot } from '../services/lootService';
+import { rollAndGrantLootWithCapacity } from '../services/lootService';
+import { storePendingLoot, type PendingLootItem } from '../services/pendingLootService';
 import { serializeXpGrant, toMobTemplate, recordBestiaryKill, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
@@ -33,7 +34,9 @@ import {
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../services/combatStatsService';
 import { calculateExplorationPercent, getExplorationPercent } from '../services/zoneExplorationService';
 import { asyncHandler } from '../utils/asyncHandler';
+import { assertNotOverEncumbered } from '../services/inventoryService';
 import { applyGuildTax, getPlayerTaxRate, calculateInflatedCost, taxInfoFromResult } from '../services/guildTaxService';
+
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 
@@ -191,6 +194,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
   if (hpState.isRecovering || hpState.currentHp <= 0) {
     throw new AppError(400, 'Cannot travel while recovering', 'IS_RECOVERING');
   }
+  await assertNotOverEncumbered(playerId);
 
   // 4. Validate destination is discovered
   const discovery = await prismaAny.playerZoneDiscovery.findUnique({
@@ -288,6 +292,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
 
 
   // 10. Run travel ambushes (only for wild traversal)
+  let travelPendingLootSessionId: string | null = null;
+
   if (!isTownDeparture) {
     const ambushes = simulateTravelAmbushes(travelCost);
 
@@ -337,6 +343,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         type: 'flee';
         refundAmount: number;
       } | null = null;
+
+      const allTravelOverflow: PendingLootItem[] = [];
 
       for (const ambush of ambushes) {
         if (tieredMobs.length === 0) break;
@@ -393,7 +401,9 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           : [];
 
         if (combatResult.outcome === 'victory') {
-          const loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+          const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+          const loot = lootResult.drops;
+          allTravelOverflow.push(...lootResult.overflow);
           const xpGrant = await grantSkillXp(playerId, attackSkill, prefixedMob.xpReward);
           const xpGain = xpGrant.xpResult.xpAfterEfficiency;
           await setHp(playerId, currentHp);
@@ -616,6 +626,11 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       // Single deduction point for all exit paths
       await deductConsumedPotions(playerId, allPotionsConsumed);
 
+      // Store travel ambush overflow as pending loot
+      if (allTravelOverflow.length > 0) {
+        travelPendingLootSessionId = await storePendingLoot(playerId, allTravelOverflow);
+      }
+
       if (ambushAbort?.type === 'knockout') {
         res.json({
           zone: { id: ambushAbort.respawn.townId, name: ambushAbort.respawn.townName, zoneType: 'town' },
@@ -628,6 +643,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           respawnedTo: ambushAbort.respawn,
           newDiscoveries: ambushAbort.newDiscoveries,
           tax: taxInfoFromResult(taxResult),
+          ...(travelPendingLootSessionId ? { pendingLootSessionId: travelPendingLootSessionId } : {}),
         });
         return;
       }
@@ -644,6 +660,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           respawnedTo: null,
           newDiscoveries: [],
           tax: taxInfoFromResult(taxResult),
+          ...(travelPendingLootSessionId ? { pendingLootSessionId: travelPendingLootSessionId } : {}),
         });
         return;
       }
@@ -695,5 +712,6 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     respawnedTo: null,
     newDiscoveries,
     tax: taxInfoFromResult(taxResult),
+    ...(travelPendingLootSessionId ? { pendingLootSessionId: travelPendingLootSessionId } : {}),
   });
 }));

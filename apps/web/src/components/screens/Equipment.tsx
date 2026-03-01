@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
-import { Crosshair, Heart, Shield, Sparkles, Sword, X, Zap } from 'lucide-react';
+import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, X, Zap } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
 import { DURABILITY_CONSTANTS } from '@adventure/shared';
@@ -91,6 +91,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
     legs: { gridColumn: '2', gridRow: '5', label: 'Legs' },
     boots: { gridColumn: '2', gridRow: '6', label: 'Boots' },
     charm: { gridColumn: '3', gridRow: '6', label: 'Charm' },
+    backpack: { gridColumn: '1', gridRow: '6', label: 'Backpack' },
   };
 
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
@@ -165,7 +166,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
               ) : (
                 <span className="text-2xl">{item.icon ?? '❓'}</span>
               )}
-              {item.durability <= 0 && (
+              {item.maxDurability > 0 && item.durability <= 0 && (
                 <div className="absolute -top-1 -right-1 bg-[var(--rpg-red)] text-white text-[8px] font-bold px-1 rounded leading-tight">
                   !
                 </div>
@@ -281,19 +282,23 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         {currentItem.weightClass && (
                           <div className="text-xs text-[var(--rpg-gold)]">{prettyWeightClass(currentItem.weightClass)}</div>
                         )}
-                        <div className={`text-xs font-mono ${currentItem.durability <= 0 ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text-secondary)]'}`}>
-                          {currentItem.durability <= 0 ? 'BROKEN' : `${currentItem.durability}/${currentItem.maxDurability}`}
-                        </div>
+                        {currentItem.maxDurability > 0 && (
+                          <div className={`text-xs font-mono ${currentItem.durability <= 0 ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text-secondary)]'}`}>
+                            {currentItem.durability <= 0 ? 'BROKEN' : `${currentItem.durability}/${currentItem.maxDurability}`}
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <StatBar
-                      current={currentItem.durability}
-                      max={currentItem.maxDurability}
-                      color="durability"
-                      size="sm"
-                      showNumbers={false}
-                    />
+                    {currentItem.maxDurability > 0 && (
+                      <StatBar
+                        current={currentItem.durability}
+                        max={currentItem.maxDurability}
+                        color="durability"
+                        size="sm"
+                        showNumbers={false}
+                      />
+                    )}
 
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack') !== 0 && (
@@ -347,6 +352,15 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                           <span className="text-[var(--rpg-text-secondary)]">Accuracy</span>
                           <span className={`ml-auto font-mono ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy'), 'text-[var(--rpg-blue-light)]')}`}>
                             {formatSignedStatValue('accuracy', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy'))}
+                          </span>
+                        </div>
+                      )}
+                      {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'inventorySlots') !== 0 && (
+                        <div className="flex items-center gap-2">
+                          <Backpack size={16} className="text-[var(--rpg-gold)]" />
+                          <span className="text-[var(--rpg-text-secondary)]">Inventory Slots</span>
+                          <span className="ml-auto font-mono text-[var(--rpg-gold)]">
+                            +{totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'inventorySlots')}
                           </span>
                         </div>
                       )}
@@ -559,7 +573,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                       <span className="text-sm">{r.item.icon ?? '?'}</span>
                     )}
                     <span className="text-[var(--rpg-text-primary)]">{r.item.name}</span>
-                    {r.item.durability <= 0 && (
+                    {r.item.maxDurability > 0 && r.item.durability <= 0 && (
                       <span className="text-[8px] font-bold text-[var(--rpg-red)] bg-[var(--rpg-red)]/10 px-1 rounded">BROKEN</span>
                     )}
                   </div>
@@ -722,7 +736,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                   <div className="flex items-baseline justify-between mb-1">
                     <span className="font-semibold text-[var(--rpg-text-primary)] text-sm">
                       {slot.item?.name}
-                      {slot.item && slot.item.durability <= 0 && (
+                      {slot.item && slot.item.maxDurability > 0 && slot.item.durability <= 0 && (
                         <span className="ml-1.5 text-[10px] font-bold text-[var(--rpg-red)] bg-[var(--rpg-red)]/10 px-1 py-0.5 rounded">BROKEN</span>
                       )}
                     </span>

@@ -31,6 +31,10 @@ export * from './crafting/craftingCrit';
 // Items
 export * from './items/itemRarity';
 
+// Inventory
+export * from './inventory/inventoryCapacity';
+export * from './inventory/sellPrice';
+
 // Events
 export * from './events/applyEventModifiers';
 

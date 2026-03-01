@@ -5,6 +5,7 @@ import { calculateFleeResult } from '@adventure/game-engine';
 import { prismaAny } from './prismaAny.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { getHpState, setHp, enterRecoveringState } from '../services/hpService.js';
+import { assertNotOverEncumbered } from '../services/inventoryService.js';
 import { incrementStats } from '../services/statsService.js';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService.js';
 import { respawnToHomeTown } from '../services/zoneDiscoveryService.js';
@@ -64,6 +65,13 @@ export async function assertNotRecovering(playerId: string): Promise<Awaited<Ret
   if (hpState.isRecovering) {
     throw new AppError(400, 'Cannot perform action while recovering', 'IS_RECOVERING');
   }
+  return hpState;
+}
+
+/** Combined pre-flight guard: not recovering + not over-encumbered. */
+export async function assertCanAct(playerId: string): Promise<Awaited<ReturnType<typeof getHpState>>> {
+  const hpState = await assertNotRecovering(playerId);
+  await assertNotOverEncumbered(playerId);
   return hpState;
 }
 

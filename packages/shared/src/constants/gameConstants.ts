@@ -60,9 +60,10 @@ export const SLOT_STAT_POOLS: Record<string, { primary: string[]; utility: strin
   boots: { primary: ['dodge', 'armor', 'magicDefence'], utility: ['luck'] },
   gloves: { primary: ['critChance', 'accuracy', 'critDamage'], utility: ['attack', 'luck'] },
   neck: { primary: ['health', 'luck'], utility: ['accuracy'] },
-  belt: { primary: ['armor', 'magicDefence', 'health'], utility: ['luck'] },
+  belt: { primary: ['armor', 'magicDefence', 'health'], utility: ['luck', 'inventorySlots'] },
   ring: { primary: ['luck', 'accuracy', 'critChance', 'critDamage'], utility: ['dodge'] },
   charm: { primary: ['luck', 'accuracy', 'dodge', 'critChance', 'critDamage'], utility: ['health'] },
+  backpack: { primary: [], utility: [] },
 };
 
 // =============================================================================
@@ -267,6 +268,31 @@ export const CRAFTING_CONSTANTS = {
 
   /** Max items per batch salvage request */
   SALVAGE_BATCH_LIMIT: 50,
+} as const;
+
+// =============================================================================
+// INVENTORY & BACKPACK
+// =============================================================================
+
+export const INVENTORY_CONSTANTS = {
+  BASE_CAPACITY: 24,
+  BACKPACK_SLOTS_PER_TIER: 8,
+  BACKPACK_SLOTS_PER_RARITY: 2,
+  BELT_INVENTORY_SLOTS_MIN: 4,
+  BELT_INVENTORY_SLOTS_MAX: 8,
+  CHAMPION_BONUS_SLOTS: 8,
+  PENDING_LOOT_TTL_SECONDS: 600,
+} as const;
+
+export const SELL_CONSTANTS = {
+  RARITY_MULTIPLIERS: {
+    common: 1,
+    uncommon: 2,
+    rare: 4,
+    epic: 8,
+    legendary: 16,
+  },
+  DURABILITY_PENALTY_THRESHOLD: 0.5,
 } as const;
 
 // =============================================================================

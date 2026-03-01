@@ -375,6 +375,15 @@ export const IDS = {
     goblinKingsCrown: randomUUID(),
   },
 
+  // ── Item Templates: Backpacks ───────────────────────────────────────────
+  backpack: {
+    clothSatchel: randomUUID(),
+    reinforcedPack: randomUUID(),
+    travellerRucksack: randomUUID(),
+    rangerHaversack: randomUUID(),
+    adventurerExpeditionPack: randomUUID(),
+  },
+
   // ── Mob Templates ─────────────────────────────────────────────────────────
   mobs: {
     // Forest Edge

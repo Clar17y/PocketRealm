@@ -16,6 +16,15 @@ export const RARITY_COLORS: Record<Rarity, string> = {
   legendary: '#d4a84b',
 };
 
+const RARITY_RANK: Record<string, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+
+export type ConfirmRarity = Rarity | 'none';
+
+export function rarityMeetsThreshold(itemRarity: string, threshold: string): boolean {
+  if (threshold === 'none') return false;
+  return (RARITY_RANK[itemRarity] ?? 0) >= (RARITY_RANK[threshold] ?? 0);
+}
+
 export const RARITY_GLOW: Record<Rarity, string> = {
   common: 'shadow-none',
   uncommon: 'shadow-[0_0_8px_rgba(106,170,90,0.3)]',

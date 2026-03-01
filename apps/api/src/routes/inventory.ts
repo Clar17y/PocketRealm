@@ -9,6 +9,10 @@ import { useConsumable } from '../services/consumableService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { repairAllEquipped, repairTurnCost, repairItemDurability } from '../services/repairService';
 import { asyncHandler } from '../utils/asyncHandler';
+import { sellItem, sellBulk } from '../services/sellService';
+import { depositItem, depositBatch, withdrawItem, withdrawBatch, listStash } from '../services/stashService';
+import { claimPendingLoot, getPendingLoot } from '../services/pendingLootService';
+import { getUsedSlots, getPlayerCapacity } from '../services/inventoryService';
 
 export const inventoryRouter = Router();
 
@@ -21,20 +25,33 @@ inventoryRouter.use(authenticate);
 inventoryRouter.get('/', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
 
-  const items = await prisma.item.findMany({
-    where: { ownerId: playerId },
-    include: { template: true },
-    orderBy: [{ createdAt: 'desc' }],
-  });
-
-  const equipped = await prisma.playerEquipment.findMany({
-    where: { playerId, itemId: { not: null } },
-    select: { slot: true, itemId: true },
-  });
+  const [items, equipped, capacity, usedSlots, materialRows] = await Promise.all([
+    prisma.item.findMany({
+      where: { ownerId: playerId, inStash: false },
+      include: { template: true },
+      orderBy: [{ createdAt: 'desc' }],
+    }),
+    prisma.playerEquipment.findMany({
+      where: { playerId, itemId: { not: null } },
+      select: { slot: true, itemId: true },
+    }),
+    getPlayerCapacity(playerId),
+    getUsedSlots(playerId),
+    prisma.item.groupBy({
+      by: ['templateId'],
+      where: { ownerId: playerId },
+      _sum: { quantity: true },
+    }),
+  ]);
 
   const equippedByItemId = new Map<string, string>();
   for (const e of equipped) {
     if (e.itemId) equippedByItemId.set(e.itemId, e.slot);
+  }
+
+  const materialTotals: Record<string, number> = {};
+  for (const row of materialRows) {
+    materialTotals[row.templateId] = row._sum.quantity ?? 0;
   }
 
   res.json({
@@ -42,6 +59,9 @@ inventoryRouter.get('/', asyncHandler(async (req, res) => {
       ...item,
       equippedSlot: equippedByItemId.get(item.id) ?? null,
     })),
+    capacity,
+    usedSlots,
+    materialTotals,
   });
 }));
 
@@ -163,4 +183,119 @@ inventoryRouter.post('/use', asyncHandler(async (req, res) => {
   const body = useSchema.parse(req.body);
   const result = await useConsumable(playerId, body.itemId);
   res.json(result);
+}));
+
+// --- Town zone guard ---
+
+async function assertInTown(playerId: string): Promise<void> {
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { currentZone: { select: { zoneType: true } } },
+  });
+  if (player?.currentZone?.zoneType !== 'town') {
+    throw new AppError(400, 'Must be in a town', 'NOT_IN_TOWN');
+  }
+}
+
+// --- Sell endpoints ---
+
+const sellSchema = z.object({
+  itemId: z.string().uuid(),
+  quantity: z.coerce.number().int().positive().optional(),
+});
+
+inventoryRouter.post('/sell', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = sellSchema.parse(req.body);
+  await assertInTown(playerId);
+  const result = await sellItem(playerId, body.itemId, body.quantity);
+  res.json(result);
+}));
+
+const sellBulkSchema = z.object({
+  itemIds: z.array(z.string().uuid()).min(1).max(50),
+});
+
+inventoryRouter.post('/sell/bulk', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = sellBulkSchema.parse(req.body);
+  await assertInTown(playerId);
+  const result = await sellBulk(playerId, body.itemIds);
+  res.json(result);
+}));
+
+// --- Stash endpoints ---
+
+inventoryRouter.get('/stash', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const items = await listStash(playerId);
+  res.json({ items });
+}));
+
+const stashSchema = z.object({
+  itemId: z.string().uuid(),
+  quantity: z.coerce.number().int().positive().optional(),
+});
+
+inventoryRouter.post('/stash/deposit', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = stashSchema.parse(req.body);
+  await assertInTown(playerId);
+  await depositItem(playerId, body.itemId, body.quantity);
+  res.json({ success: true });
+}));
+
+const stashBatchSchema = z.object({
+  itemIds: z.array(z.string().uuid()).min(1).max(50),
+});
+
+inventoryRouter.post('/stash/deposit/batch', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = stashBatchSchema.parse(req.body);
+  await assertInTown(playerId);
+  const result = await depositBatch(playerId, body.itemIds);
+  res.json(result);
+}));
+
+inventoryRouter.post('/stash/withdraw', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = stashSchema.parse(req.body);
+  await assertInTown(playerId);
+  await withdrawItem(playerId, body.itemId, body.quantity);
+  res.json({ success: true });
+}));
+
+inventoryRouter.post('/stash/withdraw/batch', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = stashBatchSchema.parse(req.body);
+  await assertInTown(playerId);
+  const result = await withdrawBatch(playerId, body.itemIds);
+  res.json(result);
+}));
+
+// --- Loot endpoints ---
+
+const lootSessionSchema = z.object({ sessionId: z.string().uuid() });
+
+inventoryRouter.get('/loot/:sessionId', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { sessionId } = lootSessionSchema.parse({ sessionId: req.params.sessionId });
+  const items = await getPendingLoot(playerId, sessionId);
+  if (!items) {
+    res.json({ items: [] });
+    return;
+  }
+  res.json({ items });
+}));
+
+const lootClaimSchema = z.object({
+  sessionId: z.string().uuid(),
+  selectedIndices: z.array(z.number().int().min(0)).min(0),
+});
+
+inventoryRouter.post('/loot/claim', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = lootClaimSchema.parse(req.body);
+  await claimPendingLoot(playerId, body.sessionId, body.selectedIndices);
+  res.json({ success: true });
 }));

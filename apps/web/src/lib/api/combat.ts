@@ -60,6 +60,7 @@ export async function travelToZone(zoneId: string) {
     respawnedTo: { townId: string; townName: string } | null;
     newDiscoveries: Array<{ id: string; name: string }>;
     tax: TaxInfo | null;
+    pendingLootSessionId?: string;
   }>('/api/v1/zones/travel', {
     method: 'POST',
     body: JSON.stringify({ zoneId }),
@@ -125,6 +126,7 @@ export async function startExploration(zoneId: string, turns: number, tier?: num
       percent: number;
       turnsToExplore: number | null;
     };
+    pendingLootSessionIds?: string[];
     tax: TaxInfo | null;
   }>('/api/v1/exploration/start', {
     method: 'POST',
@@ -312,6 +314,8 @@ export interface CombatResponse {
     durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
     skillXp: SkillXpGrantResponse | null;
   };
+  pendingLootSessionId?: string | null;
+  pendingLootItems?: Array<{ templateName: string; rarity: string; quantity: number }>;
   activeEvents?: CombatActiveEvent[];
   explorationProgress?: {
     turnsExplored: number;
