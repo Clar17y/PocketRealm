@@ -770,3 +770,40 @@ export async function markNotificationsRead(playerId: string, matchIds?: string[
     data: { defenderRead: true },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Scout Notifications
+// ---------------------------------------------------------------------------
+
+export async function getScoutNotificationCount(playerId: string): Promise<number> {
+  return prisma.pvpScoutLog.count({
+    where: { targetId: playerId, isRead: false },
+  });
+}
+
+export async function getScoutNotifications(playerId: string) {
+  const logs = await prisma.pvpScoutLog.findMany({
+    where: { targetId: playerId, isRead: false },
+    include: { scouter: { select: { username: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+  return logs.map(l => ({
+    id: l.id,
+    scouterName: l.scouter.username,
+    createdAt: l.createdAt.toISOString(),
+  }));
+}
+
+export async function markScoutNotificationsRead(playerId: string, ids?: string[]): Promise<void> {
+  if (ids && ids.length > 0) {
+    await prisma.pvpScoutLog.updateMany({
+      where: { id: { in: ids }, targetId: playerId },
+      data: { isRead: true },
+    });
+  } else {
+    await prisma.pvpScoutLog.updateMany({
+      where: { targetId: playerId, isRead: false },
+      data: { isRead: true },
+    });
+  }
+}

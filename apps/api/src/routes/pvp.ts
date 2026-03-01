@@ -11,6 +11,9 @@ import {
   getNotificationCount,
   getNotifications,
   markNotificationsRead,
+  getScoutNotificationCount,
+  getScoutNotifications,
+  markScoutNotificationsRead,
 } from '../services/pvpService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 import { paginationSchema } from '../utils/routeHelpers.js';
@@ -164,5 +167,32 @@ pvpRouter.post('/notifications/read', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = markReadSchema.parse(req.body ?? {});
   await markNotificationsRead(playerId, body.matchIds);
+  res.json({ success: true });
+}));
+
+// ---------------------------------------------------------------------------
+// Scout Notifications
+// ---------------------------------------------------------------------------
+
+pvpRouter.get('/notifications/scouts/count', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const count = await getScoutNotificationCount(playerId);
+  res.json({ count });
+}));
+
+pvpRouter.get('/notifications/scouts', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const notifications = await getScoutNotifications(playerId);
+  res.json({ notifications });
+}));
+
+const scoutReadSchema = z.object({
+  ids: z.array(z.string().uuid()).optional(),
+});
+
+pvpRouter.post('/notifications/scouts/read', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = scoutReadSchema.parse(req.body ?? {});
+  await markScoutNotificationsRead(playerId, body.ids);
   res.json({ success: true });
 }));
