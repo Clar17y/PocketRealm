@@ -60,6 +60,7 @@ export async function travelToZone(zoneId: string) {
     respawnedTo: { townId: string; townName: string } | null;
     newDiscoveries: Array<{ id: string; name: string }>;
     tax: TaxInfo | null;
+    pendingLootSessionId?: string;
   }>('/api/v1/zones/travel', {
     method: 'POST',
     body: JSON.stringify({ zoneId }),

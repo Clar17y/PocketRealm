@@ -575,6 +575,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     playerHpBefore: number;
     playerMaxHp: number;
     respawnedToName?: string;
+    pendingLootSessionId?: string;
   } | null>(null);
 
   const loadTurnsAndHp = useCallback(async () => {
@@ -1893,6 +1894,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           playerHpBefore: hpBefore,
           playerMaxHp: hpState.maxHp,
           respawnedToName: data.respawnedTo?.townName,
+          pendingLootSessionId: data.pendingLootSessionId,
         });
         setPlaybackActive(true);
       } else {
@@ -1931,6 +1933,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         if (Array.isArray(losses)) logDurabilityWarnings(losses);
       }
     }
+    const travelPendingId = travelPlaybackData?.pendingLootSessionId;
     setTravelPlaybackData(null);
     setPlaybackActive(false);
     await loadAll();
@@ -1938,6 +1941,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (arrivedInTownRef.current) {
       arrivedInTownRef.current = false;
       advanceTutorial(TUTORIAL_STEP_TRAVEL);
+    }
+
+    if (travelPendingId) {
+      await activatePendingLoot(travelPendingId);
     }
   };
 
@@ -1973,6 +1980,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
     }
+    const travelPendingId = travelPlaybackData?.pendingLootSessionId;
     setTravelPlaybackData(null);
     setPlaybackActive(false);
     await loadAll();
@@ -1980,6 +1988,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (arrivedInTownRef.current) {
       arrivedInTownRef.current = false;
       advanceTutorial(TUTORIAL_STEP_TRAVEL);
+    }
+
+    if (travelPendingId) {
+      await activatePendingLoot(travelPendingId);
     }
   };
 
