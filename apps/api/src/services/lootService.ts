@@ -80,7 +80,7 @@ export async function rollAndGrantLootWithCapacity(
   mobTemplateId: string,
   mobLevel: number,
   dropChanceMultiplier = 1
-): Promise<{ drops: LootDrop[]; pendingLootSessionId: string | null }> {
+): Promise<{ drops: LootDrop[]; overflow: PendingLootItem[]; pendingLootSessionId: string | null }> {
   const entries = await prisma.dropTable.findMany({
     where: { mobTemplateId },
     include: { itemTemplate: true },
@@ -170,7 +170,7 @@ export async function rollAndGrantLootWithCapacity(
     pendingLootSessionId = await storePendingLoot(playerId, overflow);
   }
 
-  return { drops, pendingLootSessionId };
+  return { drops, overflow, pendingLootSessionId };
 }
 
 export async function enrichLootWithNames(

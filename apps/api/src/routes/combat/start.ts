@@ -195,6 +195,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
   let sitePendingLootSessionId: string | null = null;
+  const allSiteOverflow: import('../../services/pendingLootService').PendingLootItem[] = [];
   const fightResults: FightResult[] = [];
   let lastCombatResult: ReturnType<typeof runCombat> | null = null;
   let lastPrefixedMob: (MobTemplate & { mobPrefix: string | null; mobDisplayName: string | null }) | null = null;
@@ -266,9 +267,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         await setHp(playerId, combatResult.combatantAHpRemaining);
         const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
         mobLoot = await enrichLootWithNames(lootResult.drops);
-        if (lootResult.pendingLootSessionId && !sitePendingLootSessionId) {
-          sitePendingLootSessionId = lootResult.pendingLootSessionId;
-        }
+        allSiteOverflow.push(...lootResult.overflow);
         mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded, undefined, guildMods.xpBoost || undefined);
 
         // Bestiary
@@ -405,11 +404,14 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const turnSpend = txResult.turnSpend;
   const siteCompletionRewards = txResult.siteCompletionRewards;
 
-  // Store chest overflow as pending loot
+  // Collect chest overflow
   if (siteCompletionRewards?.overflow?.length) {
-    const chestPendingId = await storePendingLoot(playerId, siteCompletionRewards.overflow);
-    // Use chest overflow session if no mob overflow session exists
-    if (!sitePendingLootSessionId) sitePendingLootSessionId = chestPendingId;
+    allSiteOverflow.push(...siteCompletionRewards.overflow);
+  }
+
+  // Store all overflow as a single pending loot session
+  if (allSiteOverflow.length > 0) {
+    sitePendingLootSessionId = await storePendingLoot(playerId, allSiteOverflow);
   }
 
   // --- Defeat handling (last fight only) ---
