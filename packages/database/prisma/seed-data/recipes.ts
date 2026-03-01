@@ -14,6 +14,7 @@ const gems = IDS.gems;
 const jewel = IDS.jewel;
 const trophy = IDS.trophy;
 const bossGear = IDS.bossGear;
+const backpack = IDS.backpack;
 
 type Recipe = {
   id?: string;
@@ -301,8 +302,20 @@ function bossRecipes() {
   ];
 }
 
+// ── Backpack Recipes ──────────────────────────────────────────────────────────
+
+function backpackRecipes() {
+  return [
+    recipe({ skillType: 'tailoring', requiredLevel: 5, resultTemplateId: backpack.clothSatchel, turnCost: 20, xpReward: 25, materials: [{ itemTemplateId: lth.silkCloth, quantity: 6 }, { itemTemplateId: lth.ratLeather, quantity: 3 }] }),
+    recipe({ skillType: 'tailoring', requiredLevel: 15, resultTemplateId: backpack.reinforcedPack, turnCost: 35, xpReward: 45, materials: [{ itemTemplateId: lth.wovenCloth, quantity: 6 }, { itemTemplateId: lth.wolfLeather, quantity: 4 }] }),
+    recipe({ skillType: 'tailoring', requiredLevel: 25, resultTemplateId: backpack.travellerRucksack, turnCost: 55, xpReward: 70, materials: [{ itemTemplateId: lth.faeFabric, quantity: 6 }, { itemTemplateId: lth.wargLeather, quantity: 4 }] }),
+    recipe({ skillType: 'tailoring', requiredLevel: 35, resultTemplateId: backpack.rangerHaversack, turnCost: 80, xpReward: 100, materials: [{ itemTemplateId: lth.cursedFabric, quantity: 6 }, { itemTemplateId: lth.crocLeather, quantity: 4 }] }),
+    recipe({ skillType: 'tailoring', requiredLevel: 45, resultTemplateId: backpack.adventurerExpeditionPack, turnCost: 110, xpReward: 140, materials: [{ itemTemplateId: lth.spectralFabric, quantity: 6 }, { itemTemplateId: lth.nagaLeather, quantity: 4 }] }),
+  ];
+}
+
 // ── Export ─────────────────────────────────────────────────────────────────────
 
 export function getAllRecipes() {
-  return [...processingRecipes(), ...gemRefiningRecipes(), ...weaponRecipes(), ...armorRecipes(), ...jewelcraftingRecipes(), ...advancedRecipes(), ...bossRecipes()];
+  return [...processingRecipes(), ...gemRefiningRecipes(), ...weaponRecipes(), ...armorRecipes(), ...jewelcraftingRecipes(), ...advancedRecipes(), ...bossRecipes(), ...backpackRecipes()];
 }

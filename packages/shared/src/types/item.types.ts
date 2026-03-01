@@ -14,6 +14,7 @@ export interface ItemTemplate {
   maxDurability: number;
   stackable: boolean;
   consumableEffect: ConsumableEffect | null;
+  sellPrice?: number | null;
 }
 
 export type ConsumableEffectType = 'heal_flat' | 'heal_percent' | 'restore_stamina' | 'restore_mana';
@@ -33,6 +34,7 @@ export interface Item {
   quantity: number;
   bonusStats: ItemStats | null;
   createdAt: Date;
+  inStash: boolean;
 }
 
 export type ItemType = 'weapon' | 'armor' | 'resource' | 'consumable';
@@ -51,6 +53,7 @@ export interface ItemStats {
   luck?: number;
   critChance?: number;  // flat bonus to base 5% (e.g., 0.04 = +4%)
   critDamage?: number;  // flat bonus to base 1.5x (e.g., 0.15 -> 1.65x)
+  inventorySlots?: number;
 }
 
 export interface DropTableEntry {

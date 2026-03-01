@@ -27,7 +27,7 @@ import {
   type PotionConsumed,
 } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
-import { rollAndGrantLoot, enrichLootWithNames } from '../../services/lootService';
+import { rollAndGrantLoot, rollAndGrantLootWithCapacity, enrichLootWithNames } from '../../services/lootService';
 import type { LootDropWithName } from '../../services/lootService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { grantSkillXp } from '../../services/xpService';
@@ -36,6 +36,8 @@ import { setHp } from '../../services/hpService';
 import { getActiveTemplate } from '../../services/combatTemplateService';
 import { getResourceState, setAllResources } from '../../services/resourceService';
 import { getEquipmentStats } from '../../services/equipmentService';
+import { getUsedSlots, getPlayerCapacity } from '../../services/inventoryService';
+import { storePendingLoot } from '../../services/pendingLootService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, type EventModifierBadge } from '../../services/worldEventService';
@@ -58,7 +60,7 @@ import { buildPotionPool, deductConsumedPotions } from '../../services/potionSer
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
-import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertCanAct, recordBestiaryKill, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { incrementContractProgress } from '../../services/guildContractService';
@@ -110,7 +112,7 @@ function buildPlayerTemplateCombatant(
  * Handle encounter site room combat: fight ALL alive mobs in the current room sequentially.
  */
 async function handleEncounterSiteRoomCombat(req: Request, res: Response, playerId: string, encounterSiteId: string, body: { attackSkill?: 'melee' | 'ranged' | 'magic' }) {
-  const hpState = await assertNotRecovering(playerId);
+  const hpState = await assertCanAct(playerId);
   if (hpState.currentHp <= 0) {
     throw new AppError(400, 'Cannot fight with 0 HP. Rest to recover health.', 'NO_HP');
   }
@@ -236,6 +238,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
 
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
+  let sitePendingLootSessionId: string | null = null;
+  const allSiteOverflow: import('../../services/pendingLootService').PendingLootItem[] = [];
   const fightResults: FightResult[] = [];
   let lastCombatResult: ReturnType<typeof runTemplateCombat> | null = null;
   let lastPrefixedMob: (MobTemplate & { mobPrefix: string | null; mobDisplayName: string | null }) | null = null;
@@ -308,8 +312,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
       if (combatResult.outcome === 'victory') {
         await setAllResources(playerId, combatResult.combatantAHpRemaining, currentStamina, currentMana);
-        const rawLoot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
-        mobLoot = await enrichLootWithNames(rawLoot);
+        const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+        mobLoot = await enrichLootWithNames(lootResult.drops);
+        allSiteOverflow.push(...lootResult.overflow);
         mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded, undefined, guildMods.xpBoost || undefined);
 
         // Bestiary
@@ -362,6 +367,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const defeatedSlots = fightResults.filter(f => f.outcome === 'victory').map(f => f.slot);
   let encounterSiteCleared = false;
   let roomCleared = false;
+
+  // Compute available slots for capacity-aware chest rewards
+  const [usedSlotsNow, capacityNow] = await Promise.all([
+    getUsedSlots(playerId),
+    getPlayerCapacity(playerId),
+  ]);
+  let chestAvailableSlots = Math.max(0, capacityNow - usedSlotsNow);
 
   const txResult = await prisma.$transaction(async (tx) => {
     const txAny = tx as unknown as any;
@@ -417,6 +429,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         mobFamilyId: freshSite.mobFamilyId,
         size: toEncounterSiteSize(freshSite.size),
         fullClearBonus: siteStrategy === 'full_clear' && siteFullClearActive,
+        availableSlots: chestAvailableSlots,
       });
       await txAny.encounterSite.deleteMany({ where: { id: encounterSiteId, playerId } });
       encounterSiteCleared = true;
@@ -437,6 +450,16 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   const turnSpend = txResult.turnSpend;
   const siteCompletionRewards = txResult.siteCompletionRewards;
+
+  // Collect chest overflow
+  if (siteCompletionRewards?.overflow?.length) {
+    allSiteOverflow.push(...siteCompletionRewards.overflow);
+  }
+
+  // Store all overflow as a single pending loot session
+  if (allSiteOverflow.length > 0) {
+    sitePendingLootSessionId = await storePendingLoot(playerId, allSiteOverflow);
+  }
 
   // --- Defeat handling (last fight only) ---
   const lastFight = fightResults[fightResults.length - 1];
@@ -698,6 +721,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         ? serializeXpGrant(lastVictoryXpGrant)
         : null,
     },
+    pendingLootSessionId: sitePendingLootSessionId,
     explorationProgress: {
       turnsExplored: explorationProgress.turnsExplored,
       percent: explorationProgress.percent,
@@ -725,7 +749,7 @@ export function registerStartRoutes(router: Router): void {
       }
 
       // --- Zone combat (single mob, unchanged) ---
-      const hpState = await assertNotRecovering(playerId);
+      const hpState = await assertCanAct(playerId);
       if (hpState.currentHp <= 0) {
         throw new AppError(400, 'Cannot fight with 0 HP. Rest to recover health.', 'NO_HP');
       }
@@ -881,6 +905,7 @@ export function registerStartRoutes(router: Router): void {
       });
 
       let loot: LootDrop[] = [];
+      let pendingLootSessionId: string | null = null;
       let xpGrant = null as null | Awaited<ReturnType<typeof grantSkillXp>>;
       const durabilityLost = await degradeEquippedDurability(playerId);
       let fleeResult = null as null | ReturnType<typeof calculateFleeResult>;
@@ -896,7 +921,9 @@ export function registerStartRoutes(router: Router): void {
           combatResult.combatantAStaminaRemaining,
           combatResult.combatantAManaRemaining,
         );
-        loot = await rollAndGrantLoot(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+        const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
+        loot = lootResult.drops;
+        pendingLootSessionId = lootResult.pendingLootSessionId;
         xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded, undefined, guildMods.xpBoost || undefined);
 
         // Guild XP and contract progress
@@ -1044,6 +1071,7 @@ export function registerStartRoutes(router: Router): void {
             ? serializeXpGrant(xpGrant)
             : null,
         },
+        pendingLootSessionId,
         explorationProgress: {
           turnsExplored: explorationProgress.turnsExplored,
           percent: explorationProgress.percent,

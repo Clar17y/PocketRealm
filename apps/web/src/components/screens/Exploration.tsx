@@ -34,6 +34,7 @@ interface ExplorationProps {
   onStartExploration: (turns: number, tier?: number) => void;
   activityLog: ActivityLogEntry[];
   isRecovering?: boolean;
+  isOverEncumbered?: boolean;
   recoveryCost?: number | null;
   currentHp?: number;
   maxHp?: number;
@@ -66,7 +67,7 @@ interface ExplorationProps {
   combatXpRate?: { skillName: string; rate: number };
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
@@ -346,7 +347,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                 onStartExploration(turnInvestment[0], effectiveSelectedTier ?? undefined);
               }
             }}
-            disabled={isRecovering || turnInvestment[0] > availableTurns || !!busyAction}
+            disabled={isRecovering || isOverEncumbered || turnInvestment[0] > availableTurns || !!busyAction}
           >
             <div className="flex items-center justify-center gap-2">
               {busyAction === 'exploration' ? (
@@ -357,7 +358,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               ) : (
                 <>
                   <Play size={20} />
-                  {isRecovering ? 'Recover First' : 'Start Exploration'}
+                  {isOverEncumbered ? 'Over-Encumbered' : isRecovering ? 'Recover First' : 'Start Exploration'}
                 </>
               )}
             </div>

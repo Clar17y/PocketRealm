@@ -5,9 +5,9 @@ import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONST
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
-import { addStackableItemTx } from '../services/inventoryService';
+import { addStackableItemTx, getUsedSlots, getPlayerCapacity } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
-import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
+import { serializeXpGrant, paginationSchema, buildPagination, assertCanAct, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
@@ -235,8 +235,8 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = mineSchema.parse(req.body);
 
-  // Check if player is recovering
-  const hpState = await assertNotRecovering(playerId);
+  // Pre-flight: not recovering, not over-encumbered
+  const hpState = await assertCanAct(playerId);
 
   // Find the player's discovered node
   const playerNode = await prisma.playerResourceNode.findUnique({
@@ -279,6 +279,22 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     throw new AppError(400, `Minimum is ${GATHERING_CONSTANTS.BASE_TURN_COST} turns`, 'INVALID_TURNS');
   }
 
+  const resourceTemplateId = await getResourceTemplateId(template.resourceType);
+
+  // Check backpack capacity — resources stack, so only block if no existing stack
+  const existingStack = await prisma.item.findFirst({
+    where: { ownerId: playerId, templateId: resourceTemplateId, inStash: false },
+  });
+  if (!existingStack) {
+    const [usedSlots, capacity] = await Promise.all([
+      getUsedSlots(playerId),
+      getPlayerCapacity(playerId),
+    ]);
+    if (usedSlots >= capacity) {
+      throw new AppError(400, 'Backpack is full. Make space before gathering.', 'BACKPACK_FULL');
+    }
+  }
+
   // Linear yield scaling: +10% per level above requirement
   const levelsAbove = Math.max(0, level - template.levelRequired);
   const yieldMultiplier = 1 + levelsAbove * GATHERING_CONSTANTS.YIELD_MULTIPLIER_PER_LEVEL;
@@ -303,7 +319,6 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const eventMultiplier = zoneModifiers.resourceYieldMultiplier;
   const eventMinActions = computeEventMinActions(eventMultiplier);
 
-  const resourceTemplateId = await getResourceTemplateId(template.resourceType);
   const { turnSpend, taxResult, actions, totalYield, rawTotalYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
     // Look up tax rate to calculate effective turns
     const { taxRate } = await getPlayerTaxRateTx(tx, playerId);

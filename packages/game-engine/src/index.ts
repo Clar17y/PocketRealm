@@ -38,5 +38,9 @@ export * from './items/itemRarity';
 export * from './resources/staminaCalculator';
 export * from './resources/manaCalculator';
 
+// Inventory
+export * from './inventory/inventoryCapacity';
+export * from './inventory/sellPrice';
+
 // Events
 export * from './events/applyEventModifiers';

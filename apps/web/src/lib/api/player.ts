@@ -20,6 +20,8 @@ export async function getPlayer() {
       quickRestHealPercent: number;
       defaultRefiningMax: boolean;
       lowHpWarning: boolean;
+      confirmRarity: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+      gold: number;
       attributes: {
         vitality: number;
         strength: number;
@@ -41,6 +43,7 @@ export interface PlayerSettings {
   quickRestHealPercent?: number;
   defaultRefiningMax?: boolean;
   lowHpWarning?: boolean;
+  confirmRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 }
 
 export async function updatePlayerSettings(settings: PlayerSettings) {
