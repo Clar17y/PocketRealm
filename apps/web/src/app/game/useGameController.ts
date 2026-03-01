@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
+import type { ConfirmRarity } from '@/lib/rarity';
 import { updateTutorialStep } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
@@ -502,6 +503,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [quickRestHealPercent, setQuickRestHealPercent] = useState(100);
   const [defaultRefiningMax, setDefaultRefiningMax] = useState(false);
   const [lowHpWarning, setLowHpWarning] = useState(true);
+  const [confirmRarity, setConfirmRarity] = useState<ConfirmRarity>('uncommon');
   const [guildTaxRate, setGuildTaxRate] = useState(0);
   const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
   const [achievementUnclaimedCount, setAchievementUnclaimedCount] = useState(0);
@@ -636,6 +638,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setQuickRestHealPercent(playerRes.data.player.quickRestHealPercent ?? 100);
       setDefaultRefiningMax(playerRes.data.player.defaultRefiningMax ?? false);
       setLowHpWarning(playerRes.data.player.lowHpWarning ?? true);
+      setConfirmRarity(playerRes.data.player.confirmRarity ?? 'uncommon');
       setGold(playerRes.data.player.gold ?? 0);
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
@@ -2046,6 +2049,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetSetting('defaultRefiningMax', value, setDefaultRefiningMax, defaultRefiningMax);
   const handleSetLowHpWarning = (value: boolean) =>
     handleSetSetting('lowHpWarning', value, setLowHpWarning, lowHpWarning);
+  const handleSetConfirmRarity = (value: ConfirmRarity) =>
+    handleSetSetting('confirmRarity', value, setConfirmRarity, confirmRarity);
 
   const handleQuickRest = async () => {
     if (!hpState || hpState.currentHp >= hpState.maxHp || hpState.isRecovering || turns <= 0) return;
@@ -2163,6 +2168,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     defaultRefiningMax,
     lowHpWarning,
     handleSetLowHpWarning,
+    confirmRarity,
+    handleSetConfirmRarity,
     playbackActive,
     combatPlaybackData,
     combatPlaybackQueue,

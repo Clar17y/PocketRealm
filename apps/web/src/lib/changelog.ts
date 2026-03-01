@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.20',
+    date: '2026-03-01',
+    title: 'Inventory & Backpack System',
+    summary:
+      'Your inventory is no longer bottomless. A new backpack equipment slot determines your carrying capacity — craft or find better backpacks to carry more. Items have sell prices and can be sold to vendors in town for gold. A new Stash in every town lets you store items you want to keep safe. When loot drops exceed your capacity, a Loot Picker lets you choose which items to claim. Traveling or exploring with a full backpack warns you about pending loot. A "Confirm Before" setting in Settings lets you choose which item rarity triggers a confirmation dialog on drop, salvage, or sell — no more accidentally destroying your epics.',
+  },
+  {
     version: '0.19',
     date: '2026-02-28',
     title: 'Combat Log Improvements',

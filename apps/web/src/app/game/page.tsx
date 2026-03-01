@@ -293,6 +293,8 @@ export default function GamePage() {
     handleSetDefaultRefiningMax,
     lowHpWarning,
     handleSetLowHpWarning,
+    confirmRarity,
+    handleSetConfirmRarity,
     handleQuickRest,
     guildTaxRate,
     showChangelog,
@@ -571,6 +573,7 @@ export default function GamePage() {
             onWithdraw={handleWithdrawItem}
             onWithdrawBatch={handleWithdrawBatch}
             zoneCraftingLevel={zoneCraftingLevel}
+            confirmRarity={confirmRarity}
           />
         );
       }
@@ -1127,6 +1130,32 @@ export default function GamePage() {
                   <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Auto-set refining quantity to maximum when selecting a recipe</p>
                 </div>
                 <ToggleSwitch checked={defaultRefiningMax} onChange={handleSetDefaultRefiningMax} />
+              </div>
+            </PixelCard>
+
+            {/* Inventory */}
+            <PixelCard>
+              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Inventory</h3>
+              <div>
+                <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Confirm Before Drop / Salvage / Sell</p>
+                <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
+                  Show a confirmation dialog when destroying items at or above this rarity.
+                </p>
+                <div className="flex gap-2">
+                  {(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary'] as const).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => handleSetConfirmRarity(r)}
+                      className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors capitalize ${
+                        confirmRarity === r
+                          ? 'bg-[var(--rpg-gold)] text-black'
+                          : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-border)]'
+                      }`}
+                    >
+                      {r === 'none' ? 'Off' : r}
+                    </button>
+                  ))}
+                </div>
               </div>
             </PixelCard>
 

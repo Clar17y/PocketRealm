@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { LootOverflowTutorial } from '@/components/common/LootOverflowTutorial';
 import { X } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 
@@ -27,6 +29,7 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
     return initial;
   });
   const [busy, setBusy] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const noSpace = availableSlots <= 0;
 
   const toggleItem = (index: number) => {
@@ -129,7 +132,7 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
             variant="secondary"
             size="sm"
             disabled={busy}
-            onClick={onDismiss}
+            onClick={noSpace ? onDismiss : () => setShowDiscardConfirm(true)}
           >
             {noSpace ? 'Make Space' : 'Discard All'}
           </PixelButton>
@@ -150,6 +153,19 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
           </PixelButton>
         </div>
       </PixelCard>
+
+      <LootOverflowTutorial />
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          title="Discard All Loot?"
+          message="All unclaimed overflow items will be lost forever."
+          variant="danger"
+          confirmLabel="Discard All"
+          onConfirm={onDismiss}
+          onCancel={() => setShowDiscardConfirm(false)}
+        />
+      )}
     </div>
   );
 }

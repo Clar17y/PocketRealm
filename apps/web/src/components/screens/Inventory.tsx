@@ -13,7 +13,9 @@ import { titleCaseFromSnake } from '@/lib/format';
 import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass } from '@/lib/statFormat';
 import { getStash } from '@/lib/api/items';
 import { itemImageSrc } from '@/lib/assets';
-import type { Rarity } from '@/lib/rarity';
+import { rarityMeetsThreshold, type Rarity, type ConfirmRarity } from '@/lib/rarity';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { StashTutorial } from '@/components/common/StashTutorial';
 
 interface Item {
   id: string;
@@ -67,6 +69,7 @@ interface InventoryProps {
   onWithdraw?: (itemId: string) => void | Promise<void>;
   onWithdrawBatch?: (itemIds: string[]) => void | Promise<void>;
   zoneCraftingLevel?: number | null;
+  confirmRarity?: ConfirmRarity;
 }
 
 function prettySlot(slot: string) {
@@ -89,10 +92,16 @@ function statDisplay(stat: string) {
 export function Inventory({
   items, capacity, usedSlots, gold, isInTown,
   onDrop, onSalvage, onSalvageBatch, onRepair, onEquip, onUnequip, onUse, onSell, onSellBatch, onDeposit, onDepositBatch, onWithdraw, onWithdrawBatch,
-  zoneCraftingLevel,
+  zoneCraftingLevel, confirmRarity = 'uncommon',
 }: InventoryProps) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'drop' | 'salvage' | 'sell';
+    itemId: string;
+    itemName: string;
+    rarity: string;
+  } | null>(null);
   const SALVAGE_LIMIT = CRAFTING_CONSTANTS.SALVAGE_BATCH_LIMIT;
   const BATCH_LIMIT = 50;
 
@@ -167,6 +176,27 @@ export function Inventory({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInTown, activeTab]);
+
+  const runItemAction = async (type: 'drop' | 'salvage' | 'sell', itemId: string) => {
+    setBusy(true);
+    try {
+      if (type === 'drop' && onDrop) await onDrop(itemId);
+      else if (type === 'salvage' && onSalvage) await onSalvage(itemId);
+      else if (type === 'sell' && onSell) await onSell(itemId);
+      setSelectedItem(null);
+    } finally {
+      setBusy(false);
+      setConfirmAction(null);
+    }
+  };
+
+  const tryAction = (type: 'drop' | 'salvage' | 'sell', item: Item) => {
+    if (rarityMeetsThreshold(item.rarity, confirmRarity)) {
+      setConfirmAction({ type, itemId: item.id, itemName: item.name, rarity: item.rarity });
+    } else {
+      void runItemAction(type, item.id);
+    }
+  };
 
   const equippedItems = items.filter((item) => item.equippedSlot);
   const backpackItems = items.filter((item) => !item.equippedSlot);
@@ -288,6 +318,7 @@ export function Inventory({
       {/* Stash Tab */}
       {activeTab === 'stash' && isInTown && (
         <div className="space-y-2">
+          <StashTutorial />
           <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
             Stash ({stashItems.length} items)
           </div>
@@ -859,16 +890,7 @@ export function Inventory({
                   size="sm"
                   className="flex-1"
                   disabled={busy || !canSalvage}
-                  onClick={async () => {
-                    if (!onSalvage) return;
-                    setBusy(true);
-                    try {
-                      await onSalvage(selectedItem.id);
-                      setSelectedItem(null);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
+                  onClick={() => tryAction('salvage', selectedItem)}
                 >
                   {noFacility
                     ? 'No Facility'
@@ -884,16 +906,7 @@ export function Inventory({
                   size="sm"
                   className="flex-1"
                   disabled={busy || !canDrop}
-                  onClick={async () => {
-                    if (!onDrop) return;
-                    setBusy(true);
-                    try {
-                      await onDrop(selectedItem.id);
-                      setSelectedItem(null);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
+                  onClick={() => tryAction('drop', selectedItem)}
                 >
                   Drop
                 </PixelButton>
@@ -908,16 +921,7 @@ export function Inventory({
                     variant="gold"
                     size="sm"
                     disabled={busy}
-                    onClick={async () => {
-                      if (!onSell) return;
-                      setBusy(true);
-                      try {
-                        await onSell(selectedItem.id);
-                        setSelectedItem(null);
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
+                    onClick={() => tryAction('sell', selectedItem)}
                   >
                     Sell
                   </PixelButton>
@@ -970,16 +974,7 @@ export function Inventory({
                   size="sm"
                   className="flex-1"
                   disabled={busy || !canDrop}
-                  onClick={async () => {
-                    if (!onDrop) return;
-                    setBusy(true);
-                    try {
-                      await onDrop(selectedItem.id);
-                      setSelectedItem(null);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
+                  onClick={() => tryAction('drop', selectedItem)}
                 >
                   Drop
                 </PixelButton>
@@ -994,16 +989,7 @@ export function Inventory({
                     variant="gold"
                     size="sm"
                     disabled={busy}
-                    onClick={async () => {
-                      if (!onSell) return;
-                      setBusy(true);
-                      try {
-                        await onSell(selectedItem.id);
-                        setSelectedItem(null);
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
+                    onClick={() => tryAction('sell', selectedItem)}
                   >
                     Sell
                   </PixelButton>
@@ -1037,16 +1023,7 @@ export function Inventory({
                   size="sm"
                   className="flex-1"
                   disabled={busy || !canDrop}
-                  onClick={async () => {
-                    if (!onDrop) return;
-                    setBusy(true);
-                    try {
-                      await onDrop(selectedItem.id);
-                      setSelectedItem(null);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
+                  onClick={() => tryAction('drop', selectedItem)}
                 >
                   Drop
                 </PixelButton>
@@ -1054,6 +1031,17 @@ export function Inventory({
             )}
           </PixelCard>
         </div>
+      )}
+
+      {confirmAction && (
+        <ConfirmModal
+          title={`${confirmAction.type.charAt(0).toUpperCase() + confirmAction.type.slice(1)} ${confirmAction.rarity} item?`}
+          message={`Are you sure you want to ${confirmAction.type} ${confirmAction.itemName}?`}
+          variant={confirmAction.type === 'drop' ? 'danger' : 'warning'}
+          confirmLabel={confirmAction.type.charAt(0).toUpperCase() + confirmAction.type.slice(1)}
+          onConfirm={() => runItemAction(confirmAction.type, confirmAction.itemId)}
+          onCancel={() => setConfirmAction(null)}
+        />
       )}
     </div>
   );
