@@ -5,7 +5,11 @@ import {
   calculateMaxMana, calculateManaRegenPerRound,
 } from '@adventure/game-engine';
 import type { TemplateCombatant } from '@adventure/game-engine';
-import { PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, BASE_ACTION_DEFINITIONS, type SkillType } from '@adventure/shared';
+import {
+  PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, BASE_ACTION_DEFINITIONS,
+  TALENT_TREE_DEFINITIONS,
+  type SkillType, type ActionCategory,
+} from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { buildPagination, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from './combatStatsService.js';
@@ -17,6 +21,7 @@ import { normalizePlayerAttributes } from './attributesService';
 import { getHpState, setHp, enterRecoveringState } from './hpService';
 import { getActiveTemplate } from './combatTemplateService';
 import { getResourceState, setAllResources } from './resourceService';
+import { getSkillPoints } from './skillPointService';
 
 type AttackStyle = 'melee' | 'ranged' | 'magic';
 
@@ -157,12 +162,54 @@ export async function scoutOpponent(attackerId: string, targetId: string) {
     calculatePowerRating(attackerId),
   ]);
 
+  // Template info
+  const targetTemplate = await getActiveTemplate(targetId);
+  const categoryBreakdown = computeTemplateCategoryBreakdown(
+    targetTemplate,
+    BASE_ACTION_DEFINITIONS as Record<string, { category: ActionCategory }>,
+  );
+
+  // Resource profile
+  const targetSkills = await prisma.playerSkill.findMany({
+    where: { playerId: targetId },
+    select: { skillType: true, level: true },
+  });
+  const skillMap: Record<string, number> = {};
+  for (const s of targetSkills) skillMap[s.skillType] = s.level;
+
+  const maxStamina = calculateMaxStamina({
+    meleeLevel: skillMap['melee'] ?? 1,
+    rangedLevel: skillMap['ranged'] ?? 1,
+    evasionLevel: skillMap['evasion'] ?? 1,
+    equipmentStaminaBonus: 0,
+  });
+  const maxMana = calculateMaxMana({
+    magicLevel: skillMap['magic'] ?? 1,
+    equipmentManaBonus: 0,
+  });
+
+  // Talent investment
+  const skillPoints = await getSkillPoints(targetId);
+  const talentInvestment = computeTalentInvestment(skillPoints.allocations);
+
+  // Create scout notification
+  await prisma.pvpScoutLog.create({
+    data: { scouterId: attackerId, targetId },
+  });
+
   return {
     combatLevel: target.characterLevel,
     attackStyle,
     armorClass,
     powerRating: targetPower,
     myPowerRating: myPower,
+    templateInfo: {
+      templateLength: targetTemplate.length,
+      ...categoryBreakdown,
+      maxStamina,
+      maxMana,
+      talentInvestment,
+    },
   };
 }
 
@@ -205,6 +252,40 @@ async function calculatePowerRating(playerId: string): Promise<number> {
   const skillTotal = combatSkills.reduce((sum, s) => sum + s.level, 0);
 
   return statTotal + attrTotal + skillTotal;
+}
+
+function computeTemplateCategoryBreakdown(
+  template: Array<{ actionId: string }>,
+  actionDefs: Record<string, { category: ActionCategory }>,
+): { offensiveCount: number; defensiveCount: number; supportiveCount: number } {
+  let offensiveCount = 0;
+  let defensiveCount = 0;
+  let supportiveCount = 0;
+  for (const action of template) {
+    const def = actionDefs[action.actionId];
+    if (!def) continue;
+    switch (def.category) {
+      case 'offensive': offensiveCount++; break;
+      case 'defensive': defensiveCount++; break;
+      case 'supportive': supportiveCount++; break;
+    }
+  }
+  return { offensiveCount, defensiveCount, supportiveCount };
+}
+
+function computeTalentInvestment(
+  allocations: Record<string, number>,
+): Record<string, number> {
+  const investment: Record<string, number> = { melee: 0, ranged: 0, magic: 0, general: 0 };
+  for (const nodeId of Object.keys(allocations)) {
+    for (const [tree, nodes] of Object.entries(TALENT_TREE_DEFINITIONS)) {
+      const node = nodes.find(n => n.id === nodeId);
+      if (node) {
+        investment[tree] = Math.max(investment[tree], node.tier);
+      }
+    }
+  }
+  return investment;
 }
 
 export async function challenge(
