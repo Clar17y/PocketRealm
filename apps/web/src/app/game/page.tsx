@@ -312,13 +312,18 @@ export default function GamePage() {
     combatLogPrefetch,
     inventoryCapacity,
     inventoryUsedSlots,
+    isOverEncumbered,
     gold,
     pendingLootSession,
     handleSellItem,
+    handleSellBatch,
     handleDepositItem,
+    handleDepositBatch,
     handleWithdrawItem,
+    handleWithdrawBatch,
     handleClaimLoot,
     handleDismissLoot,
+    handleReopenLoot,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -415,7 +420,7 @@ export default function GamePage() {
               turns,
               maxTurns: TURN_CONSTANTS.BANK_CAP,
               turnsRegenRate: TURN_CONSTANTS.REGEN_RATE * 60,
-              gold: 0,
+              gold,
               currentXP: characterProgression.characterXp,
               nextLevelXP: nextLevelTotalXp,
               currentLevelXp,
@@ -425,6 +430,7 @@ export default function GamePage() {
               maxHp: hpState.maxHp,
               hpRegenRate: hpState.regenPerSecond,
               isRecovering: hpState.isRecovering,
+              isOverEncumbered,
               recoveryCost: hpState.recoveryCost,
             }}
             characterProgression={characterProgression}
@@ -482,6 +488,7 @@ export default function GamePage() {
             onStartExploration={handleStartExploration}
             activityLog={activityLog}
             isRecovering={hpState.isRecovering}
+            isOverEncumbered={isOverEncumbered}
             recoveryCost={hpState.recoveryCost}
             currentHp={hpState.currentHp}
             maxHp={hpState.maxHp}
@@ -554,8 +561,11 @@ export default function GamePage() {
             onUnequip={handleUnequipSlot}
             onUse={handleUseItem}
             onSell={handleSellItem}
+            onSellBatch={handleSellBatch}
             onDeposit={handleDepositItem}
+            onDepositBatch={handleDepositBatch}
             onWithdraw={handleWithdrawItem}
+            onWithdrawBatch={handleWithdrawBatch}
             zoneCraftingLevel={zoneCraftingLevel}
           />
         );
@@ -689,6 +699,7 @@ export default function GamePage() {
             currentZoneId={activeZoneId ?? ''}
             availableTurns={turns}
             isRecovering={hpState.isRecovering}
+            isOverEncumbered={isOverEncumbered}
             playbackActive={playbackActive}
             travelPlaybackData={travelPlaybackData}
             onTravelPlaybackComplete={handleTravelPlaybackComplete}
@@ -793,11 +804,13 @@ export default function GamePage() {
               onCraft={handleCraft}
               activityLog={activityLog}
               isRecovering={hpState.isRecovering}
+              isOverEncumbered={isOverEncumbered}
               recoveryCost={hpState.recoveryCost}
               zoneCraftingLevel={zoneCraftingLevel}
               zoneName={zoneCraftingName}
               defaultMaxQuantity={activeCraftingSkill === 'refining' && defaultRefiningMax}
               guildTaxRate={guildTaxRate}
+              backpackFull={inventoryUsedSlots >= inventoryCapacity}
             />
           </div>
         );
@@ -896,6 +909,8 @@ export default function GamePage() {
               onResourceTypeFilterChange={handleGatheringResourceTypeFilterChange}
               onStartGathering={handleMine}
               isRecovering={hpState.isRecovering}
+              isOverEncumbered={isOverEncumbered}
+              backpackFull={inventoryUsedSlots >= inventoryCapacity}
               recoveryCost={hpState.recoveryCost}
               guildTaxRate={guildTaxRate}
             />
@@ -907,6 +922,7 @@ export default function GamePage() {
         return (
           <CombatScreen
             hpState={hpState}
+            isOverEncumbered={isOverEncumbered}
             currentTurns={turns}
             currentZoneId={activeZoneId}
             pendingEncounters={pendingEncounters}
@@ -1161,7 +1177,7 @@ export default function GamePage() {
   return (
     <>
       {showChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
-      {pendingLootSession && (
+      {pendingLootSession && !pendingLootSession.minimized && (
         <LootPicker
           sessionId={pendingLootSession.sessionId}
           items={pendingLootSession.items}
@@ -1187,12 +1203,23 @@ export default function GamePage() {
         {/* Broken gear warning banner */}
         {equipment.some((e) => {
           if (!e.item) return false;
-          const cur = e.item.currentDurability ?? e.item.template?.maxDurability ?? 1;
+          const maxDur = e.item.template?.maxDurability ?? 0;
+          if (maxDur <= 0) return false; // no durability system (e.g. backpacks)
+          const cur = e.item.currentDurability ?? maxDur;
           return cur <= 0;
         }) && (
           <div className="mb-3 p-2 rounded-lg bg-[var(--rpg-red)]/10 border border-[var(--rpg-red)] text-[var(--rpg-red)] text-sm text-center">
             You have broken equipment! Broken gear provides no stats. Visit your inventory to repair.
           </div>
+        )}
+
+        {pendingLootSession?.minimized && (
+          <button
+            onClick={handleReopenLoot}
+            className="mb-3 w-full p-2 rounded-lg bg-[var(--rpg-gold)]/10 border border-[var(--rpg-gold)] text-[var(--rpg-gold)] text-sm text-center hover:bg-[var(--rpg-gold)]/20 transition-colors"
+          >
+            You have unclaimed loot! Tap to pick up items.
+          </button>
         )}
 
         <TutorialBanner

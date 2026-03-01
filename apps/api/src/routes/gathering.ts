@@ -7,7 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { addStackableItemTx, getUsedSlots, getPlayerCapacity } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
-import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
+import { serializeXpGrant, paginationSchema, buildPagination, assertCanAct, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
@@ -235,8 +235,8 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = mineSchema.parse(req.body);
 
-  // Check if player is recovering
-  const hpState = await assertNotRecovering(playerId);
+  // Pre-flight: not recovering, not over-encumbered
+  const hpState = await assertCanAct(playerId);
 
   // Find the player's discovered node
   const playerNode = await prisma.playerResourceNode.findUnique({

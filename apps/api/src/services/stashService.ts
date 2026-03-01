@@ -99,6 +99,66 @@ export async function withdrawItem(
   }) as unknown as void;
 }
 
+export async function depositBatch(
+  playerId: string,
+  itemIds: string[]
+): Promise<{ depositedCount: number }> {
+  return prisma.$transaction(async (tx) => {
+    let depositedCount = 0;
+    for (const itemId of itemIds) {
+      const item = await tx.item.findUnique({
+        where: { id: itemId },
+        include: { template: true, equipment: true },
+      });
+      if (!item || item.ownerId !== playerId) continue;
+      if (item.equipment.length > 0) continue;
+      if (item.inStash) continue;
+      await moveStackableItem(tx, item, item.quantity, true);
+      depositedCount++;
+    }
+    return { depositedCount };
+  });
+}
+
+export async function withdrawBatch(
+  playerId: string,
+  itemIds: string[]
+): Promise<{ withdrawnCount: number }> {
+  const [usedSlots, capacity] = await Promise.all([
+    getUsedSlots(playerId),
+    getPlayerCapacity(playerId),
+  ]);
+
+  let availableSlots = capacity - usedSlots;
+  if (availableSlots <= 0) {
+    return { withdrawnCount: 0 };
+  }
+
+  return prisma.$transaction(async (tx) => {
+    let withdrawnCount = 0;
+    for (const itemId of itemIds) {
+      const item = await tx.item.findUnique({
+        where: { id: itemId },
+        include: { template: true },
+      });
+      if (!item || item.ownerId !== playerId) continue;
+      if (!item.inStash) continue;
+
+      // Stackable items that merge into an existing backpack stack don't consume a slot
+      const willMerge = item.template.stackable && await tx.item.findFirst({
+        where: { ownerId: playerId, templateId: item.templateId, inStash: false },
+        select: { id: true },
+      });
+      if (!willMerge && availableSlots <= 0) break;
+
+      await moveStackableItem(tx, item, item.quantity, false);
+      withdrawnCount++;
+      if (!willMerge) availableSlots--;
+    }
+    return { withdrawnCount };
+  });
+}
+
 export async function listStash(playerId: string) {
   return prisma.item.findMany({
     where: { ownerId: playerId, inStash: true },

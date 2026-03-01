@@ -5,11 +5,14 @@ import { PixelCard } from '@/components/PixelCard';
 import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
-import { Crosshair, Heart, Shield, Sword, X, Zap, Coins } from 'lucide-react';
+import { Backpack, Crosshair, Heart, Shield, Sword, X, Zap, Coins } from 'lucide-react';
 import { CRAFTING_CONSTANTS } from '@adventure/shared';
+import { useBatchMode } from '@/hooks/useBatchMode';
+import { BatchActionBar, BatchCheckboxOverlay, BatchDimOverlay } from '@/components/common/BatchActionBar';
 import { titleCaseFromSnake } from '@/lib/format';
 import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass } from '@/lib/statFormat';
 import { getStash } from '@/lib/api/items';
+import { itemImageSrc } from '@/lib/assets';
 import type { Rarity } from '@/lib/rarity';
 
 interface Item {
@@ -41,6 +44,7 @@ interface StashItem {
   rarity: Rarity;
   type: string;
   durability?: { current: number; max: number } | null;
+  sellPrice: number | null;
 }
 
 interface InventoryProps {
@@ -57,8 +61,11 @@ interface InventoryProps {
   onUnequip?: (slot: string) => void | Promise<void>;
   onUse?: (itemId: string) => void | Promise<void>;
   onSell?: (itemId: string) => void | Promise<void>;
+  onSellBatch?: (itemIds: string[]) => void | Promise<void>;
   onDeposit?: (itemId: string) => void | Promise<void>;
+  onDepositBatch?: (itemIds: string[]) => void | Promise<void>;
   onWithdraw?: (itemId: string) => void | Promise<void>;
+  onWithdrawBatch?: (itemIds: string[]) => void | Promise<void>;
   zoneCraftingLevel?: number | null;
 }
 
@@ -75,37 +82,48 @@ function statDisplay(stat: string) {
   if (stat === 'accuracy') return { Icon: Crosshair, color: 'text-[var(--rpg-blue-light)]', label: 'Accuracy' };
   if (stat === 'critChance') return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: 'Crit Chance' };
   if (stat === 'critDamage') return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: 'Crit Damage' };
+  if (stat === 'inventorySlots') return { Icon: Backpack, color: 'text-[var(--rpg-gold)]', label: 'Inventory Slots' };
   return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: prettyStatName(stat) };
 }
 
 export function Inventory({
   items, capacity, usedSlots, gold, isInTown,
-  onDrop, onSalvage, onSalvageBatch, onRepair, onEquip, onUnequip, onUse, onSell, onDeposit, onWithdraw,
+  onDrop, onSalvage, onSalvageBatch, onRepair, onEquip, onUnequip, onUse, onSell, onSellBatch, onDeposit, onDepositBatch, onWithdraw, onWithdrawBatch,
   zoneCraftingLevel,
 }: InventoryProps) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
-  const [salvageMode, setSalvageMode] = useState(false);
-  const [salvageSelection, setSalvageSelection] = useState<Set<string>>(new Set());
-  const [salvageBusy, setSalvageBusy] = useState(false);
+  const SALVAGE_LIMIT = CRAFTING_CONSTANTS.SALVAGE_BATCH_LIMIT;
+  const BATCH_LIMIT = 50;
+
+  const salvageBatch = useBatchMode(SALVAGE_LIMIT);
+  const stashBatch = useBatchMode(BATCH_LIMIT);
+  const sellBatchMode = useBatchMode(BATCH_LIMIT);
+  const withdrawBatchMode = useBatchMode(BATCH_LIMIT);
+  const stashSellBatch = useBatchMode(BATCH_LIMIT);
+
   const [activeTab, setActiveTab] = useState<'backpack' | 'stash'>('backpack');
   const [stashItems, setStashItems] = useState<StashItem[]>([]);
   const [stashLoading, setStashLoading] = useState(false);
   const [selectedStashItem, setSelectedStashItem] = useState<StashItem | null>(null);
 
-  const SALVAGE_BATCH_LIMIT = CRAFTING_CONSTANTS.SALVAGE_BATCH_LIMIT;
+  // Mutual exclusion helpers — activate one mode, reset all others in the same tab
+  const backpackModes = [salvageBatch, stashBatch, sellBatchMode];
+  const stashModes = [withdrawBatchMode, stashSellBatch];
 
-  const toggleSalvageItem = (id: string) => {
-    setSalvageSelection((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else if (next.size < SALVAGE_BATCH_LIMIT) {
-        next.add(id);
-      }
-      return next;
-    });
+  const activateBackpackMode = (mode: typeof salvageBatch) => {
+    for (const m of backpackModes) { if (m !== mode) m.reset(); }
+    mode.activate();
+    setSelectedItem(null);
   };
+  const resetAllBackpackModes = () => { for (const m of backpackModes) m.reset(); };
+
+  const activateStashMode = (mode: typeof withdrawBatchMode) => {
+    for (const m of stashModes) { if (m !== mode) m.reset(); }
+    mode.activate();
+    setSelectedStashItem(null);
+  };
+  const resetAllStashModes = () => { for (const m of stashModes) m.reset(); };
 
   const loadStash = useCallback(async () => {
     setStashLoading(true);
@@ -119,10 +137,12 @@ export function Inventory({
           return {
             id: item.id,
             name: item.template.name,
+            imageSrc: itemImageSrc(item.template.name, item.template.itemType),
             quantity: item.quantity,
             rarity: item.rarity,
             type: item.template.itemType,
             durability: isEquip && max > 0 ? { current: item.currentDurability ?? max, max } : null,
+            sellPrice: item.template.sellPrice ?? null,
           };
         }));
       }
@@ -138,21 +158,35 @@ export function Inventory({
     }
   }, [activeTab, isInTown, loadStash]);
 
-  // Reset stash tab when leaving town
+  // Reset batch modes when leaving town
   useEffect(() => {
-    if (!isInTown && activeTab === 'stash') {
-      setActiveTab('backpack');
+    if (!isInTown) {
+      if (activeTab === 'stash') setActiveTab('backpack');
+      resetAllBackpackModes();
+      resetAllStashModes();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInTown, activeTab]);
 
   const equippedItems = items.filter((item) => item.equippedSlot);
   const backpackItems = items.filter((item) => !item.equippedSlot);
 
-  const salvageableBackpackItems = backpackItems.filter((i) => i.salvageCost !== null && !i.equippedSlot);
-  const selectedSalvageCount = salvageSelection.size;
+  const salvageableIds = backpackItems.filter((i) => i.salvageCost !== null && !i.equippedSlot).map((i) => i.id);
+  const stashableIds = backpackItems.filter((i) => !i.equippedSlot).map((i) => i.id);
+  const sellableBackpackIds = backpackItems.filter((i) => !i.equippedSlot && i.sellPrice != null && i.sellPrice > 0).map((i) => i.id);
   const totalSalvageCost = backpackItems
-    .filter((i) => salvageSelection.has(i.id))
+    .filter((i) => salvageBatch.selection.has(i.id))
     .reduce((sum, i) => sum + (i.salvageCost ?? 0), 0);
+  const totalSellGold = backpackItems
+    .filter((i) => sellBatchMode.selection.has(i.id))
+    .reduce((sum, i) => sum + (i.sellPrice ?? 0) * i.quantity, 0);
+  const backpackBatchActive = salvageBatch.active || stashBatch.active || sellBatchMode.active;
+
+  const sellableStashIds = stashItems.filter((i) => i.sellPrice != null && i.sellPrice > 0).map((i) => i.id);
+  const totalStashSellGold = stashItems
+    .filter((i) => stashSellBatch.selection.has(i.id))
+    .reduce((sum, i) => sum + (i.sellPrice ?? 0) * i.quantity, 0);
+  const stashBatchActive = withdrawBatchMode.active || stashSellBatch.active;
 
   const stats = selectedItem?.baseStats ?? {};
   const attack = numStat(stats.attack);
@@ -161,10 +195,12 @@ export function Inventory({
   const health = numStat(stats.health);
   const dodge = numStat(stats.dodge);
   const accuracy = numStat(stats.accuracy);
+  const inventorySlots = numStat(stats.inventorySlots);
   const bonusEntries = Object.entries(selectedItem?.bonusStats ?? {})
     .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]) && entry[1] !== 0);
 
-  const hasAnyStats = [attack, armor, magicDefence, health, dodge, accuracy].some((v) => typeof v === 'number' && v !== 0);
+  const isBackpack = selectedItem?.slot === 'backpack';
+  const hasAnyStats = [attack, armor, magicDefence, health, dodge, accuracy, inventorySlots].some((v) => typeof v === 'number' && v !== 0);
   const hasAnyBonusStats = bonusEntries.length > 0;
   const itemType = selectedItem?.type ?? '';
   const isEquipment = itemType === 'weapon' || itemType === 'armor';
@@ -226,7 +262,7 @@ export function Inventory({
         <div className="flex gap-2 border-b border-[var(--rpg-border)]">
           <button
             type="button"
-            onClick={() => { setActiveTab('backpack'); setSelectedStashItem(null); }}
+            onClick={() => { setActiveTab('backpack'); setSelectedStashItem(null); resetAllStashModes(); }}
             className={`px-3 py-1.5 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'backpack'
                 ? 'text-[var(--rpg-gold)] border-[var(--rpg-gold)]'
@@ -237,7 +273,7 @@ export function Inventory({
           </button>
           <button
             type="button"
-            onClick={() => { setActiveTab('stash'); setSalvageMode(false); }}
+            onClick={() => { setActiveTab('stash'); resetAllBackpackModes(); }}
             className={`px-3 py-1.5 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'stash'
                 ? 'text-[var(--rpg-gold)] border-[var(--rpg-gold)]'
@@ -255,38 +291,137 @@ export function Inventory({
           <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
             Stash ({stashItems.length} items)
           </div>
+
+          {/* Stash Batch Mode Toggles + Actions */}
+          {withdrawBatchMode.active ? (
+            <BatchActionBar
+              batch={withdrawBatchMode}
+              limit={BATCH_LIMIT}
+              eligibleIds={stashItems.map((i) => i.id)}
+              actionLabel="Withdraw Selected"
+              disabledLabel="Backpack Full"
+              actionDisabled={usedSlots >= capacity}
+              onAction={async () => {
+                if (!onWithdrawBatch) return;
+                withdrawBatchMode.setBusy(true);
+                try {
+                  await onWithdrawBatch([...withdrawBatchMode.selection]);
+                  withdrawBatchMode.reset();
+                  await loadStash();
+                } finally {
+                  withdrawBatchMode.setBusy(false);
+                }
+              }}
+            />
+          ) : stashSellBatch.active ? (
+            <BatchActionBar
+              batch={stashSellBatch}
+              limit={BATCH_LIMIT}
+              eligibleIds={sellableStashIds}
+              actionLabel="Sell Selected"
+              counterSuffix={
+                stashSellBatch.selection.size > 0 && totalStashSellGold > 0
+                  ? `(${totalStashSellGold} gold)`
+                  : undefined
+              }
+              onAction={async () => {
+                if (!onSellBatch) return;
+                stashSellBatch.setBusy(true);
+                try {
+                  await onSellBatch([...stashSellBatch.selection]);
+                  stashSellBatch.reset();
+                  await loadStash();
+                } finally {
+                  stashSellBatch.setBusy(false);
+                }
+              }}
+            />
+          ) : stashItems.length > 0 ? (
+            <div className="flex justify-end gap-2">
+              {onSellBatch && (
+                <PixelButton
+                  variant="gold"
+                  size="sm"
+                  onClick={() => activateStashMode(stashSellBatch)}
+                >
+                  Sell Mode
+                </PixelButton>
+              )}
+              {onWithdrawBatch && (
+                <PixelButton
+                  variant="primary"
+                  size="sm"
+                  onClick={() => activateStashMode(withdrawBatchMode)}
+                >
+                  Withdraw Mode
+                </PixelButton>
+              )}
+            </div>
+          ) : null}
+
           {stashLoading ? (
             <div className="text-sm text-[var(--rpg-text-secondary)]">Loading stash...</div>
           ) : stashItems.length === 0 ? (
             <div className="text-sm text-[var(--rpg-text-secondary)]">Your stash is empty. Deposit items from your backpack.</div>
           ) : (
             <div className="grid grid-cols-6 gap-2">
-              {stashItems.map((item) => (
-                <ItemCard
-                  key={item.id}
-                  name={item.name}
-                  quantity={item.quantity}
-                  rarity={item.rarity}
-                  durability={item.durability}
-                  onClick={() => setSelectedStashItem(item)}
-                />
-              ))}
+              {stashItems.map((item) => {
+                const isSellable = stashSellBatch.active && item.sellPrice != null && item.sellPrice > 0;
+                const isSelectable = withdrawBatchMode.active || isSellable;
+                const isSelected = (withdrawBatchMode.active && withdrawBatchMode.selection.has(item.id))
+                  || (stashSellBatch.active && stashSellBatch.selection.has(item.id));
+                return (
+                  <div key={item.id} className="relative">
+                    <ItemCard
+                      name={item.name}
+                      imageSrc={item.imageSrc}
+                      quantity={item.quantity}
+                      rarity={item.rarity}
+                      durability={item.durability}
+                      onClick={() => {
+                        if (withdrawBatchMode.active) {
+                          withdrawBatchMode.toggle(item.id);
+                        } else if (stashSellBatch.active) {
+                          if (isSellable) stashSellBatch.toggle(item.id);
+                        } else {
+                          setSelectedStashItem(item);
+                        }
+                      }}
+                    />
+                    {stashBatchActive && isSelectable && (
+                      <BatchCheckboxOverlay selected={isSelected} />
+                    )}
+                    {stashBatchActive && !isSelectable && (
+                      <BatchDimOverlay />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
           {/* Stash item withdraw modal */}
-          {selectedStashItem && (
+          {!stashBatchActive && selectedStashItem && (
             <div
               className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
               onClick={() => setSelectedStashItem(null)}
             >
               <PixelCard className="max-w-sm w-full" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                 <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">{selectedStashItem.name}</h3>
-                    <div className="text-xs text-[var(--rpg-text-secondary)] capitalize">
-                      {selectedStashItem.rarity} {selectedStashItem.type}
-                      {selectedStashItem.quantity > 1 && ` x${selectedStashItem.quantity}`}
+                  <div className="flex items-center gap-3">
+                    {selectedStashItem.imageSrc && (
+                      <img
+                        src={selectedStashItem.imageSrc}
+                        alt={selectedStashItem.name}
+                        className="w-12 h-12 object-contain image-rendering-pixelated"
+                      />
+                    )}
+                    <div>
+                      <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">{selectedStashItem.name}</h3>
+                      <div className="text-xs text-[var(--rpg-text-secondary)] capitalize">
+                        {selectedStashItem.rarity} {selectedStashItem.type}
+                        {selectedStashItem.quantity > 1 && ` x${selectedStashItem.quantity}`}
+                      </div>
                     </div>
                   </div>
                   <button
@@ -324,94 +459,114 @@ export function Inventory({
       {/* Backpack Tab */}
       {activeTab === 'backpack' && (
         <>
-          {/* Salvage Mode Toggle + Actions */}
-          {onSalvageBatch && !noFacility && (
-            salvageMode ? (
-              <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-[var(--rpg-text-primary)]">
-                    {selectedSalvageCount}/{SALVAGE_BATCH_LIMIT} selected
-                    {selectedSalvageCount > 0 && (
-                      totalSalvageCost > 0
-                        ? ` (${totalSalvageCost} turns)`
-                        : ' (Free)'
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSalvageMode(false);
-                      setSalvageSelection(new Set());
-                    }}
-                    className="text-xs text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  {salvageableBackpackItems.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const allSelected = salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT);
-                        if (allSelected) {
-                          setSalvageSelection(new Set());
-                        } else {
-                          setSalvageSelection(new Set(salvageableBackpackItems.slice(0, SALVAGE_BATCH_LIMIT).map((i) => i.id)));
-                        }
-                      }}
-                      className="text-xs text-[var(--rpg-gold)] hover:underline"
-                    >
-                      {salvageSelection.size === Math.min(salvageableBackpackItems.length, SALVAGE_BATCH_LIMIT) ? 'Deselect All' : 'Select All'}
-                    </button>
-                  )}
-                  <div className="flex-1" />
-                  <PixelButton
-                    variant="primary"
-                    size="sm"
-                    disabled={selectedSalvageCount === 0 || salvageBusy}
-                    onClick={async () => {
-                      if (!onSalvageBatch) return;
-                      setSalvageBusy(true);
-                      try {
-                        await onSalvageBatch([...salvageSelection]);
-                        setSalvageMode(false);
-                        setSalvageSelection(new Set());
-                      } finally {
-                        setSalvageBusy(false);
-                      }
-                    }}
-                  >
-                    Salvage All
-                  </PixelButton>
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-end">
+          {/* Batch Mode Toggles + Actions */}
+          {salvageBatch.active ? (
+            <BatchActionBar
+              batch={salvageBatch}
+              limit={SALVAGE_LIMIT}
+              eligibleIds={salvageableIds}
+              actionLabel="Salvage All"
+              counterSuffix={
+                salvageBatch.selection.size > 0
+                  ? totalSalvageCost > 0 ? `(${totalSalvageCost} turns)` : '(Free)'
+                  : undefined
+              }
+              onAction={async () => {
+                if (!onSalvageBatch) return;
+                salvageBatch.setBusy(true);
+                try {
+                  await onSalvageBatch([...salvageBatch.selection]);
+                  salvageBatch.reset();
+                } finally {
+                  salvageBatch.setBusy(false);
+                }
+              }}
+            />
+          ) : stashBatch.active ? (
+            <BatchActionBar
+              batch={stashBatch}
+              limit={BATCH_LIMIT}
+              eligibleIds={stashableIds}
+              actionLabel="Stash Selected"
+              onAction={async () => {
+                if (!onDepositBatch) return;
+                stashBatch.setBusy(true);
+                try {
+                  await onDepositBatch([...stashBatch.selection]);
+                  stashBatch.reset();
+                } finally {
+                  stashBatch.setBusy(false);
+                }
+              }}
+            />
+          ) : sellBatchMode.active ? (
+            <BatchActionBar
+              batch={sellBatchMode}
+              limit={BATCH_LIMIT}
+              eligibleIds={sellableBackpackIds}
+              actionLabel="Sell Selected"
+              counterSuffix={
+                sellBatchMode.selection.size > 0 && totalSellGold > 0
+                  ? `(${totalSellGold} gold)`
+                  : undefined
+              }
+              onAction={async () => {
+                if (!onSellBatch) return;
+                sellBatchMode.setBusy(true);
+                try {
+                  await onSellBatch([...sellBatchMode.selection]);
+                  sellBatchMode.reset();
+                } finally {
+                  sellBatchMode.setBusy(false);
+                }
+              }}
+            />
+          ) : (
+            <div className="flex justify-end gap-2">
+              {onSellBatch && isInTown && (
+                <PixelButton
+                  variant="gold"
+                  size="sm"
+                  onClick={() => activateBackpackMode(sellBatchMode)}
+                >
+                  Sell Mode
+                </PixelButton>
+              )}
+              {onDepositBatch && isInTown && (
+                <PixelButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => activateBackpackMode(stashBatch)}
+                >
+                  Stash Mode
+                </PixelButton>
+              )}
+              {onSalvageBatch && !noFacility && (
                 <PixelButton
                   variant="primary"
                   size="sm"
-                  onClick={() => {
-                    setSalvageMode(true);
-                    setSalvageSelection(new Set());
-                    setSelectedItem(null);
-                  }}
+                  onClick={() => activateBackpackMode(salvageBatch)}
                 >
                   Salvage Mode
                 </PixelButton>
-              </div>
-            )
+              )}
+            </div>
           )}
 
           {/* Backpack Items */}
           <div className="space-y-2">
-            <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
-              Backpack ({usedSlots}/{capacity})
+            <div className={`text-sm font-semibold ${usedSlots > capacity ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
+              Backpack ({usedSlots}/{capacity}){usedSlots > capacity && ' — Over-encumbered!'}
             </div>
             <div className="grid grid-cols-6 gap-2">
               {backpackItems.map((item) => {
-                const isSalvageable = salvageMode && item.salvageCost !== null;
-                const isSelected = salvageMode && salvageSelection.has(item.id);
+                const isSalvageable = salvageBatch.active && item.salvageCost !== null;
+                const isStashable = stashBatch.active && !item.equippedSlot;
+                const isSellable = sellBatchMode.active && !item.equippedSlot && item.sellPrice != null && item.sellPrice > 0;
+                const isSelectable = isSalvageable || isStashable || isSellable;
+                const isSelected = (salvageBatch.active && salvageBatch.selection.has(item.id))
+                  || (stashBatch.active && stashBatch.selection.has(item.id))
+                  || (sellBatchMode.active && sellBatchMode.selection.has(item.id));
                 return (
                   <div key={item.id} className="relative">
                     <ItemCard
@@ -422,24 +577,22 @@ export function Inventory({
                       rarity={item.rarity}
                       durability={item.durability}
                       onClick={() => {
-                        if (salvageMode) {
-                          if (isSalvageable) toggleSalvageItem(item.id);
+                        if (salvageBatch.active) {
+                          if (isSalvageable) salvageBatch.toggle(item.id);
+                        } else if (stashBatch.active) {
+                          if (isStashable) stashBatch.toggle(item.id);
+                        } else if (sellBatchMode.active) {
+                          if (isSellable) sellBatchMode.toggle(item.id);
                         } else {
                           setSelectedItem(item);
                         }
                       }}
                     />
-                    {salvageMode && isSalvageable && (
-                      <div className={`absolute top-0.5 right-0.5 w-5 h-5 rounded border-2 flex items-center justify-center pointer-events-none ${
-                        isSelected
-                          ? 'border-[var(--rpg-gold)] bg-[var(--rpg-gold)]'
-                          : 'border-[var(--rpg-text-secondary)] bg-[var(--rpg-surface)]'
-                      }`}>
-                        {isSelected && <span className="text-[var(--rpg-background)] text-xs font-bold">&#10003;</span>}
-                      </div>
+                    {backpackBatchActive && isSelectable && (
+                      <BatchCheckboxOverlay selected={isSelected} />
                     )}
-                    {salvageMode && !isSalvageable && (
-                      <div className="absolute inset-0 bg-black/50 rounded-lg pointer-events-none" />
+                    {backpackBatchActive && !isSelectable && (
+                      <BatchDimOverlay />
                     )}
                   </div>
                 );
@@ -457,7 +610,7 @@ export function Inventory({
       )}
 
       {/* Item Detail Modal */}
-      {!salvageMode && selectedItem && activeTab === 'backpack' && (
+      {!backpackBatchActive && selectedItem && activeTab === 'backpack' && (
         <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
           onClick={() => setSelectedItem(null)}
@@ -498,7 +651,7 @@ export function Inventory({
                     </div>
                   )}
                   <div className="text-xs text-[var(--rpg-text-secondary)] capitalize">
-                    {selectedItem.rarity} &bull; {selectedItem.type}
+                    {selectedItem.rarity} &bull; {isBackpack ? 'backpack' : selectedItem.type}
                   </div>
                   {selectedItem.weightClass && (
                     <div className="text-xs text-[var(--rpg-gold)]">
@@ -601,6 +754,21 @@ export function Inventory({
                         </span>
                       </div>
                     )}
+                    {typeof inventorySlots === 'number' && inventorySlots !== 0 && (() => {
+                      const rarityBonus = isBackpack
+                        ? ({ common: 0, uncommon: 2, rare: 4, epic: 6, legendary: 8 }[selectedItem?.rarity ?? 'common'] ?? 0)
+                        : 0;
+                      const totalSlots = inventorySlots + rarityBonus;
+                      return (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Backpack size={16} className="text-[var(--rpg-gold)]" />
+                          <span className="text-[var(--rpg-text-secondary)]">Inventory Slots</span>
+                          <span className="ml-auto font-mono text-[var(--rpg-gold)]">
+                            +{totalSlots}{rarityBonus > 0 && <span className="text-xs text-[var(--rpg-text-secondary)]"> ({inventorySlots}+{rarityBonus})</span>}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -636,7 +804,7 @@ export function Inventory({
             {canSell && selectedItem.sellPrice != null && selectedItem.sellPrice > 0 && (
               <div className="flex items-center gap-1 text-xs text-[var(--rpg-text-secondary)] mb-3">
                 <Coins size={12} className="text-[var(--rpg-gold)]" />
-                <span>Sell value: <span className="text-[var(--rpg-gold)] font-mono">{selectedItem.sellPrice}</span> gold</span>
+                <span>Sell value: <span className="text-[var(--rpg-gold)] font-mono">{selectedItem.sellPrice * selectedItem.quantity}</span> gold{selectedItem.quantity > 1 && <span className="text-[var(--rpg-text-secondary)]"> ({selectedItem.sellPrice} ea)</span>}</span>
               </div>
             )}
 

@@ -34,7 +34,9 @@ import {
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../services/combatStatsService';
 import { calculateExplorationPercent, getExplorationPercent } from '../services/zoneExplorationService';
 import { asyncHandler } from '../utils/asyncHandler';
+import { assertNotOverEncumbered } from '../services/inventoryService';
 import { applyGuildTax, getPlayerTaxRate, calculateInflatedCost, taxInfoFromResult } from '../services/guildTaxService';
+
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 
@@ -192,6 +194,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
   if (hpState.isRecovering || hpState.currentHp <= 0) {
     throw new AppError(400, 'Cannot travel while recovering', 'IS_RECOVERING');
   }
+  await assertNotOverEncumbered(playerId);
 
   // 4. Validate destination is discovered
   const discovery = await prismaAny.playerZoneDiscovery.findUnique({

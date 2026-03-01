@@ -3,6 +3,7 @@ import type { LootDrop, ItemRarity } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
 import { pickWeighted } from '../utils/pickWeighted.js';
+import type { PendingLootItem } from './pendingLootService';
 
 /** Converts Prisma Decimal-like values to plain numbers. */
 export function decimalLikeToNumber(value: unknown): number {
@@ -45,9 +46,15 @@ export function createLootAccumulator() {
   };
 }
 
+export interface DropGrantResult {
+  loot: LootDrop[];
+  overflow: PendingLootItem[];
+  slotsConsumed: number;
+}
+
 /**
  * Roll material drops from a drop table and grant them to a player.
- * Handles stackable vs non-stackable items, equipment durability, etc.
+ * When `availableSlots` is provided, items that don't fit go to overflow.
  */
 export async function rollAndGrantDropsTx(
   tx: Prisma.TransactionClient,
@@ -55,8 +62,33 @@ export async function rollAndGrantDropsTx(
   dropEntries: DropTableEntry[],
   rolls: number,
   rarity: ItemRarity = 'common',
-): Promise<LootDrop[]> {
+  availableSlots?: number,
+): Promise<DropGrantResult> {
   const accumulator = createLootAccumulator();
+  const overflow: PendingLootItem[] = [];
+  const initialSlots = availableSlots ?? Infinity;
+  let remainingSlots = initialSlots;
+
+  // Track existing stacks so merges don't consume a slot
+  const grantedStackableTemplates = new Set<string>();
+  let existingStacks: Set<string> | null = null;
+  if (availableSlots != null) {
+    const playerItems = await (tx as any).item.findMany({
+      where: { ownerId: playerId, inStash: false },
+      select: { templateId: true },
+    }) as Array<{ templateId: string }>;
+    existingStacks = new Set(playerItems.map((i: { templateId: string }) => i.templateId));
+  }
+
+  // Fetch template names for overflow display
+  const templateNameCache = new Map<string, string>();
+  if (availableSlots != null) {
+    const templates = await (tx as any).itemTemplate.findMany({
+      where: { id: { in: dropEntries.map(e => e.itemTemplateId) } },
+      select: { id: true, name: true },
+    }) as Array<{ id: string; name: string }>;
+    for (const t of templates) templateNameCache.set(t.id, t.name);
+  }
 
   for (let i = 0; i < rolls; i++) {
     const picked = pickWeighted(dropEntries, (e: DropTableEntry) => Math.max(0, decimalLikeToNumber(e.dropChance)));
@@ -65,15 +97,33 @@ export async function rollAndGrantDropsTx(
     const quantity = Math.max(1, randomIntInclusive(picked.minQuantity, picked.maxQuantity));
 
     if (picked.itemTemplate.stackable) {
+      const hasStack = existingStacks?.has(picked.itemTemplateId) || grantedStackableTemplates.has(picked.itemTemplateId);
+      const needsNewSlot = !hasStack;
+
+      if (needsNewSlot && remainingSlots <= 0) {
+        const existing = overflow.find(o => o.templateId === picked.itemTemplateId);
+        if (existing) { existing.quantity += quantity; }
+        else { overflow.push({ templateId: picked.itemTemplateId, templateName: templateNameCache.get(picked.itemTemplateId) ?? 'Unknown', rarity, quantity, bonusStats: null, currentDurability: null, maxDurability: null }); }
+        continue;
+      }
+
+      if (needsNewSlot) remainingSlots--;
+      grantedStackableTemplates.add(picked.itemTemplateId);
       await addStackableItemTx(tx, playerId, picked.itemTemplateId, quantity);
       accumulator.add({ itemTemplateId: picked.itemTemplateId, quantity, rarity });
       continue;
     }
 
+    // Non-stackable: each item needs its own slot
     const isEquipment = picked.itemTemplate.itemType === 'weapon' || picked.itemTemplate.itemType === 'armor';
     const maxDurability = isEquipment ? picked.itemTemplate.maxDurability : null;
 
     for (let q = 0; q < quantity; q++) {
+      if (remainingSlots <= 0) {
+        overflow.push({ templateId: picked.itemTemplateId, templateName: templateNameCache.get(picked.itemTemplateId) ?? 'Unknown', rarity, quantity: 1, bonusStats: null, currentDurability: maxDurability, maxDurability });
+        continue;
+      }
+      remainingSlots--;
       await tx.item.create({
         data: {
           ownerId: playerId,
@@ -82,11 +132,12 @@ export async function rollAndGrantDropsTx(
           quantity: 1,
           maxDurability,
           currentDurability: maxDurability,
-        } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        } as any,
       });
     }
     accumulator.add({ itemTemplateId: picked.itemTemplateId, quantity, rarity });
   }
 
-  return accumulator.toArray();
+  const slotsConsumed = initialSlots === Infinity ? 0 : Math.max(0, initialSlots - remainingSlots);
+  return { loot: accumulator.toArray(), overflow, slotsConsumed };
 }

@@ -23,6 +23,7 @@ import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '
 
 interface CombatScreenProps {
   hpState: HpState;
+  isOverEncumbered?: boolean;
   currentTurns: number;
   currentZoneId: string | null;
   pendingEncounters: PendingEncounter[];
@@ -79,6 +80,7 @@ interface CombatScreenProps {
 
 export function CombatScreen({
   hpState,
+  isOverEncumbered,
   currentTurns,
   currentZoneId,
   pendingEncounters,
@@ -503,7 +505,7 @@ export function CombatScreen({
                     ? (prefix ? `${prefix.displayName} ${e.nextMobName}` : e.nextMobName)
                     : null;
                   const isWrongZone = Boolean(currentZoneId) && e.zoneId !== currentZoneId;
-                  const isDisabled = hpState.isRecovering || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData;
+                  const isDisabled = isOverEncumbered || hpState.isRecovering || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData;
                   return (
                     <div
                       key={e.encounterSiteId}
@@ -555,13 +557,15 @@ export function CombatScreen({
                             : 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
                         }`}
                       >
-                        {hpState.isRecovering
-                          ? 'Recover First'
-                          : isWrongZone
-                            ? 'Wrong Zone'
-                            : !e.nextMobTemplateId
-                              ? 'Decayed'
-                              : 'Fight'}
+                        {isOverEncumbered
+                          ? 'Over-Encumbered'
+                          : hpState.isRecovering
+                            ? 'Recover First'
+                            : isWrongZone
+                              ? 'Wrong Zone'
+                              : !e.nextMobTemplateId
+                                ? 'Decayed'
+                                : 'Fight'}
                       </button>
                     </div>
                   );

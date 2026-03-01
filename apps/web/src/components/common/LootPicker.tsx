@@ -20,7 +20,6 @@ interface LootPickerProps {
 
 export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismiss }: LootPickerProps) {
   const [selected, setSelected] = useState<Set<number>>(() => {
-    // Auto-select up to available slot count
     const initial = new Set<number>();
     for (let i = 0; i < Math.min(items.length, availableSlots); i++) {
       initial.add(i);
@@ -28,8 +27,10 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
     return initial;
   });
   const [busy, setBusy] = useState(false);
+  const noSpace = availableSlots <= 0;
 
   const toggleItem = (index: number) => {
+    if (noSpace) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(index)) {
@@ -51,7 +52,9 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
           <div>
             <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">Loot Overflow</h3>
             <div className="text-xs text-[var(--rpg-text-secondary)]">
-              Your backpack was full! Select items to claim.
+              {noSpace
+                ? 'Your backpack is full! Free up space to claim these items.'
+                : 'Your backpack was full! Select items to claim.'}
             </div>
           </div>
           <button
@@ -62,8 +65,18 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
           </button>
         </div>
 
+        {noSpace && (
+          <div className="mb-3 p-2 rounded-lg bg-[var(--rpg-gold)]/10 border border-[var(--rpg-gold)] text-[var(--rpg-gold)] text-xs text-center">
+            Sell, salvage, stash, or drop items from your backpack, then reopen this to claim.
+          </div>
+        )}
+
         <div className="text-sm text-[var(--rpg-text-secondary)] mb-3">
-          Selected: <span className="font-mono text-[var(--rpg-gold)]">{selected.size}</span> / {availableSlots} slots available
+          {noSpace
+            ? <span className="text-[var(--rpg-red)] font-mono">0</span>
+            : <>Selected: <span className="font-mono text-[var(--rpg-gold)]">{selected.size}</span></>
+          }
+          {' '}/ {availableSlots} slots available
         </div>
 
         <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
@@ -75,10 +88,13 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
                 key={index}
                 type="button"
                 onClick={() => toggleItem(index)}
+                disabled={noSpace}
                 className={`w-full flex items-center gap-3 p-2 rounded-lg border transition-colors text-left ${
-                  isSelected
-                    ? 'bg-[var(--rpg-surface)] border-[var(--rpg-gold)]'
-                    : 'bg-[var(--rpg-background)] border-[var(--rpg-border)] opacity-60'
+                  noSpace
+                    ? 'bg-[var(--rpg-background)] border-[var(--rpg-border)] opacity-50 cursor-not-allowed'
+                    : isSelected
+                      ? 'bg-[var(--rpg-surface)] border-[var(--rpg-gold)]'
+                      : 'bg-[var(--rpg-background)] border-[var(--rpg-border)] opacity-60'
                 }`}
               >
                 <div
@@ -109,7 +125,7 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
             disabled={busy}
             onClick={onDismiss}
           >
-            Leave All
+            {noSpace ? 'Close' : 'Leave All'}
           </PixelButton>
           <PixelButton
             variant="primary"

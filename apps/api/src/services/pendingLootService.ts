@@ -48,8 +48,10 @@ export async function claimPendingLoot(
 
   let slotsUsed = usedSlots;
 
+  const uniqueIndices = [...new Set(selectedIndices)];
+
   await prisma.$transaction(async (tx) => {
-    for (const idx of selectedIndices) {
+    for (const idx of uniqueIndices) {
       if (idx < 0 || idx >= items.length) continue;
       if (slotsUsed >= capacity) break;
 

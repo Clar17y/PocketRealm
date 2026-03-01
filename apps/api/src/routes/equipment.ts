@@ -22,6 +22,7 @@ const slotSchema = z.enum([
   'off_hand',
   'ring',
   'charm',
+  'backpack',
 ]);
 
 const equipSchema = z.object({

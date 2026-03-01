@@ -30,6 +30,8 @@ import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { setHp } from '../../services/hpService';
 import { getEquipmentStats } from '../../services/equipmentService';
+import { getUsedSlots, getPlayerCapacity } from '../../services/inventoryService';
+import { storePendingLoot } from '../../services/pendingLootService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, type EventModifierBadge } from '../../services/worldEventService';
@@ -52,7 +54,7 @@ import { buildPotionPool, deductConsumedPotions } from '../../services/potionSer
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
-import { serializeXpGrant, toMobTemplate, assertNotRecovering, recordBestiaryKill, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertCanAct, recordBestiaryKill, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { incrementContractProgress } from '../../services/guildContractService';
@@ -76,7 +78,7 @@ import {
  * Handle encounter site room combat: fight ALL alive mobs in the current room sequentially.
  */
 async function handleEncounterSiteRoomCombat(req: Request, res: Response, playerId: string, encounterSiteId: string, body: { attackSkill?: 'melee' | 'ranged' | 'magic' }) {
-  const hpState = await assertNotRecovering(playerId);
+  const hpState = await assertCanAct(playerId);
   if (hpState.currentHp <= 0) {
     throw new AppError(400, 'Cannot fight with 0 HP. Rest to recover health.', 'NO_HP');
   }
@@ -320,6 +322,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   let encounterSiteCleared = false;
   let roomCleared = false;
 
+  // Compute available slots for capacity-aware chest rewards
+  const [usedSlotsNow, capacityNow] = await Promise.all([
+    getUsedSlots(playerId),
+    getPlayerCapacity(playerId),
+  ]);
+  let chestAvailableSlots = Math.max(0, capacityNow - usedSlotsNow);
+
   const txResult = await prisma.$transaction(async (tx) => {
     const txAny = tx as unknown as any;
     const spent = await spendPlayerTurnsTx(tx, playerId, totalTurnCost);
@@ -374,6 +383,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         mobFamilyId: freshSite.mobFamilyId,
         size: toEncounterSiteSize(freshSite.size),
         fullClearBonus: siteStrategy === 'full_clear' && siteFullClearActive,
+        availableSlots: chestAvailableSlots,
       });
       await txAny.encounterSite.deleteMany({ where: { id: encounterSiteId, playerId } });
       encounterSiteCleared = true;
@@ -394,6 +404,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   const turnSpend = txResult.turnSpend;
   const siteCompletionRewards = txResult.siteCompletionRewards;
+
+  // Store chest overflow as pending loot
+  if (siteCompletionRewards?.overflow?.length) {
+    const chestPendingId = await storePendingLoot(playerId, siteCompletionRewards.overflow);
+    // Use chest overflow session if no mob overflow session exists
+    if (!sitePendingLootSessionId) sitePendingLootSessionId = chestPendingId;
+  }
 
   // --- Defeat handling (last fight only) ---
   const lastFight = fightResults[fightResults.length - 1];
@@ -680,7 +697,7 @@ export function registerStartRoutes(router: Router): void {
       }
 
       // --- Zone combat (single mob, unchanged) ---
-      const hpState = await assertNotRecovering(playerId);
+      const hpState = await assertCanAct(playerId);
       if (hpState.currentHp <= 0) {
         throw new AppError(400, 'Cannot fight with 0 HP. Rest to recover health.', 'NO_HP');
       }

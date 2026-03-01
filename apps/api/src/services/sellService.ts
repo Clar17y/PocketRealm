@@ -29,6 +29,7 @@ export async function sellItem(
     });
     if (!item || item.ownerId !== playerId) throw new AppError(404, 'Item not found', 'NOT_FOUND');
     if (item.equipment.length > 0) throw new AppError(400, 'Cannot sell equipped items', 'ITEM_EQUIPPED');
+    if (item.inStash) throw new AppError(400, 'Cannot sell stashed items', 'ITEM_STASHED');
     if (!item.template.sellPrice) throw new AppError(400, 'Item cannot be sold', 'NOT_SELLABLE');
 
     const sellQty = quantity ?? item.quantity;

@@ -67,6 +67,8 @@ interface GatheringProps {
   isRecovering?: boolean;
   recoveryCost?: number | null;
   guildTaxRate?: number;
+  isOverEncumbered?: boolean;
+  backpackFull?: boolean;
 }
 
 export function Gathering({
@@ -91,6 +93,8 @@ export function Gathering({
   isRecovering = false,
   recoveryCost,
   guildTaxRate = 0,
+  isOverEncumbered = false,
+  backpackFull = false,
 }: GatheringProps) {
   const getEventYieldMultiplier = (node: ResourceNode) =>
     computeResourceYieldMultiplier(node.eventModifiers ?? []);
@@ -272,7 +276,7 @@ export function Gathering({
           const isSelected = selectedNode?.id === node.id;
           const canGather = skillLevel >= node.levelRequired;
           const isInZone = currentZoneId === node.zoneId;
-          const canSelect = canGather && isInZone;
+          const canSelect = canGather && isInZone && !isRecovering && !isOverEncumbered && !backpackFull;
           const capacityPct = Math.round((node.remainingCapacity / node.maxCapacity) * 100);
 
           return (
@@ -434,11 +438,11 @@ export function Gathering({
           size="lg"
           className="w-full"
           onClick={() => onStartGathering(selectedNode.id, turnInvestment[0])}
-          disabled={isRecovering || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
+          disabled={isOverEncumbered || isRecovering || backpackFull || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
         >
           <div className="flex items-center justify-center gap-2">
             <Pickaxe size={20} />
-            {isRecovering ? 'Recover First' : availableTurns < sliderMin ? `Need ${sliderMin} turns` : `Start ${skillName}`}
+            {isOverEncumbered ? 'Over-Encumbered' : isRecovering ? 'Recover First' : backpackFull ? 'Backpack Full' : availableTurns < sliderMin ? `Need ${sliderMin} turns` : `Start ${skillName}`}
           </div>
         </PixelButton>
       )}

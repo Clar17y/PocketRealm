@@ -9,7 +9,7 @@ import {
 } from '@adventure/game-engine';
 import { FULL_CLEAR_CONSTANTS, type LootDrop } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
-import { rollAndGrantDropsTx, type DropTableEntry } from './dropRollingService';
+import { rollAndGrantDropsTx, type DropTableEntry, type DropGrantResult } from './dropRollingService';
 
 export interface RecipeUnlockReward {
   recipeId: string;
@@ -23,6 +23,8 @@ export interface EncounterSiteChestRewards {
   materialRolls: number;
   loot: LootDrop[];
   recipeUnlocked: RecipeUnlockReward | null;
+  overflow: DropGrantResult['overflow'];
+  slotsConsumed: number;
 }
 
 export async function grantEncounterSiteChestRewardsTx(
@@ -32,6 +34,7 @@ export async function grantEncounterSiteChestRewardsTx(
     mobFamilyId: string;
     size: EncounterSiteSize;
     fullClearBonus?: boolean;
+    availableSlots?: number;
   }
 ): Promise<EncounterSiteChestRewards> {
   const txAny = tx as unknown as any;
@@ -61,7 +64,7 @@ export async function grantEncounterSiteChestRewardsTx(
     },
   })) as DropTableEntry[];
 
-  const loot = await rollAndGrantDropsTx(tx, params.playerId, dropEntries, materialRolls);
+  const dropResult = await rollAndGrantDropsTx(tx, params.playerId, dropEntries, materialRolls, 'common', params.availableSlots);
 
   let recipeUnlocked: RecipeUnlockReward | null = null;
   const baseRecipeChance = getChestRecipeChanceForEncounterSize(effectiveSize);
@@ -125,7 +128,9 @@ export async function grantEncounterSiteChestRewardsTx(
   return {
     chestRarity,
     materialRolls,
-    loot,
+    loot: dropResult.loot,
     recipeUnlocked,
+    overflow: dropResult.overflow,
+    slotsConsumed: dropResult.slotsConsumed,
   };
 }

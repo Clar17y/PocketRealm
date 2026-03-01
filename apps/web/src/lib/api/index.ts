@@ -74,10 +74,14 @@ export {
   sellBulk,
   getStash,
   depositToStash,
+  depositBatchToStash,
   withdrawFromStash,
+  withdrawBatchFromStash,
   claimLoot,
+  fetchPendingLoot,
 } from './items';
 export type {
+  PendingLootItem,
   GatheringNodesQuery,
   GatheringNodesResponse,
   InventoryItem,

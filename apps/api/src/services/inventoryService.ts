@@ -145,6 +145,21 @@ export async function consumeItemsByTemplateTx(
   await consumeItemsByTemplateWithClient(tx, playerId, itemTemplateId, quantity);
 }
 
+/** Throws if player's used slots exceed capacity (over-encumbered). */
+export async function assertNotOverEncumbered(playerId: string): Promise<void> {
+  const [usedSlots, capacity] = await Promise.all([
+    getUsedSlots(playerId),
+    getPlayerCapacity(playerId),
+  ]);
+  if (usedSlots > capacity) {
+    throw new AppError(
+      400,
+      'Over-encumbered! Drop, sell, stash, or salvage items to make space.',
+      'OVER_ENCUMBERED',
+    );
+  }
+}
+
 /** Count occupied backpack slots (excludes equipped and stashed items). */
 export async function getUsedSlots(playerId: string): Promise<number> {
   const items = await prisma.item.findMany({

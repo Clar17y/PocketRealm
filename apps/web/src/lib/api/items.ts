@@ -385,6 +385,20 @@ export async function depositToStash(itemId: string, quantity?: number) {
   });
 }
 
+export async function depositBatchToStash(itemIds: string[]) {
+  return fetchApi<{ depositedCount: number }>('/api/v1/inventory/stash/deposit/batch', {
+    method: 'POST',
+    body: JSON.stringify({ itemIds }),
+  });
+}
+
+export async function withdrawBatchFromStash(itemIds: string[]) {
+  return fetchApi<{ withdrawnCount: number }>('/api/v1/inventory/stash/withdraw/batch', {
+    method: 'POST',
+    body: JSON.stringify({ itemIds }),
+  });
+}
+
 export async function withdrawFromStash(itemId: string, quantity?: number) {
   return fetchApi<{ success: true }>('/api/v1/inventory/stash/withdraw', {
     method: 'POST',
@@ -393,6 +407,20 @@ export async function withdrawFromStash(itemId: string, quantity?: number) {
 }
 
 // Loot
+
+export interface PendingLootItem {
+  templateId: string;
+  templateName: string;
+  rarity: string;
+  quantity: number;
+  bonusStats: Record<string, number> | null;
+  currentDurability: number | null;
+  maxDurability: number | null;
+}
+
+export async function fetchPendingLoot(sessionId: string) {
+  return fetchApi<{ items: PendingLootItem[] }>(`/api/v1/inventory/loot/${sessionId}`);
+}
 
 export async function claimLoot(sessionId: string, selectedIndices: number[]) {
   return fetchApi<{ success: true }>('/api/v1/inventory/loot/claim', {

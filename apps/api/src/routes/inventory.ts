@@ -10,8 +10,8 @@ import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { repairAllEquipped, repairTurnCost, repairItemDurability } from '../services/repairService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sellItem, sellBulk } from '../services/sellService';
-import { depositItem, withdrawItem, listStash } from '../services/stashService';
-import { claimPendingLoot } from '../services/pendingLootService';
+import { depositItem, depositBatch, withdrawItem, withdrawBatch, listStash } from '../services/stashService';
+import { claimPendingLoot, getPendingLoot } from '../services/pendingLootService';
 import { getUsedSlots, getPlayerCapacity } from '../services/inventoryService';
 
 export const inventoryRouter = Router();
@@ -234,6 +234,18 @@ inventoryRouter.post('/stash/deposit', asyncHandler(async (req, res) => {
   res.json({ success: true });
 }));
 
+const stashBatchSchema = z.object({
+  itemIds: z.array(z.string().uuid()).min(1).max(50),
+});
+
+inventoryRouter.post('/stash/deposit/batch', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = stashBatchSchema.parse(req.body);
+  await assertInTown(playerId);
+  const result = await depositBatch(playerId, body.itemIds);
+  res.json(result);
+}));
+
 inventoryRouter.post('/stash/withdraw', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = stashSchema.parse(req.body);
@@ -242,7 +254,28 @@ inventoryRouter.post('/stash/withdraw', asyncHandler(async (req, res) => {
   res.json({ success: true });
 }));
 
-// --- Loot claim endpoint ---
+inventoryRouter.post('/stash/withdraw/batch', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const body = stashBatchSchema.parse(req.body);
+  await assertInTown(playerId);
+  const result = await withdrawBatch(playerId, body.itemIds);
+  res.json(result);
+}));
+
+// --- Loot endpoints ---
+
+const lootSessionSchema = z.object({ sessionId: z.string().uuid() });
+
+inventoryRouter.get('/loot/:sessionId', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { sessionId } = lootSessionSchema.parse({ sessionId: req.params.sessionId });
+  const items = await getPendingLoot(playerId, sessionId);
+  if (!items) {
+    res.json({ items: [] });
+    return;
+  }
+  res.json({ items });
+}));
 
 const lootClaimSchema = z.object({
   sessionId: z.string().uuid(),

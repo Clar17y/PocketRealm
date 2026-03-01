@@ -37,6 +37,7 @@ interface ZoneMapProps {
   currentZoneId: string;
   availableTurns: number;
   isRecovering: boolean;
+  isOverEncumbered: boolean;
   playbackActive?: boolean;
   travelPlaybackData?: {
     totalTurns: number;
@@ -109,6 +110,7 @@ export function ZoneMap({
   currentZoneId,
   availableTurns,
   isRecovering,
+  isOverEncumbered,
   playbackActive,
   travelPlaybackData,
   onTravelPlaybackComplete,
@@ -193,6 +195,7 @@ export function ZoneMap({
     selectedZone.discovered &&
     selectedZone.id !== currentZoneId &&
     !isRecovering &&
+    !isOverEncumbered &&
     !playbackActive &&
     availableTurns >= inflateCost(selectedZone.travelCost, guildTaxRate);
 
@@ -514,6 +517,7 @@ export function ZoneMap({
             >
               {(() => {
                 const inflated = inflateCost(selectedZone.travelCost, guildTaxRate);
+                if (isOverEncumbered) return 'Over-encumbered';
                 if (isRecovering) return 'Recover first to travel';
                 if (availableTurns < inflated) return `Need ${inflated} turns (have ${availableTurns})`;
                 return `Travel to ${selectedZone.name} (${inflated} turns)`;

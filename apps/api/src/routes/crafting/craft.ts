@@ -21,7 +21,7 @@ import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { incrementContractProgress } from '../../services/guildContractService';
-import { serializeXpGrant, assertNotRecovering, trackAchievements } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
   isSkillType,
@@ -44,8 +44,8 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = craftSchema.parse(req.body);
 
-    // Check if player is recovering
-    await assertNotRecovering(playerId);
+    // Pre-flight: not recovering, not over-encumbered
+    await assertCanAct(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);

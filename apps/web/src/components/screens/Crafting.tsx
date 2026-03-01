@@ -52,6 +52,8 @@ interface CraftingProps {
   zoneName: string | null;
   defaultMaxQuantity?: boolean;
   guildTaxRate?: number;
+  backpackFull?: boolean;
+  isOverEncumbered?: boolean;
 }
 
 function statEntries(stats: Record<string, unknown> | undefined): Array<[string, number]> {
@@ -67,7 +69,7 @@ function statEntries(stats: Record<string, unknown> | undefined): Array<[string,
     });
 }
 
-export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0 }: CraftingProps) {
+export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
@@ -408,12 +410,16 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
             size="lg"
             className="w-full"
             onClick={() => onCraft(selectedRecipe.id, quantity)}
-            disabled={isRecovering || noFacility || selectedMax < 1}
+            disabled={isOverEncumbered || isRecovering || noFacility || selectedMax < 1 || backpackFull}
           >
-            {isRecovering
+            {isOverEncumbered
+              ? 'Over-Encumbered'
+              : isRecovering
               ? 'Recover First'
               : noFacility
               ? 'No Crafting Facility'
+              : backpackFull
+              ? 'Backpack Full'
               : selectedForgeLocked
               ? 'Requires Higher-Level Forge'
               : selectedLevelLocked

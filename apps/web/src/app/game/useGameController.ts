@@ -59,9 +59,14 @@ import {
   travelToZone,
   unequip,
   sellItem,
+  sellBulk,
   depositToStash,
+  depositBatchToStash,
+  withdrawBatchFromStash,
   withdrawFromStash,
   claimLoot,
+  fetchPendingLoot,
+  type PendingLootItem,
   type AchievementsResponse,
   type EventModifierBadge,
   type CombatActiveEvent,
@@ -346,7 +351,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [gold, setGold] = useState(0);
   const [pendingLootSession, setPendingLootSession] = useState<{
     sessionId: string;
-    items: Array<{ templateName: string; rarity: string; quantity: number }>;
+    items: PendingLootItem[];
+    minimized?: boolean;
   } | null>(null);
   const [equipment, setEquipment] = useState<Array<{
     slot: string;
@@ -558,6 +564,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     refundedTurns: number;
     playerHpBeforeExploration: number;
     playerMaxHp: number;
+    pendingLootSessionIds?: string[];
   } | null>(null);
   const [travelPlaybackData, setTravelPlaybackData] = useState<{
     totalTurns: number;
@@ -1026,6 +1033,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         refundedTurns: data.refundedTurns,
         playerHpBeforeExploration: hpBefore,
         playerMaxHp: maxHpBefore,
+        pendingLootSessionIds: data.pendingLootSessionIds,
       });
       setPlaybackActive(true);
 
@@ -1060,11 +1068,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         if (Array.isArray(losses)) logDurabilityWarnings(losses);
       }
     }
+    // Show loot picker for first pending overflow session
+    const pendingIds = explorationPlaybackData?.pendingLootSessionIds;
     setExplorationPlaybackData(null);
     combatLogPrefetch.clear();
     setPlaybackActive(false);
     await advanceTutorial(TUTORIAL_STEP_EXPLORE);
     await loadAll();
+    if (pendingIds?.length) {
+      await activatePendingLoot(pendingIds[0]);
+    }
   };
 
   const handlePlaybackSkip = async () => {
@@ -1098,10 +1111,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
       }
     }
+    const pendingIds = explorationPlaybackData?.pendingLootSessionIds;
     setExplorationPlaybackData(null);
     setPlaybackActive(false);
     await advanceTutorial(TUTORIAL_STEP_EXPLORE);
     await loadAll();
+    if (pendingIds?.length) {
+      await activatePendingLoot(pendingIds[0]);
+    }
   };
 
   const handleStartCombat = async (encounterSiteId: string) => {
@@ -1266,17 +1283,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       // Detect pending loot overflow
-      if (data.pendingLootSessionId && data.pendingLootItems?.length) {
-        setPendingLootSession({
-          sessionId: data.pendingLootSessionId,
-          items: data.pendingLootItems,
-        });
-      } else if (data.pendingLootSessionId) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'warning',
-          message: 'Your backpack was full! Some loot could not be collected.',
-        });
+      if (data.pendingLootSessionId) {
+        await activatePendingLoot(data.pendingLootSessionId);
       }
 
       await Promise.all([loadAll(), loadTurnsAndHp(), loadBestiary()]);
@@ -1704,6 +1712,23 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
+  const handleSellBatch = async (itemIds: string[]) => {
+    await runAction('sell_batch', async () => {
+      const res = await sellBulk(itemIds);
+      if (!res.data) {
+        setActionError(res.error?.message ?? 'Batch sell failed');
+        return;
+      }
+      setGold(res.data.newGold);
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'success',
+        message: `Sold ${res.data.soldCount} item(s) for ${res.data.totalGoldEarned} gold`,
+      });
+      await loadAll();
+    });
+  };
+
   const handleDepositItem = async (itemId: string) => {
     await runAction('deposit', async () => {
       const res = await depositToStash(itemId);
@@ -1715,6 +1740,22 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         timestamp: nowStamp(),
         type: 'success',
         message: 'Item deposited to stash',
+      });
+      await loadAll();
+    });
+  };
+
+  const handleDepositBatch = async (itemIds: string[]) => {
+    await runAction('deposit_batch', async () => {
+      const res = await depositBatchToStash(itemIds);
+      if (!res.data) {
+        setActionError(res.error?.message ?? 'Batch deposit failed');
+        return;
+      }
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'success',
+        message: `${res.data.depositedCount} item(s) deposited to stash`,
       });
       await loadAll();
     });
@@ -1736,11 +1777,51 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
+  const handleWithdrawBatch = async (itemIds: string[]) => {
+    await runAction('withdraw_batch', async () => {
+      const res = await withdrawBatchFromStash(itemIds);
+      if (!res.data) {
+        setActionError(res.error?.message ?? 'Batch withdraw failed');
+        return;
+      }
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'success',
+        message: `${res.data.withdrawnCount} item(s) withdrawn from stash`,
+      });
+      await loadAll();
+    });
+  };
+
+  const clearExpiredLoot = () => {
+    setPendingLootSession(null);
+    pushLog({ timestamp: nowStamp(), type: 'warning', message: 'Overflow loot expired — unclaimed items were lost.' });
+  };
+
+  const activatePendingLoot = async (sessionId: string) => {
+    const res = await fetchPendingLoot(sessionId);
+    if (res.data?.items?.length) {
+      setPendingLootSession({ sessionId, items: res.data.items, minimized: false });
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'warning',
+        message: `Backpack full! ${res.data.items.length} item(s) waiting to be claimed.`,
+      });
+    } else {
+      clearExpiredLoot();
+    }
+  };
+
   const handleClaimLoot = async (sessionId: string, selectedIndices: number[]) => {
     await runAction('claim_loot', async () => {
       const res = await claimLoot(sessionId, selectedIndices);
       if (!res.data) {
-        setActionError(res.error?.message ?? 'Loot claim failed');
+        if (res.error?.code === 'LOOT_EXPIRED') {
+          clearExpiredLoot();
+        } else {
+          setPendingLootSession(null);
+          setActionError(res.error?.message ?? 'Loot claim failed');
+        }
         return;
       }
       setPendingLootSession(null);
@@ -1754,7 +1835,18 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   };
 
   const handleDismissLoot = () => {
-    setPendingLootSession(null);
+    setPendingLootSession((prev) => prev ? { ...prev, minimized: true } : null);
+  };
+
+  const handleReopenLoot = async () => {
+    const session = pendingLootSession;
+    if (!session) return;
+    const res = await fetchPendingLoot(session.sessionId);
+    if (res.data?.items?.length) {
+      setPendingLootSession({ sessionId: session.sessionId, items: res.data.items, minimized: false });
+    } else {
+      clearExpiredLoot();
+    }
   };
 
   const handleTravelToZone = async (id: string) => {
@@ -2123,13 +2215,18 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Inventory & backpack
     inventoryCapacity,
     inventoryUsedSlots,
+    isOverEncumbered: inventoryUsedSlots > inventoryCapacity,
     gold,
     pendingLootSession,
     handleSellItem,
+    handleSellBatch,
     handleDepositItem,
+    handleDepositBatch,
     handleWithdrawItem,
+    handleWithdrawBatch,
     handleClaimLoot,
     handleDismissLoot,
+    handleReopenLoot,
   };
 }
 

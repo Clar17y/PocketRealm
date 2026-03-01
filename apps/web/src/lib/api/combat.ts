@@ -125,6 +125,7 @@ export async function startExploration(zoneId: string, turns: number, tier?: num
       percent: number;
       turnsToExplore: number | null;
     };
+    pendingLootSessionIds?: string[];
     tax: TaxInfo | null;
   }>('/api/v1/exploration/start', {
     method: 'POST',
