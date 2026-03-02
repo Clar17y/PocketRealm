@@ -59,25 +59,32 @@ interface ChipStack {
   otherCount: number;
 }
 
-function ChipStackIndicator({ myCount, otherCount, myAmount }: ChipStack) {
-  const total = Math.min(myCount + otherCount, 4);
+function ChipStackIndicator({ myCount, otherCount }: ChipStack) {
+  const total = Math.min(myCount + otherCount, 3);
   if (total === 0) return null;
-  const overflow = myCount + otherCount > 4 ? myCount + otherCount : 0;
+  const overflow = myCount + otherCount > 3 ? myCount + otherCount : 0;
 
   return (
-    <div className="absolute bottom-0 right-0.5 flex flex-col-reverse items-center pointer-events-none">
-      {Array.from({ length: total }, (_, i) => (
-        <div
-          key={i}
-          className={`w-3 h-1.5 rounded-full border -mt-0.5 first:mt-0 ${
-            i < myCount
-              ? 'bg-[var(--rpg-gold)] border-[var(--rpg-gold)]/70'
-              : 'bg-gray-400 border-gray-500'
-          }`}
-        />
-      ))}
-      {overflow > 0 && <span className="text-[6px] text-white font-bold">x{overflow}</span>}
-      {myAmount > 0 && <span className="text-[6px] text-[var(--rpg-gold)] font-bold">{myAmount}g</span>}
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="relative w-5 h-5">
+        {Array.from({ length: total }, (_, i) => {
+          const isMine = i < myCount;
+          return (
+            <img
+              key={i}
+              src={isMine ? '/assets/ui/chip-gold.svg' : '/assets/ui/chip-silver.svg'}
+              alt=""
+              className="absolute w-5 h-5 drop-shadow-sm"
+              style={{ top: `${-i * 2}px` }}
+            />
+          );
+        })}
+        {overflow > 0 && (
+          <span className="absolute -top-2 -right-1.5 text-[7px] text-white font-bold bg-black/60 rounded-full px-0.5 leading-tight">
+            x{overflow}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
