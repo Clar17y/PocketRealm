@@ -11,7 +11,7 @@ vi.mock('./turnBankService', () => ({
 }));
 
 import { mockPrisma } from '../__test__/setup';
-import { SKILL_POINT_CONSTANTS, BASE_ACTION_DEFINITIONS } from '@adventure/shared';
+import { SKILL_POINT_CONSTANTS, ALWAYS_AVAILABLE_ACTION_IDS } from '@adventure/shared';
 import { spendPlayerTurnsTx } from './turnBankService';
 import {
   getSkillPoints,
@@ -229,16 +229,16 @@ describe('getUnlockedActions', () => {
 
     const result = await getUnlockedActions(PLAYER_ID);
 
-    const baseKeys = Object.keys(BASE_ACTION_DEFINITIONS);
+    const baseIds = [...ALWAYS_AVAILABLE_ACTION_IDS];
     // Should include all base actions
-    for (const key of baseKeys) {
+    for (const key of baseIds) {
       expect(result).toContain(key);
     }
     // Should include talent unlocks
     expect(result).toContain('power_strike');
     expect(result).toContain('fire_bolt');
     // Total = base count + 2 talent unlocks
-    expect(result).toHaveLength(baseKeys.length + 2);
+    expect(result).toHaveLength(baseIds.length + 2);
   });
 
   it('returns only base actions when no talent allocations', async () => {
@@ -247,6 +247,6 @@ describe('getUnlockedActions', () => {
 
     const result = await getUnlockedActions(PLAYER_ID);
 
-    expect(result).toEqual(Object.keys(BASE_ACTION_DEFINITIONS));
+    expect(result).toEqual([...ALWAYS_AVAILABLE_ACTION_IDS]);
   });
 });

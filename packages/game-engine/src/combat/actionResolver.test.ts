@@ -136,16 +136,14 @@ describe('resolveAction', () => {
     expect(result.wasExhausted).toBe(false);
   });
 
-  it('falls back to BASE_ACTION_DEFINITIONS for known IDs not in custom defs', () => {
-    // Provide custom defs that omit light_attack; resolveAction should find it
-    // in the fallback BASE_ACTION_DEFINITIONS
+  it('falls back to defend when action ID is not in provided definitions', () => {
     const sparseCustom: Record<string, ActionDefinition> = {
       damage_spell: damageSpell,
     };
     const template = templateOf('light_attack');
     const result = resolveAction(template, 1, 100, 100, sparseCustom);
-    expect(result.action.id).toBe('light_attack');
-    expect(result.wasExhausted).toBe(false);
+    expect(result.action.id).toBe('defend');
+    expect(result.wasExhausted).toBe(true);
   });
 
   it('exactly at cost boundary is affordable', () => {

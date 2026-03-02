@@ -1,9 +1,9 @@
 import { prisma } from '@adventure/database';
 import {
   SKILL_POINT_CONSTANTS,
+  ALWAYS_AVAILABLE_ACTION_IDS,
   getAllTalentNodes,
   getTalentNode,
-  BASE_ACTION_DEFINITIONS,
   type SkillPointAllocationData,
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
@@ -129,7 +129,7 @@ export async function respecPoints(
 export async function getUnlockedActions(playerId: string): Promise<string[]> {
   const state = await getSkillPoints(playerId);
   return [
-    ...Object.keys(BASE_ACTION_DEFINITIONS),
+    ...ALWAYS_AVAILABLE_ACTION_IDS,
     ...state.unlockedActions,
   ];
 }

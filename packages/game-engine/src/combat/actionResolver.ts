@@ -49,9 +49,7 @@ export function resolveAction(
 ): ResolvedAction {
   const index = (roundNumber - 1) % template.length;
   const templateEntry = template[index];
-  const definition =
-    actionDefinitions[templateEntry.actionId] ??
-    BASE_ACTION_DEFINITIONS[templateEntry.actionId];
+  const definition = actionDefinitions[templateEntry.actionId];
 
   if (!definition) {
     return { action: DEFEND_FALLBACK, wasExhausted: true };

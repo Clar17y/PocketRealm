@@ -1,6 +1,6 @@
 import { prisma } from '@adventure/database';
 import type { CombatTemplateAction, CombatTemplateData } from '@adventure/shared';
-import { BASE_ACTION_DEFINITIONS, SKILL_POINT_CONSTANTS } from '@adventure/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, SKILL_POINT_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 
 function toTemplateData(record: any): CombatTemplateData {
@@ -128,7 +128,7 @@ export function validateTemplateActions(
   }
 
   const allAvailable = new Set([
-    ...Object.keys(BASE_ACTION_DEFINITIONS),
+    ...ALWAYS_AVAILABLE_ACTION_IDS,
     ...unlockedActions,
   ]);
 
