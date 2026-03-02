@@ -60,6 +60,7 @@ import { buildPotionPool, deductConsumedPotions } from '../../services/potionSer
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
+import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { serializeXpGrant, toMobTemplate, assertCanAct, recordBestiaryKill, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
@@ -340,7 +341,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         playerMaxHp: combatResult.combatantAMaxHp,
         playerStartHp,
         mobMaxHp: combatResult.combatantBMaxHp,
-        log: combatResult.log,
+        log: mapTemplateCombatLog(combatResult.log),
         playerHpRemaining: combatResult.combatantAHpRemaining,
         potionsConsumed: combatResult.potionsConsumed,
         xp: mobXpAwarded,
@@ -1016,7 +1017,7 @@ export function registerStartRoutes(router: Router): void {
             outcome: combatResult.outcome,
             playerMaxHp: combatResult.combatantAMaxHp,
             mobMaxHp: combatResult.combatantBMaxHp,
-            log: combatResult.log,
+            log: mapTemplateCombatLog(combatResult.log),
             potionsConsumed: combatResult.potionsConsumed,
             rewards: {
               xp: xpAwarded,
@@ -1048,7 +1049,7 @@ export function registerStartRoutes(router: Router): void {
           outcome: combatResult.outcome,
           playerMaxHp: combatResult.combatantAMaxHp,
           mobMaxHp: combatResult.combatantBMaxHp,
-          log: combatResult.log,
+          log: mapTemplateCombatLog(combatResult.log),
           playerHpRemaining: combatResult.combatantAHpRemaining,
           potionsConsumed: combatResult.potionsConsumed,
           fleeResult: fleeResult

@@ -4,6 +4,7 @@ import { Prisma, prisma } from '@adventure/database';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { enrichLootWithNames } from '../../services/lootService';
+import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { lootDropWithNameSchema } from './helpers';
 import { paginationSchema, buildPagination } from '../../utils/routeHelpers.js';
 
@@ -371,6 +372,14 @@ export function registerLogRoutes(router: Router): void {
           combat = {
             ...combatRecord,
             rewards: nextRewards,
+          } as unknown as Prisma.JsonValue;
+        }
+
+        // Map template combat log fields to frontend response shape
+        if (Array.isArray(combatRecord.log)) {
+          combat = {
+            ...(combat as Record<string, unknown>),
+            log: mapTemplateCombatLog(combatRecord.log),
           } as unknown as Prisma.JsonValue;
         }
       }
