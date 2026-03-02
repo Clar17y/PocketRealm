@@ -572,6 +572,10 @@ export default function GamePage() {
             onDepositBatch={handleDepositBatch}
             onWithdraw={handleWithdrawItem}
             onWithdrawBatch={handleWithdrawBatch}
+            getSalvageCost={(templateId) => {
+              if (!discountLookup.recipeByTemplateId.has(templateId)) return null;
+              return getDiscountedCost(discountLookup, templateId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
+            }}
             zoneCraftingLevel={zoneCraftingLevel}
             confirmRarity={confirmRarity}
           />

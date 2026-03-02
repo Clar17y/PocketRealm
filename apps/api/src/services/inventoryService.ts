@@ -20,7 +20,8 @@ async function addStackableItemWithClient(
   client: InventoryClient,
   playerId: string,
   itemTemplateId: string,
-  quantity: number
+  quantity: number,
+  inStash = false,
 ): Promise<{ itemId: string; quantity: number }> {
   if (!Number.isInteger(quantity) || quantity <= 0) {
     throw new AppError(400, 'Quantity must be a positive integer', 'INVALID_QUANTITY');
@@ -36,7 +37,7 @@ async function addStackableItemWithClient(
   }
 
   const existing = await client.item.findFirst({
-    where: { ownerId: playerId, templateId: itemTemplateId },
+    where: { ownerId: playerId, templateId: itemTemplateId, inStash },
     select: { id: true, quantity: true },
   });
 
@@ -57,6 +58,7 @@ async function addStackableItemWithClient(
       quantity,
       maxDurability: null,
       currentDurability: null,
+      inStash,
     } as any,
     select: { id: true, quantity: true },
   });
@@ -66,18 +68,20 @@ async function addStackableItemWithClient(
 export async function addStackableItem(
   playerId: string,
   itemTemplateId: string,
-  quantity: number
+  quantity: number,
+  inStash = false,
 ): Promise<{ itemId: string; quantity: number }> {
-  return addStackableItemWithClient(prisma, playerId, itemTemplateId, quantity);
+  return addStackableItemWithClient(prisma, playerId, itemTemplateId, quantity, inStash);
 }
 
 export async function addStackableItemTx(
   tx: Prisma.TransactionClient,
   playerId: string,
   itemTemplateId: string,
-  quantity: number
+  quantity: number,
+  inStash = false,
 ): Promise<{ itemId: string; quantity: number }> {
-  return addStackableItemWithClient(tx, playerId, itemTemplateId, quantity);
+  return addStackableItemWithClient(tx, playerId, itemTemplateId, quantity, inStash);
 }
 
 export async function getTotalQuantityByTemplate(
