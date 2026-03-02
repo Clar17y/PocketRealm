@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { PixelButton } from '@/components/PixelButton';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
-import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { MapPin, Star, Hourglass, Lock } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';

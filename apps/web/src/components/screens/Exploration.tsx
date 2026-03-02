@@ -14,7 +14,7 @@ import { XpRateBadge } from '@/components/common/XpRateBadge';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
-import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 
 interface ExplorationProps {

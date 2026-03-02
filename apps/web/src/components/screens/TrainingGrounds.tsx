@@ -9,7 +9,7 @@ import { Swords, Shield, AlertTriangle } from 'lucide-react';
 import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
 import { getMobPrefixDefinition } from '@adventure/shared';
 import type { CombatResult } from '@adventure/shared';
-import type { LastCombatLogEntry } from '@/app/game/useGameController';
+import type { LastCombatLogEntry } from '@/app/game/gameController.types';
 import { monsterImageSrc } from '@/lib/assets';
 
 interface BestiaryMob {

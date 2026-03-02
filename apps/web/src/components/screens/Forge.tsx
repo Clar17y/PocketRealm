@@ -10,7 +10,7 @@ import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ActivityLog } from '@/components/ActivityLog';
 import { inflateCost } from '@/lib/taxCalc';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { ForgeTutorial } from '@/components/common/ForgeTutorial';
 

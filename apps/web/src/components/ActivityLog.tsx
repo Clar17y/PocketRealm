@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { Clock } from 'lucide-react';
 import { PixelCard } from './PixelCard';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry } from '@/app/game/gameController.types';
 
 const TYPE_COLORS: Record<ActivityLogEntry['type'], string> = {
   info: 'text-[var(--rpg-text-secondary)]',

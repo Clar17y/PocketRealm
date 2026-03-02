@@ -8,7 +8,7 @@ import { SKILL_POINT_CONSTANTS } from '@adventure/shared';
 import type { TalentNodeDefinition, TalentTree as TalentTreeName } from '@adventure/shared';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import type { SkillPointState } from '@/lib/api';
-import type { Screen } from '@/app/game/useGameController';
+import type { Screen } from '@/app/game/gameController.types';
 import { SkillTreeTutorial } from '@/components/common/SkillTreeTutorial';
 
 interface TalentTreeProps {

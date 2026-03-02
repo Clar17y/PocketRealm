@@ -8,7 +8,7 @@ import { Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } from 'lu
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ActivityLog } from '@/components/ActivityLog';
 import { inflateCost } from '@/lib/taxCalc';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import { STAT_ORDER, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { xpRateColor } from '@/lib/format';
 import { XpRateTooltip } from '@/components/common/XpRateTooltip';

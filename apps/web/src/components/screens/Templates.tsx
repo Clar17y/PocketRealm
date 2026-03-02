@@ -10,7 +10,7 @@ import {
   deleteTemplate,
   activateTemplate,
 } from '@/lib/api';
-import type { Screen } from '@/app/game/useGameController';
+import type { Screen } from '@/app/game/gameController.types';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@adventure/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateAction, ResourceState } from '@adventure/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { LastCombatLogEntry } from '@/app/game/useGameController';
+import type { LastCombatLogEntry } from '@/app/game/gameController.types';
 import { BASE_ACTION_DEFINITIONS } from '@adventure/shared';
 import { ACTION_CATEGORY_COLORS } from '@/lib/categoryColors';
 

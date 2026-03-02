@@ -15,7 +15,7 @@ import { computeResourceYieldMultiplier, computeEventMinActions } from '@adventu
 import { EventBadges } from '@/components/common/EventBadge';
 import { effectiveTurns as calcEffectiveTurns, inflateCost } from '@/lib/taxCalc';
 import { ActivityLog } from '@/components/ActivityLog';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import type { EventModifierBadge } from '@/lib/api';
 
 interface ResourceNode {

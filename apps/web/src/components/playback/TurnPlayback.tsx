@@ -8,7 +8,8 @@ import { monsterImageSrc } from '@/lib/assets';
 import type { CombatLogEntryResponse, EventModifierBadge } from '@/lib/api/combat';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { isAmbushWithCombatLog } from '@/lib/explorationUtils';
-import { isMobKnown, type BestiarySkipEntry } from '@/app/game/useGameController';
+import type { BestiarySkipEntry } from '@/app/game/gameController.types';
+import { isMobKnown } from '@/app/game/combatHelpers';
 
 interface TurnPlaybackProps {
   totalTurns: number;
