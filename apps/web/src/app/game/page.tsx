@@ -1400,6 +1400,8 @@ export default function GamePage() {
           <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
             {[
               { id: 'combat', label: 'Combat', badge: 0 },
+              { id: 'templates', label: 'Templates', badge: 0 },
+              { id: 'talentTree', label: 'Skill Tree', badge: 0 },
               { id: 'arena', label: 'Arena', badge: pvpNotificationCount },
             ].map((tab) => (
               <button
