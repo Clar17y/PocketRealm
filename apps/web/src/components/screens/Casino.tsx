@@ -265,12 +265,14 @@ export function Casino({
     }
   }, [roundState?.phase, fetchHistory]);
 
-  // Win animation trigger
+  // Win animation trigger — only fires on new results, checks player's wins
+  const lastResultRef = useRef<typeof lastResult>(null);
   useEffect(() => {
-    if (!lastResult) return;
-    const myWinnings = sessionBets
-      .filter((b) => b.payout !== null && b.payout > 0)
-      .reduce((sum, b) => sum + (b.payout ?? 0), 0);
+    if (!lastResult || lastResult === lastResultRef.current) return;
+    lastResultRef.current = lastResult;
+    const myWinnings = lastResult.winningBets
+      .filter((wb) => wb.playerName === playerName)
+      .reduce((sum, wb) => sum + wb.payout, 0);
     if (myWinnings > 0) {
       setWinAnimation({
         payout: myWinnings,
@@ -279,7 +281,7 @@ export function Casino({
       const timer = setTimeout(() => setWinAnimation(null), 2500);
       return () => clearTimeout(timer);
     }
-  }, [lastResult, sessionBets]);
+  }, [lastResult, playerName]);
 
   // Gold exchange handler
   const handleExchange = async () => {
