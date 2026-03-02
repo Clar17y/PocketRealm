@@ -217,3 +217,8 @@ export type {
   GuildJoinRequestResponse,
   GuildJoinRequestsResponse,
 } from './guild';
+
+export { exchangeGold, getRouletteRound, placeRouletteBet, getRouletteHistory, getRouletteStats } from './casino';
+export type { GoldExchangeResponse, PlaceBetResponse, RouletteNumberStat } from './casino';
+export { startTrainingFight, getTrainingCooldown } from './training';
+export type { TrainingFightResponse, TrainingCooldownResponse } from './training';

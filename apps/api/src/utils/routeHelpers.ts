@@ -11,6 +11,21 @@ import { checkAchievements, emitAchievementNotifications } from '../services/ach
 import { respawnToHomeTown } from '../services/zoneDiscoveryService.js';
 import type { GrantXpResult } from '../services/xpService.js';
 
+// ── Town zone gate ─────────────────────────────────────────────────
+
+export async function assertInTown(playerId: string): Promise<void> {
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { currentZoneId: true },
+  });
+  if (!player?.currentZoneId) throw new AppError(400, 'Not in a zone', 'NO_ZONE');
+
+  const zone = await prisma.zone.findUnique({ where: { id: player.currentZoneId } });
+  if (!zone || zone.zoneType !== 'town') {
+    throw new AppError(403, 'Must be in a town for this action', 'NOT_IN_TOWN');
+  }
+}
+
 export const paginationSchema = {
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(10),
@@ -55,8 +70,10 @@ export async function assertNotRecovering(playerId: string): Promise<Awaited<Ret
 
 /** Combined pre-flight guard: not recovering + not over-encumbered. */
 export async function assertCanAct(playerId: string): Promise<Awaited<ReturnType<typeof getHpState>>> {
-  const hpState = await assertNotRecovering(playerId);
-  await assertNotOverEncumbered(playerId);
+  const [hpState] = await Promise.all([
+    assertNotRecovering(playerId),
+    assertNotOverEncumbered(playerId),
+  ]);
   return hpState;
 }
 
@@ -156,13 +173,38 @@ export function toMobTemplate(raw: Record<string, unknown>): MobTemplate {
   } as MobTemplate;
 }
 
-// ── Combat defeat handling ───────────────────────────────────────────
+// ── Flee with gold loss ──────────────────────────────────────────────
 
-export interface CombatDefeatParams {
+export interface FleeWithGoldParams {
   evasionLevel: number;
   mobLevel: number;
   maxHp: number;
 }
+
+export async function calculateFleeWithGold(
+  playerId: string,
+  params: FleeWithGoldParams,
+): Promise<ReturnType<typeof calculateFleeResult>> {
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { gold: true },
+  });
+  const fleeResult = calculateFleeResult({
+    ...params,
+    currentGold: player?.gold ?? 0,
+  });
+  if (fleeResult.goldLost > 0) {
+    await prisma.player.update({
+      where: { id: playerId },
+      data: { gold: { decrement: fleeResult.goldLost } },
+    });
+  }
+  return fleeResult;
+}
+
+// ── Combat defeat handling ───────────────────────────────────────────
+
+export type CombatDefeatParams = FleeWithGoldParams;
 
 export interface CombatDefeatResult {
   fleeResult: ReturnType<typeof calculateFleeResult>;
@@ -173,12 +215,7 @@ export async function handleCombatDefeat(
   playerId: string,
   params: CombatDefeatParams,
 ): Promise<CombatDefeatResult> {
-  const fleeResult = calculateFleeResult({
-    evasionLevel: params.evasionLevel,
-    mobLevel: params.mobLevel,
-    maxHp: params.maxHp,
-    currentGold: 0,
-  });
+  const fleeResult = await calculateFleeWithGold(playerId, params);
 
   let respawnedTo: { townId: string; townName: string } | null = null;
 

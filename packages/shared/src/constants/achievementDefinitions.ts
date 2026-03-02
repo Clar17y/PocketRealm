@@ -732,6 +732,104 @@ const GUILD_ACHIEVEMENTS: AchievementDef[] = [
   },
 ];
 
+// --- Casino achievements ---
+const CASINO_ACHIEVEMENTS: AchievementDef[] = [
+  {
+    id: 'casino_first_bet',
+    category: 'casino',
+    title: 'Feeling Lucky',
+    description: 'Place your first bet',
+    statKey: 'totalBetsPlaced',
+    threshold: 1,
+  },
+  {
+    id: 'casino_wagered_10k',
+    category: 'casino',
+    title: 'Small Stakes',
+    description: 'Wager 10,000 gold total',
+    statKey: 'totalGoldWagered',
+    threshold: 10000,
+  },
+  {
+    id: 'casino_wagered_100k',
+    category: 'casino',
+    title: 'High Roller',
+    description: 'Wager 100,000 gold total',
+    statKey: 'totalGoldWagered',
+    threshold: 100000,
+    tier: 2,
+  },
+  {
+    id: 'casino_wagered_1m',
+    category: 'casino',
+    title: 'Whale',
+    description: 'Wager 1,000,000 gold total',
+    titleReward: 'Whale',
+    statKey: 'totalGoldWagered',
+    threshold: 1000000,
+    tier: 3,
+  },
+  {
+    id: 'casino_wagered_10m',
+    category: 'casino',
+    title: 'The House',
+    description: 'Wager 10,000,000 gold total',
+    titleReward: 'The House',
+    statKey: 'totalGoldWagered',
+    threshold: 10000000,
+    tier: 5,
+    rewards: [{ type: 'attribute_points', amount: 3 }],
+  },
+  {
+    id: 'casino_exchanged_10k',
+    category: 'casino',
+    title: 'Gold Rush',
+    description: 'Exchange 10,000 turns for gold',
+    statKey: 'totalTurnsExchanged',
+    threshold: 10000,
+  },
+  {
+    id: 'casino_exchanged_100k',
+    category: 'casino',
+    title: 'Minted',
+    description: 'Exchange 100,000 turns for gold',
+    statKey: 'totalTurnsExchanged',
+    threshold: 100000,
+    tier: 2,
+  },
+  {
+    id: 'casino_exchanged_1m',
+    category: 'casino',
+    title: 'Gold Standard',
+    description: 'Exchange 1,000,000 turns for gold',
+    titleReward: 'Minted',
+    statKey: 'totalTurnsExchanged',
+    threshold: 1000000,
+    tier: 3,
+    rewards: [{ type: 'attribute_points', amount: 2 }],
+  },
+  {
+    id: 'casino_gold_100k',
+    category: 'casino',
+    title: 'Jackpot',
+    description: 'Hold 100,000 gold at once',
+    statKey: 'peakGoldHeld',
+    threshold: 100000,
+    tier: 2,
+  },
+  {
+    id: 'casino_gold_1m',
+    category: 'casino',
+    title: 'Fortune',
+    description: 'Hold 1,000,000 gold at once',
+    titleReward: 'Fortunate',
+    statKey: 'peakGoldHeld',
+    threshold: 1000000,
+    tier: 4,
+    rewards: [{ type: 'attribute_points', amount: 3 }],
+  },
+];
+
 export const ALL_ACHIEVEMENTS: AchievementDef[] = [
   ...COMBAT_ACHIEVEMENTS,
   ...EXPLORATION_ACHIEVEMENTS,
@@ -742,6 +840,7 @@ export const ALL_ACHIEVEMENTS: AchievementDef[] = [
   ...GENERAL_ACHIEVEMENTS,
   ...FAMILY_ACHIEVEMENTS,
   ...GUILD_ACHIEVEMENTS,
+  ...CASINO_ACHIEVEMENTS,
 ];
 
 // Lookup maps for efficient access

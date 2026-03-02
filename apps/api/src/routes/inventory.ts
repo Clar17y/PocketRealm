@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@adventure/database';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
-import { getOwnedItem } from '../utils/routeHelpers.js';
+import { getOwnedItem, assertInTown } from '../utils/routeHelpers.js';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { useConsumable } from '../services/consumableService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
@@ -12,7 +12,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { sellItem, sellBulk } from '../services/sellService';
 import { depositItem, depositBatch, withdrawItem, withdrawBatch, listStash } from '../services/stashService';
 import { claimPendingLoot, getPendingLoot } from '../services/pendingLootService';
-import { getUsedSlots, getPlayerCapacity } from '../services/inventoryService';
+import { getInventoryState } from '../services/inventoryService';
 
 export const inventoryRouter = Router();
 
@@ -25,7 +25,7 @@ inventoryRouter.use(authenticate);
 inventoryRouter.get('/', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
 
-  const [items, equipped, capacity, usedSlots, materialRows] = await Promise.all([
+  const [items, equipped, inventoryState, materialRows] = await Promise.all([
     prisma.item.findMany({
       where: { ownerId: playerId, inStash: false },
       include: { template: true },
@@ -35,14 +35,14 @@ inventoryRouter.get('/', asyncHandler(async (req, res) => {
       where: { playerId, itemId: { not: null } },
       select: { slot: true, itemId: true },
     }),
-    getPlayerCapacity(playerId),
-    getUsedSlots(playerId),
+    getInventoryState(playerId),
     prisma.item.groupBy({
       by: ['templateId'],
       where: { ownerId: playerId },
       _sum: { quantity: true },
     }),
   ]);
+  const { usedSlots, capacity } = inventoryState;
 
   const equippedByItemId = new Map<string, string>();
   for (const e of equipped) {
@@ -184,18 +184,6 @@ inventoryRouter.post('/use', asyncHandler(async (req, res) => {
   const result = await useConsumable(playerId, body.itemId);
   res.json(result);
 }));
-
-// --- Town zone guard ---
-
-async function assertInTown(playerId: string): Promise<void> {
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { currentZone: { select: { zoneType: true } } },
-  });
-  if (player?.currentZone?.zoneType !== 'town') {
-    throw new AppError(400, 'Must be in a town', 'NOT_IN_TOWN');
-  }
-}
 
 // --- Sell endpoints ---
 

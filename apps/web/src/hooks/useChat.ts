@@ -6,7 +6,7 @@ import { CHAT_CONSTANTS } from '@adventure/shared';
 import { getSocket, connectSocket, disconnectSocket } from '@/lib/socket';
 import { getChatHistory } from '@/lib/api';
 
-export type ChatChannel = 'world' | 'zone';
+export type ChatChannel = 'world' | 'zone' | 'casino';
 
 interface UseChatParams {
   isAuthenticated: boolean;
@@ -16,6 +16,7 @@ interface UseChatParams {
 export interface UseChatReturn {
   worldMessages: ChatMessageEvent[];
   zoneMessages: ChatMessageEvent[];
+  casinoMessages: ChatMessageEvent[];
   activeChannel: ChatChannel;
   setActiveChannel: (ch: ChatChannel) => void;
   isOpen: boolean;
@@ -23,12 +24,17 @@ export interface UseChatReturn {
   presence: ChatPresenceEvent;
   unreadWorld: number;
   unreadZone: number;
+  unreadCasino: number;
+  casinoActive: boolean;
+  joinCasino: () => void;
+  leaveCasino: () => void;
   sendMessage: (text: string) => void;
   rateLimitError: string | null;
   pinnedWorld: ChatPinnedMessageEvent | null;
   pinnedZone: ChatPinnedMessageEvent | null;
   pinMessage: (channelId: string, message: string) => void;
   unpinMessage: (channelId: string) => void;
+  injectCasinoSystemMessage: (texts: string | string[]) => void;
 }
 
 export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseChatReturn {
@@ -42,14 +48,19 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [pinnedWorld, setPinnedWorld] = useState<ChatPinnedMessageEvent | null>(null);
   const [pinnedZone, setPinnedZone] = useState<ChatPinnedMessageEvent | null>(null);
+  const [casinoMessages, setCasinoMessages] = useState<ChatMessageEvent[]>([]);
+  const [unreadCasino, setUnreadCasino] = useState(0);
+  const [casinoActive, setCasinoActive] = useState(false);
 
   const currentZoneIdRef = useRef(currentZoneId);
   const isOpenRef = useRef(isOpen);
   const activeChannelRef = useRef(activeChannel);
+  const casinoActiveRef = useRef(casinoActive);
 
   currentZoneIdRef.current = currentZoneId;
   isOpenRef.current = isOpen;
   activeChannelRef.current = activeChannel;
+  casinoActiveRef.current = casinoActive;
 
   const appendMessage = useCallback((msg: ChatMessageEvent) => {
     if (msg.channelType === 'world') {
@@ -61,6 +72,11 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
       setZoneMessages((prev) => [...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)), msg]);
       if (!isOpenRef.current || activeChannelRef.current !== 'zone') {
         setUnreadZone((n) => n + 1);
+      }
+    } else if (msg.channelType === 'casino') {
+      setCasinoMessages((prev) => [...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)), msg]);
+      if (!isOpenRef.current || activeChannelRef.current !== 'casino') {
+        setUnreadCasino((n) => n + 1);
       }
     }
   }, []);
@@ -83,7 +99,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     const onPinned = (pin: ChatPinnedMessageEvent) => {
       if (pin.channelId === 'world') {
         setPinnedWorld(pin.id ? pin : null);
-      } else {
+      } else if (pin.channelId !== 'casino') {
         setPinnedZone(pin.id ? pin : null);
       }
     };
@@ -106,6 +122,16 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
         getChatHistory('zone', `zone:${currentZoneIdRef.current}`).then((res) => {
           if (res.data) {
             setZoneMessages(res.data.messages as ChatMessageEvent[]);
+          }
+        });
+      }
+
+      // Re-join casino room and reload history on reconnect
+      if (casinoActiveRef.current) {
+        socket.emit('chat:join-casino');
+        getChatHistory('casino', 'casino').then((res) => {
+          if (res.data) {
+            setCasinoMessages(res.data.messages as ChatMessageEvent[]);
           }
         });
       }
@@ -153,14 +179,16 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
   const setActiveChannel = useCallback((ch: ChatChannel) => {
     setActiveChannelRaw(ch);
     if (ch === 'world') setUnreadWorld(0);
-    else setUnreadZone(0);
+    else if (ch === 'zone') setUnreadZone(0);
+    else if (ch === 'casino') setUnreadCasino(0);
   }, []);
 
   // Clear unread when opening chat on active channel
   useEffect(() => {
     if (isOpen) {
       if (activeChannel === 'world') setUnreadWorld(0);
-      else setUnreadZone(0);
+      else if (activeChannel === 'zone') setUnreadZone(0);
+      else if (activeChannel === 'casino') setUnreadCasino(0);
     }
   }, [isOpen, activeChannel]);
 
@@ -172,7 +200,9 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     if (!socket.connected) return;
 
     const channelType = activeChannelRef.current;
-    const channelId = channelType === 'world' ? 'world' : `zone:${currentZoneIdRef.current}`;
+    const channelId = channelType === 'world' ? 'world'
+      : channelType === 'casino' ? 'casino'
+      : `zone:${currentZoneIdRef.current}`;
 
     socket.emit('chat:send', { channelType, channelId, message: trimmed });
   }, []);
@@ -189,9 +219,53 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     socket.emit('chat:unpin', { channelId });
   }, []);
 
+  const joinCasino = useCallback(() => {
+    setCasinoActive(true);
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit('chat:join-casino');
+    }
+    getChatHistory('casino', 'casino').then((res) => {
+      if (res.data) {
+        setCasinoMessages(res.data.messages as ChatMessageEvent[]);
+      }
+    });
+  }, []);
+
+  const injectCasinoSystemMessage = useCallback((texts: string | string[]) => {
+    const arr = Array.isArray(texts) ? texts : [texts];
+    setCasinoMessages((prev) => {
+      const msgs: ChatMessageEvent[] = arr.map((text) => ({
+        id: Math.random().toString(36).slice(2),
+        channelType: 'casino' as const,
+        channelId: 'casino',
+        playerId: 'dealer',
+        username: 'Dealer',
+        message: text,
+        createdAt: new Date().toISOString(),
+        messageType: 'system' as const,
+      }));
+      return [...prev, ...msgs].slice(-CHAT_CONSTANTS.HISTORY_LIMIT);
+    });
+  }, []);
+
+  const leaveCasino = useCallback(() => {
+    setCasinoActive(false);
+    if (activeChannelRef.current === 'casino') {
+      setActiveChannelRaw('world');
+    }
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit('chat:leave-casino');
+    }
+    setCasinoMessages([]);
+    setUnreadCasino(0);
+  }, []);
+
   return {
     worldMessages,
     zoneMessages,
+    casinoMessages,
     activeChannel,
     setActiveChannel,
     isOpen,
@@ -199,11 +273,16 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     presence,
     unreadWorld,
     unreadZone,
+    unreadCasino,
+    casinoActive,
+    joinCasino,
+    leaveCasino,
     sendMessage,
     rateLimitError,
     pinnedWorld,
     pinnedZone,
     pinMessage,
     unpinMessage,
+    injectCasinoSystemMessage,
   };
 }

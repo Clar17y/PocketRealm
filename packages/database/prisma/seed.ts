@@ -242,6 +242,7 @@ async function seedBots() {
         currentHp: bot.player.currentHp,
         currentZoneId: starterZone.id,
         homeTownId: starterZone.id,
+        gold: 500,
         turnBank: {
           create: { currentTurns: 0, lastRegenAt: now },
         },

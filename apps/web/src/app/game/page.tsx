@@ -25,6 +25,8 @@ import { WorldEvents } from '@/components/screens/WorldEvents';
 import { Achievements } from '@/components/screens/Achievements';
 import { AchievementToast } from '@/components/AchievementToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
+import { Casino } from '@/components/screens/Casino';
+import { TrainingGrounds } from '@/components/screens/TrainingGrounds';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
@@ -50,6 +52,7 @@ import { GuildScreen } from '@/components/screens/GuildScreen';
 import { CombatScreen } from './screens/CombatScreen';
 import { useGameController, isMobKnown, type Screen } from './useGameController';
 import { useChat } from '@/hooks/useChat';
+import { useCasinoSocket } from '@/hooks/useCasinoSocket';
 import { ChatPanel } from '@/components/ChatPanel';
 
 const SKILL_META: Record<string, { name: string; icon: typeof Sword; color: string }> = {
@@ -316,7 +319,13 @@ export default function GamePage() {
     inventoryCapacity,
     inventoryUsedSlots,
     isOverEncumbered,
+    backpackFull,
     gold,
+    setGold,
+    trainingCooldown,
+    setTrainingCooldown,
+    handleExchangeGold,
+    handlePlaceBet,
     pendingLootSession,
     handleSellItem,
     handleSellBatch,
@@ -334,6 +343,8 @@ export default function GamePage() {
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
   const chat = useChat({ isAuthenticated, currentZoneId: activeZoneId });
+  const casinoSocket = useCasinoSocket(activeScreen === 'casino', player?.id ?? null);
+  const lastDealerCountRef = useRef(0);
   const errorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -347,6 +358,23 @@ export default function GamePage() {
       void loadAchievements();
     }
   }, [activeScreen, loadAchievements]);
+
+  useEffect(() => {
+    if (activeScreen === 'casino') {
+      chat.joinCasino();
+      return () => chat.leaveCasino();
+    }
+  }, [activeScreen, chat.joinCasino, chat.leaveCasino]);
+
+  // Inject dealer messages from casino socket into casino chat (batched)
+  useEffect(() => {
+    const msgs = casinoSocket.dealerMessages;
+    if (msgs.length > lastDealerCountRef.current) {
+      const newTexts = msgs.slice(lastDealerCountRef.current).map((m) => m.text);
+      chat.injectCasinoSystemMessage(newTexts);
+      lastDealerCountRef.current = msgs.length;
+    }
+  }, [casinoSocket.dealerMessages, chat.injectCasinoSystemMessage]);
 
   // Auto-navigate to the relevant screen when the tutorial step changes
   useEffect(() => {
@@ -821,7 +849,7 @@ export default function GamePage() {
               zoneName={zoneCraftingName}
               defaultMaxQuantity={activeCraftingSkill === 'refining' && defaultRefiningMax}
               guildTaxRate={guildTaxRate}
-              backpackFull={inventoryUsedSlots >= inventoryCapacity}
+              backpackFull={backpackFull}
             />
           </div>
         );
@@ -921,7 +949,7 @@ export default function GamePage() {
               onStartGathering={handleMine}
               isRecovering={hpState.isRecovering}
               isOverEncumbered={isOverEncumbered}
-              backpackFull={inventoryUsedSlots >= inventoryCapacity}
+              backpackFull={backpackFull}
               recoveryCost={hpState.recoveryCost}
               guildTaxRate={guildTaxRate}
             />
@@ -1204,6 +1232,41 @@ export default function GamePage() {
             onTurnsChanged={() => void loadTurnsAndHp()}
           />
         );
+      case 'casino':
+        return (
+          <Casino
+            gold={gold}
+            turns={turns}
+            onExchangeGold={handleExchangeGold}
+            onPlaceBet={handlePlaceBet}
+            onGoldUpdate={setGold}
+            onTurnsUpdate={setTurns}
+            isInTown={currentZone?.zoneType === 'town'}
+            liveBets={casinoSocket.liveBets}
+            sessionBets={casinoSocket.sessionBets}
+            sessionProfit={casinoSocket.sessionProfit}
+            lastResult={casinoSocket.lastResult}
+            trackBet={casinoSocket.trackBet}
+            playerName={player?.username ?? null}
+          />
+        );
+      case 'training':
+        return (
+          <TrainingGrounds
+            bestiary={bestiaryMobs
+              .filter((m) => m.isDiscovered)
+              .map((m) => ({
+                id: m.id,
+                name: m.name,
+                level: m.level,
+                prefixesEncountered: m.prefixesEncountered,
+              }))}
+            cooldownSeconds={trainingCooldown}
+            onCooldownUpdate={setTrainingCooldown}
+            isInTown={currentZone?.zoneType === 'town'}
+            combatLogSpeedMs={combatLogSpeedMs}
+          />
+        );
       case 'admin':
         return <AdminScreen onAction={loadAll} />;
       default:
@@ -1286,6 +1349,10 @@ export default function GamePage() {
               { id: 'leaderboard', label: 'Rankings', badge: 0 },
               { id: 'bestiary', label: 'Bestiary', badge: 0 },
               { id: 'skills', label: 'Skills', badge: 0 },
+              ...(currentZone?.zoneType === 'town' ? [
+                { id: 'casino', label: 'Casino', badge: 0 },
+                { id: 'training', label: 'Training', badge: 0 },
+              ] : []),
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1408,15 +1475,18 @@ export default function GamePage() {
         setActiveChannel={chat.setActiveChannel}
         worldMessages={chat.worldMessages}
         zoneMessages={chat.zoneMessages}
+        casinoMessages={chat.casinoMessages}
         presence={chat.presence}
         unreadWorld={chat.unreadWorld}
         unreadZone={chat.unreadZone}
+        unreadCasino={chat.unreadCasino}
+        casinoActive={chat.casinoActive}
         sendMessage={chat.sendMessage}
         rateLimitError={chat.rateLimitError}
         currentZoneId={activeZoneId}
         currentZoneName={currentZone?.name ?? null}
         playerId={player?.id ?? null}
-        pinnedMessage={chat.activeChannel === 'world' ? chat.pinnedWorld : chat.pinnedZone}
+        pinnedMessage={chat.activeChannel === 'casino' ? null : chat.activeChannel === 'world' ? chat.pinnedWorld : chat.pinnedZone}
       />
       <BottomNav
         activeTab={getActiveTab()}

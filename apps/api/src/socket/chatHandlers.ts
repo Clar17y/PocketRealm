@@ -35,7 +35,7 @@ function broadcastPresence(io: Server): void {
   io.to('chat:world').emit('chat:presence', event);
 }
 
-const VALID_CHANNEL_TYPES = new Set<ChatChannelType>(['world', 'zone', 'guild']);
+const VALID_CHANNEL_TYPES = new Set<ChatChannelType>(['world', 'zone', 'guild', 'casino']);
 
 export function registerChatHandlers(io: Server, socket: Socket): void {
   const { playerId, username, role } = socket.data;
@@ -149,6 +149,15 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
       socket.emit('chat:pinned', zonePin);
     }
     schedulePresenceBroadcast(io);
+  });
+
+  // Casino room join/leave
+  socket.on('chat:join-casino', () => {
+    socket.join('chat:casino');
+  });
+
+  socket.on('chat:leave-casino', () => {
+    socket.leave('chat:casino');
   });
 
   // Pin a message (admin only)

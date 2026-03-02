@@ -180,6 +180,7 @@ describe('leaderboardService', () => {
       mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
       mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
       mockPrisma.guild.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
 
       await refreshAllLeaderboards();
 
@@ -196,6 +197,7 @@ describe('leaderboardService', () => {
       mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
       mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
       mockPrisma.guild.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
 
       await refreshAllLeaderboards();
 
@@ -211,6 +213,7 @@ describe('leaderboardService', () => {
       mockPrisma.playerSkill.findMany.mockResolvedValue([]);
       mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
       mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
 
       // Should not throw even though PvP failed
       await expect(refreshAllLeaderboards()).resolves.toBeUndefined();
@@ -225,6 +228,7 @@ describe('leaderboardService', () => {
       mockPrisma.playerSkill.findMany.mockResolvedValue([]);
       mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
       mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
 
       await refreshAllLeaderboards();
 
@@ -243,6 +247,7 @@ describe('leaderboardService', () => {
       ]);
       mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
       mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
 
       await refreshAllLeaderboards();
 
@@ -261,6 +266,7 @@ describe('leaderboardService', () => {
         { playerId: 'p1', kills: 30, player: { username: 'Slayer', characterLevel: 8, isBot: false, activeTitle: null } },
       ]);
       mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
 
       await refreshAllLeaderboards();
 

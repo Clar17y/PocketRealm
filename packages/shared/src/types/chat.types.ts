@@ -1,4 +1,4 @@
-export type ChatChannelType = 'world' | 'zone' | 'guild';
+export type ChatChannelType = 'world' | 'zone' | 'guild' | 'casino';
 
 export interface ChatSendPayload {
   channelType: ChatChannelType;

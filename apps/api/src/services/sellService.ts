@@ -72,13 +72,7 @@ export async function sellBulk(
       if (item.inStash) continue;
       if (!item.template.sellPrice) continue;
 
-      const unitPrice = calculateSellPrice({
-        baseSellPrice: item.template.sellPrice,
-        rarity: item.rarity as ItemRarity,
-        currentDurability: item.currentDurability,
-        maxDurability: item.maxDurability,
-      });
-      totalGold += unitPrice * item.quantity;
+      totalGold += itemSellPrice(item) * item.quantity;
       soldCount++;
       await tx.item.delete({ where: { id: itemId } });
     }

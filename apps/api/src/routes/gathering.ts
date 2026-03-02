@@ -5,7 +5,7 @@ import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONST
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
-import { addStackableItemTx, getUsedSlots, getPlayerCapacity } from '../services/inventoryService';
+import { addStackableItemTx, getInventoryState } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
 import { serializeXpGrant, paginationSchema, buildPagination, assertCanAct, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
@@ -286,11 +286,8 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     where: { ownerId: playerId, templateId: resourceTemplateId, inStash: false },
   });
   if (!existingStack) {
-    const [usedSlots, capacity] = await Promise.all([
-      getUsedSlots(playerId),
-      getPlayerCapacity(playerId),
-    ]);
-    if (usedSlots >= capacity) {
+    const { availableSlots } = await getInventoryState(playerId);
+    if (availableSlots <= 0) {
       throw new AppError(400, 'Backpack is full. Make space before gathering.', 'BACKPACK_FULL');
     }
   }

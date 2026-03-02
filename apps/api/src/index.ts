@@ -24,6 +24,8 @@ import { achievementsRouter } from './routes/achievements';
 import { leaderboardRouter } from './routes/leaderboard';
 import { guildRouter } from './routes/guild';
 import { adminRouter } from './routes/admin';
+import { casinoRouter } from './routes/casino';
+import { trainingRouter } from './routes/training';
 import { errorHandler } from './middleware/errorHandler';
 import { createSocketServer, getIo } from './socket';
 import { checkAndResolveDueBossRounds } from './services/bossEncounterService';
@@ -106,6 +108,8 @@ app.use('/api/v1/achievements', achievementsRouter);
 app.use('/api/v1/leaderboard', leaderboardRouter);
 app.use('/api/v1/guild', guildRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/casino', casinoRouter);
+app.use('/api/v1/training', trainingRouter);
 
 // Error handler
 app.use(errorHandler);

@@ -10,6 +10,7 @@ export * from './types/worldEvent.types';
 export * from './types/achievement.types';
 export * from './types/guild.types';
 export * from './types/encounter.types';
+export * from './types/casino.types';
 
 // Constants
 export * from './constants/gameConstants';
