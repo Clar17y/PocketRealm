@@ -9,6 +9,7 @@ import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { LootPicker } from '@/components/common/LootPicker';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
+import { SubNav } from '@/components/common/SubNav';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
@@ -1291,122 +1292,61 @@ export default function GamePage() {
 
         {/* Sub-navigation for screens */}
         {getActiveTab() === 'home' && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-            {[
-              { id: 'home', label: 'Dashboard', badge: 0 },
-              { id: 'zones', label: 'Map', badge: 0 },
-              { id: 'worldEvents', label: 'Events', badge: 0 },
+          <SubNav
+            tabs={[
+              { id: 'home', label: 'Dashboard' },
+              { id: 'zones', label: 'Map' },
+              { id: 'worldEvents', label: 'Events' },
               { id: 'achievements', label: 'Achievements', badge: achievementUnclaimedCount },
-              { id: 'leaderboard', label: 'Rankings', badge: 0 },
-              { id: 'bestiary', label: 'Bestiary', badge: 0 },
-              { id: 'skills', label: 'Skills', badge: 0 },
+              { id: 'leaderboard', label: 'Rankings' },
+              { id: 'bestiary', label: 'Bestiary' },
+              { id: 'skills', label: 'Skills' },
               ...(currentZone?.zoneType === 'town' ? [
-                { id: 'casino', label: 'Casino', badge: 0 },
-                { id: 'training', label: 'Training', badge: 0 },
+                { id: 'casino', label: 'Casino' },
+                { id: 'training', label: 'Training' },
               ] : []),
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveScreen(tab.id as Screen)}
-                className={`relative px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeScreen === tab.id
-                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-                }`}
-              >
-                {tab.label}
-                {tab.badge > 0 && (
-                  <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-[var(--rpg-red)] text-white font-bold">
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-            {player?.role === 'admin' && (
-              <button
-                onClick={() => setActiveScreen('admin')}
-                className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeScreen === 'admin'
-                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-                }`}
-              >
-                Admin
-              </button>
-            )}
-          </div>
+              ...(player?.role === 'admin' ? [{ id: 'admin', label: 'Admin' }] : []),
+            ]}
+            activeId={activeScreen}
+            onSelect={(id) => setActiveScreen(id as Screen)}
+          />
         )}
 
         {getActiveTab() === 'explore' && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-            {[
+          <SubNav
+            tabs={[
               { id: 'explore', label: 'Explore' },
               { id: 'gathering', label: 'Gathering' },
               { id: 'crafting', label: 'Crafting' },
               { id: 'forge', label: 'Forge' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveScreen(tab.id as Screen)}
-                className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeScreen === tab.id
-                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+            ]}
+            activeId={activeScreen}
+            onSelect={(id) => setActiveScreen(id as Screen)}
+          />
         )}
 
         {getActiveTab() === 'inventory' && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-            {[
+          <SubNav
+            tabs={[
               { id: 'inventory', label: 'Items' },
               { id: 'equipment', label: 'Equipment' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveScreen(tab.id as Screen)}
-                className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeScreen === tab.id
-                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+            ]}
+            activeId={activeScreen}
+            onSelect={(id) => setActiveScreen(id as Screen)}
+          />
         )}
 
         {getActiveTab() === 'combat' && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-            {[
-              { id: 'combat', label: 'Combat', badge: 0 },
-              { id: 'templates', label: 'Templates', badge: 0 },
-              { id: 'talentTree', label: 'Skill Tree', badge: 0 },
+          <SubNav
+            tabs={[
+              { id: 'combat', label: 'Combat' },
+              { id: 'templates', label: 'Templates' },
+              { id: 'talentTree', label: 'Skill Tree' },
               { id: 'arena', label: 'Arena', badge: pvpNotificationCount },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveScreen(tab.id as Screen)}
-                className={`relative px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeScreen === tab.id
-                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-                }`}
-              >
-                {tab.label}
-                {tab.badge > 0 && (
-                  <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-[var(--rpg-red)] text-white font-bold">
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+            ]}
+            activeId={activeScreen}
+            onSelect={(id) => setActiveScreen(id as Screen)}
+          />
         )}
 
         {actionError && (
