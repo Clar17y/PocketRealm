@@ -6,6 +6,7 @@ import type { CombatActiveEvent } from '@/lib/api';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
+import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 
@@ -154,8 +155,6 @@ export function CombatPlayback({
     ? mobMaxHp
     : (log[revealedCount - 1].combatantBHpAfter ?? mobMaxHp);
 
-  // Resource bars: only show when data exists (new combat system)
-  const hasResourceData = log.length > 0 && log[0].staminaAfter !== undefined;
   const currentEntry = revealedCount > 0 ? log[revealedCount - 1] : null;
   const currentStamina = currentEntry?.staminaAfter ?? 100;
   const currentMana = currentEntry?.manaAfter ?? 100;
@@ -177,44 +176,29 @@ export function CombatPlayback({
 
       {/* HP Bars */}
       <div className="space-y-3 my-4">
-        {/* Player HP */}
-        <div>
-          <div className="flex justify-between text-xs mb-1">
+        {/* Player HP + resources */}
+        <div className={shakeTarget === 'combatantA' ? 'animate-shake' : ''}>
+          <div className="text-xs mb-1">
             <span className="text-[var(--rpg-green-light)]">{playerLabel}</span>
-            <span className="text-[var(--rpg-green-light)] font-mono">{currentPlayerHp}/{playerMaxHp}</span>
           </div>
-          <div className={`h-4 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded overflow-hidden ${shakeTarget === 'combatantA' ? 'animate-shake' : ''}`}>
-            <div
-              className="h-full bg-[var(--rpg-green-light)]"
-              style={{
-                width: `${Math.max(0, (currentPlayerHp / playerMaxHp) * 100)}%`,
-                transition: 'width 0.4s ease-out',
-              }}
-            />
-          </div>
-          {hasResourceData && (
-            <div className="flex gap-2 mt-1">
-              <StatBar current={currentStamina} max={100} color="stamina" size="sm" showNumbers={false} className="flex-1" />
-              <StatBar current={currentMana} max={100} color="mana" size="sm" showNumbers={false} className="flex-1" />
-            </div>
-          )}
+          <ResourceStatusBar
+            currentHp={currentPlayerHp}
+            maxHp={playerMaxHp}
+            currentStamina={currentStamina}
+            maxStamina={100}
+            currentMana={currentMana}
+            maxMana={100}
+            compact
+          />
         </div>
 
         {/* Mob HP */}
-        <div>
+        <div className={shakeTarget === 'combatantB' ? 'animate-shake' : ''}>
           <div className="flex justify-between text-xs mb-1">
             <span className="text-[var(--rpg-red)]">{mobDisplayName}</span>
             <span className="text-[var(--rpg-red)] font-mono">{Math.max(0, currentMobHp)}/{mobMaxHp}</span>
           </div>
-          <div className={`h-4 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded overflow-hidden ${shakeTarget === 'combatantB' ? 'animate-shake' : ''}`}>
-            <div
-              className="h-full bg-[var(--rpg-red)]"
-              style={{
-                width: `${Math.max(0, (currentMobHp / mobMaxHp) * 100)}%`,
-                transition: 'width 0.4s ease-out',
-              }}
-            />
-          </div>
+          <StatBar current={Math.max(0, currentMobHp)} max={mobMaxHp} color="health" size="sm" showNumbers={false} />
         </div>
       </div>
 
