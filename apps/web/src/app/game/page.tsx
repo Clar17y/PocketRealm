@@ -52,6 +52,7 @@ import { GuildScreen } from '@/components/screens/GuildScreen';
 import { CombatScreen } from './screens/CombatScreen';
 import { useGameController, isMobKnown, type Screen } from './useGameController';
 import { useChat } from '@/hooks/useChat';
+import { useCasinoSocket } from '@/hooks/useCasinoSocket';
 import { ChatPanel } from '@/components/ChatPanel';
 
 const SKILL_META: Record<string, { name: string; icon: typeof Sword; color: string }> = {
@@ -318,6 +319,7 @@ export default function GamePage() {
     inventoryCapacity,
     inventoryUsedSlots,
     isOverEncumbered,
+    backpackFull,
     gold,
     setGold,
     trainingCooldown,
@@ -341,6 +343,8 @@ export default function GamePage() {
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
   const chat = useChat({ isAuthenticated, currentZoneId: activeZoneId });
+  const casinoSocket = useCasinoSocket(activeScreen === 'casino', player?.id ?? null);
+  const lastDealerCountRef = useRef(0);
   const errorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -354,6 +358,25 @@ export default function GamePage() {
       void loadAchievements();
     }
   }, [activeScreen, loadAchievements]);
+
+  useEffect(() => {
+    if (activeScreen === 'casino') {
+      chat.joinCasino();
+      return () => chat.leaveCasino();
+    }
+  }, [activeScreen, chat.joinCasino, chat.leaveCasino]);
+
+  // Inject dealer messages from casino socket into casino chat
+  useEffect(() => {
+    const msgs = casinoSocket.dealerMessages;
+    if (msgs.length > lastDealerCountRef.current) {
+      const newMsgs = msgs.slice(lastDealerCountRef.current);
+      for (const msg of newMsgs) {
+        chat.injectCasinoSystemMessage(msg.text);
+      }
+      lastDealerCountRef.current = msgs.length;
+    }
+  }, [casinoSocket.dealerMessages, chat.injectCasinoSystemMessage]);
 
   // Auto-navigate to the relevant screen when the tutorial step changes
   useEffect(() => {
@@ -824,7 +847,7 @@ export default function GamePage() {
               zoneName={zoneCraftingName}
               defaultMaxQuantity={activeCraftingSkill === 'refining' && defaultRefiningMax}
               guildTaxRate={guildTaxRate}
-              backpackFull={inventoryUsedSlots >= inventoryCapacity}
+              backpackFull={backpackFull}
             />
           </div>
         );
@@ -924,7 +947,7 @@ export default function GamePage() {
               onStartGathering={handleMine}
               isRecovering={hpState.isRecovering}
               isOverEncumbered={isOverEncumbered}
-              backpackFull={inventoryUsedSlots >= inventoryCapacity}
+              backpackFull={backpackFull}
               recoveryCost={hpState.recoveryCost}
               guildTaxRate={guildTaxRate}
             />
@@ -1217,6 +1240,12 @@ export default function GamePage() {
             onGoldUpdate={setGold}
             onTurnsUpdate={setTurns}
             isInTown={currentZone?.zoneType === 'town'}
+            liveBets={casinoSocket.liveBets}
+            sessionBets={casinoSocket.sessionBets}
+            sessionProfit={casinoSocket.sessionProfit}
+            lastResult={casinoSocket.lastResult}
+            trackBet={casinoSocket.trackBet}
+            playerName={player?.username ?? null}
           />
         );
       case 'training':
@@ -1444,15 +1473,18 @@ export default function GamePage() {
         setActiveChannel={chat.setActiveChannel}
         worldMessages={chat.worldMessages}
         zoneMessages={chat.zoneMessages}
+        casinoMessages={chat.casinoMessages}
         presence={chat.presence}
         unreadWorld={chat.unreadWorld}
         unreadZone={chat.unreadZone}
+        unreadCasino={chat.unreadCasino}
+        casinoActive={chat.casinoActive}
         sendMessage={chat.sendMessage}
         rateLimitError={chat.rateLimitError}
         currentZoneId={activeZoneId}
         currentZoneName={currentZone?.name ?? null}
         playerId={player?.id ?? null}
-        pinnedMessage={chat.activeChannel === 'world' ? chat.pinnedWorld : chat.pinnedZone}
+        pinnedMessage={chat.activeChannel === 'casino' ? null : chat.activeChannel === 'world' ? chat.pinnedWorld : chat.pinnedZone}
       />
       <BottomNav
         activeTab={getActiveTab()}

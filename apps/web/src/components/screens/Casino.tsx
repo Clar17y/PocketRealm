@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Coins, Clock, History, Users } from 'lucide-react';
@@ -8,12 +8,16 @@ import * as api from '@/lib/api';
 import {
   CASINO_CONSTANTS,
   getNumberColor,
+  getNumbersForBet,
 } from '@adventure/shared';
 import type {
   RouletteBetType,
   RouletteRoundState,
   RouletteHistoryEntry,
+  RoulettePublicBet,
+  CasinoResultEvent,
 } from '@adventure/shared';
+import type { SessionBet } from '@/hooks/useCasinoSocket';
 
 interface CasinoProps {
   gold: number;
@@ -23,6 +27,12 @@ interface CasinoProps {
   onGoldUpdate: (gold: number) => void;
   onTurnsUpdate: (turns: number) => void;
   isInTown: boolean;
+  liveBets: RoulettePublicBet[];
+  sessionBets: SessionBet[];
+  sessionProfit: number;
+  lastResult: CasinoResultEvent | null;
+  trackBet: (betType: RouletteBetType, betValue: string, amount: number, roundId: string) => void;
+  playerName: string | null;
 }
 
 // Helpers
@@ -57,7 +67,16 @@ export function Casino({
   onGoldUpdate,
   onTurnsUpdate,
   isInTown,
+  liveBets: _liveBets,
+  sessionBets: _sessionBets,
+  sessionProfit: _sessionProfit,
+  lastResult: _socketLastResult,
+  trackBet: _trackBet,
+  playerName: _playerName,
 }: CasinoProps) {
+  // New socket-driven props (_liveBets, _sessionBets, _sessionProfit,
+  // _socketLastResult, _trackBet, _playerName) will replace polling
+  // in Tasks 6-8, 11.
   // Gold exchange state
   const [exchangeTurns, setExchangeTurns] = useState(100);
   const [isExchanging, setIsExchanging] = useState(false);
@@ -70,6 +89,13 @@ export function Casino({
   const [isBetting, setIsBetting] = useState(false);
   const [history, setHistory] = useState<RouletteHistoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [hoveredBet, setHoveredBet] = useState<{ type: RouletteBetType; value: string } | null>(null);
+
+  const highlightedNumbers = useMemo(() => {
+    const bet = hoveredBet ?? (selectedBetType ? { type: selectedBetType, value: selectedBetValue } : null);
+    if (!bet) return new Set<number>();
+    return getNumbersForBet(bet.type, bet.value);
+  }, [hoveredBet, selectedBetType, selectedBetValue]);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -95,14 +121,16 @@ export function Casino({
     fetchHistory();
   }, [fetchRound, fetchHistory]);
 
-  // Polling: every 3s when betting or spinning
+  // Polling: every 3s during betting/spinning, after a delay during result to auto-start next round
   useEffect(() => {
-    const shouldPoll = roundState?.phase === 'betting' || roundState?.phase === 'spinning';
+    const phase = roundState?.phase;
+    const interval = phase === 'result' ? 5000 : 3000;
+    const shouldPoll = phase === 'betting' || phase === 'spinning' || phase === 'result';
 
     if (shouldPoll) {
       pollRef.current = setInterval(() => {
         fetchRound();
-      }, 3000);
+      }, interval);
     }
 
     return () => {
@@ -291,6 +319,7 @@ export function Casino({
                   const color = getNumberColor(n);
                   const isSelected = selectedBetType === 'straight' && selectedBetValue === String(n);
                   const isResult = roundState?.phase === 'result' && roundState.result === n;
+                  const isHighlighted = highlightedNumbers.has(n);
                   return (
                     <button
                       key={n}
@@ -298,7 +327,9 @@ export function Casino({
                       className={`h-9 text-sm font-bold transition-all ${colorClass(color)} hover:opacity-80 ${
                         isSelected
                           ? 'ring-2 ring-[var(--rpg-gold)] ring-inset'
-                          : ''
+                          : isHighlighted
+                            ? 'brightness-[1.35] ring-1 ring-[var(--rpg-gold)]/50 ring-inset'
+                            : ''
                       } ${
                         isResult
                           ? 'ring-2 ring-[var(--rpg-gold)] animate-pulse'
@@ -313,16 +344,18 @@ export function Casino({
             </div>
 
             {/* Column bets */}
-            <div className="grid grid-cols-3 gap-px bg-[var(--rpg-border)] mt-px">
+            <div className="grid grid-cols-3 gap-1 mt-1">
               {[1, 2, 3].map((col) => (
                 <button
                   key={`col-${col}`}
                   onClick={() => handleOutsideBet('column', `col${col}`)}
-                  className={`h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-border)] transition-all ${
+                  onMouseEnter={() => setHoveredBet({ type: 'column', value: `col${col}` })}
+                  onMouseLeave={() => setHoveredBet(null)}
+                  className={`h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] rounded transition-all hover:bg-[var(--rpg-border)] ${
                     selectedBetType === 'column' && selectedBetValue === `col${col}`
-                      ? 'ring-2 ring-[var(--rpg-gold)] ring-inset'
-                      : ''
-                  }`}
+                      ? 'border-[var(--rpg-gold)] ring-1 ring-[var(--rpg-gold)]'
+                      : 'border-[var(--rpg-border)]'
+                  } border`}
                 >
                   Col {col}
                 </button>
@@ -330,7 +363,7 @@ export function Casino({
             </div>
 
             {/* Dozen bets */}
-            <div className="grid grid-cols-3 gap-px bg-[var(--rpg-border)] mt-px">
+            <div className="grid grid-cols-3 gap-1 mt-1">
               {[
                 { label: '1st 12', value: '1-12' },
                 { label: '2nd 12', value: '13-24' },
@@ -339,11 +372,13 @@ export function Casino({
                 <button
                   key={`dozen-${value}`}
                   onClick={() => handleOutsideBet('dozen', value)}
-                  className={`h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-border)] transition-all ${
+                  onMouseEnter={() => setHoveredBet({ type: 'dozen', value })}
+                  onMouseLeave={() => setHoveredBet(null)}
+                  className={`h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] rounded transition-all hover:bg-[var(--rpg-border)] ${
                     selectedBetType === 'dozen' && selectedBetValue === value
-                      ? 'ring-2 ring-[var(--rpg-gold)] ring-inset'
-                      : ''
-                  }`}
+                      ? 'border-[var(--rpg-gold)] ring-1 ring-[var(--rpg-gold)]'
+                      : 'border-[var(--rpg-border)]'
+                  } border`}
                 >
                   {label}
                 </button>
@@ -351,7 +386,7 @@ export function Casino({
             </div>
 
             {/* Even-money bets */}
-            <div className="grid grid-cols-4 gap-px bg-[var(--rpg-border)] mt-px rounded-b-lg overflow-hidden">
+            <div className="grid grid-cols-4 gap-1 mt-1">
               {([
                 { label: 'Red', type: 'red' as RouletteBetType, value: 'red', cls: 'bg-[var(--rpg-red)] text-white' },
                 { label: 'Black', type: 'black' as RouletteBetType, value: 'black', cls: 'bg-[#1a1a2e] text-white' },
@@ -361,11 +396,13 @@ export function Casino({
                 <button
                   key={value}
                   onClick={() => handleOutsideBet(type, value)}
-                  className={`h-8 text-xs font-semibold ${cls} hover:opacity-80 transition-all ${
+                  onMouseEnter={() => setHoveredBet({ type, value })}
+                  onMouseLeave={() => setHoveredBet(null)}
+                  className={`h-8 text-xs font-semibold ${cls} rounded transition-all hover:opacity-80 ${
                     selectedBetType === type && selectedBetValue === value
-                      ? 'ring-2 ring-[var(--rpg-gold)] ring-inset'
-                      : ''
-                  }`}
+                      ? 'border-[var(--rpg-gold)] ring-1 ring-[var(--rpg-gold)]'
+                      : 'border-[var(--rpg-border)]'
+                  } border`}
                 >
                   {label}
                 </button>
