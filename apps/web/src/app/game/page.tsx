@@ -432,20 +432,24 @@ export default function GamePage() {
         const requiredLevelXp = Math.max(1, nextLevelTotalXp - currentLevelFloorXp);
         return (
           <>
-            <ResourceStatusBar
-              currentHp={hpState.currentHp}
-              maxHp={hpState.maxHp}
-              currentStamina={staminaState.current}
-              maxStamina={staminaState.max}
-              currentMana={manaState.current}
-              maxMana={manaState.max}
-              hpRegenPerSecond={hpState.regenPerSecond}
-              isRecovering={hpState.isRecovering}
-              recoveryCost={hpState.recoveryCost}
-              onQuickRest={handleQuickRest}
-              quickRestPercent={quickRestHealPercent}
-              busyAction={busyAction}
-            />
+            <div className="mb-4">
+              <ResourceStatusBar
+                currentHp={hpState.currentHp}
+                maxHp={hpState.maxHp}
+                currentStamina={staminaState.current}
+                maxStamina={staminaState.max}
+                currentMana={manaState.current}
+                maxMana={manaState.max}
+                hpRegenPerSecond={hpState.regenPerSecond}
+                staminaRegenPerSecond={staminaState.regenPerSecond}
+                manaRegenPerSecond={manaState.regenPerSecond}
+                isRecovering={hpState.isRecovering}
+                recoveryCost={hpState.recoveryCost}
+                onQuickRest={handleQuickRest}
+                quickRestPercent={quickRestHealPercent}
+                busyAction={busyAction}
+              />
+            </div>
             <Dashboard
               playerData={{
                 turns,
