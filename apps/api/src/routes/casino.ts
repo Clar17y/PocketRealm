@@ -23,7 +23,7 @@ casinoRouter.post('/exchange', asyncHandler(async (req, res) => {
 }));
 
 const betSchema = z.object({
-  betType: z.enum(['straight', 'split', 'red', 'black', 'odd', 'even', 'dozen', 'column']),
+  betType: z.enum(['straight', 'split', 'red', 'black', 'odd', 'even', 'dozen', 'column', 'corner']),
   betValue: z.string(),
   amount: z.number().int().positive(),
 });

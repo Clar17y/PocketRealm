@@ -11,6 +11,8 @@ vi.mock('./turnBankService', () => ({
   }),
 }));
 
+vi.mock('../socket', () => ({ getIo: () => null }));
+
 vi.mock('@adventure/game-engine', () => ({
   validateBet: vi.fn().mockReturnValue({ valid: true }),
   generateSpinResult: vi.fn().mockReturnValue(17),
@@ -83,15 +85,18 @@ describe('exchangeTurnsForGold', () => {
 });
 
 describe('getCurrentRound', () => {
-  it('returns idle state when no active round in Redis', async () => {
+  it('auto-creates a new round when no active round in Redis', async () => {
     mockRedis.get.mockResolvedValue(null);
+    mockPrisma.rouletteRound.create.mockResolvedValue({ id: 'new-round' });
+    mockRedis.set.mockResolvedValue('OK');
 
     const result = await getCurrentRound();
 
-    expect(result.phase).toBe('idle');
-    expect(result.roundId).toBe('');
+    expect(result.phase).toBe('betting');
+    expect(result.roundId).toBe('new-round');
     expect(result.result).toBeNull();
     expect(result.bets).toEqual([]);
+    expect(mockPrisma.rouletteRound.create).toHaveBeenCalled();
   });
 
   it('returns betting phase with time remaining', async () => {

@@ -1,15 +1,23 @@
 import { prisma } from '@adventure/database';
-import { CASINO_CONSTANTS } from '@adventure/shared';
+import { CASINO_CONSTANTS, getNumberColor } from '@adventure/shared';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
+import { getIo } from '../socket';
 import {
   isWinningBet,
   calculatePayout,
   validateBet,
   generateSpinResult,
 } from '@adventure/game-engine';
-import type { RouletteBetType, RouletteRoundState, RoulettePublicBet } from '@adventure/shared';
+import type {
+  RouletteBetType,
+  RouletteRoundState,
+  RoulettePublicBet,
+  CasinoBetEvent,
+  CasinoResultEvent,
+  CasinoPhaseEvent,
+} from '@adventure/shared';
 
 export interface GoldExchangeResult {
   turnsSpent: number;
@@ -92,12 +100,15 @@ async function resolveRound(roundId: string): Promise<number> {
 
   const result = generateSpinResult();
 
-  const bets = await prisma.rouletteBet.findMany({ where: { roundId } });
+  const bets = await prisma.rouletteBet.findMany({
+    where: { roundId },
+    include: { player: { select: { username: true } } },
+  });
 
   const updates = bets.map((bet) => {
     const won = isWinningBet(bet.betType as RouletteBetType, bet.betValue, result);
     const payout = won ? calculatePayout(bet.betType as RouletteBetType, bet.amount) : 0;
-    return { id: bet.id, playerId: bet.playerId, payout };
+    return { id: bet.id, playerId: bet.playerId, payout, won, username: bet.player.username, betType: bet.betType, amount: bet.amount };
   });
 
   await prisma.$transaction(async (tx) => {
@@ -127,14 +138,68 @@ async function resolveRound(roundId: string): Promise<number> {
     }
   });
 
+  const io = getIo();
+  if (io) {
+    const winningBets = updates
+      .filter((b) => b.won)
+      .map((b) => ({
+        playerName: b.username,
+        betType: b.betType as RouletteBetType,
+        amount: b.amount,
+        payout: b.payout,
+      }));
+    const resultEvent: CasinoResultEvent = {
+      result,
+      color: getNumberColor(result),
+      winningBets,
+    };
+    io.to('chat:casino').emit('casino:result', resultEvent);
+  }
+
   await redis.del(ROUND_KEY);
   return result;
+}
+
+async function emitPhaseIfChanged(
+  phase: CasinoPhaseEvent['phase'],
+  roundId: string,
+  timeRemainingMs: number,
+  result?: number,
+): Promise<void> {
+  const io = getIo();
+  if (!io) return;
+
+  const phaseKey = `roulette:last_phase`;
+  const lastPhase = await redis.get(phaseKey);
+  if (lastPhase === phase) return;
+
+  await redis.set(phaseKey, phase, 'EX', CASINO_CONSTANTS.ROUND_DURATION_SECONDS + 10);
+
+  const phaseEvent: CasinoPhaseEvent = {
+    phase,
+    roundId,
+    timeRemainingMs,
+    result: phase === 'result' ? result : undefined,
+    bets: phase === 'betting' ? await getPublicBets(roundId) : undefined,
+  };
+  io.to('chat:casino').emit('casino:phase', phaseEvent);
 }
 
 export async function getCurrentRound(): Promise<RouletteRoundState> {
   const existing = await redis.get(ROUND_KEY);
   if (!existing) {
-    return { roundId: '', phase: 'idle', result: null, startedAt: '', timeRemainingMs: 0, bets: [] };
+    // Auto-start a new round so the casino never stalls in idle
+    const { roundId, startedAt } = await getOrCreateRound();
+    const totalMs = CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000;
+    await emitPhaseIfChanged('betting', roundId, totalMs);
+    return {
+      roundId,
+      phase: 'betting',
+      result: null,
+      startedAt: new Date(startedAt).toISOString(),
+      timeRemainingMs: totalMs,
+      bets: [],
+    };
   }
 
   const parsed: ActiveRound = JSON.parse(existing);
@@ -143,11 +208,12 @@ export async function getCurrentRound(): Promise<RouletteRoundState> {
   const bettingMs = CASINO_CONSTANTS.BETTING_WINDOW_SECONDS * 1000;
 
   if (elapsed >= totalMs) {
-    const result = await resolveRound(parsed.roundId);
+    const resolvedResult = await resolveRound(parsed.roundId);
+    await emitPhaseIfChanged('result', parsed.roundId, 0, resolvedResult);
     return {
       roundId: parsed.roundId,
       phase: 'result',
-      result,
+      result: resolvedResult,
       startedAt: new Date(parsed.startedAt).toISOString(),
       timeRemainingMs: 0,
       bets: await getPublicBets(parsed.roundId),
@@ -156,6 +222,7 @@ export async function getCurrentRound(): Promise<RouletteRoundState> {
 
   const phase = elapsed < bettingMs ? 'betting' : 'spinning';
   const timeRemainingMs = totalMs - elapsed;
+  await emitPhaseIfChanged(phase, parsed.roundId, timeRemainingMs);
 
   return {
     roundId: parsed.roundId,
@@ -198,7 +265,7 @@ export async function placeBet(
     throw new AppError(400, 'Betting window closed', 'BETTING_CLOSED');
   }
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const player = await tx.player.findUnique({
       where: { id: playerId },
       select: { gold: true },
@@ -218,6 +285,24 @@ export async function placeBet(
 
     return { roundId, goldRemaining: player.gold - amount };
   });
+
+  const io = getIo();
+  if (io) {
+    const betPlayer = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { username: true },
+    });
+    const betEvent: CasinoBetEvent = {
+      playerName: betPlayer?.username ?? 'Unknown',
+      playerId,
+      betType,
+      betValue,
+      amount,
+    };
+    io.to('chat:casino').emit('casino:bet', betEvent);
+  }
+
+  return result;
 }
 
 export async function getRouletteHistory(): Promise<{ spinNumber: number; result: number; resolvedAt: string }[]> {
