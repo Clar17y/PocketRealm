@@ -1,6 +1,7 @@
 import { prisma } from '@adventure/database';
 import { prismaAny } from '../utils/prismaAny.js';
 import { WORLD_EVENT_CONSTANTS, type BossPlayerReward, type SkillType } from '@adventure/shared';
+import { calculateContributionScore } from '@adventure/game-engine';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantLoot, enrichLootWithNames } from './lootService';
 import { addStackableItem } from './inventoryService';
@@ -11,6 +12,8 @@ export interface BossContributor {
   playerId: string;
   totalDamage: number;
   totalHealing: number;
+  damageAbsorbed: number;
+  roundsSurvived: number;
   attackSkill?: string;
 }
 
@@ -74,10 +77,16 @@ export async function distributeBossLoot(
   const baseXp = WORLD_EVENT_CONSTANTS.BOSS_BASE_XP_REWARD_BY_TIER[tierIndex]!;
   const rarityBonus = WORLD_EVENT_CONSTANTS.BOSS_RARITY_BONUS;
 
-  const totalContribution = contributors.reduce(
-    (sum, c) => sum + c.totalDamage + c.totalHealing,
-    0,
-  );
+  const scores = contributors.map(c => ({
+    playerId: c.playerId,
+    score: calculateContributionScore({
+      totalDamage: c.totalDamage,
+      totalHealing: c.totalHealing,
+      damageAbsorbed: c.damageAbsorbed,
+      roundsSurvived: c.roundsSurvived,
+    }),
+  }));
+  const totalContribution = scores.reduce((sum, s) => sum + s.score, 0);
 
   // Look up mob name + family for recipe drops and trophy grants
   const mob = await prisma.mobTemplate.findUnique({
@@ -102,8 +111,8 @@ export async function distributeBossLoot(
   }
 
   for (const contributor of contributors) {
-    const contribution = contributor.totalDamage + contributor.totalHealing;
-    const ratio = totalContribution > 0 ? contribution / totalContribution : 1 / contributors.length;
+    const playerScore = scores.find(s => s.playerId === contributor.playerId)?.score ?? 0;
+    const ratio = totalContribution > 0 ? playerScore / totalContribution : 1 / contributors.length;
     const dropMultiplier = Math.max(0.5, Math.min(2, ratio * contributors.length));
 
     // 1. Item loot with rarity bonus
