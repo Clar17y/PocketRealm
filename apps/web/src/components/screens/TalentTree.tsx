@@ -9,6 +9,7 @@ import type { TalentNodeDefinition, TalentTree as TalentTreeName } from '@advent
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import type { SkillPointState } from '@/lib/api';
 import type { Screen } from '@/app/game/useGameController';
+import { SkillTreeTutorial } from '@/components/common/SkillTreeTutorial';
 
 interface TalentTreeProps {
   skillPointState: SkillPointState;
@@ -139,6 +140,7 @@ export function TalentTree({
 
   return (
     <div className="space-y-4">
+      <SkillTreeTutorial />
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">Talent Tree</h2>

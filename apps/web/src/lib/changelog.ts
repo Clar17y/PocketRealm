@@ -7,6 +7,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.22',
+    date: '2026-03-02',
+    title: 'Combat Rework: Templates, Resources & Skill Trees',
+    summary:
+      'Combat is no longer auto-attack. Build combat templates — ordered action rotations that your character follows each fight. Stamina and mana fuel your actions; run out and you fall back to Defend. A new Skill Tree lets you spend points earned from levelling to unlock 24 powerful abilities across Melee, Ranged, Magic, and General trees. Resource bars show HP, stamina, and mana on the Explore and Combat screens, with values embedded inside the bars. Combat playback now shows action names, resource costs, and interaction results like Countered! and Warded!',
+  },
+  {
+    version: '0.21',
+    date: '2026-03-02',
+    title: 'Boss Encounters & PvP Rework',
+    summary:
+      'Boss encounters now use individual HP per participant instead of a shared raid pool. A new threat system determines who the boss targets — deal more damage, draw more aggro. Boss loot is distributed by contribution score. PvP uses your combat template so fights play out action-by-action. Scout notifications tell you when someone is sizing you up. The bestiary progressively reveals boss attack rotations as you fight them.',
+  },
+  {
     version: '0.20',
     date: '2026-03-01',
     title: 'Inventory & Backpack System',

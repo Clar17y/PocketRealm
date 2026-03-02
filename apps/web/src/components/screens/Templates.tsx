@@ -13,6 +13,7 @@ import {
 import type { Screen } from '@/app/game/useGameController';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@adventure/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateAction, ResourceState } from '@adventure/shared';
+import { TemplateTutorial } from '@/components/common/TemplateTutorial';
 
 // --- Constants ---
 
@@ -393,6 +394,7 @@ export function Templates({
   // -- List view --
   return (
     <div className="space-y-4">
+      <TemplateTutorial />
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">Combat Templates</h2>
         <PixelButton size="sm" variant="primary" onClick={handleNewTemplate}>
