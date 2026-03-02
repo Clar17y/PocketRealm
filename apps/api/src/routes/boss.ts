@@ -15,6 +15,8 @@ import { paginationSchema, buildPagination, assertNotRecovering } from '../utils
 import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerGuildId } from '../services/guildService';
 import { incrementContractProgress } from '../services/guildContractService';
+import { getSkillLevel } from '../services/combatStatsService';
+import { calculateMaxStamina, calculateMaxMana } from '@adventure/game-engine';
 
 export const bossRouter = Router();
 
@@ -136,7 +138,6 @@ bossRouter.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 const signupSchema = z.object({
-  role: z.enum(['attacker', 'healer']),
   autoSignUp: z.boolean().optional(),
 });
 
@@ -173,11 +174,21 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
 
     const hpState = await assertNotRecovering(playerId);
 
+    // Compute resource pools from skill levels
+    const [meleeLevel, rangedLevel, magicLevel] = await Promise.all([
+      getSkillLevel(playerId, 'melee'),
+      getSkillLevel(playerId, 'ranged'),
+      getSkillLevel(playerId, 'magic'),
+    ]);
+    const maxStamina = calculateMaxStamina({ meleeLevel, rangedLevel, evasionLevel: 0, equipmentStaminaBonus: 0 });
+    const maxMana = calculateMaxMana({ magicLevel, equipmentManaBonus: 0 });
+
     const participant = await signUpForBossRound(
       id,
       playerId,
-      body.role,
       hpState.maxHp,
+      maxStamina,
+      maxMana,
       body.autoSignUp ?? false,
     );
 
@@ -221,7 +232,6 @@ bossRouter.get('/:id/round/:num', asyncHandler(async (req, res) => {
     round: num,
     participants: participants.map((p) => ({
       playerId: p.playerId,
-      role: p.role,
       turnsCommitted: p.turnsCommitted,
       totalDamage: p.totalDamage,
       totalHealing: p.totalHealing,
@@ -229,6 +239,10 @@ bossRouter.get('/:id/round/:num', asyncHandler(async (req, res) => {
       hits: p.hits,
       crits: p.crits,
       currentHp: p.currentHp,
+      currentStamina: p.currentStamina,
+      currentMana: p.currentMana,
+      threat: p.threat,
+      damageAbsorbed: p.damageAbsorbed,
       status: p.status,
     })),
   });
