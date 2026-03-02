@@ -50,7 +50,7 @@ export function useCasinoSocket(
   const addDealerMsg = useCallback((text: string) => {
     setDealerMessages((prev) => [
       ...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)),
-      { id: crypto.randomUUID(), text, timestamp: Date.now() },
+      { id: Math.random().toString(36).slice(2), text, timestamp: Date.now() },
     ]);
   }, []);
 
@@ -128,7 +128,7 @@ export function useCasinoSocket(
   const trackBet = useCallback(
     (betType: RouletteBetType, betValue: string, amount: number, roundId: string) => {
       setSessionBets((prev) => [
-        { id: crypto.randomUUID(), betType, betValue, amount, roundId, payout: null },
+        { id: Math.random().toString(36).slice(2), betType, betValue, amount, roundId, payout: null },
         ...prev,
       ].slice(0, 50));
     },

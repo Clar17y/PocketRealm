@@ -236,7 +236,7 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     const arr = Array.isArray(texts) ? texts : [texts];
     setCasinoMessages((prev) => {
       const msgs: ChatMessageEvent[] = arr.map((text) => ({
-        id: crypto.randomUUID(),
+        id: Math.random().toString(36).slice(2),
         channelType: 'casino' as const,
         channelId: 'casino',
         playerId: 'dealer',
