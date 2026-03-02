@@ -27,12 +27,12 @@ skillPointsRouter.post('/allocate', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = allocateSchema.parse(req.body);
   const state = await allocatePoints(playerId, body.nodeId);
-  res.json(state);
+  res.json({ ...state, trees: TALENT_TREE_DEFINITIONS });
 }));
 
 /** POST /api/v1/skillpoints/respec — Reset all allocations (costs turns) */
 skillPointsRouter.post('/respec', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const state = await respecPoints(playerId);
-  res.json(state);
+  res.json({ ...state, trees: TALENT_TREE_DEFINITIONS });
 }));
