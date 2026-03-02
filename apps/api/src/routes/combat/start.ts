@@ -19,6 +19,7 @@ import {
   COMBAT_CONSTANTS,
   GUILD_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
+  type ActionDefinition,
   type CombatTemplateAction,
   type Combatant,
   type CombatOptions,
@@ -39,6 +40,7 @@ import { getEquipmentStats } from '../../services/equipmentService';
 import { getUsedSlots, getPlayerCapacity } from '../../services/inventoryService';
 import { storePendingLoot } from '../../services/pendingLootService';
 import { getPlayerProgressionState } from '../../services/attributesService';
+import { getSkillPoints } from '../../services/skillPointService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, type EventModifierBadge } from '../../services/worldEventService';
 
@@ -81,6 +83,12 @@ import {
   type FightResult,
 } from './helpers';
 
+const ALWAYS_AVAILABLE_ACTIONS = new Set([
+  'light_attack', 'normal_attack', 'heavy_attack',
+  'defend', 'counter', 'ward',
+  'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
+]);
+
 function buildPlayerTemplateCombatant(
   playerId: string,
   username: string,
@@ -92,7 +100,15 @@ function buildPlayerTemplateCombatant(
   currentMana: number,
   maxMana: number,
   manaRegenPerRound: number,
+  unlockedActions: string[],
 ): TemplateCombatant {
+  const unlockedSet = new Set(unlockedActions);
+  const filteredActions: Record<string, ActionDefinition> = {};
+  for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
+    if (ALWAYS_AVAILABLE_ACTIONS.has(id) || unlockedSet.has(id)) {
+      filteredActions[id] = def;
+    }
+  }
   return {
     id: playerId,
     name: username,
@@ -104,8 +120,7 @@ function buildPlayerTemplateCombatant(
     mana: currentMana,
     maxMana,
     manaRegenPerRound,
-    // TODO: merge talent-unlocked action definitions when they are implemented
-    actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
+    actionDefinitions: filteredActions,
   };
 }
 
@@ -220,9 +235,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const potionPool = autoPotionThreshold > 0 ? await buildPotionPool(playerId, hpState.maxHp) : [];
   const allPotionsConsumed: PotionConsumed[] = [];
 
-  // Fetch player's active template and resource state
-  const playerTemplate = await getActiveTemplate(playerId);
-  const resourceState = await getResourceState(playerId);
+  // Fetch player's active template, resource state, and unlocked actions
+  const [playerTemplate, resourceState, skillPointState] = await Promise.all([
+    getActiveTemplate(playerId),
+    getResourceState(playerId),
+    getSkillPoints(playerId),
+  ]);
+  const playerUnlockedActions = skillPointState.unlockedActions;
   let currentStamina = resourceState.stamina.current;
   let currentMana = resourceState.mana.current;
   const maxStamina = resourceState.stamina.max;
@@ -286,6 +305,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         playerId, req.player!.username, playerStats, playerTemplate,
         currentStamina, maxStamina, staminaRegenPerRound,
         currentMana, maxMana, manaRegenPerRound,
+        playerUnlockedActions,
       );
       const mobCombatant = mobToTemplateCombatant(prefixedMob);
 
@@ -886,14 +906,18 @@ export function registerStartRoutes(router: Router): void {
 
       const finalMob = mobHpOverride ? { ...prefixedMob, ...mobHpOverride } : prefixedMob;
 
-      // Fetch player's active template and resource state
-      const playerTemplate = await getActiveTemplate(playerId);
-      const resourceState = await getResourceState(playerId);
+      // Fetch player's active template, resource state, and unlocked actions
+      const [playerTemplate, resourceState, zoneCombatSkillPoints] = await Promise.all([
+        getActiveTemplate(playerId),
+        getResourceState(playerId),
+        getSkillPoints(playerId),
+      ]);
 
       const playerCombatant = buildPlayerTemplateCombatant(
         playerId, req.player!.username, playerStats, playerTemplate,
         resourceState.stamina.current, resourceState.stamina.max, resourceState.stamina.regenPerRound,
         resourceState.mana.current, resourceState.mana.max, resourceState.mana.regenPerRound,
+        zoneCombatSkillPoints.unlockedActions,
       );
       const mobCombatant = mobToTemplateCombatant(finalMob);
 

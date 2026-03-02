@@ -23,6 +23,7 @@ import {
   WORLD_EVENT_CONSTANTS,
   getUnlockedTiers,
   getHighestUnlockedTier,
+  type ActionDefinition,
   type CombatOptions,
   type MobTemplate,
   type PotionConsumed,
@@ -39,6 +40,7 @@ import { degradeEquippedDurability } from '../../services/durabilityService';
 import { serializeXpGrant, toMobTemplate, assertCanAct, recordBestiaryKill, trackAchievements } from '../../utils/routeHelpers.js';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getActiveTemplate } from '../../services/combatTemplateService';
+import { getSkillPoints } from '../../services/skillPointService';
 import { getResourceState, setAllResources } from '../../services/resourceService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { getPlayerProgressionState } from '../../services/attributesService';
@@ -71,6 +73,12 @@ import {
   type PendingEncounterSiteDiscovery,
   type PendingAmbushCombatLog,
 } from './helpers';
+
+const ALWAYS_AVAILABLE_ACTIONS = new Set([
+  'light_attack', 'normal_attack', 'heavy_attack',
+  'defend', 'counter', 'ward',
+  'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
+]);
 
 export const startRouter = Router();
 
@@ -236,11 +244,13 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
     let currentHp = hpState.currentHp;
 
-    // Fetch combat template + resource state for template combat
-    const [playerTemplate, resourceState] = await Promise.all([
+    // Fetch combat template, resource state, and unlocked actions for template combat
+    const [playerTemplate, resourceState, explorationSkillPoints] = await Promise.all([
       getActiveTemplate(playerId),
       getResourceState(playerId),
+      getSkillPoints(playerId),
     ]);
+    const explorationUnlockedActions = explorationSkillPoints.unlockedActions;
     let currentStamina = resourceState.stamina.current;
     let currentMana = resourceState.mana.current;
     const maxStamina = resourceState.stamina.max;
@@ -325,6 +335,13 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           combatOptions = { autoPotionThreshold, potions: [...potionPool] };
         }
 
+        const unlockedSet = new Set(explorationUnlockedActions);
+        const filteredActions: Record<string, ActionDefinition> = {};
+        for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
+          if (ALWAYS_AVAILABLE_ACTIONS.has(id) || unlockedSet.has(id)) {
+            filteredActions[id] = def;
+          }
+        }
         const combatantA: TemplateCombatant = {
           id: playerId,
           name: req.player!.username,
@@ -336,7 +353,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           mana: currentMana,
           maxMana,
           manaRegenPerRound,
-          actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
+          actionDefinitions: filteredActions,
         };
         const combatantB = mobToTemplateCombatant(prefixedMob);
         const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);

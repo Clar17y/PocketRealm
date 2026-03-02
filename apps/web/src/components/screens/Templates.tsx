@@ -12,20 +12,49 @@ import {
 } from '@/lib/api';
 import type { Screen } from '@/app/game/useGameController';
 import { BASE_ACTION_DEFINITIONS } from '@adventure/shared';
-import type { ActionDefinition, ActionCategory, CombatTemplateData, CombatTemplateAction, ResourceState } from '@adventure/shared';
-import { ACTION_CATEGORY_COLORS } from '@/lib/categoryColors';
+import type { ActionDefinition, CombatTemplateData, CombatTemplateAction, ResourceState } from '@adventure/shared';
+
+// --- Constants ---
+
+const ALWAYS_AVAILABLE_ACTIONS = new Set([
+  'light_attack', 'normal_attack', 'heavy_attack',
+  'defend', 'counter', 'ward',
+  'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
+]);
+
+const ACTION_GROUPS: Record<string, string> = {
+  light_attack: 'Basic', normal_attack: 'Basic', heavy_attack: 'Basic',
+  defend: 'Basic', counter: 'Basic', ward: 'Basic',
+  use_hp_potion: 'Basic', use_stamina_potion: 'Basic', use_mana_potion: 'Basic',
+  power_strike: 'Melee', cleave: 'Melee', battle_cry: 'Melee',
+  devastating_blow: 'Melee', berserker_rage: 'Melee', execute: 'Melee', titans_wrath: 'Melee',
+  aimed_shot: 'Ranged', crippling_shot: 'Ranged', eagle_eye: 'Ranged',
+  volley: 'Ranged', snipers_mark: 'Ranged', piercing_shot: 'Ranged', death_mark: 'Ranged',
+  fire_bolt: 'Magic', minor_heal: 'Magic', frost_nova: 'Magic',
+  enhanced_fortitude: 'Magic', chain_lightning: 'Magic', heal_ally: 'Magic',
+  arcane_blast: 'Magic', regeneration: 'Magic', meteor_strike: 'Magic',
+  taunt: 'General', fortify: 'General',
+};
+
+const GROUP_ORDER = ['Basic', 'Melee', 'Ranged', 'Magic', 'General'];
+
+const GROUP_COLORS: Record<string, string> = {
+  Basic: 'var(--rpg-text-secondary)',
+  Melee: 'var(--rpg-red)',
+  Ranged: 'var(--rpg-green-light)',
+  Magic: 'var(--rpg-blue-light)',
+  General: 'var(--rpg-gold)',
+};
 
 // --- Helpers ---
 
-const CATEGORY_ORDER: ActionCategory[] = ['offensive', 'defensive', 'supportive'];
-
-function categoryBadge(category: ActionCategory) {
+function groupBadge(group: string) {
   return (
     <span
       className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
-      style={{ color: ACTION_CATEGORY_COLORS[category], borderColor: ACTION_CATEGORY_COLORS[category], borderWidth: 1 }}
+      style={{ color: GROUP_COLORS[group] ?? 'var(--rpg-text-secondary)', borderColor: GROUP_COLORS[group] ?? 'var(--rpg-text-secondary)', borderWidth: 1 }}
     >
-      {category}
+      {group}
     </span>
   );
 }
@@ -38,14 +67,6 @@ function ActionCostLabel({ cost }: { cost: { stamina: number; mana: number } }) 
       {cost.stamina === 0 && cost.mana === 0 && <span>Free</span>}
     </div>
   );
-}
-
-function groupActionsByCategory(actions: ActionDefinition[]): Record<ActionCategory, ActionDefinition[]> {
-  const grouped: Record<ActionCategory, ActionDefinition[]> = { offensive: [], defensive: [], supportive: [] };
-  for (const a of actions) {
-    grouped[a.category].push(a);
-  }
-  return grouped;
 }
 
 // --- Props ---
@@ -188,11 +209,15 @@ export function Templates({
 
   const isEditing = editingTemplate !== null || isNew;
 
-  // Action picker — base actions are always available; talent-unlocked actions require unlockedActions
-  const baseActionIds = new Set(Object.keys(BASE_ACTION_DEFINITIONS));
+  // Action picker — 9 base actions are always available; talent actions require unlockedActions
   const unlockedSet = new Set(unlockedActions);
   const allActions = Object.values(BASE_ACTION_DEFINITIONS);
-  const grouped = groupActionsByCategory(allActions);
+  const grouped: Record<string, ActionDefinition[]> = {};
+  for (const group of GROUP_ORDER) grouped[group] = [];
+  for (const def of allActions) {
+    const group = ACTION_GROUPS[def.id] ?? 'Basic';
+    if (grouped[group]) grouped[group].push(def);
+  }
 
   if (showPicker) {
     return (
@@ -203,14 +228,14 @@ export function Templates({
           </button>
           <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">Add Action</h2>
         </div>
-        {CATEGORY_ORDER.map(cat => (
-          <div key={cat}>
-            <h3 className="text-sm font-bold mb-2" style={{ color: ACTION_CATEGORY_COLORS[cat] }}>
-              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+        {GROUP_ORDER.map(group => (
+          <div key={group}>
+            <h3 className="text-sm font-bold mb-2" style={{ color: GROUP_COLORS[group] ?? 'var(--rpg-text-secondary)' }}>
+              {group}
             </h3>
             <div className="space-y-1">
-              {grouped[cat].map(def => {
-                const locked = !baseActionIds.has(def.id) && !unlockedSet.has(def.id);
+              {grouped[group].map(def => {
+                const locked = !ALWAYS_AVAILABLE_ACTIONS.has(def.id) && !unlockedSet.has(def.id);
                 return (
                   <PixelCard key={def.id} padding="sm" className={locked ? 'opacity-50' : ''}>
                     <div className="flex items-center justify-between">
@@ -295,7 +320,7 @@ export function Templates({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{def.name}</span>
-                        {categoryBadge(def.category)}
+                        {groupBadge(ACTION_GROUPS[def.id] ?? 'Basic')}
                       </div>
                       <ActionCostLabel cost={def.cost} />
                     </div>

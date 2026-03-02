@@ -13,7 +13,7 @@ import {
   type TemplateCombatant,
 } from '@adventure/game-engine';
 import { BASE_ACTION_DEFINITIONS } from '@adventure/shared';
-import type { CombatOptions, PotionConsumed } from '@adventure/shared';
+import type { ActionDefinition, CombatOptions, PotionConsumed } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
@@ -37,6 +37,7 @@ import {
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../services/combatStatsService';
 import { getActiveTemplate } from '../services/combatTemplateService';
 import { getResourceState, setAllResources } from '../services/resourceService';
+import { getSkillPoints } from '../services/skillPointService';
 import { mapTemplateCombatLog } from '../services/combatLogMapper';
 import { calculateExplorationPercent, getExplorationPercent } from '../services/zoneExplorationService';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -46,6 +47,12 @@ import { applyGuildTax, getPlayerTaxRate, calculateInflatedCost, taxInfoFromResu
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 
+
+const ALWAYS_AVAILABLE_ACTIONS = new Set([
+  'light_attack', 'normal_attack', 'heavy_attack',
+  'defend', 'counter', 'ward',
+  'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
+]);
 
 export const zonesRouter = Router();
 
@@ -339,11 +346,13 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         zoneTiers,
       );
 
-      // Fetch combat template + resource state for template combat
-      const [playerTemplate, resourceState] = await Promise.all([
+      // Fetch combat template, resource state, and unlocked actions for template combat
+      const [playerTemplate, resourceState, travelSkillPoints] = await Promise.all([
         getActiveTemplate(playerId),
         getResourceState(playerId),
+        getSkillPoints(playerId),
       ]);
+      const travelUnlockedActions = travelSkillPoints.unlockedActions;
       let currentStamina = resourceState.stamina.current;
       let currentMana = resourceState.mana.current;
       const maxStamina = resourceState.stamina.max;
@@ -382,6 +391,13 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           equipmentStats,
         );
 
+        const travelUnlockedSet = new Set(travelUnlockedActions);
+        const travelFilteredActions: Record<string, ActionDefinition> = {};
+        for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
+          if (ALWAYS_AVAILABLE_ACTIONS.has(id) || travelUnlockedSet.has(id)) {
+            travelFilteredActions[id] = def;
+          }
+        }
         const combatantA: TemplateCombatant = {
           id: playerId,
           name: req.player!.username,
@@ -393,7 +409,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           mana: currentMana,
           maxMana,
           manaRegenPerRound,
-          actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
+          actionDefinitions: travelFilteredActions,
         };
         const combatantB = mobToTemplateCombatant(prefixedMob);
         let combatOptions: CombatOptions | undefined;

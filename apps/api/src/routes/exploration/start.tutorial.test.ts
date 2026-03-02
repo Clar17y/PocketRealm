@@ -96,6 +96,16 @@ vi.mock('../../services/combatStatsService', () => ({
 vi.mock('../../services/combatTemplateService', () => ({
   getActiveTemplate: vi.fn().mockResolvedValue([]),
 }));
+vi.mock('../../services/skillPointService', () => ({
+  getSkillPoints: vi.fn().mockResolvedValue({
+    playerId: 'test-player',
+    totalPointsEarned: 0,
+    totalPointsSpent: 0,
+    availablePoints: 0,
+    allocations: {},
+    unlockedActions: [],
+  }),
+}));
 vi.mock('../../services/resourceService', () => ({
   getResourceState: vi.fn().mockResolvedValue({
     stamina: { current: 100, max: 100, regenPerRound: 5 },
