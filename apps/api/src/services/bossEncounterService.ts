@@ -3,6 +3,7 @@ import { prisma } from '@adventure/database';
 import {
   WORLD_EVENT_CONSTANTS,
   BASE_ACTION_DEFINITIONS,
+  BOSS_ACTION_DEFINITIONS,
   BOSS_TEMPLATES,
   type BossActiveEffect,
   type BossEncounterData,
@@ -119,6 +120,35 @@ function toBossParticipantData(row: {
   };
 }
 
+// --- Helpers ---
+
+async function resolveUsername(playerId: string | null): Promise<string | null> {
+  if (!playerId) return null;
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { username: true },
+  });
+  return player?.username ?? null;
+}
+
+async function computeResourcePools(playerId: string): Promise<{ maxStamina: number; maxMana: number; meleeLevel: number; rangedLevel: number; magicLevel: number; evasionLevel: number }> {
+  const [meleeLevel, rangedLevel, magicLevel, progression] = await Promise.all([
+    getSkillLevel(playerId, 'melee'),
+    getSkillLevel(playerId, 'ranged'),
+    getSkillLevel(playerId, 'magic'),
+    getPlayerProgressionState(playerId),
+  ]);
+  const evasionLevel = progression.attributes.evasion;
+  return {
+    maxStamina: calculateMaxStamina({ meleeLevel, rangedLevel, evasionLevel, equipmentStaminaBonus: 0 }),
+    maxMana: calculateMaxMana({ magicLevel, equipmentManaBonus: 0 }),
+    meleeLevel,
+    rangedLevel,
+    magicLevel,
+    evasionLevel,
+  };
+}
+
 // --- Public API ---
 
 export async function createBossEncounter(
@@ -150,8 +180,6 @@ export async function signUpForBossRound(
   encounterId: string,
   playerId: string,
   playerMaxHp: number,
-  maxStamina: number,
-  maxMana: number,
   autoSignUp = false,
 ): Promise<BossParticipantData> {
   const turnCost = WORLD_EVENT_CONSTANTS.BOSS_SIGNUP_TURN_COST;
@@ -185,6 +213,9 @@ export async function signUpForBossRound(
       data: { autoSignUp },
     });
   } else {
+    // Compute resource pools from skill levels
+    const { maxStamina, maxMana } = await computeResourcePools(playerId);
+
     row = await prisma.$transaction(async (tx) => {
       await spendPlayerTurnsTx(tx, playerId, turnCost);
 
@@ -275,34 +306,23 @@ export async function resolveBossRound(
   // Build participant combatants with carried-forward resources
   const participants: BossRoundParticipant[] = await Promise.all(
     signups.map(async (signup) => {
-      const [hpState, equipStats, progression, template] = await Promise.all([
+      const [hpState, equipStats, template, resources] = await Promise.all([
         getHpState(signup.playerId),
         getEquipmentStats(signup.playerId),
-        getPlayerProgressionState(signup.playerId),
         getActiveTemplate(signup.playerId),
+        computeResourcePools(signup.playerId),
       ]);
 
       const mainHandSkill = await getMainHandAttackSkill(signup.playerId);
       const attackSkill = mainHandSkill ?? 'melee';
       const attackSkillLevel = await getSkillLevel(signup.playerId, attackSkill);
-      const [meleeLevel, rangedLevel, magicLevel] = await Promise.all([
-        getSkillLevel(signup.playerId, 'melee'),
-        getSkillLevel(signup.playerId, 'ranged'),
-        getSkillLevel(signup.playerId, 'magic'),
-      ]);
-      const evasionLevel = progression.attributes.evasion;
 
+      const progression = await getPlayerProgressionState(signup.playerId);
       const stats = buildPlayerCombatStats(
         hpState.maxHp, hpState.maxHp,
         { attackStyle: attackSkill, skillLevel: attackSkillLevel, attributes: progression.attributes },
         equipStats,
       );
-
-      const maxStamina = calculateMaxStamina({
-        meleeLevel, rangedLevel, evasionLevel,
-        equipmentStaminaBonus: 0,
-      });
-      const maxMana = calculateMaxMana({ magicLevel, equipmentManaBonus: 0 });
 
       return {
         playerId: signup.playerId,
@@ -312,11 +332,11 @@ export async function resolveBossRound(
         hp: signup.currentHp,
         maxHp: hpState.maxHp,
         stamina: signup.currentStamina,
-        maxStamina,
-        staminaRegenPerRound: calculateStaminaRegenPerRound(meleeLevel, rangedLevel, evasionLevel),
+        maxStamina: resources.maxStamina,
+        staminaRegenPerRound: calculateStaminaRegenPerRound(resources.meleeLevel, resources.rangedLevel, resources.evasionLevel),
         mana: signup.currentMana,
-        maxMana,
-        manaRegenPerRound: calculateManaRegenPerRound(magicLevel),
+        maxMana: resources.maxMana,
+        manaRegenPerRound: calculateManaRegenPerRound(resources.magicLevel),
         templateRound: signup.templateRound,
         activeEffects: [],
       };
@@ -326,26 +346,26 @@ export async function resolveBossRound(
   // Build boss state from template
   const mob = encounter.mobTemplate;
   const bossTemplate = BOSS_TEMPLATES[mob.name];
-  const bossStats = buildPlayerCombatStats(
-    encounter.currentHp, encounter.maxHp,
-    { attackStyle: 'melee', skillLevel: mob.level, attributes: { vitality: 0, strength: 0, dexterity: 0, intelligence: 0, luck: 0, evasion: 0 } },
-    { attack: 0, rangedPower: 0, magicPower: 0, accuracy: 0, armor: 0, magicDefence: 0, health: 0, dodge: 0 },
-  );
-  // Override with mob's actual stats
-  bossStats.defence = mob.defence;
-  bossStats.magicDefence = mob.magicDefence;
-  bossStats.dodge = mob.evasion;
-  bossStats.accuracy = mob.accuracy;
-  bossStats.damageMin = mob.damageMin;
-  bossStats.damageMax = mob.damageMax;
-  bossStats.damageType = (mob.damageType as 'physical' | 'magic') ?? 'physical';
 
   const bossState: BossState = {
     hp: encounter.currentHp,
     maxHp: encounter.maxHp,
-    stats: bossStats,
+    stats: {
+      hp: encounter.currentHp,
+      maxHp: encounter.maxHp,
+      attack: mob.accuracy,
+      accuracy: mob.accuracy,
+      defence: mob.defence,
+      magicDefence: mob.magicDefence,
+      dodge: mob.evasion,
+      evasion: 0,
+      damageMin: mob.damageMin,
+      damageMax: mob.damageMax,
+      speed: 0,
+      damageType: (mob.damageType as 'physical' | 'magic') ?? 'physical',
+    },
     template: bossTemplate?.actions ?? [{ actionId: 'boss_physical_attack', targetMode: 'single_target' as const }],
-    actionDefinitions: bossTemplate?.actionDefinitions ?? { boss_physical_attack: { id: 'boss_physical_attack', name: 'Attack', description: 'Physical boss attack', actionType: 'normal_attack', category: 'offensive', cost: { stamina: 0, mana: 0 }, damageMultiplier: 1.0, damageType: 'physical' } },
+    actionDefinitions: bossTemplate?.actionDefinitions ?? BOSS_ACTION_DEFINITIONS,
     roundNumber: nextRound,
     activeEffects: Array.isArray(encounter.bossEffects) ? encounter.bossEffects as unknown as BossActiveEffect[] : [],
   };
@@ -594,14 +614,7 @@ export async function resolveBossRound(
       data: { rewardsByPlayer: JSON.parse(JSON.stringify(rewardsByPlayer)) },
     });
 
-    let killerName = 'unknown';
-    if (killedBy) {
-      const killer = await prisma.player.findUnique({
-        where: { id: killedBy },
-        select: { username: true },
-      });
-      if (killer) killerName = killer.username;
-    }
+    const killerName = await resolveUsername(killedBy) ?? 'unknown';
     const zoneName = encounter.event.zone?.name ?? 'unknown';
     await emitSystemMessage(
       io, 'world', 'world',

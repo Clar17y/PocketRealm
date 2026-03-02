@@ -156,7 +156,7 @@ describe('bossEncounterService', () => {
     it('throws if encounter not found', async () => {
       mockPrisma.bossEncounter.findUnique.mockResolvedValue(null);
 
-      await expect(signUpForBossRound('enc-1', 'p1', 100, 100, 50))
+      await expect(signUpForBossRound('enc-1', 'p1', 100))
         .rejects.toThrow('Boss encounter not found');
     });
 
@@ -165,7 +165,7 @@ describe('bossEncounterService', () => {
         makeEncounterRow({ status: 'defeated' }),
       );
 
-      await expect(signUpForBossRound('enc-1', 'p1', 100, 100, 50))
+      await expect(signUpForBossRound('enc-1', 'p1', 100))
         .rejects.toThrow('Boss encounter is already over');
     });
 
@@ -174,7 +174,7 @@ describe('bossEncounterService', () => {
         makeEncounterRow({ status: 'expired' }),
       );
 
-      await expect(signUpForBossRound('enc-1', 'p1', 100, 100, 50))
+      await expect(signUpForBossRound('enc-1', 'p1', 100))
         .rejects.toThrow('Boss encounter is already over');
     });
 
@@ -187,7 +187,7 @@ describe('bossEncounterService', () => {
       mockPrisma.bossParticipant.create.mockResolvedValue(participantRow);
       mockPrisma.bossEncounter.update.mockResolvedValue({});
 
-      const result = await signUpForBossRound('enc-1', 'p1', 100, 100, 50);
+      const result = await signUpForBossRound('enc-1', 'p1', 100);
 
       expect(result.playerId).toBe('p1');
       expect(result.status).toBe('alive');
@@ -204,7 +204,7 @@ describe('bossEncounterService', () => {
         makeParticipantRow({ autoSignUp: true }),
       );
 
-      const result = await signUpForBossRound('enc-1', 'p1', 100, 100, 50);
+      const result = await signUpForBossRound('enc-1', 'p1', 100);
 
       expect(mockPrisma.bossParticipant.update).toHaveBeenCalledWith({
         where: { id: 'bp-1' },
@@ -223,7 +223,7 @@ describe('bossEncounterService', () => {
       mockPrisma.bossParticipant.create.mockResolvedValue(makeParticipantRow());
       mockPrisma.bossEncounter.update.mockResolvedValue({});
 
-      await signUpForBossRound('enc-1', 'p1', 100, 100, 50);
+      await signUpForBossRound('enc-1', 'p1', 100);
 
       expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
         where: { id: 'enc-1' },
@@ -238,7 +238,7 @@ describe('bossEncounterService', () => {
       mockPrisma.bossParticipant.findUnique.mockResolvedValue(null);
       mockPrisma.bossParticipant.create.mockResolvedValue(makeParticipantRow());
 
-      await signUpForBossRound('enc-1', 'p1', 100, 100, 50);
+      await signUpForBossRound('enc-1', 'p1', 100);
 
       expect(mockPrisma.bossEncounter.update).not.toHaveBeenCalled();
     });
@@ -252,7 +252,7 @@ describe('bossEncounterService', () => {
         makeParticipantRow({ autoSignUp: true }),
       );
 
-      const result = await signUpForBossRound('enc-1', 'p1', 100, 100, 50, true);
+      const result = await signUpForBossRound('enc-1', 'p1', 100, true);
 
       expect(result.autoSignUp).toBe(true);
     });

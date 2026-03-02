@@ -2,6 +2,7 @@ import type { ActionDefinition } from '../types/combatAction.types';
 import type { BossTemplateDefinition } from '../types/bossTemplate.types';
 
 // Boss action definitions — all zero-cost (mobs don't manage resources)
+const BOSS_ZERO_COST = { stamina: 0, mana: 0 } as const;
 
 const bossPhysicalAttack: ActionDefinition = {
   id: 'boss_physical_attack',
@@ -9,7 +10,7 @@ const bossPhysicalAttack: ActionDefinition = {
   description: 'Physical boss attack.',
   actionType: 'normal_attack',
   category: 'offensive',
-  cost: { stamina: 0, mana: 0 },
+  cost: BOSS_ZERO_COST,
   damageMultiplier: 1.0,
   damageType: 'physical',
 };
@@ -20,7 +21,7 @@ const bossMagicAttack: ActionDefinition = {
   description: 'Magical boss attack.',
   actionType: 'damage_spell',
   category: 'offensive',
-  cost: { stamina: 0, mana: 0 },
+  cost: BOSS_ZERO_COST,
   damageMultiplier: 1.0,
   damageType: 'magic',
 };
@@ -31,7 +32,7 @@ const bossEarthquake: ActionDefinition = {
   description: 'Massive physical AoE. Counter or take huge damage.',
   actionType: 'heavy_attack',
   category: 'offensive',
-  cost: { stamina: 0, mana: 0 },
+  cost: BOSS_ZERO_COST,
   damageMultiplier: 2.0,
   damageType: 'physical',
 };
@@ -42,7 +43,7 @@ const bossArcaneStorm: ActionDefinition = {
   description: 'Massive magical AoE. Ward or take huge damage.',
   actionType: 'damage_spell',
   category: 'offensive',
-  cost: { stamina: 0, mana: 0 },
+  cost: BOSS_ZERO_COST,
   damageMultiplier: 2.0,
   damageType: 'magic',
 };
@@ -53,7 +54,7 @@ const bossWeaken: ActionDefinition = {
   description: 'Reduces all players\' attack for 3 rounds.',
   actionType: 'debuff_spell',
   category: 'offensive',
-  cost: { stamina: 0, mana: 0 },
+  cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'magic',
   effect: {
@@ -71,7 +72,7 @@ const bossEnrage: ActionDefinition = {
   description: 'Boss increases its own damage for 3 rounds.',
   actionType: 'buff',
   category: 'supportive',
-  cost: { stamina: 0, mana: 0 },
+  cost: BOSS_ZERO_COST,
   effect: {
     name: 'Enraged',
     stat: 'attack',
@@ -86,7 +87,7 @@ const bossHealSelf: ActionDefinition = {
   description: 'Boss heals itself.',
   actionType: 'heal_self',
   category: 'supportive',
-  cost: { stamina: 0, mana: 0 },
+  cost: BOSS_ZERO_COST,
   healPercent: 0.05,
   isChanneling: true,
 };
@@ -97,7 +98,7 @@ const bossRest: ActionDefinition = {
   description: 'Boss rests and does nothing.',
   actionType: 'defend',
   category: 'defensive',
-  cost: { stamina: 0, mana: 0 },
+  cost: BOSS_ZERO_COST,
 };
 
 export const BOSS_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
