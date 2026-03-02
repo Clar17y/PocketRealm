@@ -488,6 +488,39 @@ export const COMBAT_ACTION_CONSTANTS = {
   MAX_ACTIVE_BUFFS: 3,
   /** Potion sickness duration (rounds) — shared across HP/Stam/Mana potions */
   POTION_SICKNESS_ROUNDS: 4,
+
+  // Melee talent actions
+  POWER_STRIKE_STAMINA: 15,
+  CLEAVE_STAMINA: 25,
+  BATTLE_CRY_STAMINA: 20,
+  DEVASTATING_BLOW_STAMINA: 35,
+  BERSERKER_RAGE_STAMINA: 30,
+  EXECUTE_STAMINA: 40,
+  TITANS_WRATH_STAMINA: 50,
+
+  // Ranged talent actions
+  AIMED_SHOT_STAMINA: 15,
+  CRIPPLING_SHOT_STAMINA: 20,
+  EAGLE_EYE_STAMINA: 15,
+  VOLLEY_STAMINA: 30,
+  SNIPERS_MARK_STAMINA: 25,
+  PIERCING_SHOT_STAMINA: 35,
+  DEATH_MARK_STAMINA: 45,
+
+  // Magic talent actions
+  FIRE_BOLT_MANA: 15,
+  MINOR_HEAL_MANA: 20,
+  FROST_NOVA_MANA: 20,
+  ENHANCED_FORTITUDE_MANA: 25,
+  CHAIN_LIGHTNING_MANA: 30,
+  HEAL_ALLY_MANA: 35,
+  ARCANE_BLAST_MANA: 40,
+  REGENERATION_MANA: 30,
+  METEOR_STRIKE_MANA: 50,
+
+  // General talent actions
+  FORTIFY_STAMINA: 15,
+  FORTIFY_MANA: 10,
 } as const;
 
 // =============================================================================
