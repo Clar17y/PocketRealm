@@ -8,6 +8,7 @@ import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { LootPicker } from '@/components/common/LootPicker';
+import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
@@ -430,45 +431,49 @@ export default function GamePage() {
         const currentLevelXp = Math.max(0, characterProgression.characterXp - currentLevelFloorXp);
         const requiredLevelXp = Math.max(1, nextLevelTotalXp - currentLevelFloorXp);
         return (
-          <Dashboard
-            playerData={{
-              turns,
-              maxTurns: TURN_CONSTANTS.BANK_CAP,
-              turnsRegenRate: TURN_CONSTANTS.REGEN_RATE * 60,
-              gold,
-              currentXP: characterProgression.characterXp,
-              nextLevelXP: nextLevelTotalXp,
-              currentLevelXp,
-              requiredLevelXp,
-              currentZone: currentZone?.name ?? 'Unknown',
-              currentHp: hpState.currentHp,
-              maxHp: hpState.maxHp,
-              hpRegenRate: hpState.regenPerSecond,
-              isRecovering: hpState.isRecovering,
-              isOverEncumbered,
-              recoveryCost: hpState.recoveryCost,
-              currentStamina: staminaState.current,
-              maxStamina: staminaState.max,
-              staminaRegenRate: staminaState.regenPerSecond,
-              currentMana: manaState.current,
-              maxMana: manaState.max,
-              manaRegenRate: manaState.regenPerSecond,
-            }}
-            characterProgression={characterProgression}
-            skills={skills
-              .map((s) => {
-                const meta = SKILL_META[s.skillType];
-                if (!meta) return null;
-                return { name: meta.name, level: s.level, icon: meta.icon, imageSrc: skillIconSrc(s.skillType) };
-              })
-              .filter(Boolean) as Array<{ name: string; level: number; icon: typeof Sword; imageSrc: string }>}
-            onNavigate={handleNavigate}
-            activityLog={activityLog}
-            onAllocateAttribute={handleAllocateAttribute}
-            onQuickRest={handleQuickRest}
-            quickRestPercent={quickRestHealPercent}
-            busyAction={busyAction}
-          />
+          <>
+            <ResourceStatusBar
+              currentHp={hpState.currentHp}
+              maxHp={hpState.maxHp}
+              currentStamina={staminaState.current}
+              maxStamina={staminaState.max}
+              currentMana={manaState.current}
+              maxMana={manaState.max}
+              hpRegenPerSecond={hpState.regenPerSecond}
+              isRecovering={hpState.isRecovering}
+              recoveryCost={hpState.recoveryCost}
+              onQuickRest={handleQuickRest}
+              quickRestPercent={quickRestHealPercent}
+              busyAction={busyAction}
+            />
+            <Dashboard
+              playerData={{
+                turns,
+                maxTurns: TURN_CONSTANTS.BANK_CAP,
+                turnsRegenRate: TURN_CONSTANTS.REGEN_RATE * 60,
+                gold,
+                currentXP: characterProgression.characterXp,
+                nextLevelXP: nextLevelTotalXp,
+                currentLevelXp,
+                requiredLevelXp,
+                currentZone: currentZone?.name ?? 'Unknown',
+                isRecovering: hpState.isRecovering,
+                isOverEncumbered,
+                recoveryCost: hpState.recoveryCost,
+              }}
+              characterProgression={characterProgression}
+              skills={skills
+                .map((s) => {
+                  const meta = SKILL_META[s.skillType];
+                  if (!meta) return null;
+                  return { name: meta.name, level: s.level, icon: meta.icon, imageSrc: skillIconSrc(s.skillType) };
+                })
+                .filter(Boolean) as Array<{ name: string; level: number; icon: typeof Sword; imageSrc: string }>}
+              onNavigate={handleNavigate}
+              activityLog={activityLog}
+              onAllocateAttribute={handleAllocateAttribute}
+            />
+          </>
         );
       case 'explore':
         if (currentZone?.zoneType === 'town' && !explorationPlaybackData) {
