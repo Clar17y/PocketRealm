@@ -53,10 +53,82 @@ function colorPipClass(color: 'red' | 'black' | 'green'): string {
   }
 }
 
+interface ChipStack {
+  myAmount: number;
+  myCount: number;
+  otherCount: number;
+}
+
+function ChipStackIndicator({ myCount, otherCount, myAmount }: ChipStack) {
+  const total = Math.min(myCount + otherCount, 4);
+  if (total === 0) return null;
+  const overflow = myCount + otherCount > 4 ? myCount + otherCount : 0;
+
+  return (
+    <div className="absolute bottom-0 right-0.5 flex flex-col-reverse items-center pointer-events-none">
+      {Array.from({ length: total }, (_, i) => (
+        <div
+          key={i}
+          className={`w-3 h-1.5 rounded-full border -mt-0.5 first:mt-0 ${
+            i < myCount
+              ? 'bg-[var(--rpg-gold)] border-[var(--rpg-gold)]/70'
+              : 'bg-gray-400 border-gray-500'
+          }`}
+        />
+      ))}
+      {overflow > 0 && <span className="text-[6px] text-white font-bold">x{overflow}</span>}
+      {myAmount > 0 && <span className="text-[6px] text-[var(--rpg-gold)] font-bold">{myAmount}g</span>}
+    </div>
+  );
+}
+
+function WinCelebration({ payout, isBigWin }: { payout: number; isBigWin: boolean }) {
+  const coinCount = isBigWin ? 20 : 8;
+  return (
+    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+      <div className="absolute inset-0 bg-[var(--rpg-gold)]/10" style={{ animation: 'gold-shimmer 1.5s ease-out forwards' }} />
+      {Array.from({ length: coinCount }, (_, i) => (
+        <div
+          key={i}
+          className="absolute text-lg"
+          style={{
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 0.8}s`,
+            animation: `coin-fall ${1.5 + Math.random()}s ease-in forwards`,
+          }}
+        >
+          {'🪙'}
+        </div>
+      ))}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-2xl font-bold text-[var(--rpg-gold)] animate-bounce">
+          +{payout.toLocaleString()}g
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Build the roulette board rows: 12 rows of [col1, col2, col3]
 const BOARD_ROWS: number[][] = [];
 for (let row = 0; row < 12; row++) {
   BOARD_ROWS.push([row * 3 + 1, row * 3 + 2, row * 3 + 3]);
+}
+
+// Corner bet positions: each corner sits at the intersection of 4 adjacent numbers
+const CORNER_POSITIONS: { row: number; col: number; value: string; numbers: number[] }[] = [];
+for (let row = 0; row < 11; row++) {
+  const topLeft = row * 3 + 1;
+  CORNER_POSITIONS.push({
+    row, col: 0,
+    value: `${topLeft},${topLeft + 1},${topLeft + 3},${topLeft + 4}`,
+    numbers: [topLeft, topLeft + 1, topLeft + 3, topLeft + 4],
+  });
+  CORNER_POSITIONS.push({
+    row, col: 1,
+    value: `${topLeft + 1},${topLeft + 2},${topLeft + 4},${topLeft + 5}`,
+    numbers: [topLeft + 1, topLeft + 2, topLeft + 4, topLeft + 5],
+  });
 }
 
 export function Casino({
@@ -67,16 +139,13 @@ export function Casino({
   onGoldUpdate,
   onTurnsUpdate,
   isInTown,
-  liveBets: _liveBets,
-  sessionBets: _sessionBets,
-  sessionProfit: _sessionProfit,
-  lastResult: _socketLastResult,
-  trackBet: _trackBet,
-  playerName: _playerName,
+  liveBets,
+  sessionBets,
+  sessionProfit,
+  lastResult,
+  trackBet,
+  playerName,
 }: CasinoProps) {
-  // New socket-driven props (_liveBets, _sessionBets, _sessionProfit,
-  // _socketLastResult, _trackBet, _playerName) will replace polling
-  // in Tasks 6-8, 11.
   // Gold exchange state
   const [exchangeTurns, setExchangeTurns] = useState(100);
   const [isExchanging, setIsExchanging] = useState(false);
@@ -90,12 +159,43 @@ export function Casino({
   const [history, setHistory] = useState<RouletteHistoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [hoveredBet, setHoveredBet] = useState<{ type: RouletteBetType; value: string } | null>(null);
+  const [showHeatMap, setShowHeatMap] = useState(false);
+  const [winAnimation, setWinAnimation] = useState<{ payout: number; isBigWin: boolean } | null>(null);
 
   const highlightedNumbers = useMemo(() => {
     const bet = hoveredBet ?? (selectedBetType ? { type: selectedBetType, value: selectedBetValue } : null);
     if (!bet) return new Set<number>();
     return getNumbersForBet(bet.type, bet.value);
   }, [hoveredBet, selectedBetType, selectedBetValue]);
+
+  const chipMap = useMemo(() => {
+    const bets = liveBets.length > 0 ? liveBets : (roundState?.bets ?? []);
+    const map = new Map<string, ChipStack>();
+    for (const bet of bets) {
+      const key = bet.betType === 'straight' ? `num:${bet.betValue}`
+        : bet.betType === 'corner' ? `corner:${bet.betValue}`
+        : `${bet.betType}:${bet.betValue}`;
+      const isMine = bet.playerName === playerName;
+      const existing = map.get(key) ?? { myAmount: 0, myCount: 0, otherCount: 0 };
+      if (isMine) {
+        existing.myAmount += bet.amount;
+        existing.myCount++;
+      } else {
+        existing.otherCount++;
+      }
+      map.set(key, existing);
+    }
+    return map;
+  }, [liveBets, roundState?.bets, playerName]);
+
+  const heatMap = useMemo(() => {
+    if (!showHeatMap) return null;
+    const counts = new Map<number, number>();
+    for (const entry of history) {
+      counts.set(entry.result, (counts.get(entry.result) ?? 0) + 1);
+    }
+    return counts;
+  }, [history, showHeatMap]);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -148,6 +248,21 @@ export function Casino({
     }
   }, [roundState?.phase, fetchHistory]);
 
+  // Win animation trigger
+  useEffect(() => {
+    if (!lastResult) return;
+    const myWinnings = sessionBets
+      .filter((b) => b.payout !== null && b.payout > 0)
+      .reduce((sum, b) => sum + (b.payout ?? 0), 0);
+    if (myWinnings > 0) {
+      setWinAnimation({
+        payout: myWinnings,
+        isBigWin: myWinnings >= CASINO_CONSTANTS.BIG_WIN_THRESHOLD,
+      });
+      setTimeout(() => setWinAnimation(null), 2500);
+    }
+  }, [lastResult, sessionBets]);
+
   // Gold exchange handler
   const handleExchange = async () => {
     if (exchangeTurns <= 0 || exchangeTurns > turns) return;
@@ -182,6 +297,7 @@ export function Casino({
     setError(null);
     try {
       await onPlaceBet(selectedBetType, selectedBetValue, betAmount);
+      trackBet(selectedBetType, selectedBetValue, betAmount, roundState?.roundId ?? '');
       // Refresh round after bet
       await fetchRound();
     } catch (err) {
@@ -213,6 +329,8 @@ export function Casino({
 
   return (
     <div className="space-y-4">
+      {winAnimation && <WinCelebration {...winAnimation} />}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -313,34 +431,65 @@ export function Casino({
             </button>
 
             {/* Number grid: 12 rows x 3 cols */}
-            <div className="grid grid-cols-3 gap-px bg-[var(--rpg-border)]">
-              {BOARD_ROWS.map((row) =>
-                row.map((n) => {
-                  const color = getNumberColor(n);
-                  const isSelected = selectedBetType === 'straight' && selectedBetValue === String(n);
-                  const isResult = roundState?.phase === 'result' && roundState.result === n;
-                  const isHighlighted = highlightedNumbers.has(n);
-                  return (
-                    <button
-                      key={n}
-                      onClick={() => handleNumberClick(n)}
-                      className={`h-9 text-sm font-bold transition-all ${colorClass(color)} hover:opacity-80 ${
-                        isSelected
-                          ? 'ring-2 ring-[var(--rpg-gold)] ring-inset'
-                          : isHighlighted
-                            ? 'brightness-[1.35] ring-1 ring-[var(--rpg-gold)]/50 ring-inset'
-                            : ''
-                      } ${
-                        isResult
-                          ? 'ring-2 ring-[var(--rpg-gold)] animate-pulse'
+            <div className="relative">
+              <div className="grid grid-cols-3 gap-px bg-[var(--rpg-border)]">
+                {BOARD_ROWS.map((row) =>
+                  row.map((n) => {
+                    const color = getNumberColor(n);
+                    const isSelected = selectedBetType === 'straight' && selectedBetValue === String(n);
+                    const isResult = roundState?.phase === 'result' && roundState.result === n;
+                    const isHighlighted = highlightedNumbers.has(n);
+                    const heat = heatMap?.get(n);
+                    const heatClass = heatMap != null && !isSelected && !isHighlighted
+                      ? (heat ?? 0) === 0
+                        ? 'ring-1 ring-blue-400/40 ring-inset'
+                        : (heat ?? 0) >= 2
+                          ? 'ring-1 ring-orange-400/50 ring-inset'
                           : ''
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  );
-                })
-              )}
+                      : '';
+                    return (
+                      <button
+                        key={n}
+                        onClick={() => handleNumberClick(n)}
+                        className={`relative h-9 text-sm font-bold transition-all ${colorClass(color)} hover:opacity-80 ${
+                          isSelected
+                            ? 'ring-2 ring-[var(--rpg-gold)] ring-inset'
+                            : isHighlighted
+                              ? 'brightness-[1.35] ring-1 ring-[var(--rpg-gold)]/50 ring-inset'
+                              : heatClass
+                        } ${
+                          isResult
+                            ? 'ring-2 ring-[var(--rpg-gold)] animate-pulse'
+                            : ''
+                        }`}
+                      >
+                        {n}
+                        {chipMap.has(`num:${n}`) && <ChipStackIndicator {...chipMap.get(`num:${n}`)!} />}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              {/* Corner bet hit targets */}
+              {CORNER_POSITIONS.map((corner) => (
+                <button
+                  key={`corner-${corner.value}`}
+                  onClick={() => handleOutsideBet('corner', corner.value)}
+                  onMouseEnter={() => setHoveredBet({ type: 'corner', value: corner.value })}
+                  onMouseLeave={() => setHoveredBet(null)}
+                  className={`absolute w-5 h-5 rounded-full z-10 transition-colors ${
+                    selectedBetType === 'corner' && selectedBetValue === corner.value
+                      ? 'bg-[var(--rpg-gold)]/40 ring-1 ring-[var(--rpg-gold)]'
+                      : 'hover:bg-[var(--rpg-gold)]/20'
+                  }`}
+                  style={{
+                    left: `${((corner.col + 1) / 3) * 100}%`,
+                    top: `${((corner.row + 1) / 12) * 100}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                  title={`Corner: ${corner.numbers.join(', ')}`}
+                />
+              ))}
             </div>
 
             {/* Column bets */}
@@ -351,13 +500,14 @@ export function Casino({
                   onClick={() => handleOutsideBet('column', `col${col}`)}
                   onMouseEnter={() => setHoveredBet({ type: 'column', value: `col${col}` })}
                   onMouseLeave={() => setHoveredBet(null)}
-                  className={`h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] rounded transition-all hover:bg-[var(--rpg-border)] ${
+                  className={`relative h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] rounded transition-all hover:bg-[var(--rpg-border)] ${
                     selectedBetType === 'column' && selectedBetValue === `col${col}`
                       ? 'border-[var(--rpg-gold)] ring-1 ring-[var(--rpg-gold)]'
                       : 'border-[var(--rpg-border)]'
                   } border`}
                 >
                   Col {col}
+                  {chipMap.has(`column:col${col}`) && <ChipStackIndicator {...chipMap.get(`column:col${col}`)!} />}
                 </button>
               ))}
             </div>
@@ -374,13 +524,14 @@ export function Casino({
                   onClick={() => handleOutsideBet('dozen', value)}
                   onMouseEnter={() => setHoveredBet({ type: 'dozen', value })}
                   onMouseLeave={() => setHoveredBet(null)}
-                  className={`h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] rounded transition-all hover:bg-[var(--rpg-border)] ${
+                  className={`relative h-8 text-xs font-semibold bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] rounded transition-all hover:bg-[var(--rpg-border)] ${
                     selectedBetType === 'dozen' && selectedBetValue === value
                       ? 'border-[var(--rpg-gold)] ring-1 ring-[var(--rpg-gold)]'
                       : 'border-[var(--rpg-border)]'
                   } border`}
                 >
                   {label}
+                  {chipMap.has(`dozen:${value}`) && <ChipStackIndicator {...chipMap.get(`dozen:${value}`)!} />}
                 </button>
               ))}
             </div>
@@ -398,13 +549,14 @@ export function Casino({
                   onClick={() => handleOutsideBet(type, value)}
                   onMouseEnter={() => setHoveredBet({ type, value })}
                   onMouseLeave={() => setHoveredBet(null)}
-                  className={`h-8 text-xs font-semibold ${cls} rounded transition-all hover:opacity-80 ${
+                  className={`relative h-8 text-xs font-semibold ${cls} rounded transition-all hover:opacity-80 ${
                     selectedBetType === type && selectedBetValue === value
                       ? 'border-[var(--rpg-gold)] ring-1 ring-[var(--rpg-gold)]'
                       : 'border-[var(--rpg-border)]'
                   } border`}
                 >
                   {label}
+                  {chipMap.has(`${type}:${value}`) && <ChipStackIndicator {...chipMap.get(`${type}:${value}`)!} />}
                 </button>
               ))}
             </div>
@@ -470,24 +622,59 @@ export function Casino({
       </PixelCard>
 
       {/* Live Bets */}
-      {roundState && roundState.bets.length > 0 && (
+      {(() => {
+        const displayBets = liveBets.length > 0 ? liveBets : (roundState?.bets ?? []);
+        if (displayBets.length === 0) return null;
+        return (
+          <PixelCard>
+            <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3 flex items-center gap-2">
+              <Users size={18} />
+              Live Bets ({displayBets.length})
+            </h3>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              {displayBets.map((bet, i) => (
+                <div
+                  key={`${bet.playerName}-${i}`}
+                  className="flex items-center justify-between text-sm py-1 px-2 rounded bg-[var(--rpg-background)]"
+                >
+                  <span className="text-[var(--rpg-text-primary)] truncate mr-2">{bet.playerName}</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-[var(--rpg-text-secondary)]">
+                      {formatBet(bet.betType, bet.betValue)}
+                    </span>
+                    <span className="font-mono text-[var(--rpg-gold)]">{bet.amount}g</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </PixelCard>
+        );
+      })()}
+
+      {/* Session Bet History */}
+      {sessionBets.length > 0 && (
         <PixelCard>
-          <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3 flex items-center gap-2">
-            <Users size={18} />
-            Live Bets ({roundState.bets.length})
-          </h3>
-          <div className="space-y-1.5 max-h-40 overflow-y-auto">
-            {roundState.bets.map((bet, i) => (
-              <div
-                key={`${bet.playerName}-${i}`}
-                className="flex items-center justify-between text-sm py-1 px-2 rounded bg-[var(--rpg-background)]"
-              >
-                <span className="text-[var(--rpg-text-primary)] truncate mr-2">{bet.playerName}</span>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs text-[var(--rpg-text-secondary)]">
-                    {formatBet(bet.betType, bet.betValue)}
-                  </span>
-                  <span className="font-mono text-[var(--rpg-gold)]">{bet.amount}g</span>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-[var(--rpg-text-primary)] text-sm">My Bets</h3>
+            <span className={`font-mono text-sm font-bold ${
+              sessionProfit >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'
+            }`}>
+              {sessionProfit >= 0 ? '+' : ''}{sessionProfit.toLocaleString()}g
+            </span>
+          </div>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {sessionBets.map((bet) => (
+              <div key={bet.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-[var(--rpg-background)]">
+                <span className="text-[var(--rpg-text-secondary)]">{formatBet(bet.betType, bet.betValue)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--rpg-text-secondary)] font-mono">{bet.amount}g</span>
+                  {bet.payout === null ? (
+                    <span className="text-[var(--rpg-text-secondary)] italic">pending...</span>
+                  ) : bet.payout > 0 ? (
+                    <span className="text-[var(--rpg-green-light)] font-mono font-bold">+{(bet.payout - bet.amount).toLocaleString()}g</span>
+                  ) : (
+                    <span className="text-[var(--rpg-red)] font-mono font-bold">-{bet.amount.toLocaleString()}g</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -498,10 +685,22 @@ export function Casino({
       {/* Spin History */}
       {history.length > 0 && (
         <PixelCard>
-          <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3 flex items-center gap-2">
-            <History size={18} />
-            Spin History
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-[var(--rpg-text-primary)] flex items-center gap-2">
+              <History size={18} />
+              Spin History
+            </h3>
+            <button
+              onClick={() => setShowHeatMap((v) => !v)}
+              className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                showHeatMap
+                  ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]'
+                  : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+              }`}
+            >
+              Hot/Cold
+            </button>
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {history.map((entry) => {
               const color = getNumberColor(entry.result);
@@ -584,6 +783,7 @@ function formatBet(type: RouletteBetType, value: string): string {
     case 'dozen':
       return value === '1-12' ? '1st 12' : value === '13-24' ? '2nd 12' : '3rd 12';
     case 'column': return `Column ${value.replace('col', '')}`;
+    case 'corner': return `Corner ${value}`;
     case 'split': return `Split ${value}`;
     default: return `${type} ${value}`;
   }
