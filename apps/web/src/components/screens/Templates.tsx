@@ -12,7 +12,6 @@ import {
 } from '@/lib/api';
 import type { TemplateResponse, TemplateAction } from '@/lib/api';
 import type { ResourcePoolState } from '@/lib/api';
-import type { SkillPointState } from '@/lib/api';
 import type { Screen } from '@/app/game/useGameController';
 import { BASE_ACTION_DEFINITIONS } from '@adventure/shared';
 import type { ActionDefinition, ActionCategory } from '@adventure/shared';
