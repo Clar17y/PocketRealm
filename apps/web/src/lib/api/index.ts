@@ -230,3 +230,6 @@ export type {
   GuildJoinRequestResponse,
   GuildJoinRequestsResponse,
 } from './guild';
+
+export { getSkillPointState, allocateSkillPoint, respecSkillPoints } from './skillPoints';
+export type { SkillPointState } from './skillPoints';
