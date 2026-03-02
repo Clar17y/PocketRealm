@@ -137,6 +137,9 @@ export type {
   LeaderboardCategoriesResponse,
 } from './social';
 
+export { getResources } from './resources';
+export type { ResourcePoolState, CombatResourceResponse } from './resources';
+
 export {
   adminGrantTurns,
   adminSetLevel,

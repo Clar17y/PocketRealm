@@ -67,12 +67,14 @@ import {
   withdrawFromStash,
   claimLoot,
   fetchPendingLoot,
+  getResources,
   type PendingLootItem,
   type AchievementsResponse,
   type EventModifierBadge,
   type CombatActiveEvent,
   type PlayerSettings,
   type WorldEventResponse,
+  type ResourcePoolState,
 } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
@@ -493,6 +495,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     discovered: boolean;
   }>>([]);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
+  const [staminaState, setStaminaState] = useState<ResourcePoolState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 });
+  const [manaState, setManaState] = useState<ResourcePoolState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5 });
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
   const [autoPotionThreshold, setAutoPotionThreshold] = useState(0);
@@ -584,9 +588,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   } | null>(null);
 
   const loadTurnsAndHp = useCallback(async () => {
-    const [turnRes, hpRes] = await Promise.all([getTurns(), getHpState()]);
+    const [turnRes, hpRes, resourceRes] = await Promise.all([getTurns(), getHpState(), getResources()]);
     if (turnRes.data) setTurns(turnRes.data.currentTurns);
     if (hpRes.data) setHpState(hpRes.data);
+    if (resourceRes.data) {
+      setStaminaState(resourceRes.data.stamina);
+      setManaState(resourceRes.data.mana);
+    }
   }, []);
 
   const loadPvpNotificationCount = useCallback(async () => {
@@ -612,7 +620,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const loadAll = useCallback(async () => {
     setActionError(null);
 
-    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, recipesRes, hpRes] = await Promise.all([
+    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, recipesRes, hpRes, resourceRes] = await Promise.all([
       getTurns(),
       getPlayer(),
       getSkills(),
@@ -621,6 +629,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       getEquipment(),
       getCraftingRecipes(),
       getHpState(),
+      getResources(),
     ]);
 
     if (turnRes.data) setTurns(turnRes.data.currentTurns);
@@ -645,6 +654,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
     if (hpRes.data) setHpState(hpRes.data);
+    if (resourceRes.data) {
+      setStaminaState(resourceRes.data.stamina);
+      setManaState(resourceRes.data.mana);
+    }
     if (zonesRes.data) {
       setZones(zonesRes.data.zones);
       setZoneConnections(zonesRes.data.connections);
@@ -2169,6 +2182,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     bestiaryPrefixSummary,
     hpState,
     setHpState,
+    staminaState,
+    manaState,
     pvpNotificationCount,
     autoPotionThreshold,
     setAutoPotionThreshold,
