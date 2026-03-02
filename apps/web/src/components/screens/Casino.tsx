@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Coins, Clock, History, Users } from 'lucide-react';
+import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
 import * as api from '@/lib/api';
 import {
   CASINO_CONSTANTS,
@@ -351,6 +352,16 @@ export function Casino({
   return (
     <div className="space-y-4">
       {winAnimation && <WinCelebration {...winAnimation} />}
+      <FirstVisitHowTo
+        storageKey="howto_casino"
+        title="Casino"
+        sections={[
+          { heading: 'Gold Exchange', text: 'Convert your turns into gold at a 1:1 rate. Gold is used to place bets.' },
+          { heading: 'Roulette', text: 'Pick a number, colour, or group and place your bet before the timer runs out. The wheel spins every 60 seconds.' },
+          { heading: 'Payouts', text: 'Straight number pays 36:1, corner (4 numbers) 9:1, column/dozen 3:1, and colour/odd/even 2:1.' },
+          { heading: 'Chat', text: 'The Casino chat tab lets you talk with other players at the table. The dealer announces results and big wins.' },
+        ]}
+      />
 
       {/* Header */}
       <div className="flex items-center justify-between">

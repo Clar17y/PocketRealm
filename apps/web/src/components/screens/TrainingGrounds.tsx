@@ -6,6 +6,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { startTrainingFight, getTrainingCooldown } from '@/lib/api';
 import { Swords, Shield, AlertTriangle } from 'lucide-react';
+import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
 import { getMobPrefixDefinition } from '@adventure/shared';
 import type { CombatResult } from '@adventure/shared';
 import type { LastCombatLogEntry } from '@/app/game/useGameController';
@@ -238,6 +239,16 @@ export function TrainingGrounds({
   // Idle / selection phase
   return (
     <div className="space-y-4">
+      <FirstVisitHowTo
+        storageKey="howto_training"
+        title="Training Grounds"
+        sections={[
+          { heading: 'Practice Fights', text: 'Fight any monster from your bestiary with no turn cost, no HP loss, and no rewards. Great for testing builds.' },
+          { heading: 'Prefixes', text: 'Apply a mob prefix to increase difficulty. Prefixed mobs have boosted stats and different abilities.' },
+          { heading: 'Cooldown', text: 'There is a short cooldown between fights to prevent spam.' },
+        ]}
+      />
+
       {/* Header */}
       <PixelCard>
         <div className="flex items-center gap-3 mb-1">
