@@ -493,6 +493,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     prefixesEncountered: string[];
     explorationTier: number;
     tierLocked: boolean;
+    bossRotation?: {
+      totalRounds: number;
+      revealedRounds: number;
+      actions: Array<{
+        round: number;
+        actionName: string;
+        targetMode: 'single_target' | 'aoe';
+        isTelegraphed: boolean;
+      }>;
+    };
   }>>([]);
   const [bestiaryLoading, setBestiaryLoading] = useState(false);
   const [bestiaryError, setBestiaryError] = useState<string | null>(null);

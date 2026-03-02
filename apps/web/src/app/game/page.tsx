@@ -765,6 +765,7 @@ export default function GamePage() {
               prefixesEncountered: m.prefixesEncountered,
               explorationTier: m.explorationTier,
               tierLocked: m.tierLocked,
+              bossRotation: m.bossRotation,
               drops: m.drops.map((d) => ({
                 name: d.item.name,
                 imageSrc: itemImageSrc(d.item.name, d.item.itemType),

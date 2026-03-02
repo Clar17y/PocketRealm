@@ -164,6 +164,16 @@ export async function getBestiary() {
       prefixesEncountered: string[];
       explorationTier: number;
       tierLocked: boolean;
+      bossRotation?: {
+        totalRounds: number;
+        revealedRounds: number;
+        actions: Array<{
+          round: number;
+          actionName: string;
+          targetMode: 'single_target' | 'aoe';
+          isTelegraphed: boolean;
+        }>;
+      };
     }>;
     prefixSummary: Array<{
       prefix: string;
