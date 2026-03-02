@@ -624,6 +624,22 @@ export const WORLD_EVENT_CONSTANTS = {
 } as const;
 
 // =============================================================================
+// BOSS ENCOUNTER (individual HP model, threat/aggro, contribution loot)
+// =============================================================================
+
+export const BOSS_ENCOUNTER_CONSTANTS = {
+  THREAT_PER_DAMAGE: 1,
+  THREAT_PER_HEAL: 0.5,
+  TAUNT_THREAT_BONUS: 500,
+  TAUNT_DEFAULT_DURATION: 2,
+  CONTRIBUTION_DAMAGE_WEIGHT: 1.0,
+  CONTRIBUTION_HEALING_WEIGHT: 1.0,
+  CONTRIBUTION_ABSORB_WEIGHT: 0.9,
+  CONTRIBUTION_SURVIVAL_FLAT_BONUS: 10,
+  BOSS_SINGLE_TARGET_DAMAGE_BY_TIER: [30, 60, 100, 160, 250] as readonly number[],
+} as const;
+
+// =============================================================================
 // GEM TIER MAPPING (gathering skill + node level → gem name)
 // =============================================================================
 
