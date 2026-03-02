@@ -182,10 +182,13 @@ export function Casino({
     return getNumbersForBet(bet.type, bet.value);
   }, [hoveredBet, selectedBetType, selectedBetValue]);
 
-  const displayBets = useMemo(
-    () => liveBets.length > 0 ? liveBets : (roundState?.bets ?? []),
-    [liveBets, roundState?.bets],
-  );
+  const displayBets = useMemo(() => {
+    const polled = roundState?.bets ?? [];
+    if (liveBets.length === 0) return polled;
+    if (polled.length === 0) return liveBets;
+    // Merge: start with polled bets, append any live bets beyond that count
+    return liveBets.length > polled.length ? [...polled, ...liveBets.slice(polled.length)] : polled;
+  }, [liveBets, roundState?.bets]);
 
   const chipMap = useMemo(() => {
     const map = new Map<string, ChipStack>();

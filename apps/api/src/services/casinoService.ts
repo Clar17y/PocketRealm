@@ -4,6 +4,7 @@ import { spendPlayerTurnsTx } from './turnBankService';
 import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
 import { getIo } from '../socket';
+import { checkAchievements, emitAchievementNotifications } from './achievementService';
 import {
   isWinningBet,
   calculatePayout,
@@ -100,12 +101,16 @@ async function resolveRound(roundId: string): Promise<number> {
   const lockKey = `roulette:lock:${roundId}`;
   const acquired = await redis.set(lockKey, '1', 'EX', 30, 'NX');
   if (!acquired) {
-    // Another process is resolving — wait and fetch result from DB
-    const round = await prisma.rouletteRound.findUnique({
-      where: { id: roundId },
-      select: { result: true },
-    });
-    return round?.result ?? 0;
+    // Another process is resolving — poll until result is committed
+    for (let i = 0; i < 10; i++) {
+      const round = await prisma.rouletteRound.findUnique({
+        where: { id: roundId },
+        select: { result: true },
+      });
+      if (round?.result !== null && round?.result !== undefined) return round.result;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    return 0;
   }
 
   const result = generateSpinResult();
@@ -165,6 +170,22 @@ async function resolveRound(roundId: string): Promise<number> {
       winningBets,
     };
     io.to('chat:casino').emit('casino:result', resultEvent);
+  }
+
+  // Update peakGoldHeld for winners (achievements)
+  const winnerIds = [...new Set(updates.filter((u) => u.payout > 0).map((u) => u.playerId))];
+  for (const wId of winnerIds) {
+    const p = await prisma.player.findUnique({ where: { id: wId }, select: { gold: true } });
+    if (p) {
+      await prisma.$executeRaw`
+        INSERT INTO player_stats (player_id, peak_gold_held)
+        VALUES (${wId}, ${p.gold})
+        ON CONFLICT (player_id)
+        DO UPDATE SET peak_gold_held = GREATEST(player_stats.peak_gold_held, ${p.gold})
+      `;
+      const achievements = await checkAchievements(wId, { statKeys: ['peakGoldHeld'] });
+      if (achievements.length > 0) await emitAchievementNotifications(wId, achievements);
+    }
   }
 
   // Keep the resolved round visible for a few seconds before allowing a new round
