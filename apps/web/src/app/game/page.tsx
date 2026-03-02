@@ -527,6 +527,8 @@ export default function GamePage() {
             currentMana={manaState.current}
             maxMana={manaState.max}
             regenPerSecond={hpState.regenPerSecond}
+            staminaRegenPerSecond={staminaState.regenPerSecond}
+            manaRegenPerSecond={manaState.regenPerSecond}
             playbackData={explorationPlaybackData}
             onPlaybackComplete={handleExplorationPlaybackComplete}
             onPlaybackSkip={handlePlaybackSkip}

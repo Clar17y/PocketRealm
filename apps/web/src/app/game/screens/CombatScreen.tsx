@@ -76,8 +76,8 @@ interface CombatScreenProps {
   quickRestPercent?: number;
   onNavigateToRest?: () => void;
   combatXpRate?: { skillName: string; rate: number };
-  staminaState?: { current: number; max: number };
-  manaState?: { current: number; max: number };
+  staminaState?: { current: number; max: number; regenPerSecond: number };
+  manaState?: { current: number; max: number; regenPerSecond: number };
 }
 
 export function CombatScreen({
@@ -282,6 +282,8 @@ export function CombatScreen({
           currentMana={manaState?.current ?? 0}
           maxMana={manaState?.max ?? 0}
           hpRegenPerSecond={hpState.regenPerSecond}
+          staminaRegenPerSecond={staminaState?.regenPerSecond}
+          manaRegenPerSecond={manaState?.regenPerSecond}
           onQuickRest={onQuickRest}
           quickRestPercent={quickRestPercent}
           busyAction={busyAction}

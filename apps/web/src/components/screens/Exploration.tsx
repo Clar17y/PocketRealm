@@ -43,6 +43,8 @@ interface ExplorationProps {
   currentMana?: number;
   maxMana?: number;
   regenPerSecond?: number;
+  staminaRegenPerSecond?: number;
+  manaRegenPerSecond?: number;
   playbackData?: {
     totalTurns: number;
     zoneName: string;
@@ -71,7 +73,7 @@ interface ExplorationProps {
   combatXpRate?: { skillName: string; rate: number };
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
@@ -134,6 +136,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           currentMana={currentMana ?? 0}
           maxMana={maxMana ?? 0}
           hpRegenPerSecond={regenPerSecond}
+          staminaRegenPerSecond={staminaRegenPerSecond}
+          manaRegenPerSecond={manaRegenPerSecond}
           onQuickRest={onQuickRest}
           quickRestPercent={quickRestPercent}
           busyAction={busyAction}
