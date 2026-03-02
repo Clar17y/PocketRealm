@@ -65,7 +65,7 @@ export function monsterImageSrc(monsterName: string): string {
 }
 
 const SCREEN_BACKGROUNDS = new Set([
-  'arena', 'equipment', 'forge', 'guild', 'inventory',
+  'arena', 'casino', 'equipment', 'forge', 'guild', 'inventory', 'training',
 ]);
 
 const CRAFTING_SKILLS = new Set([
