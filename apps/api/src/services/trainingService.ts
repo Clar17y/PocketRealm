@@ -71,12 +71,12 @@ export async function simulateFight(
 
   // Apply prefix if specified
   const mobTemplate = toMobTemplate(mob as Record<string, unknown>);
-  const finalMob = prefix ? applyMobPrefix(mobTemplate, prefix) : mobTemplate;
+  const finalMob = applyMobPrefix(mobTemplate, prefix);
 
   const combatantA: Combatant = { id: playerId, name: 'You', stats: playerStats };
   const combatantB: Combatant = {
     id: mob.id,
-    name: prefix ? `${prefix} ${mob.name}` : mob.name,
+    name: finalMob.mobDisplayName,
     stats: mobToCombatantStats(finalMob),
   };
 

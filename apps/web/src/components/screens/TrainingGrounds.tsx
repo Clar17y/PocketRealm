@@ -6,8 +6,10 @@ import { PixelButton } from '@/components/PixelButton';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { startTrainingFight, getTrainingCooldown } from '@/lib/api';
 import { Swords, Shield, AlertTriangle } from 'lucide-react';
+import { getMobPrefixDefinition } from '@adventure/shared';
 import type { CombatResult } from '@adventure/shared';
 import type { LastCombatLogEntry } from '@/app/game/useGameController';
+import { monsterImageSrc } from '@/lib/assets';
 
 interface BestiaryMob {
   id: string;
@@ -105,7 +107,8 @@ export function TrainingGrounds({
     setCombatResult(null);
 
     const prefix = selectedPrefix === 'none' ? null : selectedPrefix;
-    const displayName = prefix ? `${prefix} ${selectedMob.name}` : selectedMob.name;
+    const prefixDef = getMobPrefixDefinition(prefix);
+    const displayName = prefixDef ? `${prefixDef.displayName} ${selectedMob.name}` : selectedMob.name;
     setMobDisplayName(displayName);
 
     const result = await startTrainingFight(selectedMob.id, prefix);
@@ -171,6 +174,7 @@ export function TrainingGrounds({
         <PixelCard>
           <CombatPlayback
             mobDisplayName={mobDisplayName}
+            mobImageSrc={selectedMob ? monsterImageSrc(selectedMob.name) : undefined}
             outcome={combatResult.outcome}
             playerMaxHp={combatResult.combatantAMaxHp}
             playerStartHp={combatResult.combatantAMaxHp}
