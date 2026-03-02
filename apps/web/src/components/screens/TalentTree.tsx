@@ -252,7 +252,7 @@ export function TalentTree({
                           </span>
                           {isAllocated && (
                             <span className="text-[10px] font-bold text-[var(--rpg-green-light)] uppercase">
-                              Allocated
+                              Allocated ({allocations[node.id]})
                             </span>
                           )}
                         </div>
