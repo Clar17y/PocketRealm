@@ -16,6 +16,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerGuildId } from '../services/guildService';
 import { incrementContractProgress } from '../services/guildContractService';
 import { getSkillLevel } from '../services/combatStatsService';
+import { getPlayerProgressionState } from '../services/attributesService';
 import { calculateMaxStamina, calculateMaxMana } from '@adventure/game-engine';
 
 export const bossRouter = Router();
@@ -175,12 +176,14 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
     const hpState = await assertNotRecovering(playerId);
 
     // Compute resource pools from skill levels
-    const [meleeLevel, rangedLevel, magicLevel] = await Promise.all([
+    const [meleeLevel, rangedLevel, magicLevel, progression] = await Promise.all([
       getSkillLevel(playerId, 'melee'),
       getSkillLevel(playerId, 'ranged'),
       getSkillLevel(playerId, 'magic'),
+      getPlayerProgressionState(playerId),
     ]);
-    const maxStamina = calculateMaxStamina({ meleeLevel, rangedLevel, evasionLevel: 0, equipmentStaminaBonus: 0 });
+    const evasionLevel = progression.attributes.evasion;
+    const maxStamina = calculateMaxStamina({ meleeLevel, rangedLevel, evasionLevel, equipmentStaminaBonus: 0 });
     const maxMana = calculateMaxMana({ magicLevel, equipmentManaBonus: 0 });
 
     const participant = await signUpForBossRound(

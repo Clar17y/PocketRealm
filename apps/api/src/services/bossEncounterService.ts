@@ -434,7 +434,7 @@ export async function resolveBossRound(
         data: {
           totalDamage: { increment: pr.damageDealt },
           totalHealing: { increment: pr.healingDone },
-          attacks: { increment: pr.actionId !== 'defend' && pr.damageDealt >= 0 ? 1 : 0 },
+          attacks: { increment: pr.damageDealt > 0 ? 1 : (pr.hit === false && pr.actionId !== 'defend' ? 1 : 0) },
           hits: { increment: pr.hit ? 1 : 0 },
           crits: { increment: pr.isCritical ? 1 : 0 },
           currentHp: pr.hpAfter,
@@ -562,12 +562,23 @@ export async function resolveBossRound(
         });
       }
     }
+    // Resolve attack skill for each contributor
+    await Promise.all(
+      Array.from(contributorMap.keys()).map(async (playerId) => {
+        const entry = contributorMap.get(playerId)!;
+        if (!entry.attackSkill) {
+          const mainHandSkill = await getMainHandAttackSkill(playerId);
+          entry.attackSkill = mainHandSkill ?? 'melee';
+        }
+      }),
+    );
     const contributors = Array.from(contributorMap.entries()).map(([playerId, stats]) => ({
       playerId,
       totalDamage: stats.totalDamage,
       totalHealing: stats.totalHealing,
       damageAbsorbed: stats.damageAbsorbed,
       roundsSurvived: stats.roundsSurvived,
+      attackSkill: stats.attackSkill,
     }));
     const rewardsByPlayer = await distributeBossLoot(encounter.mobTemplateId, encounter.mobTemplate.level ?? 1, contributors, zoneTier);
     await prisma.bossEncounter.update({

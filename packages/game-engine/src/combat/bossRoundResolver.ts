@@ -257,13 +257,16 @@ export function resolveBossRound(
 
     if (bossActionDef.category === 'offensive' || bossActionDef.actionType === 'debuff_spell') {
       let targets: string[] = [];
+      const currentAggroHolder = getSingleTarget(input.threatTable, aliveAfterSupport);
 
       if (bossTargetMode === 'single_target') {
-        const target = getSingleTarget(input.threatTable, aliveAfterSupport);
-        if (target) targets = [target];
+        if (currentAggroHolder) targets = [currentAggroHolder];
       } else {
         targets = Array.from(aliveAfterSupport);
       }
+
+      const bossIsMagic = bossActionDef.damageType === 'magic';
+      const bossIsPhysical = !bossIsMagic;
 
       for (const targetId of targets) {
         bossTargetPlayerIds.push(targetId);
@@ -273,20 +276,13 @@ export function resolveBossRound(
 
         const stance = defStances.get(targetId);
 
-        // Check defensive stances
-        const bossIsMagic = bossActionDef.damageType === 'magic';
-        const bossIsPhysical = !bossIsMagic;
-
         if (stance?.avoidsPhysical && bossIsPhysical) {
-          // Counter blocks physical — no damage
           continue;
         }
         if (stance?.resistsMagic && bossIsMagic) {
-          // Ward blocks magic — no damage
           continue;
         }
 
-        // Roll boss damage
         const bossDmgRaw = roll.rollDamage(bossStats.damageMin, bossStats.damageMax);
         const scaledBossDmg = Math.floor(bossDmgRaw * (bossActionDef.damageMultiplier ?? 1.0));
         const effectivePlayerDefence = bossIsMagic
@@ -295,7 +291,6 @@ export function resolveBossRound(
 
         let damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, scaledBossDmg - effectivePlayerDefence);
 
-        // Apply Defend damage reduction
         if (stance?.damageReductionPercent && stance.damageReductionPercent > 0) {
           damage = Math.floor(damage * (1 - stance.damageReductionPercent));
           damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, damage);
@@ -304,8 +299,6 @@ export function resolveBossRound(
         targetState.damageTaken += damage;
         targetState.hp = Math.max(0, targetState.hp - damage);
 
-        // Track damage absorbed if this target is the aggro holder
-        const currentAggroHolder = getSingleTarget(input.threatTable, aliveAfterSupport);
         if (targetId === currentAggroHolder) {
           targetState.damageAbsorbed += damage;
         }
