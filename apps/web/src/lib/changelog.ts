@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.21',
+    date: '2026-03-02',
+    title: 'Casino & Training Grounds',
+    summary:
+      'A brand new Casino has opened in every town! Exchange turns for gold and play roulette against other players — bet on numbers, colours, corners, and more. Watch chips pile up on the board in real-time, chat with fellow gamblers, and celebrate wins with a gold coin shower. The dealer announces results and calls out big winners. A Hot/Cold stats panel shows which numbers are running hot or cold over the last 200 spins. Casino leaderboards track total profit and wagered volume. 10 new casino achievements reward your gambling career. The Training Grounds let you practice against any monster from your bestiary with mob prefix variants — no turn cost, no risk. Both screens include first-visit how-to guides.',
+  },
+  {
     version: '0.20',
     date: '2026-03-01',
     title: 'Inventory & Backpack System',
