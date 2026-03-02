@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { getSocket } from '@/lib/socket';
 import type {
   CasinoPhaseEvent,
@@ -54,10 +54,13 @@ export function useCasinoSocket(
     ]);
   }, []);
 
-  const sessionProfit = sessionBets.reduce((sum, b) => {
-    if (b.payout === null) return sum;
-    return sum + (b.payout - b.amount);
-  }, 0);
+  const sessionProfit = useMemo(
+    () => sessionBets.reduce((sum, b) => {
+      if (b.payout === null) return sum;
+      return sum + (b.payout - b.amount);
+    }, 0),
+    [sessionBets],
+  );
 
   useEffect(() => {
     if (!active) return;
@@ -99,12 +102,12 @@ export function useCasinoSocket(
         }
       }
 
-      // Resolve session bets for this round
+      // Resolve session bets for this round — match on betType + betValue + amount
       setSessionBets((prev) =>
         prev.map((b) => {
           if (b.payout !== null || b.roundId !== roundIdRef.current) return b;
           const myWin = e.winningBets.find(
-            (wb) => wb.betType === b.betType && wb.amount === b.amount,
+            (wb) => wb.betType === b.betType && wb.betValue === b.betValue && wb.amount === b.amount,
           );
           return { ...b, payout: myWin ? myWin.payout : 0 };
         }),

@@ -9,7 +9,7 @@ export const chatRouter = Router();
 chatRouter.use(authenticate);
 
 const historyQuerySchema = z.object({
-  channelType: z.enum(['world', 'zone', 'guild']),
+  channelType: z.enum(['world', 'zone', 'guild', 'casino']),
   channelId: z.string().min(1).max(64),
 });
 

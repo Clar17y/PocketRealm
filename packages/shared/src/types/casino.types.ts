@@ -86,6 +86,7 @@ export interface CasinoBetEvent {
 export interface CasinoWinningBet {
   playerName: string;
   betType: RouletteBetType;
+  betValue: string;
   amount: number;
   payout: number;
 }

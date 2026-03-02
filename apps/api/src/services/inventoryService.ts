@@ -145,12 +145,18 @@ export async function consumeItemsByTemplateTx(
   await consumeItemsByTemplateWithClient(tx, playerId, itemTemplateId, quantity);
 }
 
-/** Throws if player's used slots exceed capacity (over-encumbered). */
-export async function assertNotOverEncumbered(playerId: string): Promise<void> {
+/** Fetch current slot usage and capacity in a single parallel call. */
+export async function getInventoryState(playerId: string): Promise<{ usedSlots: number; capacity: number; availableSlots: number }> {
   const [usedSlots, capacity] = await Promise.all([
     getUsedSlots(playerId),
     getPlayerCapacity(playerId),
   ]);
+  return { usedSlots, capacity, availableSlots: Math.max(0, capacity - usedSlots) };
+}
+
+/** Throws if player's used slots exceed capacity (over-encumbered). */
+export async function assertNotOverEncumbered(playerId: string): Promise<void> {
+  const { usedSlots, capacity } = await getInventoryState(playerId);
   if (usedSlots > capacity) {
     throw new AppError(
       400,

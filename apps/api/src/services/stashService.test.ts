@@ -8,21 +8,18 @@ vi.mock('./inventoryService', async (importOriginal) => {
   const original = await importOriginal<typeof import('./inventoryService')>();
   return {
     ...original,
-    getUsedSlots: vi.fn(),
-    getPlayerCapacity: vi.fn(),
+    getInventoryState: vi.fn(),
   };
 });
 
-import { getUsedSlots, getPlayerCapacity } from './inventoryService';
+import { getInventoryState } from './inventoryService';
 
-const mockGetUsedSlots = getUsedSlots as ReturnType<typeof vi.fn>;
-const mockGetPlayerCapacity = getPlayerCapacity as ReturnType<typeof vi.fn>;
+const mockGetInventoryState = getInventoryState as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   // Default: backpack has space
-  mockGetUsedSlots.mockResolvedValue(5);
-  mockGetPlayerCapacity.mockResolvedValue(24);
+  mockGetInventoryState.mockResolvedValue({ usedSlots: 5, capacity: 24, availableSlots: 19 });
 });
 
 function makeItem(overrides: Record<string, unknown> = {}) {
@@ -140,8 +137,7 @@ describe('withdrawItem', () => {
   });
 
   it('throws when backpack is full', async () => {
-    mockGetUsedSlots.mockResolvedValue(24);
-    mockGetPlayerCapacity.mockResolvedValue(24);
+    mockGetInventoryState.mockResolvedValue({ usedSlots: 24, capacity: 24, availableSlots: 0 });
 
     await expect(withdrawItem('p1', 'item-1')).rejects.toThrow('Backpack is full');
   });

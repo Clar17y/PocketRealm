@@ -259,7 +259,8 @@ export function Casino({
         payout: myWinnings,
         isBigWin: myWinnings >= CASINO_CONSTANTS.BIG_WIN_THRESHOLD,
       });
-      setTimeout(() => setWinAnimation(null), 2500);
+      const timer = setTimeout(() => setWinAnimation(null), 2500);
+      return () => clearTimeout(timer);
     }
   }, [lastResult, sessionBets]);
 
@@ -488,7 +489,11 @@ export function Casino({
                     transform: 'translate(-50%, -50%)',
                   }}
                   title={`Corner: ${corner.numbers.join(', ')}`}
-                />
+                >
+                  {chipMap.has(`corner:${corner.value}`) && (
+                    <ChipStackIndicator {...chipMap.get(`corner:${corner.value}`)!} />
+                  )}
+                </button>
               ))}
             </div>
 

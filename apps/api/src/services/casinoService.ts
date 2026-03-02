@@ -108,7 +108,7 @@ async function resolveRound(roundId: string): Promise<number> {
   const updates = bets.map((bet) => {
     const won = isWinningBet(bet.betType as RouletteBetType, bet.betValue, result);
     const payout = won ? calculatePayout(bet.betType as RouletteBetType, bet.amount) : 0;
-    return { id: bet.id, playerId: bet.playerId, payout, won, username: bet.player.username, betType: bet.betType, amount: bet.amount };
+    return { id: bet.id, playerId: bet.playerId, payout, won, username: bet.player.username, betType: bet.betType, betValue: bet.betValue, amount: bet.amount };
   });
 
   await prisma.$transaction(async (tx) => {
@@ -145,6 +145,7 @@ async function resolveRound(roundId: string): Promise<number> {
       .map((b) => ({
         playerName: b.username,
         betType: b.betType as RouletteBetType,
+        betValue: b.betValue,
         amount: b.amount,
         payout: b.payout,
       }));
@@ -268,7 +269,7 @@ export async function placeBet(
   const result = await prisma.$transaction(async (tx) => {
     const player = await tx.player.findUnique({
       where: { id: playerId },
-      select: { gold: true },
+      select: { gold: true, username: true },
     });
     if (!player || player.gold < amount) {
       throw new AppError(400, 'Insufficient gold', 'INSUFFICIENT_GOLD');
@@ -283,17 +284,13 @@ export async function placeBet(
       data: { roundId, playerId, betType, betValue, amount },
     });
 
-    return { roundId, goldRemaining: player.gold - amount };
+    return { roundId, goldRemaining: player.gold - amount, username: player.username };
   });
 
   const io = getIo();
   if (io) {
-    const betPlayer = await prisma.player.findUnique({
-      where: { id: playerId },
-      select: { username: true },
-    });
     const betEvent: CasinoBetEvent = {
-      playerName: betPlayer?.username ?? 'Unknown',
+      playerName: result.username,
       playerId,
       betType,
       betValue,

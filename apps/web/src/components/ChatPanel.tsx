@@ -14,9 +14,12 @@ interface ChatPanelProps {
   setActiveChannel: (ch: ChatChannel) => void;
   worldMessages: ChatMessageEvent[];
   zoneMessages: ChatMessageEvent[];
+  casinoMessages: ChatMessageEvent[];
   presence: ChatPresenceEvent;
   unreadWorld: number;
   unreadZone: number;
+  unreadCasino: number;
+  casinoActive: boolean;
   sendMessage: (text: string) => void;
   rateLimitError: string | null;
   currentZoneId: string | null;
@@ -32,9 +35,12 @@ export function ChatPanel({
   setActiveChannel,
   worldMessages,
   zoneMessages,
+  casinoMessages,
   presence,
   unreadWorld,
   unreadZone,
+  unreadCasino,
+  casinoActive,
   sendMessage,
   rateLimitError,
   currentZoneId,
@@ -47,7 +53,9 @@ export function ChatPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const messages = activeChannel === 'world' ? worldMessages : zoneMessages;
+  const messages = activeChannel === 'world' ? worldMessages
+    : activeChannel === 'casino' ? casinoMessages
+    : zoneMessages;
   const pinnedId = pinnedMessage?.id;
 
   // Reset dismiss when a new pin arrives
@@ -77,7 +85,7 @@ export function ChatPanel({
     setInput('');
   };
 
-  const totalUnread = unreadWorld + unreadZone;
+  const totalUnread = unreadWorld + unreadZone + unreadCasino;
   const worldOnline = presence.worldOnline;
   const zoneOnline = currentZoneId ? (presence.zoneOnline[currentZoneId] ?? 0) : 0;
 
@@ -135,6 +143,23 @@ export function ChatPanel({
               </span>
             )}
           </button>
+          {casinoActive && (
+            <button
+              onClick={() => setActiveChannel('casino')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ml-1 ${
+                activeChannel === 'casino'
+                  ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
+                  : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+              }`}
+            >
+              Casino
+              {unreadCasino > 0 && activeChannel !== 'casino' && (
+                <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full bg-[var(--rpg-red)] text-[9px] text-white px-0.5">
+                  {unreadCasino}
+                </span>
+              )}
+            </button>
+          )}
           <button
             onClick={toggleChat}
             className="ml-auto p-1 text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors"

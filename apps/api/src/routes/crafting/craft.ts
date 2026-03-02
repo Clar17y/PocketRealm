@@ -15,7 +15,7 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { consumeItemsByTemplateTx, getTotalQuantityByTemplate, getUsedSlots, getPlayerCapacity } from '../../services/inventoryService';
+import { consumeItemsByTemplateTx, getTotalQuantityByTemplate, getInventoryState } from '../../services/inventoryService';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
@@ -112,20 +112,14 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
       });
       if (!existingStack) {
-        const [usedSlots, capacity] = await Promise.all([
-          getUsedSlots(playerId),
-          getPlayerCapacity(playerId),
-        ]);
-        if (usedSlots + 1 > capacity) {
+        const { availableSlots } = await getInventoryState(playerId);
+        if (availableSlots < 1) {
           throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
         }
       }
     } else {
-      const [usedSlots, capacity] = await Promise.all([
-        getUsedSlots(playerId),
-        getPlayerCapacity(playerId),
-      ]);
-      if (usedSlots + quantity > capacity) {
+      const { availableSlots } = await getInventoryState(playerId);
+      if (availableSlots < quantity) {
         throw new AppError(400, 'Backpack is full. Make space before crafting.', 'BACKPACK_FULL');
       }
     }

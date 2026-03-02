@@ -2292,6 +2292,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     inventoryCapacity,
     inventoryUsedSlots,
     isOverEncumbered: inventoryUsedSlots > inventoryCapacity,
+    backpackFull: inventoryUsedSlots >= inventoryCapacity,
     pendingLootSession,
     handleSellItem,
     handleSellBatch,

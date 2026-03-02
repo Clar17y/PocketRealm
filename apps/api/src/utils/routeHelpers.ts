@@ -70,8 +70,10 @@ export async function assertNotRecovering(playerId: string): Promise<Awaited<Ret
 
 /** Combined pre-flight guard: not recovering + not over-encumbered. */
 export async function assertCanAct(playerId: string): Promise<Awaited<ReturnType<typeof getHpState>>> {
-  const hpState = await assertNotRecovering(playerId);
-  await assertNotOverEncumbered(playerId);
+  const [hpState] = await Promise.all([
+    assertNotRecovering(playerId),
+    assertNotOverEncumbered(playerId),
+  ]);
   return hpState;
 }
 

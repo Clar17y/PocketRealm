@@ -1,6 +1,6 @@
 import { prisma, Prisma } from '@adventure/database';
 import { AppError } from '../middleware/errorHandler';
-import { getUsedSlots, getPlayerCapacity } from './inventoryService';
+import { getInventoryState } from './inventoryService';
 
 // Shared logic for moving stackable items between backpack (inStash=false) and stash (inStash=true)
 async function moveStackableItem(
@@ -73,10 +73,7 @@ export async function withdrawItem(
   quantity?: number
 ): Promise<void> {
   // Capacity check before transaction (low-concurrency single-player context)
-  const [usedSlots, capacity] = await Promise.all([
-    getUsedSlots(playerId),
-    getPlayerCapacity(playerId),
-  ]);
+  const { usedSlots, capacity } = await getInventoryState(playerId);
 
   if (usedSlots >= capacity) {
     throw new AppError(400, 'Backpack is full', 'BACKPACK_FULL');
@@ -124,12 +121,7 @@ export async function withdrawBatch(
   playerId: string,
   itemIds: string[]
 ): Promise<{ withdrawnCount: number }> {
-  const [usedSlots, capacity] = await Promise.all([
-    getUsedSlots(playerId),
-    getPlayerCapacity(playerId),
-  ]);
-
-  let availableSlots = capacity - usedSlots;
+  let { availableSlots } = await getInventoryState(playerId);
 
   return prisma.$transaction(async (tx) => {
     let withdrawnCount = 0;

@@ -47,7 +47,7 @@ import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
 import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
 import { grantCacheLootTx } from '../../services/cacheLootService';
-import { getUsedSlots, getPlayerCapacity } from '../../services/inventoryService';
+import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import {
@@ -758,11 +758,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const refundedTurns = refundAmount > 0 ? await refundPlayerTurns(playerId, refundAmount) : null;
 
     // Compute available slots for capacity-aware cache loot
-    const [usedSlots, capacity] = await Promise.all([
-      getUsedSlots(playerId),
-      getPlayerCapacity(playerId),
-    ]);
-    let availableSlots = Math.max(0, capacity - usedSlots);
+    let { availableSlots } = await getInventoryState(playerId);
 
     const persisted = await prisma.$transaction(async (tx) => {
       const txAny = tx as unknown as any;

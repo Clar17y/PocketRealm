@@ -913,8 +913,8 @@ export function Inventory({
               </div>
             )}
 
-            {/* Sell + Deposit row for equipment */}
-            {isEquipment && (canSell || canDeposit) && (
+            {/* Sell + Deposit row */}
+            {(canSell || canDeposit) && (
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {canSell && (
                   <PixelButton
@@ -978,41 +978,6 @@ export function Inventory({
                 >
                   Drop
                 </PixelButton>
-              </div>
-            )}
-
-            {/* Sell + Deposit row for consumables / materials */}
-            {!isEquipment && (canSell || canDeposit) && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {canSell && (
-                  <PixelButton
-                    variant="gold"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => tryAction('sell', selectedItem)}
-                  >
-                    Sell
-                  </PixelButton>
-                )}
-                {canDeposit && (
-                  <PixelButton
-                    variant="secondary"
-                    size="sm"
-                    disabled={busy}
-                    onClick={async () => {
-                      if (!onDeposit) return;
-                      setBusy(true);
-                      try {
-                        await onDeposit(selectedItem.id);
-                        setSelectedItem(null);
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
-                  >
-                    Stash
-                  </PixelButton>
-                )}
               </div>
             )}
 
