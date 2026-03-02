@@ -36,6 +36,10 @@ export function isWinningBet(betType: RouletteBetType, betValue: string, result:
       if (betValue === 'col3') return col === 3;
       return false;
     }
+    case 'corner': {
+      const nums = betValue.split(',').map(Number);
+      return nums.includes(result);
+    }
     default:
       return false;
   }
@@ -67,6 +71,16 @@ const VALID_SPLITS = new Set<string>();
   VALID_SPLITS.add('0,1');
   VALID_SPLITS.add('0,2');
   VALID_SPLITS.add('0,3');
+})();
+
+// Valid corner bet positions: 4 adjacent numbers on the 3-column × 12-row grid
+const VALID_CORNERS = new Set<string>();
+(function initCorners() {
+  for (let row = 0; row < 11; row++) {
+    const topLeft = row * 3 + 1;
+    VALID_CORNERS.add(`${topLeft},${topLeft + 1},${topLeft + 3},${topLeft + 4}`);
+    VALID_CORNERS.add(`${topLeft + 1},${topLeft + 2},${topLeft + 4},${topLeft + 5}`);
+  }
 })();
 
 export interface BetValidation {
@@ -106,6 +120,13 @@ export function validateBet(betType: RouletteBetType, betValue: string, amount: 
     case 'column':
       if (!['col1', 'col2', 'col3'].includes(betValue)) return { valid: false, error: 'Invalid column' };
       return { valid: true };
+    case 'corner': {
+      const nums = betValue.split(',').map(Number);
+      if (nums.length !== 4 || nums.some(isNaN)) return { valid: false, error: 'Corner bet requires 4 numbers' };
+      const sorted = [...nums].sort((a, b) => a - b).join(',');
+      if (!VALID_CORNERS.has(sorted)) return { valid: false, error: 'Invalid corner position' };
+      return { valid: true };
+    }
     default:
       return { valid: false, error: 'Invalid bet type' };
   }

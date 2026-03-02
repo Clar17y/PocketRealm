@@ -57,6 +57,11 @@ describe('isWinningBet', () => {
     expect(isWinningBet('column', 'col3', 3)).toBe(true);
     expect(isWinningBet('column', 'col1', 0)).toBe(false);
   });
+  it('corner: wins if result matches any of 4 numbers', () => {
+    expect(isWinningBet('corner', '1,2,4,5', 1)).toBe(true);
+    expect(isWinningBet('corner', '1,2,4,5', 5)).toBe(true);
+    expect(isWinningBet('corner', '1,2,4,5', 3)).toBe(false);
+  });
 });
 
 describe('calculatePayout', () => {
@@ -76,6 +81,9 @@ describe('calculatePayout', () => {
   it('dozen/column pays 2:1', () => {
     expect(calculatePayout('dozen', 10)).toBe(30);
     expect(calculatePayout('column', 10)).toBe(30);
+  });
+  it('corner pays 9:1', () => {
+    expect(calculatePayout('corner', 10)).toBe(90);
   });
 });
 
@@ -100,6 +108,14 @@ describe('validateBet', () => {
     expect(validateBet('straight', '17', 10).valid).toBe(true);
     expect(validateBet('red', 'red', 50).valid).toBe(true);
     expect(validateBet('dozen', '1-12', 100).valid).toBe(true);
+  });
+  it('validates corner bets with 4 adjacent numbers', () => {
+    const valid = validateBet('corner', '1,2,4,5', 10);
+    expect(valid.valid).toBe(true);
+  });
+  it('rejects non-adjacent corner bets', () => {
+    const invalid = validateBet('corner', '1,2,3,4', 10);
+    expect(invalid.valid).toBe(false);
   });
 });
 
