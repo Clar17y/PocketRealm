@@ -23,6 +23,8 @@ interface CombatPlaybackProps {
   rewards?: LastCombat['rewards'];
   activeEvents?: CombatActiveEvent[];
   playerLabel?: string;
+  playerMaxStamina?: number;
+  playerMaxMana?: number;
   defeatButtonLabel?: string;
   speedMs?: number;
   autoSkip?: boolean;
@@ -41,6 +43,8 @@ export function CombatPlayback({
   rewards,
   activeEvents,
   playerLabel = 'You',
+  playerMaxStamina = 100,
+  playerMaxMana = 50,
   defeatButtonLabel,
   speedMs = 800,
   autoSkip = false,
@@ -185,9 +189,9 @@ export function CombatPlayback({
             currentHp={currentPlayerHp}
             maxHp={playerMaxHp}
             currentStamina={currentStamina}
-            maxStamina={100}
+            maxStamina={playerMaxStamina}
             currentMana={currentMana}
-            maxMana={100}
+            maxMana={playerMaxMana}
             compact
           />
         </div>

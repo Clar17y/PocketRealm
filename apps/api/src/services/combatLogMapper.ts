@@ -7,7 +7,19 @@ import { getActionDefinition } from '@adventure/shared';
  * Engine produces: combatantAAction, combatantAStaminaAfter, combatantBManaAfter, etc.
  * Frontend expects: actionName, staminaAfter, manaAfter, staminaCost, manaCost, etc.
  */
-export function mapTemplateCombatLog(log: any[]): any[] {
+interface TemplateCombatFields {
+  actor?: string;
+  combatantAAction?: string;
+  combatantBAction?: string;
+  combatantAStaminaAfter?: number;
+  combatantBStaminaAfter?: number;
+  combatantAManaAfter?: number;
+  combatantBManaAfter?: number;
+  wasExhausted?: boolean;
+  interactionResult?: string;
+}
+
+export function mapTemplateCombatLog<T extends TemplateCombatFields>(log: T[]): T[] {
   return log.map(entry => {
     if (!entry.combatantAAction && !entry.combatantBAction) return entry;
 

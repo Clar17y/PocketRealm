@@ -363,6 +363,8 @@ export function CombatScreen({
                   log={combatPlaybackData.log}
                   rewards={combatPlaybackData.rewards}
                   activeEvents={combatPlaybackData.activeEvents}
+                  playerMaxStamina={staminaState?.max}
+                  playerMaxMana={manaState?.max}
                   speedMs={combatSpeedMs}
                   autoSkip={autoSkipCombat}
                   onComplete={onCombatPlaybackComplete ?? (() => {})}
