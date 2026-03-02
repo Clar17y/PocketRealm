@@ -2,12 +2,25 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../utils/asyncHandler';
+import { prisma } from '@adventure/database';
 import { exchangeTurnsForGold, getCurrentRound, placeBet, getRouletteHistory, getRouletteStats } from '../services/casinoService';
-import { assertInTown } from '../utils/routeHelpers.js';
+import { assertInTown, trackAchievements } from '../utils/routeHelpers.js';
+import { checkAchievements, emitAchievementNotifications } from '../services/achievementService.js';
 import type { RouletteBetType } from '@adventure/shared';
 
 export const casinoRouter = Router();
 casinoRouter.use(authenticate);
+
+async function updatePeakGold(playerId: string, currentGold: number): Promise<void> {
+  await prisma.$executeRaw`
+    INSERT INTO player_stats (player_id, peak_gold_held)
+    VALUES (${playerId}, ${currentGold})
+    ON CONFLICT (player_id)
+    DO UPDATE SET peak_gold_held = GREATEST(player_stats.peak_gold_held, ${currentGold})
+  `;
+  const achievements = await checkAchievements(playerId, { statKeys: ['peakGoldHeld'] });
+  if (achievements.length > 0) await emitAchievementNotifications(playerId, achievements);
+}
 
 const exchangeSchema = z.object({
   turns: z.number().int().positive(),
@@ -19,6 +32,10 @@ casinoRouter.post('/exchange', asyncHandler(async (req, res) => {
   await assertInTown(playerId);
 
   const result = await exchangeTurnsForGold(playerId, turns);
+
+  await trackAchievements(playerId, { totalTurnsExchanged: turns });
+  await updatePeakGold(playerId, result.goldBalance);
+
   res.json(result);
 }));
 
@@ -39,6 +56,12 @@ casinoRouter.post('/roulette/bet', asyncHandler(async (req, res) => {
   await assertInTown(playerId);
 
   const result = await placeBet(playerId, betType as RouletteBetType, betValue, amount);
+
+  await trackAchievements(playerId, {
+    totalBetsPlaced: 1,
+    totalGoldWagered: amount,
+  }, { statKeys: ['totalBetsPlaced', 'totalGoldWagered'] });
+
   res.json(result);
 }));
 

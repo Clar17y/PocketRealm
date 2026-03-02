@@ -718,6 +718,10 @@ model PlayerStats {
   totalTurnsSpent         Int      @default(0) @map("total_turns_spent")
   totalDeaths             Int      @default(0) @map("total_deaths")
   tutorialCompleted       Int      @default(0) @map("tutorial_completed")
+  totalBetsPlaced         Int      @default(0) @map("total_bets_placed")
+  totalGoldWagered        Int      @default(0) @map("total_gold_wagered")
+  totalTurnsExchanged     Int      @default(0) @map("total_turns_exchanged")
+  peakGoldHeld            Int      @default(0) @map("peak_gold_held")
   updatedAt               DateTime @updatedAt @map("updated_at")
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
