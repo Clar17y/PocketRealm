@@ -4,7 +4,9 @@ import { useState, useMemo, useCallback } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Lock, CheckCircle, Sparkles, Zap } from 'lucide-react';
+import { SKILL_POINT_CONSTANTS } from '@adventure/shared';
 import type { TalentNodeDefinition, TalentTree as TalentTreeName } from '@adventure/shared';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import type { SkillPointState } from '@/lib/api';
 import type { Screen } from '@/app/game/useGameController';
 
@@ -23,7 +25,7 @@ const TREE_TABS: { id: TalentTreeName; label: string; color: string }[] = [
   { id: 'general', label: 'General', color: 'var(--rpg-gold)' },
 ];
 
-const RESPEC_TURN_COST = 500;
+const RESPEC_TURN_COST = SKILL_POINT_CONSTANTS.RESPEC_TURN_COST;
 
 function groupNodesByTier(nodes: TalentNodeDefinition[]): Map<number, TalentNodeDefinition[]> {
   const map = new Map<number, TalentNodeDefinition[]>();
@@ -314,43 +316,27 @@ export function TalentTree({
 
       {/* Respec button */}
       <div className="pt-2">
-        {!confirmRespec ? (
-          <PixelButton
-            variant="danger"
-            size="sm"
-            onClick={() => setConfirmRespec(true)}
-            className="w-full"
-            disabled={skillPointState.totalPointsSpent === 0}
-          >
-            Respec ({RESPEC_TURN_COST} turns)
-          </PixelButton>
-        ) : (
-          <PixelCard padding="sm">
-            <p className="text-sm text-[var(--rpg-text-primary)] mb-2">
-              Reset all talent allocations? This costs <span className="font-bold text-[var(--rpg-gold)]">{RESPEC_TURN_COST} turns</span>.
-            </p>
-            <div className="flex gap-2">
-              <PixelButton
-                variant="secondary"
-                size="sm"
-                onClick={() => setConfirmRespec(false)}
-                className="flex-1"
-              >
-                Cancel
-              </PixelButton>
-              <PixelButton
-                variant="danger"
-                size="sm"
-                onClick={handleRespec}
-                disabled={respeccing}
-                className="flex-1"
-              >
-                {respeccing ? 'Respeccing...' : 'Confirm Respec'}
-              </PixelButton>
-            </div>
-          </PixelCard>
-        )}
+        <PixelButton
+          variant="danger"
+          size="sm"
+          onClick={() => setConfirmRespec(true)}
+          className="w-full"
+          disabled={skillPointState.totalPointsSpent === 0 || respeccing}
+        >
+          {respeccing ? 'Respeccing...' : `Respec (${RESPEC_TURN_COST.toLocaleString()} turns)`}
+        </PixelButton>
       </div>
+
+      {confirmRespec && (
+        <ConfirmModal
+          title="Respec Talents"
+          message={`Reset all talent allocations? This will cost ${RESPEC_TURN_COST.toLocaleString()} turns and refund all spent skill points.`}
+          confirmLabel="Respec"
+          variant="danger"
+          onConfirm={handleRespec}
+          onCancel={() => setConfirmRespec(false)}
+        />
+      )}
     </div>
   );
 }
