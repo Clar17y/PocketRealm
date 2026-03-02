@@ -1,15 +1,9 @@
 import { fetchApi } from './core';
-
-export interface ResourcePoolState {
-  current: number;
-  max: number;
-  regenPerRound: number;
-  regenPerSecond: number;
-}
+import type { ResourceState } from '@adventure/shared';
 
 export interface CombatResourceResponse {
-  stamina: ResourcePoolState;
-  mana: ResourcePoolState;
+  stamina: ResourceState;
+  mana: ResourceState;
 }
 
 export async function getResources() {

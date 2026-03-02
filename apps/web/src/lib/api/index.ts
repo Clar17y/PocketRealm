@@ -138,7 +138,7 @@ export type {
 } from './social';
 
 export { getResources } from './resources';
-export type { ResourcePoolState, CombatResourceResponse } from './resources';
+export type { CombatResourceResponse } from './resources';
 
 export {
   adminGrantTurns,
@@ -179,7 +179,6 @@ export {
   deleteTemplate,
   activateTemplate,
 } from './templates';
-export type { TemplateAction, TemplateResponse } from './templates';
 
 export {
   getPlayerGuild,

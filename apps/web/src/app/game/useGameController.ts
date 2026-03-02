@@ -73,15 +73,14 @@ import {
   respecSkillPoints,
   getTemplates,
   type PendingLootItem,
-  type TemplateResponse,
   type AchievementsResponse,
   type EventModifierBadge,
   type CombatActiveEvent,
   type PlayerSettings,
   type WorldEventResponse,
-  type ResourcePoolState,
   type SkillPointState,
 } from '@/lib/api';
+import type { CombatTemplateData, ResourceState } from '@adventure/shared';
 import { getSocket } from '@/lib/socket';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 
@@ -513,10 +512,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     discovered: boolean;
   }>>([]);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
-  const [staminaState, setStaminaState] = useState<ResourcePoolState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 });
-  const [manaState, setManaState] = useState<ResourcePoolState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5 });
+  const [staminaState, setStaminaState] = useState<ResourceState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 });
+  const [manaState, setManaState] = useState<ResourceState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5 });
   const [skillPointState, setSkillPointState] = useState<SkillPointState | null>(null);
-  const [templates, setTemplates] = useState<TemplateResponse[]>([]);
+  const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
   const [autoPotionThreshold, setAutoPotionThreshold] = useState(0);

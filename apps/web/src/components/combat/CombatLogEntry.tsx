@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { LastCombatLogEntry } from '@/app/game/useGameController';
 import { BASE_ACTION_DEFINITIONS } from '@adventure/shared';
+import { ACTION_CATEGORY_COLORS } from '@/lib/categoryColors';
 
 function isMagicDamage(entry: LastCombatLogEntry): boolean {
   return entry.targetMagicDefence !== undefined || entry.magicDefenceReduction !== undefined || entry.action === 'spell';
@@ -31,15 +32,13 @@ function getActionCategoryColor(entry: LastCombatLogEntry): string {
   // Look up in BASE_ACTION_DEFINITIONS first
   if (entry.actionId && BASE_ACTION_DEFINITIONS[entry.actionId]) {
     const category = BASE_ACTION_DEFINITIONS[entry.actionId].category;
-    if (category === 'offensive') return 'text-[var(--rpg-green-light)]';
-    if (category === 'supportive') return 'text-[var(--rpg-blue-light)]';
-    if (category === 'defensive') return 'text-[var(--rpg-gold)]';
+    return `text-[${ACTION_CATEGORY_COLORS[category]}]`;
   }
   // Infer from action field
   const action = entry.action;
-  if (action === 'defend' || action === 'counter' || action === 'ward') return 'text-[var(--rpg-gold)]';
-  if (action === 'potion' || action === 'heal') return 'text-[var(--rpg-blue-light)]';
-  return 'text-[var(--rpg-green-light)]';
+  if (action === 'defend' || action === 'counter' || action === 'ward') return `text-[${ACTION_CATEGORY_COLORS.defensive}]`;
+  if (action === 'potion' || action === 'heal') return `text-[${ACTION_CATEGORY_COLORS.supportive}]`;
+  return `text-[${ACTION_CATEGORY_COLORS.offensive}]`;
 }
 
 interface CombatLogEntryProps {

@@ -10,19 +10,12 @@ import {
   deleteTemplate,
   activateTemplate,
 } from '@/lib/api';
-import type { TemplateResponse, TemplateAction } from '@/lib/api';
-import type { ResourcePoolState } from '@/lib/api';
 import type { Screen } from '@/app/game/useGameController';
 import { BASE_ACTION_DEFINITIONS } from '@adventure/shared';
-import type { ActionDefinition, ActionCategory } from '@adventure/shared';
+import type { ActionDefinition, ActionCategory, CombatTemplateData, CombatTemplateAction, ResourceState } from '@adventure/shared';
+import { ACTION_CATEGORY_COLORS } from '@/lib/categoryColors';
 
 // --- Helpers ---
-
-const CATEGORY_COLORS: Record<ActionCategory, string> = {
-  offensive: 'var(--rpg-green-light)',
-  defensive: 'var(--rpg-gold)',
-  supportive: 'var(--rpg-blue-light)',
-};
 
 const CATEGORY_ORDER: ActionCategory[] = ['offensive', 'defensive', 'supportive'];
 
@@ -30,10 +23,20 @@ function categoryBadge(category: ActionCategory) {
   return (
     <span
       className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
-      style={{ color: CATEGORY_COLORS[category], borderColor: CATEGORY_COLORS[category], borderWidth: 1 }}
+      style={{ color: ACTION_CATEGORY_COLORS[category], borderColor: ACTION_CATEGORY_COLORS[category], borderWidth: 1 }}
     >
       {category}
     </span>
+  );
+}
+
+function ActionCostLabel({ cost }: { cost: { stamina: number; mana: number } }) {
+  return (
+    <div className="flex gap-2 text-[10px] text-[var(--rpg-text-secondary)]">
+      {cost.stamina > 0 && <span>Stam: {cost.stamina}</span>}
+      {cost.mana > 0 && <span>Mana: {cost.mana}</span>}
+      {cost.stamina === 0 && cost.mana === 0 && <span>Free</span>}
+    </div>
   );
 }
 
@@ -48,10 +51,10 @@ function groupActionsByCategory(actions: ActionDefinition[]): Record<ActionCateg
 // --- Props ---
 
 interface TemplatesProps {
-  templates: TemplateResponse[];
+  templates: CombatTemplateData[];
   unlockedActions: string[];
-  staminaState: ResourcePoolState;
-  manaState: ResourcePoolState;
+  staminaState: ResourceState;
+  manaState: ResourceState;
   onLoadTemplates: () => Promise<void>;
   onNavigate: (screen: Screen) => void;
 }
@@ -66,10 +69,10 @@ export function Templates({
   onLoadTemplates,
   onNavigate,
 }: TemplatesProps) {
-  const [editingTemplate, setEditingTemplate] = useState<TemplateResponse | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<CombatTemplateData | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [editorName, setEditorName] = useState('');
-  const [editorActions, setEditorActions] = useState<TemplateAction[]>([]);
+  const [editorActions, setEditorActions] = useState<CombatTemplateAction[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +101,7 @@ export function Templates({
     setError(null);
   }, []);
 
-  const handleEdit = useCallback((t: TemplateResponse) => {
+  const handleEdit = useCallback((t: CombatTemplateData) => {
     setIsNew(false);
     setEditingTemplate(t);
     setEditorName(t.name);
@@ -201,7 +204,7 @@ export function Templates({
         </div>
         {CATEGORY_ORDER.map(cat => (
           <div key={cat}>
-            <h3 className="text-sm font-bold mb-2" style={{ color: CATEGORY_COLORS[cat] }}>
+            <h3 className="text-sm font-bold mb-2" style={{ color: ACTION_CATEGORY_COLORS[cat] }}>
               {cat.charAt(0).toUpperCase() + cat.slice(1)}
             </h3>
             <div className="space-y-1">
@@ -216,11 +219,7 @@ export function Templates({
                           <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{def.name}</span>
                         </div>
                         <p className="text-[11px] text-[var(--rpg-text-secondary)] mt-0.5 truncate">{def.description}</p>
-                        <div className="flex gap-2 mt-0.5 text-[10px] text-[var(--rpg-text-secondary)]">
-                          {def.cost.stamina > 0 && <span>Stam: {def.cost.stamina}</span>}
-                          {def.cost.mana > 0 && <span>Mana: {def.cost.mana}</span>}
-                          {def.cost.stamina === 0 && def.cost.mana === 0 && <span>Free</span>}
-                        </div>
+                        <div className="mt-0.5"><ActionCostLabel cost={def.cost} /></div>
                       </div>
                       <PixelButton
                         size="sm"
@@ -297,11 +296,7 @@ export function Templates({
                         <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{def.name}</span>
                         {categoryBadge(def.category)}
                       </div>
-                      <div className="flex gap-2 text-[10px] text-[var(--rpg-text-secondary)]">
-                        {def.cost.stamina > 0 && <span>Stam: {def.cost.stamina}</span>}
-                        {def.cost.mana > 0 && <span>Mana: {def.cost.mana}</span>}
-                        {def.cost.stamina === 0 && def.cost.mana === 0 && <span>Free</span>}
-                      </div>
+                      <ActionCostLabel cost={def.cost} />
                     </div>
                     <div className="flex gap-1 shrink-0">
                       <button
