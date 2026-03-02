@@ -1,120 +1,382 @@
+import type {
+  CombatantStats,
+  ActionDefinition,
+  CombatTemplateAction,
+  BossTemplateAction,
+  BossActiveEffect,
+  BossTargetMode,
+} from '@adventure/shared';
 import { COMBAT_CONSTANTS } from '@adventure/shared';
+import { resolveAction } from './actionResolver';
 import {
-  rollD20,
-  rollDamage,
+  addDamageThreat,
+  addHealThreat,
+  applyTaunt,
+  getSingleTarget,
+  tickTaunts,
+  type ThreatEntry,
+} from './threatSystem';
+import {
+  rollD20 as defaultRollD20,
+  rollDamage as defaultRollDamage,
+  isCriticalHit as defaultIsCriticalHit,
   doesAttackHit,
-  isCriticalHit,
   calculateFinalDamage,
 } from './damageCalculator';
 
-export interface BossStats {
-  defence: number;
-  magicDefence: number;
-  dodge: number;
-  aoeDamage: number;
-  avgParticipantDefence: number;
+// --- Input Types ---
+
+export interface BossRoundParticipant {
+  playerId: string;
+  stats: CombatantStats;
+  template: CombatTemplateAction[];
+  actionDefinitions: Record<string, ActionDefinition>;
+  hp: number;
+  maxHp: number;
+  stamina: number;
+  maxStamina: number;
+  staminaRegenPerRound: number;
+  mana: number;
+  maxMana: number;
+  manaRegenPerRound: number;
+  templateRound: number;
+  activeEffects: BossActiveEffect[];
 }
 
-export interface BossRoundAttacker {
-  playerId: string;
-  stats: import('@adventure/shared').CombatantStats;
-}
-
-export interface BossRoundHealer {
-  playerId: string;
-  healAmount: number;
+export interface BossState {
+  hp: number;
+  maxHp: number;
+  stats: CombatantStats;
+  template: BossTemplateAction[];
+  actionDefinitions: Record<string, ActionDefinition>;
+  roundNumber: number;
+  activeEffects: BossActiveEffect[];
 }
 
 export interface BossRoundInput {
-  bossHp: number;
-  bossMaxHp: number;
-  boss: BossStats;
-  attackers: BossRoundAttacker[];
-  healers: BossRoundHealer[];
-  raidPool: number;
-  raidPoolMax: number;
+  boss: BossState;
+  participants: BossRoundParticipant[];
+  threatTable: ThreatEntry[];
 }
 
-export interface AttackerResult {
+// --- Output Types ---
+
+export interface BossRoundParticipantResult {
   playerId: string;
+  actionId: string;
+  wasExhausted: boolean;
+  damageDealt: number;
+  healingDone: number;
+  damageTaken: number;
+  damageAbsorbed: number;
+  hpAfter: number;
+  staminaAfter: number;
+  manaAfter: number;
+  templateRoundAfter: number;
+  isDead: boolean;
   hit: boolean;
-  damage: number;
   isCritical: boolean;
-}
-
-export interface HealerResult {
-  playerId: string;
-  healAmount: number;
 }
 
 export interface BossRoundResult {
   bossHpAfter: number;
   bossDefeated: boolean;
-  attackerResults: AttackerResult[];
-  poolDamageTaken: number;
-  healerResults: HealerResult[];
-  raidPoolAfter: number;
-  raidWiped: boolean;
+  bossActionId: string;
+  bossTargetMode: BossTargetMode;
+  bossTargetPlayerIds: string[];
+  participantResults: BossRoundParticipantResult[];
+  threatTableAfter: ThreatEntry[];
+  bossActiveEffectsAfter: BossActiveEffect[];
+  allPlayersDead: boolean;
 }
 
-export function resolveBossRoundLogic(
-  input: BossRoundInput,
-  roll?: () => number,
-): BossRoundResult {
-  const rollFn = roll ?? rollD20;
-  let bossHp = input.bossHp;
-  let raidPool = input.raidPool;
+// --- RNG Interface ---
 
-  // 1. Attack phase: each attacker rolls against boss
-  const attackerResults: AttackerResult[] = [];
-  for (const attacker of input.attackers) {
-    const attackRoll = rollFn();
-    const hits = doesAttackHit(attackRoll, attacker.stats.accuracy, input.boss.dodge, 0);
+export interface BossRoundRng {
+  rollD20: () => number;
+  rollDamage: (min: number, max: number) => number;
+  rollCrit: (chance: number) => boolean;
+}
+
+// --- Resolver ---
+
+export function resolveBossRound(
+  input: BossRoundInput,
+  rng?: BossRoundRng,
+): BossRoundResult {
+  const roll = rng ?? {
+    rollD20: defaultRollD20,
+    rollDamage: defaultRollDamage,
+    rollCrit: defaultIsCriticalHit,
+  };
+
+  let bossHp = input.boss.hp;
+  const bossStats = input.boss.stats;
+
+  // Mutable copies of participant state
+  const pState = input.participants.map(p => ({
+    playerId: p.playerId,
+    hp: p.hp,
+    stamina: p.stamina,
+    mana: p.mana,
+    templateRound: p.templateRound,
+    damageDealt: 0,
+    healingDone: 0,
+    damageTaken: 0,
+    damageAbsorbed: 0,
+    actionId: 'defend',
+    wasExhausted: false,
+    hit: false,
+    isCritical: false,
+    actionDef: null as ActionDefinition | null,
+  }));
+
+  // --- Step 1: Pick actions for all participants ---
+  for (let i = 0; i < input.participants.length; i++) {
+    const p = input.participants[i];
+    const s = pState[i];
+    const resolved = resolveAction(
+      p.template,
+      s.templateRound,
+      s.stamina,
+      s.mana,
+      p.actionDefinitions,
+    );
+    s.actionId = resolved.action.id;
+    s.wasExhausted = resolved.wasExhausted;
+    s.actionDef = resolved.action;
+  }
+
+  // Pick boss action
+  const bossActionIndex = (input.boss.roundNumber - 1) % input.boss.template.length;
+  const bossTemplateAction = input.boss.template[bossActionIndex];
+  const bossActionDef = input.boss.actionDefinitions[bossTemplateAction.actionId];
+  const bossActionId = bossTemplateAction.actionId;
+  const bossTargetMode = bossTemplateAction.targetMode;
+
+  // --- Step 2: Resource costs already checked by resolveAction fallback ---
+
+  // --- Step 3: Apply Taunt ---
+  for (let i = 0; i < input.participants.length; i++) {
+    const s = pState[i];
+    if (s.actionDef?.tauntDuration && s.actionDef.tauntDuration > 0) {
+      applyTaunt(input.threatTable, s.playerId, s.actionDef.tauntDuration);
+    }
+  }
+
+  // --- Step 4: Record defensive stances ---
+  const defStances = new Map<string, {
+    avoidsPhysical: boolean;
+    resistsMagic: boolean;
+    damageReductionPercent: number;
+  }>();
+  for (let i = 0; i < pState.length; i++) {
+    const s = pState[i];
+    const def = s.actionDef;
+    defStances.set(s.playerId, {
+      avoidsPhysical: def?.avoidsPhysical ?? false,
+      resistsMagic: def?.resistsMagic ?? false,
+      damageReductionPercent: def?.damageReductionPercent ?? 0,
+    });
+  }
+
+  // --- Step 5: Offensive actions resolve against boss ---
+  for (let i = 0; i < input.participants.length; i++) {
+    const p = input.participants[i];
+    const s = pState[i];
+    const def = s.actionDef;
+    if (!def || def.category !== 'offensive' || (def.damageMultiplier ?? 0) <= 0) continue;
+
+    const attackRoll = roll.rollD20();
+    const hits = doesAttackHit(attackRoll, p.stats.accuracy + (def.accuracyModifier ?? 0), bossStats.dodge, 0);
 
     if (!hits) {
-      attackerResults.push({ playerId: attacker.playerId, hit: false, damage: 0, isCritical: false });
+      s.hit = false;
       continue;
     }
 
-    const rawDmg = rollDamage(attacker.stats.damageMin, attacker.stats.damageMax);
-    const crit = isCriticalHit(attacker.stats.critChance ?? 0);
-    const effectiveDefence = attacker.stats.damageType === 'magic'
-      ? input.boss.magicDefence
-      : input.boss.defence;
-    const { damage } = calculateFinalDamage(rawDmg, effectiveDefence, crit, attacker.stats.critDamage ?? 0);
+    const rawDmg = roll.rollDamage(p.stats.damageMin, p.stats.damageMax);
+    const scaledDmg = Math.floor(rawDmg * (def.damageMultiplier ?? 1.0));
+    const crit = roll.rollCrit(p.stats.critChance ?? 0);
+    const effectiveDefence = (def.damageType === 'magic' || p.stats.damageType === 'magic')
+      ? bossStats.magicDefence
+      : bossStats.defence;
+    const { damage } = calculateFinalDamage(scaledDmg, effectiveDefence, crit, p.stats.critDamage ?? 0);
 
     bossHp -= damage;
-    attackerResults.push({ playerId: attacker.playerId, hit: true, damage, isCritical: crit });
+    s.damageDealt = damage;
+    s.hit = true;
+    s.isCritical = crit;
+    addDamageThreat(input.threatTable, s.playerId, damage);
   }
 
   const bossDefeated = bossHp <= 0;
+  bossHp = Math.max(0, bossHp);
 
-  // 2. Boss phase: single hit to raid pool, reduced by avg defence
-  let poolDamageTaken = 0;
-  if (!bossDefeated) {
-    poolDamageTaken = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, input.boss.aoeDamage - input.boss.avgParticipantDefence);
-    raidPool -= poolDamageTaken;
-  }
+  // --- Step 6: Supportive actions ---
+  const alivePlayerIds = new Set(pState.filter(s => s.hp > 0).map(s => s.playerId));
+  const aggroHolder = getSingleTarget(input.threatTable, alivePlayerIds);
 
-  // 3. Heal phase: healers restore pool HP
-  const healerResults: HealerResult[] = [];
-  for (const healer of input.healers) {
-    const healed = Math.min(healer.healAmount, input.raidPoolMax - raidPool);
-    if (healed > 0) {
-      raidPool += healed;
+  for (let i = 0; i < input.participants.length; i++) {
+    const p = input.participants[i];
+    const s = pState[i];
+    const def = s.actionDef;
+    if (!def || def.category !== 'supportive') continue;
+
+    // heal_self
+    if (def.actionType === 'heal_self') {
+      const healAmount = (def.healFlat ?? 0) + Math.floor((def.healPercent ?? 0) * p.maxHp);
+      const actualHeal = Math.min(healAmount, p.maxHp - s.hp);
+      s.hp += actualHeal;
+      s.healingDone = actualHeal;
+      addHealThreat(input.threatTable, s.playerId, actualHeal);
     }
-    healerResults.push({ playerId: healer.playerId, healAmount: Math.max(0, healed) });
+
+    // heal_ally — auto-targets aggro holder
+    if (def.actionType === 'heal_ally' && aggroHolder) {
+      const healAmount = (def.healFlat ?? 0) + Math.floor((def.healPercent ?? 0) * p.maxHp);
+      const targetState = pState.find(ps => ps.playerId === aggroHolder);
+      const targetParticipant = input.participants.find(pp => pp.playerId === aggroHolder);
+      if (targetState && targetParticipant) {
+        const actualHeal = Math.min(healAmount, targetParticipant.maxHp - targetState.hp);
+        targetState.hp += actualHeal;
+        s.healingDone = actualHeal;
+        addHealThreat(input.threatTable, s.playerId, actualHeal);
+      }
+    }
+
+    // taunt is already handled in step 3
   }
 
-  const raidWiped = raidPool <= 0;
+  // --- Step 7: Boss action resolves against target(s) ---
+  const bossTargetPlayerIds: string[] = [];
+
+  if (!bossDefeated && bossActionDef) {
+    // Refresh alive set after supportive phase
+    const aliveAfterSupport = new Set(pState.filter(s => s.hp > 0).map(s => s.playerId));
+
+    if (bossActionDef.category === 'offensive' || bossActionDef.actionType === 'debuff_spell') {
+      let targets: string[] = [];
+
+      if (bossTargetMode === 'single_target') {
+        const target = getSingleTarget(input.threatTable, aliveAfterSupport);
+        if (target) targets = [target];
+      } else {
+        targets = Array.from(aliveAfterSupport);
+      }
+
+      for (const targetId of targets) {
+        bossTargetPlayerIds.push(targetId);
+        const targetState = pState.find(ps => ps.playerId === targetId);
+        const targetParticipant = input.participants.find(pp => pp.playerId === targetId);
+        if (!targetState || !targetParticipant) continue;
+
+        const stance = defStances.get(targetId);
+
+        // Check defensive stances
+        const bossIsMagic = bossActionDef.damageType === 'magic';
+        const bossIsPhysical = !bossIsMagic;
+
+        if (stance?.avoidsPhysical && bossIsPhysical) {
+          // Counter blocks physical — no damage
+          continue;
+        }
+        if (stance?.resistsMagic && bossIsMagic) {
+          // Ward blocks magic — no damage
+          continue;
+        }
+
+        // Roll boss damage
+        const bossDmgRaw = roll.rollDamage(bossStats.damageMin, bossStats.damageMax);
+        const scaledBossDmg = Math.floor(bossDmgRaw * (bossActionDef.damageMultiplier ?? 1.0));
+        const effectivePlayerDefence = bossIsMagic
+          ? targetParticipant.stats.magicDefence
+          : targetParticipant.stats.defence;
+
+        let damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, scaledBossDmg - effectivePlayerDefence);
+
+        // Apply Defend damage reduction
+        if (stance?.damageReductionPercent && stance.damageReductionPercent > 0) {
+          damage = Math.floor(damage * (1 - stance.damageReductionPercent));
+          damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, damage);
+        }
+
+        targetState.damageTaken += damage;
+        targetState.hp = Math.max(0, targetState.hp - damage);
+
+        // Track damage absorbed if this target is the aggro holder
+        const currentAggroHolder = getSingleTarget(input.threatTable, aliveAfterSupport);
+        if (targetId === currentAggroHolder) {
+          targetState.damageAbsorbed += damage;
+        }
+      }
+    }
+
+    // Boss heal_self
+    if (bossActionDef.actionType === 'heal_self') {
+      const healAmount = Math.floor((bossActionDef.healPercent ?? 0) * input.boss.maxHp) + (bossActionDef.healFlat ?? 0);
+      bossHp = Math.min(input.boss.maxHp, bossHp + healAmount);
+    }
+  }
+
+  // --- Step 8: End-of-round ---
+
+  // Deduct resource costs and apply regen
+  for (let i = 0; i < pState.length; i++) {
+    const s = pState[i];
+    const p = input.participants[i];
+    const def = s.actionDef;
+
+    // Deduct action cost
+    if (def && !s.wasExhausted) {
+      s.stamina -= def.cost.stamina;
+      s.mana -= def.cost.mana;
+    }
+
+    // Regen
+    s.stamina = Math.min(p.maxStamina, s.stamina + p.staminaRegenPerRound);
+    s.mana = Math.min(p.maxMana, s.mana + p.manaRegenPerRound);
+
+    // Advance template round
+    s.templateRound += 1;
+  }
+
+  // Tick taunt durations
+  tickTaunts(input.threatTable);
+
+  // Death checks
+  const allPlayersDead = pState.every(s => s.hp <= 0);
+
+  // Build active effects (pass through for now — effect system expansion in future)
+  const bossActiveEffectsAfter = [...input.boss.activeEffects];
+
+  // --- Build results ---
+  const participantResults: BossRoundParticipantResult[] = pState.map(s => ({
+    playerId: s.playerId,
+    actionId: s.actionId,
+    wasExhausted: s.wasExhausted,
+    damageDealt: s.damageDealt,
+    healingDone: s.healingDone,
+    damageTaken: s.damageTaken,
+    damageAbsorbed: s.damageAbsorbed,
+    hpAfter: Math.max(0, s.hp),
+    staminaAfter: Math.max(0, s.stamina),
+    manaAfter: Math.max(0, s.mana),
+    templateRoundAfter: s.templateRound,
+    isDead: s.hp <= 0,
+    hit: s.hit,
+    isCritical: s.isCritical,
+  }));
 
   return {
-    bossHpAfter: Math.max(0, bossHp),
+    bossHpAfter: bossHp,
     bossDefeated,
-    attackerResults,
-    poolDamageTaken,
-    healerResults,
-    raidPoolAfter: Math.max(0, raidPool),
-    raidWiped,
+    bossActionId,
+    bossTargetMode,
+    bossTargetPlayerIds,
+    participantResults,
+    threatTableAfter: input.threatTable,
+    bossActiveEffectsAfter,
+    allPlayersDead,
   };
 }
