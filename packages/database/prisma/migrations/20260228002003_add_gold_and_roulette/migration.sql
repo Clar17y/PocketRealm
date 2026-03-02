@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE "players" ADD COLUMN     "gold" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "players" ADD COLUMN IF NOT EXISTS "gold" INTEGER NOT NULL DEFAULT 0;
 
 -- CreateTable
 CREATE TABLE "roulette_rounds" (
