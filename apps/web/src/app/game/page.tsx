@@ -47,6 +47,7 @@ import {
 import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
 import { GuildScreen } from '@/components/screens/GuildScreen';
+import { Templates } from '@/components/screens/Templates';
 import { CombatScreen } from './screens/CombatScreen';
 import { useGameController, isMobKnown, type Screen } from './useGameController';
 import { useChat } from '@/hooks/useChat';
@@ -237,6 +238,9 @@ export default function GamePage() {
     setHpState,
     staminaState,
     manaState,
+    skillPointState,
+    templates,
+    handleLoadTemplates,
     pvpNotificationCount,
     playbackActive,
     combatPlaybackData,
@@ -1206,6 +1210,17 @@ export default function GamePage() {
             playerId={player?.id ?? null}
             characterLevel={characterProgression.characterLevel}
             onTurnsChanged={() => void loadTurnsAndHp()}
+          />
+        );
+      case 'templates':
+        return (
+          <Templates
+            templates={templates}
+            unlockedActions={skillPointState?.unlockedActions ?? []}
+            staminaState={staminaState}
+            manaState={manaState}
+            onLoadTemplates={handleLoadTemplates}
+            onNavigate={setActiveScreen}
           />
         );
       case 'admin':

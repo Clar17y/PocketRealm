@@ -69,7 +69,9 @@ import {
   fetchPendingLoot,
   getResources,
   getSkillPointState,
+  getTemplates,
   type PendingLootItem,
+  type TemplateResponse,
   type AchievementsResponse,
   type EventModifierBadge,
   type CombatActiveEvent,
@@ -100,6 +102,7 @@ export type Screen =
   | 'achievements'
   | 'leaderboard'
   | 'guild'
+  | 'templates'
   | 'admin';
 
 export interface PendingEncounter {
@@ -500,6 +503,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [staminaState, setStaminaState] = useState<ResourcePoolState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 });
   const [manaState, setManaState] = useState<ResourcePoolState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5 });
   const [skillPointState, setSkillPointState] = useState<SkillPointState | null>(null);
+  const [templates, setTemplates] = useState<TemplateResponse[]>([]);
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
   const [autoPotionThreshold, setAutoPotionThreshold] = useState(0);
@@ -623,6 +627,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const handleLoadSkillPoints = useCallback(async () => {
     const res = await getSkillPointState();
     if (res.data) setSkillPointState(res.data);
+  }, []);
+
+  const handleLoadTemplates = useCallback(async () => {
+    const res = await getTemplates();
+    if (res.data) setTemplates(res.data.templates);
   }, []);
 
   const loadAll = useCallback(async () => {
@@ -964,7 +973,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'admin'].includes(activeScreen)) return 'home';
     if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
-    if (['combat', 'arena'].includes(activeScreen)) return 'combat';
+    if (['combat', 'arena', 'templates'].includes(activeScreen)) return 'combat';
     if (activeScreen === 'guild') return 'guild';
     return 'home';
   };
@@ -2197,6 +2206,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     skillPointState,
     setSkillPointState,
     handleLoadSkillPoints,
+    templates,
+    handleLoadTemplates,
     pvpNotificationCount,
     autoPotionThreshold,
     setAutoPotionThreshold,
