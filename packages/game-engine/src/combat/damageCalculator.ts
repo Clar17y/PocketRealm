@@ -1,8 +1,5 @@
 import { CHARACTER_CONSTANTS, COMBAT_CONSTANTS, CombatantStats, MobTemplate, type PlayerAttributes } from '@adventure/shared';
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
+import { clamp } from '../utils/math';
 
 function finiteOrFallback(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;

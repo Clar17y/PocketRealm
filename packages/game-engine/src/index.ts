@@ -50,3 +50,6 @@ export * from './events/applyEventModifiers';
 // Casino
 export { isWinningBet, calculatePayout, validateBet, getNumberColor, generateSpinResult } from './casino/roulette';
 export type { BetValidation } from './casino/roulette';
+
+// Utils
+export { clamp, randomUnit } from './utils/math';
