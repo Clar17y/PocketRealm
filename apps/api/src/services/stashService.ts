@@ -9,8 +9,25 @@ async function moveStackableItem(
   moveQty: number,
   targetInStash: boolean
 ): Promise<void> {
-  if (!item.template.stackable || moveQty >= item.quantity) {
+  if (!item.template.stackable) {
     await tx.item.update({ where: { id: item.id }, data: { inStash: targetInStash } });
+    return;
+  }
+
+  // Full stack move for stackable items: merge into existing target stack if one exists
+  if (moveQty >= item.quantity) {
+    const existingTarget = await tx.item.findFirst({
+      where: { ownerId: item.ownerId, templateId: item.templateId, inStash: targetInStash },
+    });
+    if (existingTarget) {
+      await tx.item.update({
+        where: { id: existingTarget.id },
+        data: { quantity: existingTarget.quantity + item.quantity },
+      });
+      await tx.item.delete({ where: { id: item.id } });
+    } else {
+      await tx.item.update({ where: { id: item.id }, data: { inStash: targetInStash } });
+    }
     return;
   }
 

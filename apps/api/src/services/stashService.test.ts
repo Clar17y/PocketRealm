@@ -90,6 +90,25 @@ describe('depositItem', () => {
     });
   });
 
+  it('merges full stackable deposit into existing stash stack', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({ quantity: 5, template: { stackable: true } })
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+    mockPrisma.item.findFirst.mockResolvedValue({ id: 'stash-item', quantity: 3 });
+    mockPrisma.item.delete.mockResolvedValue({});
+
+    await depositItem('p1', 'item-1', 5);
+
+    expect(mockPrisma.item.update).toHaveBeenCalledWith({
+      where: { id: 'stash-item' },
+      data: { quantity: 8 },
+    });
+    expect(mockPrisma.item.delete).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+    });
+  });
+
   it('splits partial stackable deposit', async () => {
     mockPrisma.item.findUnique.mockResolvedValue(
       makeItem({ quantity: 10, template: { stackable: true } })
@@ -154,6 +173,25 @@ describe('withdrawItem', () => {
   it('throws when item not found', async () => {
     mockPrisma.item.findUnique.mockResolvedValue(null);
     await expect(withdrawItem('p1', 'missing')).rejects.toThrow('Item not found');
+  });
+
+  it('merges full stackable withdraw into existing backpack stack', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({ inStash: true, quantity: 3, template: { stackable: true } })
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+    mockPrisma.item.findFirst.mockResolvedValue({ id: 'bp-item', quantity: 7 });
+    mockPrisma.item.delete.mockResolvedValue({});
+
+    await withdrawItem('p1', 'item-1');
+
+    expect(mockPrisma.item.update).toHaveBeenCalledWith({
+      where: { id: 'bp-item' },
+      data: { quantity: 10 },
+    });
+    expect(mockPrisma.item.delete).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+    });
   });
 
   it('splits partial stackable withdraw', async () => {
