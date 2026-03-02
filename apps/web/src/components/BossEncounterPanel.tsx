@@ -25,7 +25,6 @@ export function BossEncounterPanel({ encounterId, playerId, onClose }: BossEncou
   const [myRewards, setMyRewards] = useState<BossPlayerReward | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
-  const [role, setRole] = useState<'attacker' | 'healer'>('attacker');
   const [autoSignUp, setAutoSignUp] = useState(false);
   const [signupError, setSignupError] = useState('');
   const autoSignUpInitRef = useRef(false);
@@ -53,14 +52,13 @@ export function BossEncounterPanel({ encounterId, playerId, onClose }: BossEncou
     );
     if (mySignup) {
       setAutoSignUp(mySignup.autoSignUp);
-      setRole(mySignup.role as 'attacker' | 'healer');
     }
   }, [playerId, encounter, participants]);
 
   async function handleSignup() {
     setSigning(true);
     setSignupError('');
-    const res = await signUpForBoss(encounterId, role, autoSignUp);
+    const res = await signUpForBoss(encounterId, autoSignUp);
     if (res.error) {
       setSignupError(res.error.message);
     } else {
@@ -152,29 +150,6 @@ export function BossEncounterPanel({ encounterId, playerId, onClose }: BossEncou
         </div>
       </div>
 
-      {/* Raid Pool — percentage only */}
-      {encounter.raidPoolMax != null && encounter.raidPoolMax > 0 && (() => {
-        const poolHp = encounter.raidPoolHp ?? encounter.raidPoolMax;
-        const poolPercent = Math.round((poolHp / encounter.raidPoolMax) * 100);
-        return (
-          <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span>Raid Pool</span>
-              <span>{poolPercent}%</span>
-            </div>
-            <div className="w-full h-3 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }}>
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${poolPercent}%`,
-                  background: poolPercent > 50 ? 'var(--rpg-green-light)' : poolPercent > 25 ? 'var(--rpg-gold)' : '#ff4444',
-                }}
-              />
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Status */}
       <div className="flex justify-between text-xs">
         <span>
@@ -191,22 +166,6 @@ export function BossEncounterPanel({ encounterId, playerId, onClose }: BossEncou
       {!isOver && (
         <div className="space-y-2 border-t border-white/10 pt-3">
           <p className="text-sm font-semibold">Sign up for next round</p>
-          <div className="flex gap-2">
-            <PixelButton
-              size="sm"
-              variant={role === 'attacker' ? 'primary' : 'secondary'}
-              onClick={() => setRole('attacker')}
-            >
-              Attacker
-            </PixelButton>
-            <PixelButton
-              size="sm"
-              variant={role === 'healer' ? 'primary' : 'secondary'}
-              onClick={() => setRole('healer')}
-            >
-              Healer
-            </PixelButton>
-          </div>
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-1.5 text-xs cursor-pointer">
               <input
@@ -285,14 +244,13 @@ export function BossEncounterPanel({ encounterId, playerId, onClose }: BossEncou
                     {roundParticipants.map((p) => (
                       <div key={p.id} className="flex justify-between text-xs">
                         <span className="truncate">
-                          {p.role === 'healer' ? '💚' : '⚔'} {displayName(p.playerId)}
+                          {displayName(p.playerId)}
                           {p.autoSignUp && <span className="ml-1 opacity-60">(auto)</span>}
                         </span>
                         <span>
-                          {p.role === 'healer'
-                            ? `${p.totalHealing} healed`
-                            : `${p.totalDamage} dmg`}
-                          {p.role !== 'healer' && p.attacks > 0 && (
+                          {p.totalDamage > 0 && `${p.totalDamage} dmg`}
+                          {p.totalHealing > 0 && ` ${p.totalHealing} healed`}
+                          {p.attacks > 0 && (
                             <span className="ml-1 opacity-60">
                               ({p.hits}/{p.attacks} hit{p.crits > 0 ? `, ${p.crits} crit` : ''})
                             </span>
