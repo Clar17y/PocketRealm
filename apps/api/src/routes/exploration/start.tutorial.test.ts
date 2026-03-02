@@ -93,6 +93,19 @@ vi.mock('../../services/combatStatsService', () => ({
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
   getSkillLevel: vi.fn().mockResolvedValue(1),
 }));
+vi.mock('../../services/combatTemplateService', () => ({
+  getActiveTemplate: vi.fn().mockResolvedValue([]),
+}));
+vi.mock('../../services/resourceService', () => ({
+  getResourceState: vi.fn().mockResolvedValue({
+    stamina: { current: 100, max: 100, regenPerRound: 5 },
+    mana: { current: 50, max: 50, regenPerRound: 3 },
+  }),
+  setAllResources: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../services/combatLogMapper', () => ({
+  mapTemplateCombatLog: vi.fn((log: any) => log),
+}));
 vi.mock('../../services/statsService', () => ({
   incrementStats: vi.fn(),
 }));
@@ -131,14 +144,18 @@ vi.mock('@adventure/game-engine', () => ({
   buildPlayerCombatStats: vi.fn(() => ({ attack: 10, accuracy: 10, defence: 5, magicDefence: 0, speed: 5, hp: 100, critChance: 0.05, critDamage: 1.5 })),
   calculateFleeResult: vi.fn(),
   filterAndWeightMobsByTier: vi.fn(() => []),
-  mobToCombatantStats: vi.fn((mob: any) => ({ attack: mob.attack ?? 5, accuracy: 5, defence: 5, magicDefence: 0, speed: 5, hp: mob.hp ?? 20, critChance: 0, critDamage: 1 })),
+  mobToTemplateCombatant: vi.fn((mob: any) => ({ id: mob.id, name: mob.mobDisplayName ?? mob.name, stats: { attack: mob.attack ?? 5, accuracy: 5, defence: 5, magicDefence: 0, speed: 5, hp: mob.hp ?? 20, critChance: 0, critDamage: 1 }, template: [], stamina: 100, maxStamina: 100, staminaRegenPerRound: 5, mana: 50, maxMana: 50, manaRegenPerRound: 3, actionDefinitions: {} })),
   rollMobPrefix: vi.fn(() => null),
-  runCombat: vi.fn(() => ({
+  runTemplateCombat: vi.fn(() => ({
     outcome: 'victory',
     combatantAHpRemaining: 80,
     combatantAMaxHp: 100,
     combatantBMaxHp: 20,
     combatantBHpRemaining: 0,
+    combatantAStaminaRemaining: 90,
+    combatantBStaminaRemaining: 100,
+    combatantAManaRemaining: 45,
+    combatantBManaRemaining: 50,
     log: [],
     potionsConsumed: [],
   })),
@@ -150,13 +167,13 @@ vi.mock('@adventure/game-engine', () => ({
 
 import { mockPrisma } from '../../__test__/setup';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
-import { applyMobPrefix, simulateExploration, runCombat } from '@adventure/game-engine';
+import { applyMobPrefix, simulateExploration, runTemplateCombat } from '@adventure/game-engine';
 import { startRouter } from './start';
 
 const mockSpendPlayerTurnsTx = spendPlayerTurnsTx as ReturnType<typeof vi.fn>;
 const mockApplyMobPrefix = applyMobPrefix as ReturnType<typeof vi.fn>;
 const mockSimulateExploration = simulateExploration as ReturnType<typeof vi.fn>;
-const mockRunCombat = runCombat as ReturnType<typeof vi.fn>;
+const mockRunTemplateCombat = runTemplateCombat as ReturnType<typeof vi.fn>;
 
 function findHandler(method: string, path: string) {
   const layer = (startRouter as any).stack.find(
@@ -229,7 +246,7 @@ describe('exploration tutorial path', () => {
     // Should NOT call simulateExploration for tutorial
     expect(mockSimulateExploration).not.toHaveBeenCalled();
     // Should have run combat (from the forced ambush)
-    expect(mockRunCombat).toHaveBeenCalled();
+    expect(mockRunTemplateCombat).toHaveBeenCalled();
   });
 
   it('selects Field Mouse by name and applies no prefix', async () => {
