@@ -1,6 +1,6 @@
 import { prisma, Prisma } from '@adventure/database';
 import { AppError } from '../middleware/errorHandler';
-import { getUsedSlots, getPlayerCapacity } from './inventoryService';
+import { getInventoryState } from './inventoryService';
 
 // Shared logic for moving stackable items between backpack (inStash=false) and stash (inStash=true)
 async function moveStackableItem(
@@ -9,8 +9,25 @@ async function moveStackableItem(
   moveQty: number,
   targetInStash: boolean
 ): Promise<void> {
-  if (!item.template.stackable || moveQty >= item.quantity) {
+  if (!item.template.stackable) {
     await tx.item.update({ where: { id: item.id }, data: { inStash: targetInStash } });
+    return;
+  }
+
+  // Full stack move for stackable items: merge into existing target stack if one exists
+  if (moveQty >= item.quantity) {
+    const existingTarget = await tx.item.findFirst({
+      where: { ownerId: item.ownerId, templateId: item.templateId, inStash: targetInStash },
+    });
+    if (existingTarget) {
+      await tx.item.update({
+        where: { id: existingTarget.id },
+        data: { quantity: existingTarget.quantity + item.quantity },
+      });
+      await tx.item.delete({ where: { id: item.id } });
+    } else {
+      await tx.item.update({ where: { id: item.id }, data: { inStash: targetInStash } });
+    }
     return;
   }
 
@@ -73,10 +90,7 @@ export async function withdrawItem(
   quantity?: number
 ): Promise<void> {
   // Capacity check before transaction (low-concurrency single-player context)
-  const [usedSlots, capacity] = await Promise.all([
-    getUsedSlots(playerId),
-    getPlayerCapacity(playerId),
-  ]);
+  const { usedSlots, capacity } = await getInventoryState(playerId);
 
   if (usedSlots >= capacity) {
     throw new AppError(400, 'Backpack is full', 'BACKPACK_FULL');
@@ -124,12 +138,7 @@ export async function withdrawBatch(
   playerId: string,
   itemIds: string[]
 ): Promise<{ withdrawnCount: number }> {
-  const [usedSlots, capacity] = await Promise.all([
-    getUsedSlots(playerId),
-    getPlayerCapacity(playerId),
-  ]);
-
-  let availableSlots = capacity - usedSlots;
+  let { availableSlots } = await getInventoryState(playerId);
 
   return prisma.$transaction(async (tx) => {
     let withdrawnCount = 0;

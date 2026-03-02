@@ -29,7 +29,7 @@ import {
   type PotionConsumed,
 } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
-import { rollAndGrantLoot, rollAndGrantLootWithCapacity, enrichLootWithNames } from '../../services/lootService';
+import { rollAndGrantLootWithCapacity, enrichLootWithNames } from '../../services/lootService';
 import type { LootDropWithName } from '../../services/lootService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { grantSkillXp } from '../../services/xpService';
@@ -38,7 +38,7 @@ import { setHp } from '../../services/hpService';
 import { getActiveTemplate } from '../../services/combatTemplateService';
 import { getResourceState, setAllResources } from '../../services/resourceService';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { getUsedSlots, getPlayerCapacity } from '../../services/inventoryService';
+import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot } from '../../services/pendingLootService';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { getSkillPoints } from '../../services/skillPointService';
@@ -386,11 +386,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   let roomCleared = false;
 
   // Compute available slots for capacity-aware chest rewards
-  const [usedSlotsNow, capacityNow] = await Promise.all([
-    getUsedSlots(playerId),
-    getPlayerCapacity(playerId),
-  ]);
-  let chestAvailableSlots = Math.max(0, capacityNow - usedSlotsNow);
+  const { availableSlots: chestAvailableSlotsRaw } = await getInventoryState(playerId);
+  let chestAvailableSlots = chestAvailableSlotsRaw;
 
   const txResult = await prisma.$transaction(async (tx) => {
     const txAny = tx as unknown as any;

@@ -2,76 +2,21 @@ import { Prisma, prisma } from '@adventure/database';
 import { rollBonusStatsForRarity, rollDropRarity } from '@adventure/game-engine';
 import type { EquipmentSlot, ItemStats, ItemType, LootDrop } from '@adventure/shared';
 import { randomIntInclusive } from '../utils/random';
-import { addStackableItem, getUsedSlots, getPlayerCapacity } from './inventoryService';
+import { addStackableItem, getInventoryState } from './inventoryService';
 import { storePendingLoot, type PendingLootItem } from './pendingLootService';
 
 export type LootDropWithName = LootDrop & { itemName: string | null };
 
+/** Grants loot without capacity limits (e.g. boss drops). */
 export async function rollAndGrantLoot(
   playerId: string,
   mobTemplateId: string,
   mobLevel: number,
   dropChanceMultiplier = 1
 ): Promise<LootDrop[]> {
-  const entries = await prisma.dropTable.findMany({
-    where: { mobTemplateId },
-    include: { itemTemplate: true },
-  });
-
-  const drops: LootDrop[] = [];
-
-  for (const entry of entries) {
-    const chance = Math.min(1, Math.max(0, entry.dropChance.toNumber()));
-    if (chance <= 0) continue;
-
-    if (Math.random() >= chance) continue;
-
-    const quantity = randomIntInclusive(entry.minQuantity, entry.maxQuantity);
-    if (quantity <= 0) continue;
-
-    // Create/merge item instances
-    if (entry.itemTemplate.stackable) {
-      await addStackableItem(playerId, entry.itemTemplateId, quantity);
-      drops.push({ itemTemplateId: entry.itemTemplateId, quantity, rarity: 'common' });
-      continue;
-    }
-
-    const itemType = entry.itemTemplate.itemType as ItemType;
-    const isEquipment = itemType === 'weapon' || itemType === 'armor';
-    const needsDurability = isEquipment;
-    const maxDurability = needsDurability ? entry.itemTemplate.maxDurability : null;
-    const templateBaseStats = entry.itemTemplate.baseStats as ItemStats | null | undefined;
-
-    for (let i = 0; i < quantity; i++) {
-      const rarity = isEquipment
-        ? rollDropRarity(mobLevel, dropChanceMultiplier)
-        : 'common';
-      const templateSlot = entry.itemTemplate.slot as EquipmentSlot | null;
-      const bonusStats = isEquipment
-        ? rollBonusStatsForRarity({
-            itemType,
-            rarity,
-            baseStats: templateBaseStats,
-            slot: templateSlot,
-          })
-        : null;
-
-      await prisma.item.create({
-        data: {
-          ownerId: playerId,
-          templateId: entry.itemTemplateId,
-          rarity,
-          quantity: 1,
-          maxDurability,
-          currentDurability: maxDurability,
-          bonusStats: bonusStats ? (bonusStats as Prisma.InputJsonObject) : undefined,
-        } as any,
-      });
-
-      drops.push({ itemTemplateId: entry.itemTemplateId, quantity: 1, rarity });
-    }
-  }
-
+  const { drops } = await rollAndGrantLootWithCapacity(
+    playerId, mobTemplateId, mobLevel, dropChanceMultiplier, Infinity,
+  );
   return drops;
 }
 
@@ -79,17 +24,22 @@ export async function rollAndGrantLootWithCapacity(
   playerId: string,
   mobTemplateId: string,
   mobLevel: number,
-  dropChanceMultiplier = 1
+  dropChanceMultiplier = 1,
+  capacityOverride?: number,
 ): Promise<{ drops: LootDrop[]; overflow: PendingLootItem[]; pendingLootSessionId: string | null }> {
   const entries = await prisma.dropTable.findMany({
     where: { mobTemplateId },
     include: { itemTemplate: true },
   });
 
-  const [usedSlots, capacity] = await Promise.all([
-    getUsedSlots(playerId),
-    getPlayerCapacity(playerId),
-  ]);
+  let usedSlots: number;
+  let capacity: number;
+  if (capacityOverride !== undefined) {
+    usedSlots = 0;
+    capacity = capacityOverride;
+  } else {
+    ({ usedSlots, capacity } = await getInventoryState(playerId));
+  }
 
   let slotsUsed = usedSlots;
   const drops: LootDrop[] = [];

@@ -69,6 +69,7 @@ model Player {
   activeTitle        String?   @map("active_title")
 
   turnBank           TurnBank?
+  rouletteBets       RouletteBet[]
   skills             PlayerSkill[]
   equipment          PlayerEquipment[]
   items              Item[]
@@ -744,6 +745,10 @@ model PlayerStats {
   totalTurnsSpent         Int      @default(0) @map("total_turns_spent")
   totalDeaths             Int      @default(0) @map("total_deaths")
   tutorialCompleted       Int      @default(0) @map("tutorial_completed")
+  totalBetsPlaced         Int      @default(0) @map("total_bets_placed")
+  totalGoldWagered        Int      @default(0) @map("total_gold_wagered")
+  totalTurnsExchanged     Int      @default(0) @map("total_turns_exchanged")
+  peakGoldHeld            Int      @default(0) @map("peak_gold_held")
   updatedAt               DateTime @updatedAt @map("updated_at")
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
@@ -953,4 +958,36 @@ model PvpScoutLog {
 
   @@index([targetId, isRead])
   @@map("pvp_scout_logs")
+}
+
+// =============================================================================
+// CASINO
+// =============================================================================
+
+model RouletteRound {
+  id         String    @id @default(uuid())
+  spinNumber Int       @default(autoincrement()) @map("spin_number")
+  result     Int?
+  startedAt  DateTime  @default(now()) @map("started_at")
+  resolvedAt DateTime? @map("resolved_at")
+  bets       RouletteBet[]
+
+  @@map("roulette_rounds")
+}
+
+model RouletteBet {
+  id       String @id @default(uuid())
+  roundId  String @map("round_id")
+  playerId String @map("player_id")
+  betType  String @db.VarChar(16) @map("bet_type")
+  betValue String @db.VarChar(32) @map("bet_value")
+  amount   Int
+  payout   Int?
+
+  round  RouletteRound @relation(fields: [roundId], references: [id])
+  player Player        @relation(fields: [playerId], references: [id])
+
+  @@index([roundId])
+  @@index([playerId])
+  @@map("roulette_bets")
 }

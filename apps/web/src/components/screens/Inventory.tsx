@@ -47,6 +47,7 @@ interface StashItem {
   type: string;
   durability?: { current: number; max: number } | null;
   sellPrice: number | null;
+  salvageCost: number | null;
 }
 
 interface InventoryProps {
@@ -68,6 +69,7 @@ interface InventoryProps {
   onDepositBatch?: (itemIds: string[]) => void | Promise<void>;
   onWithdraw?: (itemId: string) => void | Promise<void>;
   onWithdrawBatch?: (itemIds: string[]) => void | Promise<void>;
+  getSalvageCost?: (templateId: string) => number | null;
   zoneCraftingLevel?: number | null;
   confirmRarity?: ConfirmRarity;
 }
@@ -92,7 +94,7 @@ function statDisplay(stat: string) {
 export function Inventory({
   items, capacity, usedSlots, gold, isInTown,
   onDrop, onSalvage, onSalvageBatch, onRepair, onEquip, onUnequip, onUse, onSell, onSellBatch, onDeposit, onDepositBatch, onWithdraw, onWithdrawBatch,
-  zoneCraftingLevel, confirmRarity = 'uncommon',
+  getSalvageCost, zoneCraftingLevel, confirmRarity = 'uncommon',
 }: InventoryProps) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
@@ -110,6 +112,7 @@ export function Inventory({
   const sellBatchMode = useBatchMode(BATCH_LIMIT);
   const withdrawBatchMode = useBatchMode(BATCH_LIMIT);
   const stashSellBatch = useBatchMode(BATCH_LIMIT);
+  const stashSalvageBatch = useBatchMode(SALVAGE_LIMIT);
 
   const [activeTab, setActiveTab] = useState<'backpack' | 'stash'>('backpack');
   const [stashItems, setStashItems] = useState<StashItem[]>([]);
@@ -118,7 +121,7 @@ export function Inventory({
 
   // Mutual exclusion helpers — activate one mode, reset all others in the same tab
   const backpackModes = [salvageBatch, stashBatch, sellBatchMode];
-  const stashModes = [withdrawBatchMode, stashSellBatch];
+  const stashModes = [withdrawBatchMode, stashSellBatch, stashSalvageBatch];
 
   const activateBackpackMode = (mode: typeof salvageBatch) => {
     for (const m of backpackModes) { if (m !== mode) m.reset(); }
@@ -152,6 +155,7 @@ export function Inventory({
             type: item.template.itemType,
             durability: isEquip && max > 0 ? { current: item.currentDurability ?? max, max } : null,
             sellPrice: item.template.sellPrice ?? null,
+            salvageCost: isEquip && getSalvageCost ? getSalvageCost(item.template.id) : null,
           };
         }));
       }
@@ -216,7 +220,11 @@ export function Inventory({
   const totalStashSellGold = stashItems
     .filter((i) => stashSellBatch.selection.has(i.id))
     .reduce((sum, i) => sum + (i.sellPrice ?? 0) * i.quantity, 0);
-  const stashBatchActive = withdrawBatchMode.active || stashSellBatch.active;
+  const salvageableStashIds = stashItems.filter((i) => i.salvageCost !== null).map((i) => i.id);
+  const totalStashSalvageCost = stashItems
+    .filter((i) => stashSalvageBatch.selection.has(i.id))
+    .reduce((sum, i) => sum + (i.salvageCost ?? 0), 0);
+  const stashBatchActive = withdrawBatchMode.active || stashSellBatch.active || stashSalvageBatch.active;
 
   const stats = selectedItem?.baseStats ?? {};
   const attack = numStat(stats.attack);
@@ -319,9 +327,6 @@ export function Inventory({
       {activeTab === 'stash' && isInTown && (
         <div className="space-y-2">
           <StashTutorial />
-          <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
-            Stash ({stashItems.length} items)
-          </div>
 
           {/* Stash Batch Mode Toggles + Actions */}
           {withdrawBatchMode.active ? (
@@ -367,6 +372,29 @@ export function Inventory({
                 }
               }}
             />
+          ) : stashSalvageBatch.active ? (
+            <BatchActionBar
+              batch={stashSalvageBatch}
+              limit={SALVAGE_LIMIT}
+              eligibleIds={salvageableStashIds}
+              actionLabel="Salvage All"
+              counterSuffix={
+                stashSalvageBatch.selection.size > 0
+                  ? totalStashSalvageCost > 0 ? `(${totalStashSalvageCost} turns)` : '(Free)'
+                  : undefined
+              }
+              onAction={async () => {
+                if (!onSalvageBatch) return;
+                stashSalvageBatch.setBusy(true);
+                try {
+                  await onSalvageBatch([...stashSalvageBatch.selection]);
+                  stashSalvageBatch.reset();
+                  await loadStash();
+                } finally {
+                  stashSalvageBatch.setBusy(false);
+                }
+              }}
+            />
           ) : stashItems.length > 0 ? (
             <div className="flex justify-end gap-2">
               {onSellBatch && (
@@ -380,16 +408,30 @@ export function Inventory({
               )}
               {onWithdrawBatch && (
                 <PixelButton
-                  variant="primary"
+                  variant="secondary"
                   size="sm"
                   onClick={() => activateStashMode(withdrawBatchMode)}
                 >
                   Withdraw Mode
                 </PixelButton>
               )}
+              {onSalvageBatch && (
+                <PixelButton
+                  variant="primary"
+                  size="sm"
+                  onClick={() => activateStashMode(stashSalvageBatch)}
+                >
+                  Salvage Mode
+                </PixelButton>
+              )}
             </div>
           ) : null}
 
+          {/* Stash Items */}
+          <div className="space-y-2">
+            <div className="text-sm font-semibold text-[var(--rpg-text-secondary)]">
+              Stash ({stashItems.length} {stashItems.length === 1 ? 'item' : 'items'})
+            </div>
           {stashLoading ? (
             <div className="text-sm text-[var(--rpg-text-secondary)]">Loading stash...</div>
           ) : stashItems.length === 0 ? (
@@ -398,9 +440,11 @@ export function Inventory({
             <div className="grid grid-cols-6 gap-2">
               {stashItems.map((item) => {
                 const isSellable = stashSellBatch.active && item.sellPrice != null && item.sellPrice > 0;
-                const isSelectable = withdrawBatchMode.active || isSellable;
+                const isSalvageable = stashSalvageBatch.active && item.salvageCost !== null;
+                const isSelectable = withdrawBatchMode.active || isSellable || isSalvageable;
                 const isSelected = (withdrawBatchMode.active && withdrawBatchMode.selection.has(item.id))
-                  || (stashSellBatch.active && stashSellBatch.selection.has(item.id));
+                  || (stashSellBatch.active && stashSellBatch.selection.has(item.id))
+                  || (stashSalvageBatch.active && stashSalvageBatch.selection.has(item.id));
                 return (
                   <div key={item.id} className="relative">
                     <ItemCard
@@ -414,6 +458,8 @@ export function Inventory({
                           withdrawBatchMode.toggle(item.id);
                         } else if (stashSellBatch.active) {
                           if (isSellable) stashSellBatch.toggle(item.id);
+                        } else if (stashSalvageBatch.active) {
+                          if (isSalvageable) stashSalvageBatch.toggle(item.id);
                         } else {
                           setSelectedStashItem(item);
                         }
@@ -430,6 +476,7 @@ export function Inventory({
               })}
             </div>
           )}
+          </div>
 
           {/* Stash item withdraw modal */}
           {!stashBatchActive && selectedStashItem && (
@@ -913,8 +960,8 @@ export function Inventory({
               </div>
             )}
 
-            {/* Sell + Deposit row for equipment */}
-            {isEquipment && (canSell || canDeposit) && (
+            {/* Sell + Deposit row */}
+            {(canSell || canDeposit) && (
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {canSell && (
                   <PixelButton
@@ -978,41 +1025,6 @@ export function Inventory({
                 >
                   Drop
                 </PixelButton>
-              </div>
-            )}
-
-            {/* Sell + Deposit row for consumables / materials */}
-            {!isEquipment && (canSell || canDeposit) && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {canSell && (
-                  <PixelButton
-                    variant="gold"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => tryAction('sell', selectedItem)}
-                  >
-                    Sell
-                  </PixelButton>
-                )}
-                {canDeposit && (
-                  <PixelButton
-                    variant="secondary"
-                    size="sm"
-                    disabled={busy}
-                    onClick={async () => {
-                      if (!onDeposit) return;
-                      setBusy(true);
-                      try {
-                        await onDeposit(selectedItem.id);
-                        setSelectedItem(null);
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
-                  >
-                    Stash
-                  </PixelButton>
-                )}
               </div>
             )}
 

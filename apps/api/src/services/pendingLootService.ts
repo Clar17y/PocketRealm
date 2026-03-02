@@ -3,7 +3,7 @@ import { prisma } from '@adventure/database';
 import { INVENTORY_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
-import { getUsedSlots, getPlayerCapacity } from './inventoryService';
+import { getInventoryState } from './inventoryService';
 
 export interface PendingLootItem {
   templateId: string;
@@ -66,10 +66,7 @@ export async function claimPendingLoot(
   if (!data) throw new AppError(404, 'Pending loot expired or not found', 'LOOT_EXPIRED');
 
   const items: PendingLootItem[] = JSON.parse(data);
-  const [usedSlots, capacity] = await Promise.all([
-    getUsedSlots(playerId),
-    getPlayerCapacity(playerId),
-  ]);
+  const { usedSlots, capacity } = await getInventoryState(playerId);
 
   let slotsUsed = usedSlots;
 

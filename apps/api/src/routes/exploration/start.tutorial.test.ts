@@ -123,8 +123,7 @@ vi.mock('../../services/cacheLootService', () => ({
   grantCacheLootTx: vi.fn().mockResolvedValue({ materials: [], soulboundItem: null, slotsConsumed: 0, overflow: [] }),
 }));
 vi.mock('../../services/inventoryService', () => ({
-  getUsedSlots: vi.fn().mockResolvedValue(5),
-  getPlayerCapacity: vi.fn().mockResolvedValue(24),
+  getInventoryState: vi.fn().mockResolvedValue({ usedSlots: 5, capacity: 24, availableSlots: 19 }),
   assertNotOverEncumbered: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../services/pendingLootService', () => ({

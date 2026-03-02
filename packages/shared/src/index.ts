@@ -12,6 +12,7 @@ export * from './types/guild.types';
 export * from './types/encounter.types';
 export * from './types/combatAction.types';
 export * from './types/bossTemplate.types';
+export * from './types/casino.types';
 
 // Constants
 export * from './constants/gameConstants';

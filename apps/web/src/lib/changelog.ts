@@ -7,18 +7,25 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: '0.22',
+    version: '0.23',
     date: '2026-03-02',
     title: 'Combat Rework: Templates, Resources & Skill Trees',
     summary:
       'Combat is no longer auto-attack. Build combat templates — ordered action rotations that your character follows each fight. Stamina and mana fuel your actions; run out and you fall back to Defend. A new Skill Tree lets you spend points earned from levelling to unlock 24 powerful abilities across Melee, Ranged, Magic, and General trees. Resource bars show HP, stamina, and mana on the Explore and Combat screens, with values embedded inside the bars. Combat playback now shows action names, resource costs, and interaction results like Countered! and Warded!',
   },
   {
-    version: '0.21',
+    version: '0.22',
     date: '2026-03-02',
     title: 'Boss Encounters & PvP Rework',
     summary:
       'Boss encounters now use individual HP per participant instead of a shared raid pool. A new threat system determines who the boss targets — deal more damage, draw more aggro. Boss loot is distributed by contribution score. PvP uses your combat template so fights play out action-by-action. Scout notifications tell you when someone is sizing you up. The bestiary progressively reveals boss attack rotations as you fight them.',
+  },
+  {
+    version: '0.21',
+    date: '2026-03-02',
+    title: 'Casino & Training Grounds',
+    summary:
+      'A brand new Casino has opened in every town! Exchange turns for gold and play roulette against other players — bet on numbers, colours, corners, and more. Watch chips pile up on the board in real-time, chat with fellow gamblers, and celebrate wins with a gold coin shower. The dealer announces results and calls out big winners. A Hot/Cold stats panel shows which numbers are running hot or cold over the last 200 spins. Casino leaderboards track total profit and wagered volume. 10 new casino achievements reward your gambling career. The Training Grounds let you practice against any monster from your bestiary with mob prefix variants — no turn cost, no risk. Both screens include first-visit how-to guides.',
   },
   {
     version: '0.20',

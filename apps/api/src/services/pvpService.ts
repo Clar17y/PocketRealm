@@ -1,6 +1,6 @@
 import { Prisma, prisma } from '@adventure/database';
 import {
-  buildPlayerCombatStats, calculateFleeResult, calculateMaxHp,
+  buildPlayerCombatStats, calculateMaxHp,
   runTemplateCombat, calculateMaxStamina, calculateStaminaRegenPerRound,
   calculateMaxMana, calculateManaRegenPerRound,
 } from '@adventure/game-engine';
@@ -11,7 +11,7 @@ import {
   type SkillType, type ActionDefinition,
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
-import { buildPagination, trackAchievements } from '../utils/routeHelpers.js';
+import { buildPagination, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { getSkillLevel } from './combatStatsService.js';
 import { calculateEloChange } from './eloService';
 import { getEquipmentStats } from './equipmentService';
@@ -597,11 +597,10 @@ export async function challenge(
       combatResult.combatantAStaminaRemaining,
       combatResult.combatantAManaRemaining,
     );
-    const fleeResult = calculateFleeResult({
+    const fleeResult = await calculateFleeWithGold(attackerId, {
       evasionLevel: attackerAttributes.evasion,
       mobLevel: target.characterLevel,
       maxHp: attackerMaxHp,
-      currentGold: 0,
     });
     fleeOutcome = fleeResult.outcome;
     if (fleeResult.outcome === 'knockout') {

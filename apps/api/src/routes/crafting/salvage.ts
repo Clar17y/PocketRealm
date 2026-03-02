@@ -35,6 +35,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
       requireNotStacked: true,
       requireNotEquipped: true,
     });
+    const targetStash = Boolean((item as any).inStash);
 
     const recipe = await prisma.craftingRecipe.findFirst({
       where: { resultTemplateId: item.templateId },
@@ -87,7 +88,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
         }
 
         if (template.stackable) {
-          const stack = await addStackableItemTx(tx, playerId, material.templateId, material.quantity);
+          const stack = await addStackableItemTx(tx, playerId, material.templateId, material.quantity, targetStash);
           minted.push({
             templateId: material.templateId,
             name: template.name,
@@ -109,6 +110,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
               quantity: 1,
               maxDurability,
               currentDurability: maxDurability,
+              inStash: targetStash,
             } as any,
             select: { id: true },
           });
@@ -238,11 +240,15 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
 
     const totalTurnCost = plans.reduce((sum, p) => sum + p.turnCost, 0);
 
-    // Aggregate all materials across all items
-    const materialTotals = new Map<string, number>();
+    // Aggregate all materials across all items, split by source location
+    const materialTotals = new Map<string, { backpack: number; stash: number }>();
     for (const plan of plans) {
+      const isStash = Boolean(plan.item.inStash);
       for (const mat of plan.refundedMaterials) {
-        materialTotals.set(mat.templateId, (materialTotals.get(mat.templateId) ?? 0) + mat.quantity);
+        const entry = materialTotals.get(mat.templateId) ?? { backpack: 0, stash: 0 };
+        if (isStash) entry.stash += mat.quantity;
+        else entry.backpack += mat.quantity;
+        materialTotals.set(mat.templateId, entry);
       }
     }
 
@@ -268,32 +274,38 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
       }
 
       const minted: Array<{ templateId: string; name: string; quantity: number }> = [];
-      for (const [templateId, quantity] of materialTotals) {
+      for (const [templateId, totals] of materialTotals) {
         const template = templateById.get(templateId);
         if (!template) {
           throw new AppError(400, 'Recipe references invalid material template', 'INVALID_RECIPE');
         }
 
-        if (template.stackable) {
-          await addStackableItemTx(tx, playerId, templateId, quantity);
-        } else {
-          const needsDurability = template.itemType === 'weapon' || template.itemType === 'armor';
-          const maxDurability = needsDurability ? template.maxDurability : null;
-          for (let i = 0; i < quantity; i++) {
-            await tx.item.create({
-              data: {
-                ownerId: playerId,
-                templateId,
-                rarity: 'common',
-                quantity: 1,
-                maxDurability,
-                currentDurability: maxDurability,
-              } as any,
-            });
+        const totalQty = totals.backpack + totals.stash;
+
+        for (const [qty, inStash] of [[totals.backpack, false], [totals.stash, true]] as const) {
+          if (qty <= 0) continue;
+          if (template.stackable) {
+            await addStackableItemTx(tx, playerId, templateId, qty, inStash);
+          } else {
+            const needsDurability = template.itemType === 'weapon' || template.itemType === 'armor';
+            const maxDurability = needsDurability ? template.maxDurability : null;
+            for (let i = 0; i < qty; i++) {
+              await tx.item.create({
+                data: {
+                  ownerId: playerId,
+                  templateId,
+                  rarity: 'common',
+                  quantity: 1,
+                  maxDurability,
+                  currentDurability: maxDurability,
+                  inStash,
+                } as any,
+              });
+            }
           }
         }
 
-        minted.push({ templateId, name: template.name, quantity });
+        minted.push({ templateId, name: template.name, quantity: totalQty });
       }
 
       return { turnSpend: spent, taxResult: tax, returned: minted };

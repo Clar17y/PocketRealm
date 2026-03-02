@@ -27,6 +27,8 @@ import { guildRouter } from './routes/guild';
 import { adminRouter } from './routes/admin';
 import { templatesRouter } from './routes/templates';
 import { skillPointsRouter } from './routes/skillpoints';
+import { casinoRouter } from './routes/casino';
+import { trainingRouter } from './routes/training';
 import { errorHandler } from './middleware/errorHandler';
 import { createSocketServer, getIo } from './socket';
 import { checkAndResolveDueBossRounds } from './services/bossEncounterService';
@@ -112,6 +114,8 @@ app.use('/api/v1/guild', guildRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/templates', templatesRouter);
 app.use('/api/v1/skillpoints', skillPointsRouter);
+app.use('/api/v1/casino', casinoRouter);
+app.use('/api/v1/training', trainingRouter);
 
 // Error handler
 app.use(errorHandler);

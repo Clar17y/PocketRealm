@@ -12,25 +12,22 @@ vi.mock('./inventoryService', async (importOriginal) => {
   const original = await importOriginal<typeof import('./inventoryService')>();
   return {
     ...original,
-    getUsedSlots: vi.fn(),
-    getPlayerCapacity: vi.fn(),
+    getInventoryState: vi.fn(),
   };
 });
 
 import { mockPrisma } from '../__test__/setup';
 import { redis } from '../redis';
-import { getUsedSlots, getPlayerCapacity } from './inventoryService';
+import { getInventoryState } from './inventoryService';
 import { storePendingLoot, getPendingLoot, claimPendingLoot } from './pendingLootService';
 import type { PendingLootItem } from './pendingLootService';
 
 const mockRedis = redis as unknown as Record<string, ReturnType<typeof vi.fn>>;
-const mockGetUsedSlots = getUsedSlots as ReturnType<typeof vi.fn>;
-const mockGetPlayerCapacity = getPlayerCapacity as ReturnType<typeof vi.fn>;
+const mockGetInventoryState = getInventoryState as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetUsedSlots.mockResolvedValue(5);
-  mockGetPlayerCapacity.mockResolvedValue(24);
+  mockGetInventoryState.mockResolvedValue({ usedSlots: 5, capacity: 24, availableSlots: 19 });
 });
 
 const sampleLoot: PendingLootItem[] = [
@@ -117,8 +114,7 @@ describe('claimPendingLoot', () => {
   });
 
   it('respects capacity limit', async () => {
-    mockGetUsedSlots.mockResolvedValue(23);
-    mockGetPlayerCapacity.mockResolvedValue(24);
+    mockGetInventoryState.mockResolvedValue({ usedSlots: 23, capacity: 24, availableSlots: 1 });
     mockRedis.get.mockResolvedValue(JSON.stringify(sampleLoot));
     mockRedis.del.mockResolvedValue(1);
     mockPrisma.item.create.mockResolvedValue({});

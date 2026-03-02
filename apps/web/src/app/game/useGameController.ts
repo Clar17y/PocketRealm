@@ -79,8 +79,11 @@ import {
   type PlayerSettings,
   type WorldEventResponse,
   type SkillPointState,
+  exchangeGold,
+  placeRouletteBet,
 } from '@/lib/api';
 import type { CombatTemplateData, ResourceState } from '@adventure/shared';
+import type { RouletteBetType } from '@adventure/shared';
 import { getSocket } from '@/lib/socket';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 
@@ -105,6 +108,8 @@ export type Screen =
   | 'guild'
   | 'templates'
   | 'talentTree'
+  | 'casino'
+  | 'training'
   | 'admin';
 
 export interface PendingEncounter {
@@ -310,6 +315,8 @@ const PENDING_ENCOUNTER_PAGE_SIZE = 8;
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [activeScreen, setActiveScreen] = useState<Screen>('home');
   const [turns, setTurns] = useState(0);
+  const [gold, setGold] = useState(0);
+  const [trainingCooldown, setTrainingCooldown] = useState(0);
   const [zones, setZones] = useState<Array<{
     id: string;
     name: string;
@@ -359,7 +366,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [inventoryCapacity, setInventoryCapacity] = useState(24);
   const [inventoryUsedSlots, setInventoryUsedSlots] = useState(0);
   const [materialTotals, setMaterialTotals] = useState<Record<string, number>>({});
-  const [gold, setGold] = useState(0);
   const [pendingLootSession, setPendingLootSession] = useState<{
     sessionId: string;
     items: PendingLootItem[];
@@ -680,6 +686,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         attributePoints: playerRes.data.player.attributePoints,
         attributes: playerRes.data.player.attributes,
       });
+      setGold(playerRes.data.player.gold ?? 0);
       setAutoPotionThreshold(playerRes.data.player.autoPotionThreshold ?? 0);
       setTutorialStep(playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED);
       setCombatLogSpeedMs(playerRes.data.player.combatLogSpeedMs ?? 800);
@@ -690,7 +697,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setDefaultRefiningMax(playerRes.data.player.defaultRefiningMax ?? false);
       setLowHpWarning(playerRes.data.player.lowHpWarning ?? true);
       setConfirmRarity(playerRes.data.player.confirmRarity ?? 'uncommon');
-      setGold(playerRes.data.player.gold ?? 0);
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
     if (hpRes.data) setHpState(hpRes.data);
@@ -992,7 +998,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, []);
 
   const getActiveTab = () => {
-    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'admin'].includes(activeScreen)) return 'home';
+    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
     if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
     if (['combat', 'arena', 'templates', 'talentTree'].includes(activeScreen)) return 'combat';
@@ -2164,6 +2170,21 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const openChangelog = useCallback(() => setShowChangelog(true), []);
 
+  const handleExchangeGold = useCallback(async (turnAmount: number) => {
+    const result = await exchangeGold(turnAmount);
+    if (result.data) {
+      setGold(result.data.goldBalance);
+      setTurns(result.data.turnsRemaining);
+    }
+  }, []);
+
+  const handlePlaceBet = useCallback(async (betType: RouletteBetType, betValue: string, amount: number) => {
+    const result = await placeRouletteBet(betType, betValue, amount);
+    if (result.data) {
+      setGold(result.data.goldRemaining);
+    }
+  }, []);
+
   return {
     // Navigation
     activeScreen,
@@ -2178,6 +2199,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Core state
     turns,
     setTurns,
+    gold,
+    setGold,
+    trainingCooldown,
+    setTrainingCooldown,
     zones,
     activeZoneId,
     setActiveZoneId,
@@ -2330,7 +2355,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     inventoryCapacity,
     inventoryUsedSlots,
     isOverEncumbered: inventoryUsedSlots > inventoryCapacity,
-    gold,
+    backpackFull: inventoryUsedSlots >= inventoryCapacity,
     pendingLootSession,
     handleSellItem,
     handleSellBatch,
@@ -2341,6 +2366,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleClaimLoot,
     handleDismissLoot,
     handleReopenLoot,
+
+    // Casino & Training
+    handleExchangeGold,
+    handlePlaceBet,
   };
 }
 

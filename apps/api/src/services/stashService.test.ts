@@ -8,21 +8,18 @@ vi.mock('./inventoryService', async (importOriginal) => {
   const original = await importOriginal<typeof import('./inventoryService')>();
   return {
     ...original,
-    getUsedSlots: vi.fn(),
-    getPlayerCapacity: vi.fn(),
+    getInventoryState: vi.fn(),
   };
 });
 
-import { getUsedSlots, getPlayerCapacity } from './inventoryService';
+import { getInventoryState } from './inventoryService';
 
-const mockGetUsedSlots = getUsedSlots as ReturnType<typeof vi.fn>;
-const mockGetPlayerCapacity = getPlayerCapacity as ReturnType<typeof vi.fn>;
+const mockGetInventoryState = getInventoryState as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   // Default: backpack has space
-  mockGetUsedSlots.mockResolvedValue(5);
-  mockGetPlayerCapacity.mockResolvedValue(24);
+  mockGetInventoryState.mockResolvedValue({ usedSlots: 5, capacity: 24, availableSlots: 19 });
 });
 
 function makeItem(overrides: Record<string, unknown> = {}) {
@@ -90,6 +87,25 @@ describe('depositItem', () => {
     });
   });
 
+  it('merges full stackable deposit into existing stash stack', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({ quantity: 5, template: { stackable: true } })
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+    mockPrisma.item.findFirst.mockResolvedValue({ id: 'stash-item', quantity: 3 });
+    mockPrisma.item.delete.mockResolvedValue({});
+
+    await depositItem('p1', 'item-1', 5);
+
+    expect(mockPrisma.item.update).toHaveBeenCalledWith({
+      where: { id: 'stash-item' },
+      data: { quantity: 8 },
+    });
+    expect(mockPrisma.item.delete).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+    });
+  });
+
   it('splits partial stackable deposit', async () => {
     mockPrisma.item.findUnique.mockResolvedValue(
       makeItem({ quantity: 10, template: { stackable: true } })
@@ -140,8 +156,7 @@ describe('withdrawItem', () => {
   });
 
   it('throws when backpack is full', async () => {
-    mockGetUsedSlots.mockResolvedValue(24);
-    mockGetPlayerCapacity.mockResolvedValue(24);
+    mockGetInventoryState.mockResolvedValue({ usedSlots: 24, capacity: 24, availableSlots: 0 });
 
     await expect(withdrawItem('p1', 'item-1')).rejects.toThrow('Backpack is full');
   });
@@ -154,6 +169,25 @@ describe('withdrawItem', () => {
   it('throws when item not found', async () => {
     mockPrisma.item.findUnique.mockResolvedValue(null);
     await expect(withdrawItem('p1', 'missing')).rejects.toThrow('Item not found');
+  });
+
+  it('merges full stackable withdraw into existing backpack stack', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({ inStash: true, quantity: 3, template: { stackable: true } })
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+    mockPrisma.item.findFirst.mockResolvedValue({ id: 'bp-item', quantity: 7 });
+    mockPrisma.item.delete.mockResolvedValue({});
+
+    await withdrawItem('p1', 'item-1');
+
+    expect(mockPrisma.item.update).toHaveBeenCalledWith({
+      where: { id: 'bp-item' },
+      data: { quantity: 10 },
+    });
+    expect(mockPrisma.item.delete).toHaveBeenCalledWith({
+      where: { id: 'item-1' },
+    });
   });
 
   it('splits partial stackable withdraw', async () => {

@@ -232,3 +232,7 @@ export type {
 
 export { getSkillPointState, allocateSkillPoint, respecSkillPoints } from './skillPoints';
 export type { SkillPointState } from './skillPoints';
+export { exchangeGold, getRouletteRound, placeRouletteBet, getRouletteHistory, getRouletteStats } from './casino';
+export type { GoldExchangeResponse, PlaceBetResponse, RouletteNumberStat } from './casino';
+export { startTrainingFight, getTrainingCooldown } from './training';
+export type { TrainingFightResponse, TrainingCooldownResponse } from './training';

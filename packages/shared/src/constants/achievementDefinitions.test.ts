@@ -33,7 +33,7 @@ describe('achievementDefinitions', () => {
     it('every achievement has a valid category', () => {
       const validCategories = new Set([
         'combat', 'exploration', 'crafting', 'skills',
-        'gathering', 'bestiary', 'general', 'family', 'guild',
+        'gathering', 'bestiary', 'general', 'family', 'guild', 'casino',
       ]);
       for (const a of ALL_ACHIEVEMENTS) {
         expect(validCategories.has(a.category)).toBe(true);

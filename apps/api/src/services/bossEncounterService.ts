@@ -16,7 +16,6 @@ import {
 import {
   resolveBossRound as resolveBossRoundEngine,
   buildPlayerCombatStats,
-  calculateFleeResult,
   calculateMaxStamina,
   calculateStaminaRegenPerRound,
   calculateMaxMana,
@@ -34,7 +33,7 @@ import { getPlayerProgressionState } from './attributesService';
 import { getMainHandAttackSkill, getSkillLevel } from './combatStatsService';
 import { getHpState, setHp, enterRecoveringState } from './hpService';
 import { getActiveTemplate } from './combatTemplateService';
-import { trackAchievements } from '../utils/routeHelpers.js';
+import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { distributeBossLoot } from './bossLootService';
 
 // --- Mappers ---
@@ -529,11 +528,10 @@ export async function resolveBossRound(
     await Promise.all(
       participants.map(async (p) => {
         const progression = await getPlayerProgressionState(p.playerId);
-        const fleeResult = calculateFleeResult({
+        const fleeResult = await calculateFleeWithGold(p.playerId, {
           evasionLevel: progression.attributes.evasion,
           mobLevel: encounter.mobTemplate.level ?? 1,
           maxHp: p.maxHp,
-          currentGold: 0,
         });
         if (fleeResult.outcome === 'knockout') {
           await enterRecoveringState(p.playerId, p.maxHp);

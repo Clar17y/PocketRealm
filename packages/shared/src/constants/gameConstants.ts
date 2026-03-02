@@ -1210,3 +1210,27 @@ export const GUILD_SPECIALIZATION_DEFINITIONS: readonly GuildSpecializationDefin
     ],
   },
 ] as const;
+
+// =============================================================================
+// CASINO
+// =============================================================================
+
+export const CASINO_CONSTANTS = {
+  GOLD_EXCHANGE_RATE: 1,
+  ROULETTE_MIN_BET: 1,
+  ROULETTE_MAX_BET: 1000,
+  ROULETTE_SLOTS: 37,
+  ROULETTE_HISTORY_LENGTH: 20,
+  ROULETTE_STATS_DEPTH: 200,
+  ROUND_DURATION_SECONDS: 60,
+  BETTING_WINDOW_SECONDS: 50,
+  BIG_WIN_THRESHOLD: 500,
+} as const;
+
+// =============================================================================
+// TRAINING GROUNDS
+// =============================================================================
+
+export const TRAINING_CONSTANTS = {
+  COOLDOWN_SECONDS: 60,
+} as const;
