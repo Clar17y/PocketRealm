@@ -7,6 +7,7 @@ export * from './combat/bossRoundResolver';
 export * from './combat/actionResolver';
 export * from './combat/templateCombatEngine';
 export * from './combat/mobTemplateConverter';
+export * from './combat/threatSystem';
 
 // Turns
 export * from './turns/turnCalculator';
