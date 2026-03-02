@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
-import { HpStatusBar } from '@/components/common/HpStatusBar';
+import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { LowHpWarningDialog } from '@/components/common/LowHpWarningDialog';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
@@ -76,6 +76,8 @@ interface CombatScreenProps {
   quickRestPercent?: number;
   onNavigateToRest?: () => void;
   combatXpRate?: { skillName: string; rate: number };
+  staminaState?: { current: number; max: number };
+  manaState?: { current: number; max: number };
 }
 
 export function CombatScreen({
@@ -113,6 +115,8 @@ export function CombatScreen({
   quickRestPercent,
   onNavigateToRest,
   combatXpRate,
+  staminaState,
+  manaState,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
@@ -268,9 +272,20 @@ export function CombatScreen({
         <KnockoutBanner action="fighting" recoveryCost={hpState.recoveryCost} onClick={onNavigateToRest} />
       )}
 
-      {/* HP Status */}
+      {/* Resource Status */}
       {!combatPlaybackData && !hpState.isRecovering && (
-        <HpStatusBar currentHp={hpState.currentHp} maxHp={hpState.maxHp} regenPerSecond={hpState.regenPerSecond} onQuickRest={onQuickRest} quickRestPercent={quickRestPercent} busyAction={busyAction} />
+        <ResourceStatusBar
+          currentHp={hpState.currentHp}
+          maxHp={hpState.maxHp}
+          currentStamina={staminaState?.current ?? 0}
+          maxStamina={staminaState?.max ?? 0}
+          currentMana={manaState?.current ?? 0}
+          maxMana={manaState?.max ?? 0}
+          hpRegenPerSecond={hpState.regenPerSecond}
+          onQuickRest={onQuickRest}
+          quickRestPercent={quickRestPercent}
+          busyAction={busyAction}
+        />
       )}
 
       <div className="flex gap-2">

@@ -513,6 +513,10 @@ export default function GamePage() {
             recoveryCost={hpState.recoveryCost}
             currentHp={hpState.currentHp}
             maxHp={hpState.maxHp}
+            currentStamina={staminaState.current}
+            maxStamina={staminaState.max}
+            currentMana={manaState.current}
+            maxMana={manaState.max}
             regenPerSecond={hpState.regenPerSecond}
             playbackData={explorationPlaybackData}
             onPlaybackComplete={handleExplorationPlaybackComplete}
@@ -985,6 +989,8 @@ export default function GamePage() {
             quickRestPercent={quickRestHealPercent}
             onNavigateToRest={() => handleNavigate('rest')}
             combatXpRate={primaryCombatXpRate}
+            staminaState={staminaState}
+            manaState={manaState}
           />
         );
       }

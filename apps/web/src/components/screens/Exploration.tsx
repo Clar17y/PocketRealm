@@ -5,7 +5,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
-import { HpStatusBar } from '../common/HpStatusBar';
+import { ResourceStatusBar } from '../common/ResourceStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Loader2, Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@adventure/shared';
@@ -38,6 +38,10 @@ interface ExplorationProps {
   recoveryCost?: number | null;
   currentHp?: number;
   maxHp?: number;
+  currentStamina?: number;
+  maxStamina?: number;
+  currentMana?: number;
+  maxMana?: number;
   regenPerSecond?: number;
   playbackData?: {
     totalTurns: number;
@@ -67,7 +71,7 @@ interface ExplorationProps {
   combatXpRate?: { skillName: string; rate: number };
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
@@ -120,9 +124,20 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
         <KnockoutBanner action="exploring" recoveryCost={recoveryCost} onClick={onNavigateToRest} />
       )}
 
-      {/* HP Status */}
+      {/* Resource Status */}
       {!playbackData && typeof currentHp === 'number' && typeof maxHp === 'number' && !isRecovering && (
-        <HpStatusBar currentHp={currentHp} maxHp={maxHp} regenPerSecond={regenPerSecond} onQuickRest={onQuickRest} quickRestPercent={quickRestPercent} busyAction={busyAction} />
+        <ResourceStatusBar
+          currentHp={currentHp}
+          maxHp={maxHp}
+          currentStamina={currentStamina ?? 0}
+          maxStamina={maxStamina ?? 0}
+          currentMana={currentMana ?? 0}
+          maxMana={maxMana ?? 0}
+          hpRegenPerSecond={regenPerSecond}
+          onQuickRest={onQuickRest}
+          quickRestPercent={quickRestPercent}
+          busyAction={busyAction}
+        />
       )}
 
       {/* Zone Header — always visible */}
