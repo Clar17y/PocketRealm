@@ -483,7 +483,7 @@ export async function refreshAllLeaderboards(): Promise<void> {
   try { await refreshSkills(); } catch (err) { failures++; console.error('Leaderboard refresh error (skills):', err); }
   try { await refreshCombat(); } catch (err) { failures++; console.error('Leaderboard refresh error (combat):', err); }
   try { await refreshGuilds(); } catch (err) { failures++; console.error('Leaderboard refresh error (guilds):', err); }
-  try { await refreshCasino(); } catch (err) { failures++; console.error('[Leaderboard] refreshCasino failed:', err); }
+  try { await refreshCasino(); } catch (err) { failures++; console.error('Leaderboard refresh error (casino):', err); }
 
   if (failures === 0) {
     await redis.set('leaderboard:last_refresh', new Date().toISOString());

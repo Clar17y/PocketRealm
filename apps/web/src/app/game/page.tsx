@@ -366,14 +366,12 @@ export default function GamePage() {
     }
   }, [activeScreen, chat.joinCasino, chat.leaveCasino]);
 
-  // Inject dealer messages from casino socket into casino chat
+  // Inject dealer messages from casino socket into casino chat (batched)
   useEffect(() => {
     const msgs = casinoSocket.dealerMessages;
     if (msgs.length > lastDealerCountRef.current) {
-      const newMsgs = msgs.slice(lastDealerCountRef.current);
-      for (const msg of newMsgs) {
-        chat.injectCasinoSystemMessage(msg.text);
-      }
+      const newTexts = msgs.slice(lastDealerCountRef.current).map((m) => m.text);
+      chat.injectCasinoSystemMessage(newTexts);
       lastDealerCountRef.current = msgs.length;
     }
   }, [casinoSocket.dealerMessages, chat.injectCasinoSystemMessage]);

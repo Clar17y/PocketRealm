@@ -1,48 +1,10 @@
-import { CASINO_CONSTANTS, ROULETTE_RED_NUMBERS, getNumberColor } from '@adventure/shared';
+import { CASINO_CONSTANTS, getNumberColor, getNumbersForBet } from '@adventure/shared';
 import type { RouletteBetType } from '@adventure/shared';
 
 export { getNumberColor };
 
-const RED_SET = new Set<number>(ROULETTE_RED_NUMBERS);
-
 export function isWinningBet(betType: RouletteBetType, betValue: string, result: number): boolean {
-  switch (betType) {
-    case 'straight':
-      return result === parseInt(betValue, 10);
-    case 'split': {
-      const [a, b] = betValue.split(',').map(Number);
-      return result === a || result === b;
-    }
-    case 'red':
-      return result > 0 && RED_SET.has(result);
-    case 'black':
-      return result > 0 && !RED_SET.has(result);
-    case 'odd':
-      return result > 0 && result % 2 === 1;
-    case 'even':
-      return result > 0 && result % 2 === 0;
-    case 'dozen': {
-      if (result === 0) return false;
-      if (betValue === '1-12') return result >= 1 && result <= 12;
-      if (betValue === '13-24') return result >= 13 && result <= 24;
-      if (betValue === '25-36') return result >= 25 && result <= 36;
-      return false;
-    }
-    case 'column': {
-      if (result === 0) return false;
-      const col = ((result - 1) % 3) + 1;
-      if (betValue === 'col1') return col === 1;
-      if (betValue === 'col2') return col === 2;
-      if (betValue === 'col3') return col === 3;
-      return false;
-    }
-    case 'corner': {
-      const nums = betValue.split(',').map(Number);
-      return nums.includes(result);
-    }
-    default:
-      return false;
-  }
+  return getNumbersForBet(betType, betValue).has(result);
 }
 
 const PAYOUT_MULTIPLIERS: Record<RouletteBetType, number> = {

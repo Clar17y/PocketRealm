@@ -82,19 +82,25 @@ function ChipStackIndicator({ myCount, otherCount, myAmount }: ChipStack) {
   );
 }
 
+const COIN_POSITIONS = Array.from({ length: 20 }, () => ({
+  left: Math.random() * 100,
+  delay: Math.random() * 0.8,
+  duration: 1.5 + Math.random(),
+}));
+
 function WinCelebration({ payout, isBigWin }: { payout: number; isBigWin: boolean }) {
   const coinCount = isBigWin ? 20 : 8;
   return (
     <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
       <div className="absolute inset-0 bg-[var(--rpg-gold)]/10" style={{ animation: 'gold-shimmer 1.5s ease-out forwards' }} />
-      {Array.from({ length: coinCount }, (_, i) => (
+      {COIN_POSITIONS.slice(0, coinCount).map((pos, i) => (
         <div
           key={i}
           className="absolute text-lg"
           style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 0.8}s`,
-            animation: `coin-fall ${1.5 + Math.random()}s ease-in forwards`,
+            left: `${pos.left}%`,
+            animationDelay: `${pos.delay}s`,
+            animation: `coin-fall ${pos.duration}s ease-in forwards`,
           }}
         >
           {'🪙'}
@@ -168,10 +174,14 @@ export function Casino({
     return getNumbersForBet(bet.type, bet.value);
   }, [hoveredBet, selectedBetType, selectedBetValue]);
 
+  const displayBets = useMemo(
+    () => liveBets.length > 0 ? liveBets : (roundState?.bets ?? []),
+    [liveBets, roundState?.bets],
+  );
+
   const chipMap = useMemo(() => {
-    const bets = liveBets.length > 0 ? liveBets : (roundState?.bets ?? []);
     const map = new Map<string, ChipStack>();
-    for (const bet of bets) {
+    for (const bet of displayBets) {
       const key = bet.betType === 'straight' ? `num:${bet.betValue}`
         : bet.betType === 'corner' ? `corner:${bet.betValue}`
         : `${bet.betType}:${bet.betValue}`;
@@ -186,7 +196,7 @@ export function Casino({
       map.set(key, existing);
     }
     return map;
-  }, [liveBets, roundState?.bets, playerName]);
+  }, [displayBets, playerName]);
 
   const heatMap = useMemo(() => {
     if (!showHeatMap) return null;
@@ -627,10 +637,7 @@ export function Casino({
       </PixelCard>
 
       {/* Live Bets */}
-      {(() => {
-        const displayBets = liveBets.length > 0 ? liveBets : (roundState?.bets ?? []);
-        if (displayBets.length === 0) return null;
-        return (
+      {displayBets.length > 0 && (
           <PixelCard>
             <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3 flex items-center gap-2">
               <Users size={18} />
@@ -653,8 +660,7 @@ export function Casino({
               ))}
             </div>
           </PixelCard>
-        );
-      })()}
+      )}
 
       {/* Session Bet History */}
       {sessionBets.length > 0 && (

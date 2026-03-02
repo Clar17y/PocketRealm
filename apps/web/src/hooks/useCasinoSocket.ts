@@ -9,7 +9,7 @@ import type {
   RoulettePublicBet,
   RouletteBetType,
 } from '@adventure/shared';
-import { CASINO_CONSTANTS, getNumberColor } from '@adventure/shared';
+import { CASINO_CONSTANTS, CHAT_CONSTANTS, getNumberColor } from '@adventure/shared';
 
 export interface SessionBet {
   id: string;
@@ -49,7 +49,7 @@ export function useCasinoSocket(
 
   const addDealerMsg = useCallback((text: string) => {
     setDealerMessages((prev) => [
-      ...prev.slice(-49),
+      ...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)),
       { id: crypto.randomUUID(), text, timestamp: Date.now() },
     ]);
   }, []);

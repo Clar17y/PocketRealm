@@ -34,7 +34,7 @@ export interface UseChatReturn {
   pinnedZone: ChatPinnedMessageEvent | null;
   pinMessage: (channelId: string, message: string) => void;
   unpinMessage: (channelId: string) => void;
-  injectCasinoSystemMessage: (text: string) => void;
+  injectCasinoSystemMessage: (texts: string | string[]) => void;
 }
 
 export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseChatReturn {
@@ -232,18 +232,21 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
     });
   }, []);
 
-  const injectCasinoSystemMessage = useCallback((text: string) => {
-    const msg: ChatMessageEvent = {
-      id: crypto.randomUUID(),
-      channelType: 'casino',
-      channelId: 'casino',
-      playerId: 'dealer',
-      username: 'Dealer',
-      message: text,
-      createdAt: new Date().toISOString(),
-      messageType: 'system',
-    };
-    setCasinoMessages((prev) => [...prev.slice(-(CHAT_CONSTANTS.HISTORY_LIMIT - 1)), msg]);
+  const injectCasinoSystemMessage = useCallback((texts: string | string[]) => {
+    const arr = Array.isArray(texts) ? texts : [texts];
+    setCasinoMessages((prev) => {
+      const msgs: ChatMessageEvent[] = arr.map((text) => ({
+        id: crypto.randomUUID(),
+        channelType: 'casino' as const,
+        channelId: 'casino',
+        playerId: 'dealer',
+        username: 'Dealer',
+        message: text,
+        createdAt: new Date().toISOString(),
+        messageType: 'system' as const,
+      }));
+      return [...prev, ...msgs].slice(-CHAT_CONSTANTS.HISTORY_LIMIT);
+    });
   }, []);
 
   const leaveCasino = useCallback(() => {

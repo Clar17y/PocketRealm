@@ -45,6 +45,7 @@ export function getNumberColor(n: number): 'red' | 'black' | 'green' {
 export function getNumbersForBet(betType: RouletteBetType, betValue: string): Set<number> {
   switch (betType) {
     case 'straight': return new Set([parseInt(betValue, 10)]);
+    case 'split': return new Set(betValue.split(',').map(Number));
     case 'red': return new Set(RED_SET);
     case 'black': return new Set(BLACK_SET);
     case 'odd': return new Set(Array.from({ length: 18 }, (_, i) => i * 2 + 1));
