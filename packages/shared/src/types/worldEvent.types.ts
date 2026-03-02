@@ -17,6 +17,13 @@ export type WorldEventEffectType = MobEffectType | ResourceEffectType;
 export type BossEncounterStatus = 'waiting' | 'in_progress' | 'defeated' | 'expired';
 export type BossParticipantStatus = 'alive' | 'knocked_out';
 
+export interface BossActiveEffect {
+  name: string;
+  stat: string;
+  modifier: number;
+  roundsRemaining: number;
+}
+
 export type WorldEventScope = 'zone' | 'world';
 
 export interface WorldEventData {
@@ -75,7 +82,7 @@ export interface BossEncounterData {
   currentHp: number;
   maxHp: number;
   baseHp: number;
-  bossEffects: unknown[];
+  bossEffects: BossActiveEffect[];
   roundNumber: number;
   nextRoundAt: string | null;
   status: BossEncounterStatus;

@@ -68,6 +68,14 @@ describe('threatSystem', () => {
       const table = initThreatTable(['p1']);
       expect(getSingleTarget(table, new Set())).toBeNull();
     });
+
+    it('picks highest threat among multiple taunters', () => {
+      const table = initThreatTable(['p1', 'p2', 'p3']);
+      applyTaunt(table, 'p1', 2);
+      applyTaunt(table, 'p2', 2);
+      addDamageThreat(table, 'p2', 100);
+      expect(getSingleTarget(table, new Set(['p1', 'p2', 'p3']))).toBe('p2');
+    });
   });
 
   describe('applyTaunt', () => {

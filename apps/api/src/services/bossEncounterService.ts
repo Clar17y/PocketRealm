@@ -2,6 +2,7 @@ import type { Server as SocketServer } from 'socket.io';
 import { prisma } from '@adventure/database';
 import {
   WORLD_EVENT_CONSTANTS,
+  type BossActiveEffect,
   type BossEncounterData,
   type BossEncounterStatus,
   type BossParticipantData,
@@ -56,7 +57,7 @@ function toBossEncounterData(row: {
     currentHp: row.currentHp,
     maxHp: row.maxHp,
     baseHp: row.baseHp,
-    bossEffects: Array.isArray(row.bossEffects) ? row.bossEffects as unknown[] : [],
+    bossEffects: Array.isArray(row.bossEffects) ? row.bossEffects as BossActiveEffect[] : [],
     roundNumber: row.roundNumber,
     nextRoundAt: row.nextRoundAt?.toISOString() ?? null,
     status: row.status as BossEncounterStatus,

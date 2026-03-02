@@ -100,7 +100,7 @@ const bossRest: ActionDefinition = {
   cost: { stamina: 0, mana: 0 },
 };
 
-const BOSS_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
+export const BOSS_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   boss_physical_attack: bossPhysicalAttack,
   boss_magic_attack: bossMagicAttack,
   boss_earthquake: bossEarthquake,

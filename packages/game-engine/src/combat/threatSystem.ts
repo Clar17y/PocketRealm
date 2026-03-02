@@ -34,10 +34,10 @@ export function getSingleTarget(table: ThreatEntry[], alivePlayerIds: Set<string
 
   const taunters = alive.filter(e => e.tauntRoundsRemaining > 0);
   if (taunters.length > 0) {
-    return taunters.sort((a, b) => b.threat - a.threat)[0].playerId;
+    return taunters.reduce((max, e) => e.threat > max.threat ? e : max).playerId;
   }
 
-  return alive.sort((a, b) => b.threat - a.threat)[0].playerId;
+  return alive.reduce((max, e) => e.threat > max.threat ? e : max).playerId;
 }
 
 export function tickTaunts(table: ThreatEntry[]): void {
