@@ -8,7 +8,6 @@ import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { PixelButton } from '@/components/PixelButton';
-import { StatBar } from '@/components/StatBar';
 
 type Phase = 'playing' | 'finished-auto' | 'finished-manual';
 
@@ -25,6 +24,9 @@ interface CombatPlaybackProps {
   playerLabel?: string;
   playerMaxStamina?: number;
   playerMaxMana?: number;
+  opponentMaxStamina?: number;
+  opponentMaxMana?: number;
+  showOpponentResources?: boolean;
   defeatButtonLabel?: string;
   speedMs?: number;
   autoSkip?: boolean;
@@ -45,6 +47,9 @@ export function CombatPlayback({
   playerLabel = 'You',
   playerMaxStamina = 100,
   playerMaxMana = 50,
+  opponentMaxStamina = 100,
+  opponentMaxMana = 50,
+  showOpponentResources = false,
   defeatButtonLabel,
   speedMs = 800,
   autoSkip = false,
@@ -165,6 +170,8 @@ export function CombatPlayback({
   const rawEntry = currentEntry as Record<string, unknown> | null;
   const currentStamina = (rawEntry?.combatantAStaminaAfter as number) ?? playerMaxStamina;
   const currentMana = (rawEntry?.combatantAManaAfter as number) ?? playerMaxMana;
+  const opponentStamina = (rawEntry?.combatantBStaminaAfter as number) ?? opponentMaxStamina;
+  const opponentMana = (rawEntry?.combatantBManaAfter as number) ?? opponentMaxMana;
 
   return (
     <div>
@@ -199,13 +206,20 @@ export function CombatPlayback({
           />
         </div>
 
-        {/* Mob HP */}
+        {/* Opponent HP + optional resources */}
         <div className={shakeTarget === 'combatantB' ? 'animate-shake' : ''}>
-          <div className="flex justify-between text-xs mb-1">
+          <div className="text-xs mb-1">
             <span className="text-[var(--rpg-red)]">{mobDisplayName}</span>
-            <span className="text-[var(--rpg-red)] font-mono">{Math.max(0, currentMobHp)}/{mobMaxHp}</span>
           </div>
-          <StatBar current={Math.max(0, currentMobHp)} max={mobMaxHp} color="health" size="sm" showNumbers={false} />
+          <ResourceStatusBar
+            currentHp={Math.max(0, currentMobHp)}
+            maxHp={mobMaxHp}
+            currentStamina={showOpponentResources ? opponentStamina : 0}
+            maxStamina={showOpponentResources ? opponentMaxStamina : 0}
+            currentMana={showOpponentResources ? opponentMana : 0}
+            maxMana={showOpponentResources ? opponentMaxMana : 0}
+            compact
+          />
         </div>
       </div>
 

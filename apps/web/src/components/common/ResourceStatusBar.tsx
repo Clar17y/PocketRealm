@@ -102,20 +102,24 @@ export function ResourceStatusBar({
           color={hpColor}
           regenPerSecond={isRecovering ? undefined : hpRegenPerSecond}
         />
-        <ResourceBar
-          current={currentStamina}
-          max={maxStamina}
-          label="STA"
-          color="bg-teal-400"
-          regenPerSecond={staminaRegenPerSecond}
-        />
-        <ResourceBar
-          current={currentMana}
-          max={maxMana}
-          label="MP"
-          color="bg-[var(--rpg-blue-light)]"
-          regenPerSecond={manaRegenPerSecond}
-        />
+        {maxStamina > 0 && (
+          <ResourceBar
+            current={currentStamina}
+            max={maxStamina}
+            label="STA"
+            color="bg-teal-400"
+            regenPerSecond={staminaRegenPerSecond}
+          />
+        )}
+        {maxMana > 0 && (
+          <ResourceBar
+            current={currentMana}
+            max={maxMana}
+            label="MP"
+            color="bg-[var(--rpg-blue-light)]"
+            regenPerSecond={manaRegenPerSecond}
+          />
+        )}
       </div>
     </div>
   );

@@ -265,6 +265,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
         mobMaxHp={lastResult.combat.combatantBMaxHp}
         log={lastResult.combat.log}
         playerLabel={lastResult.attackerName}
+        showOpponentResources
         defeatButtonLabel="Continue"
         speedMs={combatSpeedMs}
         onComplete={() => { setPvpPlaybackActive(false); void loadArenaData(); }}
