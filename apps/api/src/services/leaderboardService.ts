@@ -48,12 +48,18 @@ const GUILD_CATEGORIES: CategoryDef[] = [
   { slug: 'guild_members', label: 'Member Count', group: 'Guilds' },
 ];
 
+const CASINO_CATEGORIES: CategoryDef[] = [
+  { slug: 'casino_profit', label: 'Casino Profit', group: 'Casino' },
+  { slug: 'casino_wagered', label: 'Total Wagered', group: 'Casino' },
+];
+
 const ALL_CATEGORIES = [
   ...PVP_CATEGORIES,
   ...PROGRESSION_CATEGORIES,
   ...SKILL_CATEGORIES,
   ...COMBAT_CATEGORIES,
   ...GUILD_CATEGORIES,
+  ...CASINO_CATEGORIES,
 ];
 
 const VALID_SLUGS = new Set(ALL_CATEGORIES.map((c) => c.slug));
@@ -430,6 +436,44 @@ async function refreshGuilds() {
   );
 }
 
+async function refreshCasino(): Promise<void> {
+  const rows = await prisma.$queryRaw<{ playerId: string; totalWagered: number; totalPayout: number }[]>`
+    SELECT
+      rb.player_id AS "playerId",
+      SUM(rb.amount)::int AS "totalWagered",
+      COALESCE(SUM(rb.payout), 0)::int AS "totalPayout"
+    FROM roulette_bets rb
+    WHERE rb.payout IS NOT NULL
+    GROUP BY rb.player_id
+  `;
+
+  if (rows.length === 0) return;
+
+  const playerIds = rows.map((r) => r.playerId);
+  const players = await prisma.player.findMany({
+    where: { id: { in: playerIds } },
+    select: { id: true, username: true, characterLevel: true, isBot: true, role: true, activeTitle: true },
+  });
+  const playerMap = new Map(players.map((p) => [p.id, p]));
+
+  const buildRows = (scoreFn: (r: (typeof rows)[0]) => number) =>
+    rows.map((r) => {
+      const p = playerMap.get(r.playerId);
+      return {
+        playerId: r.playerId,
+        score: scoreFn(r),
+        username: p?.username ?? 'Unknown',
+        characterLevel: p?.characterLevel ?? 1,
+        isBot: p?.isBot ?? false,
+        isAdmin: p?.role === 'admin',
+        ...resolveTitle(p?.activeTitle),
+      };
+    });
+
+  await writeToZset('casino_profit', buildRows((r) => r.totalPayout - r.totalWagered));
+  await writeToZset('casino_wagered', buildRows((r) => r.totalWagered));
+}
+
 export async function refreshAllLeaderboards(): Promise<void> {
   const start = Date.now();
   let failures = 0;
@@ -439,6 +483,7 @@ export async function refreshAllLeaderboards(): Promise<void> {
   try { await refreshSkills(); } catch (err) { failures++; console.error('Leaderboard refresh error (skills):', err); }
   try { await refreshCombat(); } catch (err) { failures++; console.error('Leaderboard refresh error (combat):', err); }
   try { await refreshGuilds(); } catch (err) { failures++; console.error('Leaderboard refresh error (guilds):', err); }
+  try { await refreshCasino(); } catch (err) { failures++; console.error('[Leaderboard] refreshCasino failed:', err); }
 
   if (failures === 0) {
     await redis.set('leaderboard:last_refresh', new Date().toISOString());
