@@ -15,6 +15,7 @@ import { getStash } from '@/lib/api/items';
 import { itemImageSrc } from '@/lib/assets';
 import { rarityMeetsThreshold, type Rarity, type ConfirmRarity } from '@/lib/rarity';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { StashTutorial } from '@/components/common/StashTutorial';
 
 interface Item {
@@ -480,11 +481,8 @@ export function Inventory({
 
           {/* Stash item withdraw modal */}
           {!stashBatchActive && selectedStashItem && (
-            <div
-              className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
-              onClick={() => setSelectedStashItem(null)}
-            >
-              <PixelCard className="max-w-sm w-full" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+            <ModalOverlay opacity={80} onClose={() => setSelectedStashItem(null)}>
+              <PixelCard className="max-w-sm w-full">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
                     {selectedStashItem.imageSrc && (
@@ -529,7 +527,7 @@ export function Inventory({
                   {usedSlots >= capacity ? 'Backpack Full' : 'Withdraw'}
                 </PixelButton>
               </PixelCard>
-            </div>
+            </ModalOverlay>
           )}
         </div>
       )}
@@ -689,11 +687,8 @@ export function Inventory({
 
       {/* Item Detail Modal */}
       {!backpackBatchActive && selectedItem && activeTab === 'backpack' && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
-          onClick={() => setSelectedItem(null)}
-        >
-          <PixelCard className="max-w-sm w-full" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <ModalOverlay opacity={80} onClose={() => setSelectedItem(null)}>
+          <PixelCard className="max-w-sm w-full">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-3">
                 <div
@@ -1042,7 +1037,7 @@ export function Inventory({
               </div>
             )}
           </PixelCard>
-        </div>
+        </ModalOverlay>
       )}
 
       {confirmAction && (
