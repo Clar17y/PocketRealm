@@ -172,6 +172,16 @@ export type {
 } from './admin';
 
 export {
+  getTemplates,
+  getActiveTemplate,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  activateTemplate,
+} from './templates';
+export type { TemplateAction, TemplateResponse } from './templates';
+
+export {
   getPlayerGuild,
   createGuild,
   searchGuilds,
