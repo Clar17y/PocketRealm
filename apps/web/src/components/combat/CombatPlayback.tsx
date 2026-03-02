@@ -159,9 +159,12 @@ export function CombatPlayback({
     ? mobMaxHp
     : (log[revealedCount - 1].combatantBHpAfter ?? mobMaxHp);
 
+  // Use combatant-indexed fields (always player's values) rather than actor-relative
+  // staminaAfter/manaAfter which alternate between player and mob per entry
   const currentEntry = revealedCount > 0 ? log[revealedCount - 1] : null;
-  const currentStamina = currentEntry?.staminaAfter ?? 100;
-  const currentMana = currentEntry?.manaAfter ?? 100;
+  const rawEntry = currentEntry as Record<string, unknown> | null;
+  const currentStamina = (rawEntry?.combatantAStaminaAfter as number) ?? playerMaxStamina;
+  const currentMana = (rawEntry?.combatantAManaAfter as number) ?? playerMaxMana;
 
   return (
     <div>
