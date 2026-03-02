@@ -5,7 +5,6 @@ import {
   type BossEncounterData,
   type BossEncounterStatus,
   type BossParticipantData,
-  type BossParticipantRole,
   type BossParticipantStatus,
   type BossPlayerReward,
   type BossRoundSummary,
@@ -35,8 +34,7 @@ function toBossEncounterData(row: {
   currentHp: number;
   maxHp: number;
   baseHp: number;
-  raidPoolHp: number | null;
-  raidPoolMax: number | null;
+  bossEffects?: unknown;
   roundNumber: number;
   nextRoundAt: Date | null;
   status: string;
@@ -58,8 +56,7 @@ function toBossEncounterData(row: {
     currentHp: row.currentHp,
     maxHp: row.maxHp,
     baseHp: row.baseHp,
-    raidPoolHp: row.raidPoolHp,
-    raidPoolMax: row.raidPoolMax,
+    bossEffects: Array.isArray(row.bossEffects) ? row.bossEffects as unknown[] : [],
     roundNumber: row.roundNumber,
     nextRoundAt: row.nextRoundAt?.toISOString() ?? null,
     status: row.status as BossEncounterStatus,
@@ -73,7 +70,6 @@ function toBossParticipantData(row: {
   id: string;
   encounterId: string;
   playerId: string;
-  role: string;
   roundNumber: number;
   turnsCommitted: number;
   totalDamage: number;
@@ -83,13 +79,17 @@ function toBossParticipantData(row: {
   crits: number;
   autoSignUp: boolean;
   currentHp: number;
+  currentStamina: number;
+  currentMana: number;
+  threat: number;
+  damageAbsorbed: number;
+  templateRound: number;
   status: string;
 }): BossParticipantData {
   return {
     id: row.id,
     encounterId: row.encounterId,
     playerId: row.playerId,
-    role: row.role as BossParticipantRole,
     roundNumber: row.roundNumber,
     turnsCommitted: row.turnsCommitted,
     totalDamage: row.totalDamage,
@@ -99,6 +99,11 @@ function toBossParticipantData(row: {
     crits: row.crits,
     autoSignUp: row.autoSignUp,
     currentHp: row.currentHp,
+    currentStamina: row.currentStamina,
+    currentMana: row.currentMana,
+    threat: row.threat,
+    damageAbsorbed: row.damageAbsorbed,
+    templateRound: row.templateRound,
     status: row.status as BossParticipantStatus,
   };
 }
