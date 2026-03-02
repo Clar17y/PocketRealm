@@ -30,6 +30,13 @@ interface DashboardProps {
     isRecovering: boolean;
     recoveryCost: number | null;
     isOverEncumbered: boolean;
+    // Resource fields
+    currentStamina: number;
+    maxStamina: number;
+    staminaRegenRate: number;
+    currentMana: number;
+    maxMana: number;
+    manaRegenRate: number;
   };
   skills: Array<{ name: string; level: number; icon?: LucideIcon; imageSrc?: string }>;
   onNavigate: (screen: string) => void;
@@ -193,6 +200,28 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
           </PixelButton>
         )}
       </PixelCard>
+
+      {/* Stamina */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-[var(--rpg-text-secondary)] w-10">Stam</span>
+        <div className="flex-1">
+          <StatBar current={playerData.currentStamina} max={playerData.maxStamina} color="stamina" size="sm" showNumbers={false} />
+        </div>
+        <span className="text-xs text-[var(--rpg-text-secondary)]">
+          {playerData.currentStamina}/{playerData.maxStamina}
+        </span>
+      </div>
+
+      {/* Mana */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-[var(--rpg-text-secondary)] w-10">Mana</span>
+        <div className="flex-1">
+          <StatBar current={playerData.currentMana} max={playerData.maxMana} color="mana" size="sm" showNumbers={false} />
+        </div>
+        <span className="text-xs text-[var(--rpg-text-secondary)]">
+          {playerData.currentMana}/{playerData.maxMana}
+        </span>
+      </div>
 
       {/* Action Buttons */}
       <div>

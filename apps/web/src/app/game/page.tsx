@@ -235,6 +235,8 @@ export default function GamePage() {
     bestiaryPrefixSummary,
     hpState,
     setHpState,
+    staminaState,
+    manaState,
     pvpNotificationCount,
     playbackActive,
     combatPlaybackData,
@@ -438,6 +440,12 @@ export default function GamePage() {
               isRecovering: hpState.isRecovering,
               isOverEncumbered,
               recoveryCost: hpState.recoveryCost,
+              currentStamina: staminaState.current,
+              maxStamina: staminaState.max,
+              staminaRegenRate: staminaState.regenPerSecond,
+              currentMana: manaState.current,
+              maxMana: manaState.max,
+              manaRegenRate: manaState.regenPerSecond,
             }}
             characterProgression={characterProgression}
             skills={skills
