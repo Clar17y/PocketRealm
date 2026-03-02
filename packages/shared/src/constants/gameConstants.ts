@@ -1079,6 +1079,7 @@ export const CASINO_CONSTANTS = {
   ROULETTE_HISTORY_LENGTH: 20,
   ROUND_DURATION_SECONDS: 60,
   BETTING_WINDOW_SECONDS: 50,
+  BIG_WIN_THRESHOLD: 500,
 } as const;
 
 // =============================================================================

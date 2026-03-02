@@ -50,6 +50,7 @@ const PAYOUT_MULTIPLIERS: Record<RouletteBetType, number> = {
   even: 2,
   dozen: 3,
   column: 3,
+  corner: 9,
 };
 
 export function calculatePayout(betType: RouletteBetType, amount: number): number {
