@@ -48,6 +48,7 @@ import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
 import { GuildScreen } from '@/components/screens/GuildScreen';
 import { Templates } from '@/components/screens/Templates';
+import { TalentTree } from '@/components/screens/TalentTree';
 import { CombatScreen } from './screens/CombatScreen';
 import { useGameController, isMobKnown, type Screen } from './useGameController';
 import { useChat } from '@/hooks/useChat';
@@ -239,6 +240,8 @@ export default function GamePage() {
     staminaState,
     manaState,
     skillPointState,
+    handleAllocateSkillPoint,
+    handleRespecSkillPoints,
     templates,
     handleLoadTemplates,
     pvpNotificationCount,
@@ -1220,6 +1223,16 @@ export default function GamePage() {
             staminaState={staminaState}
             manaState={manaState}
             onLoadTemplates={handleLoadTemplates}
+            onNavigate={setActiveScreen}
+          />
+        );
+      case 'talentTree':
+        return (
+          <TalentTree
+            skillPointState={skillPointState!}
+            skills={skills}
+            onAllocate={handleAllocateSkillPoint}
+            onRespec={handleRespecSkillPoints}
             onNavigate={setActiveScreen}
           />
         );

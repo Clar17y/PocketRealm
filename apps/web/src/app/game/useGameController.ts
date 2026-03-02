@@ -69,6 +69,8 @@ import {
   fetchPendingLoot,
   getResources,
   getSkillPointState,
+  allocateSkillPoint,
+  respecSkillPoints,
   getTemplates,
   type PendingLootItem,
   type TemplateResponse,
@@ -103,6 +105,7 @@ export type Screen =
   | 'leaderboard'
   | 'guild'
   | 'templates'
+  | 'talentTree'
   | 'admin';
 
 export interface PendingEncounter {
@@ -629,6 +632,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (res.data) setSkillPointState(res.data);
   }, []);
 
+  const handleAllocateSkillPoint = useCallback(async (nodeId: string) => {
+    const res = await allocateSkillPoint(nodeId);
+    if (res.data) setSkillPointState(res.data);
+  }, []);
+
+  const handleRespecSkillPoints = useCallback(async () => {
+    const res = await respecSkillPoints();
+    if (res.data) setSkillPointState(res.data);
+  }, []);
+
   const handleLoadTemplates = useCallback(async () => {
     const res = await getTemplates();
     if (res.data) setTemplates(res.data.templates);
@@ -973,7 +986,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'admin'].includes(activeScreen)) return 'home';
     if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
-    if (['combat', 'arena', 'templates'].includes(activeScreen)) return 'combat';
+    if (['combat', 'arena', 'templates', 'talentTree'].includes(activeScreen)) return 'combat';
     if (activeScreen === 'guild') return 'guild';
     return 'home';
   };
@@ -2206,6 +2219,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     skillPointState,
     setSkillPointState,
     handleLoadSkillPoints,
+    handleAllocateSkillPoint,
+    handleRespecSkillPoints,
     templates,
     handleLoadTemplates,
     pvpNotificationCount,
