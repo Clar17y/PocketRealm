@@ -2,7 +2,7 @@ import { prisma, Prisma } from '@adventure/database';
 import {
   GUILD_CONSTANTS,
   GUILD_SPECIALIZATION_DEFINITIONS,
-  type GuildSpecializationPath,
+  type GuildSpecialization,
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 
@@ -15,7 +15,7 @@ const VALID_PATHS = new Set<string>(GUILD_SPECIALIZATION_DEFINITIONS.map((s) => 
 export async function selectSpecialization(
   playerId: string,
   guildId: string,
-  path: GuildSpecializationPath,
+  path: GuildSpecialization,
 ) {
   if (!VALID_PATHS.has(path)) {
     throw new AppError(400, 'Invalid specialization path', 'INVALID_SPECIALIZATION');
@@ -77,7 +77,7 @@ export async function selectSpecialization(
 export async function respecSpecialization(
   playerId: string,
   guildId: string,
-  newPath: GuildSpecializationPath,
+  newPath: GuildSpecialization,
 ) {
   if (!VALID_PATHS.has(newPath)) {
     throw new AppError(400, 'Invalid specialization path', 'INVALID_SPECIALIZATION');

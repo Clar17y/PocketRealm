@@ -1,7 +1,7 @@
 import { prisma } from '@adventure/database';
 import type { SkillType, SkillXpResult } from '@adventure/shared';
 import { SKILL_POINT_CONSTANTS } from '@adventure/shared';
-import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, shouldResetDailyCap } from '@adventure/game-engine';
+import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, shouldResetWindowCap } from '@adventure/game-engine';
 import { getPlayerGuildModifiers } from './guildUpgradeService';
 
 export interface GrantXpResult {
@@ -57,7 +57,7 @@ export async function grantSkillXp(
       throw new Error(`Player not found for playerId=${playerId}`);
     }
 
-    const needsReset = shouldResetDailyCap(skill.lastXpResetAt, now);
+    const needsReset = shouldResetWindowCap(skill.lastXpResetAt, now);
     const currentWindowXpGained = needsReset ? 0 : skill.dailyXpGained;
 
     const currentXp = Number(skill.xp);

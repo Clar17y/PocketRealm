@@ -144,8 +144,6 @@ export interface GuildProjectContributionData {
 
 // --- Guild Specialization ---
 
-export type GuildSpecializationPath = 'warfare' | 'industry' | 'discovery';
-
 export interface SpecializationTierBonus {
   effectType: string;
   value: number;
@@ -158,7 +156,7 @@ export interface SpecializationTier {
 }
 
 export interface GuildSpecializationDefinition {
-  path: GuildSpecializationPath;
+  path: GuildSpecialization;
   name: string;
   description: string;
   tiers: SpecializationTier[];
