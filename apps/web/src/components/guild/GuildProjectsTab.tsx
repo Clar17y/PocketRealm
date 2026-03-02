@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
+import { LoadingCard } from '@/components/common/LoadingCard';
 import {
   getGuildProjects, startGuildProject, contributeProjectTurns, contributeProjectMaterials,
   GUILD_MODIFIER_LABELS,
@@ -131,7 +132,7 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
     }
   };
 
-  if (loading && !data) return <PixelCard><p className="text-sm opacity-60">Loading...</p></PixelCard>;
+  if (loading && !data) return <LoadingCard />;
 
   const activeProject = data?.projects.find((p) => p.status === 'active');
   const completedProjects = data?.projects.filter((p) => p.status === 'completed') ?? [];

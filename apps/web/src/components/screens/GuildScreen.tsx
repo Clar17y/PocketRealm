@@ -17,6 +17,8 @@ import {
 } from '@/lib/api';
 import { GuildProjectsTab } from '@/components/guild/GuildProjectsTab';
 import { GuildSpecializationTab } from '@/components/guild/GuildSpecializationTab';
+import { LoadingCard } from '@/components/common/LoadingCard';
+import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { GUILD_CONSTANTS } from '@adventure/shared';
 import { formatNumber } from '@/lib/format';
 
@@ -56,7 +58,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
     return (
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Guild</h2>
-        <PixelCard><p className="text-sm opacity-60">Loading...</p></PixelCard>
+        <LoadingCard />
       </div>
     );
   }
@@ -78,11 +80,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
         [{guildData.guild.tag}] {guildData.guild.name}
       </h2>
 
-      {error && (
-        <div className="p-3 rounded bg-[var(--rpg-red)]/10 border border-[var(--rpg-red)] text-[var(--rpg-red)] text-sm">
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} />}
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {(['overview', 'members', 'upgrades', 'contracts', 'projects', 'specialization', 'log', ...(guildData.role === 'leader' || guildData.role === 'officer' ? ['settings'] : [])] as GuildTab[]).map((tab) => (
@@ -235,11 +233,7 @@ function NoGuildView({
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Guild</h2>
 
-      {(error || actionError) && (
-        <div className="p-3 rounded bg-[var(--rpg-red)]/10 border border-[var(--rpg-red)] text-[var(--rpg-red)] text-sm">
-          {error || actionError}
-        </div>
-      )}
+      {(error || actionError) && <ErrorBanner message={(error || actionError)!} />}
 
       <PixelCard>
         <p className="text-sm text-[var(--rpg-text-secondary)] mb-3">
@@ -618,7 +612,7 @@ function GuildActivityLog({ guildId }: { guildId: string }) {
   }, [loadLog]);
 
   if (loading && !logData) {
-    return <PixelCard><p className="text-sm opacity-60">Loading...</p></PixelCard>;
+    return <LoadingCard />;
   }
 
   return (
@@ -714,7 +708,7 @@ function GuildUpgradesTab({
     }
   };
 
-  if (loading && !data) return <PixelCard><p className="text-sm opacity-60">Loading...</p></PixelCard>;
+  if (loading && !data) return <LoadingCard />;
 
   return (
     <div className="space-y-3">
@@ -785,7 +779,7 @@ function GuildContractsTab({ guildId }: { guildId: string }) {
 
   useEffect(() => { void loadContracts(); }, [loadContracts]);
 
-  if (loading && !data) return <PixelCard><p className="text-sm opacity-60">Loading...</p></PixelCard>;
+  if (loading && !data) return <LoadingCard />;
 
   if (!data?.contracts.length) {
     return <PixelCard><p className="text-sm text-[var(--rpg-text-secondary)]">No active contracts this week.</p></PixelCard>;

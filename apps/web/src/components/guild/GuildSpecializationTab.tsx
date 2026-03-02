@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
+import { LoadingCard } from '@/components/common/LoadingCard';
 import {
   getGuildSpecialization, selectGuildSpecialization, respecGuildSpecialization,
   GUILD_MODIFIER_LABELS,
@@ -76,7 +77,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
   };
 
   if (loading && status === undefined) {
-    return <PixelCard><p className="text-sm opacity-60">Loading...</p></PixelCard>;
+    return <LoadingCard />;
   }
 
   // Guild level too low
