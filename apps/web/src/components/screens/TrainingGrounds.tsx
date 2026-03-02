@@ -328,11 +328,14 @@ export function TrainingGrounds({
                   className="w-full rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--rpg-gold)]"
                 >
                   <option value="none">{selectedMob.name} (base)</option>
-                  {selectedMob.prefixesEncountered.map((prefix) => (
-                    <option key={prefix} value={prefix}>
-                      {prefix} {selectedMob.name}
-                    </option>
-                  ))}
+                  {selectedMob.prefixesEncountered.map((prefix) => {
+                    const def = getMobPrefixDefinition(prefix);
+                    return (
+                      <option key={prefix} value={prefix}>
+                        {def?.displayName ?? prefix} {selectedMob.name}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             )}
