@@ -61,7 +61,7 @@ export function TalentTree({
   const [confirmRespec, setConfirmRespec] = useState(false);
   const [respeccing, setRespeccing] = useState(false);
 
-  const { availablePoints, allocations, trees } = skillPointState;
+  const { availablePoints = 0, allocations = {}, trees = {} } = skillPointState;
   const treeNodes = trees[activeTree] ?? [];
   const tierGroups = useMemo(() => groupNodesByTier(treeNodes), [treeNodes]);
   const sortedTiers = useMemo(() => [...tierGroups.keys()].sort((a, b) => a - b), [tierGroups]);
