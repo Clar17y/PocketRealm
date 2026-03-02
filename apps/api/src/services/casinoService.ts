@@ -63,6 +63,9 @@ interface ActiveRound {
   startedAt: number;
 }
 
+const RESULT_KEY = 'roulette:resolved_round';
+const RESULT_DISPLAY_SECONDS = 5;
+
 async function getOrCreateRound(): Promise<{ roundId: string; startedAt: number; isNew: boolean }> {
   const existing = await redis.get(ROUND_KEY);
   if (existing) {
@@ -72,6 +75,13 @@ async function getOrCreateRound(): Promise<{ roundId: string; startedAt: number;
       return { ...parsed, isNew: false };
     }
     await resolveRound(parsed.roundId);
+  }
+
+  // Don't create a new round while the result is still being displayed
+  const resolved = await redis.get(RESULT_KEY);
+  if (resolved) {
+    const parsed = JSON.parse(resolved);
+    return { roundId: parsed.roundId, startedAt: parsed.startedAt, isNew: false };
   }
 
   const round = await prisma.rouletteRound.create({ data: {} });
@@ -157,7 +167,12 @@ async function resolveRound(roundId: string): Promise<number> {
     io.to('chat:casino').emit('casino:result', resultEvent);
   }
 
+  // Keep the resolved round visible for a few seconds before allowing a new round
+  const parsed = await redis.get(ROUND_KEY);
+  const startedAt = parsed ? JSON.parse(parsed).startedAt : Date.now();
   await redis.del(ROUND_KEY);
+  await redis.set(RESULT_KEY, JSON.stringify({ roundId, startedAt, result }), 'EX', RESULT_DISPLAY_SECONDS);
+
   return result;
 }
 
@@ -187,6 +202,21 @@ async function emitPhaseIfChanged(
 }
 
 export async function getCurrentRound(): Promise<RouletteRoundState> {
+  // Check if we're in the result display window
+  const resolved = await redis.get(RESULT_KEY);
+  if (resolved) {
+    const { roundId, startedAt, result: resolvedResult } = JSON.parse(resolved);
+    await emitPhaseIfChanged('result', roundId, 0, resolvedResult);
+    return {
+      roundId,
+      phase: 'result' as const,
+      result: resolvedResult,
+      startedAt: new Date(startedAt).toISOString(),
+      timeRemainingMs: 0,
+      bets: await getPublicBets(roundId),
+    };
+  }
+
   const existing = await redis.get(ROUND_KEY);
   if (!existing) {
     // Auto-start a new round so the casino never stalls in idle

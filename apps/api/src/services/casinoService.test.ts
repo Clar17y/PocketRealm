@@ -101,8 +101,9 @@ describe('getCurrentRound', () => {
 
   it('returns betting phase with time remaining', async () => {
     const startedAt = Date.now() - 5000; // 5 seconds ago (within 50s betting window)
-    mockRedis.get.mockResolvedValue(
-      JSON.stringify({ roundId: 'round-1', startedAt })
+    const roundData = JSON.stringify({ roundId: 'round-1', startedAt });
+    mockRedis.get.mockImplementation((key: string) =>
+      Promise.resolve(key === 'roulette:current_round' ? roundData : null)
     );
     mockPrisma.rouletteBet.findMany.mockResolvedValue([]);
 
@@ -120,8 +121,9 @@ describe('getCurrentRound', () => {
   it('returns spinning phase when past betting window', async () => {
     // 55 seconds ago: past 50s betting window but within 60s round duration
     const startedAt = Date.now() - 55_000;
-    mockRedis.get.mockResolvedValue(
-      JSON.stringify({ roundId: 'round-1', startedAt })
+    const roundData = JSON.stringify({ roundId: 'round-1', startedAt });
+    mockRedis.get.mockImplementation((key: string) =>
+      Promise.resolve(key === 'roulette:current_round' ? roundData : null)
     );
     mockPrisma.rouletteBet.findMany.mockResolvedValue([]);
 
@@ -136,8 +138,9 @@ describe('getCurrentRound', () => {
   it('resolves round and returns result when past total duration', async () => {
     // 65 seconds ago: past 60s round duration
     const startedAt = Date.now() - 65_000;
-    mockRedis.get.mockResolvedValue(
-      JSON.stringify({ roundId: 'round-1', startedAt })
+    const roundData = JSON.stringify({ roundId: 'round-1', startedAt });
+    mockRedis.get.mockImplementation((key: string) =>
+      Promise.resolve(key === 'roulette:current_round' ? roundData : null)
     );
     mockGenerateSpinResult.mockReturnValue(7);
     mockRedis.set.mockResolvedValue('OK'); // lock acquisition
