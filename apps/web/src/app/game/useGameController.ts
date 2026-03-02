@@ -67,15 +67,22 @@ import {
   withdrawFromStash,
   claimLoot,
   fetchPendingLoot,
+  getResources,
+  getSkillPointState,
+  allocateSkillPoint,
+  respecSkillPoints,
+  getTemplates,
   type PendingLootItem,
   type AchievementsResponse,
   type EventModifierBadge,
   type CombatActiveEvent,
   type PlayerSettings,
   type WorldEventResponse,
+  type SkillPointState,
   exchangeGold,
   placeRouletteBet,
 } from '@/lib/api';
+import type { CombatTemplateData, ResourceState } from '@adventure/shared';
 import type { RouletteBetType } from '@adventure/shared';
 import { getSocket } from '@/lib/socket';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
@@ -99,6 +106,8 @@ export type Screen =
   | 'achievements'
   | 'leaderboard'
   | 'guild'
+  | 'templates'
+  | 'talentTree'
   | 'casino'
   | 'training'
   | 'admin';
@@ -489,6 +498,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     prefixesEncountered: string[];
     explorationTier: number;
     tierLocked: boolean;
+    bossRotation?: {
+      totalRounds: number;
+      revealedRounds: number;
+      actions: Array<{
+        round: number;
+        actionName: string;
+        targetMode: 'single_target' | 'aoe';
+        isTelegraphed: boolean;
+      }>;
+    };
   }>>([]);
   const [bestiaryLoading, setBestiaryLoading] = useState(false);
   const [bestiaryError, setBestiaryError] = useState<string | null>(null);
@@ -499,6 +518,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     discovered: boolean;
   }>>([]);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
+  const [staminaState, setStaminaState] = useState<ResourceState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 });
+  const [manaState, setManaState] = useState<ResourceState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5 });
+  const [skillPointState, setSkillPointState] = useState<SkillPointState | null>(null);
+  const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
   const [autoPotionThreshold, setAutoPotionThreshold] = useState(0);
@@ -590,9 +613,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   } | null>(null);
 
   const loadTurnsAndHp = useCallback(async () => {
-    const [turnRes, hpRes] = await Promise.all([getTurns(), getHpState()]);
+    const [turnRes, hpRes, resourceRes] = await Promise.all([getTurns(), getHpState(), getResources()]);
     if (turnRes.data) setTurns(turnRes.data.currentTurns);
     if (hpRes.data) setHpState(hpRes.data);
+    if (resourceRes.data) {
+      setStaminaState(resourceRes.data.stamina);
+      setManaState(resourceRes.data.mana);
+    }
   }, []);
 
   const loadPvpNotificationCount = useCallback(async () => {
@@ -615,10 +642,30 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (res.data) setAchievementUnclaimedCount(res.data.unclaimedCount);
   }, []);
 
+  const handleLoadSkillPoints = useCallback(async () => {
+    const res = await getSkillPointState();
+    if (res.data) setSkillPointState(res.data);
+  }, []);
+
+  const handleAllocateSkillPoint = useCallback(async (nodeId: string) => {
+    const res = await allocateSkillPoint(nodeId);
+    if (res.data) setSkillPointState(res.data);
+  }, []);
+
+  const handleRespecSkillPoints = useCallback(async () => {
+    const res = await respecSkillPoints();
+    if (res.data) setSkillPointState(res.data);
+  }, []);
+
+  const handleLoadTemplates = useCallback(async () => {
+    const res = await getTemplates();
+    if (res.data) setTemplates(res.data.templates);
+  }, []);
+
   const loadAll = useCallback(async () => {
     setActionError(null);
 
-    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, recipesRes, hpRes] = await Promise.all([
+    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, recipesRes, hpRes, resourceRes, skillPointRes] = await Promise.all([
       getTurns(),
       getPlayer(),
       getSkills(),
@@ -627,6 +674,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       getEquipment(),
       getCraftingRecipes(),
       getHpState(),
+      getResources(),
+      getSkillPointState(),
     ]);
 
     if (turnRes.data) setTurns(turnRes.data.currentTurns);
@@ -651,6 +700,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
     if (hpRes.data) setHpState(hpRes.data);
+    if (resourceRes.data) {
+      setStaminaState(resourceRes.data.stamina);
+      setManaState(resourceRes.data.mana);
+    }
+    if (skillPointRes.data) setSkillPointState(skillPointRes.data);
     if (zonesRes.data) {
       setZones(zonesRes.data.zones);
       setZoneConnections(zonesRes.data.connections);
@@ -947,7 +1001,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
     if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
-    if (['combat', 'arena'].includes(activeScreen)) return 'combat';
+    if (['combat', 'arena', 'templates', 'talentTree'].includes(activeScreen)) return 'combat';
     if (activeScreen === 'guild') return 'guild';
     return 'home';
   };
@@ -2194,6 +2248,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     bestiaryPrefixSummary,
     hpState,
     setHpState,
+    staminaState,
+    manaState,
+    skillPointState,
+    setSkillPointState,
+    handleLoadSkillPoints,
+    handleAllocateSkillPoint,
+    handleRespecSkillPoints,
+    templates,
+    handleLoadTemplates,
     pvpNotificationCount,
     autoPotionThreshold,
     setAutoPotionThreshold,

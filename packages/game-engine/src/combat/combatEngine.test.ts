@@ -242,8 +242,8 @@ describe('auto-potion system', () => {
 
   function makePotions(): CombatPotion[] {
     return [
-      { name: 'Minor Health Potion', healAmount: 50, templateId: 'tmpl-minor' },
-      { name: 'Health Potion', healAmount: 150, templateId: 'tmpl-health' },
+      { name: 'Minor Health Potion', healAmount: 50, templateId: 'tmpl-minor', potionType: 'hp' },
+      { name: 'Health Potion', healAmount: 150, templateId: 'tmpl-health', potionType: 'hp' },
     ];
   }
 
@@ -343,9 +343,9 @@ describe('auto-potion system', () => {
     const options: CombatOptions = {
       autoPotionThreshold: 50,
       potions: [
-        { name: 'Potion A', healAmount: 50, templateId: 'a' },
-        { name: 'Potion B', healAmount: 50, templateId: 'b' },
-        { name: 'Potion C', healAmount: 50, templateId: 'c' },
+        { name: 'Potion A', healAmount: 50, templateId: 'a', potionType: 'hp' },
+        { name: 'Potion B', healAmount: 50, templateId: 'b', potionType: 'hp' },
+        { name: 'Potion C', healAmount: 50, templateId: 'c', potionType: 'hp' },
       ],
     };
 
@@ -402,7 +402,7 @@ describe('auto-potion system', () => {
     const options: CombatOptions = {
       autoPotionThreshold: 80,
       potions: [
-        { name: 'Tiny Potion', healAmount: 20, templateId: 'tiny' },
+        { name: 'Tiny Potion', healAmount: 20, templateId: 'tiny', potionType: 'hp' },
       ],
     };
 
@@ -451,9 +451,9 @@ describe('auto-potion system', () => {
     const options: CombatOptions = {
       autoPotionThreshold: 90,
       potions: [
-        { name: 'Potion 1', healAmount: 30, templateId: 'p1' },
-        { name: 'Potion 2', healAmount: 30, templateId: 'p2' },
-        { name: 'Potion 3', healAmount: 30, templateId: 'p3' },
+        { name: 'Potion 1', healAmount: 30, templateId: 'p1', potionType: 'hp' },
+        { name: 'Potion 2', healAmount: 30, templateId: 'p2', potionType: 'hp' },
+        { name: 'Potion 3', healAmount: 30, templateId: 'p3', potionType: 'hp' },
       ],
     };
 

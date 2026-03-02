@@ -15,8 +15,14 @@ export type ResourceEffectType = 'drop_rate_up' | 'drop_rate_down' | 'yield_up' 
 export type WorldEventEffectType = MobEffectType | ResourceEffectType;
 
 export type BossEncounterStatus = 'waiting' | 'in_progress' | 'defeated' | 'expired';
-export type BossParticipantRole = 'attacker' | 'healer';
 export type BossParticipantStatus = 'alive' | 'knocked_out';
+
+export interface BossActiveEffect {
+  name: string;
+  stat: string;
+  modifier: number;
+  roundsRemaining: number;
+}
 
 export type WorldEventScope = 'zone' | 'world';
 
@@ -44,7 +50,8 @@ export interface BossRoundSummary {
   bossDamage: number;
   totalPlayerDamage: number;
   bossHpPercent: number;
-  raidPoolPercent: number;
+  playersAlive: number;
+  playersDead: number;
 }
 
 export interface BossPlayerReward {
@@ -75,8 +82,7 @@ export interface BossEncounterData {
   currentHp: number;
   maxHp: number;
   baseHp: number;
-  raidPoolHp: number | null;
-  raidPoolMax: number | null;
+  bossEffects: BossActiveEffect[];
   roundNumber: number;
   nextRoundAt: string | null;
   status: BossEncounterStatus;
@@ -89,7 +95,6 @@ export interface BossParticipantData {
   id: string;
   encounterId: string;
   playerId: string;
-  role: BossParticipantRole;
   roundNumber: number;
   turnsCommitted: number;
   totalDamage: number;
@@ -99,6 +104,11 @@ export interface BossParticipantData {
   crits: number;
   autoSignUp: boolean;
   currentHp: number;
+  currentStamina: number;
+  currentMana: number;
+  threat: number;
+  damageAbsorbed: number;
+  templateRound: number;
   status: BossParticipantStatus;
 }
 

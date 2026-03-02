@@ -2,21 +2,29 @@ import type { Server as SocketServer } from 'socket.io';
 import { prisma } from '@adventure/database';
 import {
   WORLD_EVENT_CONSTANTS,
+  BASE_ACTION_DEFINITIONS,
+  BOSS_ACTION_DEFINITIONS,
+  BOSS_TEMPLATES,
+  type BossActiveEffect,
   type BossEncounterData,
   type BossEncounterStatus,
   type BossParticipantData,
-  type BossParticipantRole,
   type BossParticipantStatus,
   type BossPlayerReward,
   type BossRoundSummary,
 } from '@adventure/shared';
 import {
-  resolveBossRoundLogic,
+  resolveBossRound as resolveBossRoundEngine,
   buildPlayerCombatStats,
-  type BossRoundAttacker,
-  type BossRoundHealer,
+  calculateMaxStamina,
+  calculateStaminaRegenPerRound,
+  calculateMaxMana,
+  calculateManaRegenPerRound,
+  initThreatTable,
+  type BossRoundParticipant,
+  type BossState,
+  type BossRoundInput,
   type BossRoundResult,
-  type BossStats,
 } from '@adventure/game-engine';
 import { emitSystemMessage } from './systemMessageService';
 import { spendPlayerTurnsTx } from './turnBankService';
@@ -24,8 +32,11 @@ import { getEquipmentStats } from './equipmentService';
 import { getPlayerProgressionState } from './attributesService';
 import { getMainHandAttackSkill, getSkillLevel } from './combatStatsService';
 import { getHpState, setHp, enterRecoveringState } from './hpService';
+import { getActiveTemplate } from './combatTemplateService';
 import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { distributeBossLoot } from './bossLootService';
+
+// --- Mappers ---
 
 function toBossEncounterData(row: {
   id: string;
@@ -34,8 +45,7 @@ function toBossEncounterData(row: {
   currentHp: number;
   maxHp: number;
   baseHp: number;
-  raidPoolHp: number | null;
-  raidPoolMax: number | null;
+  bossEffects?: unknown;
   roundNumber: number;
   nextRoundAt: Date | null;
   status: string;
@@ -57,8 +67,7 @@ function toBossEncounterData(row: {
     currentHp: row.currentHp,
     maxHp: row.maxHp,
     baseHp: row.baseHp,
-    raidPoolHp: row.raidPoolHp,
-    raidPoolMax: row.raidPoolMax,
+    bossEffects: Array.isArray(row.bossEffects) ? row.bossEffects as BossActiveEffect[] : [],
     roundNumber: row.roundNumber,
     nextRoundAt: row.nextRoundAt?.toISOString() ?? null,
     status: row.status as BossEncounterStatus,
@@ -72,7 +81,6 @@ function toBossParticipantData(row: {
   id: string;
   encounterId: string;
   playerId: string;
-  role: string;
   roundNumber: number;
   turnsCommitted: number;
   totalDamage: number;
@@ -82,13 +90,17 @@ function toBossParticipantData(row: {
   crits: number;
   autoSignUp: boolean;
   currentHp: number;
+  currentStamina: number;
+  currentMana: number;
+  threat: number;
+  damageAbsorbed: number;
+  templateRound: number;
   status: string;
 }): BossParticipantData {
   return {
     id: row.id,
     encounterId: row.encounterId,
     playerId: row.playerId,
-    role: row.role as BossParticipantRole,
     roundNumber: row.roundNumber,
     turnsCommitted: row.turnsCommitted,
     totalDamage: row.totalDamage,
@@ -98,9 +110,45 @@ function toBossParticipantData(row: {
     crits: row.crits,
     autoSignUp: row.autoSignUp,
     currentHp: row.currentHp,
+    currentStamina: row.currentStamina,
+    currentMana: row.currentMana,
+    threat: row.threat,
+    damageAbsorbed: row.damageAbsorbed,
+    templateRound: row.templateRound,
     status: row.status as BossParticipantStatus,
   };
 }
+
+// --- Helpers ---
+
+async function resolveUsername(playerId: string | null): Promise<string | null> {
+  if (!playerId) return null;
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { username: true },
+  });
+  return player?.username ?? null;
+}
+
+async function computeResourcePools(playerId: string): Promise<{ maxStamina: number; maxMana: number; meleeLevel: number; rangedLevel: number; magicLevel: number; evasionLevel: number }> {
+  const [meleeLevel, rangedLevel, magicLevel, progression] = await Promise.all([
+    getSkillLevel(playerId, 'melee'),
+    getSkillLevel(playerId, 'ranged'),
+    getSkillLevel(playerId, 'magic'),
+    getPlayerProgressionState(playerId),
+  ]);
+  const evasionLevel = progression.attributes.evasion;
+  return {
+    maxStamina: calculateMaxStamina({ meleeLevel, rangedLevel, evasionLevel, equipmentStaminaBonus: 0 }),
+    maxMana: calculateMaxMana({ magicLevel, equipmentManaBonus: 0 }),
+    meleeLevel,
+    rangedLevel,
+    magicLevel,
+    evasionLevel,
+  };
+}
+
+// --- Public API ---
 
 export async function createBossEncounter(
   eventId: string,
@@ -130,7 +178,6 @@ export async function createBossEncounter(
 export async function signUpForBossRound(
   encounterId: string,
   playerId: string,
-  role: BossParticipantRole,
   playerMaxHp: number,
   autoSignUp = false,
 ): Promise<BossParticipantData> {
@@ -159,12 +206,15 @@ export async function signUpForBossRound(
 
   let row;
   if (existing) {
-    // Update role/autoSignUp on existing signup — no additional turn cost
+    // Update autoSignUp on existing signup — no additional turn cost
     row = await prisma.bossParticipant.update({
       where: { id: existing.id },
-      data: { role, autoSignUp },
+      data: { autoSignUp },
     });
   } else {
+    // Compute resource pools from skill levels
+    const { maxStamina, maxMana } = await computeResourcePools(playerId);
+
     row = await prisma.$transaction(async (tx) => {
       await spendPlayerTurnsTx(tx, playerId, turnCost);
 
@@ -172,10 +222,11 @@ export async function signUpForBossRound(
         data: {
           encounterId,
           playerId,
-          role,
           roundNumber: nextRound,
           turnsCommitted: turnCost,
           currentHp: playerMaxHp,
+          currentStamina: maxStamina,
+          currentMana: maxMana,
           status: 'alive',
           autoSignUp,
         },
@@ -222,7 +273,7 @@ export async function resolveBossRound(
     where: { id: encounterId },
     include: {
       event: { select: { zoneId: true, title: true, zone: { select: { name: true, difficulty: true } } } },
-      mobTemplate: { select: { name: true, level: true, defence: true, magicDefence: true, evasion: true, bossAoeDmg: true } },
+      mobTemplate: { select: { id: true, name: true, level: true, defence: true, magicDefence: true, evasion: true, damageMin: true, damageMax: true, accuracy: true, hp: true, damageType: true, bossAoeDmg: true } },
     },
   });
   if (!encounter || encounter.status === 'defeated' || encounter.status === 'expired') {
@@ -251,106 +302,109 @@ export async function resolveBossRound(
   encounter.maxHp = scaledMaxHp;
   encounter.currentHp = scaledCurrentHp;
 
-  // Build attacker/healer lists with real stats and compute raid pool
-  const attackers: BossRoundAttacker[] = [];
-  const healers: BossRoundHealer[] = [];
-
-  // M3: batch all participant stat lookups in parallel
-  const participantData = await Promise.all(
+  // Build participant combatants with carried-forward resources
+  const participants: BossRoundParticipant[] = await Promise.all(
     signups.map(async (signup) => {
-      const [hpState, equipStats, progression] = await Promise.all([
+      const [hpState, equipStats, template, resources] = await Promise.all([
         getHpState(signup.playerId),
         getEquipmentStats(signup.playerId),
-        getPlayerProgressionState(signup.playerId),
+        getActiveTemplate(signup.playerId),
+        computeResourcePools(signup.playerId),
       ]);
 
-      if (signup.role === 'attacker') {
-        const mainHandSkill = await getMainHandAttackSkill(signup.playerId);
-        const attackSkill = mainHandSkill ?? 'melee';
-        const attackSkillLevel = await getSkillLevel(signup.playerId, attackSkill);
-        return { signup, hpState, equipStats, progression, role: 'attacker' as const, attackSkill, attackSkillLevel };
-      } else {
-        const magicLevel = await getSkillLevel(signup.playerId, 'magic');
-        return { signup, hpState, equipStats, progression, role: 'healer' as const, magicLevel };
-      }
+      const mainHandSkill = await getMainHandAttackSkill(signup.playerId);
+      const attackSkill = mainHandSkill ?? 'melee';
+      const attackSkillLevel = await getSkillLevel(signup.playerId, attackSkill);
+
+      const progression = await getPlayerProgressionState(signup.playerId);
+      const stats = buildPlayerCombatStats(
+        hpState.maxHp, hpState.maxHp,
+        { attackStyle: attackSkill, skillLevel: attackSkillLevel, attributes: progression.attributes },
+        equipStats,
+      );
+
+      return {
+        playerId: signup.playerId,
+        stats,
+        template,
+        actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
+        hp: signup.currentHp,
+        maxHp: hpState.maxHp,
+        stamina: signup.currentStamina,
+        maxStamina: resources.maxStamina,
+        staminaRegenPerRound: calculateStaminaRegenPerRound(resources.meleeLevel, resources.rangedLevel, resources.evasionLevel),
+        mana: signup.currentMana,
+        maxMana: resources.maxMana,
+        manaRegenPerRound: calculateManaRegenPerRound(resources.magicLevel),
+        templateRound: signup.templateRound,
+        activeEffects: [],
+      };
     }),
   );
 
-  let raidPoolMax = 0;
-  let totalDefence = 0;
+  // Build boss state from template
+  const mob = encounter.mobTemplate;
+  const bossTemplate = BOSS_TEMPLATES[mob.name];
 
-  for (const pd of participantData) {
-    raidPoolMax += pd.hpState.maxHp;
-    totalDefence += pd.equipStats.armor;
-
-    if (pd.role === 'attacker') {
-      const stats = buildPlayerCombatStats(
-        pd.hpState.maxHp, pd.hpState.maxHp,
-        { attackStyle: pd.attackSkill, skillLevel: pd.attackSkillLevel, attributes: pd.progression.attributes },
-        pd.equipStats,
-      );
-      const turnMultiplier = 1 + pd.signup.turnsCommitted * WORLD_EVENT_CONSTANTS.ATTACKER_TURN_SCALING;
-      stats.damageMin = Math.round(stats.damageMin * turnMultiplier);
-      stats.damageMax = Math.round(stats.damageMax * turnMultiplier);
-      attackers.push({ playerId: pd.signup.playerId, stats });
-    } else {
-      const healAmount = Math.floor(
-        pd.signup.turnsCommitted * (1 + pd.magicLevel * WORLD_EVENT_CONSTANTS.HEALER_MAGIC_SCALING),
-      );
-      healers.push({ playerId: pd.signup.playerId, healAmount });
-    }
-  }
-
-  const avgDefence = signups.length > 0 ? totalDefence / signups.length : 0;
-
-  // M2: use mob-specific stats with tier constants as fallback
-  const tierDefence = WORLD_EVENT_CONSTANTS.BOSS_DEFENCE_BY_TIER[tierIndex]!;
-  const mobAoe = encounter.mobTemplate.bossAoeDmg ?? WORLD_EVENT_CONSTANTS.BOSS_AOE_PER_PLAYER_BY_TIER[tierIndex]!;
-  const bossStats: BossStats = {
-    defence: encounter.mobTemplate.defence ?? tierDefence,
-    magicDefence: encounter.mobTemplate.magicDefence ?? Math.round(tierDefence * 0.7),
-    dodge: encounter.mobTemplate.evasion ?? Math.round(zoneTier * 3),
-    aoeDamage: mobAoe * participantCount,
-    avgParticipantDefence: avgDefence,
+  const bossState: BossState = {
+    hp: encounter.currentHp,
+    maxHp: encounter.maxHp,
+    stats: {
+      hp: encounter.currentHp,
+      maxHp: encounter.maxHp,
+      attack: mob.accuracy,
+      accuracy: mob.accuracy,
+      defence: mob.defence,
+      magicDefence: mob.magicDefence,
+      dodge: mob.evasion,
+      evasion: 0,
+      damageMin: mob.damageMin,
+      damageMax: mob.damageMax,
+      speed: 0,
+      damageType: (mob.damageType as 'physical' | 'magic') ?? 'physical',
+    },
+    template: bossTemplate?.actions ?? [{ actionId: 'boss_physical_attack', targetMode: 'single_target' as const }],
+    actionDefinitions: bossTemplate?.actionDefinitions ?? BOSS_ACTION_DEFINITIONS,
+    roundNumber: nextRound,
+    activeEffects: Array.isArray(encounter.bossEffects) ? encounter.bossEffects as unknown as BossActiveEffect[] : [],
   };
 
-  // Compute raid pool HP: new joiners add full HP, existing damage preserved as absolute
-  let currentRaidPool: number;
-  if (encounter.raidPoolHp !== null && encounter.raidPoolMax !== null && encounter.raidPoolMax > 0) {
-    const damageTaken = encounter.raidPoolMax - encounter.raidPoolHp;
-    currentRaidPool = Math.max(0, raidPoolMax - damageTaken);
-  } else {
-    currentRaidPool = raidPoolMax;
+  // Build threat table from carried-forward threat values
+  const threatTable = initThreatTable(signups.map(s => s.playerId));
+  for (const signup of signups) {
+    const entry = threatTable.find(e => e.playerId === signup.playerId);
+    if (entry) entry.threat = signup.threat;
   }
 
-  const result = resolveBossRoundLogic({
-    bossHp: encounter.currentHp,
-    bossMaxHp: encounter.maxHp,
-    boss: bossStats,
-    attackers,
-    healers,
-    raidPool: currentRaidPool,
-    raidPoolMax,
-  });
+  const input: BossRoundInput = {
+    boss: bossState,
+    participants,
+    threatTable,
+  };
+
+  const result = resolveBossRoundEngine(input);
 
   // Compute round summary
-  const totalPlayerDmg = result.attackerResults.reduce((s, a) => s + a.damage, 0);
+  const totalPlayerDmg = result.participantResults.reduce((s, r) => s + r.damageDealt, 0);
+  const playersAlive = result.participantResults.filter(r => !r.isDead).length;
+  const playersDead = result.participantResults.filter(r => r.isDead).length;
+
   const roundSummary: BossRoundSummary = {
     round: nextRound,
-    bossDamage: result.poolDamageTaken,
+    bossDamage: result.participantResults.reduce((s, r) => s + r.damageTaken, 0),
     totalPlayerDamage: totalPlayerDmg,
     bossHpPercent: encounter.maxHp > 0 ? Math.round((result.bossHpAfter / encounter.maxHp) * 100) : 0,
-    raidPoolPercent: raidPoolMax > 0 ? Math.round((result.raidPoolAfter / raidPoolMax) * 100) : 100,
+    playersAlive,
+    playersDead,
   };
   const existingSummaries = (Array.isArray(encounter.roundSummaries)
     ? encounter.roundSummaries
     : []) as unknown as BossRoundSummary[];
   const newSummaries = [...existingSummaries, roundSummary];
 
-  // Defeated boss lingers for one interval so players can see the result
   const nextNextRoundAt = new Date(Date.now() + WORLD_EVENT_CONSTANTS.BOSS_ROUND_INTERVAL_MINUTES * 60 * 1000);
 
-  // M6: find top cumulative damage dealer across all rounds for killedBy
+  // Find top cumulative damage dealer for killedBy
   let killedBy: string | null = null;
   if (result.bossDefeated) {
     const allParticipantsForKill = await prisma.bossParticipant.findMany({
@@ -361,10 +415,9 @@ export async function resolveBossRound(
     for (const p of allParticipantsForKill) {
       cumulativeDamage.set(p.playerId, (cumulativeDamage.get(p.playerId) ?? 0) + p.totalDamage);
     }
-    // Also add this round's damage (not yet persisted to DB)
-    for (const ar of result.attackerResults) {
-      if (ar.damage > 0) {
-        cumulativeDamage.set(ar.playerId, (cumulativeDamage.get(ar.playerId) ?? 0) + ar.damage);
+    for (const pr of result.participantResults) {
+      if (pr.damageDealt > 0) {
+        cumulativeDamage.set(pr.playerId, (cumulativeDamage.get(pr.playerId) ?? 0) + pr.damageDealt);
       }
     }
     let topDamage = 0;
@@ -376,7 +429,7 @@ export async function resolveBossRound(
     }
   }
 
-  // Optimistic lock: only update if roundNumber hasn't changed (C2 concurrency fix)
+  // Optimistic lock: only update if roundNumber hasn't changed
   const updated = await prisma.bossEncounter.updateMany({
     where: { id: encounterId, roundNumber: encounter.roundNumber },
     data: {
@@ -385,58 +438,63 @@ export async function resolveBossRound(
       nextRoundAt: nextNextRoundAt,
       status: result.bossDefeated ? 'defeated' : 'in_progress',
       killedBy,
-      raidPoolHp: result.raidPoolAfter,
-      raidPoolMax: raidPoolMax,
+      bossEffects: JSON.parse(JSON.stringify(result.bossActiveEffectsAfter)),
       roundSummaries: JSON.parse(JSON.stringify(newSummaries)),
     },
   });
 
-  // Another process already resolved this round — bail out
   if (updated.count === 0) return null;
 
-  // M3: batch participant damage/healing/stats updates in parallel
-  await Promise.all([
-    ...result.attackerResults.map((ar) =>
+  // Persist per-participant results
+  await Promise.all(
+    result.participantResults.map((pr) =>
       prisma.bossParticipant.updateMany({
-        where: { encounterId, playerId: ar.playerId, roundNumber: nextRound },
+        where: { encounterId, playerId: pr.playerId, roundNumber: nextRound },
         data: {
-          totalDamage: { increment: ar.damage },
-          attacks: { increment: 1 },
-          hits: { increment: ar.hit ? 1 : 0 },
-          crits: { increment: ar.isCritical ? 1 : 0 },
+          totalDamage: { increment: pr.damageDealt },
+          totalHealing: { increment: pr.healingDone },
+          attacks: { increment: pr.damageDealt > 0 ? 1 : (pr.hit === false && pr.actionId !== 'defend' ? 1 : 0) },
+          hits: { increment: pr.hit ? 1 : 0 },
+          crits: { increment: pr.isCritical ? 1 : 0 },
+          currentHp: pr.hpAfter,
+          currentStamina: pr.staminaAfter,
+          currentMana: pr.manaAfter,
+          threat: result.threatTableAfter.find(t => t.playerId === pr.playerId)?.threat ?? 0,
+          damageAbsorbed: { increment: pr.damageAbsorbed },
+          templateRound: pr.templateRoundAfter,
+          status: pr.isDead ? 'knocked_out' : 'alive',
         },
       }),
     ),
-    ...result.healerResults
-      .filter((hr) => hr.healAmount > 0)
-      .map((hr) =>
-        prisma.bossParticipant.updateMany({
-          where: { encounterId, playerId: hr.playerId, roundNumber: nextRound },
-          data: { totalHealing: { increment: hr.healAmount } },
-        }),
-      ),
-  ]);
+  );
 
-  // Auto-signup: re-enroll auto-signup participants for the next round (batched)
-  if (!result.bossDefeated && !result.raidWiped) {
+  // Progressive bestiary reveal: alive players learn the boss's action for this round
+  const alivePlayerIdsForReveal = result.participantResults
+    .filter(r => !r.isDead)
+    .map(r => r.playerId);
+  if (alivePlayerIdsForReveal.length > 0) {
+    await revealBossRotation(encounter.mobTemplate.id, alivePlayerIdsForReveal, nextRound);
+  }
+
+  // Auto-signup: create next-round rows carrying forward resources (skip dead players)
+  if (!result.bossDefeated && !result.allPlayersDead) {
     const autoSignupParticipants = signups.filter((s) => s.autoSignUp);
     if (autoSignupParticipants.length > 0) {
       const turnCost = WORLD_EVENT_CONSTANTS.BOSS_SIGNUP_TURN_COST;
       const autoNextRound = nextRound + 1;
 
-      // Check HP states in parallel to filter out recovering players
-      const hpChecks = await Promise.all(
-        autoSignupParticipants.map(async (p) => {
-          const hpState = await getHpState(p.playerId);
-          return { participant: p, hpState };
-        }),
-      );
-      const eligible = hpChecks.filter((c) => !c.hpState.isRecovering);
+      // Filter out dead players and recovering players
+      const aliveResults = result.participantResults.filter(r => !r.isDead);
+      const alivePlayerIds = new Set(aliveResults.map(r => r.playerId));
 
-      // Each player gets its own transaction so one failure doesn't affect others
+      const eligible = autoSignupParticipants.filter(s => alivePlayerIds.has(s.playerId));
+
       if (eligible.length > 0) {
         await Promise.all(
-          eligible.map(async ({ participant, hpState }) => {
+          eligible.map(async (participant) => {
+            const pr = result.participantResults.find(r => r.playerId === participant.playerId);
+            if (!pr) return;
+
             try {
               await prisma.$transaction(async (tx) => {
                 await spendPlayerTurnsTx(tx, participant.playerId, turnCost);
@@ -444,10 +502,13 @@ export async function resolveBossRound(
                   data: {
                     encounterId,
                     playerId: participant.playerId,
-                    role: participant.role,
                     roundNumber: autoNextRound,
                     turnsCommitted: turnCost,
-                    currentHp: hpState.maxHp,
+                    currentHp: pr.hpAfter,
+                    currentStamina: pr.staminaAfter,
+                    currentMana: pr.manaAfter,
+                    threat: result.threatTableAfter.find(t => t.playerId === participant.playerId)?.threat ?? 0,
+                    templateRound: pr.templateRoundAfter,
                     status: 'alive',
                     autoSignUp: true,
                   },
@@ -463,25 +524,24 @@ export async function resolveBossRound(
   }
 
   // Handle raid wipe
-  if (result.raidWiped) {
-    // M3: batch flee rolls in parallel (reuse participantData from above)
+  if (result.allPlayersDead) {
     await Promise.all(
-      participantData.map(async (pd) => {
-        const fleeResult = await calculateFleeWithGold(pd.signup.playerId, {
-          evasionLevel: pd.progression.attributes.evasion,
+      participants.map(async (p) => {
+        const progression = await getPlayerProgressionState(p.playerId);
+        const fleeResult = await calculateFleeWithGold(p.playerId, {
+          evasionLevel: progression.attributes.evasion,
           mobLevel: encounter.mobTemplate.level ?? 1,
-          maxHp: pd.hpState.maxHp,
+          maxHp: p.maxHp,
         });
         if (fleeResult.outcome === 'knockout') {
-          await enterRecoveringState(pd.signup.playerId, pd.hpState.maxHp);
-          await trackAchievements(pd.signup.playerId, { totalDeaths: 1 });
+          await enterRecoveringState(p.playerId, p.maxHp);
+          await trackAchievements(p.playerId, { totalDeaths: 1 });
         } else {
-          await setHp(pd.signup.playerId, fleeResult.remainingHp);
+          await setHp(p.playerId, fleeResult.remainingHp);
         }
       }),
     );
 
-    // Persist boss HP and reset scaling for next attempt (don't reset roundNumber — C1 fix)
     await prisma.bossEncounter.update({
       where: { id: encounterId },
       data: {
@@ -489,8 +549,6 @@ export async function resolveBossRound(
         nextRoundAt: new Date(Date.now() + WORLD_EVENT_CONSTANTS.BOSS_ROUND_INTERVAL_MINUTES * 60 * 1000),
         status: 'waiting',
         scaledAt: null,
-        raidPoolHp: null,
-        raidPoolMax: null,
       },
     });
 
@@ -503,38 +561,49 @@ export async function resolveBossRound(
     return { bossDefeated: false, roundResult: result };
   }
 
-  // Complete event if boss defeated
+  // Boss defeated — distribute loot
   if (result.bossDefeated) {
     await prisma.worldEvent.updateMany({
       where: { id: encounter.eventId, status: 'active' },
       data: { status: 'completed' },
     });
 
-    // Distribute loot to all contributors across all rounds
     const allParticipants = await prisma.bossParticipant.findMany({
       where: { encounterId },
     });
-    const contributorMap = new Map<string, { totalDamage: number; totalHealing: number; attackSkill?: string }>();
+    const contributorMap = new Map<string, { totalDamage: number; totalHealing: number; damageAbsorbed: number; roundsSurvived: number; attackSkill?: string }>();
     for (const p of allParticipants) {
       const existing = contributorMap.get(p.playerId);
       if (existing) {
         existing.totalDamage += p.totalDamage;
         existing.totalHealing += p.totalHealing;
+        existing.damageAbsorbed += p.damageAbsorbed;
+        existing.roundsSurvived += p.status === 'alive' ? 1 : 0;
       } else {
-        contributorMap.set(p.playerId, { totalDamage: p.totalDamage, totalHealing: p.totalHealing });
+        contributorMap.set(p.playerId, {
+          totalDamage: p.totalDamage,
+          totalHealing: p.totalHealing,
+          damageAbsorbed: p.damageAbsorbed,
+          roundsSurvived: p.status === 'alive' ? 1 : 0,
+        });
       }
     }
-    // Resolve attack skill for each contributor from current round's participantData
-    for (const pd of participantData) {
-      const entry = contributorMap.get(pd.signup.playerId);
-      if (entry && pd.role === 'attacker' && !entry.attackSkill) {
-        entry.attackSkill = pd.attackSkill;
-      }
-    }
+    // Resolve attack skill for each contributor
+    await Promise.all(
+      Array.from(contributorMap.keys()).map(async (playerId) => {
+        const entry = contributorMap.get(playerId)!;
+        if (!entry.attackSkill) {
+          const mainHandSkill = await getMainHandAttackSkill(playerId);
+          entry.attackSkill = mainHandSkill ?? 'melee';
+        }
+      }),
+    );
     const contributors = Array.from(contributorMap.entries()).map(([playerId, stats]) => ({
       playerId,
       totalDamage: stats.totalDamage,
       totalHealing: stats.totalHealing,
+      damageAbsorbed: stats.damageAbsorbed,
+      roundsSurvived: stats.roundsSurvived,
       attackSkill: stats.attackSkill,
     }));
     const rewardsByPlayer = await distributeBossLoot(encounter.mobTemplateId, encounter.mobTemplate.level ?? 1, contributors, zoneTier);
@@ -543,38 +612,23 @@ export async function resolveBossRound(
       data: { rewardsByPlayer: JSON.parse(JSON.stringify(rewardsByPlayer)) },
     });
 
-    // Announce boss kill in world chat and zone chat with killer name
-    let killerName = 'unknown';
-    if (killedBy) {
-      const killer = await prisma.player.findUnique({
-        where: { id: killedBy },
-        select: { username: true },
-      });
-      if (killer) killerName = killer.username;
-    }
+    const killerName = await resolveUsername(killedBy) ?? 'unknown';
     const zoneName = encounter.event.zone?.name ?? 'unknown';
     await emitSystemMessage(
-      io,
-      'world',
-      'world',
+      io, 'world', 'world',
       `${encounter.mobTemplate.name} in ${zoneName} has been slain! ${killerName} dealt the final blow.`,
     );
     if (encounter.event.zoneId) {
       await emitSystemMessage(
-        io,
-        'zone',
-        `zone:${encounter.event.zoneId}`,
+        io, 'zone', `zone:${encounter.event.zoneId}`,
         `${encounter.mobTemplate.name} has been slain! ${killerName} dealt the final blow.`,
       );
     }
   } else {
-    const totalDmg = result.attackerResults.reduce((s, a) => s + a.damage, 0);
     const hpPercent = Math.round((result.bossHpAfter / encounter.maxHp) * 100);
     await emitSystemMessage(
-      io,
-      'zone',
-      `zone:${encounter.event.zoneId}`,
-      `Boss round ${nextRound}: ${totalDmg} damage dealt to ${encounter.mobTemplate.name} (${hpPercent}% HP remaining)`,
+      io, 'zone', `zone:${encounter.event.zoneId}`,
+      `Boss round ${nextRound}: ${totalPlayerDmg} damage dealt to ${encounter.mobTemplate.name} (${hpPercent}% HP remaining)`,
     );
   }
 
@@ -609,6 +663,23 @@ export async function getActiveBossEncounters(): Promise<BossEncounterData[]> {
   return rows.map(toBossEncounterData);
 }
 
+async function revealBossRotation(
+  mobTemplateId: string,
+  alivePlayerIds: string[],
+  roundNumber: number,
+): Promise<void> {
+  await Promise.all(
+    alivePlayerIds.map(playerId =>
+      prisma.$queryRaw`
+        INSERT INTO player_boss_rotations (player_id, mob_template_id, rounds_revealed)
+        VALUES (${playerId}, ${mobTemplateId}, ${roundNumber})
+        ON CONFLICT (player_id, mob_template_id)
+        DO UPDATE SET rounds_revealed = GREATEST(player_boss_rotations.rounds_revealed, ${roundNumber})
+      `,
+    ),
+  );
+}
+
 export async function getBossHistory(
   playerId: string,
   page: number,
@@ -624,7 +695,6 @@ export async function getBossHistory(
   }>;
   total: number;
 }> {
-  // Count distinct encounters at DB level
   const distinctEncounters = await prisma.bossParticipant.findMany({
     where: { playerId },
     select: { encounterId: true },
@@ -633,14 +703,12 @@ export async function getBossHistory(
   });
   const total = distinctEncounters.length;
 
-  // Paginate at DB level using skip/take on the encounter IDs
   const paginatedIds = distinctEncounters
     .slice((page - 1) * pageSize, page * pageSize)
     .map((p) => p.encounterId);
 
   if (paginatedIds.length === 0) return { entries: [], total };
 
-  // Fetch encounters with relations, ordered newest first
   const encounters = await prisma.bossEncounter.findMany({
     where: { id: { in: paginatedIds } },
     include: {
@@ -648,16 +716,13 @@ export async function getBossHistory(
       mobTemplate: { select: { name: true, level: true } },
     },
   });
-  // Sort by the paginated order (newest first, matching distinctEncounters order)
   const idOrder = new Map(paginatedIds.map((id, i) => [id, i]));
   encounters.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
 
-  // Fetch player's participation rows for these encounters
   const participations = await prisma.bossParticipant.findMany({
     where: { playerId, encounterId: { in: paginatedIds } },
   });
 
-  // Aggregate per encounter
   const statsMap = new Map<string, { totalDamage: number; totalHealing: number; attacks: number; hits: number; crits: number; roundsParticipated: number }>();
   for (const p of participations) {
     const existing = statsMap.get(p.encounterId);
@@ -680,7 +745,6 @@ export async function getBossHistory(
     }
   }
 
-  // Resolve killedBy usernames
   const killedByIds = encounters.map((e) => e.killedBy).filter((id): id is string => id !== null);
   const killedByPlayers = killedByIds.length > 0
     ? await prisma.player.findMany({ where: { id: { in: killedByIds } }, select: { id: true, username: true } })

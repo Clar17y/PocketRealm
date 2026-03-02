@@ -131,6 +131,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
           encounterId={selectedBossId}
           playerId={playerId ?? undefined}
           onClose={() => setSelectedBossId(null)}
+          onNavigate={onNavigate}
         />
       )}
 

@@ -52,8 +52,8 @@ describe('distributeBossLoot', () => {
 
   it('calls rollAndGrantLoot for each contributor with correct drop multiplier', async () => {
     const contributors = [
-      { playerId: 'p1', totalDamage: 100, totalHealing: 0 },
-      { playerId: 'p2', totalDamage: 100, totalHealing: 0 },
+      { playerId: 'p1', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
+      { playerId: 'p2', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
     ];
 
     await distributeBossLoot('mob-1', 10, contributors, 1);
@@ -67,7 +67,7 @@ describe('distributeBossLoot', () => {
 
   it('calls grantSkillXp for each contributor with scaled XP', async () => {
     const contributors = [
-      { playerId: 'p1', totalDamage: 200, totalHealing: 0 },
+      { playerId: 'p1', totalDamage: 200, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
     ];
 
     await distributeBossLoot('mob-1', 10, contributors, 1);
@@ -79,7 +79,7 @@ describe('distributeBossLoot', () => {
 
   it('uses contributor attackSkill as skill type', async () => {
     const contributors = [
-      { playerId: 'p1', totalDamage: 100, totalHealing: 0, attackSkill: 'melee' },
+      { playerId: 'p1', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1, attackSkill: 'melee' },
     ];
 
     await distributeBossLoot('mob-1', 10, contributors, 1);
@@ -89,7 +89,7 @@ describe('distributeBossLoot', () => {
 
   it('defaults attackSkill to magic when not provided', async () => {
     const contributors = [
-      { playerId: 'p1', totalDamage: 100, totalHealing: 0 },
+      { playerId: 'p1', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
     ];
 
     await distributeBossLoot('mob-1', 10, contributors, 1);
@@ -99,7 +99,7 @@ describe('distributeBossLoot', () => {
 
   it('looks up mob template and family for recipe drops', async () => {
     const contributors = [
-      { playerId: 'p1', totalDamage: 100, totalHealing: 0 },
+      { playerId: 'p1', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
     ];
 
     await distributeBossLoot('mob-1', 10, contributors, 1);
@@ -115,8 +115,8 @@ describe('distributeBossLoot', () => {
 
   it('handles multiple contributors with correct contribution ratios', async () => {
     const contributors = [
-      { playerId: 'p1', totalDamage: 300, totalHealing: 0 },
-      { playerId: 'p2', totalDamage: 100, totalHealing: 0 },
+      { playerId: 'p1', totalDamage: 300, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 0 },
+      { playerId: 'p2', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 0 },
     ];
 
     await distributeBossLoot('mob-1', 10, contributors, 2);
@@ -124,6 +124,7 @@ describe('distributeBossLoot', () => {
     const baseXp = WORLD_EVENT_CONSTANTS.BOSS_BASE_XP_REWARD_BY_TIER[1]!;
     const rarityBonus = WORLD_EVENT_CONSTANTS.BOSS_RARITY_BONUS;
 
+    // p1: score=300, p2: score=100, total=400
     // p1: ratio = 300/400 = 0.75, multiplier = max(0.5, min(2, 0.75*2)) = 1.5
     expect(rollAndGrantLoot).toHaveBeenCalledWith('p1', 'mob-1', 10 + rarityBonus, 1.5);
     expect(grantSkillXp).toHaveBeenCalledWith('p1', 'magic', Math.round(baseXp * 1.5));
@@ -135,7 +136,7 @@ describe('distributeBossLoot', () => {
 
   it('includes XP reward in result for each contributor', async () => {
     const contributors = [
-      { playerId: 'p1', totalDamage: 100, totalHealing: 0 },
+      { playerId: 'p1', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
     ];
 
     const result = await distributeBossLoot('mob-1', 10, contributors, 1);
@@ -152,8 +153,8 @@ describe('distributeBossLoot', () => {
 
   it('calls checkAchievements and emitAchievementNotifications per contributor', async () => {
     const contributors = [
-      { playerId: 'p1', totalDamage: 100, totalHealing: 0 },
-      { playerId: 'p2', totalDamage: 100, totalHealing: 0 },
+      { playerId: 'p1', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
+      { playerId: 'p2', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
     ];
 
     await distributeBossLoot('mob-1', 10, contributors, 1);
@@ -168,7 +169,7 @@ describe('distributeBossLoot', () => {
 
   it('clamps zoneTier to valid index range', async () => {
     const contributors = [
-      { playerId: 'p1', totalDamage: 100, totalHealing: 0 },
+      { playerId: 'p1', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
     ];
 
     // zoneTier 0 → tierIndex clamped to 0
@@ -185,7 +186,7 @@ describe('distributeBossLoot', () => {
 
     const { addStackableItem } = await import('./inventoryService.js');
     const contributors = [
-      { playerId: 'p1', totalDamage: 100, totalHealing: 0 },
+      { playerId: 'p1', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
     ];
 
     const result = await distributeBossLoot('mob-1', 10, contributors, 1);
@@ -202,8 +203,8 @@ describe('distributeBossLoot', () => {
 
   it('includes healing in contribution calculation', async () => {
     const contributors = [
-      { playerId: 'p1', totalDamage: 0, totalHealing: 200 },
-      { playerId: 'p2', totalDamage: 200, totalHealing: 0 },
+      { playerId: 'p1', totalDamage: 0, totalHealing: 200, damageAbsorbed: 0, roundsSurvived: 1 },
+      { playerId: 'p2', totalDamage: 200, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
     ];
 
     await distributeBossLoot('mob-1', 10, contributors, 1);

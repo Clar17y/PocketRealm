@@ -33,6 +33,7 @@ describe('potionService', () => {
         name: 'Minor Health Potion',
         healAmount: 50,
         templateId: 'tmpl-1',
+        potionType: 'hp',
       });
     });
 

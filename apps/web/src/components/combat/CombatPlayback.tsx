@@ -6,6 +6,7 @@ import type { CombatActiveEvent } from '@/lib/api';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
+import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { PixelButton } from '@/components/PixelButton';
 
 type Phase = 'playing' | 'finished-auto' | 'finished-manual';
@@ -21,6 +22,11 @@ interface CombatPlaybackProps {
   rewards?: LastCombat['rewards'];
   activeEvents?: CombatActiveEvent[];
   playerLabel?: string;
+  playerMaxStamina?: number;
+  playerMaxMana?: number;
+  opponentMaxStamina?: number;
+  opponentMaxMana?: number;
+  showOpponentResources?: boolean;
   defeatButtonLabel?: string;
   speedMs?: number;
   autoSkip?: boolean;
@@ -39,6 +45,11 @@ export function CombatPlayback({
   rewards,
   activeEvents,
   playerLabel = 'You',
+  playerMaxStamina = 100,
+  playerMaxMana = 50,
+  opponentMaxStamina = 100,
+  opponentMaxMana = 50,
+  showOpponentResources = false,
   defeatButtonLabel,
   speedMs = 800,
   autoSkip = false,
@@ -153,6 +164,15 @@ export function CombatPlayback({
     ? mobMaxHp
     : (log[revealedCount - 1].combatantBHpAfter ?? mobMaxHp);
 
+  // Use combatant-indexed fields (always player's values) rather than actor-relative
+  // staminaAfter/manaAfter which alternate between player and mob per entry
+  const currentEntry = revealedCount > 0 ? log[revealedCount - 1] : null;
+  const rawEntry = currentEntry as Record<string, unknown> | null;
+  const currentStamina = (rawEntry?.combatantAStaminaAfter as number) ?? playerMaxStamina;
+  const currentMana = (rawEntry?.combatantAManaAfter as number) ?? playerMaxMana;
+  const opponentStamina = (rawEntry?.combatantBStaminaAfter as number) ?? opponentMaxStamina;
+  const opponentMana = (rawEntry?.combatantBManaAfter as number) ?? opponentMaxMana;
+
   return (
     <div>
       {/* Header */}
@@ -170,38 +190,36 @@ export function CombatPlayback({
 
       {/* HP Bars */}
       <div className="space-y-3 my-4">
-        {/* Player HP */}
-        <div>
-          <div className="flex justify-between text-xs mb-1">
+        {/* Player HP + resources */}
+        <div className={shakeTarget === 'combatantA' ? 'animate-shake' : ''}>
+          <div className="text-xs mb-1">
             <span className="text-[var(--rpg-green-light)]">{playerLabel}</span>
-            <span className="text-[var(--rpg-green-light)] font-mono">{currentPlayerHp}/{playerMaxHp}</span>
           </div>
-          <div className={`h-4 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded overflow-hidden ${shakeTarget === 'combatantA' ? 'animate-shake' : ''}`}>
-            <div
-              className="h-full bg-[var(--rpg-green-light)]"
-              style={{
-                width: `${Math.max(0, (currentPlayerHp / playerMaxHp) * 100)}%`,
-                transition: 'width 0.4s ease-out',
-              }}
-            />
-          </div>
+          <ResourceStatusBar
+            currentHp={currentPlayerHp}
+            maxHp={playerMaxHp}
+            currentStamina={currentStamina}
+            maxStamina={playerMaxStamina}
+            currentMana={currentMana}
+            maxMana={playerMaxMana}
+            compact
+          />
         </div>
 
-        {/* Mob HP */}
-        <div>
-          <div className="flex justify-between text-xs mb-1">
+        {/* Opponent HP + optional resources */}
+        <div className={shakeTarget === 'combatantB' ? 'animate-shake' : ''}>
+          <div className="text-xs mb-1">
             <span className="text-[var(--rpg-red)]">{mobDisplayName}</span>
-            <span className="text-[var(--rpg-red)] font-mono">{Math.max(0, currentMobHp)}/{mobMaxHp}</span>
           </div>
-          <div className={`h-4 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded overflow-hidden ${shakeTarget === 'combatantB' ? 'animate-shake' : ''}`}>
-            <div
-              className="h-full bg-[var(--rpg-red)]"
-              style={{
-                width: `${Math.max(0, (currentMobHp / mobMaxHp) * 100)}%`,
-                transition: 'width 0.4s ease-out',
-              }}
-            />
-          </div>
+          <ResourceStatusBar
+            currentHp={Math.max(0, currentMobHp)}
+            maxHp={mobMaxHp}
+            currentStamina={showOpponentResources ? opponentStamina : 0}
+            maxStamina={showOpponentResources ? opponentMaxStamina : 0}
+            currentMana={showOpponentResources ? opponentMana : 0}
+            maxMana={showOpponentResources ? opponentMaxMana : 0}
+            compact
+          />
         </div>
       </div>
 
@@ -210,27 +228,31 @@ export function CombatPlayback({
         <div className="text-center text-sm mb-2">
           {(() => {
             const lastEntry = log[revealedCount - 1];
+            const displayLabel = lastEntry.actionName ?? lastEntry.spellName;
             if (lastEntry.effectsExpired && lastEntry.effectsExpired.length > 0) {
               return <span className="text-[var(--rpg-text-secondary)] italic">
                 {lastEntry.effectsExpired.map(e => `${e.name} wore off`).join(', ')}
               </span>;
             }
-            if (lastEntry.action === 'potion') return <span className="text-[var(--rpg-green-light)]">🧪 {lastEntry.spellName}: +{lastEntry.healAmount} HP</span>;
+            if (lastEntry.interactionResult === 'countered') return <span className="text-[var(--rpg-gold)] font-bold">Countered!</span>;
+            if (lastEntry.interactionResult === 'warded') return <span className="text-purple-400 font-bold">Warded!</span>;
+            if (lastEntry.wasExhausted) return <span className="text-[var(--rpg-text-secondary)] italic">Exhausted &rarr; Defend</span>;
+            if (lastEntry.action === 'potion') return <span className="text-[var(--rpg-green-light)]">🧪 {displayLabel ?? 'Potion'}: +{lastEntry.healAmount} HP</span>;
             if (lastEntry.evaded) return <span className="text-[var(--rpg-blue-light)]">Dodged!</span>;
             if (lastEntry.isCritical) return <span className="text-[var(--rpg-gold)] font-bold">Critical Hit! {lastEntry.damage} dmg</span>;
             if (lastEntry.damage && lastEntry.damage > 0 && lastEntry.healAmount && lastEntry.healAmount > 0) {
-              return <span className="text-[var(--rpg-text-primary)]">{lastEntry.spellName ? `${lastEntry.spellName}: ` : ''}{lastEntry.damage} dmg, +{lastEntry.healAmount} HP</span>;
+              return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}{lastEntry.damage} dmg, +{lastEntry.healAmount} HP</span>;
             }
-            if (lastEntry.damage && lastEntry.damage > 0) return <span className="text-[var(--rpg-text-primary)]">{lastEntry.spellName ? `${lastEntry.spellName}: ` : ''}{lastEntry.damage} dmg</span>;
-            if (lastEntry.healAmount && lastEntry.healAmount > 0) return <span className="text-[var(--rpg-green-light)]">{lastEntry.spellName ? `${lastEntry.spellName}: ` : ''}+{lastEntry.healAmount} HP</span>;
+            if (lastEntry.damage && lastEntry.damage > 0) return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}{lastEntry.damage} dmg</span>;
+            if (lastEntry.healAmount && lastEntry.healAmount > 0) return <span className="text-[var(--rpg-green-light)]">{displayLabel ? `${displayLabel}: ` : ''}+{lastEntry.healAmount} HP</span>;
             if (lastEntry.effectsApplied && lastEntry.effectsApplied.length > 0) {
               const e = lastEntry.effectsApplied[0];
               return <span className="text-[var(--rpg-blue-light)]">
-                {lastEntry.spellName} ({e.stat} {e.modifier > 0 ? '+' : ''}{e.modifier})
+                {displayLabel} ({e.stat} {e.modifier > 0 ? '+' : ''}{e.modifier})
               </span>;
             }
             if (lastEntry.roll && !lastEntry.damage) return <span className="text-[var(--rpg-text-secondary)]">Miss!</span>;
-            if (lastEntry.spellName) return <span className="text-[var(--rpg-blue-light)]">{lastEntry.spellName}</span>;
+            if (displayLabel) return <span className="text-[var(--rpg-blue-light)]">{displayLabel}</span>;
             return null;
           })()}
         </div>

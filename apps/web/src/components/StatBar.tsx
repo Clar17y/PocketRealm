@@ -4,7 +4,7 @@ interface StatBarProps {
   current: number;
   max: number;
   label?: string;
-  color?: 'health' | 'mana' | 'xp' | 'gold' | 'durability';
+  color?: 'health' | 'mana' | 'stamina' | 'xp' | 'gold' | 'durability';
   showNumbers?: boolean;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -31,6 +31,7 @@ export function StatBar({
   const colorClasses = {
     health: 'bg-[var(--rpg-green-light)]',
     mana: 'bg-[var(--rpg-blue-light)]',
+    stamina: 'bg-teal-400',
     xp: 'bg-[var(--rpg-gold)]',
     gold: 'bg-[var(--rpg-gold)]',
     durability: durabilityColor,

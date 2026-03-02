@@ -1,5 +1,17 @@
 import { Prisma, prisma } from '@adventure/database';
-import type { CombatPotion, ConsumableEffect, PotionConsumed } from '@adventure/shared';
+import type { CombatPotion, ConsumableEffect, ConsumableEffectType, PotionConsumed } from '@adventure/shared';
+
+function getEffectPotionType(effectType: ConsumableEffectType): 'hp' | 'stamina' | 'mana' {
+  switch (effectType) {
+    case 'heal_flat':
+    case 'heal_percent':
+      return 'hp';
+    case 'restore_stamina':
+      return 'stamina';
+    case 'restore_mana':
+      return 'mana';
+  }
+}
 
 export async function buildPotionPool(playerId: string, maxHp: number): Promise<CombatPotion[]> {
   const consumables = await prisma.item.findMany({
@@ -17,13 +29,16 @@ export async function buildPotionPool(playerId: string, maxHp: number): Promise<
 
     const healAmount = effect.type === 'heal_flat'
       ? effect.value
-      : Math.floor(maxHp * effect.value);
+      : effect.type === 'heal_percent'
+        ? Math.floor(maxHp * effect.value)
+        : effect.value;
 
     for (let i = 0; i < item.quantity; i++) {
       potions.push({
         name: item.template.name,
         healAmount,
         templateId: item.template.id,
+        potionType: getEffectPotionType(effect.type),
       });
     }
   }

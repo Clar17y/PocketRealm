@@ -136,7 +136,6 @@ bossRouter.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 const signupSchema = z.object({
-  role: z.enum(['attacker', 'healer']),
   autoSignUp: z.boolean().optional(),
 });
 
@@ -176,7 +175,6 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
     const participant = await signUpForBossRound(
       id,
       playerId,
-      body.role,
       hpState.maxHp,
       body.autoSignUp ?? false,
     );
@@ -221,7 +219,6 @@ bossRouter.get('/:id/round/:num', asyncHandler(async (req, res) => {
     round: num,
     participants: participants.map((p) => ({
       playerId: p.playerId,
-      role: p.role,
       turnsCommitted: p.turnsCommitted,
       totalDamage: p.totalDamage,
       totalHealing: p.totalHealing,
@@ -229,6 +226,10 @@ bossRouter.get('/:id/round/:num', asyncHandler(async (req, res) => {
       hits: p.hits,
       crits: p.crits,
       currentHp: p.currentHp,
+      currentStamina: p.currentStamina,
+      currentMana: p.currentMana,
+      threat: p.threat,
+      damageAbsorbed: p.damageAbsorbed,
       status: p.status,
     })),
   });

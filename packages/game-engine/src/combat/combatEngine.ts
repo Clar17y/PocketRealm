@@ -147,23 +147,29 @@ function tryAutoPotion(
   );
   if (hasSickness) return false;
 
-  // Smart selection: pick weakest potion whose healAmount >= deficit
+  // Filter to HP potions only for auto-potion
+  const hpPotionIndices = availablePotions
+    .map((p, i) => ({ p, i }))
+    .filter(({ p }) => p.potionType === 'hp');
+  if (hpPotionIndices.length === 0) return false;
+
+  // Smart selection: pick weakest HP potion whose healAmount >= deficit
   const deficit = Math.floor(state.combatantAMaxHp * (threshold / 100)) - state.combatantAHp;
   let chosenIndex = -1;
 
-  // Ensure ascending sort for weakest-sufficient selection
-  availablePotions.sort((a, b) => a.healAmount - b.healAmount);
+  // Sort candidates by healAmount ascending for weakest-sufficient selection
+  hpPotionIndices.sort((a, b) => a.p.healAmount - b.p.healAmount);
 
-  for (let i = 0; i < availablePotions.length; i++) {
-    if (availablePotions[i].healAmount >= deficit) {
+  for (const { i, p } of hpPotionIndices) {
+    if (p.healAmount >= deficit) {
       chosenIndex = i;
       break;
     }
   }
 
-  // If none fully covers the deficit, pick the strongest available (last one)
+  // If none fully covers the deficit, pick the strongest available HP potion
   if (chosenIndex === -1) {
-    chosenIndex = availablePotions.length - 1;
+    chosenIndex = hpPotionIndices[hpPotionIndices.length - 1].i;
   }
 
   const potion = availablePotions[chosenIndex];

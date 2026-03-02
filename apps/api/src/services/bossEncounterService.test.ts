@@ -30,22 +30,37 @@ vi.mock('./hpService', () => ({
 vi.mock('./bossLootService', () => ({
   distributeBossLoot: vi.fn().mockResolvedValue({}),
 }));
+vi.mock('./combatTemplateService', () => ({
+  getActiveTemplate: vi.fn().mockResolvedValue([{ actionId: 'normal_attack' }]),
+}));
 vi.mock('@adventure/game-engine', () => ({
-  resolveBossRoundLogic: vi.fn().mockReturnValue({
+  resolveBossRound: vi.fn().mockReturnValue({
     bossDefeated: false,
-    raidWiped: false,
+    allPlayersDead: false,
     bossHpAfter: 500,
-    raidPoolAfter: 200,
-    poolDamageTaken: 50,
-    attackerResults: [{ playerId: 'p1', damage: 100, hit: true, isCritical: false }],
-    healerResults: [],
+    bossActionId: 'boss_physical_attack',
+    bossTargetMode: 'single_target',
+    bossTargetPlayerIds: ['p1'],
+    participantResults: [{
+      playerId: 'p1', actionId: 'normal_attack', wasExhausted: false,
+      damageDealt: 100, healingDone: 0, damageTaken: 20, damageAbsorbed: 20,
+      hpAfter: 80, staminaAfter: 90, manaAfter: 50, templateRoundAfter: 2,
+      isDead: false, hit: true, isCritical: false,
+    }],
+    threatTableAfter: [{ playerId: 'p1', threat: 100, tauntRoundsRemaining: 0 }],
+    bossActiveEffectsAfter: [],
   }),
   buildPlayerCombatStats: vi.fn().mockReturnValue({
-    attack: 15, defence: 10, magicPower: 0, magicDefence: 5,
-    accuracy: 60, dodge: 10, speed: 5, damageMin: 5, damageMax: 15,
-    critChance: 0.05, critDamage: 1.5, maxHp: 100, currentHp: 100,
+    hp: 100, maxHp: 100, attack: 15, defence: 10, magicDefence: 5,
+    accuracy: 60, dodge: 10, evasion: 0, speed: 5, damageMin: 5, damageMax: 15,
+    critChance: 0.05, critDamage: 1.5, damageType: 'physical',
   }),
   calculateFleeResult: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1 }),
+  calculateMaxStamina: vi.fn().mockReturnValue(100),
+  calculateStaminaRegenPerRound: vi.fn().mockReturnValue(10),
+  calculateMaxMana: vi.fn().mockReturnValue(50),
+  calculateManaRegenPerRound: vi.fn().mockReturnValue(5),
+  initThreatTable: vi.fn().mockReturnValue([{ playerId: 'p1', threat: 0, tauntRoundsRemaining: 0 }]),
 }));
 
 import { mockPrisma } from '../__test__/setup';
@@ -65,8 +80,7 @@ const makeEncounterRow = (overrides: Record<string, any> = {}) => ({
   currentHp: 1000,
   maxHp: 1000,
   baseHp: 1000,
-  raidPoolHp: null,
-  raidPoolMax: null,
+  bossEffects: [],
   roundNumber: 0,
   nextRoundAt: new Date('2026-02-20T12:00:00Z'),
   status: 'waiting',
@@ -80,7 +94,6 @@ const makeParticipantRow = (overrides: Record<string, any> = {}) => ({
   id: 'bp-1',
   encounterId: 'enc-1',
   playerId: 'p1',
-  role: 'attacker',
   roundNumber: 1,
   turnsCommitted: 200,
   totalDamage: 0,
@@ -90,6 +103,11 @@ const makeParticipantRow = (overrides: Record<string, any> = {}) => ({
   crits: 0,
   autoSignUp: false,
   currentHp: 100,
+  currentStamina: 100,
+  currentMana: 50,
+  threat: 0,
+  damageAbsorbed: 0,
+  templateRound: 1,
   status: 'alive',
   ...overrides,
 });
@@ -138,7 +156,7 @@ describe('bossEncounterService', () => {
     it('throws if encounter not found', async () => {
       mockPrisma.bossEncounter.findUnique.mockResolvedValue(null);
 
-      await expect(signUpForBossRound('enc-1', 'p1', 'attacker', 100))
+      await expect(signUpForBossRound('enc-1', 'p1', 100))
         .rejects.toThrow('Boss encounter not found');
     });
 
@@ -147,7 +165,7 @@ describe('bossEncounterService', () => {
         makeEncounterRow({ status: 'defeated' }),
       );
 
-      await expect(signUpForBossRound('enc-1', 'p1', 'attacker', 100))
+      await expect(signUpForBossRound('enc-1', 'p1', 100))
         .rejects.toThrow('Boss encounter is already over');
     });
 
@@ -156,7 +174,7 @@ describe('bossEncounterService', () => {
         makeEncounterRow({ status: 'expired' }),
       );
 
-      await expect(signUpForBossRound('enc-1', 'p1', 'attacker', 100))
+      await expect(signUpForBossRound('enc-1', 'p1', 100))
         .rejects.toThrow('Boss encounter is already over');
     });
 
@@ -169,31 +187,30 @@ describe('bossEncounterService', () => {
       mockPrisma.bossParticipant.create.mockResolvedValue(participantRow);
       mockPrisma.bossEncounter.update.mockResolvedValue({});
 
-      const result = await signUpForBossRound('enc-1', 'p1', 'attacker', 100);
+      const result = await signUpForBossRound('enc-1', 'p1', 100);
 
       expect(result.playerId).toBe('p1');
-      expect(result.role).toBe('attacker');
       expect(result.status).toBe('alive');
     });
 
-    it('updates role if player already signed up for this round', async () => {
+    it('updates autoSignUp if player already signed up for this round', async () => {
       mockPrisma.bossEncounter.findUnique.mockResolvedValue(
         makeEncounterRow({ status: 'in_progress' }),
       );
       mockPrisma.bossParticipant.findUnique.mockResolvedValue(
-        makeParticipantRow({ role: 'attacker' }),
+        makeParticipantRow(),
       );
       mockPrisma.bossParticipant.update.mockResolvedValue(
-        makeParticipantRow({ role: 'healer' }),
+        makeParticipantRow({ autoSignUp: true }),
       );
 
-      const result = await signUpForBossRound('enc-1', 'p1', 'healer', 100);
+      const result = await signUpForBossRound('enc-1', 'p1', 100);
 
       expect(mockPrisma.bossParticipant.update).toHaveBeenCalledWith({
         where: { id: 'bp-1' },
-        data: { role: 'healer', autoSignUp: false },
+        data: { autoSignUp: false },
       });
-      expect(result.role).toBe('healer');
+      expect(result.autoSignUp).toBe(true);
       // Should NOT spend turns again
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
@@ -206,7 +223,7 @@ describe('bossEncounterService', () => {
       mockPrisma.bossParticipant.create.mockResolvedValue(makeParticipantRow());
       mockPrisma.bossEncounter.update.mockResolvedValue({});
 
-      await signUpForBossRound('enc-1', 'p1', 'attacker', 100);
+      await signUpForBossRound('enc-1', 'p1', 100);
 
       expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
         where: { id: 'enc-1' },
@@ -221,7 +238,7 @@ describe('bossEncounterService', () => {
       mockPrisma.bossParticipant.findUnique.mockResolvedValue(null);
       mockPrisma.bossParticipant.create.mockResolvedValue(makeParticipantRow());
 
-      await signUpForBossRound('enc-1', 'p1', 'attacker', 100);
+      await signUpForBossRound('enc-1', 'p1', 100);
 
       expect(mockPrisma.bossEncounter.update).not.toHaveBeenCalled();
     });
@@ -235,7 +252,7 @@ describe('bossEncounterService', () => {
         makeParticipantRow({ autoSignUp: true }),
       );
 
-      const result = await signUpForBossRound('enc-1', 'p1', 'attacker', 100, true);
+      const result = await signUpForBossRound('enc-1', 'p1', 100, true);
 
       expect(result.autoSignUp).toBe(true);
     });

@@ -116,7 +116,7 @@ export function BossHistory() {
                             <span>
                               Players: {rs.totalPlayerDamage.toLocaleString()} dmg |
                               Boss: {rs.bossDamage.toLocaleString()} dmg |
-                              HP: {rs.bossHpPercent}% | Pool: {rs.raidPoolPercent}%
+                              HP: {rs.bossHpPercent}% | Alive: {rs.playersAlive} Dead: {rs.playersDead}
                             </span>
                           </div>
                         ))}

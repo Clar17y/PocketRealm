@@ -29,6 +29,26 @@ vi.mock('./hpService', () => ({
   setHp: vi.fn().mockResolvedValue(undefined),
   enterRecoveringState: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('./combatTemplateService', () => ({
+  getActiveTemplate: vi.fn().mockResolvedValue([{ actionId: 'light_attack' }]),
+}));
+vi.mock('./resourceService', () => ({
+  getResourceState: vi.fn().mockResolvedValue({
+    stamina: { current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 },
+    mana: { current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5 },
+  }),
+  setAllResources: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('./skillPointService', () => ({
+  getSkillPoints: vi.fn().mockResolvedValue({
+    playerId: 'test',
+    totalPointsEarned: 0,
+    totalPointsSpent: 0,
+    availablePoints: 0,
+    allocations: {},
+    unlockedActions: [],
+  }),
+}));
 vi.mock('@adventure/game-engine', () => ({
   buildPlayerCombatStats: vi.fn().mockReturnValue({
     attack: 15, defence: 10, magicPower: 0, magicDefence: 5,
@@ -36,20 +56,31 @@ vi.mock('@adventure/game-engine', () => ({
     critChance: 0.05, critDamage: 1.5, maxHp: 100, currentHp: 100,
   }),
   calculateFleeResult: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1 }),
-  runCombat: vi.fn().mockReturnValue({
+  runTemplateCombat: vi.fn().mockReturnValue({
     outcome: 'victory',
     log: [],
-    combatantAHpRemaining: 80,
-    combatantBHpRemaining: 0,
     combatantAMaxHp: 100,
     combatantBMaxHp: 100,
+    combatantAHpRemaining: 80,
+    combatantBHpRemaining: 0,
+    combatantAStaminaRemaining: 60,
+    combatantBStaminaRemaining: 100,
+    combatantAManaRemaining: 30,
+    combatantBManaRemaining: 50,
     potionsConsumed: [],
+    totalRounds: 5,
   }),
   calculateMaxHp: vi.fn().mockReturnValue(100),
+  calculateMaxStamina: vi.fn().mockReturnValue(100),
+  calculateStaminaRegenPerRound: vi.fn().mockReturnValue(10),
+  calculateMaxMana: vi.fn().mockReturnValue(50),
+  calculateManaRegenPerRound: vi.fn().mockReturnValue(5),
 }));
 
 import { mockPrisma } from '../__test__/setup';
 import { getHpState } from './hpService';
+import { setAllResources } from './resourceService';
+import { runTemplateCombat } from '@adventure/game-engine';
 import {
   getOrCreateRating,
   getLadder,
@@ -59,11 +90,14 @@ import {
   getMatchDetail,
   getNotificationCount,
   markNotificationsRead,
+  getScoutNotificationCount,
+  getScoutNotifications,
+  markScoutNotificationsRead,
 } from './pvpService';
 
 function setupChallengeMocks() {
   mockPrisma.player.findUnique
-    .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, currentZone: { id: 'z1', zoneType: 'town' } })
+    .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' } })
     .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, username: 'Target', isBot: false });
   mockPrisma.pvpRating.upsert
     .mockResolvedValueOnce({ playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: 1000 })
@@ -78,6 +112,9 @@ function setupChallengeMocks() {
   mockPrisma.pvpRating.update.mockResolvedValue({});
   mockPrisma.pvpMatch.create.mockResolvedValue({ id: 'match-1' });
   mockPrisma.pvpCooldown.upsert.mockResolvedValue({});
+  // Template combat needs combatTemplate mock
+  mockPrisma.combatTemplate.findFirst.mockResolvedValue(null);
+  mockPrisma.skillPointAllocation.findUnique.mockResolvedValue(null);
 }
 
 describe('pvpService', () => {
@@ -180,14 +217,15 @@ describe('pvpService', () => {
       await expect(scoutOpponent('p1', 'p2')).rejects.toThrow('Target player not found');
     });
 
-    it('returns power ratings on success', async () => {
+    it('returns templateInfo with category breakdown on success', async () => {
       mockPrisma.player.findUnique
         .mockResolvedValueOnce({ currentZone: { zoneType: 'town' } })
         .mockResolvedValueOnce({ characterLevel: 12, attributes: {} })
         .mockResolvedValueOnce({ attributes: {} })
         .mockResolvedValueOnce({ attributes: {} });
       mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
-      mockPrisma.playerSkill.findMany.mockResolvedValue([{ level: 5 }]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([{ skillType: 'melee', level: 5 }]);
+      mockPrisma.pvpScoutLog.create.mockResolvedValue({});
 
       const result = await scoutOpponent('p1', 'p2');
 
@@ -195,6 +233,28 @@ describe('pvpService', () => {
       expect(result.attackStyle).toBe('melee');
       expect(typeof result.powerRating).toBe('number');
       expect(typeof result.myPowerRating).toBe('number');
+      expect(result.templateInfo).toBeDefined();
+      expect(result.templateInfo.templateLength).toBe(1);
+      expect(typeof result.templateInfo.maxStamina).toBe('number');
+      expect(typeof result.templateInfo.maxMana).toBe('number');
+      expect(result.templateInfo.talentInvestment).toBeDefined();
+    });
+
+    it('creates PvpScoutLog notification', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ currentZone: { zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 12, attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} });
+      mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+      mockPrisma.pvpScoutLog.create.mockResolvedValue({});
+
+      await scoutOpponent('p1', 'p2');
+
+      expect(mockPrisma.pvpScoutLog.create).toHaveBeenCalledWith({
+        data: { scouterId: 'p1', targetId: 'p2' },
+      });
     });
   });
 
@@ -227,11 +287,12 @@ describe('pvpService', () => {
       await expect(challenge('p1', 'Attacker', 'p2')).rejects.toThrow('Must be in a town to challenge');
     });
 
-    it('returns match result on success', async () => {
+    it('uses runTemplateCombat and returns match result', async () => {
       setupChallengeMocks();
 
       const result = await challenge('p1', 'Attacker', 'p2');
 
+      expect(runTemplateCombat).toHaveBeenCalled();
       expect(result.matchId).toBe('match-1');
       expect(result.attackerId).toBe('p1');
       expect(result.defenderId).toBe('p2');
@@ -241,6 +302,37 @@ describe('pvpService', () => {
       expect(result.isDraw).toBe(false);
       expect(result.attackerRatingChange).toBe(16);
       expect(result.defenderRatingChange).toBe(-16);
+    });
+
+    it('persists attacker resources via setAllResources on victory', async () => {
+      setupChallengeMocks();
+
+      await challenge('p1', 'Attacker', 'p2');
+
+      expect(setAllResources).toHaveBeenCalledWith('p1', 80, 60, 30);
+    });
+
+    it('persists attacker resources and handles flee on defeat', async () => {
+      vi.mocked(runTemplateCombat).mockReturnValueOnce({
+        outcome: 'defeat',
+        log: [],
+        combatantAMaxHp: 100,
+        combatantBMaxHp: 100,
+        combatantAHpRemaining: 0,
+        combatantBHpRemaining: 50,
+        combatantAStaminaRemaining: 20,
+        combatantBStaminaRemaining: 100,
+        combatantAManaRemaining: 10,
+        combatantBManaRemaining: 50,
+        potionsConsumed: [],
+        totalRounds: 10,
+      } as any);
+      setupChallengeMocks();
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(setAllResources).toHaveBeenCalledWith('p1', 0, 20, 10);
+      expect(result.fleeOutcome).toBe('escape');
     });
 
     it('creates pvpMatch and upserts cooldown in transaction', async () => {
@@ -393,6 +485,63 @@ describe('pvpService', () => {
       expect(mockPrisma.pvpMatch.updateMany).toHaveBeenCalledWith({
         where: { defenderId: 'p1', defenderRead: false },
         data: { defenderRead: true },
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Scout Notifications
+  // -------------------------------------------------------------------------
+
+  describe('getScoutNotificationCount', () => {
+    it('returns unread scout count', async () => {
+      mockPrisma.pvpScoutLog.count.mockResolvedValue(2);
+
+      const result = await getScoutNotificationCount('p1');
+
+      expect(result).toBe(2);
+      expect(mockPrisma.pvpScoutLog.count).toHaveBeenCalledWith({
+        where: { targetId: 'p1', isRead: false },
+      });
+    });
+  });
+
+  describe('getScoutNotifications', () => {
+    it('returns unread scout logs with scouter names', async () => {
+      mockPrisma.pvpScoutLog.findMany.mockResolvedValue([
+        { id: 's1', scouterId: 'p2', targetId: 'p1', isRead: false, createdAt: new Date('2026-03-01T12:00:00Z'), scouter: { username: 'Scout1' } },
+        { id: 's2', scouterId: 'p3', targetId: 'p1', isRead: false, createdAt: new Date('2026-03-01T11:00:00Z'), scouter: { username: 'Scout2' } },
+      ]);
+
+      const result = await getScoutNotifications('p1');
+
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('s1');
+      expect(result[0].scouterName).toBe('Scout1');
+      expect(result[0].createdAt).toBe('2026-03-01T12:00:00.000Z');
+    });
+  });
+
+  describe('markScoutNotificationsRead', () => {
+    it('marks specific scout logs as read when ids provided', async () => {
+      mockPrisma.pvpScoutLog.updateMany.mockResolvedValue({ count: 1 });
+
+      await markScoutNotificationsRead('p1', ['s1']);
+
+      expect(mockPrisma.pvpScoutLog.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['s1'] }, targetId: 'p1' },
+        data: { isRead: true },
+      });
+    });
+
+    it('marks all unread scout logs when no ids provided', async () => {
+      mockPrisma.pvpScoutLog.updateMany.mockResolvedValue({ count: 3 });
+
+      await markScoutNotificationsRead('p1');
+
+      expect(mockPrisma.pvpScoutLog.updateMany).toHaveBeenCalledWith({
+        where: { targetId: 'p1', isRead: false },
+        data: { isRead: true },
       });
     });
   });

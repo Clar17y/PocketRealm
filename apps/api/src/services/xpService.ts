@@ -1,5 +1,6 @@
 import { prisma } from '@adventure/database';
 import type { SkillType, SkillXpResult } from '@adventure/shared';
+import { SKILL_POINT_CONSTANTS } from '@adventure/shared';
 import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, shouldResetDailyCap } from '@adventure/game-engine';
 import { getPlayerGuildModifiers } from './guildUpgradeService';
 
@@ -15,6 +16,7 @@ export interface GrantXpResult {
   characterLevelAfter: number;
   attributePointsAfter: number;
   characterLeveledUp: boolean;
+  skillPointsGained: number;
 }
 
 export async function grantSkillXp(
@@ -67,6 +69,11 @@ export async function grantSkillXp(
       skillType
     );
 
+    const skillLeveledUp = xpResult.newLevel > skill.level;
+    const skillPointsGained = skillLeveledUp
+      ? (xpResult.newLevel - skill.level) * SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL
+      : 0;
+
     const newTotalXp = currentXp + xpResult.xpAfterEfficiency;
     const newDailyXpGained = currentWindowXpGained + xpResult.xpAfterEfficiency;
 
@@ -111,6 +118,7 @@ export async function grantSkillXp(
       characterLevelAfter,
       attributePointsAfter,
       characterLeveledUp: characterLevelAfter > characterLevelBefore,
+      skillPointsGained,
     };
   });
 }

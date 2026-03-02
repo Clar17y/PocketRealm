@@ -8,19 +8,22 @@ import {
   buildPlayerCombatStats,
   filterAndWeightMobsByTier,
   getScaledZoneExitChance,
-  mobToCombatantStats,
+  mobToTemplateCombatant,
   rollMobPrefix,
-  runCombat,
+  runTemplateCombat,
   selectTierWithBleedthrough,
   simulateExploration,
   validateExplorationTurns,
+  type TemplateCombatant,
 } from '@adventure/game-engine';
 import {
+  ALWAYS_AVAILABLE_ACTION_IDS,
+  BASE_ACTION_DEFINITIONS,
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
   getUnlockedTiers,
   getHighestUnlockedTier,
-  type Combatant,
+  type ActionDefinition,
   type CombatOptions,
   type MobTemplate,
   type PotionConsumed,
@@ -36,6 +39,10 @@ import { grantSkillXp } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { serializeXpGrant, toMobTemplate, assertCanAct, recordBestiaryKill, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
 import { getEquipmentStats } from '../../services/equipmentService';
+import { getActiveTemplate } from '../../services/combatTemplateService';
+import { getSkillPoints } from '../../services/skillPointService';
+import { getResourceState, setAllResources } from '../../services/resourceService';
+import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
 import { addExplorationTurns, calculateExplorationPercent, getExplorationPercent } from '../../services/zoneExplorationService';
@@ -66,6 +73,7 @@ import {
   type PendingEncounterSiteDiscovery,
   type PendingAmbushCombatLog,
 } from './helpers';
+
 
 export const startRouter = Router();
 
@@ -230,6 +238,21 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     let wasKnockedOut = false;
 
     let currentHp = hpState.currentHp;
+
+    // Fetch combat template, resource state, and unlocked actions for template combat
+    const [playerTemplate, resourceState, explorationSkillPoints] = await Promise.all([
+      getActiveTemplate(playerId),
+      getResourceState(playerId),
+      getSkillPoints(playerId),
+    ]);
+    const explorationUnlockedActions = explorationSkillPoints.unlockedActions;
+    let currentStamina = resourceState.stamina.current;
+    let currentMana = resourceState.mana.current;
+    const maxStamina = resourceState.stamina.max;
+    const maxMana = resourceState.mana.max;
+    const staminaRegenPerRound = resourceState.stamina.regenPerRound;
+    const manaRegenPerRound = resourceState.mana.regenPerRound;
+
     let aborted = false;
     let abortedAtTurn: number | null = null;
     let respawnedTo: { townId: string; townName: string } | null = null;
@@ -307,18 +330,28 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           combatOptions = { autoPotionThreshold, potions: [...potionPool] };
         }
 
-        const combatantA: Combatant = {
+        const unlockedSet = new Set(explorationUnlockedActions);
+        const filteredActions: Record<string, ActionDefinition> = {};
+        for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
+          if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
+            filteredActions[id] = def;
+          }
+        }
+        const combatantA: TemplateCombatant = {
           id: playerId,
           name: req.player!.username,
           stats: playerStats,
+          template: playerTemplate,
+          stamina: currentStamina,
+          maxStamina,
+          staminaRegenPerRound,
+          mana: currentMana,
+          maxMana,
+          manaRegenPerRound,
+          actionDefinitions: filteredActions,
         };
-        const combatantB: Combatant = {
-          id: prefixedMob.id,
-          name: prefixedMob.mobDisplayName ?? prefixedMob.name,
-          stats: mobToCombatantStats(prefixedMob),
-          spells: prefixedMob.spellPattern,
-        };
-        const combatResult = runCombat(combatantA, combatantB, combatOptions);
+        const combatantB = mobToTemplateCombatant(prefixedMob);
+        const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
 
         // Remove consumed potions from the shared pool
         for (const consumed of combatResult.potionsConsumed) {
@@ -343,6 +376,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
         if (combatResult.outcome === 'victory') {
           currentHp = combatResult.combatantAHpRemaining;
+          currentStamina = combatResult.combatantAStaminaRemaining;
+          currentMana = combatResult.combatantAManaRemaining;
           await setHp(playerId, currentHp);
 
           const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
@@ -374,7 +409,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
               outcome: combatResult.outcome,
               playerMaxHp: combatResult.combatantAMaxHp,
               mobMaxHp: combatResult.combatantBMaxHp,
-              log: combatResult.log,
+              log: mapTemplateCombatLog(combatResult.log),
               rewards: {
                 xp: prefixedMob.xpReward,
                 baseXp: prefixedMob.xpReward,
@@ -398,7 +433,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
               outcome: combatResult.outcome,
               playerMaxHp: combatResult.combatantAMaxHp,
               mobMaxHp: combatResult.combatantBMaxHp,
-              log: combatResult.log,
+              log: mapTemplateCombatLog(combatResult.log),
               playerHpRemaining: currentHp,
               xp: xpGain,
               loot,
@@ -407,6 +442,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             },
           });
         } else {
+          currentStamina = combatResult.combatantAStaminaRemaining;
+          currentMana = combatResult.combatantAManaRemaining;
+
           const fleeResult = await calculateFleeWithGold(playerId, {
             evasionLevel: progression.attributes.evasion,
             mobLevel: prefixedMob.level,
@@ -447,7 +485,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
               outcome: combatResult.outcome,
               playerMaxHp: combatResult.combatantAMaxHp,
               mobMaxHp: combatResult.combatantBMaxHp,
-              log: combatResult.log,
+              log: mapTemplateCombatLog(combatResult.log),
               rewards: {
                 xp: 0,
                 baseXp: 0,
@@ -471,7 +509,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
               outcome: combatResult.outcome,
               playerMaxHp: combatResult.combatantAMaxHp,
               mobMaxHp: combatResult.combatantBMaxHp,
-              log: combatResult.log,
+              log: mapTemplateCombatLog(combatResult.log),
               playerHpRemaining: currentHp,
               fleeResult: {
                 outcome: fleeResult.outcome,
@@ -719,6 +757,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
     // Deduct all potions consumed across ambushes
     await deductConsumedPotions(playerId, allPotionsConsumed);
+
+    // Persist stamina/mana after all ambush combats
+    await setAllResources(playerId, currentHp, currentStamina, currentMana);
 
     const spentTurns = aborted && abortedAtTurn ? abortedAtTurn : effectiveTurns;
     const explorationTurnsToAdd = selectedTier === maxUnlockedTier ? spentTurns : 0;

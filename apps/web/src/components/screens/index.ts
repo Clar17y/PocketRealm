@@ -12,3 +12,5 @@ export { Gathering } from './Gathering';
 export { WorldEvents } from './WorldEvents';
 export { Achievements } from './Achievements';
 export { GuildScreen } from './GuildScreen';
+export { Templates } from './Templates';
+export { TalentTree } from './TalentTree';

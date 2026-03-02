@@ -42,7 +42,7 @@ export const TUTORIAL_STEPS: Record<number, TutorialStepDef> = {
     banner: 'You have an encounter site! Select it and fight the mobs inside.',
     dialog: {
       title: 'Combat',
-      body: 'Encounter sites contain groups of mobs to fight. Select a site and engage in combat to earn XP for your combat skills and collect loot drops. Winning makes you stronger!',
+      body: 'Encounter sites contain groups of mobs to fight. Your character follows the combat template you\'ve set — visit the Templates screen under the Combat tab to customise your action rotation. Winning earns XP for your combat skills and drops loot!',
     },
     pulseTab: 'combat',
     navigateTo: 'combat',

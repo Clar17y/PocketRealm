@@ -1,7 +1,7 @@
 import { IDS } from './ids';
 import { POTION_CONSTANTS } from '@adventure/shared';
 
-type ConsumableEffectJson = { type: 'heal_flat' | 'heal_percent'; value: number };
+type ConsumableEffectJson = { type: 'heal_flat' | 'heal_percent' | 'restore_stamina' | 'restore_mana'; value: number };
 
 type ItemRow = {
   id: string;
@@ -250,8 +250,15 @@ const consumables = [
   consumable(IDS.pots.antivenomPotion, 'Antivenom Potion', 2),
   consumable(IDS.pots.greaterHealthPotion, 'Greater Health Potion', 3, { type: 'heal_flat', value: POTION_CONSTANTS.GREATER_HEALTH_HEAL }),
   consumable(IDS.pots.resistPotion, 'Resist Potion', 4),
-  consumable(IDS.pots.manaPotion, 'Mana Potion', 4),
+  consumable(IDS.pots.manaPotion, 'Mana Potion', 4, { type: 'restore_mana', value: POTION_CONSTANTS.MANA_RESTORE }),
   consumable(IDS.pots.elixirOfPower, 'Elixir of Power', 5),
+  // Stamina potions
+  consumable(IDS.pots.minorStaminaPotion, 'Minor Stamina Potion', 1, { type: 'restore_stamina', value: POTION_CONSTANTS.MINOR_STAMINA_RESTORE }),
+  consumable(IDS.pots.staminaPotion, 'Stamina Potion', 2, { type: 'restore_stamina', value: POTION_CONSTANTS.STAMINA_RESTORE }),
+  consumable(IDS.pots.greaterStaminaPotion, 'Greater Stamina Potion', 3, { type: 'restore_stamina', value: POTION_CONSTANTS.GREATER_STAMINA_RESTORE }),
+  // Mana potions
+  consumable(IDS.pots.minorManaPotion, 'Minor Mana Potion', 1, { type: 'restore_mana', value: POTION_CONSTANTS.MINOR_MANA_RESTORE }),
+  consumable(IDS.pots.greaterManaPotion, 'Greater Mana Potion', 5, { type: 'restore_mana', value: POTION_CONSTANTS.GREATER_MANA_RESTORE }),
 ];
 
 // ── Weapons ──────────────────────────────────────────────────────────────────

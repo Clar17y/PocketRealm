@@ -3,14 +3,16 @@ import { z } from 'zod';
 import { Prisma, prisma } from '@adventure/database';
 import {
   buildPlayerCombatStats,
-  runCombat,
   applyMobPrefix,
   rollMobPrefix,
   simulateTravelAmbushes,
-  mobToCombatantStats,
+  mobToTemplateCombatant,
   filterAndWeightMobsByTier,
+  runTemplateCombat,
+  type TemplateCombatant,
 } from '@adventure/game-engine';
-import type { Combatant, CombatOptions, MobTemplate, PotionConsumed, SkillType } from '@adventure/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@adventure/shared';
+import type { ActionDefinition, CombatOptions, PotionConsumed } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
@@ -32,6 +34,10 @@ import {
   respawnToHomeTown,
 } from '../services/zoneDiscoveryService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../services/combatStatsService';
+import { getActiveTemplate } from '../services/combatTemplateService';
+import { getResourceState, setAllResources } from '../services/resourceService';
+import { getSkillPoints } from '../services/skillPointService';
+import { mapTemplateCombatLog } from '../services/combatLogMapper';
 import { calculateExplorationPercent, getExplorationPercent } from '../services/zoneExplorationService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { assertNotOverEncumbered } from '../services/inventoryService';
@@ -39,6 +45,7 @@ import { applyGuildTax, getPlayerTaxRate, calculateInflatedCost, taxInfoFromResu
 
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
+
 
 
 export const zonesRouter = Router();
@@ -333,6 +340,20 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         zoneTiers,
       );
 
+      // Fetch combat template, resource state, and unlocked actions for template combat
+      const [playerTemplate, resourceState, travelSkillPoints] = await Promise.all([
+        getActiveTemplate(playerId),
+        getResourceState(playerId),
+        getSkillPoints(playerId),
+      ]);
+      const travelUnlockedActions = travelSkillPoints.unlockedActions;
+      let currentStamina = resourceState.stamina.current;
+      let currentMana = resourceState.mana.current;
+      const maxStamina = resourceState.stamina.max;
+      const maxMana = resourceState.mana.max;
+      const staminaRegenPerRound = resourceState.stamina.regenPerRound;
+      const manaRegenPerRound = resourceState.mana.regenPerRound;
+
       let currentHp = hpState.currentHp;
       let ambushAbort: {
         type: 'knockout';
@@ -364,23 +385,35 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           equipmentStats,
         );
 
-        const combatantA: Combatant = {
+        const travelUnlockedSet = new Set(travelUnlockedActions);
+        const travelFilteredActions: Record<string, ActionDefinition> = {};
+        for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
+          if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || travelUnlockedSet.has(id)) {
+            travelFilteredActions[id] = def;
+          }
+        }
+        const combatantA: TemplateCombatant = {
           id: playerId,
           name: req.player!.username,
           stats: playerStats,
+          template: playerTemplate,
+          stamina: currentStamina,
+          maxStamina,
+          staminaRegenPerRound,
+          mana: currentMana,
+          maxMana,
+          manaRegenPerRound,
+          actionDefinitions: travelFilteredActions,
         };
-        const combatantB: Combatant = {
-          id: prefixedMob.id,
-          name: prefixedMob.mobDisplayName ?? prefixedMob.name,
-          stats: mobToCombatantStats(prefixedMob),
-          spells: prefixedMob.spellPattern,
-        };
+        const combatantB = mobToTemplateCombatant(prefixedMob);
         let combatOptions: CombatOptions | undefined;
         if (autoPotionThreshold > 0 && potionPool.length > 0) {
           combatOptions = { autoPotionThreshold, potions: [...potionPool] };
         }
-        const combatResult = runCombat(combatantA, combatantB, combatOptions);
+        const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
         currentHp = combatResult.combatantAHpRemaining;
+        currentStamina = combatResult.combatantAStaminaRemaining;
+        currentMana = combatResult.combatantAManaRemaining;
 
         // Remove consumed potions from the shared pool
         for (const consumed of combatResult.potionsConsumed) {
@@ -435,7 +468,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                 outcome: combatResult.outcome,
                 playerMaxHp: combatResult.combatantAMaxHp,
                 mobMaxHp: combatResult.combatantBMaxHp,
-                log: combatResult.log,
+                log: mapTemplateCombatLog(combatResult.log),
                 rewards: {
                   xp: prefixedMob.xpReward,
                   baseXp: prefixedMob.xpReward,
@@ -458,7 +491,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
               outcome: combatResult.outcome,
               playerMaxHp: combatResult.combatantAMaxHp,
               mobMaxHp: combatResult.combatantBMaxHp,
-              log: combatResult.log,
+              log: mapTemplateCombatLog(combatResult.log),
               xp: xpGain,
               loot,
               durabilityLost,
@@ -495,7 +528,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                   outcome: combatResult.outcome,
                   playerMaxHp: combatResult.combatantAMaxHp,
                   mobMaxHp: combatResult.combatantBMaxHp,
-                  log: combatResult.log,
+                  log: mapTemplateCombatLog(combatResult.log),
                   rewards: {
                     xp: 0,
                     baseXp: 0,
@@ -518,7 +551,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                 outcome: combatResult.outcome,
                 playerMaxHp: combatResult.combatantAMaxHp,
                 mobMaxHp: combatResult.combatantBMaxHp,
-                log: combatResult.log,
+                log: mapTemplateCombatLog(combatResult.log),
                 fleeResult: { outcome: fleeResult.outcome, remainingHp: fleeResult.remainingHp },
                 durabilityLost,
               },
@@ -570,7 +603,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                   outcome: combatResult.outcome,
                   playerMaxHp: combatResult.combatantAMaxHp,
                   mobMaxHp: combatResult.combatantBMaxHp,
-                  log: combatResult.log,
+                  log: mapTemplateCombatLog(combatResult.log),
                   rewards: {
                     xp: 0,
                     baseXp: 0,
@@ -593,7 +626,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                 outcome: combatResult.outcome,
                 playerMaxHp: combatResult.combatantAMaxHp,
                 mobMaxHp: combatResult.combatantBMaxHp,
-                log: combatResult.log,
+                log: mapTemplateCombatLog(combatResult.log),
                 remainingHp: currentHp,
                 fleeResult: { outcome: fleeResult.outcome, remainingHp: fleeResult.remainingHp },
                 durabilityLost,
@@ -625,6 +658,9 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
 
       // Single deduction point for all exit paths
       await deductConsumedPotions(playerId, allPotionsConsumed);
+
+      // Persist stamina/mana after all ambush combats
+      await setAllResources(playerId, currentHp, currentStamina, currentMana);
 
       // Store travel ambush overflow as pending loot
       if (allTravelOverflow.length > 0) {

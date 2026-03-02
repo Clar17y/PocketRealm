@@ -224,7 +224,8 @@ export interface BossRoundSummary {
   bossDamage: number;
   totalPlayerDamage: number;
   bossHpPercent: number;
-  raidPoolPercent: number;
+  playersAlive: number;
+  playersDead: number;
 }
 
 export interface BossEncounterResponse {
@@ -243,8 +244,7 @@ export interface BossEncounterResponse {
   mobLevel: number;
   zoneId?: string;
   zoneName?: string;
-  raidPoolHp?: number;
-  raidPoolMax?: number;
+  bossEffects?: Array<{ name: string; stat: string; modifier: number; roundsRemaining: number }>;
   roundSummaries?: BossRoundSummary[] | null;
 }
 
@@ -252,7 +252,6 @@ export interface BossParticipantResponse {
   id: string;
   playerId: string;
   username?: string | null;
-  role: string;
   roundNumber: number;
   turnsCommitted: number;
   totalDamage: number;
@@ -262,6 +261,11 @@ export interface BossParticipantResponse {
   crits: number;
   autoSignUp: boolean;
   currentHp: number;
+  currentStamina: number;
+  currentMana: number;
+  threat: number;
+  damageAbsorbed: number;
+  templateRound: number;
   status: string;
 }
 
@@ -294,10 +298,10 @@ export async function getBossEncounter(id: string) {
   }>(`/api/v1/boss/${id}`);
 }
 
-export async function signUpForBoss(id: string, role: 'attacker' | 'healer', autoSignUp = false) {
+export async function signUpForBoss(id: string, autoSignUp = false) {
   return fetchApi<{ participant: BossParticipantResponse }>(`/api/v1/boss/${id}/signup`, {
     method: 'POST',
-    body: JSON.stringify({ role, autoSignUp }),
+    body: JSON.stringify({ autoSignUp }),
   });
 }
 

@@ -135,6 +135,7 @@ export interface CombatPotion {
   name: string;
   healAmount: number;
   templateId: string;
+  potionType: 'hp' | 'stamina' | 'mana';
 }
 
 export interface CombatOptions {

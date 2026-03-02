@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { getMobPrefixDefinition, getTierName } from '@adventure/shared';
+import { StatBar } from '@/components/StatBar';
 
 interface MonsterDrop {
   name: string;
@@ -34,6 +35,16 @@ interface Monster {
   prefixesEncountered: string[];
   explorationTier?: number;
   tierLocked?: boolean;
+  bossRotation?: {
+    totalRounds: number;
+    revealedRounds: number;
+    actions: Array<{
+      round: number;
+      actionName: string;
+      targetMode: 'single_target' | 'aoe';
+      isTelegraphed: boolean;
+    }>;
+  };
 }
 
 interface PrefixSummaryEntry {
@@ -425,6 +436,43 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                                 <div className="text-sm text-[var(--rpg-text-primary)]">{drop.name}</div>
                                 <div className="text-xs text-[var(--rpg-text-secondary)]">{drop.dropRate}% drop rate</div>
                               </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Boss Rotation */}
+                  {selectedMonster.bossRotation && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-bold text-[var(--rpg-gold)] mb-2">
+                        Boss Rotation ({selectedMonster.bossRotation.revealedRounds}/{selectedMonster.bossRotation.totalRounds} revealed)
+                      </h4>
+                      <StatBar
+                        current={selectedMonster.bossRotation.revealedRounds}
+                        max={selectedMonster.bossRotation.totalRounds}
+                        color="xp" size="sm"
+                        showNumbers={false}
+                      />
+                      <div className="mt-2 space-y-1">
+                        {Array.from({ length: selectedMonster.bossRotation.totalRounds }, (_, i) => {
+                          const action = selectedMonster.bossRotation!.actions.find(a => a.round === i + 1);
+                          return (
+                            <div key={i} className="flex items-center gap-2 text-xs">
+                              <span className="text-[var(--rpg-text-secondary)] w-8">R{i + 1}</span>
+                              {action ? (
+                                <>
+                                  <span className={action.isTelegraphed ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text)]'}>
+                                    {action.actionName}
+                                  </span>
+                                  <span className="text-[var(--rpg-text-secondary)]">
+                                    ({action.targetMode === 'aoe' ? 'AoE' : 'Single'})
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-[var(--rpg-text-secondary)]">???</span>
+                              )}
                             </div>
                           );
                         })}

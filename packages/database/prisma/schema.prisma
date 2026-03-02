@@ -34,6 +34,12 @@ model Player {
   isRecovering  Boolean  @default(false) @map("is_recovering")
   recoveryCost  Int?     @map("recovery_cost")
 
+  // Stamina & Mana
+  currentStamina      Int      @default(100) @map("current_stamina")
+  lastStaminaRegenAt  DateTime @default(now()) @map("last_stamina_regen_at")
+  currentMana         Int      @default(50) @map("current_mana")
+  lastManaRegenAt     DateTime @default(now()) @map("last_mana_regen_at")
+
   // Auto-Potion
   autoPotionThreshold Int @default(0) @map("auto_potion_threshold")
 
@@ -85,6 +91,11 @@ model Player {
   achievements       PlayerAchievement[]
   guildMember        GuildMember?
   guildJoinRequests  GuildJoinRequest[]
+  combatTemplates      CombatTemplate[]
+  skillPointAllocation SkillPointAllocation?
+  pvpScoutsSent        PvpScoutLog[] @relation("PvpScouter")
+  pvpScoutsReceived    PvpScoutLog[] @relation("PvpScoutTarget")
+  bossRotations        PlayerBossRotation[]
 
   @@map("players")
 }
@@ -303,6 +314,7 @@ model MobTemplate {
   familyMembers     MobFamilyMember[]
   bossEncounters    BossEncounter[]
   persistedMobs     PersistedMob[]
+  bossRotations     PlayerBossRotation[]
 
   @@map("mob_templates")
 }
@@ -644,8 +656,7 @@ model BossEncounter {
   currentHp      Int       @map("current_hp")
   maxHp          Int       @map("max_hp")
   baseHp         Int       @map("base_hp")
-  raidPoolHp     Int?      @map("raid_pool_hp")
-  raidPoolMax    Int?      @map("raid_pool_max")
+  bossEffects    Json      @default("[]") @map("boss_effects")
   scaledAt       DateTime? @map("scaled_at")
   roundNumber    Int       @default(0) @map("round_number")
   nextRoundAt    DateTime? @map("next_round_at")
@@ -666,7 +677,6 @@ model BossParticipant {
   id              String @id @default(uuid())
   encounterId     String @map("encounter_id")
   playerId        String @map("player_id")
-  role            String @db.VarChar(16)
   roundNumber     Int    @map("round_number")
   turnsCommitted  Int    @map("turns_committed")
   totalDamage     Int    @default(0) @map("total_damage")
@@ -676,6 +686,11 @@ model BossParticipant {
   crits           Int    @default(0)
   autoSignUp      Boolean @default(false) @map("auto_sign_up")
   currentHp       Int    @map("current_hp")
+  currentStamina  Int    @default(100) @map("current_stamina")
+  currentMana     Int    @default(50)  @map("current_mana")
+  threat          Int    @default(0)
+  damageAbsorbed  Int    @default(0) @map("damage_absorbed")
+  templateRound   Int    @default(1) @map("template_round")
   status          String @default("alive") @db.VarChar(16)
 
   encounter BossEncounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
@@ -684,6 +699,18 @@ model BossParticipant {
   @@unique([encounterId, playerId, roundNumber])
   @@index([encounterId, roundNumber])
   @@map("boss_participants")
+}
+
+model PlayerBossRotation {
+  playerId       String @map("player_id")
+  mobTemplateId  String @map("mob_template_id")
+  roundsRevealed Int    @default(0) @map("rounds_revealed")
+
+  player      Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  mobTemplate MobTemplate @relation(fields: [mobTemplateId], references: [id], onDelete: Cascade)
+
+  @@id([playerId, mobTemplateId])
+  @@map("player_boss_rotations")
 }
 
 model PersistedMob {
@@ -878,6 +905,59 @@ model GuildJoinRequest {
   @@unique([guildId, playerId])
   @@index([guildId, status])
   @@map("guild_join_requests")
+}
+
+// =============================================================================
+// COMBAT TEMPLATES
+// =============================================================================
+
+model CombatTemplate {
+  id        String   @id @default(uuid())
+  playerId  String   @map("player_id")
+  name      String   @db.VarChar(64)
+  isActive  Boolean  @default(false) @map("is_active")
+  actions   Json     // CombatTemplateAction[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, isActive])
+  @@map("combat_templates")
+}
+
+// =============================================================================
+// SKILL POINTS
+// =============================================================================
+
+model SkillPointAllocation {
+  id          String   @id @default(uuid())
+  playerId    String   @unique @map("player_id")
+  allocations Json     @default("{}") // Record<nodeId, pointCost>
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@map("skill_point_allocations")
+}
+
+// =============================================================================
+// PVP SCOUT LOG
+// =============================================================================
+
+model PvpScoutLog {
+  id        String   @id @default(uuid())
+  scouterId String   @map("scouter_id")
+  targetId  String   @map("target_id")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  scouter Player @relation("PvpScouter", fields: [scouterId], references: [id], onDelete: Cascade)
+  target  Player @relation("PvpScoutTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([targetId, isRead])
+  @@map("pvp_scout_logs")
 }
 
 // =============================================================================

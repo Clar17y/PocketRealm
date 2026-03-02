@@ -1,0 +1,150 @@
+// --- Action Categories ---
+export type ActionCategory = 'offensive' | 'supportive' | 'defensive';
+
+// --- Specific Action Types ---
+export type OffensiveAction =
+  | 'light_attack'
+  | 'normal_attack'
+  | 'heavy_attack'
+  | 'skill_attack'
+  | 'damage_spell'
+  | 'debuff_spell';
+
+export type SupportiveAction =
+  | 'buff'
+  | 'heal_self'
+  | 'heal_ally'
+  | 'taunt'
+  | 'use_potion';
+
+export type DefensiveAction =
+  | 'defend'
+  | 'counter'
+  | 'ward';
+
+export type CombatActionType = OffensiveAction | SupportiveAction | DefensiveAction;
+
+// --- Action Definition ---
+export interface ActionCost {
+  stamina: number;
+  mana: number;
+}
+
+export interface ActionDefinition {
+  id: string;
+  name: string;
+  description: string;
+  actionType: CombatActionType;
+  category: ActionCategory;
+  cost: ActionCost;
+  /** Damage multiplier relative to base weapon damage (1.0 = normal) */
+  damageMultiplier?: number;
+  /** Accuracy modifier added to hit roll */
+  accuracyModifier?: number;
+  /** Defence reduction applied to target receiving this action */
+  defenceReduction?: number;
+  /** Damage reduction percentage when defending (0-1) */
+  damageReductionPercent?: number;
+  /** Whether this action guarantees avoidance of physical attacks */
+  avoidsPhysical?: boolean;
+  /** Whether this action guarantees resistance to magical attacks */
+  resistsMagic?: boolean;
+  /** Buff/debuff effect applied */
+  effect?: ActionEffect;
+  /** Heal amount (flat + percent of max HP) */
+  healFlat?: number;
+  healPercent?: number;
+  /** Damage type override (e.g., spells that deal magic damage) */
+  damageType?: 'physical' | 'magic';
+  /** Whether this action makes the user "channeling" (vulnerable to bonus damage) */
+  isChanneling?: boolean;
+  /** Bonus damage multiplier when hitting a channeling target */
+  bonusVsChanneling?: number;
+  /** Number of rounds this ability forces boss to target the user (taunt) */
+  tauntDuration?: number;
+  /** Potion type consumed */
+  potionType?: 'hp' | 'stamina' | 'mana';
+}
+
+export interface ActionEffect {
+  name: string;
+  /** Stat modified (e.g., 'attack', 'defence', 'accuracy', 'dodge') */
+  stat: string;
+  /** Flat modifier applied to the stat */
+  modifier: number;
+  /** Duration in rounds */
+  duration: number;
+  /** Whether this is a debuff applied to the target (vs buff on self) */
+  isDebuff?: boolean;
+  /** Whether this is a DoT/HoT */
+  damagePerRound?: number;
+  healPerRound?: number;
+}
+
+// --- Combat Template ---
+export interface CombatTemplateAction {
+  /** Action definition ID (references an unlocked ability) */
+  actionId: string;
+  /** Optional override label for display */
+  label?: string;
+}
+
+export interface CombatTemplateData {
+  id: string;
+  playerId: string;
+  name: string;
+  isActive: boolean;
+  actions: CombatTemplateAction[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// --- Resource State ---
+export interface ResourceState {
+  current: number;
+  max: number;
+  regenPerRound: number;
+  regenPerSecond: number;
+}
+
+export interface CombatResourceState {
+  hp: ResourceState;
+  stamina: ResourceState;
+  mana: ResourceState;
+}
+
+// --- Skill Points ---
+export type TalentTree = 'melee' | 'ranged' | 'magic' | 'general';
+
+export interface TalentNodeDefinition {
+  id: string;
+  tree: TalentTree;
+  tier: number;
+  name: string;
+  description: string;
+  pointCost: number;
+  /** Minimum skill level required (e.g., melee level 25) */
+  skillLevelGate?: { skill: string; level: number };
+  /** Node IDs that must be unlocked first */
+  prerequisites: string[];
+  /** If this node unlocks a combat action, reference the ActionDefinition ID */
+  unlocksAction?: string;
+  /** If this node grants a passive bonus */
+  passiveBonus?: PassiveBonus;
+}
+
+export interface PassiveBonus {
+  stat: string;
+  value: number;
+  isPercent?: boolean;
+  description: string;
+}
+
+export interface SkillPointAllocationData {
+  playerId: string;
+  totalPointsEarned: number;
+  totalPointsSpent: number;
+  availablePoints: number;
+  allocations: Record<string, number>;
+  unlockedActions: string[];
+}

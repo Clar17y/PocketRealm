@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import type { LastCombatLogEntry } from '@/app/game/useGameController';
+import { BASE_ACTION_DEFINITIONS } from '@adventure/shared';
+import { ACTION_CATEGORY_COLORS } from '@/lib/categoryColors';
 
 function isMagicDamage(entry: LastCombatLogEntry): boolean {
   return entry.targetMagicDefence !== undefined || entry.magicDefenceReduction !== undefined || entry.action === 'spell';
@@ -24,6 +26,19 @@ function formatHp(hp: number | undefined, maxHp?: number): string {
   if (hp === undefined) return '';
   if (maxHp !== undefined) return `${hp}/${maxHp}`;
   return `${hp}`;
+}
+
+function getActionCategoryColor(entry: LastCombatLogEntry): string {
+  // Look up in BASE_ACTION_DEFINITIONS first
+  if (entry.actionId && BASE_ACTION_DEFINITIONS[entry.actionId]) {
+    const category = BASE_ACTION_DEFINITIONS[entry.actionId].category;
+    return `text-[${ACTION_CATEGORY_COLORS[category]}]`;
+  }
+  // Infer from action field
+  const action = entry.action;
+  if (action === 'defend' || action === 'counter' || action === 'ward') return `text-[${ACTION_CATEGORY_COLORS.defensive}]`;
+  if (action === 'potion' || action === 'heal') return `text-[${ACTION_CATEGORY_COLORS.supportive}]`;
+  return `text-[${ACTION_CATEGORY_COLORS.offensive}]`;
 }
 
 interface CombatLogEntryProps {
@@ -102,9 +117,11 @@ export function CombatLogEntry({
               <span className="text-[var(--rpg-gold)] font-mono w-7 shrink-0">R{entry.round}</span>
               <span className={`shrink-0 ${actorColor}`}>{isPlayerAction ? playerLabel : opponentLabel}</span>
               {icon && <span className="shrink-0 text-xs">{icon}</span>}
-              {entry.spellName && (
+              {entry.actionName ? (
+                <span className={`text-xs font-semibold ${getActionCategoryColor(entry)}`}>{entry.actionName}</span>
+              ) : entry.spellName ? (
                 <span className="text-[var(--rpg-blue-light)] text-xs font-semibold">{entry.spellName}</span>
-              )}
+              ) : null}
               {entry.damage !== undefined && entry.damage > 0 && (
                 <span className="text-[var(--rpg-text-primary)] font-mono font-semibold">{entry.damage} dmg</span>
               )}
@@ -118,6 +135,15 @@ export function CombatLogEntry({
                   ).join(', ')}
                   {` (${entry.effectsApplied[0].duration} rds)`}
                 </span>
+              )}
+              {entry.interactionResult === 'countered' && (
+                <span className="text-[var(--rpg-gold)] text-xs font-bold">Countered!</span>
+              )}
+              {entry.interactionResult === 'warded' && (
+                <span className="text-purple-400 text-xs font-bold">Warded!</span>
+              )}
+              {entry.wasExhausted && (
+                <span className="text-[var(--rpg-text-secondary)] text-xs italic">(Exhausted &rarr; Defend)</span>
               )}
               {entry.evaded && <span className="text-[var(--rpg-blue-light)] text-xs">Dodged</span>}
               {entry.roll !== undefined && !entry.damage && !entry.evaded && !entry.effectsApplied && !entry.healAmount && (
@@ -200,6 +226,17 @@ export function CombatLogEntry({
           )}
           {entry.healAmount !== undefined && entry.healAmount > 0 && (
             <div>Heals {entry.healAmount} HP</div>
+          )}
+          {(entry.staminaCost !== undefined || entry.manaCost !== undefined) && (
+            <div>
+              {entry.staminaCost !== undefined && entry.staminaCost > 0 && (
+                <span className="text-teal-400">-{entry.staminaCost} STA</span>
+              )}
+              {entry.staminaCost !== undefined && entry.staminaCost > 0 && entry.manaCost !== undefined && entry.manaCost > 0 && ' / '}
+              {entry.manaCost !== undefined && entry.manaCost > 0 && (
+                <span className="text-[var(--rpg-blue-light)]">-{entry.manaCost} MP</span>
+              )}
+            </div>
           )}
         </div>
       )}

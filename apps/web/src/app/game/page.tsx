@@ -8,6 +8,7 @@ import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { LootPicker } from '@/components/common/LootPicker';
+import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
@@ -49,6 +50,8 @@ import {
 import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
 import { GuildScreen } from '@/components/screens/GuildScreen';
+import { Templates } from '@/components/screens/Templates';
+import { TalentTree } from '@/components/screens/TalentTree';
 import { CombatScreen } from './screens/CombatScreen';
 import { useGameController, isMobKnown, type Screen } from './useGameController';
 import { useChat } from '@/hooks/useChat';
@@ -238,6 +241,13 @@ export default function GamePage() {
     bestiaryPrefixSummary,
     hpState,
     setHpState,
+    staminaState,
+    manaState,
+    skillPointState,
+    handleAllocateSkillPoint,
+    handleRespecSkillPoints,
+    templates,
+    handleLoadTemplates,
     pvpNotificationCount,
     playbackActive,
     combatPlaybackData,
@@ -449,39 +459,35 @@ export default function GamePage() {
         const currentLevelXp = Math.max(0, characterProgression.characterXp - currentLevelFloorXp);
         const requiredLevelXp = Math.max(1, nextLevelTotalXp - currentLevelFloorXp);
         return (
-          <Dashboard
-            playerData={{
-              turns,
-              maxTurns: TURN_CONSTANTS.BANK_CAP,
-              turnsRegenRate: TURN_CONSTANTS.REGEN_RATE * 60,
-              gold,
-              currentXP: characterProgression.characterXp,
-              nextLevelXP: nextLevelTotalXp,
-              currentLevelXp,
-              requiredLevelXp,
-              currentZone: currentZone?.name ?? 'Unknown',
-              currentHp: hpState.currentHp,
-              maxHp: hpState.maxHp,
-              hpRegenRate: hpState.regenPerSecond,
-              isRecovering: hpState.isRecovering,
-              isOverEncumbered,
-              recoveryCost: hpState.recoveryCost,
-            }}
-            characterProgression={characterProgression}
-            skills={skills
-              .map((s) => {
-                const meta = SKILL_META[s.skillType];
-                if (!meta) return null;
-                return { name: meta.name, level: s.level, icon: meta.icon, imageSrc: skillIconSrc(s.skillType) };
-              })
-              .filter(Boolean) as Array<{ name: string; level: number; icon: typeof Sword; imageSrc: string }>}
-            onNavigate={handleNavigate}
-            activityLog={activityLog}
-            onAllocateAttribute={handleAllocateAttribute}
-            onQuickRest={handleQuickRest}
-            quickRestPercent={quickRestHealPercent}
-            busyAction={busyAction}
-          />
+          <>
+            <Dashboard
+              playerData={{
+                turns,
+                maxTurns: TURN_CONSTANTS.BANK_CAP,
+                turnsRegenRate: TURN_CONSTANTS.REGEN_RATE * 60,
+                gold,
+                currentXP: characterProgression.characterXp,
+                nextLevelXP: nextLevelTotalXp,
+                currentLevelXp,
+                requiredLevelXp,
+                currentZone: currentZone?.name ?? 'Unknown',
+                isRecovering: hpState.isRecovering,
+                isOverEncumbered,
+                recoveryCost: hpState.recoveryCost,
+              }}
+              characterProgression={characterProgression}
+              skills={skills
+                .map((s) => {
+                  const meta = SKILL_META[s.skillType];
+                  if (!meta) return null;
+                  return { name: meta.name, level: s.level, icon: meta.icon, imageSrc: skillIconSrc(s.skillType) };
+                })
+                .filter(Boolean) as Array<{ name: string; level: number; icon: typeof Sword; imageSrc: string }>}
+              onNavigate={handleNavigate}
+              activityLog={activityLog}
+              onAllocateAttribute={handleAllocateAttribute}
+            />
+          </>
         );
       case 'explore':
         if (currentZone?.zoneType === 'town' && !explorationPlaybackData) {
@@ -526,7 +532,13 @@ export default function GamePage() {
             recoveryCost={hpState.recoveryCost}
             currentHp={hpState.currentHp}
             maxHp={hpState.maxHp}
+            currentStamina={staminaState.current}
+            maxStamina={staminaState.max}
+            currentMana={manaState.current}
+            maxMana={manaState.max}
             regenPerSecond={hpState.regenPerSecond}
+            staminaRegenPerSecond={staminaState.regenPerSecond}
+            manaRegenPerSecond={manaState.regenPerSecond}
             playbackData={explorationPlaybackData}
             onPlaybackComplete={handleExplorationPlaybackComplete}
             onPlaybackSkip={handlePlaybackSkip}
@@ -782,6 +794,7 @@ export default function GamePage() {
               prefixesEncountered: m.prefixesEncountered,
               explorationTier: m.explorationTier,
               tierLocked: m.tierLocked,
+              bossRotation: m.bossRotation,
               drops: m.drops.map((d) => ({
                 name: d.item.name,
                 imageSrc: itemImageSrc(d.item.name, d.item.itemType),
@@ -1001,6 +1014,8 @@ export default function GamePage() {
             quickRestPercent={quickRestHealPercent}
             onNavigateToRest={() => handleNavigate('rest')}
             combatXpRate={primaryCombatXpRate}
+            staminaState={staminaState}
+            manaState={manaState}
           />
         );
       }
@@ -1232,6 +1247,27 @@ export default function GamePage() {
             onTurnsChanged={() => void loadTurnsAndHp()}
           />
         );
+      case 'templates':
+        return (
+          <Templates
+            templates={templates}
+            unlockedActions={skillPointState?.unlockedActions ?? []}
+            staminaState={staminaState}
+            manaState={manaState}
+            onLoadTemplates={handleLoadTemplates}
+            onNavigate={setActiveScreen}
+          />
+        );
+      case 'talentTree':
+        return (
+          <TalentTree
+            skillPointState={skillPointState!}
+            skills={skills}
+            onAllocate={handleAllocateSkillPoint}
+            onRespec={handleRespecSkillPoints}
+            onNavigate={setActiveScreen}
+          />
+        );
       case 'casino':
         return (
           <Casino
@@ -1434,6 +1470,8 @@ export default function GamePage() {
           <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
             {[
               { id: 'combat', label: 'Combat', badge: 0 },
+              { id: 'templates', label: 'Templates', badge: 0 },
+              { id: 'talentTree', label: 'Skill Tree', badge: 0 },
               { id: 'arena', label: 'Arena', badge: pvpNotificationCount },
             ].map((tab) => (
               <button

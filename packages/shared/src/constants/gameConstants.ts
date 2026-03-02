@@ -420,6 +420,124 @@ export const FLEE_CONSTANTS = {
   GOLD_LOSS_SEVERE: 0.3,
 } as const;
 
+// =============================================================================
+// STAMINA
+// =============================================================================
+
+export const STAMINA_CONSTANTS = {
+  /** Base stamina pool for all players */
+  BASE_POOL: 100,
+  /** Additional stamina per average of (melee, ranged, evasion) levels */
+  POOL_PER_SKILL_LEVEL: 3,
+  /** Base stamina regen per combat round */
+  BASE_REGEN_PER_ROUND: 10,
+  /** Additional regen per average combat skill level */
+  REGEN_PER_SKILL_LEVEL: 0.2,
+  /** Out-of-combat regen rate (per second, like HP) */
+  PASSIVE_REGEN_PER_SECOND: 1.0,
+  /** Heal per turn when resting */
+  REST_HEAL_PER_TURN: 5,
+} as const;
+
+// =============================================================================
+// MANA
+// =============================================================================
+
+export const MANA_CONSTANTS = {
+  /** Base mana pool for all players */
+  BASE_POOL: 50,
+  /** Additional mana per magic skill level */
+  POOL_PER_MAGIC_LEVEL: 3,
+  /** Base mana regen per combat round */
+  BASE_REGEN_PER_ROUND: 5,
+  /** Additional regen per magic skill level */
+  REGEN_PER_MAGIC_LEVEL: 0.15,
+  /** Out-of-combat regen rate (per second) */
+  PASSIVE_REGEN_PER_SECOND: 0.5,
+  /** Heal per turn when resting */
+  REST_HEAL_PER_TURN: 3,
+} as const;
+
+// =============================================================================
+// COMBAT ACTIONS
+// =============================================================================
+
+export const COMBAT_ACTION_CONSTANTS = {
+  /** Defend: free fallback */
+  DEFEND_DAMAGE_REDUCTION: 0.35,
+  /** Counter/Ward costs */
+  COUNTER_STAMINA_COST: 35,
+  WARD_MANA_COST: 30,
+  /** Light attack: stamina-neutral (cost = base regen) */
+  LIGHT_ATTACK_STAMINA: 10,
+  NORMAL_ATTACK_STAMINA: 20,
+  HEAVY_ATTACK_STAMINA: 40,
+  /** Spell base stamina cost (all actions cost stamina) */
+  SPELL_BASE_STAMINA: 15,
+  /** Use potion stamina cost */
+  USE_POTION_STAMINA: 5,
+  /** Buff stamina cost */
+  BUFF_BASE_STAMINA: 10,
+  /** Taunt stamina cost */
+  TAUNT_STAMINA: 20,
+  /** Heal stamina cost */
+  HEAL_BASE_STAMINA: 10,
+  /** Bonus damage multiplier when hitting a channeling target */
+  CHANNELING_BONUS_DAMAGE: 1.5,
+  /** Max active buffs simultaneously */
+  MAX_ACTIVE_BUFFS: 3,
+  /** Potion sickness duration (rounds) — shared across HP/Stam/Mana potions */
+  POTION_SICKNESS_ROUNDS: 4,
+
+  // Melee talent actions
+  POWER_STRIKE_STAMINA: 15,
+  CLEAVE_STAMINA: 25,
+  BATTLE_CRY_STAMINA: 20,
+  DEVASTATING_BLOW_STAMINA: 35,
+  BERSERKER_RAGE_STAMINA: 30,
+  EXECUTE_STAMINA: 40,
+  TITANS_WRATH_STAMINA: 50,
+
+  // Ranged talent actions
+  AIMED_SHOT_STAMINA: 15,
+  CRIPPLING_SHOT_STAMINA: 20,
+  EAGLE_EYE_STAMINA: 15,
+  VOLLEY_STAMINA: 30,
+  SNIPERS_MARK_STAMINA: 25,
+  PIERCING_SHOT_STAMINA: 35,
+  DEATH_MARK_STAMINA: 45,
+
+  // Magic talent actions
+  FIRE_BOLT_MANA: 15,
+  MINOR_HEAL_MANA: 20,
+  FROST_NOVA_MANA: 20,
+  ENHANCED_FORTITUDE_MANA: 25,
+  CHAIN_LIGHTNING_MANA: 30,
+  HEAL_ALLY_MANA: 35,
+  ARCANE_BLAST_MANA: 40,
+  REGENERATION_MANA: 30,
+  METEOR_STRIKE_MANA: 50,
+
+  // General talent actions
+  FORTIFY_STAMINA: 15,
+  FORTIFY_MANA: 10,
+} as const;
+
+// =============================================================================
+// SKILL POINTS
+// =============================================================================
+
+export const SKILL_POINT_CONSTANTS = {
+  /** Skill points earned per skill level-up (all 14 skills) */
+  POINTS_PER_LEVEL: 1,
+  /** Turn cost to respec all skill points */
+  RESPEC_TURN_COST: 50_000,
+  /** Max saved combat templates */
+  MAX_TEMPLATES: 10,
+  /** Default template action (light attack ID) */
+  DEFAULT_ACTION_ID: 'light_attack',
+} as const;
+
 export const POTION_CONSTANTS = {
   /** HP restored by Minor Health Potion */
   MINOR_HEALTH_HEAL: 50,
@@ -441,6 +559,16 @@ export const POTION_CONSTANTS = {
 
   /** Rounds of Potion Sickness cooldown after auto-potion use */
   AUTO_POTION_SICKNESS_DURATION: 5,
+
+  // Stamina potions
+  MINOR_STAMINA_RESTORE: 30,
+  STAMINA_RESTORE: 60,
+  GREATER_STAMINA_RESTORE: 100,
+
+  // Mana potions
+  MINOR_MANA_RESTORE: 20,
+  MANA_RESTORE: 40,
+  GREATER_MANA_RESTORE: 70,
 } as const;
 
 // =============================================================================
@@ -526,6 +654,22 @@ export const WORLD_EVENT_CONSTANTS = {
     'Alpha Wolf': [{ itemName: 'Alpha Wolf Fang', minQty: 2, maxQty: 4 }],
     'Ancient Spirit': [{ itemName: 'Spirit Essence', minQty: 2, maxQty: 4 }],
   } as Record<string, Array<{ itemName: string; minQty: number; maxQty: number }>>,
+} as const;
+
+// =============================================================================
+// BOSS ENCOUNTER (individual HP model, threat/aggro, contribution loot)
+// =============================================================================
+
+export const BOSS_ENCOUNTER_CONSTANTS = {
+  THREAT_PER_DAMAGE: 1,
+  THREAT_PER_HEAL: 0.5,
+  TAUNT_THREAT_BONUS: 500,
+  TAUNT_DEFAULT_DURATION: 2,
+  CONTRIBUTION_DAMAGE_WEIGHT: 1.0,
+  CONTRIBUTION_HEALING_WEIGHT: 1.0,
+  CONTRIBUTION_ABSORB_WEIGHT: 0.9,
+  CONTRIBUTION_SURVIVAL_FLAT_BONUS: 10,
+  BOSS_SINGLE_TARGET_DAMAGE_BY_TIER: [30, 60, 100, 160, 250] as readonly number[],
 } as const;
 
 // =============================================================================

@@ -137,6 +137,9 @@ export type {
   LeaderboardCategoriesResponse,
 } from './social';
 
+export { getResources } from './resources';
+export type { CombatResourceResponse } from './resources';
+
 export {
   adminGrantTurns,
   adminSetLevel,
@@ -167,6 +170,15 @@ export type {
   AdminActiveEvent,
   AdminResourceNode,
 } from './admin';
+
+export {
+  getTemplates,
+  getActiveTemplate,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  activateTemplate,
+} from './templates';
 
 export {
   getPlayerGuild,
@@ -218,6 +230,8 @@ export type {
   GuildJoinRequestsResponse,
 } from './guild';
 
+export { getSkillPointState, allocateSkillPoint, respecSkillPoints } from './skillPoints';
+export type { SkillPointState } from './skillPoints';
 export { exchangeGold, getRouletteRound, placeRouletteBet, getRouletteHistory, getRouletteStats } from './casino';
 export type { GoldExchangeResponse, PlaceBetResponse, RouletteNumberStat } from './casino';
 export { startTrainingFight, getTrainingCooldown } from './training';
