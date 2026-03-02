@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '@adventure/database';
-import { getAllMobPrefixes } from '@adventure/shared';
+import { getAllMobPrefixes, BOSS_TEMPLATES } from '@adventure/shared';
+import type { BossRotationReveal } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { prismaAny } from '../utils/prismaAny.js';
 import { calculateExplorationPercent } from '../services/zoneExplorationService';
@@ -25,7 +26,7 @@ function rarityFromTier(tier: number): 'common' | 'uncommon' | 'rare' | 'epic' |
 bestiaryRouter.get('/', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
 
-  const [mobTemplates, progress, prefixProgress, explorations] = await Promise.all([
+  const [mobTemplates, progress, prefixProgress, explorations, bossRotations] = await Promise.all([
     prisma.mobTemplate.findMany({
       include: {
         zone: { select: { id: true, name: true, difficulty: true, turnsToExplore: true, explorationTiers: true } },
@@ -49,7 +50,14 @@ bestiaryRouter.get('/', asyncHandler(async (req, res) => {
       where: { playerId },
       select: { zoneId: true, turnsExplored: true },
     }),
+    prisma.playerBossRotation.findMany({
+      where: { playerId },
+      select: { mobTemplateId: true, roundsRevealed: true },
+    }),
   ]);
+  const rotationByMobId = new Map<string, number>(
+    bossRotations.map(r => [r.mobTemplateId, r.roundsRevealed]),
+  );
   const explorationByZoneId = new Map<string, number>(
     (explorations as Array<{ zoneId: string; turnsExplored: number }>).map(
       (e: { zoneId: string; turnsExplored: number }) => [e.zoneId, e.turnsExplored],
@@ -111,6 +119,23 @@ bestiaryRouter.get('/', asyncHandler(async (req, res) => {
           maxQuantity: dt.maxQuantity,
         })),
         prefixesEncountered: isHidden ? [] : (prefixKeysByMobId.get(mob.id) ?? []),
+        bossRotation: (() => {
+          const isBoss = (mob as unknown as { isBoss: boolean }).isBoss;
+          if (!isBoss || isHidden) return undefined;
+          const roundsRevealed = rotationByMobId.get(mob.id) ?? 0;
+          const template = BOSS_TEMPLATES[mob.name];
+          if (!template) return undefined;
+          return {
+            totalRounds: template.actions.length,
+            revealedRounds: roundsRevealed,
+            actions: template.actions.slice(0, roundsRevealed).map((a, i) => ({
+              round: i + 1,
+              actionName: template.actionDefinitions[a.actionId]?.name ?? a.actionId,
+              targetMode: a.targetMode,
+              isTelegraphed: a.isTelegraphed ?? false,
+            })),
+          } satisfies BossRotationReveal;
+        })(),
       };
     }),
     prefixSummary: allPrefixes.map(p => ({

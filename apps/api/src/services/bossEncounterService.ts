@@ -449,6 +449,14 @@ export async function resolveBossRound(
     ),
   );
 
+  // Progressive bestiary reveal: alive players learn the boss's action for this round
+  const alivePlayerIdsForReveal = result.participantResults
+    .filter(r => !r.isDead)
+    .map(r => r.playerId);
+  if (alivePlayerIdsForReveal.length > 0) {
+    await revealBossRotation(encounter.mobTemplate.id, alivePlayerIdsForReveal, nextRound);
+  }
+
   // Auto-signup: create next-round rows carrying forward resources (skip dead players)
   if (!result.bossDefeated && !result.allPlayersDead) {
     const autoSignupParticipants = signups.filter((s) => s.autoSignUp);
@@ -642,6 +650,23 @@ export async function getActiveBossEncounters(): Promise<BossEncounterData[]> {
     orderBy: { nextRoundAt: 'asc' },
   });
   return rows.map(toBossEncounterData);
+}
+
+async function revealBossRotation(
+  mobTemplateId: string,
+  alivePlayerIds: string[],
+  roundNumber: number,
+): Promise<void> {
+  await Promise.all(
+    alivePlayerIds.map(playerId =>
+      prisma.$queryRaw`
+        INSERT INTO player_boss_rotations (player_id, mob_template_id, rounds_revealed)
+        VALUES (${playerId}, ${mobTemplateId}, ${roundNumber})
+        ON CONFLICT (player_id, mob_template_id)
+        DO UPDATE SET rounds_revealed = GREATEST(player_boss_rotations.rounds_revealed, ${roundNumber})
+      `,
+    ),
+  );
 }
 
 export async function getBossHistory(
