@@ -7,6 +7,7 @@ import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
 import { PixelButton } from '@/components/PixelButton';
+import { StatBar } from '@/components/StatBar';
 
 type Phase = 'playing' | 'finished-auto' | 'finished-manual';
 
@@ -153,6 +154,12 @@ export function CombatPlayback({
     ? mobMaxHp
     : (log[revealedCount - 1].combatantBHpAfter ?? mobMaxHp);
 
+  // Resource bars: only show when data exists (new combat system)
+  const hasResourceData = log.length > 0 && log[0].staminaAfter !== undefined;
+  const currentEntry = revealedCount > 0 ? log[revealedCount - 1] : null;
+  const currentStamina = currentEntry?.staminaAfter ?? 100;
+  const currentMana = currentEntry?.manaAfter ?? 100;
+
   return (
     <div>
       {/* Header */}
@@ -185,6 +192,12 @@ export function CombatPlayback({
               }}
             />
           </div>
+          {hasResourceData && (
+            <div className="flex gap-2 mt-1">
+              <StatBar current={currentStamina} max={100} color="stamina" size="sm" showNumbers={false} className="flex-1" />
+              <StatBar current={currentMana} max={100} color="mana" size="sm" showNumbers={false} className="flex-1" />
+            </div>
+          )}
         </div>
 
         {/* Mob HP */}
@@ -210,27 +223,31 @@ export function CombatPlayback({
         <div className="text-center text-sm mb-2">
           {(() => {
             const lastEntry = log[revealedCount - 1];
+            const displayLabel = lastEntry.actionName ?? lastEntry.spellName;
             if (lastEntry.effectsExpired && lastEntry.effectsExpired.length > 0) {
               return <span className="text-[var(--rpg-text-secondary)] italic">
                 {lastEntry.effectsExpired.map(e => `${e.name} wore off`).join(', ')}
               </span>;
             }
-            if (lastEntry.action === 'potion') return <span className="text-[var(--rpg-green-light)]">🧪 {lastEntry.spellName}: +{lastEntry.healAmount} HP</span>;
+            if (lastEntry.interactionResult === 'countered') return <span className="text-[var(--rpg-gold)] font-bold">Countered!</span>;
+            if (lastEntry.interactionResult === 'warded') return <span className="text-purple-400 font-bold">Warded!</span>;
+            if (lastEntry.wasExhausted) return <span className="text-[var(--rpg-text-secondary)] italic">Exhausted &rarr; Defend</span>;
+            if (lastEntry.action === 'potion') return <span className="text-[var(--rpg-green-light)]">🧪 {displayLabel ?? 'Potion'}: +{lastEntry.healAmount} HP</span>;
             if (lastEntry.evaded) return <span className="text-[var(--rpg-blue-light)]">Dodged!</span>;
             if (lastEntry.isCritical) return <span className="text-[var(--rpg-gold)] font-bold">Critical Hit! {lastEntry.damage} dmg</span>;
             if (lastEntry.damage && lastEntry.damage > 0 && lastEntry.healAmount && lastEntry.healAmount > 0) {
-              return <span className="text-[var(--rpg-text-primary)]">{lastEntry.spellName ? `${lastEntry.spellName}: ` : ''}{lastEntry.damage} dmg, +{lastEntry.healAmount} HP</span>;
+              return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}{lastEntry.damage} dmg, +{lastEntry.healAmount} HP</span>;
             }
-            if (lastEntry.damage && lastEntry.damage > 0) return <span className="text-[var(--rpg-text-primary)]">{lastEntry.spellName ? `${lastEntry.spellName}: ` : ''}{lastEntry.damage} dmg</span>;
-            if (lastEntry.healAmount && lastEntry.healAmount > 0) return <span className="text-[var(--rpg-green-light)]">{lastEntry.spellName ? `${lastEntry.spellName}: ` : ''}+{lastEntry.healAmount} HP</span>;
+            if (lastEntry.damage && lastEntry.damage > 0) return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}{lastEntry.damage} dmg</span>;
+            if (lastEntry.healAmount && lastEntry.healAmount > 0) return <span className="text-[var(--rpg-green-light)]">{displayLabel ? `${displayLabel}: ` : ''}+{lastEntry.healAmount} HP</span>;
             if (lastEntry.effectsApplied && lastEntry.effectsApplied.length > 0) {
               const e = lastEntry.effectsApplied[0];
               return <span className="text-[var(--rpg-blue-light)]">
-                {lastEntry.spellName} ({e.stat} {e.modifier > 0 ? '+' : ''}{e.modifier})
+                {displayLabel} ({e.stat} {e.modifier > 0 ? '+' : ''}{e.modifier})
               </span>;
             }
             if (lastEntry.roll && !lastEntry.damage) return <span className="text-[var(--rpg-text-secondary)]">Miss!</span>;
-            if (lastEntry.spellName) return <span className="text-[var(--rpg-blue-light)]">{lastEntry.spellName}</span>;
+            if (displayLabel) return <span className="text-[var(--rpg-blue-light)]">{displayLabel}</span>;
             return null;
           })()}
         </div>

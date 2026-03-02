@@ -170,6 +170,14 @@ export interface CombatLogEntryResponse {
     name: string;
     target: 'combatantA' | 'combatantB';
   }>;
+  actionId?: string;
+  actionName?: string;
+  wasExhausted?: boolean;
+  staminaAfter?: number;
+  manaAfter?: number;
+  staminaCost?: number;
+  manaCost?: number;
+  interactionResult?: string;  // 'countered' | 'warded' | 'defended' | null
   /** @deprecated Backward compat alias */
   playerHpAfter?: number;
   /** @deprecated Backward compat alias */
