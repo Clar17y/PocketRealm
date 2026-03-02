@@ -1,6 +1,5 @@
 import { ROOM_CONSTANTS } from '@adventure/shared';
-
-type EncounterSiteSize = 'small' | 'medium' | 'large';
+import type { EncounterSiteSize } from '@adventure/shared';
 
 interface RoomLayout {
   roomNumber: number;
