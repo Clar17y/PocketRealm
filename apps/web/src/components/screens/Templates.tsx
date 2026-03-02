@@ -11,16 +11,10 @@ import {
   activateTemplate,
 } from '@/lib/api';
 import type { Screen } from '@/app/game/useGameController';
-import { BASE_ACTION_DEFINITIONS } from '@adventure/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@adventure/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateAction, ResourceState } from '@adventure/shared';
 
 // --- Constants ---
-
-const ALWAYS_AVAILABLE_ACTIONS = new Set([
-  'light_attack', 'normal_attack', 'heavy_attack',
-  'defend', 'counter', 'ward',
-  'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
-]);
 
 const ACTION_GROUPS: Record<string, string> = {
   light_attack: 'Basic', normal_attack: 'Basic', heavy_attack: 'Basic',
@@ -235,7 +229,7 @@ export function Templates({
             </h3>
             <div className="space-y-1">
               {grouped[group].map(def => {
-                const locked = !ALWAYS_AVAILABLE_ACTIONS.has(def.id) && !unlockedSet.has(def.id);
+                const locked = !ALWAYS_AVAILABLE_ACTION_IDS.has(def.id) && !unlockedSet.has(def.id);
                 return (
                   <PixelCard key={def.id} padding="sm" className={locked ? 'opacity-50' : ''}>
                     <div className="flex items-center justify-between">

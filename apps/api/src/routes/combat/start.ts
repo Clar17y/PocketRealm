@@ -15,6 +15,7 @@ import {
 } from '@adventure/game-engine';
 import type { TemplateCombatant } from '@adventure/game-engine';
 import {
+  ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
   COMBAT_CONSTANTS,
   GUILD_CONSTANTS,
@@ -83,11 +84,6 @@ import {
   type FightResult,
 } from './helpers';
 
-const ALWAYS_AVAILABLE_ACTIONS = new Set([
-  'light_attack', 'normal_attack', 'heavy_attack',
-  'defend', 'counter', 'ward',
-  'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
-]);
 
 function buildPlayerTemplateCombatant(
   playerId: string,
@@ -105,7 +101,7 @@ function buildPlayerTemplateCombatant(
   const unlockedSet = new Set(unlockedActions);
   const filteredActions: Record<string, ActionDefinition> = {};
   for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
-    if (ALWAYS_AVAILABLE_ACTIONS.has(id) || unlockedSet.has(id)) {
+    if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
       filteredActions[id] = def;
     }
   }

@@ -18,6 +18,7 @@ import {
   type TemplateCombatant,
 } from '@adventure/game-engine';
 import {
+  ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
@@ -74,11 +75,6 @@ import {
   type PendingAmbushCombatLog,
 } from './helpers';
 
-const ALWAYS_AVAILABLE_ACTIONS = new Set([
-  'light_attack', 'normal_attack', 'heavy_attack',
-  'defend', 'counter', 'ward',
-  'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
-]);
 
 export const startRouter = Router();
 
@@ -338,7 +334,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         const unlockedSet = new Set(explorationUnlockedActions);
         const filteredActions: Record<string, ActionDefinition> = {};
         for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
-          if (ALWAYS_AVAILABLE_ACTIONS.has(id) || unlockedSet.has(id)) {
+          if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
             filteredActions[id] = def;
           }
         }

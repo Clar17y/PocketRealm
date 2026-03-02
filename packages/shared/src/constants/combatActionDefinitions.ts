@@ -390,6 +390,13 @@ const fortify: ActionDefinition = {
 
 // --- Registry ---
 
+/** The 9 base actions available to all players without talent unlocks */
+export const ALWAYS_AVAILABLE_ACTION_IDS = new Set([
+  'light_attack', 'normal_attack', 'heavy_attack',
+  'defend', 'counter', 'ward',
+  'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
+]);
+
 export const BASE_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   // Base actions
   light_attack: lightAttack,
