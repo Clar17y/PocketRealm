@@ -345,3 +345,16 @@ export async function getRouletteHistory(): Promise<{ spinNumber: number; result
     resolvedAt: r.resolvedAt!.toISOString(),
   }));
 }
+
+export async function getRouletteStats(): Promise<{ number: number; count: number }[]> {
+  const rounds = await prisma.rouletteRound.findMany({
+    where: { result: { not: null } },
+    orderBy: { resolvedAt: 'desc' },
+    take: CASINO_CONSTANTS.ROULETTE_STATS_DEPTH,
+    select: { result: true },
+  });
+  const counts = new Map<number, number>();
+  for (let n = 0; n <= 36; n++) counts.set(n, 0);
+  for (const r of rounds) counts.set(r.result!, (counts.get(r.result!) ?? 0) + 1);
+  return Array.from(counts, ([number, count]) => ({ number, count }));
+}

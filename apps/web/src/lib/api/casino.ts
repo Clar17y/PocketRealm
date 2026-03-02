@@ -38,3 +38,12 @@ export async function placeRouletteBet(betType: RouletteBetType, betValue: strin
 export async function getRouletteHistory() {
   return fetchApi<{ history: RouletteHistoryEntry[] }>('/api/v1/casino/roulette/history');
 }
+
+export interface RouletteNumberStat {
+  number: number;
+  count: number;
+}
+
+export async function getRouletteStats() {
+  return fetchApi<{ stats: RouletteNumberStat[] }>('/api/v1/casino/roulette/stats');
+}

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../utils/asyncHandler';
-import { exchangeTurnsForGold, getCurrentRound, placeBet, getRouletteHistory } from '../services/casinoService';
+import { exchangeTurnsForGold, getCurrentRound, placeBet, getRouletteHistory, getRouletteStats } from '../services/casinoService';
 import { assertInTown } from '../utils/routeHelpers.js';
 import type { RouletteBetType } from '@adventure/shared';
 
@@ -45,4 +45,9 @@ casinoRouter.post('/roulette/bet', asyncHandler(async (req, res) => {
 casinoRouter.get('/roulette/history', asyncHandler(async (_req, res) => {
   const history = await getRouletteHistory();
   res.json({ history });
+}));
+
+casinoRouter.get('/roulette/stats', asyncHandler(async (_req, res) => {
+  const stats = await getRouletteStats();
+  res.json({ stats });
 }));

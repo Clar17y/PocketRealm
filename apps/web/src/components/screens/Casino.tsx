@@ -205,14 +205,15 @@ export function Casino({
     return map;
   }, [displayBets, playerName]);
 
-  const heatMap = useMemo(() => {
-    if (!showHeatMap) return null;
-    const counts = new Map<number, number>();
-    for (const entry of history) {
-      counts.set(entry.result, (counts.get(entry.result) ?? 0) + 1);
-    }
-    return counts;
-  }, [history, showHeatMap]);
+  const [numberStats, setNumberStats] = useState<{ number: number; count: number }[] | null>(null);
+
+  // Fetch stats when toggled on
+  useEffect(() => {
+    if (!showHeatMap) { setNumberStats(null); return; }
+    api.getRouletteStats().then((res) => {
+      if (res.data) setNumberStats(res.data.stats);
+    });
+  }, [showHeatMap]);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -459,14 +460,6 @@ export function Casino({
                     const isSelected = selectedBetType === 'straight' && selectedBetValue === String(n);
                     const isResult = roundState?.phase === 'result' && roundState.result === n;
                     const isHighlighted = highlightedNumbers.has(n);
-                    const heat = heatMap?.get(n);
-                    const heatClass = heatMap != null && !isSelected && !isHighlighted
-                      ? (heat ?? 0) === 0
-                        ? 'ring-1 ring-blue-400/40 ring-inset'
-                        : (heat ?? 0) >= 2
-                          ? 'ring-1 ring-orange-400/50 ring-inset'
-                          : ''
-                      : '';
                     return (
                       <button
                         key={n}
@@ -476,7 +469,7 @@ export function Casino({
                             ? 'ring-2 ring-[var(--rpg-gold)] ring-inset'
                             : isHighlighted
                               ? 'brightness-[1.35] ring-1 ring-[var(--rpg-gold)]/50 ring-inset'
-                              : heatClass
+                              : ''
                         } ${
                           isResult
                             ? 'ring-2 ring-[var(--rpg-gold)] animate-pulse'
@@ -712,10 +705,10 @@ export function Casino({
             </h3>
             <button
               onClick={() => setShowHeatMap((v) => !v)}
-              className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+              className={`text-xs px-2 py-1 rounded transition-colors ${
                 showHeatMap
-                  ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]'
-                  : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                  ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
+                  : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] border border-[var(--rpg-border)]'
               }`}
             >
               Hot/Cold
@@ -749,6 +742,67 @@ export function Casino({
               <span className={`w-2.5 h-2.5 rounded-full ${colorPipClass('green')}`} />
               {history.filter((h) => getNumberColor(h.result) === 'green').length}
             </span>
+          </div>
+        </PixelCard>
+      )}
+
+      {/* Hot/Cold Panel */}
+      {showHeatMap && numberStats && (
+        <PixelCard>
+          <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3 text-sm">
+            Hot / Cold <span className="text-[var(--rpg-text-secondary)] font-normal">(last {CASINO_CONSTANTS.ROULETTE_STATS_DEPTH} spins)</span>
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-orange-400 font-semibold mb-1.5 flex items-center gap-1">
+                Hot
+              </div>
+              <div className="space-y-0.5">
+                {numberStats
+                  .filter((s) => s.number > 0)
+                  .sort((a, b) => b.count - a.count)
+                  .slice(0, 10)
+                  .map((s) => (
+                    <div key={`hot-${s.number}`} className="flex items-center gap-1.5">
+                      <div className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${colorClass(getNumberColor(s.number))}`}>
+                        {s.number}
+                      </div>
+                      <div className="flex-1 h-1.5 rounded-full bg-[var(--rpg-border)] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-orange-400"
+                          style={{ width: `${Math.min(100, (s.count / (CASINO_CONSTANTS.ROULETTE_STATS_DEPTH / 37)) * 50)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-mono text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-blue-400 font-semibold mb-1.5 flex items-center gap-1">
+                Cold
+              </div>
+              <div className="space-y-0.5">
+                {numberStats
+                  .filter((s) => s.number > 0)
+                  .sort((a, b) => a.count - b.count)
+                  .slice(0, 10)
+                  .map((s) => (
+                    <div key={`cold-${s.number}`} className="flex items-center gap-1.5">
+                      <div className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${colorClass(getNumberColor(s.number))}`}>
+                        {s.number}
+                      </div>
+                      <div className="flex-1 h-1.5 rounded-full bg-[var(--rpg-border)] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-blue-400"
+                          style={{ width: `${Math.min(100, (s.count / (CASINO_CONSTANTS.ROULETTE_STATS_DEPTH / 37)) * 50)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-mono text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
           </div>
         </PixelCard>
       )}
