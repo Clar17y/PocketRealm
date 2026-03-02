@@ -188,9 +188,10 @@ export function Templates({
 
   const isEditing = editingTemplate !== null || isNew;
 
-  // Action picker
-  const allActions = Object.values(BASE_ACTION_DEFINITIONS);
+  // Action picker — base actions are always available; talent-unlocked actions require unlockedActions
+  const baseActionIds = new Set(Object.keys(BASE_ACTION_DEFINITIONS));
   const unlockedSet = new Set(unlockedActions);
+  const allActions = Object.values(BASE_ACTION_DEFINITIONS);
   const grouped = groupActionsByCategory(allActions);
 
   if (showPicker) {
@@ -209,7 +210,7 @@ export function Templates({
             </h3>
             <div className="space-y-1">
               {grouped[cat].map(def => {
-                const locked = !unlockedSet.has(def.id);
+                const locked = !baseActionIds.has(def.id) && !unlockedSet.has(def.id);
                 return (
                   <PixelCard key={def.id} padding="sm" className={locked ? 'opacity-50' : ''}>
                     <div className="flex items-center justify-between">
