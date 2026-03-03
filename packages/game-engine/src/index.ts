@@ -1,5 +1,4 @@
 // Combat
-export * from './combat/combatEngine';
 export * from './combat/damageCalculator';
 export * from './combat/mobPrefixes';
 export * from './combat/persistedMobRegen';

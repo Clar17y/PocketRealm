@@ -36,30 +36,12 @@ export interface SpellAction {
 
 export type CombatActor = 'combatantA' | 'combatantB';
 
-export interface Combatant {
-  id: string;
-  name: string;
-  stats: CombatantStats;
-  spells?: SpellAction[];
-}
-
 export interface ActiveEffect {
   name: string;
   target: CombatActor;
   stat: string;
   modifier: number;
   remainingRounds: number;
-}
-
-export interface CombatState {
-  combatantAHp: number;
-  combatantAMaxHp: number;
-  combatantBHp: number;
-  combatantBMaxHp: number;
-  round: number;
-  log: CombatLogEntry[];
-  outcome: CombatOutcome | null;
-  activeEffects: ActiveEffect[];
 }
 
 export interface CombatLogEntry {
@@ -102,16 +84,6 @@ export interface CombatLogEntry {
 export type CombatAction = 'attack' | 'spell' | 'defend' | 'flee' | 'potion';
 
 export type CombatOutcome = 'victory' | 'defeat' | 'fled' | 'draw';
-
-export interface CombatResult {
-  outcome: CombatOutcome;
-  log: CombatLogEntry[];
-  combatantAMaxHp: number;
-  combatantBMaxHp: number;
-  combatantAHpRemaining: number;
-  combatantBHpRemaining: number;
-  potionsConsumed: PotionConsumed[];
-}
 
 export interface LootDrop {
   itemTemplateId: string;
