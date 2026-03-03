@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Prisma, prisma } from '@adventure/database';
 import { authenticate } from '../middleware/auth';
 import { getHpState, rest, recover } from '../services/hpService';
 import { getTurnState } from '../services/turnBankService';
@@ -8,6 +7,7 @@ import { calculateHealPerTurn, calculateRecoveryExitHp } from '@adventure/game-e
 import { getPlayerProgressionState } from '../services/attributesService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
+import { createActivityLog } from '../services/activityLogService';
 
 export const hpRouter = Router();
 
@@ -39,17 +39,15 @@ hpRouter.post('/rest', asyncHandler(async (req, res) => {
   const turns = await getTurnState(playerId);
 
   // Log the activity
-  await prisma.activityLog.create({
-    data: {
-      playerId,
-      activityType: 'rest',
-      turnsSpent: taxResult.preTaxAmount,
-      result: {
-        previousHp: result.previousHp,
-        healedAmount: result.healedAmount,
-        currentHp: result.currentHp,
-        maxHp: result.maxHp,
-      } as unknown as Prisma.InputJsonValue,
+  await createActivityLog({
+    playerId,
+    activityType: 'rest',
+    turnsSpent: taxResult.preTaxAmount,
+    result: {
+      previousHp: result.previousHp,
+      healedAmount: result.healedAmount,
+      currentHp: result.currentHp,
+      maxHp: result.maxHp,
     },
   });
 
@@ -71,16 +69,14 @@ hpRouter.post('/recover', asyncHandler(async (req, res) => {
   const turns = await getTurnState(playerId);
 
   // Log the activity
-  await prisma.activityLog.create({
-    data: {
-      playerId,
-      activityType: 'recovery',
-      turnsSpent: result.turnsSpent,
-      result: {
-        previousState: result.previousState,
-        currentHp: result.currentHp,
-        maxHp: result.maxHp,
-      } as unknown as Prisma.InputJsonValue,
+  await createActivityLog({
+    playerId,
+    activityType: 'recovery',
+    turnsSpent: result.turnsSpent,
+    result: {
+      previousState: result.previousState,
+      currentHp: result.currentHp,
+      maxHp: result.maxHp,
     },
   });
 

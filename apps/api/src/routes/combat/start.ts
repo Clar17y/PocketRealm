@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { Prisma, prisma } from '@adventure/database';
+import { createActivityLog } from '../../services/activityLogService';
 import {
   applyMobEventModifiers,
   applyMobPrefix,
@@ -531,40 +532,38 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const mobFamilyName: string | null = site.mobFamily?.name ?? null;
 
   // --- Activity log ---
-  const combatLog = await prisma.activityLog.create({
-    data: {
-      playerId,
-      activityType: 'combat',
-      turnsSpent: totalTurnCost,
-      result: {
-        zoneId,
-        zoneName: zone.name,
-        mobTemplateId: lastPrefixedMob?.id ?? fightResults[0]?.mobTemplateId,
-        mobName: lastBaseMob?.name,
-        mobPrefix: lastPrefixedMob?.mobPrefix,
-        mobDisplayName: lastPrefixedMob?.mobDisplayName,
-        source: 'encounter_site',
-        encounterSiteId,
-        encounterSiteCleared,
-        mobFamilyName,
-        attackSkill,
-        outcome: lastCombatResult?.outcome ?? 'defeat',
-        playerMaxHp: lastCombatResult?.combatantAMaxHp ?? hpState.maxHp,
-        mobMaxHp: lastCombatResult?.combatantBMaxHp ?? 0,
-        potionsConsumed: allPotionsConsumed,
-        fightCount: fightResults.length,
-        rewards: {
-          xp: aggregatedXp,
-          baseXp: aggregatedXp,
-          loot: aggregatedLoot,
-          siteCompletion: siteCompletionWithNames,
-          durabilityLost: aggregatedDurabilityLost,
-          skillXp: lastVictoryXpGrant
-            ? serializeXpGrant(lastVictoryXpGrant)
-            : null,
-        },
-        eventModifiers: siteMobBadges,
-      } as unknown as Prisma.InputJsonValue,
+  const combatLog = await createActivityLog({
+    playerId,
+    activityType: 'combat',
+    turnsSpent: totalTurnCost,
+    result: {
+      zoneId,
+      zoneName: zone.name,
+      mobTemplateId: lastPrefixedMob?.id ?? fightResults[0]?.mobTemplateId,
+      mobName: lastBaseMob?.name,
+      mobPrefix: lastPrefixedMob?.mobPrefix,
+      mobDisplayName: lastPrefixedMob?.mobDisplayName,
+      source: 'encounter_site',
+      encounterSiteId,
+      encounterSiteCleared,
+      mobFamilyName,
+      attackSkill,
+      outcome: lastCombatResult?.outcome ?? 'defeat',
+      playerMaxHp: lastCombatResult?.combatantAMaxHp ?? hpState.maxHp,
+      mobMaxHp: lastCombatResult?.combatantBMaxHp ?? 0,
+      potionsConsumed: allPotionsConsumed,
+      fightCount: fightResults.length,
+      rewards: {
+        xp: aggregatedXp,
+        baseXp: aggregatedXp,
+        loot: aggregatedLoot,
+        siteCompletion: siteCompletionWithNames,
+        durabilityLost: aggregatedDurabilityLost,
+        skillXp: lastVictoryXpGrant
+          ? serializeXpGrant(lastVictoryXpGrant)
+          : null,
+      },
+      eventModifiers: siteMobBadges,
     },
   });
 
@@ -574,38 +573,35 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   let fightLogIds: string[] = [];
   try {
     for (const fight of fightResults) {
-      const fightLog = await prisma.activityLog.create({
-        data: {
-          playerId,
-          activityType: 'combat',
-          turnsSpent: 0,
-          result: {
-            zoneId,
-            zoneName: zone.name,
-            mobTemplateId: fight.mobTemplateId,
-            mobName: fight.mobName,
-            mobPrefix: fight.mobPrefix,
-            mobDisplayName: fight.mobDisplayName,
-            source: 'encounter_site_fight',
-            encounterSiteId,
-            summaryLogId: combatLog.id,
-            room: fight.room,
-            attackSkill,
-            outcome: fight.outcome,
-            playerMaxHp: fight.playerMaxHp,
-            mobMaxHp: fight.mobMaxHp,
-            log: fight.log,
-            rewards: {
-              xp: fight.xp,
-              baseXp: fight.xp,
-              loot: fight.loot,
-              durabilityLost: fight.durabilityLost,
-              skillXp: fight.skillXp ? serializeXpGrant(fight.skillXp) : null,
-            },
-            eventModifiers: siteMobBadges,
-          } as unknown as Prisma.InputJsonValue,
+      const fightLog = await createActivityLog({
+        playerId,
+        activityType: 'combat',
+        turnsSpent: 0,
+        result: {
+          zoneId,
+          zoneName: zone.name,
+          mobTemplateId: fight.mobTemplateId,
+          mobName: fight.mobName,
+          mobPrefix: fight.mobPrefix,
+          mobDisplayName: fight.mobDisplayName,
+          source: 'encounter_site_fight',
+          encounterSiteId,
+          summaryLogId: combatLog.id,
+          room: fight.room,
+          attackSkill,
+          outcome: fight.outcome,
+          playerMaxHp: fight.playerMaxHp,
+          mobMaxHp: fight.mobMaxHp,
+          log: fight.log,
+          rewards: {
+            xp: fight.xp,
+            baseXp: fight.xp,
+            loot: fight.loot,
+            durabilityLost: fight.durabilityLost,
+            skillXp: fight.skillXp ? serializeXpGrant(fight.skillXp) : null,
+          },
+          eventModifiers: siteMobBadges,
         },
-        select: { id: true },
       });
       fightLogIds.push(fightLog.id);
     }
@@ -952,39 +948,37 @@ export function registerStartRoutes(router: Router): void {
         ? filterEventModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents, { mobFamilyId: zoneMobFamilyId })
         : [];
 
-      const combatLog = await prisma.activityLog.create({
-        data: {
-          playerId,
-          activityType: 'combat',
-          turnsSpent: COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
-          result: {
-            zoneId,
-            zoneName: zone.name,
-            mobTemplateId: prefixedMob.id,
-            mobName: baseMob.name,
-            mobPrefix,
-            mobDisplayName: prefixedMob.mobDisplayName,
-            source: 'zone_combat',
-            encounterSiteId: null,
-            encounterSiteCleared: false,
-            attackSkill,
-            outcome: combatResult.outcome,
-            playerMaxHp: combatResult.combatantAMaxHp,
-            mobMaxHp: combatResult.combatantBMaxHp,
-            log: mapTemplateCombatLog(combatResult.log),
-            potionsConsumed: combatResult.potionsConsumed,
-            rewards: {
-              xp: xpAwarded,
-              baseXp,
-              loot: lootWithNames,
-              siteCompletion: null,
-              durabilityLost,
-              skillXp: xpGrant
-                ? serializeXpGrant(xpGrant)
-                : null,
-            },
-            eventModifiers: zoneMobBadges,
-          } as unknown as Prisma.InputJsonValue,
+      const combatLog = await createActivityLog({
+        playerId,
+        activityType: 'combat',
+        turnsSpent: COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
+        result: {
+          zoneId,
+          zoneName: zone.name,
+          mobTemplateId: prefixedMob.id,
+          mobName: baseMob.name,
+          mobPrefix,
+          mobDisplayName: prefixedMob.mobDisplayName,
+          source: 'zone_combat',
+          encounterSiteId: null,
+          encounterSiteCleared: false,
+          attackSkill,
+          outcome: combatResult.outcome,
+          playerMaxHp: combatResult.combatantAMaxHp,
+          mobMaxHp: combatResult.combatantBMaxHp,
+          log: mapTemplateCombatLog(combatResult.log),
+          potionsConsumed: combatResult.potionsConsumed,
+          rewards: {
+            xp: xpAwarded,
+            baseXp,
+            loot: lootWithNames,
+            siteCompletion: null,
+            durabilityLost,
+            skillXp: xpGrant
+              ? serializeXpGrant(xpGrant)
+              : null,
+          },
+          eventModifiers: zoneMobBadges,
         },
       });
 

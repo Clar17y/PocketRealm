@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
+import { createActivityLog } from '../../services/activityLogService';
 import type { EquipmentSlot, ItemStats } from '@adventure/shared';
 import {
   calculateForgeUpgradeSuccessChance,
@@ -128,30 +129,28 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         } as any,
       });
 
-      const log = await prisma.activityLog.create({
-        data: {
-          playerId,
-          activityType: 'forge_upgrade',
-          turnsSpent: turnSpend.spent,
-          result: {
-            itemId: item.id,
-            templateId: item.templateId,
-            fromRarity: currentRarity,
-            toRarity: nextRarity,
-            success: true,
-            successChance,
-            roll,
-            luckStat: equipmentStats.luck,
-            sacrificialItem: {
-              itemId: sacrificial.id,
-              templateId: sacrificial.templateId,
-              rarity: sacrificial.rarity,
-            },
-            previousBonusStats: item.bonusStats ?? null,
-            addedBonusStat: newRoll.stat,
-            addedBonusValue: newRoll.value,
-            bonusStats: upgradedBonusStats,
-          } as unknown as Prisma.InputJsonValue,
+      const log = await createActivityLog({
+        playerId,
+        activityType: 'forge_upgrade',
+        turnsSpent: turnSpend.spent,
+        result: {
+          itemId: item.id,
+          templateId: item.templateId,
+          fromRarity: currentRarity,
+          toRarity: nextRarity,
+          success: true,
+          successChance,
+          roll,
+          luckStat: equipmentStats.luck,
+          sacrificialItem: {
+            itemId: sacrificial.id,
+            templateId: sacrificial.templateId,
+            rarity: sacrificial.rarity,
+          },
+          previousBonusStats: item.bonusStats ?? null,
+          addedBonusStat: newRoll.stat,
+          addedBonusValue: newRoll.value,
+          bonusStats: upgradedBonusStats,
         },
       });
 
@@ -187,28 +186,26 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
     };
     await prisma.item.delete({ where: { id: item.id } });
 
-    const log = await prisma.activityLog.create({
-      data: {
-        playerId,
-        activityType: 'forge_upgrade',
-        turnsSpent: turnSpend.spent,
-        result: {
-          itemId: item.id,
-          templateId: item.templateId,
-          fromRarity: currentRarity,
-          toRarity: nextRarity,
-          success: false,
-          successChance,
-          roll,
-          luckStat: equipmentStats.luck,
-          sacrificialItem: {
-            itemId: sacrificial.id,
-            templateId: sacrificial.templateId,
-            rarity: sacrificial.rarity,
-          },
-          outcome: 'destroyed',
-          destroyedItem: destroyedItemSnapshot,
-        } as unknown as Prisma.InputJsonValue,
+    const log = await createActivityLog({
+      playerId,
+      activityType: 'forge_upgrade',
+      turnsSpent: turnSpend.spent,
+      result: {
+        itemId: item.id,
+        templateId: item.templateId,
+        fromRarity: currentRarity,
+        toRarity: nextRarity,
+        success: false,
+        successChance,
+        roll,
+        luckStat: equipmentStats.luck,
+        sacrificialItem: {
+          itemId: sacrificial.id,
+          templateId: sacrificial.templateId,
+          rarity: sacrificial.rarity,
+        },
+        outcome: 'destroyed',
+        destroyedItem: destroyedItemSnapshot,
       },
     });
 
@@ -299,23 +296,21 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
       },
     });
 
-    const log = await prisma.activityLog.create({
-      data: {
-        playerId,
-        activityType: 'forge_reroll',
-        turnsSpent: turnSpend.spent,
-        result: {
-          itemId: item.id,
-          templateId: item.templateId,
-          rarity,
-          sacrificialItem: {
-            itemId: sacrificial.id,
-            templateId: sacrificial.templateId,
-            rarity: sacrificial.rarity,
-          },
-          previousBonusStats: item.bonusStats ?? null,
-          bonusStats: rerolledBonusStats ?? null,
-        } as unknown as Prisma.InputJsonValue,
+    const log = await createActivityLog({
+      playerId,
+      activityType: 'forge_reroll',
+      turnsSpent: turnSpend.spent,
+      result: {
+        itemId: item.id,
+        templateId: item.templateId,
+        rarity,
+        sacrificialItem: {
+          itemId: sacrificial.id,
+          templateId: sacrificial.templateId,
+          rarity: sacrificial.rarity,
+        },
+        previousBonusStats: item.bonusStats ?? null,
+        bonusStats: rerolledBonusStats ?? null,
       },
     });
 

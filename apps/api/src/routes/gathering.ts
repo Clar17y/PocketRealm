@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma, prisma } from '@adventure/database';
 import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONSTANTS, levelToGemTier, type SkillType } from '@adventure/shared';
+import { createActivityLog } from '../services/activityLogService';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
@@ -436,28 +437,26 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     totalTurnsSpent: turnSpend.spent,
   }, { statKeys: gatherAchKeys });
 
-  const log = await prisma.activityLog.create({
-    data: {
-      playerId,
-      activityType: skillRequired,
-      turnsSpent: turnSpend.spent,
-      result: {
-        zoneId: template.zoneId,
-        zoneName: template.zone.name,
-        playerNodeId: playerNode.id,
-        resourceNodeId: template.id,
-        resourceType: template.resourceType,
-        actions,
-        baseYield,
-        yieldMultiplier,
-        totalYield,
-        remainingCapacity: nodeDepleted ? 0 : newCapacity,
-        nodeDepleted,
-        itemTemplateId: resourceTemplateId,
-        itemId: stack.itemId,
-        xp: serializeXpGrant(xpGrant),
-        gemCrit: gemCrit ? { itemTemplateId: gemCrit.itemTemplateId, gemName: gemCrit.gemName, gemsFound: gemCrit.gemsFound } : undefined,
-      } as unknown as Prisma.InputJsonValue,
+  const log = await createActivityLog({
+    playerId,
+    activityType: skillRequired,
+    turnsSpent: turnSpend.spent,
+    result: {
+      zoneId: template.zoneId,
+      zoneName: template.zone.name,
+      playerNodeId: playerNode.id,
+      resourceNodeId: template.id,
+      resourceType: template.resourceType,
+      actions,
+      baseYield,
+      yieldMultiplier,
+      totalYield,
+      remainingCapacity: nodeDepleted ? 0 : newCapacity,
+      nodeDepleted,
+      itemTemplateId: resourceTemplateId,
+      itemId: stack.itemId,
+      xp: serializeXpGrant(xpGrant),
+      gemCrit: gemCrit ? { itemTemplateId: gemCrit.itemTemplateId, gemName: gemCrit.gemName, gemsFound: gemCrit.gemsFound } : undefined,
     },
   });
 
