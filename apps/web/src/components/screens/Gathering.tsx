@@ -11,7 +11,7 @@ import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 import { Pickaxe, MapPin } from 'lucide-react';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { GATHERING_CONSTANTS } from '@adventure/shared';
-import { computeResourceYieldMultiplier, computeEventMinActions } from '@adventure/game-engine';
+import { computeResourceYieldMultiplier, computeEventTurnCost } from '@adventure/game-engine';
 import { EventBadges } from '@/components/common/EventBadge';
 import { effectiveTurns as calcEffectiveTurns, inflateCost } from '@/lib/taxCalc';
 import { ActivityLog } from '@/components/ActivityLog';
@@ -99,8 +99,8 @@ export function Gathering({
   const getEventYieldMultiplier = (node: ResourceNode) =>
     computeResourceYieldMultiplier(node.eventModifiers ?? []);
 
-  const getEventMinActions = (node: ResourceNode) =>
-    computeEventMinActions(getEventYieldMultiplier(node));
+  const getEventTurnCostPerAction = (node: ResourceNode) =>
+    computeEventTurnCost(getEventYieldMultiplier(node));
 
   const getNodeTurnsToDeplete = (node: ResourceNode) => {
     const levelsAbove = Math.max(0, skillLevel - node.levelRequired);
@@ -108,13 +108,13 @@ export function Gathering({
     const baseYield = Math.max(node.baseYield, GATHERING_CONSTANTS.BASE_YIELD);
     const yieldPerAction = Math.floor(baseYield * yieldMultiplier);
     if (yieldPerAction <= 0) return inflateCost(GATHERING_CONSTANTS.BASE_TURN_COST, guildTaxRate);
-    const baseTurns = Math.ceil(node.remainingCapacity / yieldPerAction) * GATHERING_CONSTANTS.BASE_TURN_COST;
+    const turnCost = getEventTurnCostPerAction(node);
+    const baseTurns = Math.ceil(node.remainingCapacity / yieldPerAction) * turnCost;
     return inflateCost(baseTurns, guildTaxRate);
   };
 
   const getNodeMinTurns = (node: ResourceNode) => {
-    const minActions = getEventMinActions(node);
-    return inflateCost(minActions * GATHERING_CONSTANTS.BASE_TURN_COST, guildTaxRate);
+    return inflateCost(getEventTurnCostPerAction(node), guildTaxRate);
   };
 
   const [selectedNode, setSelectedNode] = useState<ResourceNode | null>(() => {
@@ -156,7 +156,8 @@ export function Gathering({
   const calculateYield = (node: ResourceNode, turns: number) => {
     // Match backend formula exactly: linear +10% per level above requirement
     const effective = calcEffectiveTurns(turns, guildTaxRate);
-    const maxActionsByTurns = Math.floor(effective / GATHERING_CONSTANTS.BASE_TURN_COST);
+    const turnCost = getEventTurnCostPerAction(node);
+    const maxActionsByTurns = Math.floor(effective / turnCost);
     const levelsAbove = Math.max(0, skillLevel - node.levelRequired);
     const yieldMultiplier = 1 + levelsAbove * GATHERING_CONSTANTS.YIELD_MULTIPLIER_PER_LEVEL;
     const baseYield = Math.max(node.baseYield, GATHERING_CONSTANTS.BASE_YIELD);
@@ -167,9 +168,9 @@ export function Gathering({
     const actions = Math.min(maxActionsByTurns, maxActionsByCapacity);
     const rawTotalYield = Math.min(actions * yieldPerAction, node.remainingCapacity);
 
-    // Apply event modifiers to session total (matches backend)
+    // yield_up: apply bonus multiplier; yield_down: already penalised via turn cost
     const eventYieldMultiplier = getEventYieldMultiplier(node);
-    const totalYield = eventYieldMultiplier !== 1
+    const totalYield = eventYieldMultiplier > 1
       ? Math.max(1, Math.floor(rawTotalYield * eventYieldMultiplier))
       : rawTotalYield;
     const willDeplete = totalYield >= node.remainingCapacity;
@@ -198,7 +199,7 @@ export function Gathering({
     const yieldPerAction = Math.floor(baseYield * yieldMultiplier);
     const targetYield = Math.ceil(selectedNode.remainingCapacity * pct);
     const actions = Math.ceil(targetYield / Math.max(1, yieldPerAction));
-    const rawTurns = actions * GATHERING_CONSTANTS.BASE_TURN_COST;
+    const rawTurns = actions * getEventTurnCostPerAction(selectedNode);
     const inflated = inflateCost(rawTurns, guildTaxRate);
     return { label, turns: Math.min(Math.max(sliderMin, inflated), availableTurns) };
   }) : null;
@@ -376,7 +377,7 @@ export function Gathering({
               onValueChange={setTurnInvestment}
               min={sliderMin}
               max={sliderMax}
-              step={GATHERING_CONSTANTS.BASE_TURN_COST}
+              step={selectedNode ? getEventTurnCostPerAction(selectedNode) : GATHERING_CONSTANTS.BASE_TURN_COST}
               className="w-full"
             />
 
@@ -415,9 +416,14 @@ export function Gathering({
                 {yieldInfo.yieldMultiplier > 1 && (
                   <span className="text-[var(--rpg-green-light)]"> x {yieldInfo.yieldMultiplier.toFixed(1)}</span>
                 )}
-                {yieldInfo.eventYieldMultiplier !== 1 && (
-                  <span className={yieldInfo.eventYieldMultiplier < 1 ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-green-light)]'}>
-                    {' '}({yieldInfo.eventYieldMultiplier < 1 ? '' : '+'}{Math.round((yieldInfo.eventYieldMultiplier - 1) * 100)}% event)
+                {yieldInfo.eventYieldMultiplier > 1 && (
+                  <span className="text-[var(--rpg-green-light)]">
+                    {' '}(+{Math.round((yieldInfo.eventYieldMultiplier - 1) * 100)}% event)
+                  </span>
+                )}
+                {yieldInfo.eventYieldMultiplier < 1 && (
+                  <span className="text-[var(--rpg-red)]">
+                    {' '}(+{Math.round((1 / yieldInfo.eventYieldMultiplier - 1) * 100)}% turn cost)
                   </span>
                 )}
               </div>
