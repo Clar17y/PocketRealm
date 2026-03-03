@@ -81,7 +81,8 @@ export function TrainingGrounds({
     cooldownTimerRef.current = setInterval(() => {
       setCooldown((prev) => {
         const next = Math.max(0, prev - 1);
-        onCooldownUpdateRef.current(next);
+        // Notify parent outside the updater to avoid setState-during-render
+        queueMicrotask(() => onCooldownUpdateRef.current(next));
         return next;
       });
     }, 1000);
