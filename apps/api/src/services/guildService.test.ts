@@ -3,11 +3,13 @@ import { GUILD_CONSTANTS } from '@adventure/shared';
 import { mockPrisma } from '../__test__/setup';
 import {
   createGuild, getGuild, getPlayerGuild, getPlayerGuildId,
-  searchGuilds, joinGuild, leaveGuild, kickMember,
-  promoteMember, demoteMember, transferLeadership, disbandGuild,
-  updateSettings, getGuildLog, addGuildXp,
+  searchGuilds, updateSettings, getGuildLog, addGuildXp,
   calculateMaxMembers, calculateTreasuryCap, calculateXpForLevel,
 } from './guildService';
+import {
+  joinGuild, leaveGuild, kickMember,
+  promoteMember, demoteMember, transferLeadership, disbandGuild,
+} from './guildMembershipService';
 
 beforeEach(() => {
   vi.clearAllMocks();
