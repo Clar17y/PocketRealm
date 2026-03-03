@@ -179,7 +179,11 @@ export function TrainingGrounds({
             outcome={combatResult.outcome}
             playerMaxHp={combatResult.combatantAMaxHp}
             playerStartHp={combatResult.combatantAMaxHp}
+            playerMaxStamina={combatResult.combatantAMaxStamina}
+            playerMaxMana={combatResult.combatantAMaxMana}
             mobMaxHp={combatResult.combatantBMaxHp}
+            opponentMaxStamina={combatResult.combatantBMaxStamina}
+            opponentMaxMana={combatResult.combatantBMaxMana}
             log={combatResult.log}
             speedMs={combatLogSpeedMs}
             onComplete={handlePlaybackComplete}

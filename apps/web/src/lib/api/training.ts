@@ -8,7 +8,11 @@ export interface TrainingCombatResult {
   combatantBMaxHp: number;
   combatantAHpRemaining: number;
   combatantBHpRemaining: number;
+  combatantAMaxStamina: number;
+  combatantBMaxStamina: number;
   combatantAStaminaRemaining: number;
+  combatantAMaxMana: number;
+  combatantBMaxMana: number;
   combatantAManaRemaining: number;
   potionsConsumed: Array<{ tier: number; healAmount: number; round: number; templateId?: string }>;
   totalRounds: number;

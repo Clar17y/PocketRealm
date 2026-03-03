@@ -31,7 +31,11 @@ export interface TrainingCombatResult {
   combatantBMaxHp: number;
   combatantAHpRemaining: number;
   combatantBHpRemaining: number;
+  combatantAMaxStamina: number;
+  combatantBMaxStamina: number;
   combatantAStaminaRemaining: number;
+  combatantAMaxMana: number;
+  combatantBMaxMana: number;
   combatantAManaRemaining: number;
   potionsConsumed: TemplateCombatResult['potionsConsumed'];
   totalRounds: number;
@@ -131,7 +135,11 @@ export async function simulateFight(
       combatantBMaxHp: combatResult.combatantBMaxHp,
       combatantAHpRemaining: combatResult.combatantAHpRemaining,
       combatantBHpRemaining: combatResult.combatantBHpRemaining,
+      combatantAMaxStamina: combatResult.combatantAMaxStamina,
+      combatantBMaxStamina: combatResult.combatantBMaxStamina,
       combatantAStaminaRemaining: combatResult.combatantAStaminaRemaining,
+      combatantAMaxMana: combatResult.combatantAMaxMana,
+      combatantBMaxMana: combatResult.combatantBMaxMana,
       combatantAManaRemaining: combatResult.combatantAManaRemaining,
       potionsConsumed: combatResult.potionsConsumed,
       totalRounds: combatResult.totalRounds,

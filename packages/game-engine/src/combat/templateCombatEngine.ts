@@ -59,8 +59,12 @@ export interface TemplateCombatResult {
   combatantBMaxHp: number;
   combatantAHpRemaining: number;
   combatantBHpRemaining: number;
+  combatantAMaxStamina: number;
+  combatantBMaxStamina: number;
   combatantAStaminaRemaining: number;
   combatantBStaminaRemaining: number;
+  combatantAMaxMana: number;
+  combatantBMaxMana: number;
   combatantAManaRemaining: number;
   combatantBManaRemaining: number;
   potionsConsumed: PotionConsumed[];
@@ -801,8 +805,12 @@ export function runTemplateCombat(
     combatantBMaxHp: state.combatantBMaxHp,
     combatantAHpRemaining: Math.max(0, state.combatantAHp),
     combatantBHpRemaining: Math.max(0, state.combatantBHp),
+    combatantAMaxStamina: state.combatantAMaxStamina,
+    combatantBMaxStamina: state.combatantBMaxStamina,
     combatantAStaminaRemaining: state.combatantAStamina,
     combatantBStaminaRemaining: state.combatantBStamina,
+    combatantAMaxMana: state.combatantAMaxMana,
+    combatantBMaxMana: state.combatantBMaxMana,
     combatantAManaRemaining: state.combatantAMana,
     combatantBManaRemaining: state.combatantBMana,
     potionsConsumed,
