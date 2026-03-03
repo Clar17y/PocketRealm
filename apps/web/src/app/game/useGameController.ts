@@ -91,6 +91,7 @@ import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
 export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { buildFightsList, buildLastCombat, isMobKnown } from './combatHelpers';
 export { isMobKnown } from './combatHelpers';
+import { useActivityLog, nowStamp } from './hooks/useActivityLog';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
@@ -236,7 +237,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     xpReward: number;
   }>>([]);
   const [activeCraftingSkill, setActiveCraftingSkill] = useState<'refining' | 'tanning' | 'weaving' | 'weaponsmithing' | 'armorsmithing' | 'leatherworking' | 'tailoring' | 'alchemy' | 'jewelcrafting'>('weaponsmithing');
-  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+  const { activityLog, setActivityLog, pushLog } = useActivityLog();
   const [pendingEncounters, setPendingEncounters] = useState<PendingEncounter[]>([]);
   const [pendingEncountersLoading, setPendingEncountersLoading] = useState(false);
   const [pendingEncountersError, setPendingEncountersError] = useState<string | null>(null);
@@ -789,12 +790,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (['combat', 'arena', 'templates', 'talentTree'].includes(activeScreen)) return 'combat';
     if (activeScreen === 'guild') return 'guild';
     return 'home';
-  };
-
-  const nowStamp = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  const pushLog = (...entries: ActivityLogEntry[]) => {
-    setActivityLog((prev) => [...entries, ...prev].slice(0, 100));
   };
 
   const logActiveEvents = (events: Array<{ title: string; effectType: string; effectValue: number }> | undefined) => {
