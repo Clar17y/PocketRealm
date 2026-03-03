@@ -170,7 +170,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     };
   }>>([]);
   const gathering = useGathering(isAuthenticated, activeScreen);
-  const { loadGatheringNodes } = gathering;
+  const { loadGatheringNodes, setActiveGatheringSkill } = gathering;
   const [zoneCraftingLevel, setZoneCraftingLevel] = useState<number | null>(0);
   const [zoneCraftingName, setZoneCraftingName] = useState<string | null>(null);
   const [craftingRecipes, setCraftingRecipes] = useState<Array<{
