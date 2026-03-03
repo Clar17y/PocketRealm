@@ -33,7 +33,6 @@ import {
   getBestiary,
   getCraftingRecipes,
   getEquipment,
-  getGatheringNodes,
   getHpState,
   getInventory,
   getPlayer,
@@ -72,7 +71,6 @@ import {
   getTemplates,
   type PendingLootItem,
   type AchievementsResponse,
-  type EventModifierBadge,
   type CombatActiveEvent,
   type WorldEventResponse,
   type SkillPointState,
@@ -91,10 +89,9 @@ export { isMobKnown } from './combatHelpers';
 import { useActivityLog, nowStamp } from './hooks/useActivityLog';
 import { usePlayerSettings } from './hooks/usePlayerSettings';
 import { useBestiary } from './hooks/useBestiary';
+import { useGathering } from './hooks/useGathering';
 
 type AttributeType = keyof CharacterProgression['attributes'];
-
-const GATHERING_PAGE_SIZE = 8;
 const PENDING_ENCOUNTER_PAGE_SIZE = 8;
 
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
@@ -180,44 +177,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       };
     };
   }>>([]);
-  const [gatheringNodes, setGatheringNodes] = useState<Array<{
-    id: string;
-    templateId: string;
-    zoneId: string;
-    zoneName: string;
-    resourceType: string;
-    resourceTypeCategory: string;
-    skillRequired: string;
-    levelRequired: number;
-    baseYield: number;
-    remainingCapacity: number;
-    maxCapacity: number;
-    sizeName: string;
-    discoveredAt: string;
-    weathered: boolean;
-    eventModifiers?: EventModifierBadge[];
-  }>>([]);
-  const [gatheringLoading, setGatheringLoading] = useState(false);
-  const [gatheringError, setGatheringError] = useState<string | null>(null);
-  const [gatheringPage, setGatheringPage] = useState(1);
-  const [gatheringZoneFilter, setGatheringZoneFilter] = useState('all');
-  const [gatheringResourceTypeFilter, setGatheringResourceTypeFilter] = useState('all');
-  const [activeGatheringSkill, setActiveGatheringSkill] = useState<'mining' | 'foraging' | 'woodcutting'>('mining');
-  const [gatheringPagination, setGatheringPagination] = useState({
-    page: 1,
-    pageSize: GATHERING_PAGE_SIZE,
-    total: 0,
-    totalPages: 1,
-    hasNext: false,
-    hasPrevious: false,
-  });
-  const [gatheringFilters, setGatheringFilters] = useState<{
-    zones: Array<{ id: string; name: string }>;
-    resourceTypes: string[];
-  }>({
-    zones: [],
-    resourceTypes: [],
-  });
+  const gathering = useGathering(isAuthenticated, activeScreen);
+  const { loadGatheringNodes } = gathering;
   const [zoneCraftingLevel, setZoneCraftingLevel] = useState<number | null>(0);
   const [zoneCraftingName, setZoneCraftingName] = useState<string | null>(null);
   const [craftingRecipes, setCraftingRecipes] = useState<Array<{
@@ -657,58 +618,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const interval = setInterval(tick, 15000);
     return () => clearInterval(interval);
   }, [isAuthenticated, activeScreen, refreshPendingEncounters]);
-
-  const loadGatheringNodes = useCallback(async () => {
-    if (!isAuthenticated) return;
-
-    setGatheringLoading(true);
-    setGatheringError(null);
-
-    const { data, error } = await getGatheringNodes({
-      page: gatheringPage,
-      pageSize: GATHERING_PAGE_SIZE,
-      zoneId: gatheringZoneFilter === 'all' ? undefined : gatheringZoneFilter,
-      resourceType: gatheringResourceTypeFilter === 'all' ? undefined : gatheringResourceTypeFilter,
-      skillRequired: activeGatheringSkill,
-    });
-
-    if (data) {
-      if (gatheringPage > data.pagination.totalPages) {
-        setGatheringPage(data.pagination.totalPages);
-        setGatheringLoading(false);
-        return;
-      }
-
-      setGatheringNodes(data.nodes);
-      setGatheringPagination(data.pagination);
-      setGatheringFilters(data.filters);
-    } else {
-      setGatheringNodes([]);
-      setGatheringError(error?.message ?? 'Failed to load gathering nodes');
-    }
-
-    setGatheringLoading(false);
-  }, [isAuthenticated, gatheringPage, gatheringZoneFilter, gatheringResourceTypeFilter, activeGatheringSkill]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    if (activeScreen !== 'gathering') return;
-    void loadGatheringNodes();
-  }, [isAuthenticated, activeScreen, loadGatheringNodes]);
-
-  const handleGatheringPageChange = useCallback((page: number) => {
-    setGatheringPage(page);
-  }, []);
-
-  const handleGatheringZoneFilterChange = useCallback((zoneId: string) => {
-    setGatheringZoneFilter(zoneId);
-    setGatheringPage(1);
-  }, []);
-
-  const handleGatheringResourceTypeFilterChange = useCallback((resourceType: string) => {
-    setGatheringResourceTypeFilter(resourceType);
-    setGatheringPage(1);
-  }, []);
 
   const handlePendingEncounterPageChange = useCallback((page: number) => {
     setPendingEncounterPage(page);
@@ -1913,16 +1822,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     characterProgression,
     inventory,
     equipment,
-    gatheringNodes,
-    gatheringLoading,
-    gatheringError,
-    gatheringPage,
-    gatheringPagination,
-    gatheringFilters,
-    gatheringZoneFilter,
-    gatheringResourceTypeFilter,
-    activeGatheringSkill,
-    setActiveGatheringSkill,
+    ...gathering,
     craftingRecipes,
     zoneCraftingLevel,
     zoneCraftingName,
@@ -2021,9 +1921,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleTravelPlaybackComplete,
     handleTravelPlaybackSkip,
     handleMine,
-    handleGatheringPageChange,
-    handleGatheringZoneFilterChange,
-    handleGatheringResourceTypeFilterChange,
     handlePendingEncounterPageChange,
     handlePendingEncounterZoneFilterChange,
     handlePendingEncounterMobFilterChange,
