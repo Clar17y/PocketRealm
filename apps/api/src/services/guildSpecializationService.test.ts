@@ -11,18 +11,24 @@ import {
 const GUILD_ID = 'guild-1';
 const PLAYER_ID = 'player-1';
 
+function makeMember(role: string, guild: Record<string, unknown> = {}) {
+  return {
+    guildId: GUILD_ID,
+    playerId: PLAYER_ID,
+    role,
+    guild: { id: GUILD_ID, ...guild },
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('selectSpecialization', () => {
   it('sets specialization when guild is level 10+ and has none', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, level: 12, specialization: null,
-    });
+    db.guildMember.findUnique.mockResolvedValue(
+      makeMember('leader', { level: 12, specialization: null }),
+    );
     db.guild.update.mockResolvedValue({
       id: GUILD_ID, specialization: 'warfare',
     });
@@ -33,42 +39,36 @@ describe('selectSpecialization', () => {
   });
 
   it('throws if player is not leader', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'officer',
-    });
+    db.guildMember.findUnique.mockResolvedValue(
+      makeMember('officer'),
+    );
 
     await expect(selectSpecialization(PLAYER_ID, GUILD_ID, 'warfare'))
       .rejects.toThrow('Only the leader');
   });
 
   it('throws if guild level is below 10', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, level: 5, specialization: null,
-    });
+    db.guildMember.findUnique.mockResolvedValue(
+      makeMember('leader', { level: 5, specialization: null }),
+    );
 
     await expect(selectSpecialization(PLAYER_ID, GUILD_ID, 'warfare'))
       .rejects.toThrow(`level ${GUILD_CONSTANTS.SPECIALIZATION_UNLOCK_LEVEL}`);
   });
 
   it('throws if guild already has a specialization', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, level: 15, specialization: 'industry',
-    });
+    db.guildMember.findUnique.mockResolvedValue(
+      makeMember('leader', { level: 15, specialization: 'industry' }),
+    );
 
     await expect(selectSpecialization(PLAYER_ID, GUILD_ID, 'warfare'))
       .rejects.toThrow('already has a specialization');
   });
 
   it('throws for invalid specialization path', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
+    db.guildMember.findUnique.mockResolvedValue(
+      makeMember('leader'),
+    );
 
     await expect(selectSpecialization(PLAYER_ID, GUILD_ID, 'invalid' as any))
       .rejects.toThrow('Invalid specialization');
@@ -77,13 +77,9 @@ describe('selectSpecialization', () => {
 
 describe('respecSpecialization', () => {
   it('changes specialization when treasury is sufficient', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, level: 20, specialization: 'warfare',
-      treasuryTurns: 2_500_000,
-    });
+    db.guildMember.findUnique.mockResolvedValue(
+      makeMember('leader', { level: 20, specialization: 'warfare', treasuryTurns: 2_500_000 }),
+    );
     db.$transaction.mockImplementation(async (fn: any) => fn(db));
     db.guild.update.mockResolvedValue({
       id: GUILD_ID, specialization: 'discovery',
@@ -95,48 +91,36 @@ describe('respecSpecialization', () => {
   });
 
   it('throws if treasury is insufficient for respec', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, level: 20, specialization: 'warfare',
-      treasuryTurns: 100_000,
-    });
+    db.guildMember.findUnique.mockResolvedValue(
+      makeMember('leader', { level: 20, specialization: 'warfare', treasuryTurns: 100_000 }),
+    );
 
     await expect(respecSpecialization(PLAYER_ID, GUILD_ID, 'discovery'))
       .rejects.toThrow('Insufficient treasury');
   });
 
   it('throws if trying to respec to same path', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, level: 20, specialization: 'warfare',
-      treasuryTurns: 3_000_000,
-    });
+    db.guildMember.findUnique.mockResolvedValue(
+      makeMember('leader', { level: 20, specialization: 'warfare', treasuryTurns: 3_000_000 }),
+    );
 
     await expect(respecSpecialization(PLAYER_ID, GUILD_ID, 'warfare'))
       .rejects.toThrow('same specialization');
   });
 
   it('throws if no specialization to respec from', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, level: 20, specialization: null,
-      treasuryTurns: 3_000_000,
-    });
+    db.guildMember.findUnique.mockResolvedValue(
+      makeMember('leader', { level: 20, specialization: null, treasuryTurns: 3_000_000 }),
+    );
 
     await expect(respecSpecialization(PLAYER_ID, GUILD_ID, 'warfare'))
       .rejects.toThrow('no specialization');
   });
 
   it('throws if player is not leader', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'officer',
-    });
+    db.guildMember.findUnique.mockResolvedValue(
+      makeMember('officer'),
+    );
 
     await expect(respecSpecialization(PLAYER_ID, GUILD_ID, 'discovery'))
       .rejects.toThrow('Only the leader');

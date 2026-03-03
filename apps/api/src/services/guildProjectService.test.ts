@@ -13,18 +13,22 @@ import {
 const GUILD_ID = 'guild-1';
 const PLAYER_ID = 'player-1';
 
+function makeMember(role: string, guild: Record<string, unknown> = {}) {
+  return {
+    guildId: GUILD_ID,
+    playerId: PLAYER_ID,
+    role,
+    guild: { id: GUILD_ID, treasuryTurns: 600_000, level: 5, ...guild },
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('startProject', () => {
   it('starts a project when prerequisites are met and treasury is sufficient', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, treasuryTurns: 600_000, level: 5,
-    });
+    db.guildMember.findUnique.mockResolvedValue(makeMember('leader'));
     db.guildProject.findFirst.mockResolvedValue(null);
     db.guildProject.findMany.mockResolvedValue([]);
     db.$transaction.mockImplementation(async (fn: any) => fn(db));
@@ -43,21 +47,14 @@ describe('startProject', () => {
   });
 
   it('throws if player is not officer or leader', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'member',
-    });
+    db.guildMember.findUnique.mockResolvedValue(makeMember('member'));
 
     await expect(startProject(PLAYER_ID, GUILD_ID, 'guild_forge'))
-      .rejects.toThrow('Only officers and leaders can start projects');
+      .rejects.toThrow('Only officers and leaders can do this');
   });
 
   it('throws if treasury is insufficient', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, treasuryTurns: 100, level: 5,
-    });
+    db.guildMember.findUnique.mockResolvedValue(makeMember('leader', { treasuryTurns: 100 }));
     db.guildProject.findFirst.mockResolvedValue(null);
     db.guildProject.findMany.mockResolvedValue([]);
 
@@ -66,12 +63,7 @@ describe('startProject', () => {
   });
 
   it('throws if another project is already active', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, treasuryTurns: 600_000, level: 5,
-    });
+    db.guildMember.findUnique.mockResolvedValue(makeMember('leader'));
     db.guildProject.findFirst.mockResolvedValue({ id: 'existing-active' });
 
     await expect(startProject(PLAYER_ID, GUILD_ID, 'guild_forge'))
@@ -79,12 +71,7 @@ describe('startProject', () => {
   });
 
   it('throws if prerequisites not met', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, treasuryTurns: 3_000_000, level: 10,
-    });
+    db.guildMember.findUnique.mockResolvedValue(makeMember('leader', { treasuryTurns: 3_000_000, level: 10 }));
     db.guildProject.findFirst.mockResolvedValue(null);
     db.guildProject.findMany.mockResolvedValue([]);
 
@@ -93,12 +80,7 @@ describe('startProject', () => {
   });
 
   it('throws if project already completed', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, treasuryTurns: 600_000, level: 5,
-    });
+    db.guildMember.findUnique.mockResolvedValue(makeMember('leader'));
     db.guildProject.findFirst.mockResolvedValue(null);
     db.guildProject.findMany.mockResolvedValue([
       { projectKey: 'guild_forge', status: 'completed' },
@@ -109,12 +91,7 @@ describe('startProject', () => {
   });
 
   it('allows starting apothecary with any one L1 project completed', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
-    db.guild.findUnique.mockResolvedValue({
-      id: GUILD_ID, treasuryTurns: 2_000_000, level: 10,
-    });
+    db.guildMember.findUnique.mockResolvedValue(makeMember('leader', { treasuryTurns: 2_000_000, level: 10 }));
     db.guildProject.findFirst.mockResolvedValue(null);
     db.guildProject.findMany.mockResolvedValue([
       { projectKey: 'scout_network', status: 'completed' },
@@ -133,9 +110,7 @@ describe('startProject', () => {
   });
 
   it('throws for unknown project key', async () => {
-    db.guildMember.findUnique.mockResolvedValue({
-      guildId: GUILD_ID, playerId: PLAYER_ID, role: 'leader',
-    });
+    db.guildMember.findUnique.mockResolvedValue(makeMember('leader'));
 
     await expect(startProject(PLAYER_ID, GUILD_ID, 'nonexistent'))
       .rejects.toThrow('Unknown project');

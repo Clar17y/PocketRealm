@@ -5,6 +5,7 @@ import {
   type GuildSpecialization,
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
+import { requireRole } from './guildService';
 
 const VALID_PATHS = new Set<string>(GUILD_SPECIALIZATION_DEFINITIONS.map((s) => s.path));
 
@@ -21,19 +22,11 @@ export async function selectSpecialization(
     throw new AppError(400, 'Invalid specialization path', 'INVALID_SPECIALIZATION');
   }
 
-  const membership = await prisma.guildMember.findUnique({ where: { playerId } });
-  if (!membership || membership.guildId !== guildId) {
+  const membership = await requireRole(playerId, 'leader');
+  if (membership.guildId !== guildId) {
     throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
   }
-  if (membership.role !== 'leader') {
-    throw new AppError(403, 'Only the leader can select a specialization', 'INSUFFICIENT_ROLE');
-  }
-
-  const guild = await prisma.guild.findUnique({
-    where: { id: guildId },
-    select: { level: true, specialization: true },
-  });
-  if (!guild) throw new AppError(404, 'Guild not found', 'NOT_FOUND');
+  const guild = membership.guild;
 
   if (guild.level < GUILD_CONSTANTS.SPECIALIZATION_UNLOCK_LEVEL) {
     throw new AppError(
@@ -83,19 +76,11 @@ export async function respecSpecialization(
     throw new AppError(400, 'Invalid specialization path', 'INVALID_SPECIALIZATION');
   }
 
-  const membership = await prisma.guildMember.findUnique({ where: { playerId } });
-  if (!membership || membership.guildId !== guildId) {
+  const membership = await requireRole(playerId, 'leader');
+  if (membership.guildId !== guildId) {
     throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
   }
-  if (membership.role !== 'leader') {
-    throw new AppError(403, 'Only the leader can respec specialization', 'INSUFFICIENT_ROLE');
-  }
-
-  const guild = await prisma.guild.findUnique({
-    where: { id: guildId },
-    select: { level: true, specialization: true, treasuryTurns: true },
-  });
-  if (!guild) throw new AppError(404, 'Guild not found', 'NOT_FOUND');
+  const guild = membership.guild;
 
   if (!guild.specialization) {
     throw new AppError(400, 'Guild has no specialization to respec from', 'NO_SPECIALIZATION');
