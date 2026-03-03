@@ -1,4 +1,4 @@
-# Combat-Rework Branch: Codebase Refactoring Plan
+# Codebase Refactoring Plan
 
 > **For Claude:** This plan is designed for **autonomous overnight execution**. Work through every task sequentially. Do NOT stop between tasks. Do NOT ask for user input. If a task fails, debug it, fix it, and continue. If you cannot fix a task after 3 attempts, commit what you have, skip it, and move to the next task. After every task, commit your work.
 
@@ -6,8 +6,23 @@
 
 **CRITICAL — READ BEFORE STARTING:**
 
-1. **Working directory:** `D:/Code/Adventure/.worktrees/adventure-combat-rework`
-2. **Before starting:** Run `npm run typecheck && npm run test` to confirm baseline passes (all 1,220 tests across 82 files should pass)
+### Step 0: Create a fresh worktree
+
+Create a new worktree for this refactoring work:
+
+```bash
+cd D:/Code/Adventure
+./scripts/setup-worktree.sh codebase-refactor --no-seed
+```
+
+This creates the worktree at `D:/Code/Adventure/.worktrees/adventure-codebase-refactor` with its own branch, database, env files, and dependencies.
+
+**All subsequent work happens inside that worktree.**
+
+### Execution rules
+
+1. **Working directory:** `D:/Code/Adventure/.worktrees/adventure-codebase-refactor`
+2. **Before starting:** Run `npm run typecheck && npm run test` to confirm baseline passes. All tests should pass.
 3. **After every task:** Run `npm run typecheck` to verify no type errors. If typecheck fails, fix the errors before committing.
 4. **After every phase:** Run `npm run test` to verify no test regressions. If tests fail, fix them before moving on.
 5. **Commit after every task** using the provided commit message. Use `git add <specific files>` — never `git add -A`.
@@ -15,6 +30,7 @@
 7. **Pure refactoring only.** No new features, no behavior changes. The app must work identically before and after.
 8. **Do NOT create new test files** unless the task explicitly says to. Move-only changes don't need new tests.
 9. **File operations:** Use the Write tool for new files, Edit tool for modifications. NEVER use shell heredocs.
+10. **Line numbers are approximate.** Always read the actual file before editing. Use the patterns and function/variable names to locate code, not exact line numbers.
 
 **Goal:** Reduce code duplication, enforce single responsibility, and improve maintainability across the entire codebase without changing any user-facing behavior.
 
