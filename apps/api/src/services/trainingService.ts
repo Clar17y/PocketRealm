@@ -24,22 +24,9 @@ export async function getCooldownRemaining(playerId: string): Promise<number> {
   return ttl > 0 ? ttl : 0;
 }
 
-export interface TrainingCombatResult {
-  outcome: TemplateCombatResult['outcome'];
+export type TrainingCombatResult = Omit<TemplateCombatResult, 'log'> & {
   log: ReturnType<typeof mapTemplateCombatLog>;
-  combatantAMaxHp: number;
-  combatantBMaxHp: number;
-  combatantAHpRemaining: number;
-  combatantBHpRemaining: number;
-  combatantAMaxStamina: number;
-  combatantBMaxStamina: number;
-  combatantAStaminaRemaining: number;
-  combatantAMaxMana: number;
-  combatantBMaxMana: number;
-  combatantAManaRemaining: number;
-  potionsConsumed: TemplateCombatResult['potionsConsumed'];
-  totalRounds: number;
-}
+};
 
 export async function simulateFight(
   playerId: string,
@@ -129,20 +116,8 @@ export async function simulateFight(
 
   return {
     combat: {
-      outcome: combatResult.outcome,
+      ...combatResult,
       log: mapTemplateCombatLog(combatResult.log),
-      combatantAMaxHp: combatResult.combatantAMaxHp,
-      combatantBMaxHp: combatResult.combatantBMaxHp,
-      combatantAHpRemaining: combatResult.combatantAHpRemaining,
-      combatantBHpRemaining: combatResult.combatantBHpRemaining,
-      combatantAMaxStamina: combatResult.combatantAMaxStamina,
-      combatantBMaxStamina: combatResult.combatantBMaxStamina,
-      combatantAStaminaRemaining: combatResult.combatantAStaminaRemaining,
-      combatantAMaxMana: combatResult.combatantAMaxMana,
-      combatantBMaxMana: combatResult.combatantBMaxMana,
-      combatantAManaRemaining: combatResult.combatantAManaRemaining,
-      potionsConsumed: combatResult.potionsConsumed,
-      totalRounds: combatResult.totalRounds,
     },
     cooldownSeconds: TRAINING_CONSTANTS.COOLDOWN_SECONDS,
   };
