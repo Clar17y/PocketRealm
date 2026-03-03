@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
-import type { ConfirmRarity } from '@/lib/rarity';
 import { updateTutorialStep } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
@@ -54,7 +53,6 @@ import {
   salvageBatch,
   selectSiteStrategy,
   useItem,
-  updatePlayerSettings,
   startCombatFromEncounterSite,
   startExploration,
   travelToZone,
@@ -76,7 +74,6 @@ import {
   type AchievementsResponse,
   type EventModifierBadge,
   type CombatActiveEvent,
-  type PlayerSettings,
   type WorldEventResponse,
   type SkillPointState,
   exchangeGold,
@@ -92,6 +89,7 @@ export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPl
 import { buildFightsList, buildLastCombat, isMobKnown } from './combatHelpers';
 export { isMobKnown } from './combatHelpers';
 import { useActivityLog, nowStamp } from './hooks/useActivityLog';
+import { usePlayerSettings } from './hooks/usePlayerSettings';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
@@ -310,17 +308,30 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
-  const [autoPotionThreshold, setAutoPotionThreshold] = useState(0);
+  const playerSettings = usePlayerSettings();
+  const {
+    autoPotionThreshold, setAutoPotionThreshold,
+    combatLogSpeedMs, setCombatLogSpeedMs,
+    explorationSpeedMs, setExplorationSpeedMs,
+    autoSkipKnownCombat,
+    defaultExploreTurns, setDefaultExploreTurns,
+    quickRestHealPercent, setQuickRestHealPercent,
+    defaultRefiningMax,
+    lowHpWarning,
+    confirmRarity,
+    guildTaxRate, setGuildTaxRate,
+    handleSetCombatLogSpeed,
+    handleSetExplorationSpeed,
+    handleSetAutoSkipKnownCombat,
+    handleSetAutoPotionThreshold,
+    handleSetDefaultExploreTurns,
+    handleSetQuickRestHealPercent,
+    handleSetDefaultRefiningMax,
+    handleSetLowHpWarning,
+    handleSetConfirmRarity,
+    initSettingsFromServer,
+  } = playerSettings;
   const [tutorialStep, setTutorialStep] = useState<number>(TUTORIAL_COMPLETED);
-  const [combatLogSpeedMs, setCombatLogSpeedMs] = useState(800);
-  const [explorationSpeedMs, setExplorationSpeedMs] = useState(800);
-  const [autoSkipKnownCombat, setAutoSkipKnownCombat] = useState(false);
-  const [defaultExploreTurns, setDefaultExploreTurns] = useState(100);
-  const [quickRestHealPercent, setQuickRestHealPercent] = useState(100);
-  const [defaultRefiningMax, setDefaultRefiningMax] = useState(false);
-  const [lowHpWarning, setLowHpWarning] = useState(true);
-  const [confirmRarity, setConfirmRarity] = useState<ConfirmRarity>('uncommon');
-  const [guildTaxRate, setGuildTaxRate] = useState(0);
   const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
   const [achievementUnclaimedCount, setAchievementUnclaimedCount] = useState(0);
   const [activeTitle, setActiveTitleState] = useState<string | null>(null);
@@ -473,16 +484,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         attributes: playerRes.data.player.attributes,
       });
       setGold(playerRes.data.player.gold ?? 0);
-      setAutoPotionThreshold(playerRes.data.player.autoPotionThreshold ?? 0);
+      initSettingsFromServer(playerRes.data.player);
       setTutorialStep(playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED);
-      setCombatLogSpeedMs(playerRes.data.player.combatLogSpeedMs ?? 800);
-      setExplorationSpeedMs(playerRes.data.player.explorationSpeedMs ?? 800);
-      setAutoSkipKnownCombat(playerRes.data.player.autoSkipKnownCombat ?? false);
-      setDefaultExploreTurns(playerRes.data.player.defaultExploreTurns ?? 100);
-      setQuickRestHealPercent(playerRes.data.player.quickRestHealPercent ?? 100);
-      setDefaultRefiningMax(playerRes.data.player.defaultRefiningMax ?? false);
-      setLowHpWarning(playerRes.data.player.lowHpWarning ?? true);
-      setConfirmRarity(playerRes.data.player.confirmRarity ?? 'uncommon');
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
     if (hpRes.data) setHpState(hpRes.data);
@@ -1881,31 +1884,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       if (hpRes.data) setHpState(hpRes.data);
     });
   };
-
-  const handleSetSetting = async <T>(key: keyof PlayerSettings, value: T, setter: (v: T) => void, prev: T) => {
-    setter(value);
-    const res = await updatePlayerSettings({ [key]: value });
-    if (!res.data) setter(prev);
-  };
-
-  const handleSetAutoPotionThreshold = (value: number) =>
-    handleSetSetting('autoPotionThreshold', value, setAutoPotionThreshold, autoPotionThreshold);
-  const handleSetCombatLogSpeed = (value: number) =>
-    handleSetSetting('combatLogSpeedMs', value, setCombatLogSpeedMs, combatLogSpeedMs);
-  const handleSetExplorationSpeed = (value: number) =>
-    handleSetSetting('explorationSpeedMs', value, setExplorationSpeedMs, explorationSpeedMs);
-  const handleSetAutoSkipKnownCombat = (value: boolean) =>
-    handleSetSetting('autoSkipKnownCombat', value, setAutoSkipKnownCombat, autoSkipKnownCombat);
-  const handleSetDefaultExploreTurns = (value: number) =>
-    handleSetSetting('defaultExploreTurns', value, setDefaultExploreTurns, defaultExploreTurns);
-  const handleSetQuickRestHealPercent = (value: number) =>
-    handleSetSetting('quickRestHealPercent', value, setQuickRestHealPercent, quickRestHealPercent);
-  const handleSetDefaultRefiningMax = (value: boolean) =>
-    handleSetSetting('defaultRefiningMax', value, setDefaultRefiningMax, defaultRefiningMax);
-  const handleSetLowHpWarning = (value: boolean) =>
-    handleSetSetting('lowHpWarning', value, setLowHpWarning, lowHpWarning);
-  const handleSetConfirmRarity = (value: ConfirmRarity) =>
-    handleSetSetting('confirmRarity', value, setConfirmRarity, confirmRarity);
 
   const handleQuickRest = async () => {
     if (!hpState || hpState.currentHp >= hpState.maxHp || hpState.isRecovering || turns <= 0) return;
