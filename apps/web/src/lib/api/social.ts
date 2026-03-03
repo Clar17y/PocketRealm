@@ -33,6 +33,15 @@ export interface PvpScoutData {
   armorClass: string;
   powerRating: number;
   myPowerRating: number;
+  templateInfo?: {
+    templateLength: number;
+    offensiveCount: number;
+    defensiveCount: number;
+    supportiveCount: number;
+    maxStamina: number;
+    maxMana: number;
+    talentInvestment: Record<string, number>;
+  };
 }
 
 export interface PvpMatchResponse {
