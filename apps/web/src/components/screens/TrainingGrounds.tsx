@@ -8,8 +8,7 @@ import { startTrainingFight, getTrainingCooldown } from '@/lib/api';
 import { Swords, Shield, AlertTriangle } from 'lucide-react';
 import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
 import { getMobPrefixDefinition } from '@adventure/shared';
-import type { CombatResult } from '@adventure/shared';
-import type { LastCombatLogEntry } from '@/app/game/gameController.types';
+import type { TrainingCombatResult } from '@/lib/api/training';
 import { monsterImageSrc } from '@/lib/assets';
 
 interface BestiaryMob {
@@ -42,7 +41,7 @@ export function TrainingGrounds({
   const [selectedPrefix, setSelectedPrefix] = useState<string>('none');
   const [cooldown, setCooldown] = useState(initialCooldown);
   const [trainingState, setTrainingState] = useState<TrainingState>('idle');
-  const [combatResult, setCombatResult] = useState<CombatResult | null>(null);
+  const [combatResult, setCombatResult] = useState<TrainingCombatResult | null>(null);
   const [mobDisplayName, setMobDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -180,7 +179,7 @@ export function TrainingGrounds({
             playerMaxHp={combatResult.combatantAMaxHp}
             playerStartHp={combatResult.combatantAMaxHp}
             mobMaxHp={combatResult.combatantBMaxHp}
-            log={combatResult.log as unknown as LastCombatLogEntry[]}
+            log={combatResult.log}
             speedMs={combatLogSpeedMs}
             onComplete={handlePlaybackComplete}
             onSkip={handlePlaybackSkip}

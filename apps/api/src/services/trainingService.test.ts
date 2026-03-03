@@ -34,27 +34,82 @@ vi.mock('./combatStatsService', () => ({
   getSkillLevel: vi.fn().mockResolvedValue(5),
 }));
 
+vi.mock('./combatTemplateService', () => ({
+  getActiveTemplate: vi.fn().mockResolvedValue([{ actionId: 'basic_attack' }]),
+}));
+
+vi.mock('./resourceService', () => ({
+  getResourceState: vi.fn().mockResolvedValue({
+    stamina: { current: 100, max: 100, regenPerRound: 5, regenPerSecond: 0.1 },
+    mana: { current: 50, max: 50, regenPerRound: 3, regenPerSecond: 0.05 },
+  }),
+}));
+
+vi.mock('./skillPointService', () => ({
+  getSkillPoints: vi.fn().mockResolvedValue({
+    playerId: 'p1',
+    totalPointsEarned: 0,
+    totalPointsSpent: 0,
+    availablePoints: 0,
+    allocations: {},
+    unlockedActions: [],
+  }),
+}));
+
+vi.mock('./combatOrchestrationService', () => ({
+  buildPlayerTemplateCombatant: vi.fn().mockReturnValue({
+    id: 'p1',
+    name: 'TestPlayer',
+    stats: { maxHp: 100, hp: 80, attack: 15, accuracy: 10, defence: 5, magicDefence: 0, speed: 5, critChance: 0.05, critDamage: 1.5, damageMin: 10, damageMax: 20 },
+    template: [{ actionId: 'basic_attack' }],
+    stamina: 100,
+    maxStamina: 100,
+    staminaRegenPerRound: 5,
+    mana: 50,
+    maxMana: 50,
+    manaRegenPerRound: 3,
+    actionDefinitions: {},
+  }),
+}));
+
+vi.mock('./combatLogMapper', () => ({
+  mapTemplateCombatLog: vi.fn().mockImplementation((log: unknown[]) => log),
+}));
+
 vi.mock('@adventure/game-engine', () => ({
-  runCombat: vi.fn().mockReturnValue({
+  runTemplateCombat: vi.fn().mockReturnValue({
     outcome: 'victory',
     log: [],
     combatantAMaxHp: 100,
     combatantBMaxHp: 50,
     combatantAHpRemaining: 60,
     combatantBHpRemaining: 0,
+    combatantAStaminaRemaining: 80,
+    combatantBStaminaRemaining: 0,
+    combatantAManaRemaining: 40,
+    combatantBManaRemaining: 0,
     potionsConsumed: [],
+    totalRounds: 5,
   }),
   buildPlayerCombatStats: vi.fn().mockReturnValue({
-    maxHp: 100, currentHp: 80, attack: 15, accuracy: 10,
-    armor: 5, magicDefence: 0, speed: 5, critChance: 0.05,
-    critDamage: 1.5,
+    maxHp: 100, hp: 80, attack: 15, accuracy: 10,
+    defence: 5, magicDefence: 0, speed: 5, critChance: 0.05,
+    critDamage: 1.5, damageMin: 10, damageMax: 20,
   }),
-  mobToCombatantStats: vi.fn().mockReturnValue({
-    maxHp: 50, currentHp: 50, attack: 8, accuracy: 8,
-    armor: 3, magicDefence: 0, speed: 3, critChance: 0.02,
-    critDamage: 1.3,
+  mobToTemplateCombatant: vi.fn().mockReturnValue({
+    id: 'mob-1',
+    name: 'Goblin',
+    stats: { maxHp: 50, hp: 50, attack: 8, accuracy: 8, defence: 3, magicDefence: 0, speed: 3, critChance: 0.02, critDamage: 1.3, damageMin: 5, damageMax: 10 },
+    template: [{ actionId: 'mob_attack' }],
+    stamina: Infinity,
+    maxStamina: Infinity,
+    staminaRegenPerRound: 0,
+    mana: Infinity,
+    maxMana: Infinity,
+    manaRegenPerRound: 0,
+    actionDefinitions: {},
   }),
-  applyMobPrefix: vi.fn().mockImplementation((mob: any) => mob),
+  applyMobPrefix: vi.fn().mockImplementation((mob: unknown) => mob),
 }));
 
 vi.mock('../redis', () => ({
@@ -131,6 +186,12 @@ describe('simulateFight', () => {
     // Mob template exists
     mockPrisma.mobTemplate.findUnique.mockResolvedValue(mobTemplate);
 
+    // Player exists
+    mockPrisma.player.findUnique.mockResolvedValue({
+      id: 'p1',
+      username: 'TestPlayer',
+    });
+
     // No prefix by default
     mockPrisma.playerBestiaryPrefix.findUnique.mockResolvedValue(null);
   });
@@ -139,6 +200,9 @@ describe('simulateFight', () => {
     const result = await simulateFight('p1', 'mob-1', null);
 
     expect(result.combat.outcome).toBe('victory');
+    expect(result.combat.combatantAStaminaRemaining).toBe(80);
+    expect(result.combat.combatantAManaRemaining).toBe(40);
+    expect(result.combat.totalRounds).toBe(5);
     expect(result.cooldownSeconds).toBe(TRAINING_CONSTANTS.COOLDOWN_SECONDS);
     // Verify cooldown was set in Redis
     expect(mockRedis.set).toHaveBeenCalledWith(
@@ -162,6 +226,27 @@ describe('simulateFight', () => {
 
     expect(result.combat).toBeDefined();
     expect(applyMobPrefix).toHaveBeenCalled();
+  });
+
+  it('maps combat log through mapTemplateCombatLog', async () => {
+    const { mapTemplateCombatLog } = await import('./combatLogMapper.js');
+
+    await simulateFight('p1', 'mob-1', null);
+
+    expect(mapTemplateCombatLog).toHaveBeenCalled();
+  });
+
+  it('calls buildPlayerTemplateCombatant with correct params', async () => {
+    const { buildPlayerTemplateCombatant } = await import('./combatOrchestrationService.js');
+
+    await simulateFight('p1', 'mob-1', null);
+
+    expect(buildPlayerTemplateCombatant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playerId: 'p1',
+        username: 'TestPlayer',
+      }),
+    );
   });
 
   it('throws when mob not in bestiary', async () => {

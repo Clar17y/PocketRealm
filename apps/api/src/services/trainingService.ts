@@ -1,14 +1,19 @@
 import { prisma } from '@adventure/database';
 import { redis } from '../redis';
-import { runCombat, buildPlayerCombatStats, mobToCombatantStats, applyMobPrefix } from '@adventure/game-engine';
+import { buildPlayerCombatStats, runTemplateCombat, mobToTemplateCombatant, applyMobPrefix } from '@adventure/game-engine';
+import type { TemplateCombatResult } from '@adventure/game-engine';
 import { TRAINING_CONSTANTS } from '@adventure/shared';
-import type { Combatant, CombatResult } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getEquipmentStats } from './equipmentService';
 import { getPlayerProgressionState } from './attributesService';
 import { getHpState } from './hpService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from './combatStatsService';
 import { toMobTemplate } from '../utils/routeHelpers.js';
+import { buildPlayerTemplateCombatant } from './combatOrchestrationService';
+import { mapTemplateCombatLog } from './combatLogMapper';
+import { getActiveTemplate } from './combatTemplateService';
+import { getResourceState } from './resourceService';
+import { getSkillPoints } from './skillPointService';
 
 function cooldownKey(playerId: string): string {
   return `training:cooldown:${playerId}`;
@@ -19,11 +24,24 @@ export async function getCooldownRemaining(playerId: string): Promise<number> {
   return ttl > 0 ? ttl : 0;
 }
 
+export interface TrainingCombatResult {
+  outcome: TemplateCombatResult['outcome'];
+  log: ReturnType<typeof mapTemplateCombatLog>;
+  combatantAMaxHp: number;
+  combatantBMaxHp: number;
+  combatantAHpRemaining: number;
+  combatantBHpRemaining: number;
+  combatantAStaminaRemaining: number;
+  combatantAManaRemaining: number;
+  potionsConsumed: TemplateCombatResult['potionsConsumed'];
+  totalRounds: number;
+}
+
 export async function simulateFight(
   playerId: string,
   mobTemplateId: string,
   prefix: string | null,
-): Promise<{ combat: CombatResult; cooldownSeconds: number }> {
+): Promise<{ combat: TrainingCombatResult; cooldownSeconds: number }> {
   const remaining = await getCooldownRemaining(playerId);
   if (remaining > 0) {
     throw new AppError(429, `Training cooldown: ${remaining}s remaining`, 'TRAINING_COOLDOWN');
@@ -51,15 +69,25 @@ export async function simulateFight(
   const mob = await prisma.mobTemplate.findUnique({ where: { id: mobTemplateId } });
   if (!mob) throw new AppError(404, 'Mob not found', 'NOT_FOUND');
 
+  // Load player username for the combatant label
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { username: true },
+  });
+  if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
+
   // Build player combat stats using the same patterns as combat routes
   const mainHandAttackSkill = await getMainHandAttackSkill(playerId);
   const attackSkill: AttackSkill = mainHandAttackSkill ?? 'melee';
 
-  const [hpState, attackLevel, progression, equipmentStats] = await Promise.all([
+  const [hpState, attackLevel, progression, equipmentStats, playerTemplate, resourceState, skillPointState] = await Promise.all([
     getHpState(playerId),
     getSkillLevel(playerId, attackSkill),
     getPlayerProgressionState(playerId),
     getEquipmentStats(playerId),
+    getActiveTemplate(playerId),
+    getResourceState(playerId),
+    getSkillPoints(playerId),
   ]);
 
   const playerStats = buildPlayerCombatStats(
@@ -69,21 +97,45 @@ export async function simulateFight(
     equipmentStats,
   );
 
-  // Apply prefix if specified
+  // Build player TemplateCombatant
+  const playerCombatant = buildPlayerTemplateCombatant({
+    playerId,
+    username: player.username,
+    playerStats,
+    template: playerTemplate,
+    stamina: resourceState.stamina.current,
+    maxStamina: resourceState.stamina.max,
+    staminaRegenPerRound: resourceState.stamina.regenPerRound,
+    mana: resourceState.mana.current,
+    maxMana: resourceState.mana.max,
+    manaRegenPerRound: resourceState.mana.regenPerRound,
+    unlockedActions: skillPointState.unlockedActions,
+  });
+
+  // Build mob TemplateCombatant
   const mobTemplate = toMobTemplate(mob as Record<string, unknown>);
   const finalMob = applyMobPrefix(mobTemplate, prefix);
+  const mobCombatant = mobToTemplateCombatant(finalMob);
 
-  const combatantA: Combatant = { id: playerId, name: 'You', stats: playerStats };
-  const combatantB: Combatant = {
-    id: mob.id,
-    name: finalMob.mobDisplayName,
-    stats: mobToCombatantStats(finalMob),
-  };
-
-  const combatResult = runCombat(combatantA, combatantB);
+  // Run template combat
+  const combatResult = runTemplateCombat(playerCombatant, mobCombatant);
 
   // Set cooldown
   await redis.set(cooldownKey(playerId), '1', 'EX', TRAINING_CONSTANTS.COOLDOWN_SECONDS);
 
-  return { combat: combatResult, cooldownSeconds: TRAINING_CONSTANTS.COOLDOWN_SECONDS };
+  return {
+    combat: {
+      outcome: combatResult.outcome,
+      log: mapTemplateCombatLog(combatResult.log),
+      combatantAMaxHp: combatResult.combatantAMaxHp,
+      combatantBMaxHp: combatResult.combatantBMaxHp,
+      combatantAHpRemaining: combatResult.combatantAHpRemaining,
+      combatantBHpRemaining: combatResult.combatantBHpRemaining,
+      combatantAStaminaRemaining: combatResult.combatantAStaminaRemaining,
+      combatantAManaRemaining: combatResult.combatantAManaRemaining,
+      potionsConsumed: combatResult.potionsConsumed,
+      totalRounds: combatResult.totalRounds,
+    },
+    cooldownSeconds: TRAINING_CONSTANTS.COOLDOWN_SECONDS,
+  };
 }
