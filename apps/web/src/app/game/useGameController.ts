@@ -25,11 +25,6 @@ import {
   equip,
   forgeReroll,
   forgeUpgrade,
-  getAchievements,
-  getAchievementUnclaimedCount,
-  getActiveTitle,
-  claimAchievementReward,
-  setActiveTitle,
   getBestiary,
   getCraftingRecipes,
   getEquipment,
@@ -69,7 +64,6 @@ import {
   respecSkillPoints,
   getTemplates,
   type PendingLootItem,
-  type AchievementsResponse,
   type CombatActiveEvent,
   type WorldEventResponse,
   type SkillPointState,
@@ -78,7 +72,6 @@ import {
 } from '@/lib/api';
 import type { CombatTemplateData, ResourceState } from '@adventure/shared';
 import type { RouletteBetType } from '@adventure/shared';
-import { getSocket } from '@/lib/socket';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
@@ -90,6 +83,7 @@ import { usePlayerSettings } from './hooks/usePlayerSettings';
 import { useBestiary } from './hooks/useBestiary';
 import { useGathering } from './hooks/useGathering';
 import { useEncounterSites } from './hooks/useEncounterSites';
+import { useAchievements } from './hooks/useAchievements';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
@@ -234,9 +228,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     initSettingsFromServer,
   } = playerSettings;
   const [tutorialStep, setTutorialStep] = useState<number>(TUTORIAL_COMPLETED);
-  const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
-  const [achievementUnclaimedCount, setAchievementUnclaimedCount] = useState(0);
-  const [activeTitle, setActiveTitleState] = useState<string | null>(null);
   const combatLogPrefetch = useCombatLogPrefetch();
   const [playbackActive, setPlaybackActive] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
@@ -326,19 +317,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (result.data) {
       setPvpNotificationCount(result.data.count);
     }
-  }, []);
-
-  const loadAchievements = useCallback(async () => {
-    const res = await getAchievements();
-    if (res.data) {
-      setAchievementData(res.data);
-      setAchievementUnclaimedCount(res.data.unclaimedCount);
-    }
-  }, []);
-
-  const loadAchievementUnclaimedCount = useCallback(async () => {
-    const res = await getAchievementUnclaimedCount();
-    if (res.data) setAchievementUnclaimedCount(res.data.unclaimedCount);
   }, []);
 
   const handleLoadSkillPoints = useCallback(async () => {
@@ -444,6 +422,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }).catch(() => setGuildTaxRate(0));
   }, []);
 
+  const achievements = useAchievements(isAuthenticated, loadAll);
+  const {
+    achievementData, achievementUnclaimedCount, activeTitle,
+    loadAchievements, loadAchievementUnclaimedCount,
+    handleClaimAchievement, handleSetActiveTitle,
+  } = achievements;
+
   const advanceTutorial = useCallback(async (fromStep: number) => {
     if (tutorialStep !== fromStep) return;
     const nextStep = fromStep + 1;
@@ -471,10 +456,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (isAuthenticated) {
       void loadAll();
       void loadPvpNotificationCount();
-      void loadAchievementUnclaimedCount();
-      void getActiveTitle().then((res) => {
-        if (res.data) setActiveTitleState(res.data.activeTitle);
-      });
       // Auto-show changelog if unseen
       const latestVer = getLatestVersion();
       if (latestVer && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVer) {
@@ -483,24 +464,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       const interval = setInterval(() => void loadTurnsAndHp(), 10000);
       // Poll PvP notifications less frequently (60s)
       const pvpInterval = setInterval(() => void loadPvpNotificationCount(), 60000);
-      const achievementPollInterval = setInterval(() => void loadAchievementUnclaimedCount(), 60_000);
-      return () => { clearInterval(interval); clearInterval(pvpInterval); clearInterval(achievementPollInterval); };
+      return () => { clearInterval(interval); clearInterval(pvpInterval); };
     }
-  }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount, loadAchievementUnclaimedCount]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const socket = getSocket();
-    const handleAchievementUnlocked = (data: { id: string; title: string; category: string }) => {
-      const showToast = (window as unknown as Record<string, unknown>).__showAchievementToast as
-        | ((toast: { id: string; title: string; category: string }) => void)
-        | undefined;
-      if (showToast) showToast(data);
-      void loadAchievementUnclaimedCount();
-    };
-    socket.on('achievement_unlocked', handleAchievementUnlocked);
-    return () => { socket.off('achievement_unlocked', handleAchievementUnlocked); };
-  }, [isAuthenticated, loadAchievementUnclaimedCount]);
+  }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount]);
 
   const getActiveTab = () => {
     if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
@@ -1620,21 +1586,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${actualTurns.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
       }
     });
-  };
-
-  const handleClaimAchievement = async (achievementId: string) => {
-    const res = await claimAchievementReward(achievementId);
-    if (res.data) {
-      await loadAchievements();
-      await loadAll();
-    }
-  };
-
-  const handleSetActiveTitle = async (achievementId: string | null) => {
-    const res = await setActiveTitle(achievementId);
-    if (res.data) {
-      setActiveTitleState(res.data.activeTitle);
-    }
   };
 
   const dismissChangelog = useCallback(() => {
