@@ -1,4 +1,4 @@
-import type { EventModifierBadge } from '@/lib/api';
+import type { EventModifierBadge, CombatActiveEvent } from '@/lib/api';
 import type { CombatLogEntryResponse as LastCombatLogEntry } from '@/lib/api/combat';
 
 export type { LastCombatLogEntry };
@@ -63,6 +63,13 @@ export type CombatPlaybackItem = {
   combatantBMaxHp: number;
   log: LastCombatLogEntry[] | null;
   combatLogId?: string;
+};
+
+export type CombatPlaybackQueueItem = CombatPlaybackItem & {
+  room?: number;
+  playerStartHp: number;
+  rewards: LastCombat['rewards'];
+  activeEvents?: CombatActiveEvent[];
 };
 
 export interface LastCombat {

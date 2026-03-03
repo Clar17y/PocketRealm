@@ -5,7 +5,6 @@ import { updateTutorialStep } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
   TUTORIAL_STEP_EXPLORE,
-  TUTORIAL_STEP_COMBAT,
   TUTORIAL_STEP_GATHER,
   TUTORIAL_STEP_TRAVEL,
   TUTORIAL_STEP_REFINE,
@@ -64,7 +63,6 @@ import {
   respecSkillPoints,
   getTemplates,
   type PendingLootItem,
-  type CombatActiveEvent,
   type WorldEventResponse,
   type SkillPointState,
   exchangeGold,
@@ -73,10 +71,10 @@ import {
 import type { CombatTemplateData, ResourceState } from '@adventure/shared';
 import type { RouletteBetType } from '@adventure/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
-import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
+import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
-export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
-import { buildFightsList, buildLastCombat, isMobKnown } from './combatHelpers';
+export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
+import { buildLastCombat, isMobKnown } from './combatHelpers';
 export { isMobKnown } from './combatHelpers';
 import { useActivityLog, nowStamp } from './hooks/useActivityLog';
 import { usePlayerSettings } from './hooks/usePlayerSettings';
@@ -84,6 +82,7 @@ import { useBestiary } from './hooks/useBestiary';
 import { useGathering } from './hooks/useGathering';
 import { useEncounterSites } from './hooks/useEncounterSites';
 import { useAchievements } from './hooks/useAchievements';
+import { useCombatPlayback } from './hooks/useCombatPlayback';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
@@ -231,55 +230,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const combatLogPrefetch = useCombatLogPrefetch();
   const [playbackActive, setPlaybackActive] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
-  const [combatPlaybackQueue, setCombatPlaybackQueue] = useState<Array<{
-    room?: number;
-    mobName: string;
-    mobDisplayName: string;
-    mobTemplateId: string;
-    mobPrefix: string | null;
-    outcome: string;
-    combatantAMaxHp: number;
-    playerStartHp: number;
-    combatantBMaxHp: number;
-    log: LastCombatLogEntry[] | null;
-    combatLogId?: string;
-    rewards: LastCombat['rewards'];
-    activeEvents?: CombatActiveEvent[];
-  }> | null>(null);
-  const [combatPlaybackIndex, setCombatPlaybackIndex] = useState(0);
-  const [roomTransition, setRoomTransition] = useState<{ entering: number } | null>(null);
-  const pendingCombatRewardsRef = useRef<LastCombat['rewards'] | null>(null);
-  const siteJustClearedRef = useRef(false);
-  const combatPendingLootRef = useRef<string | null>(null);
+  const activatePendingLootRef = useRef<(sessionId: string) => Promise<void>>(async () => {});
   const pendingLootQueueRef = useRef<string[]>([]);
   const arrivedInTownRef = useRef(false);
   const lastEventLogTimeRef = useRef(0);
-  const combatPlaybackData = combatPlaybackQueue?.[combatPlaybackIndex] ?? null;
-
-  // Lazy-load current fight's combat log and pre-fetch next fight
-  useEffect(() => {
-    if (!combatPlaybackQueue) return;
-    const currentFight = combatPlaybackQueue[combatPlaybackIndex];
-    if (!currentFight) return;
-
-    // Load current fight's log if not yet loaded
-    if (!currentFight.log && currentFight.combatLogId) {
-      void combatLogPrefetch.fetchLog(currentFight.combatLogId).then(log => {
-        setCombatPlaybackQueue(prev => {
-          if (!prev) return prev;
-          const updated = [...prev];
-          updated[combatPlaybackIndex] = { ...updated[combatPlaybackIndex], log: log as LastCombatLogEntry[] };
-          return updated;
-        });
-      });
-    }
-
-    // Pre-fetch next fight's log
-    const nextFight = combatPlaybackQueue[combatPlaybackIndex + 1];
-    if (nextFight?.combatLogId) {
-      combatLogPrefetch.prefetch(nextFight.combatLogId);
-    }
-  }, [combatPlaybackQueue, combatPlaybackIndex, combatLogPrefetch]);
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<{
     totalTurns: number;
     zoneName: string;
@@ -440,6 +394,23 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const res = await updateTutorialStep(TUTORIAL_SKIPPED);
     if (res.data) setTutorialStep(res.data.tutorialStep);
   }, []);
+
+  const combatPlayback = useCombatPlayback({
+    combatLogPrefetch,
+    setLastCombat,
+    setPlaybackActive,
+    refreshPendingEncounters,
+    advanceTutorial,
+    activatePendingLootRef,
+  });
+  const {
+    combatPlaybackQueue, setCombatPlaybackQueue,
+    combatPlaybackIndex, setCombatPlaybackIndex,
+    roomTransition, setRoomTransition,
+    combatPlaybackData,
+    pendingCombatRewardsRef, siteJustClearedRef, combatPendingLootRef,
+    handleCombatPlaybackComplete,
+  } = combatPlayback;
 
   // Default tabs during tutorial steps so the player sees the right content
   useEffect(() => {
@@ -834,52 +805,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setBusyAction(null);
     }
   }, [refreshPendingEncounters]);
-
-  const handleCombatPlaybackComplete = () => {
-    if (combatPlaybackQueue && combatPlaybackIndex < combatPlaybackQueue.length - 1) {
-      const currentFight = combatPlaybackQueue[combatPlaybackIndex];
-      const nextFight = combatPlaybackQueue[combatPlaybackIndex + 1];
-
-      // Room transition: show interstitial briefly before advancing
-      if (currentFight?.room && nextFight?.room && currentFight.room !== nextFight.room) {
-        setRoomTransition({ entering: nextFight.room });
-        setTimeout(() => {
-          setRoomTransition(null);
-          setCombatPlaybackIndex(prev => prev + 1);
-        }, 1500);
-        return;
-      }
-
-      // More fights in the queue — advance to next
-      setCombatPlaybackIndex(combatPlaybackIndex + 1);
-      return;
-    }
-
-    // All fights done — finalize lastCombat with aggregated rewards
-    const lastFight = combatPlaybackQueue?.[combatPlaybackQueue.length - 1];
-    if (lastFight) {
-      const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
-      setLastCombat(buildLastCombat(combatPlaybackQueue!, aggregatedRewards));
-    }
-    setCombatPlaybackQueue(null);
-    setCombatPlaybackIndex(0);
-    setRoomTransition(null);
-    pendingCombatRewardsRef.current = null;
-    combatLogPrefetch.clear();
-    setPlaybackActive(false);
-    void refreshPendingEncounters();
-
-    if (siteJustClearedRef.current) {
-      siteJustClearedRef.current = false;
-      advanceTutorial(TUTORIAL_STEP_COMBAT);
-    }
-
-    const pendingId = combatPendingLootRef.current;
-    combatPendingLootRef.current = null;
-    if (pendingId) {
-      void activatePendingLoot(pendingId);
-    }
-  };
 
   const handleNavigate = (screen: string) => {
     // Auto-skip any active playback when navigating away
@@ -1354,6 +1279,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       clearExpiredLoot();
     }
   };
+  activatePendingLootRef.current = activatePendingLoot;
 
   const handleClaimLoot = async (sessionId: string, selectedIndices: number[]) => {
     await runAction('claim_loot', async () => {
