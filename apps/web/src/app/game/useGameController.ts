@@ -1556,7 +1556,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setTrainingCooldown,
     zones,
     activeZoneId,
-    setActiveZoneId,
     zoneConnections,
     undiscoveredZones,
     skills,
