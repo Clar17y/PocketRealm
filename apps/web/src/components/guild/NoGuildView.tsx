@@ -12,6 +12,7 @@ import {
 } from '@/lib/api';
 import { GUILD_CONSTANTS } from '@adventure/shared';
 import { formatNumber } from '@/lib/format';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 
 interface NoGuildViewProps {
   playerId: string | null;
@@ -32,8 +33,8 @@ export function NoGuildView({
   const [searchTotal, setSearchTotal] = useState(0);
   const [searchPage, setSearchPage] = useState(1);
   const [searching, setSearching] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const { loading: actionLoading, error: actionError, run } = useAsyncAction();
   const [requestedGuildIds, setRequestedGuildIds] = useState<Set<string>>(new Set());
 
   // Create form
@@ -43,15 +44,15 @@ export function NoGuildView({
 
   const handleSearch = useCallback(async (query: string, page = 1) => {
     setSearching(true);
-    setActionError(null);
+    setSearchError(null);
     try {
       const res = await searchGuilds(query || undefined, page);
-      if (res.error) { setActionError(res.error.message); return; }
+      if (res.error) { setSearchError(res.error.message); return; }
       setSearchResults(res.data?.guilds ?? []);
       setSearchTotal(res.data?.total ?? 0);
       setSearchPage(page);
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Search failed');
+      setSearchError(err instanceof Error ? err.message : 'Search failed');
     } finally {
       setSearching(false);
     }
@@ -61,47 +62,14 @@ export function NoGuildView({
     void handleSearch('', 1);
   }, [handleSearch]);
 
-  const handleCreate = async () => {
-    setActionLoading(true);
-    setActionError(null);
-    try {
-      const res = await createGuild(name, tag, description || null);
-      if (res.error) { setActionError(res.error.message); return; }
-      onGuildJoined();
-    } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Failed to create guild');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const handleCreate = () =>
+    run(() => createGuild(name, tag, description || null), () => onGuildJoined());
 
-  const handleJoin = async (guildId: string) => {
-    setActionLoading(true);
-    setActionError(null);
-    try {
-      const res = await joinGuild(guildId);
-      if (res.error) { setActionError(res.error.message); return; }
-      onGuildJoined();
-    } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Failed to join guild');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const handleJoin = (guildId: string) =>
+    run(() => joinGuild(guildId), () => onGuildJoined());
 
-  const handleRequest = async (guildId: string) => {
-    setActionLoading(true);
-    setActionError(null);
-    try {
-      const res = await requestJoinGuild(guildId);
-      if (res.error) { setActionError(res.error.message); return; }
-      setRequestedGuildIds((prev) => new Set([...prev, guildId]));
-    } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Failed to send request');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const handleRequest = (guildId: string) =>
+    run(() => requestJoinGuild(guildId), () => setRequestedGuildIds((prev) => new Set([...prev, guildId])));
 
   const canCreate = characterLevel >= GUILD_CONSTANTS.CREATION_MIN_LEVEL;
 
@@ -109,7 +77,7 @@ export function NoGuildView({
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Guild</h2>
 
-      {(error || actionError) && <ErrorBanner message={(error || actionError)!} />}
+      {(error || actionError || searchError) && <ErrorBanner message={(error || actionError || searchError)!} />}
 
       <PixelCard>
         <p className="text-sm text-[var(--rpg-text-secondary)] mb-3">
