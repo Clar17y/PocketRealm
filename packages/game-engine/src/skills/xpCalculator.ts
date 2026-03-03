@@ -147,9 +147,6 @@ export function shouldResetWindowCap(lastResetDate: Date, now: Date = new Date()
   return elapsedMs >= SKILL_CONSTANTS.XP_WINDOW_HOURS * MS_PER_HOUR;
 }
 
-// Keep old name as alias for backwards compatibility
-export const shouldResetDailyCap = shouldResetWindowCap;
-
 export function calculateCharacterXpGain(skillXpAfterEfficiency: number): number {
   return Math.floor(skillXpAfterEfficiency * CHARACTER_CONSTANTS.XP_RATIO);
 }

@@ -1,6 +1,6 @@
 import { CHEST_CONSTANTS } from '@adventure/shared';
-
-export type EncounterSiteSize = 'small' | 'medium' | 'large';
+import type { EncounterSiteSize } from '@adventure/shared';
+export type { EncounterSiteSize };
 export type ChestRarity = 'common' | 'uncommon' | 'rare';
 
 export function getChestRarityForEncounterSize(size: EncounterSiteSize): ChestRarity {

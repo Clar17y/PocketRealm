@@ -6,6 +6,7 @@ import {
   type ItemType,
 } from '@adventure/shared';
 import { getEligibleBonusStats, rollBonusStat } from '../crafting/craftingCrit';
+import { clamp, randomUnit } from '../utils/math';
 
 export interface RarityWeights {
   common: number;
@@ -22,17 +23,6 @@ export interface RollBonusStatsForRarityInput {
   slot?: EquipmentSlot | null;
   statRolls?: number[];
   bonusPercentRolls?: number[];
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function randomUnit(roll?: number): number {
-  if (typeof roll === 'number' && Number.isFinite(roll)) {
-    return clamp(roll, 0, 0.999999999);
-  }
-  return Math.random();
 }
 
 export function getBonusSlotCount(rarity: ItemRarity): number {

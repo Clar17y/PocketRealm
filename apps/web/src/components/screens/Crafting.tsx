@@ -8,8 +8,8 @@ import { Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } from 'lu
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ActivityLog } from '@/components/ActivityLog';
 import { inflateCost } from '@/lib/taxCalc';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
-import { STAT_ORDER, prettyStatName, formatStatValue } from '@/lib/statFormat';
+import type { ActivityLogEntry } from '@/app/game/gameController.types';
+import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { xpRateColor } from '@/lib/format';
 import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 
@@ -56,18 +56,6 @@ interface CraftingProps {
   isOverEncumbered?: boolean;
 }
 
-function statEntries(stats: Record<string, unknown> | undefined): Array<[string, number]> {
-  return Object.entries(stats ?? {})
-    .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]) && entry[1] !== 0)
-    .sort((a, b) => {
-      const aOrder = STAT_ORDER.indexOf(a[0]);
-      const bOrder = STAT_ORDER.indexOf(b[0]);
-      if (aOrder === -1 && bOrder === -1) return a[0].localeCompare(b[0]);
-      if (aOrder === -1) return 1;
-      if (bOrder === -1) return -1;
-      return aOrder - bOrder;
-    });
-}
 
 export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);

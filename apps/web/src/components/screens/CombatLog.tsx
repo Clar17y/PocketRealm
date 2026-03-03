@@ -5,6 +5,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { Skull, Trophy, Coins, Sparkles } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
+import { ModalOverlay } from '@/components/common/ModalOverlay';
 
 interface CombatLogProps {
   enemy: {
@@ -101,7 +102,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
 
       {/* Victory Modal */}
       {status === 'victory' && rewards && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+        <ModalOverlay opacity={90}>
           <PixelCard className="max-w-sm w-full">
             <div className="text-center">
               <div className="flex justify-center mb-3">
@@ -163,12 +164,12 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
               </div>
             </div>
           </PixelCard>
-        </div>
+        </ModalOverlay>
       )}
 
       {/* Defeat Modal */}
       {status === 'defeat' && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+        <ModalOverlay opacity={90}>
           <PixelCard className="max-w-sm w-full">
             <div className="text-center">
               <div className="flex justify-center mb-3">
@@ -205,7 +206,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
               </div>
             </div>
           </PixelCard>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );

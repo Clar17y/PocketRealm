@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Prisma, prisma } from '@adventure/database';
+import { prisma } from '@adventure/database';
+import { createActivityLog } from '../services/activityLogService';
 import {
   buildPlayerCombatStats,
   applyMobPrefix,
@@ -9,20 +10,17 @@ import {
   mobToTemplateCombatant,
   filterAndWeightMobsByTier,
   runTemplateCombat,
-  type TemplateCombatant,
 } from '@adventure/game-engine';
-import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@adventure/shared';
-import type { ActionDefinition, CombatOptions, PotionConsumed } from '@adventure/shared';
+import type { CombatOptions, PotionConsumed } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
 import { getHpState, enterRecoveringState, setHp } from '../services/hpService';
 import { getEquipmentStats } from '../services/equipmentService';
 import { getPlayerProgressionState } from '../services/attributesService';
-import { grantSkillXp } from '../services/xpService';
-import { rollAndGrantLootWithCapacity } from '../services/lootService';
 import { storePendingLoot, type PendingLootItem } from '../services/pendingLootService';
-import { serializeXpGrant, toMobTemplate, recordBestiaryKill, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
+import { buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../services/combatOrchestrationService';
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
@@ -385,17 +383,10 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           equipmentStats,
         );
 
-        const travelUnlockedSet = new Set(travelUnlockedActions);
-        const travelFilteredActions: Record<string, ActionDefinition> = {};
-        for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
-          if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || travelUnlockedSet.has(id)) {
-            travelFilteredActions[id] = def;
-          }
-        }
-        const combatantA: TemplateCombatant = {
-          id: playerId,
-          name: req.player!.username,
-          stats: playerStats,
+        const combatantA = buildPlayerTemplateCombatant({
+          playerId,
+          username: req.player!.username,
+          playerStats,
           template: playerTemplate,
           stamina: currentStamina,
           maxStamina,
@@ -403,8 +394,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           mana: currentMana,
           maxMana,
           manaRegenPerRound,
-          actionDefinitions: travelFilteredActions,
-        };
+          unlockedActions: travelUnlockedActions,
+        });
         const combatantB = mobToTemplateCombatant(prefixedMob);
         let combatOptions: CombatOptions | undefined;
         if (autoPotionThreshold > 0 && potionPool.length > 0) {
@@ -434,15 +425,15 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           : [];
 
         if (combatResult.outcome === 'victory') {
-          const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
-          const loot = lootResult.drops;
-          allTravelOverflow.push(...lootResult.overflow);
-          const xpGrant = await grantSkillXp(playerId, attackSkill, prefixedMob.xpReward);
-          const xpGain = xpGrant.xpResult.xpAfterEfficiency;
+          const rewards = await processCombatVictoryRewards({
+            playerId,
+            mob: prefixedMob,
+            attackSkill,
+          });
+          const loot = rewards.loot;
+          allTravelOverflow.push(...rewards.overflow);
+          const xpGain = rewards.xpGrant.xpResult.xpAfterEfficiency;
           await setHp(playerId, currentHp);
-
-          // Update bestiary
-          await recordBestiaryKill(playerId, prefixedMob.id, prefixedMob.mobPrefix);
 
           // Track ambush kill for achievement checks
           ambushKillCount++;
@@ -450,35 +441,27 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
             ambushMobFamilyIds.push(familyMember.mobFamilyId);
           }
 
-          await prisma.activityLog.create({
-            data: {
-              playerId,
-              activityType: 'combat',
-              turnsSpent: 0,
-              result: {
-                zoneId: currentZoneId,
-                zoneName: currentZone.name,
-                mobTemplateId: prefixedMob.id,
-                mobName: baseMob.name,
-                mobPrefix: prefixedMob.mobPrefix,
-                mobDisplayName: prefixedMob.mobDisplayName,
-                source: 'travel_ambush',
-                encounterSiteId: null,
-                attackSkill,
-                outcome: combatResult.outcome,
-                playerMaxHp: combatResult.combatantAMaxHp,
-                mobMaxHp: combatResult.combatantBMaxHp,
-                log: mapTemplateCombatLog(combatResult.log),
-                rewards: {
-                  xp: prefixedMob.xpReward,
-                  baseXp: prefixedMob.xpReward,
-                  loot,
-                  durabilityLost,
-                  skillXp: serializeXpGrant(xpGrant),
-                },
-                eventModifiers: travelMobBadges,
-              } as unknown as Prisma.InputJsonValue,
-            },
+          await createActivityLog({
+            playerId,
+            activityType: 'combat',
+            turnsSpent: 0,
+            result: buildCombatLogResult({
+              zoneId: currentZoneId,
+              zoneName: currentZone.name,
+              mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
+              source: 'travel_ambush',
+              encounterSiteId: null,
+              attackSkill,
+              combatResult,
+              rewards: {
+                xp: prefixedMob.xpReward,
+                baseXp: prefixedMob.xpReward,
+                loot,
+                durabilityLost,
+                skillXp: serializeXpGrant(rewards.xpGrant),
+              },
+              eventModifiers: travelMobBadges,
+            }),
           });
 
           events.push({
@@ -510,35 +493,21 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
             await enterRecoveringState(playerId, hpState.maxHp);
             const respawn = await respawnToHomeTown(playerId);
 
-            await prisma.activityLog.create({
-              data: {
-                playerId,
-                activityType: 'combat',
-                turnsSpent: 0,
-                result: {
-                  zoneId: currentZoneId,
-                  zoneName: currentZone.name,
-                  mobTemplateId: prefixedMob.id,
-                  mobName: baseMob.name,
-                  mobPrefix: prefixedMob.mobPrefix,
-                  mobDisplayName: prefixedMob.mobDisplayName,
-                  source: 'travel_ambush',
-                  encounterSiteId: null,
-                  attackSkill,
-                  outcome: combatResult.outcome,
-                  playerMaxHp: combatResult.combatantAMaxHp,
-                  mobMaxHp: combatResult.combatantBMaxHp,
-                  log: mapTemplateCombatLog(combatResult.log),
-                  rewards: {
-                    xp: 0,
-                    baseXp: 0,
-                    loot: [],
-                    durabilityLost,
-                    skillXp: null,
-                  },
-                  eventModifiers: travelMobBadges,
-                } as unknown as Prisma.InputJsonValue,
-              },
+            await createActivityLog({
+              playerId,
+              activityType: 'combat',
+              turnsSpent: 0,
+              result: buildCombatLogResult({
+                zoneId: currentZoneId,
+                zoneName: currentZone.name,
+                mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
+                source: 'travel_ambush',
+                encounterSiteId: null,
+                attackSkill,
+                combatResult,
+                rewards: { xp: 0, baseXp: 0, loot: [], durabilityLost, skillXp: null },
+                eventModifiers: travelMobBadges,
+              }),
             });
 
             events.push({
@@ -585,35 +554,21 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
             currentHp = fleeResult.remainingHp;
             await setHp(playerId, currentHp);
 
-            await prisma.activityLog.create({
-              data: {
-                playerId,
-                activityType: 'combat',
-                turnsSpent: 0,
-                result: {
-                  zoneId: currentZoneId,
-                  zoneName: currentZone.name,
-                  mobTemplateId: prefixedMob.id,
-                  mobName: baseMob.name,
-                  mobPrefix: prefixedMob.mobPrefix,
-                  mobDisplayName: prefixedMob.mobDisplayName,
-                  source: 'travel_ambush',
-                  encounterSiteId: null,
-                  attackSkill,
-                  outcome: combatResult.outcome,
-                  playerMaxHp: combatResult.combatantAMaxHp,
-                  mobMaxHp: combatResult.combatantBMaxHp,
-                  log: mapTemplateCombatLog(combatResult.log),
-                  rewards: {
-                    xp: 0,
-                    baseXp: 0,
-                    loot: [],
-                    durabilityLost,
-                    skillXp: null,
-                  },
-                  eventModifiers: travelMobBadges,
-                } as unknown as Prisma.InputJsonValue,
-              },
+            await createActivityLog({
+              playerId,
+              activityType: 'combat',
+              turnsSpent: 0,
+              result: buildCombatLogResult({
+                zoneId: currentZoneId,
+                zoneName: currentZone.name,
+                mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
+                source: 'travel_ambush',
+                encounterSiteId: null,
+                attackSkill,
+                combatResult,
+                rewards: { xp: 0, baseXp: 0, loot: [], durabilityLost, skillXp: null },
+                eventModifiers: travelMobBadges,
+              }),
             });
 
             events.push({

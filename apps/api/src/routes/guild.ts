@@ -3,11 +3,13 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import {
   createGuild, getPlayerGuild, getGuild, searchGuilds,
+  updateSettings, getGuildLog,
+} from '../services/guildService';
+import {
   joinGuild, leaveGuild, kickMember, promoteMember,
   demoteMember, transferLeadership, disbandGuild,
-  updateSettings, getGuildLog,
   requestJoinGuild, getJoinRequests, respondToJoinRequest,
-} from '../services/guildService';
+} from '../services/guildMembershipService';
 import { activateUpgrade, getActiveUpgrades, getAvailableUpgrades } from '../services/guildUpgradeService';
 import { getActiveContracts } from '../services/guildContractService';
 import {

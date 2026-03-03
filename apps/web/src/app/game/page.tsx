@@ -9,6 +9,7 @@ import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { LootPicker } from '@/components/common/LootPicker';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
+import { SubNav } from '@/components/common/SubNav';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
@@ -27,11 +28,10 @@ import { Achievements } from '@/components/screens/Achievements';
 import { AchievementToast } from '@/components/AchievementToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
+import { Settings } from '@/components/screens/Settings';
 import { TrainingGrounds } from '@/components/screens/TrainingGrounds';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
-import { Slider } from '@/components/ui/Slider';
-import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { rarityFromTier } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
 import { buildRecipeDiscountLookup, getDiscountedCost, getRecipeSkillInfo } from '@/lib/recipeDiscount';
@@ -53,7 +53,9 @@ import { GuildScreen } from '@/components/screens/GuildScreen';
 import { Templates } from '@/components/screens/Templates';
 import { TalentTree } from '@/components/screens/TalentTree';
 import { CombatScreen } from './screens/CombatScreen';
-import { useGameController, isMobKnown, type Screen } from './useGameController';
+import { useGameController } from './useGameController';
+import { isMobKnown } from './combatHelpers';
+import type { Screen } from './gameController.types';
 import { useChat } from '@/hooks/useChat';
 import { useCasinoSocket } from '@/hooks/useCasinoSocket';
 import { ChatPanel } from '@/components/ChatPanel';
@@ -93,93 +95,6 @@ const CRAFTING_SKILL_TABS = [
   { id: 'alchemy', label: 'Alchemy' },
   { id: 'jewelcrafting', label: 'Jewelcrafting' },
 ] as const;
-
-/* Mock data for demo - will be replaced with API calls
-const mockPlayerData = {
-  turns: 45000,
-  maxTurns: 64800,
-  turnsRegenRate: 60,
-  gold: 1250,
-  currentXP: 15420,
-  nextLevelXP: 20000,
-  currentZone: 'Forest Edge',
-};
-
-const mockSkills = [
-  { name: 'Melee', level: 15, icon: Sword },
-  { name: 'Defence', level: 12, icon: Shield },
-  { name: 'Ranged', level: 8, icon: Crosshair },
-  { name: 'Vitality', level: 10, icon: Heart },
-  { name: 'Magic', level: 5, icon: Sparkles },
-  { name: 'Evasion', level: 7, icon: Zap },
-  { name: 'Mining', level: 20, icon: Pickaxe },
-  { name: 'Smithing', level: 14, icon: Hammer },
-];
-
-const mockDetailedSkills = [
-  { id: '1', name: 'Melee', icon: Sword, level: 15, currentXP: 12500, nextLevelXP: 15000, xpRate: 85, color: 'var(--rpg-red)' },
-  { id: '2', name: 'Defence', icon: Shield, level: 12, currentXP: 8200, nextLevelXP: 10000, xpRate: 78, color: 'var(--rpg-blue-light)' },
-  { id: '3', name: 'Ranged', icon: Crosshair, level: 8, currentXP: 3500, nextLevelXP: 5000, xpRate: 72, color: 'var(--rpg-green-light)' },
-  { id: '4', name: 'Vitality', icon: Heart, level: 10, currentXP: 5800, nextLevelXP: 7500, xpRate: 80, color: 'var(--rpg-green-light)' },
-  { id: '5', name: 'Magic', icon: Sparkles, level: 5, currentXP: 1200, nextLevelXP: 2000, xpRate: 65, color: 'var(--rpg-purple)' },
-  { id: '6', name: 'Evasion', icon: Zap, level: 7, currentXP: 2800, nextLevelXP: 4000, xpRate: 70, color: 'var(--rpg-gold)' },
-  { id: '7', name: 'Mining', icon: Pickaxe, level: 20, currentXP: 18500, nextLevelXP: 22000, xpRate: 92, color: 'var(--rpg-text-secondary)' },
-  { id: '8', name: 'Smithing', icon: Hammer, level: 14, currentXP: 11200, nextLevelXP: 14000, xpRate: 88, color: 'var(--rpg-gold)' },
-];
-
-const mockInventory = [
-  { id: '1', name: 'Iron Sword', icon: '⚔️', quantity: 1, rarity: 'uncommon' as const, description: 'A sturdy iron sword.', type: 'weapon' },
-  { id: '2', name: 'Health Potion', icon: '🧪', quantity: 5, rarity: 'common' as const, description: 'Restores 50 HP.', type: 'consumable' },
-  { id: '3', name: 'Iron Ore', icon: '🪨', quantity: 24, rarity: 'common' as const, description: 'Raw iron ore for smelting.', type: 'material' },
-  { id: '4', name: 'Dragon Scale', icon: '🐲', quantity: 2, rarity: 'epic' as const, description: 'A rare scale from a dragon.', type: 'material' },
-  { id: '5', name: 'Leather Boots', icon: '👢', quantity: 1, rarity: 'common' as const, description: 'Basic leather boots.', type: 'armor' },
-];
-
-const mockEquipmentSlots = [
-  { id: 'head', name: 'Head', item: { name: 'Iron Helmet', icon: '🪖', rarity: 'uncommon' as const, durability: 85, maxDurability: 100 } },
-  { id: 'neck', name: 'Neck', item: null },
-  { id: 'chest', name: 'Chest', item: { name: 'Leather Chest', icon: '🥋', rarity: 'common' as const, durability: 72, maxDurability: 100 } },
-  { id: 'mainHand', name: 'Main Hand', item: { name: 'Iron Sword', icon: '⚔️', rarity: 'uncommon' as const, durability: 90, maxDurability: 100 } },
-  { id: 'offHand', name: 'Off Hand', item: { name: 'Iron Shield', icon: '🛡️', rarity: 'uncommon' as const, durability: 65, maxDurability: 100 } },
-  { id: 'gloves', name: 'Gloves', item: null },
-  { id: 'belt', name: 'Belt', item: null },
-  { id: 'ring', name: 'Ring', item: null },
-  { id: 'legs', name: 'Legs', item: { name: 'Leather Legs', icon: '👖', rarity: 'common' as const, durability: 80, maxDurability: 100 } },
-  { id: 'boots', name: 'Boots', item: { name: 'Leather Boots', icon: '👢', rarity: 'common' as const, durability: 95, maxDurability: 100 } },
-  { id: 'charm', name: 'Charm', item: null },
-];
-
-const mockEquipmentStats = { attack: 45, defence: 32, hp: 120, evasion: 8 };
-
-const mockZones = [
-  { id: '1', name: 'Starter Village', icon: '🏘️', difficulty: 1, travelCost: 0, isLocked: false, isCurrent: false, description: 'A peaceful village for beginners.' },
-  { id: '2', name: 'Forest Edge', icon: '🌲', difficulty: 2, travelCost: 10, isLocked: false, isCurrent: true, description: 'Light forest with weak creatures.' },
-  { id: '3', name: 'Deep Forest', icon: '🌳', difficulty: 3, travelCost: 25, isLocked: false, isCurrent: false, description: 'Dense forest with stronger foes.' },
-  { id: '4', name: 'Cave Entrance', icon: '🕳️', difficulty: 4, travelCost: 50, isLocked: false, isCurrent: false, description: 'Dark caves with valuable ores.' },
-  { id: '5', name: 'Dragon\'s Lair', icon: '🐉', difficulty: 5, travelCost: 100, isLocked: true, isCurrent: false, description: 'Home of the fearsome dragon.' },
-];
-
-const mockMonsters = [
-  { id: '1', name: 'Rat', icon: '🐀', level: 1, isDiscovered: true, killCount: 25, stats: { hp: 10, attack: 2, defence: 1 }, drops: [{ name: 'Rat Tail', icon: '🐀', dropRate: 50, rarity: 'common' as const }], zones: ['Starter Village'], description: 'A common pest.' },
-  { id: '2', name: 'Wolf', icon: '🐺', level: 5, isDiscovered: true, killCount: 12, stats: { hp: 35, attack: 8, defence: 4 }, drops: [{ name: 'Wolf Pelt', icon: '🐺', dropRate: 30, rarity: 'uncommon' as const }], zones: ['Forest Edge', 'Deep Forest'], description: 'A fierce forest predator.' },
-  { id: '3', name: 'Goblin', icon: '👺', level: 8, isDiscovered: true, killCount: 7, stats: { hp: 45, attack: 12, defence: 6 }, drops: [{ name: 'Goblin Dagger', icon: '🗡️', dropRate: 15, rarity: 'rare' as const }], zones: ['Deep Forest', 'Cave Entrance'], description: 'A cunning cave dweller.' },
-  { id: '4', name: 'Skeleton', icon: '💀', level: 12, isDiscovered: true, killCount: 3, stats: { hp: 60, attack: 18, defence: 8 }, drops: [{ name: 'Bone Shard', icon: '🦴', dropRate: 40, rarity: 'common' as const }], zones: ['Cave Entrance'], description: 'An undead warrior.' },
-  { id: '5', name: 'Dragon', icon: '🐲', level: 50, isDiscovered: false, killCount: 0, stats: { hp: 500, attack: 100, defence: 50 }, drops: [{ name: 'Dragon Scale', icon: '🐲', dropRate: 5, rarity: 'legendary' as const }], zones: ['Dragon\'s Lair'], description: '???' },
-];
-
-const mockCraftingRecipes = [
-  { id: '1', name: 'Iron Sword', icon: '⚔️', resultQuantity: 1, requiredLevel: 10, turnCost: 50, xpReward: 150, materials: [{ name: 'Iron Ingot', icon: '🪙', required: 3, owned: 5 }, { name: 'Leather Strip', icon: '🎗️', required: 1, owned: 2 }], rarity: 'uncommon' as const },
-  { id: '2', name: 'Iron Shield', icon: '🛡️', resultQuantity: 1, requiredLevel: 12, turnCost: 60, xpReward: 180, materials: [{ name: 'Iron Ingot', icon: '🪙', required: 4, owned: 5 }, { name: 'Wood Plank', icon: '🪵', required: 2, owned: 1 }], rarity: 'uncommon' as const },
-  { id: '3', name: 'Health Potion', icon: '🧪', resultQuantity: 3, requiredLevel: 5, turnCost: 20, xpReward: 50, materials: [{ name: 'Herbs', icon: '🌿', required: 2, owned: 8 }, { name: 'Water Flask', icon: '💧', required: 1, owned: 3 }], rarity: 'common' as const },
-];
-
-const mockGatheringNodes = [
-  { id: '1', name: 'Copper Vein', icon: '🟤', levelRequired: 1, baseYield: 5, description: 'Basic copper ore deposits.' },
-  { id: '2', name: 'Iron Vein', icon: '⬛', levelRequired: 10, baseYield: 4, description: 'Rich iron ore deposits.' },
-  { id: '3', name: 'Gold Vein', icon: '🟡', levelRequired: 25, baseYield: 2, description: 'Rare gold ore deposits.' },
-];
-
-*/
 
 export default function GamePage() {
   const router = useRouter();
@@ -1043,179 +958,35 @@ export default function GamePage() {
             availableTurns={turns}
           />
         );
-      case 'settings': {
-        const speedLabel = (ms: number) =>
-          ms <= 100 ? 'Very Fast' : ms <= 300 ? 'Fast' : ms <= 500 ? 'Normal' : ms <= 700 ? 'Slow' : 'Very Slow';
+      case 'settings':
         return (
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Settings</h2>
-            <p className="text-[var(--rpg-text-secondary)]">Username: {player?.username}</p>
-
-            {/* Combat */}
-            <PixelCard>
-              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Combat</h3>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Combat Log Speed</p>
-                  <div className="flex items-center gap-3">
-                    <Slider min={100} max={1000} step={100}
-                      value={[combatLogSpeedMs]}
-                      onValueChange={(val) => setCombatLogSpeedMs(val[0])}
-                      onValueCommit={(val) => handleSetCombatLogSpeed(val[0])}
-                    />
-                    <span className="text-xs font-mono text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
-                      {speedLabel(combatLogSpeedMs)}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-[var(--rpg-text-secondary)]">Auto-Skip Known Combat</p>
-                      <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Skip playback for mob+prefix combos you&apos;ve killed before</p>
-                    </div>
-                    <ToggleSwitch checked={autoSkipKnownCombat} onChange={handleSetAutoSkipKnownCombat} />
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Auto-Potion Threshold</p>
-                  <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
-                    Drink a health potion when HP drops below this threshold during combat.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <Slider min={0} max={100} step={5}
-                      value={[autoPotionThreshold]}
-                      onValueChange={(val) => setAutoPotionThreshold(val[0])}
-                      onValueCommit={(val) => handleSetAutoPotionThreshold(val[0])}
-                    />
-                    <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
-                      {autoPotionThreshold === 0 ? 'Off' : `${autoPotionThreshold}%`}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-[var(--rpg-text-secondary)]">Low HP Warning</p>
-                      <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Show confirmation when starting actions below 25% HP</p>
-                    </div>
-                    <ToggleSwitch checked={lowHpWarning} onChange={handleSetLowHpWarning} />
-                  </div>
-                </div>
-              </div>
-            </PixelCard>
-
-            {/* Exploration */}
-            <PixelCard>
-              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Exploration</h3>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Exploration Playback Speed</p>
-                  <div className="flex items-center gap-3">
-                    <Slider min={100} max={1000} step={100}
-                      value={[explorationSpeedMs]}
-                      onValueChange={(val) => setExplorationSpeedMs(val[0])}
-                      onValueCommit={(val) => handleSetExplorationSpeed(val[0])}
-                    />
-                    <span className="text-xs font-mono text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
-                      {speedLabel(explorationSpeedMs)}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Default Explore Turns</p>
-                  <div className="flex items-center gap-3">
-                    <Slider min={10} max={10000} step={10}
-                      value={[defaultExploreTurns]}
-                      onValueChange={(val) => setDefaultExploreTurns(val[0])}
-                      onValueCommit={(val) => handleSetDefaultExploreTurns(val[0])}
-                    />
-                    <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
-                      {defaultExploreTurns.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </PixelCard>
-
-            {/* Recovery */}
-            <PixelCard>
-              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Recovery</h3>
-              <p className="text-xs text-[var(--rpg-text-secondary)] mb-2">Quick-Rest Heal Target</p>
-              <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
-                Used by the Quick Rest button on the dashboard.
-              </p>
-              <div className="flex gap-2">
-                {[25, 50, 75, 100].map((pct) => (
-                  <button
-                    key={pct}
-                    onClick={() => handleSetQuickRestHealPercent(pct)}
-                    className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors ${
-                      quickRestHealPercent === pct
-                        ? 'bg-[var(--rpg-green-light)] text-black'
-                        : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-border)]'
-                    }`}
-                  >
-                    {pct}%
-                  </button>
-                ))}
-              </div>
-            </PixelCard>
-
-            {/* Crafting */}
-            <PixelCard>
-              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Crafting</h3>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[var(--rpg-text-secondary)]">Default Refining to Max</p>
-                  <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Auto-set refining quantity to maximum when selecting a recipe</p>
-                </div>
-                <ToggleSwitch checked={defaultRefiningMax} onChange={handleSetDefaultRefiningMax} />
-              </div>
-            </PixelCard>
-
-            {/* Inventory */}
-            <PixelCard>
-              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Inventory</h3>
-              <div>
-                <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Confirm Before Drop / Salvage / Sell</p>
-                <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
-                  Show a confirmation dialog when destroying items at or above this rarity.
-                </p>
-                <div className="flex gap-2">
-                  {(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary'] as const).map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => handleSetConfirmRarity(r)}
-                      className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors capitalize ${
-                        confirmRarity === r
-                          ? 'bg-[var(--rpg-gold)] text-black'
-                          : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-border)]'
-                      }`}
-                    >
-                      {r === 'none' ? 'Off' : r}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </PixelCard>
-
-            {/* Account */}
-            <button
-              onClick={() => { logout(); router.push('/'); }}
-              className="w-full px-4 py-2 bg-[var(--rpg-red)] rounded text-white"
-            >
-              Logout
-            </button>
-          </div>
+          <Settings
+            username={player?.username}
+            combatLogSpeedMs={combatLogSpeedMs}
+            onCombatLogSpeedChange={setCombatLogSpeedMs}
+            onCombatLogSpeedCommit={handleSetCombatLogSpeed}
+            autoSkipKnownCombat={autoSkipKnownCombat}
+            onAutoSkipKnownCombatChange={handleSetAutoSkipKnownCombat}
+            autoPotionThreshold={autoPotionThreshold}
+            onAutoPotionThresholdChange={setAutoPotionThreshold}
+            onAutoPotionThresholdCommit={handleSetAutoPotionThreshold}
+            lowHpWarning={lowHpWarning}
+            onLowHpWarningChange={handleSetLowHpWarning}
+            explorationSpeedMs={explorationSpeedMs}
+            onExplorationSpeedChange={setExplorationSpeedMs}
+            onExplorationSpeedCommit={handleSetExplorationSpeed}
+            defaultExploreTurns={defaultExploreTurns}
+            onDefaultExploreTurnsChange={setDefaultExploreTurns}
+            onDefaultExploreTurnsCommit={handleSetDefaultExploreTurns}
+            quickRestHealPercent={quickRestHealPercent}
+            onQuickRestHealPercentChange={handleSetQuickRestHealPercent}
+            defaultRefiningMax={defaultRefiningMax}
+            onDefaultRefiningMaxChange={handleSetDefaultRefiningMax}
+            confirmRarity={confirmRarity}
+            onConfirmRarityChange={handleSetConfirmRarity}
+            onLogout={() => { logout(); router.push('/'); }}
+          />
         );
-      }
       case 'worldEvents':
         return (
           <WorldEvents
@@ -1376,122 +1147,61 @@ export default function GamePage() {
 
         {/* Sub-navigation for screens */}
         {getActiveTab() === 'home' && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-            {[
-              { id: 'home', label: 'Dashboard', badge: 0 },
-              { id: 'zones', label: 'Map', badge: 0 },
-              { id: 'worldEvents', label: 'Events', badge: 0 },
+          <SubNav
+            tabs={[
+              { id: 'home', label: 'Dashboard' },
+              { id: 'zones', label: 'Map' },
+              { id: 'worldEvents', label: 'Events' },
               { id: 'achievements', label: 'Achievements', badge: achievementUnclaimedCount },
-              { id: 'leaderboard', label: 'Rankings', badge: 0 },
-              { id: 'bestiary', label: 'Bestiary', badge: 0 },
-              { id: 'skills', label: 'Skills', badge: 0 },
+              { id: 'leaderboard', label: 'Rankings' },
+              { id: 'bestiary', label: 'Bestiary' },
+              { id: 'skills', label: 'Skills' },
               ...(currentZone?.zoneType === 'town' ? [
-                { id: 'casino', label: 'Casino', badge: 0 },
-                { id: 'training', label: 'Training', badge: 0 },
+                { id: 'casino', label: 'Casino' },
+                { id: 'training', label: 'Training' },
               ] : []),
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveScreen(tab.id as Screen)}
-                className={`relative px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeScreen === tab.id
-                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-                }`}
-              >
-                {tab.label}
-                {tab.badge > 0 && (
-                  <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-[var(--rpg-red)] text-white font-bold">
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-            {player?.role === 'admin' && (
-              <button
-                onClick={() => setActiveScreen('admin')}
-                className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeScreen === 'admin'
-                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-                }`}
-              >
-                Admin
-              </button>
-            )}
-          </div>
+              ...(player?.role === 'admin' ? [{ id: 'admin', label: 'Admin' }] : []),
+            ]}
+            activeId={activeScreen}
+            onSelect={(id) => setActiveScreen(id as Screen)}
+          />
         )}
 
         {getActiveTab() === 'explore' && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-            {[
+          <SubNav
+            tabs={[
               { id: 'explore', label: 'Explore' },
               { id: 'gathering', label: 'Gathering' },
               { id: 'crafting', label: 'Crafting' },
               { id: 'forge', label: 'Forge' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveScreen(tab.id as Screen)}
-                className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeScreen === tab.id
-                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+            ]}
+            activeId={activeScreen}
+            onSelect={(id) => setActiveScreen(id as Screen)}
+          />
         )}
 
         {getActiveTab() === 'inventory' && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-            {[
+          <SubNav
+            tabs={[
               { id: 'inventory', label: 'Items' },
               { id: 'equipment', label: 'Equipment' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveScreen(tab.id as Screen)}
-                className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeScreen === tab.id
-                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+            ]}
+            activeId={activeScreen}
+            onSelect={(id) => setActiveScreen(id as Screen)}
+          />
         )}
 
         {getActiveTab() === 'combat' && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-            {[
-              { id: 'combat', label: 'Combat', badge: 0 },
-              { id: 'templates', label: 'Templates', badge: 0 },
-              { id: 'talentTree', label: 'Skill Tree', badge: 0 },
+          <SubNav
+            tabs={[
+              { id: 'combat', label: 'Combat' },
+              { id: 'templates', label: 'Templates' },
+              { id: 'talentTree', label: 'Skill Tree' },
               { id: 'arena', label: 'Arena', badge: pvpNotificationCount },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveScreen(tab.id as Screen)}
-                className={`relative px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  activeScreen === tab.id
-                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-                }`}
-              >
-                {tab.label}
-                {tab.badge > 0 && (
-                  <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-[var(--rpg-red)] text-white font-bold">
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+            ]}
+            activeId={activeScreen}
+            onSelect={(id) => setActiveScreen(id as Screen)}
+          />
         )}
 
         {actionError && (

@@ -1,5 +1,4 @@
 // Combat
-export * from './combat/combatEngine';
 export * from './combat/damageCalculator';
 export * from './combat/mobPrefixes';
 export * from './combat/persistedMobRegen';
@@ -50,3 +49,6 @@ export * from './events/applyEventModifiers';
 // Casino
 export { isWinningBet, calculatePayout, validateBet, getNumberColor, generateSpinResult } from './casino/roulette';
 export type { BetValidation } from './casino/roulette';
+
+// Utils
+export { clamp, randomUnit } from './utils/math';

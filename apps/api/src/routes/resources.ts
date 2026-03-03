@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Prisma, prisma } from '@adventure/database';
 import { authenticate } from '../middleware/auth';
 import { getResourceState, restStamina, restMana } from '../services/resourceService';
 import { getTurnState } from '../services/turnBankService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { STAMINA_CONSTANTS, MANA_CONSTANTS } from '@adventure/shared';
+import { createActivityLog } from '../services/activityLogService';
 
 export const resourcesRouter = Router();
 resourcesRouter.use(authenticate);
@@ -40,17 +40,15 @@ resourcesRouter.post('/rest', asyncHandler(async (req, res) => {
 
   const turns = await getTurnState(playerId);
 
-  await prisma.activityLog.create({
-    data: {
-      playerId,
-      activityType: `rest_${body.type}`,
-      turnsSpent: taxResult.preTaxAmount,
-      result: {
-        type: body.type,
-        healedAmount: result.healedAmount,
-        newValue: result.newValue,
-        max: result.max,
-      } as unknown as Prisma.InputJsonValue,
+  await createActivityLog({
+    playerId,
+    activityType: `rest_${body.type}`,
+    turnsSpent: taxResult.preTaxAmount,
+    result: {
+      type: body.type,
+      healedAmount: result.healedAmount,
+      newValue: result.newValue,
+      max: result.max,
     },
   });
 

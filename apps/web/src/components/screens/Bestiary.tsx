@@ -9,6 +9,7 @@ import { uiIconSrc } from '@/lib/assets';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { getMobPrefixDefinition, getTierName } from '@adventure/shared';
 import { StatBar } from '@/components/StatBar';
+import { ModalOverlay } from '@/components/common/ModalOverlay';
 
 interface MonsterDrop {
   name: string;
@@ -288,11 +289,8 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
 
           {/* Monster Detail Modal */}
           {selectedMonster && (
-            <div
-              className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
-              onClick={() => setSelectedMonster(null)}
-            >
-              <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <ModalOverlay opacity={80} onClose={() => setSelectedMonster(null)}>
+              <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto">
                 <PixelCard>
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-3">
@@ -493,7 +491,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                   </PixelButton>
                 </PixelCard>
               </div>
-            </div>
+            </ModalOverlay>
           )}
         </>
       ) : (

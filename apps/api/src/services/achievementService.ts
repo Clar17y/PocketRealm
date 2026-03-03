@@ -1,4 +1,5 @@
-import { Prisma, prisma } from '@adventure/database';
+import { prisma } from '@adventure/database';
+import { createActivityLog } from './activityLogService';
 import {
   ALL_ACHIEVEMENTS,
   ACHIEVEMENTS_BY_STAT_KEY,
@@ -253,13 +254,11 @@ export async function emitAchievementNotifications(
   if (achievements.length === 0) return;
   const io = getIo();
   for (const ach of achievements) {
-    await prisma.activityLog.create({
-      data: {
-        playerId,
-        activityType: 'achievement',
-        turnsSpent: 0,
-        result: { achievementId: ach.id, title: ach.title } as unknown as Prisma.InputJsonValue,
-      },
+    await createActivityLog({
+      playerId,
+      activityType: 'achievement',
+      turnsSpent: 0,
+      result: { achievementId: ach.id, title: ach.title },
     });
     io?.to(playerId).emit('achievement_unlocked', {
       id: ach.id,

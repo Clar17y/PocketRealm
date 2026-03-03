@@ -19,7 +19,7 @@ import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
-import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../useGameController';
+import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../gameController.types';
 
 interface CombatScreenProps {
   hpState: HpState;

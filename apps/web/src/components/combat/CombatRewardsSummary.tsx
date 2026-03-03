@@ -1,6 +1,6 @@
 'use client';
 
-import type { LastCombat } from '@/app/game/useGameController';
+import type { LastCombat } from '@/app/game/gameController.types';
 import { xpRateColor } from '@/lib/format';
 
 interface CombatRewardsSummaryProps {

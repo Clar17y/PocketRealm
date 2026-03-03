@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
+import { createActivityLog } from '../../services/activityLogService';
 import { CRAFTING_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -131,23 +132,21 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
     // --- Achievement stat tracking ---
     await trackAchievements(playerId, { totalSalvages: 1 });
 
-    const log = await prisma.activityLog.create({
-      data: {
-        playerId,
-        activityType: 'salvage',
-        turnsSpent: turnSpend.spent,
-        result: {
-          salvagedItemId: item.id,
-          salvagedTemplateId: item.templateId,
-          salvageRecipeId: recipe.id,
-          salvageRefundRate: CRAFTING_CONSTANTS.SALVAGE_BASE_REFUND_RATE,
-          returnedMaterials: returned.map((entry) => ({
-            templateId: entry.templateId,
-            name: entry.name,
-            quantity: entry.quantity,
-            itemIds: entry.itemIds,
-          })),
-        } as unknown as Prisma.InputJsonValue,
+    const log = await createActivityLog({
+      playerId,
+      activityType: 'salvage',
+      turnsSpent: turnSpend.spent,
+      result: {
+        salvagedItemId: item.id,
+        salvagedTemplateId: item.templateId,
+        salvageRecipeId: recipe.id,
+        salvageRefundRate: CRAFTING_CONSTANTS.SALVAGE_BASE_REFUND_RATE,
+        returnedMaterials: returned.map((entry) => ({
+          templateId: entry.templateId,
+          name: entry.name,
+          quantity: entry.quantity,
+          itemIds: entry.itemIds,
+        })),
       },
     });
 
@@ -313,20 +312,18 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
 
     await trackAchievements(playerId, { totalSalvages: plans.length });
 
-    const log = await prisma.activityLog.create({
-      data: {
-        playerId,
-        activityType: 'salvage_batch',
-        turnsSpent: turnSpend.spent,
-        result: {
-          itemCount: plans.length,
-          salvaged: plans.map((p) => ({
-            itemId: p.item.id,
-            templateId: p.item.templateId,
-            turnCost: p.turnCost,
-          })),
-          returnedMaterials: returned,
-        } as unknown as Prisma.InputJsonValue,
+    const log = await createActivityLog({
+      playerId,
+      activityType: 'salvage_batch',
+      turnsSpent: turnSpend.spent,
+      result: {
+        itemCount: plans.length,
+        salvaged: plans.map((p) => ({
+          itemId: p.item.id,
+          templateId: p.item.templateId,
+          turnCost: p.turnCost,
+        })),
+        returnedMaterials: returned,
       },
     });
 

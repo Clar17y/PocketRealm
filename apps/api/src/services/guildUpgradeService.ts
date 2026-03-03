@@ -8,6 +8,7 @@ import {
   type GuildUpgradeEffectType,
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
+import { requireRole } from './guildService';
 import { isActiveWithinWindow } from './guildService';
 
 function toUpgradeData(row: {
@@ -50,17 +51,10 @@ export async function activateUpgrade(
   if (!tierDef) throw new AppError(400, 'Invalid upgrade tier', 'INVALID_TIER');
 
   // Validate requester is officer+
-  const membership = await prisma.guildMember.findUnique({
-    where: { playerId: requesterId },
-    include: { guild: true },
-  });
-  if (!membership || membership.guildId !== guildId) {
+  const membership = await requireRole(requesterId, 'officer');
+  if (membership.guildId !== guildId) {
     throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
   }
-  if (membership.role !== 'leader' && membership.role !== 'officer') {
-    throw new AppError(403, 'Only officers and leaders can activate upgrades', 'INSUFFICIENT_ROLE');
-  }
-
   const guild = membership.guild;
 
   // Validate guild level

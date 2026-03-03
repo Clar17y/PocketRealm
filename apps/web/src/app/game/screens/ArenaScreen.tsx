@@ -390,11 +390,20 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                   Rating: {opponent.rating} | Lv.{opponent.characterLevel}
                 </div>
                 {scouted && (
-                  <div className="text-xs text-[var(--rpg-blue-light)] mt-1">
-                    Style: {scouted.attackStyle} | Armor: {scouted.armorClass} | Power: {scouted.powerRating}
-                    <span className={scouted.myPowerRating >= scouted.powerRating ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}>
-                      {' '}(You: {scouted.myPowerRating})
-                    </span>
+                  <div className="text-xs mt-1 space-y-0.5">
+                    <div className="text-[var(--rpg-blue-light)]">
+                      Style: {scouted.attackStyle} | Armor: {scouted.armorClass} | Power: {scouted.powerRating}
+                      <span className={scouted.myPowerRating >= scouted.powerRating ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}>
+                        {' '}(You: {scouted.myPowerRating})
+                      </span>
+                    </div>
+                    {scouted.templateInfo && (
+                      <div className="text-[var(--rpg-text-secondary)]">
+                        Rotation: {scouted.templateInfo.templateLength} actions
+                        {' '}({scouted.templateInfo.offensiveCount}A/{scouted.templateInfo.defensiveCount}D/{scouted.templateInfo.supportiveCount}S)
+                        {' '}| Stamina: {scouted.templateInfo.maxStamina} | Mana: {scouted.templateInfo.maxMana}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

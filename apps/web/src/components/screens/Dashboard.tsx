@@ -10,7 +10,7 @@ import { Coins, TrendingUp, MapPin, Sword, Pickaxe, Hammer, Heart, Crosshair, Sp
 import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
 import { ActivityLog } from '@/components/ActivityLog';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
+import type { ActivityLogEntry } from '@/app/game/gameController.types';
 
 interface DashboardProps {
   playerData: {

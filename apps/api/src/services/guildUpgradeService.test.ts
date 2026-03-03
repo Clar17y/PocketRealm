@@ -54,7 +54,7 @@ describe('activateUpgrade', () => {
   it('rejects if player is not officer+', async () => {
     db.guildMember.findUnique.mockResolvedValue(makeMembership({ role: 'member' }));
     await expect(activateUpgrade(PLAYER_ID, GUILD_ID, 'xp_boost', 10))
-      .rejects.toThrow('Only officers and leaders can activate upgrades');
+      .rejects.toThrow('Only officers and leaders can do this');
   });
 
   it('rejects if guild level too low for tier', async () => {

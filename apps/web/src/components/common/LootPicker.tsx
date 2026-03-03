@@ -6,6 +6,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { LootOverflowTutorial } from '@/components/common/LootOverflowTutorial';
 import { X } from 'lucide-react';
+import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 
 interface LootPickerProps {
@@ -46,11 +47,8 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
-      onClick={onDismiss}
-    >
-      <PixelCard className="max-w-sm w-full" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+    <ModalOverlay opacity={80} onClose={onDismiss}>
+      <PixelCard className="max-w-sm w-full">
         <div className="flex justify-between items-start mb-4">
           <div>
             <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">Loot Overflow</h3>
@@ -169,6 +167,6 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
           onCancel={() => setShowDiscardConfirm(false)}
         />
       )}
-    </div>
+    </ModalOverlay>
   );
 }

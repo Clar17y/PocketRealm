@@ -10,8 +10,8 @@ import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ActivityLog } from '@/components/ActivityLog';
 import { inflateCost } from '@/lib/taxCalc';
-import type { ActivityLogEntry } from '@/app/game/useGameController';
-import { prettyStatName, formatStatValue } from '@/lib/statFormat';
+import type { ActivityLogEntry } from '@/app/game/gameController.types';
+import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { ForgeTutorial } from '@/components/common/ForgeTutorial';
 
 function SacrificePicker({
@@ -114,11 +114,6 @@ interface ForgeProps {
   recoveryCost?: number | null;
   zoneCraftingLevel: number | null;
   guildTaxRate?: number;
-}
-
-function statEntries(stats: Record<string, unknown> | null | undefined): Array<[string, number]> {
-  return Object.entries(stats ?? {})
-    .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]) && entry[1] !== 0);
 }
 
 function titleCaseRarity(rarity: Rarity): string {

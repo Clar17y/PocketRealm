@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { LastCombatLogEntry, LastCombat } from '@/app/game/useGameController';
+import type { LastCombatLogEntry, LastCombat } from '@/app/game/gameController.types';
 import type { CombatActiveEvent } from '@/lib/api';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';

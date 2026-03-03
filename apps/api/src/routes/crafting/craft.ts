@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Prisma, prisma } from '@adventure/database';
+import { createActivityLog } from '../../services/activityLogService';
 import {
   CRAFTING_CONSTANTS,
   GUILD_CONSTANTS,
@@ -271,26 +272,24 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     if (xpGrant.characterLevelAfter && xpGrant.characterLevelAfter > (xpGrant.characterLevelBefore ?? 0)) craftAchKeys.push('highestCharacterLevel');
     await trackAchievements(playerId, craftCounters, { statKeys: craftAchKeys });
 
-    const log = await prisma.activityLog.create({
-      data: {
-        playerId,
-        activityType: 'crafting',
-        turnsSpent: turnSpend.spent,
-        result: {
-          recipeId: recipe.id,
-          skillType: recipe.skillType,
-          requiredLevel: recipe.requiredLevel,
-          quantity,
-          turnCost: recipe.turnCost,
-          materials,
-          resultTemplateId: recipe.resultTemplateId,
-          craftedItemIds,
-          craftedItemDetails,
-          durability: needsDurability
-            ? { baseMax, durabilityBonusPct, craftedMax }
-            : null,
-          xp: serializeXpGrant(xpGrant),
-        } as unknown as Prisma.InputJsonValue,
+    const log = await createActivityLog({
+      playerId,
+      activityType: 'crafting',
+      turnsSpent: turnSpend.spent,
+      result: {
+        recipeId: recipe.id,
+        skillType: recipe.skillType,
+        requiredLevel: recipe.requiredLevel,
+        quantity,
+        turnCost: recipe.turnCost,
+        materials,
+        resultTemplateId: recipe.resultTemplateId,
+        craftedItemIds,
+        craftedItemDetails,
+        durability: needsDurability
+          ? { baseMax, durabilityBonusPct, craftedMax }
+          : null,
+        xp: serializeXpGrant(xpGrant),
       },
     });
 

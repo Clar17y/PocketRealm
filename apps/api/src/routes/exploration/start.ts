@@ -14,16 +14,12 @@ import {
   selectTierWithBleedthrough,
   simulateExploration,
   validateExplorationTurns,
-  type TemplateCombatant,
 } from '@adventure/game-engine';
 import {
-  ALWAYS_AVAILABLE_ACTION_IDS,
-  BASE_ACTION_DEFINITIONS,
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
   getUnlockedTiers,
   getHighestUnlockedTier,
-  type ActionDefinition,
   type CombatOptions,
   type MobTemplate,
   type PotionConsumed,
@@ -34,10 +30,10 @@ import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildId } from '../../services/guildService';
 import { incrementContractProgress } from '../../services/guildContractService';
-import { rollAndGrantLootWithCapacity } from '../../services/lootService';
-import { grantSkillXp } from '../../services/xpService';
+import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { serializeXpGrant, toMobTemplate, assertCanAct, recordBestiaryKill, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
+import { buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../../services/combatOrchestrationService';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { getActiveTemplate } from '../../services/combatTemplateService';
 import { getSkillPoints } from '../../services/skillPointService';
@@ -330,17 +326,10 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           combatOptions = { autoPotionThreshold, potions: [...potionPool] };
         }
 
-        const unlockedSet = new Set(explorationUnlockedActions);
-        const filteredActions: Record<string, ActionDefinition> = {};
-        for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
-          if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-            filteredActions[id] = def;
-          }
-        }
-        const combatantA: TemplateCombatant = {
-          id: playerId,
-          name: req.player!.username,
-          stats: playerStats,
+        const combatantA = buildPlayerTemplateCombatant({
+          playerId,
+          username: req.player!.username,
+          playerStats,
           template: playerTemplate,
           stamina: currentStamina,
           maxStamina,
@@ -348,8 +337,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           mana: currentMana,
           maxMana,
           manaRegenPerRound,
-          actionDefinitions: filteredActions,
-        };
+          unlockedActions: explorationUnlockedActions,
+        });
         const combatantB = mobToTemplateCombatant(prefixedMob);
         const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
 
@@ -372,7 +361,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
         let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
         let xpGain = 0;
-        let xpGrant: Awaited<ReturnType<typeof grantSkillXp>> | null = null;
+        let xpGrant: GrantXpResult | null = null;
 
         if (combatResult.outcome === 'victory') {
           currentHp = combatResult.combatantAHpRemaining;
@@ -380,45 +369,37 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           currentMana = combatResult.combatantAManaRemaining;
           await setHp(playerId, currentHp);
 
-          const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
-          loot = lootResult.drops;
-          if (lootResult.pendingLootSessionId) {
-            ambushPendingLootSessionIds.push(lootResult.pendingLootSessionId);
+          const rewards = await processCombatVictoryRewards({
+            playerId,
+            mob: prefixedMob,
+            attackSkill,
+          });
+          loot = rewards.loot;
+          if (rewards.pendingLootSessionId) {
+            ambushPendingLootSessionIds.push(rewards.pendingLootSessionId);
           }
-          xpGrant = await grantSkillXp(playerId, attackSkill, prefixedMob.xpReward);
+          xpGrant = rewards.xpGrant;
           xpGain = xpGrant.xpResult.xpAfterEfficiency;
-
-          await recordBestiaryKill(playerId, prefixedMob.id, prefixedMob.mobPrefix);
-
-          const skillXpReward = xpGrant
-            ? serializeXpGrant(xpGrant)
-            : null;
 
           pendingCombatLogs.push({
             turnsSpent: 0,
-            result: {
+            result: buildCombatLogResult({
               zoneId: body.zoneId,
               zoneName: zone.name,
-              mobTemplateId: prefixedMob.id,
-              mobName: baseMob.name,
-              mobPrefix: prefixedMob.mobPrefix,
-              mobDisplayName: prefixedMob.mobDisplayName,
+              mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
               source: 'exploration_ambush',
               encounterSiteId: null,
               attackSkill,
-              outcome: combatResult.outcome,
-              playerMaxHp: combatResult.combatantAMaxHp,
-              mobMaxHp: combatResult.combatantBMaxHp,
-              log: mapTemplateCombatLog(combatResult.log),
+              combatResult,
               rewards: {
                 xp: prefixedMob.xpReward,
                 baseXp: prefixedMob.xpReward,
                 loot,
                 durabilityLost,
-                skillXp: skillXpReward,
+                skillXp: xpGrant ? serializeXpGrant(xpGrant) : null,
               },
               eventModifiers: ambushEventModifiers,
-            } as unknown as Prisma.InputJsonValue,
+            }),
           });
 
           events.push({
@@ -472,20 +453,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
           pendingCombatLogs.push({
             turnsSpent: 0,
-            result: {
+            result: buildCombatLogResult({
               zoneId: body.zoneId,
               zoneName: zone.name,
-              mobTemplateId: prefixedMob.id,
-              mobName: baseMob.name,
-              mobPrefix: prefixedMob.mobPrefix,
-              mobDisplayName: prefixedMob.mobDisplayName,
+              mob: { id: prefixedMob.id, name: baseMob.name, mobPrefix: prefixedMob.mobPrefix, mobDisplayName: prefixedMob.mobDisplayName },
               source: 'exploration_ambush',
               encounterSiteId: null,
               attackSkill,
-              outcome: combatResult.outcome,
-              playerMaxHp: combatResult.combatantAMaxHp,
-              mobMaxHp: combatResult.combatantBMaxHp,
-              log: mapTemplateCombatLog(combatResult.log),
+              combatResult,
               rewards: {
                 xp: 0,
                 baseXp: 0,
@@ -494,7 +469,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 skillXp: null,
               },
               eventModifiers: ambushEventModifiers,
-            } as unknown as Prisma.InputJsonValue,
+            }),
           });
 
           events.push({

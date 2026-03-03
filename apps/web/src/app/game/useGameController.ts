@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
-import type { ConfirmRarity } from '@/lib/rarity';
 import { updateTutorialStep } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
   TUTORIAL_STEP_EXPLORE,
-  TUTORIAL_STEP_COMBAT,
   TUTORIAL_STEP_GATHER,
   TUTORIAL_STEP_TRAVEL,
   TUTORIAL_STEP_REFINE,
@@ -26,20 +24,13 @@ import {
   equip,
   forgeReroll,
   forgeUpgrade,
-  getAchievements,
-  getAchievementUnclaimedCount,
-  getActiveTitle,
-  claimAchievementReward,
-  setActiveTitle,
   getBestiary,
   getCraftingRecipes,
   getEquipment,
-  getGatheringNodes,
   getHpState,
   getInventory,
   getPlayer,
   getPlayerGuild,
-  getEncounterSites,
   getPvpNotificationCount,
   getSkills,
   getTurns,
@@ -54,7 +45,6 @@ import {
   salvageBatch,
   selectSiteStrategy,
   useItem,
-  updatePlayerSettings,
   startCombatFromEncounterSite,
   startExploration,
   travelToZone,
@@ -73,10 +63,6 @@ import {
   respecSkillPoints,
   getTemplates,
   type PendingLootItem,
-  type AchievementsResponse,
-  type EventModifierBadge,
-  type CombatActiveEvent,
-  type PlayerSettings,
   type WorldEventResponse,
   type SkillPointState,
   exchangeGold,
@@ -84,233 +70,21 @@ import {
 } from '@/lib/api';
 import type { CombatTemplateData, ResourceState } from '@adventure/shared';
 import type { RouletteBetType } from '@adventure/shared';
-import { getSocket } from '@/lib/socket';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
-
-export type Screen =
-  | 'home'
-  | 'explore'
-  | 'inventory'
-  | 'combat'
-  | 'settings'
-  | 'skills'
-  | 'equipment'
-  | 'zones'
-  | 'bestiary'
-  | 'crafting'
-  | 'forge'
-  | 'gathering'
-  | 'rest'
-  | 'arena'
-  | 'worldEvents'
-  | 'achievements'
-  | 'leaderboard'
-  | 'guild'
-  | 'templates'
-  | 'talentTree'
-  | 'casino'
-  | 'training'
-  | 'admin';
-
-export interface PendingEncounter {
-  encounterSiteId: string;
-  zoneId: string;
-  zoneName: string;
-  mobFamilyId: string;
-  mobFamilyName: string;
-  siteName: string;
-  size: string;
-  totalMobs: number;
-  aliveMobs: number;
-  defeatedMobs: number;
-  decayedMobs: number;
-  nextMobTemplateId: string | null;
-  nextMobName: string | null;
-  nextMobPrefix: string | null;
-  nextMobDisplayName: string | null;
-  discoveredAt: string;
-  clearStrategy: string | null;
-  currentRoom: number;
-  totalRooms: number;
-  roomMobCounts: Array<{ room: number; alive: number; total: number }>;
-  eventModifiers?: EventModifierBadge[];
-  totalTurnCost: number;
-}
-
-import type { CombatLogEntryResponse as LastCombatLogEntry } from '@/lib/api/combat';
-export type { LastCombatLogEntry };
-
-type CombatPlaybackItem = {
-  mobName: string;
-  mobDisplayName: string;
-  mobTemplateId: string;
-  mobPrefix: string | null;
-  outcome: string;
-  combatantAMaxHp: number;
-  combatantBMaxHp: number;
-  log: LastCombatLogEntry[] | null;
-  combatLogId?: string;
-};
-
-function buildFightsList(queue: CombatPlaybackItem[]): LastCombat['fights'] {
-  if (queue.length <= 1) return null;
-  return queue.map(f => ({
-    mobName: f.mobName,
-    mobDisplayName: f.mobDisplayName,
-    mobTemplateId: f.mobTemplateId,
-    mobPrefix: f.mobPrefix,
-    outcome: f.outcome,
-    combatantAMaxHp: f.combatantAMaxHp,
-    combatantBMaxHp: f.combatantBMaxHp,
-    log: f.log ?? [],
-    combatLogId: f.combatLogId,
-  }));
-}
-
-function buildLastCombat(
-  queue: CombatPlaybackItem[],
-  rewards: LastCombat['rewards'],
-): LastCombat {
-  const lastFight = queue[queue.length - 1]!;
-  return {
-    mobTemplateId: lastFight.mobTemplateId,
-    mobPrefix: lastFight.mobPrefix,
-    mobName: lastFight.mobName,
-    mobDisplayName: lastFight.mobDisplayName,
-    outcome: lastFight.outcome,
-    combatantAMaxHp: lastFight.combatantAMaxHp,
-    combatantBMaxHp: lastFight.combatantBMaxHp,
-    log: lastFight.log ?? [],
-    fights: buildFightsList(queue),
-    rewards,
-  };
-}
-
-export interface LastCombat {
-  mobTemplateId: string;
-  mobPrefix: string | null;
-  mobName: string;
-  mobDisplayName: string;
-  outcome: string;
-  combatantAMaxHp: number;
-  combatantBMaxHp: number;
-  log: LastCombatLogEntry[];
-  fights?: Array<{
-    mobName: string;
-    mobDisplayName: string;
-    mobTemplateId: string;
-    mobPrefix: string | null;
-    outcome: string;
-    combatantAMaxHp: number;
-    combatantBMaxHp: number;
-    log: LastCombatLogEntry[];
-    combatLogId?: string;
-  }> | null;
-  rewards: {
-    xp: number;
-    loot: Array<{
-      itemTemplateId: string;
-      quantity: number;
-      rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-      itemName?: string | null;
-    }>;
-    siteCompletion?: {
-      chestRarity: 'common' | 'uncommon' | 'rare';
-      materialRolls: number;
-      loot: Array<{
-        itemTemplateId: string;
-        quantity: number;
-        rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-        itemName?: string | null;
-      }>;
-      recipeUnlocked: {
-        recipeId: string;
-        resultTemplateId: string;
-        recipeName: string;
-        soulbound: boolean;
-      } | null;
-      fullClearBonus?: boolean;
-    } | null;
-    skillXp: {
-      skillType: string;
-      xpGained: number;
-      xpAfterEfficiency: number;
-      efficiency: number;
-      leveledUp: boolean;
-      newLevel: number;
-      characterXpGain: number;
-      characterXpAfter: number;
-      characterLevelBefore: number;
-      characterLevelAfter: number;
-      attributePointsAfter: number;
-      characterLeveledUp: boolean;
-    } | null;
-  };
-}
-
-export type BestiarySkipEntry = {
-  id: string;
-  isDiscovered: boolean;
-  prefixesEncountered: string[];
-};
-
-export function isMobKnown(
-  mobTemplateId: string,
-  prefix: string | null | undefined,
-  bestiary: BestiarySkipEntry[],
-): boolean {
-  const mob = bestiary.find(m => m.id === mobTemplateId);
-  if (!mob?.isDiscovered) return false;
-  if (prefix) return mob.prefixesEncountered.includes(prefix);
-  return true;
-}
-
-export type ActivityLogEntry = {
-  timestamp: string;
-  message: string;
-  type: 'info' | 'success' | 'danger' | 'warning';
-};
-
-export interface CharacterProgression {
-  characterXp: number;
-  characterLevel: number;
-  attributePoints: number;
-  attributes: {
-    vitality: number;
-    strength: number;
-    dexterity: number;
-    intelligence: number;
-    luck: number;
-    evasion: number;
-  };
-}
+import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
+import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
+export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
+import { buildLastCombat, isMobKnown } from './combatHelpers';
+export { isMobKnown } from './combatHelpers';
+import { useActivityLog, nowStamp } from './hooks/useActivityLog';
+import { usePlayerSettings } from './hooks/usePlayerSettings';
+import { useBestiary } from './hooks/useBestiary';
+import { useGathering } from './hooks/useGathering';
+import { useEncounterSites } from './hooks/useEncounterSites';
+import { useAchievements } from './hooks/useAchievements';
+import { useCombatPlayback } from './hooks/useCombatPlayback';
 
 type AttributeType = keyof CharacterProgression['attributes'];
-
-const DEFAULT_CHARACTER_PROGRESSION: CharacterProgression = {
-  characterXp: 0,
-  characterLevel: 1,
-  attributePoints: 0,
-  attributes: {
-    vitality: 0,
-    strength: 0,
-    dexterity: 0,
-    intelligence: 0,
-    luck: 0,
-    evasion: 0,
-  },
-};
-
-export interface HpState {
-  currentHp: number;
-  maxHp: number;
-  regenPerSecond: number;
-  isRecovering: boolean;
-  recoveryCost: number | null;
-}
-
-const GATHERING_PAGE_SIZE = 8;
-const PENDING_ENCOUNTER_PAGE_SIZE = 8;
 
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [activeScreen, setActiveScreen] = useState<Screen>('home');
@@ -395,44 +169,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       };
     };
   }>>([]);
-  const [gatheringNodes, setGatheringNodes] = useState<Array<{
-    id: string;
-    templateId: string;
-    zoneId: string;
-    zoneName: string;
-    resourceType: string;
-    resourceTypeCategory: string;
-    skillRequired: string;
-    levelRequired: number;
-    baseYield: number;
-    remainingCapacity: number;
-    maxCapacity: number;
-    sizeName: string;
-    discoveredAt: string;
-    weathered: boolean;
-    eventModifiers?: EventModifierBadge[];
-  }>>([]);
-  const [gatheringLoading, setGatheringLoading] = useState(false);
-  const [gatheringError, setGatheringError] = useState<string | null>(null);
-  const [gatheringPage, setGatheringPage] = useState(1);
-  const [gatheringZoneFilter, setGatheringZoneFilter] = useState('all');
-  const [gatheringResourceTypeFilter, setGatheringResourceTypeFilter] = useState('all');
-  const [activeGatheringSkill, setActiveGatheringSkill] = useState<'mining' | 'foraging' | 'woodcutting'>('mining');
-  const [gatheringPagination, setGatheringPagination] = useState({
-    page: 1,
-    pageSize: GATHERING_PAGE_SIZE,
-    total: 0,
-    totalPages: 1,
-    hasNext: false,
-    hasPrevious: false,
-  });
-  const [gatheringFilters, setGatheringFilters] = useState<{
-    zones: Array<{ id: string; name: string }>;
-    resourceTypes: string[];
-  }>({
-    zones: [],
-    resourceTypes: [],
-  });
+  const gathering = useGathering(isAuthenticated, activeScreen);
+  const { loadGatheringNodes, setActiveGatheringSkill } = gathering;
   const [zoneCraftingLevel, setZoneCraftingLevel] = useState<number | null>(0);
   const [zoneCraftingName, setZoneCraftingName] = useState<string | null>(null);
   const [craftingRecipes, setCraftingRecipes] = useState<Array<{
@@ -451,72 +189,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     xpReward: number;
   }>>([]);
   const [activeCraftingSkill, setActiveCraftingSkill] = useState<'refining' | 'tanning' | 'weaving' | 'weaponsmithing' | 'armorsmithing' | 'leatherworking' | 'tailoring' | 'alchemy' | 'jewelcrafting'>('weaponsmithing');
-  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
-  const [pendingEncounters, setPendingEncounters] = useState<PendingEncounter[]>([]);
-  const [pendingEncountersLoading, setPendingEncountersLoading] = useState(false);
-  const [pendingEncountersError, setPendingEncountersError] = useState<string | null>(null);
-  const [pendingEncounterPage, setPendingEncounterPage] = useState(1);
-  const [pendingEncounterZoneFilter, setPendingEncounterZoneFilter] = useState('all');
-  const [pendingEncounterMobFilter, setPendingEncounterMobFilter] = useState('all');
-  const [pendingEncounterSort, setPendingEncounterSort] = useState<'recent' | 'danger'>('danger');
-  const [pendingEncounterPagination, setPendingEncounterPagination] = useState({
-    page: 1,
-    pageSize: PENDING_ENCOUNTER_PAGE_SIZE,
-    total: 0,
-    totalPages: 1,
-    hasNext: false,
-    hasPrevious: false,
-  });
-  const [pendingEncounterFilters, setPendingEncounterFilters] = useState<{
-    zones: Array<{ id: string; name: string }>;
-    mobs: Array<{ id: string; name: string }>;
-  }>({
-    zones: [],
-    mobs: [],
-  });
-  const latestPendingRequestRef = useRef(0);
-  const [pendingClockMs, setPendingClockMs] = useState(() => Date.now());
+  const { activityLog, setActivityLog, pushLog } = useActivityLog();
+  const encounterSites = useEncounterSites(isAuthenticated, activeScreen);
+  const { refreshPendingEncounters, pendingEncounters } = encounterSites;
   const [lastCombat, setLastCombat] = useState<LastCombat | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [bestiaryMobs, setBestiaryMobs] = useState<Array<{
-    id: string;
-    name: string;
-    level: number;
-    isDiscovered: boolean;
-    killCount: number;
-    stats: { hp: number; accuracy: number; defence: number };
-    zones: string[];
-    description: string;
-    drops: Array<{
-      item: { id: string; name: string; itemType: string; tier: number };
-      rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-      dropRate: number;
-      minQuantity: number;
-      maxQuantity: number;
-    }>;
-    prefixesEncountered: string[];
-    explorationTier: number;
-    tierLocked: boolean;
-    bossRotation?: {
-      totalRounds: number;
-      revealedRounds: number;
-      actions: Array<{
-        round: number;
-        actionName: string;
-        targetMode: 'single_target' | 'aoe';
-        isTelegraphed: boolean;
-      }>;
-    };
-  }>>([]);
-  const [bestiaryLoading, setBestiaryLoading] = useState(false);
-  const [bestiaryError, setBestiaryError] = useState<string | null>(null);
-  const [bestiaryPrefixSummary, setBestiaryPrefixSummary] = useState<Array<{
-    prefix: string;
-    displayName: string;
-    totalKills: number;
-    discovered: boolean;
-  }>>([]);
+  const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
   const [staminaState, setStaminaState] = useState<ResourceState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 });
   const [manaState, setManaState] = useState<ResourceState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5 });
@@ -524,72 +203,37 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
-  const [autoPotionThreshold, setAutoPotionThreshold] = useState(0);
+  const playerSettings = usePlayerSettings();
+  const {
+    autoPotionThreshold, setAutoPotionThreshold,
+    combatLogSpeedMs, setCombatLogSpeedMs,
+    explorationSpeedMs, setExplorationSpeedMs,
+    autoSkipKnownCombat,
+    defaultExploreTurns, setDefaultExploreTurns,
+    quickRestHealPercent, setQuickRestHealPercent,
+    defaultRefiningMax,
+    lowHpWarning,
+    confirmRarity,
+    guildTaxRate, setGuildTaxRate,
+    handleSetCombatLogSpeed,
+    handleSetExplorationSpeed,
+    handleSetAutoSkipKnownCombat,
+    handleSetAutoPotionThreshold,
+    handleSetDefaultExploreTurns,
+    handleSetQuickRestHealPercent,
+    handleSetDefaultRefiningMax,
+    handleSetLowHpWarning,
+    handleSetConfirmRarity,
+    initSettingsFromServer,
+  } = playerSettings;
   const [tutorialStep, setTutorialStep] = useState<number>(TUTORIAL_COMPLETED);
-  const [combatLogSpeedMs, setCombatLogSpeedMs] = useState(800);
-  const [explorationSpeedMs, setExplorationSpeedMs] = useState(800);
-  const [autoSkipKnownCombat, setAutoSkipKnownCombat] = useState(false);
-  const [defaultExploreTurns, setDefaultExploreTurns] = useState(100);
-  const [quickRestHealPercent, setQuickRestHealPercent] = useState(100);
-  const [defaultRefiningMax, setDefaultRefiningMax] = useState(false);
-  const [lowHpWarning, setLowHpWarning] = useState(true);
-  const [confirmRarity, setConfirmRarity] = useState<ConfirmRarity>('uncommon');
-  const [guildTaxRate, setGuildTaxRate] = useState(0);
-  const [achievementData, setAchievementData] = useState<AchievementsResponse | null>(null);
-  const [achievementUnclaimedCount, setAchievementUnclaimedCount] = useState(0);
-  const [activeTitle, setActiveTitleState] = useState<string | null>(null);
   const combatLogPrefetch = useCombatLogPrefetch();
   const [playbackActive, setPlaybackActive] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
-  const [combatPlaybackQueue, setCombatPlaybackQueue] = useState<Array<{
-    room?: number;
-    mobName: string;
-    mobDisplayName: string;
-    mobTemplateId: string;
-    mobPrefix: string | null;
-    outcome: string;
-    combatantAMaxHp: number;
-    playerStartHp: number;
-    combatantBMaxHp: number;
-    log: LastCombatLogEntry[] | null;
-    combatLogId?: string;
-    rewards: LastCombat['rewards'];
-    activeEvents?: CombatActiveEvent[];
-  }> | null>(null);
-  const [combatPlaybackIndex, setCombatPlaybackIndex] = useState(0);
-  const [roomTransition, setRoomTransition] = useState<{ entering: number } | null>(null);
-  const pendingCombatRewardsRef = useRef<LastCombat['rewards'] | null>(null);
-  const siteJustClearedRef = useRef(false);
-  const combatPendingLootRef = useRef<string | null>(null);
+  const activatePendingLootRef = useRef<(sessionId: string) => Promise<void>>(async () => {});
   const pendingLootQueueRef = useRef<string[]>([]);
   const arrivedInTownRef = useRef(false);
   const lastEventLogTimeRef = useRef(0);
-  const combatPlaybackData = combatPlaybackQueue?.[combatPlaybackIndex] ?? null;
-
-  // Lazy-load current fight's combat log and pre-fetch next fight
-  useEffect(() => {
-    if (!combatPlaybackQueue) return;
-    const currentFight = combatPlaybackQueue[combatPlaybackIndex];
-    if (!currentFight) return;
-
-    // Load current fight's log if not yet loaded
-    if (!currentFight.log && currentFight.combatLogId) {
-      void combatLogPrefetch.fetchLog(currentFight.combatLogId).then(log => {
-        setCombatPlaybackQueue(prev => {
-          if (!prev) return prev;
-          const updated = [...prev];
-          updated[combatPlaybackIndex] = { ...updated[combatPlaybackIndex], log: log as LastCombatLogEntry[] };
-          return updated;
-        });
-      });
-    }
-
-    // Pre-fetch next fight's log
-    const nextFight = combatPlaybackQueue[combatPlaybackIndex + 1];
-    if (nextFight?.combatLogId) {
-      combatLogPrefetch.prefetch(nextFight.combatLogId);
-    }
-  }, [combatPlaybackQueue, combatPlaybackIndex, combatLogPrefetch]);
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<{
     totalTurns: number;
     zoneName: string;
@@ -627,19 +271,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (result.data) {
       setPvpNotificationCount(result.data.count);
     }
-  }, []);
-
-  const loadAchievements = useCallback(async () => {
-    const res = await getAchievements();
-    if (res.data) {
-      setAchievementData(res.data);
-      setAchievementUnclaimedCount(res.data.unclaimedCount);
-    }
-  }, []);
-
-  const loadAchievementUnclaimedCount = useCallback(async () => {
-    const res = await getAchievementUnclaimedCount();
-    if (res.data) setAchievementUnclaimedCount(res.data.unclaimedCount);
   }, []);
 
   const handleLoadSkillPoints = useCallback(async () => {
@@ -687,16 +318,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         attributes: playerRes.data.player.attributes,
       });
       setGold(playerRes.data.player.gold ?? 0);
-      setAutoPotionThreshold(playerRes.data.player.autoPotionThreshold ?? 0);
+      initSettingsFromServer(playerRes.data.player);
       setTutorialStep(playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED);
-      setCombatLogSpeedMs(playerRes.data.player.combatLogSpeedMs ?? 800);
-      setExplorationSpeedMs(playerRes.data.player.explorationSpeedMs ?? 800);
-      setAutoSkipKnownCombat(playerRes.data.player.autoSkipKnownCombat ?? false);
-      setDefaultExploreTurns(playerRes.data.player.defaultExploreTurns ?? 100);
-      setQuickRestHealPercent(playerRes.data.player.quickRestHealPercent ?? 100);
-      setDefaultRefiningMax(playerRes.data.player.defaultRefiningMax ?? false);
-      setLowHpWarning(playerRes.data.player.lowHpWarning ?? true);
-      setConfirmRarity(playerRes.data.player.confirmRarity ?? 'uncommon');
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
     if (hpRes.data) setHpState(hpRes.data);
@@ -753,6 +376,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }).catch(() => setGuildTaxRate(0));
   }, []);
 
+  const achievements = useAchievements(isAuthenticated, loadAll);
+  const {
+    achievementData, achievementUnclaimedCount, activeTitle,
+    loadAchievements, loadAchievementUnclaimedCount,
+    handleClaimAchievement, handleSetActiveTitle,
+  } = achievements;
+
   const advanceTutorial = useCallback(async (fromStep: number) => {
     if (tutorialStep !== fromStep) return;
     const nextStep = fromStep + 1;
@@ -764,6 +394,23 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const res = await updateTutorialStep(TUTORIAL_SKIPPED);
     if (res.data) setTutorialStep(res.data.tutorialStep);
   }, []);
+
+  const combatPlayback = useCombatPlayback({
+    combatLogPrefetch,
+    setLastCombat,
+    setPlaybackActive,
+    refreshPendingEncounters,
+    advanceTutorial,
+    activatePendingLootRef,
+  });
+  const {
+    combatPlaybackQueue, setCombatPlaybackQueue,
+    combatPlaybackIndex, setCombatPlaybackIndex,
+    roomTransition, setRoomTransition,
+    combatPlaybackData,
+    pendingCombatRewardsRef, siteJustClearedRef, combatPendingLootRef,
+    handleCombatPlaybackComplete,
+  } = combatPlayback;
 
   // Default tabs during tutorial steps so the player sees the right content
   useEffect(() => {
@@ -780,10 +427,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (isAuthenticated) {
       void loadAll();
       void loadPvpNotificationCount();
-      void loadAchievementUnclaimedCount();
-      void getActiveTitle().then((res) => {
-        if (res.data) setActiveTitleState(res.data.activeTitle);
-      });
       // Auto-show changelog if unseen
       const latestVer = getLatestVersion();
       if (latestVer && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVer) {
@@ -792,210 +435,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       const interval = setInterval(() => void loadTurnsAndHp(), 10000);
       // Poll PvP notifications less frequently (60s)
       const pvpInterval = setInterval(() => void loadPvpNotificationCount(), 60000);
-      const achievementPollInterval = setInterval(() => void loadAchievementUnclaimedCount(), 60_000);
-      return () => { clearInterval(interval); clearInterval(pvpInterval); clearInterval(achievementPollInterval); };
+      return () => { clearInterval(interval); clearInterval(pvpInterval); };
     }
-  }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount, loadAchievementUnclaimedCount]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const socket = getSocket();
-    const handleAchievementUnlocked = (data: { id: string; title: string; category: string }) => {
-      const showToast = (window as unknown as Record<string, unknown>).__showAchievementToast as
-        | ((toast: { id: string; title: string; category: string }) => void)
-        | undefined;
-      if (showToast) showToast(data);
-      void loadAchievementUnclaimedCount();
-    };
-    socket.on('achievement_unlocked', handleAchievementUnlocked);
-    return () => { socket.off('achievement_unlocked', handleAchievementUnlocked); };
-  }, [isAuthenticated, loadAchievementUnclaimedCount]);
-
-  const refreshPendingEncounters = useCallback(async (options?: { background?: boolean }) => {
-    if (!isAuthenticated) return;
-    const isBackground = options?.background ?? false;
-    const requestId = ++latestPendingRequestRef.current;
-
-    if (!isBackground) {
-      setPendingEncountersLoading(true);
-    }
-    setPendingEncountersError(null);
-
-    try {
-      const res = await getEncounterSites({
-        page: pendingEncounterPage,
-        pageSize: PENDING_ENCOUNTER_PAGE_SIZE,
-        zoneId: pendingEncounterZoneFilter === 'all' ? undefined : pendingEncounterZoneFilter,
-        mobFamilyId: pendingEncounterMobFilter === 'all' ? undefined : pendingEncounterMobFilter,
-        sort: pendingEncounterSort,
-      });
-
-      if (latestPendingRequestRef.current !== requestId) return;
-
-      if (!res.data) {
-        setPendingEncounters([]);
-        setPendingEncounterPagination({
-          page: 1,
-          pageSize: PENDING_ENCOUNTER_PAGE_SIZE,
-          total: 0,
-          totalPages: 1,
-          hasNext: false,
-          hasPrevious: false,
-        });
-        setPendingEncounterFilters({ zones: [], mobs: [] });
-        setPendingEncountersError(res.error?.message ?? 'Failed to load encounter sites');
-        return;
-      }
-
-      if (pendingEncounterPage > res.data.pagination.totalPages) {
-        setPendingEncounterPage(res.data.pagination.totalPages);
-        return;
-      }
-
-      setPendingEncounters(
-        res.data.encounterSites.map((site) => ({
-          encounterSiteId: site.encounterSiteId,
-          zoneId: site.zoneId,
-          zoneName: site.zoneName,
-          mobFamilyId: site.mobFamilyId,
-          mobFamilyName: site.mobFamilyName,
-          siteName: site.siteName,
-          size: site.size,
-          totalMobs: site.totalMobs,
-          aliveMobs: site.aliveMobs,
-          defeatedMobs: site.defeatedMobs,
-          decayedMobs: site.decayedMobs,
-          nextMobTemplateId: site.nextMobTemplateId,
-          nextMobName: site.nextMobName,
-          nextMobPrefix: site.nextMobPrefix,
-          nextMobDisplayName: site.nextMobDisplayName,
-          discoveredAt: site.discoveredAt,
-          clearStrategy: site.clearStrategy,
-          currentRoom: site.currentRoom,
-          totalRooms: site.totalRooms,
-          roomMobCounts: site.roomMobCounts,
-          eventModifiers: site.eventModifiers,
-          totalTurnCost: site.totalTurnCost,
-        }))
-      );
-      setPendingEncounterPagination(res.data.pagination);
-      setPendingEncounterFilters({
-        zones: res.data.filters.zones,
-        mobs: res.data.filters.mobFamilies,
-      });
-    } finally {
-      if (!isBackground && latestPendingRequestRef.current === requestId) {
-        setPendingEncountersLoading(false);
-      }
-    }
-  }, [isAuthenticated, pendingEncounterPage, pendingEncounterZoneFilter, pendingEncounterMobFilter, pendingEncounterSort]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    if (activeScreen !== 'combat') return;
-
-    const tick = () => {
-      setPendingClockMs(Date.now());
-      void refreshPendingEncounters({ background: true });
-    };
-
-    setPendingClockMs(Date.now());
-    void refreshPendingEncounters();
-    const interval = setInterval(tick, 15000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, activeScreen, refreshPendingEncounters]);
-
-  const loadBestiary = useCallback(async () => {
-    setBestiaryError(null);
-    setBestiaryLoading(true);
-    try {
-      const { data, error } = await getBestiary();
-      if (data) {
-        setBestiaryMobs(data.mobs);
-        setBestiaryPrefixSummary(data.prefixSummary);
-      }
-      else setBestiaryError(error?.message ?? 'Failed to load bestiary');
-    } finally {
-      setBestiaryLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated && (activeScreen === 'bestiary' || activeScreen === 'combat')) {
-      void loadBestiary();
-    }
-  }, [isAuthenticated, activeScreen, loadBestiary]);
-
-  const loadGatheringNodes = useCallback(async () => {
-    if (!isAuthenticated) return;
-
-    setGatheringLoading(true);
-    setGatheringError(null);
-
-    const { data, error } = await getGatheringNodes({
-      page: gatheringPage,
-      pageSize: GATHERING_PAGE_SIZE,
-      zoneId: gatheringZoneFilter === 'all' ? undefined : gatheringZoneFilter,
-      resourceType: gatheringResourceTypeFilter === 'all' ? undefined : gatheringResourceTypeFilter,
-      skillRequired: activeGatheringSkill,
-    });
-
-    if (data) {
-      if (gatheringPage > data.pagination.totalPages) {
-        setGatheringPage(data.pagination.totalPages);
-        setGatheringLoading(false);
-        return;
-      }
-
-      setGatheringNodes(data.nodes);
-      setGatheringPagination(data.pagination);
-      setGatheringFilters(data.filters);
-    } else {
-      setGatheringNodes([]);
-      setGatheringError(error?.message ?? 'Failed to load gathering nodes');
-    }
-
-    setGatheringLoading(false);
-  }, [isAuthenticated, gatheringPage, gatheringZoneFilter, gatheringResourceTypeFilter, activeGatheringSkill]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    if (activeScreen !== 'gathering') return;
-    void loadGatheringNodes();
-  }, [isAuthenticated, activeScreen, loadGatheringNodes]);
-
-  const handleGatheringPageChange = useCallback((page: number) => {
-    setGatheringPage(page);
-  }, []);
-
-  const handleGatheringZoneFilterChange = useCallback((zoneId: string) => {
-    setGatheringZoneFilter(zoneId);
-    setGatheringPage(1);
-  }, []);
-
-  const handleGatheringResourceTypeFilterChange = useCallback((resourceType: string) => {
-    setGatheringResourceTypeFilter(resourceType);
-    setGatheringPage(1);
-  }, []);
-
-  const handlePendingEncounterPageChange = useCallback((page: number) => {
-    setPendingEncounterPage(page);
-  }, []);
-
-  const handlePendingEncounterZoneFilterChange = useCallback((zoneId: string) => {
-    setPendingEncounterZoneFilter(zoneId);
-    setPendingEncounterPage(1);
-  }, []);
-
-  const handlePendingEncounterMobFilterChange = useCallback((mobTemplateId: string) => {
-    setPendingEncounterMobFilter(mobTemplateId);
-    setPendingEncounterPage(1);
-  }, []);
-
-  const handlePendingEncounterSortChange = useCallback((sort: 'recent' | 'danger') => {
-    setPendingEncounterSort(sort);
-    setPendingEncounterPage(1);
-  }, []);
+  }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount]);
 
   const getActiveTab = () => {
     if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
@@ -1004,12 +446,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (['combat', 'arena', 'templates', 'talentTree'].includes(activeScreen)) return 'combat';
     if (activeScreen === 'guild') return 'guild';
     return 'home';
-  };
-
-  const nowStamp = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  const pushLog = (...entries: ActivityLogEntry[]) => {
-    setActivityLog((prev) => [...entries, ...prev].slice(0, 100));
   };
 
   const logActiveEvents = (events: Array<{ title: string; effectType: string; effectValue: number }> | undefined) => {
@@ -1369,52 +805,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setBusyAction(null);
     }
   }, [refreshPendingEncounters]);
-
-  const handleCombatPlaybackComplete = () => {
-    if (combatPlaybackQueue && combatPlaybackIndex < combatPlaybackQueue.length - 1) {
-      const currentFight = combatPlaybackQueue[combatPlaybackIndex];
-      const nextFight = combatPlaybackQueue[combatPlaybackIndex + 1];
-
-      // Room transition: show interstitial briefly before advancing
-      if (currentFight?.room && nextFight?.room && currentFight.room !== nextFight.room) {
-        setRoomTransition({ entering: nextFight.room });
-        setTimeout(() => {
-          setRoomTransition(null);
-          setCombatPlaybackIndex(prev => prev + 1);
-        }, 1500);
-        return;
-      }
-
-      // More fights in the queue — advance to next
-      setCombatPlaybackIndex(combatPlaybackIndex + 1);
-      return;
-    }
-
-    // All fights done — finalize lastCombat with aggregated rewards
-    const lastFight = combatPlaybackQueue?.[combatPlaybackQueue.length - 1];
-    if (lastFight) {
-      const aggregatedRewards = pendingCombatRewardsRef.current ?? lastFight.rewards;
-      setLastCombat(buildLastCombat(combatPlaybackQueue!, aggregatedRewards));
-    }
-    setCombatPlaybackQueue(null);
-    setCombatPlaybackIndex(0);
-    setRoomTransition(null);
-    pendingCombatRewardsRef.current = null;
-    combatLogPrefetch.clear();
-    setPlaybackActive(false);
-    void refreshPendingEncounters();
-
-    if (siteJustClearedRef.current) {
-      siteJustClearedRef.current = false;
-      advanceTutorial(TUTORIAL_STEP_COMBAT);
-    }
-
-    const pendingId = combatPendingLootRef.current;
-    combatPendingLootRef.current = null;
-    if (pendingId) {
-      void activatePendingLoot(pendingId);
-    }
-  };
 
   const handleNavigate = (screen: string) => {
     // Auto-skip any active playback when navigating away
@@ -1889,6 +1279,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       clearExpiredLoot();
     }
   };
+  activatePendingLootRef.current = activatePendingLoot;
 
   const handleClaimLoot = async (sessionId: string, selectedIndices: number[]) => {
     await runAction('claim_loot', async () => {
@@ -2102,31 +1493,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
-  const handleSetSetting = async <T>(key: keyof PlayerSettings, value: T, setter: (v: T) => void, prev: T) => {
-    setter(value);
-    const res = await updatePlayerSettings({ [key]: value });
-    if (!res.data) setter(prev);
-  };
-
-  const handleSetAutoPotionThreshold = (value: number) =>
-    handleSetSetting('autoPotionThreshold', value, setAutoPotionThreshold, autoPotionThreshold);
-  const handleSetCombatLogSpeed = (value: number) =>
-    handleSetSetting('combatLogSpeedMs', value, setCombatLogSpeedMs, combatLogSpeedMs);
-  const handleSetExplorationSpeed = (value: number) =>
-    handleSetSetting('explorationSpeedMs', value, setExplorationSpeedMs, explorationSpeedMs);
-  const handleSetAutoSkipKnownCombat = (value: boolean) =>
-    handleSetSetting('autoSkipKnownCombat', value, setAutoSkipKnownCombat, autoSkipKnownCombat);
-  const handleSetDefaultExploreTurns = (value: number) =>
-    handleSetSetting('defaultExploreTurns', value, setDefaultExploreTurns, defaultExploreTurns);
-  const handleSetQuickRestHealPercent = (value: number) =>
-    handleSetSetting('quickRestHealPercent', value, setQuickRestHealPercent, quickRestHealPercent);
-  const handleSetDefaultRefiningMax = (value: boolean) =>
-    handleSetSetting('defaultRefiningMax', value, setDefaultRefiningMax, defaultRefiningMax);
-  const handleSetLowHpWarning = (value: boolean) =>
-    handleSetSetting('lowHpWarning', value, setLowHpWarning, lowHpWarning);
-  const handleSetConfirmRarity = (value: ConfirmRarity) =>
-    handleSetSetting('confirmRarity', value, setConfirmRarity, confirmRarity);
-
   const handleQuickRest = async () => {
     if (!hpState || hpState.currentHp >= hpState.maxHp || hpState.isRecovering || turns <= 0) return;
 
@@ -2146,21 +1512,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${actualTurns.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
       }
     });
-  };
-
-  const handleClaimAchievement = async (achievementId: string) => {
-    const res = await claimAchievementReward(achievementId);
-    if (res.data) {
-      await loadAchievements();
-      await loadAll();
-    }
-  };
-
-  const handleSetActiveTitle = async (achievementId: string | null) => {
-    const res = await setActiveTitle(achievementId);
-    if (res.data) {
-      setActiveTitleState(res.data.activeTitle);
-    }
   };
 
   const dismissChangelog = useCallback(() => {
@@ -2205,23 +1556,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setTrainingCooldown,
     zones,
     activeZoneId,
-    setActiveZoneId,
     zoneConnections,
     undiscoveredZones,
     skills,
     characterProgression,
     inventory,
     equipment,
-    gatheringNodes,
-    gatheringLoading,
-    gatheringError,
-    gatheringPage,
-    gatheringPagination,
-    gatheringFilters,
-    gatheringZoneFilter,
-    gatheringResourceTypeFilter,
-    activeGatheringSkill,
-    setActiveGatheringSkill,
+    ...gathering,
+    ...encounterSites,
     craftingRecipes,
     zoneCraftingLevel,
     zoneCraftingName,
@@ -2229,16 +1571,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setActiveCraftingSkill,
     activityLog,
     pushLog,
-    pendingEncounters,
-    pendingEncountersLoading,
-    pendingEncountersError,
-    pendingEncounterPage,
-    pendingEncounterPagination,
-    pendingEncounterFilters,
-    pendingEncounterZoneFilter,
-    pendingEncounterMobFilter,
-    pendingEncounterSort,
-    pendingClockMs,
     lastCombat,
     busyAction,
     actionError,
@@ -2320,13 +1652,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleTravelPlaybackComplete,
     handleTravelPlaybackSkip,
     handleMine,
-    handleGatheringPageChange,
-    handleGatheringZoneFilterChange,
-    handleGatheringResourceTypeFilterChange,
-    handlePendingEncounterPageChange,
-    handlePendingEncounterZoneFilterChange,
-    handlePendingEncounterMobFilterChange,
-    handlePendingEncounterSortChange,
     handleCraft,
     handleSalvageItem,
     handleSalvageBatch,

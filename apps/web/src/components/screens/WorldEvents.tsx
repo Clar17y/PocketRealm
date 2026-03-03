@@ -10,16 +10,7 @@ import {
   type BossEncounterResponse,
 } from '@/lib/api';
 import { BossEncounterPanel } from '@/components/BossEncounterPanel';
-
-function formatTimeRemaining(expiresAt: string | null): string {
-  if (!expiresAt) return 'Permanent';
-  const remaining = new Date(expiresAt).getTime() - Date.now();
-  if (remaining <= 0) return 'Expired';
-  const hours = Math.floor(remaining / 3_600_000);
-  const minutes = Math.floor((remaining % 3_600_000) / 60_000);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-}
+import { formatTimeRemaining } from '@/lib/format';
 
 function effectLabel(effectType: string, effectValue: number): string {
   const sign = effectType.endsWith('_down') ? '-' : '+';

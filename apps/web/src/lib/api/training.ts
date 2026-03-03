@@ -1,8 +1,25 @@
 import { fetchApi } from './core';
-import type { CombatResult } from '@adventure/shared';
+import type { CombatLogEntryResponse } from './combat';
+
+export interface TrainingCombatResult {
+  outcome: 'victory' | 'defeat' | 'fled' | 'draw';
+  log: CombatLogEntryResponse[];
+  combatantAMaxHp: number;
+  combatantBMaxHp: number;
+  combatantAHpRemaining: number;
+  combatantBHpRemaining: number;
+  combatantAMaxStamina: number;
+  combatantBMaxStamina: number;
+  combatantAStaminaRemaining: number;
+  combatantAMaxMana: number;
+  combatantBMaxMana: number;
+  combatantAManaRemaining: number;
+  potionsConsumed: Array<{ tier: number; healAmount: number; round: number; templateId?: string }>;
+  totalRounds: number;
+}
 
 export interface TrainingFightResponse {
-  combat: CombatResult;
+  combat: TrainingCombatResult;
   cooldownSeconds: number;
 }
 

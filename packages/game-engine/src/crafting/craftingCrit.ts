@@ -7,6 +7,7 @@ import {
   type ItemStats,
   type ItemType,
 } from '@adventure/shared';
+import { clamp, randomUnit } from '../utils/math';
 
 export type CraftingCritStat = keyof ItemStats;
 
@@ -33,17 +34,6 @@ export interface CraftingCritResult {
   epicCraftChance: number;
   bonusStat: CraftingCritStat | null;
   bonusValue: number | null;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function randomUnit(roll?: number): number {
-  if (typeof roll === 'number' && Number.isFinite(roll)) {
-    return clamp(roll, 0, 0.999999999);
-  }
-  return Math.random();
 }
 
 export function calculateCritChance(

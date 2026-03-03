@@ -22,6 +22,7 @@ import { getHpState, setHp, enterRecoveringState } from './hpService';
 import { getActiveTemplate } from './combatTemplateService';
 import { getResourceState, setAllResources } from './resourceService';
 import { getSkillPoints } from './skillPointService';
+import { mapTemplateCombatLog } from './combatLogMapper';
 
 type AttackStyle = 'melee' | 'ranged' | 'magic';
 
@@ -557,7 +558,7 @@ export async function challenge(
         attackerRatingChange,
         defenderRatingChange,
         winnerId,
-        combatLog: JSON.parse(JSON.stringify(combatResult)) as Prisma.InputJsonValue,
+        combatLog: JSON.parse(JSON.stringify({ ...combatResult, log: mapTemplateCombatLog(combatResult.log) })) as Prisma.InputJsonValue,
         attackerStyle: attackStyle,
         defenderStyle,
         turnsSpent: turnCost,
@@ -635,7 +636,7 @@ export async function challenge(
     defenderRatingChange,
     attackerStyle: attackStyle,
     defenderStyle,
-    combat: combatResult,
+    combat: { ...combatResult, log: mapTemplateCombatLog(combatResult.log) },
     attackerStartHp: hpState.currentHp,
     attackerKnockedOut,
     fleeOutcome,

@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { Prisma, prisma } from '@adventure/database';
+import { createActivityLog } from '../../services/activityLogService';
 import {
   applyMobEventModifiers,
   applyMobPrefix,
@@ -13,26 +14,19 @@ import {
   filterAndWeightMobsByTier,
   selectTierWithBleedthrough,
 } from '@adventure/game-engine';
-import type { TemplateCombatant } from '@adventure/game-engine';
 import {
-  ALWAYS_AVAILABLE_ACTION_IDS,
-  BASE_ACTION_DEFINITIONS,
   COMBAT_CONSTANTS,
-  GUILD_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
-  type ActionDefinition,
-  type CombatTemplateAction,
-  type Combatant,
   type CombatOptions,
   type LootDrop,
   type MobTemplate,
   type PotionConsumed,
 } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
-import { rollAndGrantLootWithCapacity, enrichLootWithNames } from '../../services/lootService';
+import { enrichLootWithNames } from '../../services/lootService';
 import type { LootDropWithName } from '../../services/lootService';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
-import { grantSkillXp } from '../../services/xpService';
+import type { GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { setHp } from '../../services/hpService';
 import { getActiveTemplate } from '../../services/combatTemplateService';
@@ -64,10 +58,9 @@ import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../s
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
-import { serializeXpGrant, toMobTemplate, assertCanAct, recordBestiaryKill, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
-import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
+import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
-import { incrementContractProgress } from '../../services/guildContractService';
+import { buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import {
   prismaAny,
   startSchema,
@@ -85,40 +78,6 @@ import {
 } from './helpers';
 
 
-function buildPlayerTemplateCombatant(
-  playerId: string,
-  username: string,
-  playerStats: ReturnType<typeof buildPlayerCombatStats>,
-  template: CombatTemplateAction[],
-  currentStamina: number,
-  maxStamina: number,
-  staminaRegenPerRound: number,
-  currentMana: number,
-  maxMana: number,
-  manaRegenPerRound: number,
-  unlockedActions: string[],
-): TemplateCombatant {
-  const unlockedSet = new Set(unlockedActions);
-  const filteredActions: Record<string, ActionDefinition> = {};
-  for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
-    if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-      filteredActions[id] = def;
-    }
-  }
-  return {
-    id: playerId,
-    name: username,
-    stats: playerStats,
-    template,
-    stamina: currentStamina,
-    maxStamina,
-    staminaRegenPerRound,
-    mana: currentMana,
-    maxMana,
-    manaRegenPerRound,
-    actionDefinitions: filteredActions,
-  };
-}
 
 /**
  * Handle encounter site room combat: fight ALL alive mobs in the current room sequentially.
@@ -282,27 +241,19 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         equipmentStats
       );
 
-      // Apply guild combat modifiers
-      if (guildMods.combatDamage > 0) {
-        playerStats.damageMin = Math.round(playerStats.damageMin * (1 + guildMods.combatDamage));
-        playerStats.damageMax = Math.round(playerStats.damageMax * (1 + guildMods.combatDamage));
-      }
-      if (guildMods.defenseBoost > 0) {
-        playerStats.defence = Math.round(playerStats.defence * (1 + guildMods.defenseBoost));
-        playerStats.magicDefence = Math.round(playerStats.magicDefence * (1 + guildMods.defenseBoost));
-      }
+      applyGuildCombatModifiers(playerStats, guildMods);
 
       let combatOptions: CombatOptions | undefined;
       if (autoPotionThreshold > 0 && potionPool.length > 0) {
         combatOptions = { autoPotionThreshold, potions: [...potionPool] };
       }
 
-      const playerCombatant = buildPlayerTemplateCombatant(
-        playerId, req.player!.username, playerStats, playerTemplate,
-        currentStamina, maxStamina, staminaRegenPerRound,
-        currentMana, maxMana, manaRegenPerRound,
-        playerUnlockedActions,
-      );
+      const playerCombatant = buildPlayerTemplateCombatant({
+        playerId, username: req.player!.username, playerStats, template: playerTemplate,
+        stamina: currentStamina, maxStamina, staminaRegenPerRound,
+        mana: currentMana, maxMana, manaRegenPerRound,
+        unlockedActions: playerUnlockedActions,
+      });
       const mobCombatant = mobToTemplateCombatant(prefixedMob);
 
       const combatResult = runTemplateCombat(playerCombatant, mobCombatant, combatOptions);
@@ -323,27 +274,22 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
       // Per-mob post-combat rewards (only on victory)
       let mobLoot: LootDropWithName[] = [];
-      let mobXpGrant: Awaited<ReturnType<typeof grantSkillXp>> | null = null;
+      let mobXpGrant: GrantXpResult | null = null;
       const mobXpAwarded = combatResult.outcome === 'victory' ? Math.max(0, prefixedMob.xpReward) : 0;
       const mobDurabilityLost = await degradeEquippedDurability(playerId);
 
       if (combatResult.outcome === 'victory') {
         await setAllResources(playerId, combatResult.combatantAHpRemaining, currentStamina, currentMana);
-        const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
-        mobLoot = await enrichLootWithNames(lootResult.drops);
-        allSiteOverflow.push(...lootResult.overflow);
-        mobXpGrant = await grantSkillXp(playerId, attackSkill, mobXpAwarded, undefined, guildMods.xpBoost || undefined);
-
-        // Bestiary
-        await recordBestiaryKill(playerId, prefixedMob.id, prefixedMob.mobPrefix);
-
-        // Guild XP and contract progress
-        const guildId = await getPlayerGuildId(playerId);
-        if (guildId) {
-          await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
-          void incrementContractProgress(guildId, 'kill_count', 1).catch(() => {});
-          void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
-        }
+        const rewards = await processCombatVictoryRewards({
+          playerId,
+          mob: prefixedMob,
+          attackSkill,
+          guildXpBoost: guildMods.xpBoost,
+          includeGuildCredit: true,
+        });
+        mobLoot = await enrichLootWithNames(rewards.loot);
+        allSiteOverflow.push(...rewards.overflow);
+        mobXpGrant = rewards.xpGrant;
       }
 
       fightResults.push({
@@ -586,40 +532,38 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const mobFamilyName: string | null = site.mobFamily?.name ?? null;
 
   // --- Activity log ---
-  const combatLog = await prisma.activityLog.create({
-    data: {
-      playerId,
-      activityType: 'combat',
-      turnsSpent: totalTurnCost,
-      result: {
-        zoneId,
-        zoneName: zone.name,
-        mobTemplateId: lastPrefixedMob?.id ?? fightResults[0]?.mobTemplateId,
-        mobName: lastBaseMob?.name,
-        mobPrefix: lastPrefixedMob?.mobPrefix,
-        mobDisplayName: lastPrefixedMob?.mobDisplayName,
-        source: 'encounter_site',
-        encounterSiteId,
-        encounterSiteCleared,
-        mobFamilyName,
-        attackSkill,
-        outcome: lastCombatResult?.outcome ?? 'defeat',
-        playerMaxHp: lastCombatResult?.combatantAMaxHp ?? hpState.maxHp,
-        mobMaxHp: lastCombatResult?.combatantBMaxHp ?? 0,
-        potionsConsumed: allPotionsConsumed,
-        fightCount: fightResults.length,
-        rewards: {
-          xp: aggregatedXp,
-          baseXp: aggregatedXp,
-          loot: aggregatedLoot,
-          siteCompletion: siteCompletionWithNames,
-          durabilityLost: aggregatedDurabilityLost,
-          skillXp: lastVictoryXpGrant
-            ? serializeXpGrant(lastVictoryXpGrant)
-            : null,
-        },
-        eventModifiers: siteMobBadges,
-      } as unknown as Prisma.InputJsonValue,
+  const combatLog = await createActivityLog({
+    playerId,
+    activityType: 'combat',
+    turnsSpent: totalTurnCost,
+    result: {
+      zoneId,
+      zoneName: zone.name,
+      mobTemplateId: lastPrefixedMob?.id ?? fightResults[0]?.mobTemplateId,
+      mobName: lastBaseMob?.name,
+      mobPrefix: lastPrefixedMob?.mobPrefix,
+      mobDisplayName: lastPrefixedMob?.mobDisplayName,
+      source: 'encounter_site',
+      encounterSiteId,
+      encounterSiteCleared,
+      mobFamilyName,
+      attackSkill,
+      outcome: lastCombatResult?.outcome ?? 'defeat',
+      playerMaxHp: lastCombatResult?.combatantAMaxHp ?? hpState.maxHp,
+      mobMaxHp: lastCombatResult?.combatantBMaxHp ?? 0,
+      potionsConsumed: allPotionsConsumed,
+      fightCount: fightResults.length,
+      rewards: {
+        xp: aggregatedXp,
+        baseXp: aggregatedXp,
+        loot: aggregatedLoot,
+        siteCompletion: siteCompletionWithNames,
+        durabilityLost: aggregatedDurabilityLost,
+        skillXp: lastVictoryXpGrant
+          ? serializeXpGrant(lastVictoryXpGrant)
+          : null,
+      },
+      eventModifiers: siteMobBadges,
     },
   });
 
@@ -629,38 +573,35 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   let fightLogIds: string[] = [];
   try {
     for (const fight of fightResults) {
-      const fightLog = await prisma.activityLog.create({
-        data: {
-          playerId,
-          activityType: 'combat',
-          turnsSpent: 0,
-          result: {
-            zoneId,
-            zoneName: zone.name,
-            mobTemplateId: fight.mobTemplateId,
-            mobName: fight.mobName,
-            mobPrefix: fight.mobPrefix,
-            mobDisplayName: fight.mobDisplayName,
-            source: 'encounter_site_fight',
-            encounterSiteId,
-            summaryLogId: combatLog.id,
-            room: fight.room,
-            attackSkill,
-            outcome: fight.outcome,
-            playerMaxHp: fight.playerMaxHp,
-            mobMaxHp: fight.mobMaxHp,
-            log: fight.log,
-            rewards: {
-              xp: fight.xp,
-              baseXp: fight.xp,
-              loot: fight.loot,
-              durabilityLost: fight.durabilityLost,
-              skillXp: fight.skillXp ? serializeXpGrant(fight.skillXp) : null,
-            },
-            eventModifiers: siteMobBadges,
-          } as unknown as Prisma.InputJsonValue,
+      const fightLog = await createActivityLog({
+        playerId,
+        activityType: 'combat',
+        turnsSpent: 0,
+        result: {
+          zoneId,
+          zoneName: zone.name,
+          mobTemplateId: fight.mobTemplateId,
+          mobName: fight.mobName,
+          mobPrefix: fight.mobPrefix,
+          mobDisplayName: fight.mobDisplayName,
+          source: 'encounter_site_fight',
+          encounterSiteId,
+          summaryLogId: combatLog.id,
+          room: fight.room,
+          attackSkill,
+          outcome: fight.outcome,
+          playerMaxHp: fight.playerMaxHp,
+          mobMaxHp: fight.mobMaxHp,
+          log: fight.log,
+          rewards: {
+            xp: fight.xp,
+            baseXp: fight.xp,
+            loot: fight.loot,
+            durabilityLost: fight.durabilityLost,
+            skillXp: fight.skillXp ? serializeXpGrant(fight.skillXp) : null,
+          },
+          eventModifiers: siteMobBadges,
         },
-        select: { id: true },
       });
       fightLogIds.push(fightLog.id);
     }
@@ -851,14 +792,7 @@ export function registerStartRoutes(router: Router): void {
 
       // Guild combat modifiers
       const guildMods = await getPlayerGuildModifiers(playerId);
-      if (guildMods.combatDamage > 0) {
-        playerStats.damageMin = Math.round(playerStats.damageMin * (1 + guildMods.combatDamage));
-        playerStats.damageMax = Math.round(playerStats.damageMax * (1 + guildMods.combatDamage));
-      }
-      if (guildMods.defenseBoost > 0) {
-        playerStats.defence = Math.round(playerStats.defence * (1 + guildMods.defenseBoost));
-        playerStats.magicDefence = Math.round(playerStats.magicDefence * (1 + guildMods.defenseBoost));
-      }
+      applyGuildCombatModifiers(playerStats, guildMods);
 
       const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
       const [zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyRow] = await Promise.all([
@@ -906,12 +840,12 @@ export function registerStartRoutes(router: Router): void {
         getSkillPoints(playerId),
       ]);
 
-      const playerCombatant = buildPlayerTemplateCombatant(
-        playerId, req.player!.username, playerStats, playerTemplate,
-        resourceState.stamina.current, resourceState.stamina.max, resourceState.stamina.regenPerRound,
-        resourceState.mana.current, resourceState.mana.max, resourceState.mana.regenPerRound,
-        zoneCombatSkillPoints.unlockedActions,
-      );
+      const playerCombatant = buildPlayerTemplateCombatant({
+        playerId, username: req.player!.username, playerStats, template: playerTemplate,
+        stamina: resourceState.stamina.current, maxStamina: resourceState.stamina.max, staminaRegenPerRound: resourceState.stamina.regenPerRound,
+        mana: resourceState.mana.current, maxMana: resourceState.mana.max, manaRegenPerRound: resourceState.mana.regenPerRound,
+        unlockedActions: zoneCombatSkillPoints.unlockedActions,
+      });
       const mobCombatant = mobToTemplateCombatant(finalMob);
 
       const combatResult = runTemplateCombat(playerCombatant, mobCombatant, combatOptions);
@@ -924,7 +858,7 @@ export function registerStartRoutes(router: Router): void {
 
       let loot: LootDrop[] = [];
       let pendingLootSessionId: string | null = null;
-      let xpGrant = null as null | Awaited<ReturnType<typeof grantSkillXp>>;
+      let xpGrant = null as null | GrantXpResult;
       const durabilityLost = await degradeEquippedDurability(playerId);
       let fleeResult = null as null | ReturnType<typeof calculateFleeResult>;
       let respawnedTo: { townId: string; townName: string } | null = null;
@@ -939,18 +873,17 @@ export function registerStartRoutes(router: Router): void {
           combatResult.combatantAStaminaRemaining,
           combatResult.combatantAManaRemaining,
         );
-        const lootResult = await rollAndGrantLootWithCapacity(playerId, prefixedMob.id, prefixedMob.level, prefixedMob.dropChanceMultiplier);
-        loot = lootResult.drops;
-        pendingLootSessionId = lootResult.pendingLootSessionId;
-        xpGrant = await grantSkillXp(playerId, attackSkill, xpAwarded, undefined, guildMods.xpBoost || undefined);
-
-        // Guild XP and contract progress
-        const guildId = await getPlayerGuildId(playerId);
-        if (guildId) {
-          await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
-          void incrementContractProgress(guildId, 'kill_count', 1).catch(() => {});
-          void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
-        }
+        const rewards = await processCombatVictoryRewards({
+          playerId,
+          mob: prefixedMob,
+          attackSkill,
+          guildXpBoost: guildMods.xpBoost,
+          includeGuildCredit: true,
+          includeBestiary: false, // zone combat has its own bestiary logic (upserts on all outcomes)
+        });
+        loot = rewards.loot;
+        pendingLootSessionId = rewards.pendingLootSessionId;
+        xpGrant = rewards.xpGrant;
       } else if (combatResult.outcome === 'defeat') {
         await setAllResources(
           playerId,
@@ -1015,39 +948,37 @@ export function registerStartRoutes(router: Router): void {
         ? filterEventModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents, { mobFamilyId: zoneMobFamilyId })
         : [];
 
-      const combatLog = await prisma.activityLog.create({
-        data: {
-          playerId,
-          activityType: 'combat',
-          turnsSpent: COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
-          result: {
-            zoneId,
-            zoneName: zone.name,
-            mobTemplateId: prefixedMob.id,
-            mobName: baseMob.name,
-            mobPrefix,
-            mobDisplayName: prefixedMob.mobDisplayName,
-            source: 'zone_combat',
-            encounterSiteId: null,
-            encounterSiteCleared: false,
-            attackSkill,
-            outcome: combatResult.outcome,
-            playerMaxHp: combatResult.combatantAMaxHp,
-            mobMaxHp: combatResult.combatantBMaxHp,
-            log: mapTemplateCombatLog(combatResult.log),
-            potionsConsumed: combatResult.potionsConsumed,
-            rewards: {
-              xp: xpAwarded,
-              baseXp,
-              loot: lootWithNames,
-              siteCompletion: null,
-              durabilityLost,
-              skillXp: xpGrant
-                ? serializeXpGrant(xpGrant)
-                : null,
-            },
-            eventModifiers: zoneMobBadges,
-          } as unknown as Prisma.InputJsonValue,
+      const combatLog = await createActivityLog({
+        playerId,
+        activityType: 'combat',
+        turnsSpent: COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
+        result: {
+          zoneId,
+          zoneName: zone.name,
+          mobTemplateId: prefixedMob.id,
+          mobName: baseMob.name,
+          mobPrefix,
+          mobDisplayName: prefixedMob.mobDisplayName,
+          source: 'zone_combat',
+          encounterSiteId: null,
+          encounterSiteCleared: false,
+          attackSkill,
+          outcome: combatResult.outcome,
+          playerMaxHp: combatResult.combatantAMaxHp,
+          mobMaxHp: combatResult.combatantBMaxHp,
+          log: mapTemplateCombatLog(combatResult.log),
+          potionsConsumed: combatResult.potionsConsumed,
+          rewards: {
+            xp: xpAwarded,
+            baseXp,
+            loot: lootWithNames,
+            siteCompletion: null,
+            durabilityLost,
+            skillXp: xpGrant
+              ? serializeXpGrant(xpGrant)
+              : null,
+          },
+          eventModifiers: zoneMobBadges,
         },
       });
 

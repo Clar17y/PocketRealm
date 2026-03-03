@@ -13,6 +13,23 @@ export function xpRateColor(rate: number): string {
 }
 
 /** Human-friendly relative time string from an ISO date or a pre-computed millisecond delta. */
+/** Format a millisecond duration as "Xh Ym" / "Xh" / "Ym". */
+export function formatDuration(ms: number): string {
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  const mins = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${mins}m`;
+}
+
+/** Human-friendly countdown string from an ISO expiry date. Returns 'Expired' when past. */
+export function formatTimeRemaining(expiresAt: string | null): string {
+  if (!expiresAt) return 'Permanent';
+  const remaining = new Date(expiresAt).getTime() - Date.now();
+  if (remaining <= 0) return 'Expired';
+  return formatDuration(remaining);
+}
+
 export function relativeTime(isoOrDeltaMs: string | number): string {
   const deltaMs =
     typeof isoOrDeltaMs === 'number'

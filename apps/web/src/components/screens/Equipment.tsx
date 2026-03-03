@@ -9,6 +9,7 @@ import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
 import { DURABILITY_CONSTANTS } from '@adventure/shared';
 import { numStat, formatSignedStatValue, signedClass, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
+import { ModalOverlay } from '@/components/common/ModalOverlay';
 
 interface EquippedItem {
   id: string;
@@ -206,11 +207,8 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
 
       {/* Slot Selection Modal */}
       {activeSlotId && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
-          onClick={closeModal}
-        >
-          <PixelCard className="max-w-md w-full" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <ModalOverlay opacity={80} onClose={closeModal}>
+          <PixelCard className="max-w-md w-full">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">
@@ -518,7 +516,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
               </div>
             </div>
           </PixelCard>
-        </div>
+        </ModalOverlay>
       )}
 
       {/* Character Equipment Grid */}
@@ -542,11 +540,8 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
 
       {/* Repair All Confirmation */}
       {showRepairAll && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
-          onClick={() => setShowRepairAll(false)}
-        >
-          <PixelCard className="max-w-sm w-full" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <ModalOverlay opacity={80} onClose={() => setShowRepairAll(false)}>
+          <PixelCard className="max-w-sm w-full">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">Repair All Equipment</h3>
               <button
@@ -621,7 +616,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
               </PixelButton>
             </div>
           </PixelCard>
-        </div>
+        </ModalOverlay>
       )}
 
       {/* Stats Panel */}

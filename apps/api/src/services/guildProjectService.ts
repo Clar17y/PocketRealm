@@ -6,6 +6,7 @@ import {
   type GuildProjectDefinition,
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
+import { requireRole } from './guildService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { consumeItemsByTemplateTx } from './inventoryService';
 import { addGuildXp } from './guildService';
@@ -23,19 +24,11 @@ export async function startProject(
   if (!def) throw new AppError(400, 'Unknown project key', 'INVALID_PROJECT');
 
   // Validate requester role
-  const membership = await prisma.guildMember.findUnique({ where: { playerId } });
-  if (!membership || membership.guildId !== guildId) {
+  const membership = await requireRole(playerId, 'officer');
+  if (membership.guildId !== guildId) {
     throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
   }
-  if (membership.role !== 'leader' && membership.role !== 'officer') {
-    throw new AppError(403, 'Only officers and leaders can start projects', 'INSUFFICIENT_ROLE');
-  }
-
-  const guild = await prisma.guild.findUnique({
-    where: { id: guildId },
-    select: { treasuryTurns: true, level: true },
-  });
-  if (!guild) throw new AppError(404, 'Guild not found', 'NOT_FOUND');
+  const guild = membership.guild;
 
   // Check no active project
   const activeProject = await prisma.guildProject.findFirst({
