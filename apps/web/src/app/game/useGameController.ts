@@ -90,6 +90,7 @@ import { buildFightsList, buildLastCombat, isMobKnown } from './combatHelpers';
 export { isMobKnown } from './combatHelpers';
 import { useActivityLog, nowStamp } from './hooks/useActivityLog';
 import { usePlayerSettings } from './hooks/usePlayerSettings';
+import { useBestiary } from './hooks/useBestiary';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
@@ -263,44 +264,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [lastCombat, setLastCombat] = useState<LastCombat | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [bestiaryMobs, setBestiaryMobs] = useState<Array<{
-    id: string;
-    name: string;
-    level: number;
-    isDiscovered: boolean;
-    killCount: number;
-    stats: { hp: number; accuracy: number; defence: number };
-    zones: string[];
-    description: string;
-    drops: Array<{
-      item: { id: string; name: string; itemType: string; tier: number };
-      rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-      dropRate: number;
-      minQuantity: number;
-      maxQuantity: number;
-    }>;
-    prefixesEncountered: string[];
-    explorationTier: number;
-    tierLocked: boolean;
-    bossRotation?: {
-      totalRounds: number;
-      revealedRounds: number;
-      actions: Array<{
-        round: number;
-        actionName: string;
-        targetMode: 'single_target' | 'aoe';
-        isTelegraphed: boolean;
-      }>;
-    };
-  }>>([]);
-  const [bestiaryLoading, setBestiaryLoading] = useState(false);
-  const [bestiaryError, setBestiaryError] = useState<string | null>(null);
-  const [bestiaryPrefixSummary, setBestiaryPrefixSummary] = useState<Array<{
-    prefix: string;
-    displayName: string;
-    totalKills: number;
-    discovered: boolean;
-  }>>([]);
+  const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
   const [staminaState, setStaminaState] = useState<ResourceState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 });
   const [manaState, setManaState] = useState<ResourceState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5 });
@@ -693,27 +657,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const interval = setInterval(tick, 15000);
     return () => clearInterval(interval);
   }, [isAuthenticated, activeScreen, refreshPendingEncounters]);
-
-  const loadBestiary = useCallback(async () => {
-    setBestiaryError(null);
-    setBestiaryLoading(true);
-    try {
-      const { data, error } = await getBestiary();
-      if (data) {
-        setBestiaryMobs(data.mobs);
-        setBestiaryPrefixSummary(data.prefixSummary);
-      }
-      else setBestiaryError(error?.message ?? 'Failed to load bestiary');
-    } finally {
-      setBestiaryLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated && (activeScreen === 'bestiary' || activeScreen === 'combat')) {
-      void loadBestiary();
-    }
-  }, [isAuthenticated, activeScreen, loadBestiary]);
 
   const loadGatheringNodes = useCallback(async () => {
     if (!isAuthenticated) return;
