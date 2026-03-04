@@ -204,7 +204,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
           Arena Locked
         </p>
         <p className="text-sm text-[var(--rpg-text-secondary)]">
-          Reach character level {PVP_CONSTANTS.MIN_CHARACTER_LEVEL} to compete in the Arena.
+          Reach character level <span className="font-pixel">{PVP_CONSTANTS.MIN_CHARACTER_LEVEL}</span> to compete in the Arena.
         </p>
         <div className="mt-3 w-full bg-[var(--rpg-background)] rounded-full h-2 overflow-hidden">
           <div
@@ -213,7 +213,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
           />
         </div>
         <p className="text-xs text-[var(--rpg-text-secondary)] mt-1">
-          Level {characterLevel} / {PVP_CONSTANTS.MIN_CHARACTER_LEVEL}
+          Level <span className="font-pixel">{characterLevel}</span> / <span className="font-pixel">{PVP_CONSTANTS.MIN_CHARACTER_LEVEL}</span>
         </p>
       </div>
     </PixelCard>
@@ -342,7 +342,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
           key={tab.id}
           type="button"
           onClick={() => handleViewChange(tab.id)}
-          className={`relative px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+          className={`relative px-3 py-1.5 rounded-lg text-sm font-display whitespace-nowrap transition-colors flex items-center gap-1.5 ${
             activeView === tab.id
               ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
               : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
@@ -377,7 +377,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
-                  <span className="text-[var(--rpg-text-primary)] font-semibold truncate">
+                  <span className="text-[var(--rpg-text-primary)] font-semibold font-display truncate">
                     {opponent.username}
                   </span>
                   {opponent.title && (
@@ -388,7 +388,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                   {opponent.isAdmin && <Shield className="w-3.5 h-3.5 text-[var(--rpg-gold)] shrink-0" />}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">
-                  Rating: {opponent.rating} | Lv.{opponent.characterLevel}
+                  Rating: <span className="font-pixel">{opponent.rating}</span> | Lv.<span className="font-pixel">{opponent.characterLevel}</span>
                 </div>
                 {scouted && (
                   <div className="text-xs mt-1 space-y-0.5">
@@ -400,9 +400,9 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                     </div>
                     {scouted.templateInfo && (
                       <div className="text-[var(--rpg-text-secondary)]">
-                        Rotation: {scouted.templateInfo.templateLength} actions
-                        {' '}({scouted.templateInfo.offensiveCount}A/{scouted.templateInfo.defensiveCount}D/{scouted.templateInfo.supportiveCount}S)
-                        {' '}| Stamina: {scouted.templateInfo.maxStamina} | Mana: {scouted.templateInfo.maxMana}
+                        Rotation: <span className="font-pixel">{scouted.templateInfo.templateLength}</span> actions
+                        {' '}(<span className="font-pixel">{scouted.templateInfo.offensiveCount}</span>A/<span className="font-pixel">{scouted.templateInfo.defensiveCount}</span>D/<span className="font-pixel">{scouted.templateInfo.supportiveCount}</span>S)
+                        {' '}| Stamina: <span className="font-pixel">{scouted.templateInfo.maxStamina}</span> | Mana: <span className="font-pixel">{scouted.templateInfo.maxMana}</span>
                       </div>
                     )}
                   </div>
@@ -470,7 +470,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                       <span className={`text-sm font-bold ${isDraw ? 'text-[var(--rpg-gold)]' : won ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
                         {isDraw ? 'DRAW' : won ? 'WIN' : 'LOSS'}
                       </span>
-                      <span className="text-[var(--rpg-text-primary)]">vs {opponentName}</span>
+                      <span className="text-[var(--rpg-text-primary)] font-display">vs {opponentName}</span>
                       {match.isRevenge && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
                           Revenge
@@ -529,7 +529,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
           >
             <ChevronLeft size={18} />
           </button>
-          <span className="text-sm text-[var(--rpg-text-secondary)]">
+          <span className="text-sm text-[var(--rpg-text-secondary)] font-pixel">
             {historyPagination.page} / {historyPagination.totalPages}
           </span>
           <button
@@ -566,7 +566,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                   <span className={`text-sm font-bold ${isDraw ? 'text-[var(--rpg-gold)]' : won ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
                     {isDraw ? 'DRAW' : won ? 'DEFENDED' : 'LOST'}
                   </span>
-                  <span className="text-[var(--rpg-text-primary)]">
+                  <span className="text-[var(--rpg-text-primary)] font-display">
                     Attacked by {notif.attackerName}
                   </span>
                   {notif.isRevenge && (

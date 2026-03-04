@@ -295,7 +295,7 @@ export function CombatScreen({
         <button
           type="button"
           onClick={() => setActiveView('encounters')}
-          className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
+          className={`px-3 py-1.5 rounded-lg text-sm font-display whitespace-nowrap transition-colors ${
             activeView === 'encounters'
               ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
               : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
@@ -306,7 +306,7 @@ export function CombatScreen({
         <button
           type="button"
           onClick={() => setActiveView('history')}
-          className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
+          className={`px-3 py-1.5 rounded-lg text-sm font-display whitespace-nowrap transition-colors ${
             activeView === 'history'
               ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
               : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
@@ -317,7 +317,7 @@ export function CombatScreen({
         <button
           type="button"
           onClick={() => setActiveView('bossHistory')}
-          className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
+          className={`px-3 py-1.5 rounded-lg text-sm font-display whitespace-nowrap transition-colors ${
             activeView === 'bossHistory'
               ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
               : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
@@ -335,7 +335,7 @@ export function CombatScreen({
           {roomTransition && (
             <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)]/30 rounded-lg p-6 text-center">
               <div className="text-lg font-bold text-[var(--rpg-gold)] mb-1">
-                Entering Room {roomTransition.entering}
+                Entering Room <span className="font-pixel">{roomTransition.entering}</span>
               </div>
               <div className="text-sm text-[var(--rpg-text-secondary)]">
                 Prepare for the next fight...
@@ -349,8 +349,8 @@ export function CombatScreen({
               {fightProgress && fightProgress.total > 1 && (
                 <div className="text-sm text-[var(--rpg-gold)] font-semibold mb-2">
                   {fightProgress.room
-                    ? `Room ${fightProgress.room} — Fight ${fightProgress.current}/${fightProgress.total}`
-                    : `Fight ${fightProgress.current}/${fightProgress.total}`
+                    ? <>Room <span className="font-pixel">{fightProgress.room}</span> — Fight <span className="font-pixel">{fightProgress.current}/{fightProgress.total}</span></>
+                    : <>Fight <span className="font-pixel">{fightProgress.current}/{fightProgress.total}</span></>
                   }
                 </div>
               )}
@@ -406,7 +406,7 @@ export function CombatScreen({
                     alt={displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
                     className="w-8 h-8 rounded object-cover"
                   />
-                  Last Combat: {displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
+                  Last Combat: <span className="font-display">{displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={`text-sm font-semibold ${outcomeColor}`}>{outcomeLabel}</div>
@@ -540,18 +540,18 @@ export function CombatScreen({
                           />
                         )}
                         <div>
-                          <div className="flex items-center gap-1.5 flex-wrap text-[var(--rpg-text-primary)] font-semibold">
+                          <div className="flex items-center gap-1.5 flex-wrap text-[var(--rpg-text-primary)] font-semibold font-display">
                             {e.siteName}
                             <EventBadges inline modifiers={e.eventModifiers} />
                           </div>
                           <span className="text-xs text-[var(--rpg-text-secondary)]">
                             {e.totalRooms > 1
-                              ? `Room ${e.currentRoom}/${e.totalRooms} · ${e.aliveMobs}/${e.totalMobs} mobs`
-                              : `${e.aliveMobs}/${e.totalMobs} mobs`
+                              ? <>Room <span className="font-pixel">{e.currentRoom}/{e.totalRooms}</span> · <span className="font-pixel">{e.aliveMobs}/{e.totalMobs}</span> mobs</>
+                              : <><span className="font-pixel">{e.aliveMobs}/{e.totalMobs}</span> mobs</>
                             }
                           </span>
                           <span className={`text-xs ${e.totalTurnCost > currentTurns ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
-                            {' · '}Cost: {e.totalTurnCost.toLocaleString()} turns
+                            {' · '}Cost: <span className="font-pixel">{e.totalTurnCost.toLocaleString()}</span> turns
                           </span>
                           {e.clearStrategy && (
                             <span className="text-xs text-[var(--rpg-gold)] ml-2">
@@ -559,10 +559,10 @@ export function CombatScreen({
                             </span>
                           )}
                           <div className="text-xs text-[var(--rpg-text-secondary)]">
-                            Next monster: {nextMobLabel ?? 'None (site decayed)'}
+                            Next monster: <span className="font-display">{nextMobLabel ?? 'None (site decayed)'}</span>
                           </div>
                         <div className="text-xs text-[var(--rpg-text-secondary)]">
-                          Zone: {e.zoneName} | Decayed {e.decayedMobs} | Found{' '}
+                          Zone: <span className="font-display">{e.zoneName}</span> | Decayed <span className="font-pixel">{e.decayedMobs}</span> | Found{' '}
                           {relativeTime(pendingClockMs - new Date(e.discoveredAt).getTime())}
                         </div>
                         </div>

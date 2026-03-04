@@ -200,7 +200,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
             <button
               key={view}
               onClick={() => setActiveView(view)}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+              className={`px-3 py-1 text-xs font-display rounded-md transition-colors ${
                 activeView === view
                   ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] font-bold'
                   : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'

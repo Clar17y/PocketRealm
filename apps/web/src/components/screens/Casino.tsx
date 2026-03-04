@@ -116,7 +116,7 @@ function WinCelebration({ payout, isBigWin }: { payout: number; isBigWin: boolea
         </div>
       ))}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-2xl font-bold text-[var(--rpg-gold)] animate-bounce">
+        <div className="text-2xl font-bold font-pixel text-[var(--rpg-gold)] animate-bounce">
           +{payout.toLocaleString()}g
         </div>
       </div>
@@ -394,9 +394,9 @@ export function Casino({
           Gold Exchange
         </h3>
         <div className="flex items-center gap-2 text-xs text-[var(--rpg-text-secondary)] mb-3">
-          <span>Rate: {CASINO_CONSTANTS.GOLD_EXCHANGE_RATE} turn = {CASINO_CONSTANTS.GOLD_EXCHANGE_RATE} gold</span>
+          <span>Rate: <span className="font-pixel">{CASINO_CONSTANTS.GOLD_EXCHANGE_RATE}</span> turn = <span className="font-pixel">{CASINO_CONSTANTS.GOLD_EXCHANGE_RATE}</span> gold</span>
           <span className="mx-1">|</span>
-          <span>{turns.toLocaleString()} turns available</span>
+          <span><span className="font-pixel">{turns.toLocaleString()}</span> turns available</span>
         </div>
         <div className="flex gap-2">
           <input
@@ -666,7 +666,7 @@ export function Casino({
                   key={`${bet.playerName}-${i}`}
                   className="flex items-center justify-between text-sm py-1 px-2 rounded bg-[var(--rpg-background)]"
                 >
-                  <span className="text-[var(--rpg-text-primary)] truncate mr-2">{bet.playerName}</span>
+                  <span className="text-[var(--rpg-text-primary)] font-display truncate mr-2">{bet.playerName}</span>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs text-[var(--rpg-text-secondary)]">
                       {formatBet(bet.betType, bet.betValue)}
@@ -747,15 +747,15 @@ export function Casino({
           <div className="flex items-center gap-3 mt-3 text-xs text-[var(--rpg-text-secondary)]">
             <span className="flex items-center gap-1">
               <span className={`w-2.5 h-2.5 rounded-full ${colorPipClass('red')}`} />
-              {history.filter((h) => getNumberColor(h.result) === 'red').length}
+              <span className="font-pixel">{history.filter((h) => getNumberColor(h.result) === 'red').length}</span>
             </span>
             <span className="flex items-center gap-1">
               <span className={`w-2.5 h-2.5 rounded-full ${colorPipClass('black')}`} />
-              {history.filter((h) => getNumberColor(h.result) === 'black').length}
+              <span className="font-pixel">{history.filter((h) => getNumberColor(h.result) === 'black').length}</span>
             </span>
             <span className="flex items-center gap-1">
               <span className={`w-2.5 h-2.5 rounded-full ${colorPipClass('green')}`} />
-              {history.filter((h) => getNumberColor(h.result) === 'green').length}
+              <span className="font-pixel">{history.filter((h) => getNumberColor(h.result) === 'green').length}</span>
             </span>
           </div>
         </PixelCard>

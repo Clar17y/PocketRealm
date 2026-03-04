@@ -153,7 +153,7 @@ export function TalentTree({
             backgroundColor: 'rgba(201, 169, 101, 0.1)',
           }}
         >
-          {availablePoints} point{availablePoints !== 1 ? 's' : ''} available
+          <span className="font-pixel">{availablePoints}</span> point{availablePoints !== 1 ? 's' : ''} available
         </span>
       </div>
 
@@ -165,7 +165,7 @@ export function TalentTree({
             <button
               key={tab.id}
               onClick={() => setActiveTree(tab.id)}
-              className="flex-1 py-2 text-sm font-semibold rounded-lg transition-all"
+              className="flex-1 py-2 text-sm font-semibold font-display rounded-lg transition-all"
               style={{
                 color: isActive ? tab.color : 'var(--rpg-text-secondary)',
                 backgroundColor: isActive ? 'var(--rpg-surface)' : 'transparent',
@@ -191,7 +191,7 @@ export function TalentTree({
         return (
           <div key={tier}>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-bold text-[var(--rpg-text-primary)]">Tier {tier}</span>
+              <span className="text-sm font-bold text-[var(--rpg-text-primary)]">Tier <span className="font-pixel">{tier}</span></span>
               {gateLabel && (
                 <span className="text-[11px] text-[var(--rpg-text-secondary)]">
                   {gateLabel}
@@ -234,7 +234,7 @@ export function TalentTree({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className="text-sm font-semibold"
+                            className="text-sm font-semibold font-display"
                             style={{
                               color: isAllocated
                                 ? 'var(--rpg-green-light)'
@@ -253,7 +253,7 @@ export function TalentTree({
                               borderWidth: 1,
                             }}
                           >
-                            {node.pointCost} pt{node.pointCost !== 1 ? 's' : ''}
+                            <span className="font-pixel">{node.pointCost}</span> pt{node.pointCost !== 1 ? 's' : ''}
                           </span>
                           {isAllocated && (
                             <span className="text-[10px] font-bold text-[var(--rpg-green-light)] uppercase">

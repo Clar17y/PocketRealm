@@ -70,10 +70,10 @@ export function BossHistory() {
                       alt={entry.mobName}
                       className="w-8 h-8 rounded object-cover shrink-0"
                     />
-                    <span className="text-[var(--rpg-text-primary)] font-semibold">
-                      {entry.mobName} (Lv.{entry.mobLevel})
+                    <span className="text-[var(--rpg-text-primary)] font-semibold font-display">
+                      {entry.mobName} <span className="font-pixel">(Lv.{entry.mobLevel})</span>
                     </span>
-                    <span className="text-xs ml-2 text-[var(--rpg-text-secondary)]">
+                    <span className="text-xs ml-2 text-[var(--rpg-text-secondary)] font-display">
                       {entry.zoneName}
                     </span>
                   </div>
@@ -82,13 +82,13 @@ export function BossHistory() {
                   </span>
                 </div>
                 <div className="flex gap-4 text-xs text-[var(--rpg-text-secondary)] mt-1">
-                  <span>{stats.roundsParticipated} round{stats.roundsParticipated !== 1 ? 's' : ''}</span>
-                  <span>{stats.totalDamage.toLocaleString()} dmg</span>
-                  {stats.totalHealing > 0 && <span>{stats.totalHealing.toLocaleString()} healed</span>}
+                  <span><span className="font-pixel">{stats.roundsParticipated}</span> round{stats.roundsParticipated !== 1 ? 's' : ''}</span>
+                  <span><span className="font-pixel">{stats.totalDamage.toLocaleString()}</span> dmg</span>
+                  {stats.totalHealing > 0 && <span><span className="font-pixel">{stats.totalHealing.toLocaleString()}</span> healed</span>}
                   {stats.attacks > 0 && (
                     <span>
-                      {stats.hits}/{stats.attacks} hit
-                      {stats.crits > 0 && `, ${stats.crits} crit`}
+                      <span className="font-pixel">{stats.hits}/{stats.attacks}</span> hit
+                      {stats.crits > 0 && <>, <span className="font-pixel">{stats.crits}</span> crit</>}
                     </span>
                   )}
                 </div>
@@ -98,10 +98,10 @@ export function BossHistory() {
                 <div className="mt-3 pt-2 border-t border-[var(--rpg-border)] text-xs space-y-2">
                   {entry.killedByUsername && (
                     <p style={{ color: 'var(--rpg-gold)' }}>
-                      Kill credit: {entry.killedByUsername}
+                      Kill credit: <span className="font-display">{entry.killedByUsername}</span>
                     </p>
                   )}
-                  <p>Total boss rounds: {entry.encounter.roundNumber}</p>
+                  <p>Total boss rounds: <span className="font-pixel">{entry.encounter.roundNumber}</span></p>
 
                   {entry.myRewards && (
                     <BossRewardsDisplay rewards={entry.myRewards} />
@@ -113,11 +113,11 @@ export function BossHistory() {
                       <div className="space-y-1">
                         {entry.encounter.roundSummaries.map((rs) => (
                           <div key={rs.round} className="flex justify-between">
-                            <span>Round {rs.round}</span>
+                            <span>Round <span className="font-pixel">{rs.round}</span></span>
                             <span>
-                              Players: {rs.totalPlayerDamage.toLocaleString()} dmg |
-                              Boss: {rs.bossDamage.toLocaleString()} dmg |
-                              HP: {rs.bossHpPercent}% | Alive: {rs.playersAlive} Dead: {rs.playersDead}
+                              Players: <span className="font-pixel">{rs.totalPlayerDamage.toLocaleString()}</span> dmg |
+                              Boss: <span className="font-pixel">{rs.bossDamage.toLocaleString()}</span> dmg |
+                              HP: <span className="font-pixel">{rs.bossHpPercent}%</span> | Alive: <span className="font-pixel">{rs.playersAlive}</span> Dead: <span className="font-pixel">{rs.playersDead}</span>
                             </span>
                           </div>
                         ))}

@@ -41,7 +41,7 @@ function EventCard({ event }: { event: WorldEventResponse }) {
   return (
     <PixelCard className="p-3">
       <div className="flex items-center justify-between mb-1">
-        <span className="font-bold" style={{ color: eventTypeColor(event.type) }}>
+        <span className="font-bold font-display" style={{ color: eventTypeColor(event.type) }}>
           {event.title}
         </span>
         <div className="flex items-center gap-2">
@@ -142,17 +142,17 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
                 onClick={() => setSelectedBossId(boss.id)}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-bold" style={{ color: 'var(--rpg-red)' }}>
-                    {boss.mobName} (Lv.{boss.mobLevel})
+                  <span className="font-bold font-display" style={{ color: 'var(--rpg-red)' }}>
+                    {boss.mobName} <span className="font-pixel">(Lv.{boss.mobLevel})</span>
                   </span>
-                  <span className="text-xs opacity-70">
+                  <span className="text-xs opacity-70 font-display">
                     {boss.zoneName ?? 'Unknown Zone'}
                   </span>
                 </div>
                 <div className="mb-2">
                   <div className="flex justify-between text-xs mb-1">
                     <span>HP</span>
-                    <span>{Math.round(hpPercent)}%</span>
+                    <span className="font-pixel">{Math.round(hpPercent)}%</span>
                   </div>
                   <div className="w-full h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }}>
                     <div
@@ -165,7 +165,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
                   </div>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span>Round {boss.roundNumber} — {boss.status}</span>
+                  <span>Round <span className="font-pixel">{boss.roundNumber}</span> — {boss.status}</span>
                   {boss.nextRoundAt && (
                     <span>Next round: {formatTimeRemaining(boss.nextRoundAt)}</span>
                   )}

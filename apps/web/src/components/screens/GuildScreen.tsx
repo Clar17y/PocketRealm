@@ -80,7 +80,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors capitalize ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-display whitespace-nowrap transition-colors capitalize ${
               activeTab === tab
                 ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
                 : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'

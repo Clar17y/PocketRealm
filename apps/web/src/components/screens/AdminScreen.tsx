@@ -194,9 +194,9 @@ function ItemsTab({ onAction }: { onAction?: () => void }) {
                   ? 'bg-[var(--rpg-gold)]/20 border border-[var(--rpg-gold)]/40'
                   : 'bg-[var(--rpg-surface)] hover:bg-[var(--rpg-surface-hover)]'
               }`}>
-              <span className="text-[var(--rpg-text-primary)]">{t.name}</span>
+              <span className="text-[var(--rpg-text-primary)] font-display">{t.name}</span>
               <span className="text-xs text-[var(--rpg-text-secondary)] ml-2">
-                {t.itemType} {t.slot ? `(${t.slot})` : ''} T{t.tier}
+                {t.itemType} {t.slot ? `(${t.slot})` : ''} T<span className="font-pixel">{t.tier}</span>
               </span>
             </div>
           ))}
@@ -433,9 +433,9 @@ function ZonesTab({ onAction }: { onAction?: () => void }) {
           {zones.map((z) => (
             <div key={z.id} className="flex items-center justify-between bg-[var(--rpg-surface)] rounded px-2 py-1.5 text-sm">
               <div>
-                <span className="text-[var(--rpg-text-primary)]">{z.name}</span>
+                <span className="text-[var(--rpg-text-primary)] font-display">{z.name}</span>
                 <span className="text-xs text-[var(--rpg-text-secondary)] ml-2">
-                  Lv.{z.difficulty} | {z.zoneType}
+                  Lv.<span className="font-pixel">{z.difficulty}</span> | {z.zoneType}
                 </span>
               </div>
               <PixelButton size="sm" disabled={busy}
@@ -583,7 +583,7 @@ export default function AdminScreen({ onAction }: { onAction?: () => void }) {
       <div className="flex gap-2 overflow-x-auto pb-1">
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium font-display whitespace-nowrap transition-colors ${
               tab === t.id
                 ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
                 : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
