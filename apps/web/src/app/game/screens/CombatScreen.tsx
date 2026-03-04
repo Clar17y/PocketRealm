@@ -295,7 +295,7 @@ export function CombatScreen({
         <button
           type="button"
           onClick={() => setActiveView('encounters')}
-          className={`px-3 py-1.5 rounded-lg text-sm font-display whitespace-nowrap transition-colors ${
+          className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
             activeView === 'encounters'
               ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
               : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
@@ -306,7 +306,7 @@ export function CombatScreen({
         <button
           type="button"
           onClick={() => setActiveView('history')}
-          className={`px-3 py-1.5 rounded-lg text-sm font-display whitespace-nowrap transition-colors ${
+          className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
             activeView === 'history'
               ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
               : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
@@ -317,7 +317,7 @@ export function CombatScreen({
         <button
           type="button"
           onClick={() => setActiveView('bossHistory')}
-          className={`px-3 py-1.5 rounded-lg text-sm font-display whitespace-nowrap transition-colors ${
+          className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
             activeView === 'bossHistory'
               ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
               : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'

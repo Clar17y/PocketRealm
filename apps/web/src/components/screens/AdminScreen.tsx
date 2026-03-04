@@ -583,7 +583,7 @@ export default function AdminScreen({ onAction }: { onAction?: () => void }) {
       <div className="flex gap-2 overflow-x-auto pb-1">
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium font-display whitespace-nowrap transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
               tab === t.id
                 ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] border border-[var(--rpg-gold)]/40'
                 : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'

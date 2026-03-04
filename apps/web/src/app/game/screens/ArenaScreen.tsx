@@ -342,7 +342,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
           key={tab.id}
           type="button"
           onClick={() => handleViewChange(tab.id)}
-          className={`relative px-3 py-1.5 rounded-lg text-sm font-display whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+          className={`relative px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors flex items-center gap-1.5 ${
             activeView === tab.id
               ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
               : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'

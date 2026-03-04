@@ -165,7 +165,7 @@ export function TalentTree({
             <button
               key={tab.id}
               onClick={() => setActiveTree(tab.id)}
-              className="flex-1 py-2 text-sm font-semibold font-display rounded-lg transition-all"
+              className="flex-1 py-2 text-sm font-semibold rounded-lg transition-all"
               style={{
                 color: isActive ? tab.color : 'var(--rpg-text-secondary)',
                 backgroundColor: isActive ? 'var(--rpg-surface)' : 'transparent',

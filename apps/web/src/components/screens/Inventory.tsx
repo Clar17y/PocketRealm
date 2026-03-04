@@ -304,7 +304,7 @@ export function Inventory({
           <button
             type="button"
             onClick={() => { setActiveTab('backpack'); setSelectedStashItem(null); resetAllStashModes(); }}
-            className={`px-3 py-1.5 text-sm font-semibold font-display border-b-2 transition-colors ${
+            className={`px-3 py-1.5 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'backpack'
                 ? 'text-[var(--rpg-gold)] border-[var(--rpg-gold)]'
                 : 'text-[var(--rpg-text-secondary)] border-transparent hover:text-[var(--rpg-text-primary)]'
@@ -315,7 +315,7 @@ export function Inventory({
           <button
             type="button"
             onClick={() => { setActiveTab('stash'); resetAllBackpackModes(); }}
-            className={`px-3 py-1.5 text-sm font-semibold font-display border-b-2 transition-colors ${
+            className={`px-3 py-1.5 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'stash'
                 ? 'text-[var(--rpg-gold)] border-[var(--rpg-gold)]'
                 : 'text-[var(--rpg-text-secondary)] border-transparent hover:text-[var(--rpg-text-primary)]'
@@ -634,7 +634,7 @@ export function Inventory({
           {/* Backpack Items */}
           <div className="space-y-2">
             <div className={`text-sm font-semibold ${usedSlots > capacity ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
-              Backpack (<span className="font-pixel">{usedSlots}/{capacity}</span>){usedSlots > capacity && ' — Over-encumbered!'}
+              Backpack (<span className="font-pixel text-xs">{usedSlots}/{capacity}</span>){usedSlots > capacity && ' — Over-encumbered!'}
             </div>
             <div className="grid grid-cols-6 gap-2">
               {backpackItems.map((item, index) => {
