@@ -20,6 +20,7 @@ export * from './constants/mobPrefixes';
 export * from './constants/worldEventTemplates';
 export * from './constants/achievementDefinitions';
 export * from './constants/combatActionDefinitions';
+export * from './constants/combatEffectNames';
 export * from './constants/talentTreeDefinitions';
 export * from './constants/bossTemplateDefinitions';
 
