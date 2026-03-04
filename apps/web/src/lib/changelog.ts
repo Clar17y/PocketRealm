@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.25',
+    date: '2026-03-04',
+    title: 'Visual Overhaul',
+    summary:
+      'The entire UI has been refreshed with a fantasy RPG aesthetic. Almendra calligraphic font for headings and entity names, Silkscreen pixel font for game numbers, and Nunito for body text. Warmer torchlit colour palette replaces the old cool greys. Cards now have layered shadows, parchment texture, and optional gold framing with corner ornaments. A subtle noise grain and vignette add atmosphere. Stat bars shimmer and glow — HP bars shift from green to amber to red as health drops. Screen transitions fade and slide in, list items stagger on reveal, loot drops animate with a flip effect, and legendary items flash gold. The header sports an ornamental gold border and the bottom nav glows under the active tab. All animations respect prefers-reduced-motion.',
+  },
+  {
     version: '0.24',
     date: '2026-03-04',
     title: 'Smarter Durability',

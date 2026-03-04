@@ -111,7 +111,7 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
       </header>
 
       {/* Spacer to push content below fixed header */}
-      <div className="h-14 shrink-0 mt-[env(safe-area-inset-top)]" />
+      <div className="h-4 shrink-0 mt-[env(safe-area-inset-top)]" />
 
       {/* Main Content */}
       <main className="w-full max-w-lg mx-auto px-4 pt-2 pb-24 flex-1">
