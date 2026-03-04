@@ -151,8 +151,8 @@ export const CHEST_CONSTANTS = {
 // =============================================================================
 
 export const DURABILITY_CONSTANTS = {
-  /** Durability lost per combat (per equipped item) */
-  COMBAT_DEGRADATION: 1,
+  /** Durability lost per hit landed/received */
+  COMBAT_DEGRADATION: 0.01,
 
   /** Turn cost to repair an item */
   REPAIR_TURN_COST: 100,

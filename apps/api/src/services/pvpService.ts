@@ -584,8 +584,8 @@ export async function challenge(
   // Apply durability loss (skip for bot defenders to preserve their gear)
   // TODO: skip potion consumption for bots when auto-potions are implemented
   const [attackerDurability, defenderDurability] = await Promise.all([
-    degradeEquippedDurability(attackerId),
-    target.isBot ? [] : degradeEquippedDurability(targetId),
+    degradeEquippedDurability(attackerId, combatResult.log, 'combatantA'),
+    target.isBot ? [] : degradeEquippedDurability(targetId, combatResult.log, 'combatantB'),
   ]);
 
   // Persist attacker resources after combat

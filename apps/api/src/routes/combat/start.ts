@@ -276,7 +276,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       let mobLoot: LootDropWithName[] = [];
       let mobXpGrant: GrantXpResult | null = null;
       const mobXpAwarded = combatResult.outcome === 'victory' ? Math.max(0, prefixedMob.xpReward) : 0;
-      const mobDurabilityLost = await degradeEquippedDurability(playerId);
+      const mobDurabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
 
       if (combatResult.outcome === 'victory') {
         await setAllResources(playerId, combatResult.combatantAHpRemaining, currentStamina, currentMana);
@@ -859,7 +859,7 @@ export function registerStartRoutes(router: Router): void {
       let loot: LootDrop[] = [];
       let pendingLootSessionId: string | null = null;
       let xpGrant = null as null | GrantXpResult;
-      const durabilityLost = await degradeEquippedDurability(playerId);
+      const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
       let fleeResult = null as null | ReturnType<typeof calculateFleeResult>;
       let respawnedTo: { townId: string; townName: string } | null = null;
 

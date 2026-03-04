@@ -71,6 +71,7 @@ import {
 import type { CombatTemplateData, ResourceState } from '@adventure/shared';
 import type { RouletteBetType } from '@adventure/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
+import { fmtDur } from '@/lib/format';
 import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
 export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
@@ -481,7 +482,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         entries.push({
           timestamp: nowStamp(),
           type: 'warning',
-          message: `Your ${loss.itemName} is about to break! (${loss.newDurability}/${loss.maxDurability})`,
+          message: `Your ${loss.itemName} is about to break! (${fmtDur(loss.newDurability!)}/${loss.maxDurability})`,
         });
       }
     }

@@ -6,6 +6,11 @@ export function formatNumber(n: number): string {
   return n.toLocaleString();
 }
 
+/** Format durability to 2 decimal places (omits decimals for whole numbers). */
+export function fmtDur(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
 export function xpRateColor(rate: number): string {
   if (rate >= 70) return 'var(--rpg-green-light)';
   if (rate >= 40) return 'var(--rpg-gold)';
