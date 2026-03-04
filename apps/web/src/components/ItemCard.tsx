@@ -39,7 +39,7 @@ export function ItemCard({ name, icon, imageSrc, quantity, rarity = 'common', du
         )}
       </div>
       {quantity !== undefined && quantity > 1 && (
-        <div className="absolute bottom-1 right-1 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-1.5 py-0.5 text-xs font-pixel text-[var(--rpg-text-primary)]">
+        <div className="absolute bottom-1 right-1 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-1.5 py-0.5 text-[8px] font-pixel text-[var(--rpg-text-primary)]">
           {quantity}
         </div>
       )}

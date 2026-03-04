@@ -231,7 +231,7 @@ export function Forge({
 
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Forge</h2>
-        <div className="text-sm text-[var(--rpg-text-secondary)]">Luck: <span className="font-pixel">{equippedLuck}</span></div>
+        <div className="text-sm text-[var(--rpg-text-secondary)]">Luck: <span className="font-pixel text-[16px]">{equippedLuck}</span></div>
       </div>
 
       {noFacility && (

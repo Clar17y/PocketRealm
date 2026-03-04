@@ -118,7 +118,7 @@ function PrefixEncyclopedia({ prefixSummary }: { prefixSummary: PrefixSummaryEnt
                 {showName ? entry.displayName : '???'}
               </span>
               {showName && (
-                <span className="text-xs text-[var(--rpg-gold)] font-pixel">
+                <span className="text-[8px] text-[var(--rpg-gold)] font-pixel">
                   {entry.totalKills} defeated
                 </span>
               )}
@@ -316,8 +316,8 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                       </div>
                       <div>
                         <h3 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">{selectedMonster.name}</h3>
-                        <div className="text-xs text-[var(--rpg-text-secondary)]">Level <span className="font-pixel">{selectedMonster.level}</span></div>
-                        <div className="text-xs text-[var(--rpg-gold)] mt-1">Defeated <span className="font-pixel">{selectedMonster.killCount}</span> times</div>
+                        <div className="text-xs text-[var(--rpg-text-secondary)]">Level <span className="font-pixel text-[8px]">{selectedMonster.level}</span></div>
+                        <div className="text-xs text-[var(--rpg-gold)] mt-1">Defeated <span className="font-pixel text-[8px]">{selectedMonster.killCount}</span> times</div>
                         {selectedMonster.explorationTier && (
                           <span className="inline-flex items-center gap-1 text-xs bg-[var(--rpg-background)] px-2 py-0.5 rounded mt-1">
                             {getTierName(selectedMonster.explorationTier)}
@@ -348,7 +348,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         <div className="flex items-center gap-3">
                           <Heart size={16} color="var(--rpg-green-light)" />
                           <span className="text-sm text-[var(--rpg-text-primary)]">HP:</span>
-                          <span className="text-sm font-pixel text-[var(--rpg-green-light)]">{selectedMonster.stats.hp}</span>
+                          <span className="text-[16px] font-pixel text-[var(--rpg-green-light)]">{selectedMonster.stats.hp}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-3 opacity-50">
@@ -361,7 +361,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         <div className="flex items-center gap-3">
                           <Sword size={16} color="var(--rpg-red)" />
                           <span className="text-sm text-[var(--rpg-text-primary)]">Accuracy:</span>
-                          <span className="text-sm font-pixel text-[var(--rpg-red)]">{selectedMonster.stats.accuracy}</span>
+                          <span className="text-[16px] font-pixel text-[var(--rpg-red)]">{selectedMonster.stats.accuracy}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-3 opacity-50">
@@ -376,7 +376,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         <div className="flex items-center gap-3">
                           <Shield size={16} color="var(--rpg-blue-light)" />
                           <span className="text-sm text-[var(--rpg-text-primary)]">Defence:</span>
-                          <span className="text-sm font-pixel text-[var(--rpg-blue-light)]">
+                          <span className="text-[16px] font-pixel text-[var(--rpg-blue-light)]">
                             {selectedMonster.stats.defence}
                           </span>
                         </div>
@@ -433,7 +433,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                               </div>
                               <div className="flex-1">
                                 <div className="text-sm text-[var(--rpg-text-primary)]">{drop.name}</div>
-                                <div className="text-xs text-[var(--rpg-text-secondary)]"><span className="font-pixel">{drop.dropRate}%</span> drop rate</div>
+                                <div className="text-xs text-[var(--rpg-text-secondary)]"><span className="font-pixel text-[8px]">{drop.dropRate}%</span> drop rate</div>
                               </div>
                             </div>
                           );

@@ -454,8 +454,8 @@ export function ZoneMap({
           {selectedZone.exploration && selectedZone.exploration.turnsToExplore && (
             <div className="mb-3">
               <div className="flex justify-between text-xs text-[var(--rpg-text-secondary)] mb-1">
-                <span><span className="font-pixel">{Math.floor(selectedZone.exploration.percent)}%</span> Explored</span>
-                <span className="font-pixel">{selectedZone.exploration.turnsExplored.toLocaleString()} / {selectedZone.exploration.turnsToExplore.toLocaleString()}</span>
+                <span><span className="font-pixel text-[8px]">{Math.floor(selectedZone.exploration.percent)}%</span> Explored</span>
+                <span className="font-pixel text-[8px]">{selectedZone.exploration.turnsExplored.toLocaleString()} / {selectedZone.exploration.turnsToExplore.toLocaleString()}</span>
               </div>
               <div className="h-2 rounded-full bg-[var(--rpg-background)] overflow-hidden">
                 <div

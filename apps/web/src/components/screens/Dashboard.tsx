@@ -106,14 +106,14 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
             </div>
             <div>
               <div className="text-sm text-[var(--rpg-text-secondary)]">Available Turns</div>
-              <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">
+              <div className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">
                 {playerData.turns.toLocaleString()}
               </div>
             </div>
           </div>
           <div className="text-right">
             <div className="text-xs text-[var(--rpg-text-secondary)]">Regen Rate</div>
-            <div className="text-sm text-[var(--rpg-green-light)] font-pixel">
+            <div className="text-[16px] text-[var(--rpg-green-light)] font-pixel">
               +{playerData.turnsRegenRate}/min
             </div>
           </div>
@@ -216,7 +216,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
           <div className="flex flex-col items-center text-center">
             <Coins size={20} color="var(--rpg-gold)" className="mb-1" />
             <div className="text-xs text-[var(--rpg-text-secondary)]">Gold</div>
-            <div className="text-lg font-bold text-[var(--rpg-gold)] font-pixel">
+            <div className="text-[16px] font-bold text-[var(--rpg-gold)] font-pixel">
               {playerData.gold.toLocaleString()}
             </div>
           </div>
@@ -226,7 +226,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
           <div className="flex flex-col items-center text-center">
             <TrendingUp size={20} color="var(--rpg-blue-light)" className="mb-1" />
             <div className="text-xs text-[var(--rpg-text-secondary)]">Total XP</div>
-            <div className="text-lg font-bold text-[var(--rpg-blue-light)] font-pixel">
+            <div className="text-[16px] font-bold text-[var(--rpg-blue-light)] font-pixel">
               {playerData.currentXP.toLocaleString()}
             </div>
           </div>
@@ -248,17 +248,17 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-sm text-[var(--rpg-text-secondary)]">Character Level</div>
-            <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">{characterProgression.characterLevel}</div>
+            <div className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">{characterProgression.characterLevel}</div>
           </div>
           <div className="text-right">
             <div className="text-sm text-[var(--rpg-text-secondary)]">Unspent Points</div>
-            <div className="text-2xl font-bold text-[var(--rpg-blue-light)] font-pixel">{characterProgression.attributePoints}</div>
+            <div className="text-[24px] font-bold text-[var(--rpg-blue-light)] font-pixel">{characterProgression.attributePoints}</div>
           </div>
         </div>
         <div className="mb-3">
           <div className="flex items-center justify-between text-xs text-[var(--rpg-text-secondary)] mb-1">
             <span>Level Progress</span>
-            <span className="font-pixel">
+            <span className="font-pixel text-[8px]">
               {playerData.currentLevelXp.toLocaleString()} / {playerData.requiredLevelXp.toLocaleString()} XP
             </span>
           </div>
@@ -285,7 +285,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
                   <div className="flex items-center gap-2">
                     <Icon size={16} color={meta.color} />
                     <span className="font-semibold text-[var(--rpg-text-primary)]">{meta.label}</span>
-                    <span className="text-sm font-bold text-[var(--rpg-gold)] font-pixel">
+                    <span className="text-[16px] font-bold text-[var(--rpg-gold)] font-pixel">
                       {characterProgression.attributes[attribute]}
                     </span>
                   </div>
@@ -334,7 +334,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
                   <Icon size={56} color="var(--rpg-gold)" />
                 ) : null}
                 <span className="text-xs text-[var(--rpg-text-secondary)]">{skill.name}</span>
-                <span className="text-sm font-bold text-[var(--rpg-gold)] font-pixel">{skill.level}</span>
+                <span className="text-[16px] font-bold text-[var(--rpg-gold)] font-pixel">{skill.level}</span>
               </button>
             );
           })}

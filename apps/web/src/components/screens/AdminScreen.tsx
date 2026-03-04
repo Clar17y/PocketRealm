@@ -196,7 +196,7 @@ function ItemsTab({ onAction }: { onAction?: () => void }) {
               }`}>
               <span className="text-[var(--rpg-text-primary)] font-display">{t.name}</span>
               <span className="text-xs text-[var(--rpg-text-secondary)] ml-2">
-                {t.itemType} {t.slot ? `(${t.slot})` : ''} T<span className="font-pixel">{t.tier}</span>
+                {t.itemType} {t.slot ? `(${t.slot})` : ''} T<span className="font-pixel text-[8px]">{t.tier}</span>
               </span>
             </div>
           ))}
@@ -435,7 +435,7 @@ function ZonesTab({ onAction }: { onAction?: () => void }) {
               <div>
                 <span className="text-[var(--rpg-text-primary)] font-display">{z.name}</span>
                 <span className="text-xs text-[var(--rpg-text-secondary)] ml-2">
-                  Lv.<span className="font-pixel">{z.difficulty}</span> | {z.zoneType}
+                  Lv.<span className="font-pixel text-[8px]">{z.difficulty}</span> | {z.zoneType}
                 </span>
               </div>
               <PixelButton size="sm" disabled={busy}

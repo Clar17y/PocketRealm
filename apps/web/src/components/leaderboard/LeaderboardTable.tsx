@@ -102,7 +102,7 @@ export function LeaderboardTable({
                     {entry.isBot && <Bot className="w-3.5 h-3.5 text-[var(--rpg-text-secondary)] shrink-0" />}
                     {entry.isAdmin && <Shield className="w-3.5 h-3.5 text-[var(--rpg-gold)] shrink-0" />}
                   </div>
-                  <span className="text-xs text-[var(--rpg-text-secondary)]">Lv.<span className="font-pixel">{entry.characterLevel}</span></span>
+                  <span className="text-xs text-[var(--rpg-text-secondary)]">Lv.<span className="font-pixel text-[8px]">{entry.characterLevel}</span></span>
                 </div>
               </div>
               <div className="text-right font-pixel text-[var(--rpg-text-primary)] shrink-0">
@@ -138,7 +138,7 @@ export function LeaderboardTable({
                     &lt;{myRank.title}&gt;
                   </span>
                 )}
-                <span className="text-xs text-[var(--rpg-text-secondary)] ml-1">Lv.<span className="font-pixel">{myRank.characterLevel}</span></span>
+                <span className="text-xs text-[var(--rpg-text-secondary)] ml-1">Lv.<span className="font-pixel text-[8px]">{myRank.characterLevel}</span></span>
               </div>
             </div>
             <div className="text-right font-pixel text-[var(--rpg-text-primary)] shrink-0">

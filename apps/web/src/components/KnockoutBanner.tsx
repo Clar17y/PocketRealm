@@ -25,7 +25,7 @@ export function KnockoutBanner({ action, recoveryCost, title = 'Knocked Out', on
             {typeof recoveryCost === 'number' && (
               <>
                 {' '}
-                Cost: <span className="font-pixel">{recoveryCost.toLocaleString()}</span> turns
+                Cost: <span className="font-pixel text-[16px]">{recoveryCost.toLocaleString()}</span> turns
               </>
             )}
           </div>

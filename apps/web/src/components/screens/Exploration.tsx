@@ -174,7 +174,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
             </p>
             <div className="inline-flex items-center gap-1 text-xs bg-[var(--rpg-background)] px-2 py-1 rounded">
               <span className="text-[var(--rpg-text-secondary)]">Min Level:</span>
-              <span className="text-[var(--rpg-gold)] font-bold font-pixel">{currentZone.minLevel}</span>
+              <span className="text-[var(--rpg-gold)] font-bold font-pixel text-[8px]">{currentZone.minLevel}</span>
             </div>
           </div>
         </div>
@@ -208,8 +208,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           {explorationProgress && explorationProgress.turnsToExplore && (
             <PixelCard>
               <div className="flex justify-between text-sm text-[var(--rpg-text-secondary)] mb-1">
-                <span>Zone Exploration: <span className="font-pixel">{Math.floor(explorationProgress.percent)}%</span></span>
-                <span className="font-pixel">{explorationProgress.turnsExplored.toLocaleString()} / {explorationProgress.turnsToExplore.toLocaleString()} turns</span>
+                <span>Zone Exploration: <span className="font-pixel text-[16px]">{Math.floor(explorationProgress.percent)}%</span></span>
+                <span className="font-pixel text-[16px]">{explorationProgress.turnsExplored.toLocaleString()} / {explorationProgress.turnsToExplore.toLocaleString()} turns</span>
               </div>
               <div className="h-2 rounded-full bg-[var(--rpg-background)] overflow-hidden">
                 <div
@@ -257,7 +257,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold text-[var(--rpg-text-primary)]">Turn Investment</h3>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">
+                  <div className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">
                     {turnInvestment[0].toLocaleString()}
                   </div>
                   {guildTaxRate > 0 && (
@@ -327,25 +327,25 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
             <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3">Expected Results</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="text-center">
-                <div className="text-2xl font-bold text-[var(--rpg-red)] font-pixel">
+                <div className="text-[24px] font-bold text-[var(--rpg-red)] font-pixel">
                   {expectedAmbushes < 1 ? expectedAmbushes.toFixed(1) : `~${Math.round(expectedAmbushes)}`}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">Ambushes</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-[var(--rpg-blue-light)] font-pixel">
+                <div className="text-[24px] font-bold text-[var(--rpg-blue-light)] font-pixel">
                   {expectedSites < 1 ? expectedSites.toFixed(2) : `~${Math.round(expectedSites)}`}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">Sites</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">
+                <div className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">
                   {expectedResources < 1 ? expectedResources.toFixed(2) : `~${Math.round(expectedResources)}`}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">Resources</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-[var(--rpg-purple)] font-pixel">{hiddenCacheChance}%</div>
+                <div className="text-[24px] font-bold text-[var(--rpg-purple)] font-pixel">{hiddenCacheChance}%</div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">Rare Find</div>
               </div>
             </div>

@@ -39,7 +39,7 @@ export function ActivityLog({ entries, maxHeight = 'max-h-64' }: ActivityLogProp
           entries.map((entry, index) => (
             <div key={index} className="flex gap-2 text-sm">
               <Clock size={14} className="text-[var(--rpg-text-secondary)] flex-shrink-0 mt-0.5" />
-              <span className="text-[var(--rpg-text-secondary)] flex-shrink-0 font-pixel">
+              <span className="text-[var(--rpg-text-secondary)] flex-shrink-0 font-pixel text-[16px]">
                 {entry.timestamp}
               </span>
               <span className={TYPE_COLORS[entry.type]}>{entry.message}</span>

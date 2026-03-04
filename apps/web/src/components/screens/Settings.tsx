@@ -92,7 +92,7 @@ export function Settings({
                 onValueChange={(val) => onCombatLogSpeedChange(val[0])}
                 onValueCommit={(val) => onCombatLogSpeedCommit(val[0])}
               />
-              <span className="text-xs font-pixel text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
+              <span className="text-[8px] font-pixel text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
                 {speedLabel(combatLogSpeedMs)}
               </span>
             </div>
@@ -119,7 +119,7 @@ export function Settings({
                 onValueChange={(val) => onAutoPotionThresholdChange(val[0])}
                 onValueCommit={(val) => onAutoPotionThresholdCommit(val[0])}
               />
-              <span className="text-sm font-pixel text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
+              <span className="text-[16px] font-pixel text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
                 {autoPotionThreshold === 0 ? 'Off' : `${autoPotionThreshold}%`}
               </span>
             </div>
@@ -150,7 +150,7 @@ export function Settings({
                 onValueChange={(val) => onExplorationSpeedChange(val[0])}
                 onValueCommit={(val) => onExplorationSpeedCommit(val[0])}
               />
-              <span className="text-xs font-pixel text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
+              <span className="text-[8px] font-pixel text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
                 {speedLabel(explorationSpeedMs)}
               </span>
             </div>
@@ -164,7 +164,7 @@ export function Settings({
                 onValueChange={(val) => onDefaultExploreTurnsChange(val[0])}
                 onValueCommit={(val) => onDefaultExploreTurnsCommit(val[0])}
               />
-              <span className="text-sm font-pixel text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
+              <span className="text-[16px] font-pixel text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
                 {defaultExploreTurns.toLocaleString()}
               </span>
             </div>

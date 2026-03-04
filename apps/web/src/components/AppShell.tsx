@@ -39,7 +39,7 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
                 height={24}
                 className="image-rendering-pixelated"
               />
-              <span className="font-pixel text-[var(--rpg-gold)]">{turns.toLocaleString()}</span>
+              <span className="font-pixel text-[16px] text-[var(--rpg-gold)]">{turns.toLocaleString()}</span>
             </div>
             {username && (
               <div

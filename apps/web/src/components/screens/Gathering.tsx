@@ -216,7 +216,7 @@ export function Gathering({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">{skillName}</h2>
-          <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-sm font-bold font-pixel">
+          <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-[16px] font-bold font-pixel">
             Lv. {skillLevel}
           </div>
         </div>
@@ -225,7 +225,7 @@ export function Gathering({
             XP Rate
             <XpRateTooltip />
           </div>
-          <div className="text-sm font-bold font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
+          <div className="text-[16px] font-bold font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>
 
@@ -309,7 +309,7 @@ export function Gathering({
                         </h4>
                         <EventBadges inline modifiers={node.eventModifiers} />
                       </div>
-                      <span className="text-xs text-[var(--rpg-text-secondary)] font-pixel">Lv. {node.levelRequired}</span>
+                      <span className="text-[8px] text-[var(--rpg-text-secondary)] font-pixel">Lv. {node.levelRequired}</span>
                     </div>
                     {/* Zone indicator */}
                     <div className="flex items-center gap-1 mt-0.5">
@@ -327,14 +327,14 @@ export function Gathering({
                       />
                     </div>
                     <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs text-[var(--rpg-text-secondary)] font-pixel">
+                      <span className="text-[8px] text-[var(--rpg-text-secondary)] font-pixel">
                         {node.remainingCapacity} / {node.maxCapacity} remaining
                       </span>
                       <div className="flex items-center gap-2">
                         {node.weathered && (
                           <span className="text-xs text-[var(--rpg-text-secondary)]">Weathered</span>
                         )}
-                        <span className="text-xs text-[var(--rpg-gold)] font-pixel">
+                        <span className="text-[8px] text-[var(--rpg-gold)] font-pixel">
                           {Math.max(node.baseYield, GATHERING_CONSTANTS.BASE_YIELD)}/action
                         </span>
                       </div>
@@ -363,7 +363,7 @@ export function Gathering({
             <div className="flex justify-between items-center">
               <h3 className="font-semibold text-[var(--rpg-text-primary)]">Turn Investment</h3>
               <div className="text-right">
-                <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">{turnInvestment[0]}</div>
+                <div className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">{turnInvestment[0]}</div>
                 {guildTaxRate > 0 && (
                   <div className="text-xs text-[var(--rpg-text-secondary)]">
                     {calcEffectiveTurns(turnInvestment[0], guildTaxRate)} effective ({guildTaxRate}% tax)

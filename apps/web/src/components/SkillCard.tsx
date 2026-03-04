@@ -50,13 +50,13 @@ export function SkillCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between mb-1">
           <h3 className="font-semibold font-display text-[var(--rpg-text-primary)]">{name}</h3>
-          <span className="text-2xl font-bold text-[var(--rpg-gold)] ml-2 font-pixel">
+          <span className="text-[24px] font-bold text-[var(--rpg-gold)] ml-2 font-pixel">
             {level}
           </span>
         </div>
         <StatBar current={currentXP} max={nextLevelXP} color="xp" size="sm" showNumbers={false} />
         <div className="flex justify-between items-center mt-1">
-          <span className="text-xs text-[var(--rpg-text-secondary)] font-pixel">
+          <span className="text-[8px] text-[var(--rpg-text-secondary)] font-pixel">
             {currentXP.toLocaleString()} / {nextLevelXP.toLocaleString()} XP
           </span>
           <span className="text-xs flex items-center gap-1" style={{ color: xpRateColor(xpRate) }}>

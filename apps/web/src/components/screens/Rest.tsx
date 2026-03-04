@@ -165,13 +165,13 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
           <div className="bg-[var(--rpg-background)] rounded-lg p-4 mb-4">
             <div className="flex justify-between items-center">
               <span className="text-[var(--rpg-text-secondary)]">Recovery Cost</span>
-              <span className="text-xl font-bold text-[var(--rpg-gold)] font-pixel">
+              <span className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">
                 {hpState.recoveryCost?.toLocaleString()} turns
               </span>
             </div>
             <div className="flex justify-between items-center mt-2">
               <span className="text-[var(--rpg-text-secondary)]">HP After Recovery</span>
-              <span className="text-lg font-bold text-[var(--rpg-green-light)] font-pixel">
+              <span className="text-[16px] font-bold text-[var(--rpg-green-light)] font-pixel">
                 {Math.floor(hpState.maxHp * 0.25)} / {hpState.maxHp}
               </span>
             </div>
@@ -234,7 +234,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
         <div className="mb-4">
           <div className="flex justify-between mb-1">
             <span className="text-sm text-[var(--rpg-text-secondary)]">Current HP</span>
-            <span className="text-sm font-pixel text-[var(--rpg-green-light)]">
+            <span className="text-[16px] font-pixel text-[var(--rpg-green-light)]">
               {hpState.currentHp} / {hpState.maxHp}
             </span>
           </div>
@@ -246,7 +246,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
             showNumbers={false}
           />
           <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">
-            Passive regen: <span className="font-pixel">+{hpState.regenPerSecond.toFixed(1)}</span> HP/sec
+            Passive regen: <span className="font-pixel text-[8px]">+{hpState.regenPerSecond.toFixed(1)}</span> HP/sec
           </div>
         </div>
 
@@ -257,7 +257,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-[var(--rpg-text-secondary)]">Turns to spend</span>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">{turns}</div>
+                  <div className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">{turns}</div>
                   {estimate?.taxRate != null && estimate.taxRate > 0 && estimate.effectiveTurns != null && (
                     <div className="text-xs text-[var(--rpg-text-secondary)]">
                       {estimate.effectiveTurns} effective ({estimate.taxRate}% tax)
@@ -288,7 +288,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
               <div className="bg-[var(--rpg-background)] rounded-lg p-4 mb-4">
                 <div className="flex justify-between items-center">
                   <span className="text-[var(--rpg-text-secondary)]">HP Restored</span>
-                  <span className="text-lg font-bold text-[var(--rpg-green-light)] font-pixel">
+                  <span className="text-[16px] font-bold text-[var(--rpg-green-light)] font-pixel">
                     +{Math.floor(estimate.healAmount)}
                   </span>
                 </div>

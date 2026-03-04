@@ -219,7 +219,7 @@ export function TrainingGrounds({
               {outcomeLabel}!
             </div>
             <div className="text-sm text-[var(--rpg-text-secondary)]">
-              vs <span className="font-display">{mobDisplayName}</span> — <span className="font-pixel">{combatResult.log.length}</span> rounds
+              vs <span className="font-display">{mobDisplayName}</span> — <span className="font-pixel text-[16px]">{combatResult.log.length}</span> rounds
             </div>
             <div className="bg-[var(--rpg-background)] rounded-lg px-4 py-2 inline-block">
               <span className="text-sm text-[var(--rpg-text-secondary)]">
@@ -307,12 +307,12 @@ export function TrainingGrounds({
                           {mob.name}
                         </span>
                         <span className="text-xs text-[var(--rpg-text-secondary)]">
-                          Lv. <span className="font-pixel">{mob.level}</span>
+                          Lv. <span className="font-pixel text-[8px]">{mob.level}</span>
                         </span>
                       </div>
                       {mob.prefixesEncountered.length > 0 && (
                         <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">
-                          <span className="font-pixel">{mob.prefixesEncountered.length}</span> variant{mob.prefixesEncountered.length !== 1 ? 's' : ''} discovered
+                          <span className="font-pixel text-[8px]">{mob.prefixesEncountered.length}</span> variant{mob.prefixesEncountered.length !== 1 ? 's' : ''} discovered
                         </div>
                       )}
                     </div>
@@ -397,7 +397,7 @@ function CooldownDisplay({ seconds }: { seconds: number }) {
   return (
     <div className="bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg p-3 text-center">
       <div className="text-xs text-[var(--rpg-text-secondary)] mb-1">Cooldown</div>
-      <div className="text-lg font-bold font-pixel text-[var(--rpg-gold)]">
+      <div className="text-[16px] font-bold font-pixel text-[var(--rpg-gold)]">
         {formatTime(seconds)}
       </div>
     </div>

@@ -82,13 +82,13 @@ export function BossHistory() {
                   </span>
                 </div>
                 <div className="flex gap-4 text-xs text-[var(--rpg-text-secondary)] mt-1">
-                  <span><span className="font-pixel">{stats.roundsParticipated}</span> round{stats.roundsParticipated !== 1 ? 's' : ''}</span>
-                  <span><span className="font-pixel">{stats.totalDamage.toLocaleString()}</span> dmg</span>
-                  {stats.totalHealing > 0 && <span><span className="font-pixel">{stats.totalHealing.toLocaleString()}</span> healed</span>}
+                  <span><span className="font-pixel text-[8px]">{stats.roundsParticipated}</span> round{stats.roundsParticipated !== 1 ? 's' : ''}</span>
+                  <span><span className="font-pixel text-[8px]">{stats.totalDamage.toLocaleString()}</span> dmg</span>
+                  {stats.totalHealing > 0 && <span><span className="font-pixel text-[8px]">{stats.totalHealing.toLocaleString()}</span> healed</span>}
                   {stats.attacks > 0 && (
                     <span>
-                      <span className="font-pixel">{stats.hits}/{stats.attacks}</span> hit
-                      {stats.crits > 0 && <>, <span className="font-pixel">{stats.crits}</span> crit</>}
+                      <span className="font-pixel text-[8px]">{stats.hits}/{stats.attacks}</span> hit
+                      {stats.crits > 0 && <>, <span className="font-pixel text-[8px]">{stats.crits}</span> crit</>}
                     </span>
                   )}
                 </div>
@@ -101,7 +101,7 @@ export function BossHistory() {
                       Kill credit: <span className="font-display">{entry.killedByUsername}</span>
                     </p>
                   )}
-                  <p>Total boss rounds: <span className="font-pixel">{entry.encounter.roundNumber}</span></p>
+                  <p>Total boss rounds: <span className="font-pixel text-[8px]">{entry.encounter.roundNumber}</span></p>
 
                   {entry.myRewards && (
                     <BossRewardsDisplay rewards={entry.myRewards} />
@@ -113,11 +113,11 @@ export function BossHistory() {
                       <div className="space-y-1">
                         {entry.encounter.roundSummaries.map((rs) => (
                           <div key={rs.round} className="flex justify-between">
-                            <span>Round <span className="font-pixel">{rs.round}</span></span>
+                            <span>Round <span className="font-pixel text-[8px]">{rs.round}</span></span>
                             <span>
-                              Players: <span className="font-pixel">{rs.totalPlayerDamage.toLocaleString()}</span> dmg |
-                              Boss: <span className="font-pixel">{rs.bossDamage.toLocaleString()}</span> dmg |
-                              HP: <span className="font-pixel">{rs.bossHpPercent}%</span> | Alive: <span className="font-pixel">{rs.playersAlive}</span> Dead: <span className="font-pixel">{rs.playersDead}</span>
+                              Players: <span className="font-pixel text-[8px]">{rs.totalPlayerDamage.toLocaleString()}</span> dmg |
+                              Boss: <span className="font-pixel text-[8px]">{rs.bossDamage.toLocaleString()}</span> dmg |
+                              HP: <span className="font-pixel text-[8px]">{rs.bossHpPercent}%</span> | Alive: <span className="font-pixel text-[8px]">{rs.playersAlive}</span> Dead: <span className="font-pixel text-[8px]">{rs.playersDead}</span>
                             </span>
                           </div>
                         ))}

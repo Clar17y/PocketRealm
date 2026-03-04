@@ -152,7 +152,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
                 <div className="mb-2">
                   <div className="flex justify-between text-xs mb-1">
                     <span>HP</span>
-                    <span className="font-pixel">{Math.round(hpPercent)}%</span>
+                    <span className="font-pixel text-[8px]">{Math.round(hpPercent)}%</span>
                   </div>
                   <div className="w-full h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }}>
                     <div
@@ -165,7 +165,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
                   </div>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span>Round <span className="font-pixel">{boss.roundNumber}</span> — {boss.status}</span>
+                  <span>Round <span className="font-pixel text-[8px]">{boss.roundNumber}</span> — {boss.status}</span>
                   {boss.nextRoundAt && (
                     <span>Next round: {formatTimeRemaining(boss.nextRoundAt)}</span>
                   )}

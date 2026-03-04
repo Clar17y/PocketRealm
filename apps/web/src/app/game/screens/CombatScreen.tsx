@@ -335,7 +335,7 @@ export function CombatScreen({
           {roomTransition && (
             <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)]/30 rounded-lg p-6 text-center">
               <div className="text-lg font-bold text-[var(--rpg-gold)] mb-1">
-                Entering Room <span className="font-pixel">{roomTransition.entering}</span>
+                Entering Room <span className="font-pixel text-[16px]">{roomTransition.entering}</span>
               </div>
               <div className="text-sm text-[var(--rpg-text-secondary)]">
                 Prepare for the next fight...
@@ -349,8 +349,8 @@ export function CombatScreen({
               {fightProgress && fightProgress.total > 1 && (
                 <div className="text-sm text-[var(--rpg-gold)] font-semibold mb-2">
                   {fightProgress.room
-                    ? <>Room <span className="font-pixel">{fightProgress.room}</span> — Fight <span className="font-pixel">{fightProgress.current}/{fightProgress.total}</span></>
-                    : <>Fight <span className="font-pixel">{fightProgress.current}/{fightProgress.total}</span></>
+                    ? <>Room <span className="font-pixel text-[16px]">{fightProgress.room}</span> — Fight <span className="font-pixel text-[16px]">{fightProgress.current}/{fightProgress.total}</span></>
+                    : <>Fight <span className="font-pixel text-[16px]">{fightProgress.current}/{fightProgress.total}</span></>
                   }
                 </div>
               )}
@@ -546,12 +546,12 @@ export function CombatScreen({
                           </div>
                           <span className="text-xs text-[var(--rpg-text-secondary)]">
                             {e.totalRooms > 1
-                              ? <>Room <span className="font-pixel">{e.currentRoom}/{e.totalRooms}</span> · <span className="font-pixel">{e.aliveMobs}/{e.totalMobs}</span> mobs</>
-                              : <><span className="font-pixel">{e.aliveMobs}/{e.totalMobs}</span> mobs</>
+                              ? <>Room <span className="font-pixel text-[8px]">{e.currentRoom}/{e.totalRooms}</span> · <span className="font-pixel text-[8px]">{e.aliveMobs}/{e.totalMobs}</span> mobs</>
+                              : <><span className="font-pixel text-[8px]">{e.aliveMobs}/{e.totalMobs}</span> mobs</>
                             }
                           </span>
                           <span className={`text-xs ${e.totalTurnCost > currentTurns ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
-                            {' · '}Cost: <span className="font-pixel">{e.totalTurnCost.toLocaleString()}</span> turns
+                            {' · '}Cost: <span className="font-pixel text-[8px]">{e.totalTurnCost.toLocaleString()}</span> turns
                           </span>
                           {e.clearStrategy && (
                             <span className="text-xs text-[var(--rpg-gold)] ml-2">
@@ -562,7 +562,7 @@ export function CombatScreen({
                             Next monster: <span className="font-display">{nextMobLabel ?? 'None (site decayed)'}</span>
                           </div>
                         <div className="text-xs text-[var(--rpg-text-secondary)]">
-                          Zone: <span className="font-display">{e.zoneName}</span> | Decayed <span className="font-pixel">{e.decayedMobs}</span> | Found{' '}
+                          Zone: <span className="font-display">{e.zoneName}</span> | Decayed <span className="font-pixel text-[8px]">{e.decayedMobs}</span> | Found{' '}
                           {relativeTime(pendingClockMs - new Date(e.discoveredAt).getTime())}
                         </div>
                         </div>

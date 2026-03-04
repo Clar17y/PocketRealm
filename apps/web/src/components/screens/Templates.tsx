@@ -312,7 +312,7 @@ export function Templates({
                 if (!def) return null;
                 return (
                   <div key={i} className="flex items-center gap-2 p-2 rounded bg-[var(--rpg-background)] border border-[var(--rpg-border)]">
-                    <span className="text-xs font-pixel text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">{i + 1}</span>
+                    <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{def.name}</span>
@@ -352,23 +352,23 @@ export function Templates({
         {/* Resource preview */}
         {editorActions.length > 0 && (
           <PixelCard padding="sm">
-            <span className="text-xs text-[var(--rpg-text-secondary)] block mb-2">Resource Preview (per cycle of <span className="font-pixel">{editorActions.length}</span> actions)</span>
+            <span className="text-xs text-[var(--rpg-text-secondary)] block mb-2">Resource Preview (per cycle of <span className="font-pixel text-[8px]">{editorActions.length}</span> actions)</span>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Stamina cost:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel">{cycleCost.stamina}</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{cycleCost.stamina}</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Mana cost:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel">{cycleCost.mana}</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{cycleCost.mana}</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Stamina regen:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel">{staminaPerCycle}/cycle</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{staminaPerCycle}/cycle</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Mana regen:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel">{manaPerCycle}/cycle</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{manaPerCycle}/cycle</span>
               </div>
             </div>
             <div className="mt-2 space-y-1 text-xs">
@@ -429,7 +429,7 @@ export function Templates({
                     )}
                   </div>
                   <span className="text-xs text-[var(--rpg-text-secondary)]">
-                    <span className="font-pixel">{t.actions.length}</span> action{t.actions.length !== 1 ? 's' : ''}
+                    <span className="font-pixel text-[8px]">{t.actions.length}</span> action{t.actions.length !== 1 ? 's' : ''}
                   </span>
                 </div>
                 <div className="flex gap-1 shrink-0">
