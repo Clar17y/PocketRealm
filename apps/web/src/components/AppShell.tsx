@@ -114,7 +114,7 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
       <div className="h-14 shrink-0 mt-[env(safe-area-inset-top)]" />
 
       {/* Main Content */}
-      <main className="w-full max-w-lg mx-auto px-4 py-4 pb-24 flex-1">
+      <main className="w-full max-w-lg mx-auto px-4 pt-2 pb-24 flex-1">
         {children}
       </main>
     </div>
