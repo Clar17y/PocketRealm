@@ -996,4 +996,254 @@ describe('runTemplateCombat', () => {
       expect(attackEntry?.targetDefence).toBeUndefined();
     });
   });
+
+  describe('DOT/HOT tick system', () => {
+    it('DOT deals damage each round', () => {
+      mockCombatRandom();
+
+      const poisonAttack: ActionDefinition = {
+        id: 'poison_strike',
+        name: 'Poison Strike',
+        description: 'An attack that poisons the target.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 15, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        effect: {
+          name: 'Poison',
+          stat: 'attack',
+          modifier: 0,
+          duration: 4,
+          isDebuff: true,
+          damagePerRound: 10,
+          dotDamageType: 'magic',
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, poison_strike: poisonAttack };
+
+      const a = makeCombatant('Player', {
+        template: templateOf('poison_strike', 'light_attack', 'light_attack', 'light_attack'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 10, damageMax: 10 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1, magicDefence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      // Should have DOT tick entries in the log
+      const dotTicks = result.log.filter(e => e.tickType === 'dot_tick');
+      expect(dotTicks.length).toBeGreaterThan(0);
+
+      // DOT should deal damage
+      for (const tick of dotTicks) {
+        expect(tick.damage).toBeGreaterThan(0);
+        expect(tick.spellName).toBe('Poison');
+        expect(tick.message).toContain('magic damage');
+      }
+    });
+
+    it('HOT heals each round via supportive action', () => {
+      mockCombatRandom();
+
+      const regenSpell: ActionDefinition = {
+        id: 'regeneration',
+        name: 'Regeneration',
+        description: 'Heal over time.',
+        actionType: 'buff',
+        category: 'supportive',
+        cost: { stamina: 5, mana: 20 },
+        isChanneling: true,
+        effect: {
+          name: 'Regeneration',
+          stat: 'defence',
+          modifier: 0,
+          duration: 4,
+          healPerRound: 8,
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, regeneration: regenSpell };
+
+      const a = makeCombatant('Player', {
+        template: templateOf('regeneration', 'light_attack', 'light_attack', 'light_attack'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 60, maxHp: 100, damageMin: 5, damageMax: 5 }),
+        mana: 500,
+        maxMana: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const hotTicks = result.log.filter(e => e.tickType === 'hot_tick');
+      expect(hotTicks.length).toBeGreaterThan(0);
+
+      for (const tick of hotTicks) {
+        expect(tick.healAmount).toBeGreaterThan(0);
+        expect(tick.spellName).toBe('Regeneration');
+        expect(tick.message).toContain('heals');
+      }
+    });
+
+    it('DOT can kill target', () => {
+      mockCombatRandom();
+
+      // Strong DOT on a low-HP target that defends (takes no direct damage to die from)
+      const strongDotAttack: ActionDefinition = {
+        id: 'deadly_poison',
+        name: 'Deadly Poison',
+        description: 'Lethal poison.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 0.1,
+        damageType: 'physical',
+        effect: {
+          name: 'Deadly Poison',
+          stat: 'attack',
+          modifier: 0,
+          duration: 10,
+          isDebuff: true,
+          damagePerRound: 50,
+          dotDamageType: 'magic',
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, deadly_poison: strongDotAttack };
+
+      const a = makeCombatant('Player', {
+        template: templateOf('deadly_poison', 'defend', 'defend', 'defend'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 10, damageMax: 10 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 80, maxHp: 80, damageMin: 1, damageMax: 1, magicDefence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      expect(result.outcome).toBe('victory');
+      expect(result.combatantBHpRemaining).toBe(0);
+
+      // Verify DOT ticks appear in the log
+      const dotTicks = result.log.filter(e => e.tickType === 'dot_tick');
+      expect(dotTicks.length).toBeGreaterThan(0);
+    });
+
+    it('same-name DOT refreshes duration instead of stacking', () => {
+      mockCombatRandom();
+
+      const poisonAttack: ActionDefinition = {
+        id: 'poison_strike',
+        name: 'Poison Strike',
+        description: 'Poisons the target.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        effect: {
+          name: 'Poison',
+          stat: 'attack',
+          modifier: 0,
+          duration: 3,
+          isDebuff: true,
+          damagePerRound: 10,
+          dotDamageType: 'magic',
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, poison_strike: poisonAttack };
+
+      // Both rounds use poison_strike → second application should refresh, not stack
+      const a = makeCombatant('Player', {
+        template: templateOf('poison_strike'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 10, damageMax: 10 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1, magicDefence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      // If DOTs stacked, each tick after round 2 would deal 20 damage (10+10).
+      // With refresh, each tick should only deal 10.
+      const dotTicks = result.log.filter(e => e.tickType === 'dot_tick');
+      expect(dotTicks.length).toBeGreaterThan(0);
+
+      // All DOT ticks should deal the same amount (10 damage with 0 magic defence)
+      const uniqueDamages = new Set(dotTicks.map(e => e.damage));
+      expect(uniqueDamages.size).toBe(1);
+      expect(dotTicks[0].damage).toBe(10);
+    });
+
+    it('DOT snapshot uses % of triggering hit damage', () => {
+      mockCombatRandom();
+
+      const percentDotAttack: ActionDefinition = {
+        id: 'burning_strike',
+        name: 'Burning Strike',
+        description: 'Sets the target on fire.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 15, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        effect: {
+          name: 'Burning',
+          stat: 'attack',
+          modifier: 0,
+          duration: 3,
+          isDebuff: true,
+          damagePerRound: 5,
+          damagePerRoundPercent: 50,
+          dotDamageType: 'physical',
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, burning_strike: percentDotAttack };
+
+      // With damageMin/Max = 20, no defence, no crit, damageMultiplier=1.0:
+      // finalDamage = 20
+      // DOT per round = 5 (flat) + floor(20 * 50 / 100) = 5 + 10 = 15
+      const a = makeCombatant('Player', {
+        template: templateOf('burning_strike', 'defend', 'defend', 'defend'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 20, damageMax: 20 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1, defence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const dotTicks = result.log.filter(e => e.tickType === 'dot_tick');
+      expect(dotTicks.length).toBeGreaterThan(0);
+
+      // The initial hit has defend's 35% reduction: floor(20 * 0.65) = 13
+      // DOT snapshot: flat 5 + floor(13 * 50 / 100) = 5 + 6 = 11
+      // DOT tick with 0 physical defence → damage = 11
+      expect(dotTicks[0].damage).toBe(11);
+    });
+  });
 });

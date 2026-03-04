@@ -12,7 +12,7 @@ import type {
   CombatAction,
   PerActionScaling,
 } from '@adventure/shared';
-import { COMBAT_ACTION_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
+import { COMBAT_ACTION_CONSTANTS, COMBAT_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
 import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type RoundInteraction } from './actionResolver';
 import {
   rollD20,
@@ -54,6 +54,7 @@ export interface TemplateCombatLogEntry extends CombatLogEntry {
   combatantBManaAfter: number;
   wasExhausted?: boolean;
   interactionResult?: string;
+  tickType?: 'dot_tick' | 'hot_tick';
 }
 
 export interface TemplateCombatResult {
@@ -239,6 +240,73 @@ function tickEffects(state: TemplateCombatState): void {
   state.activeEffects = remaining;
 }
 
+function applyEffectTicks(
+  state: TemplateCombatState,
+  combatantA: TemplateCombatant,
+  combatantB: TemplateCombatant,
+): void {
+  for (const effect of state.activeEffects) {
+    // DOT tick
+    if (effect.resolvedDamagePerRound && effect.resolvedDamagePerRound > 0) {
+      const targetKey = effect.target;
+      const target = targetKey === 'combatantA' ? combatantA : combatantB;
+      const effectiveStats = getEffectiveStats(target.stats, state.activeEffects, targetKey);
+      const defence = effect.dotDamageType === 'physical'
+        ? effectiveStats.defence
+        : effectiveStats.magicDefence;
+      const reduction = calculateDefenceReduction(defence);
+      const tickDamage = Math.max(
+        COMBAT_CONSTANTS.MIN_DAMAGE,
+        Math.round(effect.resolvedDamagePerRound * (1 - reduction)),
+      );
+
+      applyDamage(state, targetKey, tickDamage);
+
+      state.log.push({
+        round: state.round,
+        actor: targetKey === 'combatantA' ? 'combatantB' : 'combatantA',
+        actorName: targetKey === 'combatantA' ? combatantB.name : combatantA.name,
+        action: 'spell',
+        spellName: effect.name,
+        damage: tickDamage,
+        message: `${effect.name} deals ${tickDamage} ${effect.dotDamageType ?? 'magic'} damage to ${target.name}`,
+        tickType: 'dot_tick',
+        combatantAAction: '',
+        combatantBAction: '',
+        ...hpSnapshot(state),
+        ...resourceSnapshot(state),
+      });
+    }
+
+    // HOT tick
+    if (effect.resolvedHealPerRound && effect.resolvedHealPerRound > 0) {
+      const targetKey = effect.target;
+      const target = targetKey === 'combatantA' ? combatantA : combatantB;
+      const currentHp = getHp(state, targetKey);
+      const maxHeal = target.stats.maxHp - currentHp;
+      const actualHeal = Math.min(effect.resolvedHealPerRound, maxHeal);
+
+      if (actualHeal > 0) {
+        applyHeal(state, targetKey, actualHeal);
+        state.log.push({
+          round: state.round,
+          actor: targetKey,
+          actorName: target.name,
+          action: 'spell',
+          spellName: effect.name,
+          healAmount: actualHeal,
+          message: `${effect.name} heals ${target.name} for ${actualHeal} HP`,
+          tickType: 'hot_tick',
+          combatantAAction: '',
+          combatantBAction: '',
+          ...hpSnapshot(state),
+          ...resourceSnapshot(state),
+        });
+      }
+    }
+  }
+}
+
 function hasPotionSickness(state: TemplateCombatState, actor: CombatActor): boolean {
   return state.activeEffects.some(
     (e) => e.target === actor && e.stat === 'potionSickness',
@@ -384,6 +452,53 @@ function executeOffensiveAction(
     ...resourceSnapshot(state),
   });
 
+  // Apply effect (DOT debuff on the target)
+  if (action.effect) {
+    const effect = action.effect;
+    const targetKey = effect.isDebuff !== false ? opponent(actorKey) : actorKey;
+
+    const newEffect: ActiveEffect = {
+      name: effect.name,
+      target: targetKey,
+      stat: effect.stat,
+      modifier: effect.modifier,
+      remainingRounds: effect.duration,
+    };
+
+    // Snapshot DOT damage
+    if (effect.damagePerRound || effect.damagePerRoundPercent) {
+      const dotFlat = effect.damagePerRound ?? 0;
+      const dotPercent = Math.floor(finalDamage * (effect.damagePerRoundPercent ?? 0) / 100);
+      newEffect.resolvedDamagePerRound = dotFlat + dotPercent;
+      newEffect.dotDamageType = effect.dotDamageType ?? 'magic';
+    }
+
+    // Snapshot HOT healing
+    if (effect.healPerRound) {
+      newEffect.resolvedHealPerRound = effect.healPerRound;
+    }
+
+    // Same-name effects refresh, not stack
+    const existingIdx = state.activeEffects.findIndex(
+      e => e.name === newEffect.name && e.target === newEffect.target,
+    );
+    if (existingIdx >= 0) {
+      state.activeEffects[existingIdx] = { ...state.activeEffects[existingIdx], ...newEffect };
+    } else {
+      // Debuffs always apply; buffs respect cap
+      if (effect.isDebuff) {
+        state.activeEffects.push(newEffect);
+      } else {
+        const activeBufCount = state.activeEffects.filter(
+          (e) => e.target === actorKey && e.stat !== 'potionSickness' && e.modifier >= 0,
+        ).length;
+        if (activeBufCount < COMBAT_ACTION_CONSTANTS.MAX_ACTIVE_BUFFS) {
+          state.activeEffects.push(newEffect);
+        }
+      }
+    }
+  }
+
   // Check for kill
   if (getHp(state, opponent(actorKey)) <= 0) {
     state.outcome = actorKey === 'combatantA' ? 'victory' : 'defeat';
@@ -441,20 +556,43 @@ function executeSupportiveAction(
     const effect = action.effect;
     const target = effect.isDebuff ? opponent(actorKey) : actorKey;
 
-    if (!effect.isDebuff) {
+    const newEffect: ActiveEffect = {
+      name: effect.name,
+      target,
+      stat: effect.stat,
+      modifier: effect.modifier,
+      remainingRounds: effect.duration,
+    };
+
+    // Snapshot HOT healing (no finalDamage for supportive actions, so damagePerRoundPercent N/A)
+    if (effect.damagePerRound) {
+      newEffect.resolvedDamagePerRound = effect.damagePerRound;
+      newEffect.dotDamageType = effect.dotDamageType ?? 'magic';
+    }
+    if (effect.healPerRound) {
+      newEffect.resolvedHealPerRound = effect.healPerRound;
+    }
+
+    // Same-name effects refresh, not stack
+    const existingIdx = state.activeEffects.findIndex(
+      e => e.name === newEffect.name && e.target === newEffect.target,
+    );
+    if (existingIdx >= 0) {
+      state.activeEffects[existingIdx] = { ...state.activeEffects[existingIdx], ...newEffect };
+      appliedEffects.push({
+        stat: effect.stat,
+        modifier: effect.modifier,
+        duration: effect.duration,
+        target,
+      });
+    } else if (!effect.isDebuff) {
       const activeBufCount = state.activeEffects.filter(
         (e) => e.target === actorKey && e.stat !== 'potionSickness' && e.modifier >= 0,
       ).length;
       if (activeBufCount >= COMBAT_ACTION_CONSTANTS.MAX_ACTIVE_BUFFS) {
         // At buff cap — skip applying the new buff
       } else {
-        state.activeEffects.push({
-          name: effect.name,
-          target,
-          stat: effect.stat,
-          modifier: effect.modifier,
-          remainingRounds: effect.duration,
-        });
+        state.activeEffects.push(newEffect);
         appliedEffects.push({
           stat: effect.stat,
           modifier: effect.modifier,
@@ -464,13 +602,7 @@ function executeSupportiveAction(
       }
     } else {
       // Debuffs are always applied (no cap)
-      state.activeEffects.push({
-        name: effect.name,
-        target,
-        stat: effect.stat,
-        modifier: effect.modifier,
-        remainingRounds: effect.duration,
-      });
+      state.activeEffects.push(newEffect);
       appliedEffects.push({
         stat: effect.stat,
         modifier: effect.modifier,
@@ -866,6 +998,21 @@ export function runTemplateCombat(
     }
 
     if (state.outcome) break;
+
+    // Apply DOT/HOT ticks
+    applyEffectTicks(state, combatantA, combatantB);
+
+    // Check for DOT death
+    if (getHp(state, 'combatantA') <= 0 || getHp(state, 'combatantB') <= 0) {
+      if (getHp(state, 'combatantA') <= 0 && getHp(state, 'combatantB') <= 0) {
+        state.outcome = 'draw';
+      } else if (getHp(state, 'combatantA') <= 0) {
+        state.outcome = 'defeat';
+      } else {
+        state.outcome = 'victory';
+      }
+      break;
+    }
 
     // Tick effects (decrement duration, remove expired)
     tickEffects(state);
