@@ -22,27 +22,27 @@ export function GuildOverview({ guild, members }: GuildOverviewProps) {
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <span className="text-[var(--rpg-text-secondary)]">Level</span>
-            <p className="font-bold text-[var(--rpg-gold)]">{guild.level}</p>
+            <p className="font-bold font-pixel text-[var(--rpg-gold)]">{guild.level}</p>
           </div>
           <div>
             <span className="text-[var(--rpg-text-secondary)]">Members</span>
-            <p className="font-bold">{guild.memberCount}/{guild.maxMembers}</p>
+            <p className="font-bold font-pixel">{guild.memberCount}/{guild.maxMembers}</p>
           </div>
           <div>
             <span className="text-[var(--rpg-text-secondary)]">Treasury</span>
-            <p className="font-bold">{formatNumber(guild.treasuryTurns)}/{formatNumber(guild.treasuryCap)}</p>
+            <p className="font-bold font-pixel">{formatNumber(guild.treasuryTurns)}/{formatNumber(guild.treasuryCap)}</p>
           </div>
           <div>
             <span className="text-[var(--rpg-text-secondary)]">Tax Rate</span>
-            <p className="font-bold">{guild.taxRate}%</p>
+            <p className="font-bold font-pixel">{guild.taxRate}%</p>
           </div>
           <div>
             <span className="text-[var(--rpg-text-secondary)]">Active Members</span>
-            <p className="font-bold text-[var(--rpg-green-light)]">{activeCount}/{guild.memberCount}</p>
+            <p className="font-bold font-pixel text-[var(--rpg-green-light)]">{activeCount}/{guild.memberCount}</p>
           </div>
           <div>
             <span className="text-[var(--rpg-text-secondary)]">Renown</span>
-            <p className="font-bold">{formatNumber(guild.renown)}</p>
+            <p className="font-bold font-pixel">{formatNumber(guild.renown)}</p>
           </div>
         </div>
       </PixelCard>

@@ -299,7 +299,7 @@ export function CombatHistory() {
   return (
     <ScreenContainer spacing="y-3">
       <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
-        <div className="text-[var(--rpg-text-primary)] font-semibold">Combat History</div>
+        <div className="text-[var(--rpg-text-primary)] font-semibold font-display">Combat History</div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <input
@@ -401,7 +401,7 @@ export function CombatHistory() {
                         : (entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')}
                     </span>
                     {entry.source === 'encounter_site' && entry.fightCount > 1 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)]">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)] font-pixel">
                         {entry.fightCount} fights
                       </span>
                     )}
@@ -414,7 +414,7 @@ export function CombatHistory() {
                   {entry.zoneName ?? 'Unknown Zone'} | {relativeTime(entry.createdAt)}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">
-                  Source: {formatCombatSource(entry.source)} | Rounds: {entry.roundCount} | XP: {entry.xpGained.toLocaleString()}
+                  Source: {formatCombatSource(entry.source)} | Rounds: <span className="font-pixel">{entry.roundCount}</span> | XP: <span className="font-pixel">{entry.xpGained.toLocaleString()}</span>
                 </div>
               </button>
             ))}
@@ -434,7 +434,7 @@ export function CombatHistory() {
       {selectedEntry && (
         <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold flex-wrap">
+            <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold font-display flex-wrap">
               {(selectedDetail?.mobName ?? selectedEntry.mobName) && (
                 <img
                   src={monsterImageSrc((selectedDetail?.mobName ?? selectedEntry.mobName)!)}

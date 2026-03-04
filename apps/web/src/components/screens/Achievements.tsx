@@ -107,9 +107,9 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
       <PixelCard padding="sm">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm font-medium text-[var(--rpg-text-primary)]">
-            {totalCompleted} / {totalAchievements} Achievements
+            <span className="font-pixel">{totalCompleted} / {totalAchievements}</span> Achievements
           </span>
-          <span className="text-xs text-[var(--rpg-text-secondary)]">
+          <span className="text-xs text-[var(--rpg-text-secondary)] font-pixel">
             {totalAchievements > 0 ? Math.round((totalCompleted / totalAchievements) * 100) : 0}%
           </span>
         </div>

@@ -246,7 +246,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
             showNumbers={false}
           />
           <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">
-            Passive regen: +{hpState.regenPerSecond.toFixed(1)} HP/sec
+            Passive regen: <span className="font-pixel">+{hpState.regenPerSecond.toFixed(1)}</span> HP/sec
           </div>
         </div>
 

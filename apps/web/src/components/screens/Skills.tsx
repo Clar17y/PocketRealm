@@ -28,7 +28,7 @@ export function Skills({ skills }: SkillsProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Skills</h2>
         <div className="text-sm text-[var(--rpg-text-secondary)]">
-          Total Level: {skills.reduce((sum, skill) => sum + skill.level, 0)}
+          Total Level: <span className="font-pixel">{skills.reduce((sum, skill) => sum + skill.level, 0)}</span>
         </div>
       </div>
 

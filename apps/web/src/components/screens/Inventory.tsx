@@ -634,7 +634,7 @@ export function Inventory({
           {/* Backpack Items */}
           <div className="space-y-2">
             <div className={`text-sm font-semibold ${usedSlots > capacity ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
-              Backpack ({usedSlots}/{capacity}){usedSlots > capacity && ' — Over-encumbered!'}
+              Backpack (<span className="font-pixel">{usedSlots}/{capacity}</span>){usedSlots > capacity && ' — Over-encumbered!'}
             </div>
             <div className="grid grid-cols-6 gap-2">
               {backpackItems.map((item, index) => {
@@ -719,7 +719,7 @@ export function Inventory({
                   )}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">{selectedItem.name}</h3>
+                  <h3 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">{selectedItem.name}</h3>
                   {selectedItem.equippedSlot && (
                     <div className="text-xs text-[var(--rpg-gold)] mt-0.5">
                       Equipped: {prettySlot(selectedItem.equippedSlot)}

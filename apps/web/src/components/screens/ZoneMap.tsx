@@ -415,7 +415,7 @@ export function ZoneMap({
           }}
         >
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-[var(--rpg-text-primary)]">
+            <h3 className="font-semibold font-display text-[var(--rpg-text-primary)]">
               {selectedZone.name}
               {selectedZone.id === currentZoneId && (
                 <span className="ml-2 text-xs text-[var(--rpg-gold)]">(Current)</span>
@@ -454,8 +454,8 @@ export function ZoneMap({
           {selectedZone.exploration && selectedZone.exploration.turnsToExplore && (
             <div className="mb-3">
               <div className="flex justify-between text-xs text-[var(--rpg-text-secondary)] mb-1">
-                <span>{Math.floor(selectedZone.exploration.percent)}% Explored</span>
-                <span>{selectedZone.exploration.turnsExplored.toLocaleString()} / {selectedZone.exploration.turnsToExplore.toLocaleString()}</span>
+                <span><span className="font-pixel">{Math.floor(selectedZone.exploration.percent)}%</span> Explored</span>
+                <span className="font-pixel">{selectedZone.exploration.turnsExplored.toLocaleString()} / {selectedZone.exploration.turnsToExplore.toLocaleString()}</span>
               </div>
               <div className="h-2 rounded-full bg-[var(--rpg-background)] overflow-hidden">
                 <div

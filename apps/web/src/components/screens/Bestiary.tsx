@@ -257,7 +257,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         <span className="text-[10px] text-[var(--rpg-text-secondary)] text-center px-1 leading-tight">
                           {monster.name}
                         </span>
-                        <span className="text-xs text-[var(--rpg-gold)] font-pixel mt-1">x{monster.killCount}</span>
+                        <span className="text-[10px] text-[var(--rpg-gold)] font-pixel mt-1">x{monster.killCount}</span>
                       </>
                     ) : isTierLocked ? (
                       <>
@@ -316,8 +316,8 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                       </div>
                       <div>
                         <h3 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">{selectedMonster.name}</h3>
-                        <div className="text-xs text-[var(--rpg-text-secondary)]">Level {selectedMonster.level}</div>
-                        <div className="text-xs text-[var(--rpg-gold)] mt-1">Defeated {selectedMonster.killCount} times</div>
+                        <div className="text-xs text-[var(--rpg-text-secondary)]">Level <span className="font-pixel">{selectedMonster.level}</span></div>
+                        <div className="text-xs text-[var(--rpg-gold)] mt-1">Defeated <span className="font-pixel">{selectedMonster.killCount}</span> times</div>
                         {selectedMonster.explorationTier && (
                           <span className="inline-flex items-center gap-1 text-xs bg-[var(--rpg-background)] px-2 py-0.5 rounded mt-1">
                             {getTierName(selectedMonster.explorationTier)}
@@ -433,7 +433,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                               </div>
                               <div className="flex-1">
                                 <div className="text-sm text-[var(--rpg-text-primary)]">{drop.name}</div>
-                                <div className="text-xs text-[var(--rpg-text-secondary)]">{drop.dropRate}% drop rate</div>
+                                <div className="text-xs text-[var(--rpg-text-secondary)]"><span className="font-pixel">{drop.dropRate}%</span> drop rate</div>
                               </div>
                             </div>
                           );

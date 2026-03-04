@@ -121,7 +121,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">{skillName}</h2>
-          <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-sm font-bold">
+          <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-sm font-bold font-pixel">
             Lv. {skillLevel}
           </div>
         </div>
@@ -130,7 +130,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
             XP Rate
             <XpRateTooltip />
           </div>
-          <div className="text-sm font-bold" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
+          <div className="text-sm font-bold font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>
 
@@ -190,7 +190,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                             </span>
                           )}
                         </h4>
-                        <span className="text-xs text-[var(--rpg-text-secondary)]">Lv. {recipe.requiredLevel}</span>
+                        <span className="text-xs text-[var(--rpg-text-secondary)] font-pixel">Lv. {recipe.requiredLevel}</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         {levelLocked ? (
@@ -242,7 +242,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
               )}
             </div>
             <div>
-              <h3 className="font-bold text-[var(--rpg-text-primary)] text-lg">{selectedRecipe.name}</h3>
+              <h3 className="font-bold font-display text-[var(--rpg-text-primary)] text-lg">{selectedRecipe.name}</h3>
               <p className="text-xs text-[var(--rpg-text-secondary)] capitalize">
                 {selectedRecipe.rarity} - Lv. {selectedRecipe.requiredLevel} Required
                 {selectedLevelLocked && (

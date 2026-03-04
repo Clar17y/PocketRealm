@@ -174,7 +174,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
             </p>
             <div className="inline-flex items-center gap-1 text-xs bg-[var(--rpg-background)] px-2 py-1 rounded">
               <span className="text-[var(--rpg-text-secondary)]">Min Level:</span>
-              <span className="text-[var(--rpg-gold)] font-bold">{currentZone.minLevel}</span>
+              <span className="text-[var(--rpg-gold)] font-bold font-pixel">{currentZone.minLevel}</span>
             </div>
           </div>
         </div>
@@ -208,8 +208,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           {explorationProgress && explorationProgress.turnsToExplore && (
             <PixelCard>
               <div className="flex justify-between text-sm text-[var(--rpg-text-secondary)] mb-1">
-                <span>Zone Exploration: {Math.floor(explorationProgress.percent)}%</span>
-                <span>{explorationProgress.turnsExplored.toLocaleString()} / {explorationProgress.turnsToExplore.toLocaleString()} turns</span>
+                <span>Zone Exploration: <span className="font-pixel">{Math.floor(explorationProgress.percent)}%</span></span>
+                <span className="font-pixel">{explorationProgress.turnsExplored.toLocaleString()} / {explorationProgress.turnsToExplore.toLocaleString()} turns</span>
               </div>
               <div className="h-2 rounded-full bg-[var(--rpg-background)] overflow-hidden">
                 <div

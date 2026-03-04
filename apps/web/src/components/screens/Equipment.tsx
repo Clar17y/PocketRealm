@@ -214,7 +214,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
           <PixelCard className="max-w-md w-full">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">
+                <h3 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">
                   {slotPositions[activeSlotId]?.label ?? prettySlot(activeSlotId)}
                 </h3>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">Select an item to equip</div>
@@ -279,7 +279,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-[var(--rpg-text-primary)] text-sm">{currentItem.name}</div>
+                        <div className="font-semibold font-display text-[var(--rpg-text-primary)] text-sm">{currentItem.name}</div>
                         {currentItem.weightClass && (
                           <div className="text-xs text-[var(--rpg-gold)]">{prettyWeightClass(currentItem.weightClass)}</div>
                         )}
@@ -546,7 +546,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
         <ModalOverlay opacity={80} onClose={() => setShowRepairAll(false)}>
           <PixelCard className="max-w-sm w-full">
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">Repair All Equipment</h3>
+              <h3 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">Repair All Equipment</h3>
               <button
                 onClick={() => setShowRepairAll(false)}
                 className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
