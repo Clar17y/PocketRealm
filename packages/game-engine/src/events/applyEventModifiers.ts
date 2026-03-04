@@ -1,4 +1,5 @@
 import type { ActiveZoneModifiers, MobTemplate } from '@adventure/shared';
+import { GATHERING_CONSTANTS } from '@adventure/shared';
 
 /**
  * Apply active zone mob modifiers to a mob template (damage/hp multipliers).
@@ -53,9 +54,11 @@ export function computeResourceYieldMultiplier(
 }
 
 /**
- * Minimum actions so a yield penalty always produces a visible integer reduction.
- * Returns 1 when there is no penalty (multiplier >= 1).
+ * Turn cost per gathering action adjusted for yield_down events.
+ * yield_down increases turn cost (inverse of multiplier); yield_up leaves cost unchanged.
  */
-export function computeEventMinActions(yieldMultiplier: number): number {
-  return yieldMultiplier < 1 ? Math.ceil(1 / (1 - yieldMultiplier)) : 1;
+export function computeEventTurnCost(yieldMultiplier: number): number {
+  return yieldMultiplier < 1
+    ? Math.ceil(GATHERING_CONSTANTS.BASE_TURN_COST / yieldMultiplier)
+    : GATHERING_CONSTANTS.BASE_TURN_COST;
 }

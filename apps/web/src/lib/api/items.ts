@@ -203,6 +203,7 @@ export async function mine(playerNodeId: string, turns: number, currentZoneId: s
       totalYieldPerAction: number;
       rawTotalYield?: number;
       eventModifier: number;
+      turnCostPerAction?: number;
       eventTitle: string | null;
     };
     tax: TaxInfo | null;
