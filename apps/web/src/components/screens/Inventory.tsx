@@ -9,7 +9,7 @@ import { Backpack, Crosshair, Heart, Shield, Sword, X, Zap, Coins } from 'lucide
 import { CRAFTING_CONSTANTS } from '@adventure/shared';
 import { useBatchMode } from '@/hooks/useBatchMode';
 import { BatchActionBar, BatchCheckboxOverlay, BatchDimOverlay } from '@/components/common/BatchActionBar';
-import { titleCaseFromSnake } from '@/lib/format';
+import { titleCaseFromSnake, fmtDur } from '@/lib/format';
 import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass } from '@/lib/statFormat';
 import { getStash } from '@/lib/api/items';
 import { itemImageSrc } from '@/lib/assets';
@@ -757,7 +757,7 @@ export function Inventory({
                             ? 'text-[var(--rpg-gold)]'
                             : 'text-[var(--rpg-text-primary)]'
                         }`}>
-                          {selectedItem.durability.current}/{selectedItem.durability.max}
+                          {fmtDur(selectedItem.durability.current)}/{selectedItem.durability.max}
                         </span>
                       )}
                     </div>

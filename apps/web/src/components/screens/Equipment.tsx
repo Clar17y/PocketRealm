@@ -6,7 +6,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, X, Zap } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
-import { titleCaseFromSnake } from '@/lib/format';
+import { titleCaseFromSnake, fmtDur } from '@/lib/format';
 import { DURABILITY_CONSTANTS } from '@adventure/shared';
 import { numStat, formatSignedStatValue, signedClass, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
@@ -282,7 +282,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         )}
                         {currentItem.maxDurability > 0 && (
                           <div className={`text-xs font-mono ${currentItem.durability <= 0 ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text-secondary)]'}`}>
-                            {currentItem.durability <= 0 ? 'BROKEN' : `${currentItem.durability}/${currentItem.maxDurability}`}
+                            {currentItem.durability <= 0 ? 'BROKEN' : `${fmtDur(currentItem.durability)}/${currentItem.maxDurability}`}
                           </div>
                         )}
                       </div>
