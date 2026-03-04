@@ -338,7 +338,9 @@ body {
   .rpg-stagger-item,
   .rpg-loot-reveal,
   .rpg-legendary-flash,
-  .rpg-victory-pulse {
+  .rpg-victory-pulse,
+  .tutorial-pulse,
+  .rainbow-title {
     animation: none !important;
   }
   .rpg-bar-shimmer::after {
