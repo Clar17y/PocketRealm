@@ -671,7 +671,7 @@ export function Casino({
                     <span className="text-xs text-[var(--rpg-text-secondary)]">
                       {formatBet(bet.betType, bet.betValue)}
                     </span>
-                    <span className="font-pixel text-[var(--rpg-gold)]">{bet.amount}g</span>
+                    <span className="font-pixel text-[16px] text-[var(--rpg-gold)]">{bet.amount}g</span>
                   </div>
                 </div>
               ))}
@@ -788,7 +788,7 @@ export function Casino({
                           style={{ width: `${Math.min(100, (s.count / (CASINO_CONSTANTS.ROULETTE_STATS_DEPTH / 37)) * 50)}%` }}
                         />
                       </div>
-                      <span className="text-[10px] font-pixel text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
+                      <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
                     </div>
                   ))}
               </div>
@@ -813,7 +813,7 @@ export function Casino({
                           style={{ width: `${Math.min(100, (s.count / (CASINO_CONSTANTS.ROULETTE_STATS_DEPTH / 37)) * 50)}%` }}
                         />
                       </div>
-                      <span className="text-[10px] font-pixel text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
+                      <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
                     </div>
                   ))}
               </div>

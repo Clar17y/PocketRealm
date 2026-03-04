@@ -411,7 +411,7 @@ export function Gathering({
             </div>
             <div className="flex-1">
               <div className="text-sm text-[var(--rpg-text-secondary)]">{selectedNode.name}</div>
-              <div className="text-3xl text-[var(--rpg-gold)] font-pixel">{yieldInfo.totalYield}</div>
+              <div className="text-[32px] text-[var(--rpg-gold)] font-pixel">{yieldInfo.totalYield}</div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
                 {yieldInfo.actions} action{yieldInfo.actions !== 1 ? 's' : ''} x {yieldInfo.baseYield} base
                 {yieldInfo.yieldMultiplier > 1 && (

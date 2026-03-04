@@ -143,7 +143,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold font-almendra" style={{ color: 'var(--rpg-red)' }}>
-                    {boss.mobName} <span className="font-pixel">(Lv.{boss.mobLevel})</span>
+                    {boss.mobName} <span className="font-pixel text-[16px]">(Lv.{boss.mobLevel})</span>
                   </span>
                   <span className="text-xs opacity-70 font-almendra">
                     {boss.zoneName ?? 'Unknown Zone'}

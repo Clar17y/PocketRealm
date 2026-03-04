@@ -187,7 +187,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
 
               <div className="bg-[var(--rpg-background)] rounded-lg p-4 mb-4">
                 <h4 className="text-xs font-semibold text-[var(--rpg-text-secondary)] mb-3">DAMAGE TAKEN</h4>
-                <div className="text-4xl text-[var(--rpg-red)] font-pixel mb-1">
+                <div className="text-[32px] text-[var(--rpg-red)] font-pixel mb-1">
                   {player.maxHealth - player.health}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">HP Lost in Battle</div>

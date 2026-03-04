@@ -253,7 +253,7 @@ export function TalentTree({
                               borderWidth: 1,
                             }}
                           >
-                            <span className="font-pixel">{node.pointCost}</span> pt{node.pointCost !== 1 ? 's' : ''}
+                            <span className="font-pixel text-[16px]">{node.pointCost}</span> pt{node.pointCost !== 1 ? 's' : ''}
                           </span>
                           {isAllocated && (
                             <span className="text-[10px] font-bold text-[var(--rpg-green-light)] uppercase">

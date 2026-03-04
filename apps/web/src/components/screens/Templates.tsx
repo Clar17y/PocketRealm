@@ -58,8 +58,8 @@ function groupBadge(group: string) {
 function ActionCostLabel({ cost }: { cost: { stamina: number; mana: number } }) {
   return (
     <div className="flex gap-2 text-[10px] text-[var(--rpg-text-secondary)]">
-      {cost.stamina > 0 && <span>Stam: <span className="font-pixel">{cost.stamina}</span></span>}
-      {cost.mana > 0 && <span>Mana: <span className="font-pixel">{cost.mana}</span></span>}
+      {cost.stamina > 0 && <span>Stam: <span className="font-pixel text-[16px]">{cost.stamina}</span></span>}
+      {cost.mana > 0 && <span>Mana: <span className="font-pixel text-[16px]">{cost.mana}</span></span>}
       {cost.stamina === 0 && cost.mana === 0 && <span>Free</span>}
     </div>
   );

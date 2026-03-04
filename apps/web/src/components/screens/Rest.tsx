@@ -294,13 +294,13 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
                 </div>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-[var(--rpg-text-secondary)]">Result</span>
-                  <span className="font-pixel">
+                  <span className="font-pixel text-[16px]">
                     {hpState.currentHp} → {Math.floor(estimate.resultingHp)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-[var(--rpg-text-secondary)]">Turns Used</span>
-                  <span className="font-pixel text-[var(--rpg-gold)]">
+                  <span className="font-pixel text-[16px] text-[var(--rpg-gold)]">
                     {estimate.turnsNeeded}
                   </span>
                 </div>

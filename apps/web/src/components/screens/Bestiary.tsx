@@ -89,7 +89,7 @@ function PrefixPipRow({ encountered }: { encountered: string[] }) {
           );
         })}
       </div>
-      <span className={`text-[10px] font-pixel ${mastered ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-text-secondary)]'}`}>
+      <span className={`text-[8px] font-pixel ${mastered ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-text-secondary)]'}`}>
         {count}/{TOTAL_PREFIXES}
       </span>
       {mastered && <span className="text-[10px] text-[var(--rpg-gold)] font-bold">Mastered</span>}
@@ -257,7 +257,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         <span className="text-[10px] text-[var(--rpg-text-secondary)] text-center px-1 leading-tight">
                           {monster.name}
                         </span>
-                        <span className="text-[10px] text-[var(--rpg-gold)] font-pixel mt-1">x{monster.killCount}</span>
+                        <span className="text-[8px] text-[var(--rpg-gold)] font-pixel mt-1">x{monster.killCount}</span>
                       </>
                     ) : isTierLocked ? (
                       <>
