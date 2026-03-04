@@ -6,11 +6,15 @@
  */
 :root {
   /* RPG Color Palette */
-  --rpg-background: #0a0a0c;
-  --rpg-surface: #2a2a3a;
-  --rpg-border: #5a5a6a;
+  --rpg-background: #0c0a08;
+  --rpg-surface: #1e1c18;
+  --rpg-surface-light: #2a2820;
+  --rpg-border: #3a3830;
   --rpg-text-primary: #e8e8e0;
-  --rpg-text-secondary: #9a9aaa;
+  --rpg-text-secondary: #8a8878;
+  --rpg-gold-dim: rgba(212, 168, 75, 0.08);
+  --rpg-gold-glow: rgba(212, 168, 75, 0.3);
+  --rpg-hp-warning: #d4943a;
   --rpg-gold: #d4a84b;
   --rpg-green-dark: #3d6b4a;
   --rpg-green-light: #6aaa5a;
@@ -25,9 +29,13 @@
 @theme inline {
   --color-rpg-background: var(--rpg-background);
   --color-rpg-surface: var(--rpg-surface);
+  --color-rpg-surface-light: var(--rpg-surface-light);
   --color-rpg-border: var(--rpg-border);
   --color-rpg-text-primary: var(--rpg-text-primary);
   --color-rpg-text-secondary: var(--rpg-text-secondary);
+  --color-rpg-gold-dim: var(--rpg-gold-dim);
+  --color-rpg-gold-glow: var(--rpg-gold-glow);
+  --color-rpg-hp-warning: var(--rpg-hp-warning);
   --color-rpg-gold: var(--rpg-gold);
   --color-rpg-green-dark: var(--rpg-green-dark);
   --color-rpg-green-light: var(--rpg-green-light);
