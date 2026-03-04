@@ -201,9 +201,6 @@ export default function GamePage() {
     handleEquipItem,
     handleUnequipSlot,
     handleAllocateAttribute,
-    handleSetAutoPotionThreshold,
-    autoPotionThreshold,
-    setAutoPotionThreshold,
     combatLogSpeedMs,
     setCombatLogSpeedMs,
     handleSetCombatLogSpeed,
@@ -967,9 +964,6 @@ export default function GamePage() {
             onCombatLogSpeedCommit={handleSetCombatLogSpeed}
             autoSkipKnownCombat={autoSkipKnownCombat}
             onAutoSkipKnownCombatChange={handleSetAutoSkipKnownCombat}
-            autoPotionThreshold={autoPotionThreshold}
-            onAutoPotionThresholdChange={setAutoPotionThreshold}
-            onAutoPotionThresholdCommit={handleSetAutoPotionThreshold}
             lowHpWarning={lowHpWarning}
             onLowHpWarningChange={handleSetLowHpWarning}
             explorationSpeedMs={explorationSpeedMs}

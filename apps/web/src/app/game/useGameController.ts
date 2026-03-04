@@ -205,7 +205,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
   const playerSettings = usePlayerSettings();
   const {
-    autoPotionThreshold, setAutoPotionThreshold,
     combatLogSpeedMs, setCombatLogSpeedMs,
     explorationSpeedMs, setExplorationSpeedMs,
     autoSkipKnownCombat,
@@ -218,7 +217,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
     handleSetAutoSkipKnownCombat,
-    handleSetAutoPotionThreshold,
     handleSetDefaultExploreTurns,
     handleSetQuickRestHealPercent,
     handleSetDefaultRefiningMax,
@@ -1590,8 +1588,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     templates,
     handleLoadTemplates,
     pvpNotificationCount,
-    autoPotionThreshold,
-    setAutoPotionThreshold,
     combatLogSpeedMs,
     setCombatLogSpeedMs,
     explorationSpeedMs,
@@ -1667,7 +1663,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     loadAll,
     loadTurnsAndHp,
     loadPvpNotificationCount,
-    handleSetAutoPotionThreshold,
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
     handleSetAutoSkipKnownCombat,

@@ -40,9 +40,6 @@ model Player {
   currentMana         Int      @default(50) @map("current_mana")
   lastManaRegenAt     DateTime @default(now()) @map("last_mana_regen_at")
 
-  // Auto-Potion
-  autoPotionThreshold Int @default(0) @map("auto_potion_threshold")
-
   // Tutorial
   tutorialStep    Int      @default(0) @map("tutorial_step")
 

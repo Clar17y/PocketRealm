@@ -111,7 +111,6 @@ export interface CombatPotion {
 }
 
 export interface CombatOptions {
-  autoPotionThreshold?: number;
   potions?: CombatPotion[];
 }
 

@@ -222,7 +222,7 @@ function setupZoneAndMobs(tutorialStep: number) {
   mockPrisma.resourceNode.findMany.mockResolvedValue([]);
   mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
   mockPrisma.zoneConnection.findMany.mockResolvedValue([]);
-  mockPrisma.player.findUnique.mockResolvedValue({ autoPotionThreshold: 0, tutorialStep });
+  mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep });
   mockPrisma.playerBestiary.upsert.mockResolvedValue({});
   mockPrisma.activityLog.create.mockResolvedValue({ id: 'log-1' });
 }
