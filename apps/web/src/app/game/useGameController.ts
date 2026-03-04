@@ -83,6 +83,7 @@ import { useBestiary } from './hooks/useBestiary';
 import { useGathering } from './hooks/useGathering';
 import { useEncounterSites } from './hooks/useEncounterSites';
 import { useAchievements } from './hooks/useAchievements';
+import { useQuests } from './hooks/useQuests';
 import { useCombatPlayback } from './hooks/useCombatPlayback';
 
 type AttributeType = keyof CharacterProgression['attributes'];
@@ -384,6 +385,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleClaimAchievement, handleSetActiveTitle,
   } = achievements;
 
+  const {
+    quests, questState, questsLoading, questsError,
+    loadQuests, handleClaimQuestReward, handleClaimDailyBonus,
+  } = useQuests();
+
   const advanceTutorial = useCallback(async (fromStep: number) => {
     if (tutorialStep !== fromStep) return;
     const nextStep = fromStep + 1;
@@ -441,7 +447,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount]);
 
   const getActiveTab = () => {
-    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
+    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'quests', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
     if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
     if (['combat', 'arena', 'templates', 'talentTree'].includes(activeScreen)) return 'combat';
@@ -1630,6 +1636,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleClaimAchievement,
     handleSetActiveTitle,
     loadAchievements,
+
+    // Quests
+    quests,
+    questState,
+    questsLoading,
+    questsError,
+    loadQuests,
+    handleClaimQuestReward,
+    handleClaimDailyBonus,
 
     // Tutorial
     tutorialStep, skipTutorial, advanceTutorial,

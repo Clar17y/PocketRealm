@@ -26,6 +26,7 @@ export type Screen =
   | 'talentTree'
   | 'casino'
   | 'training'
+  | 'quests'
   | 'admin';
 
 export interface PendingEncounter {

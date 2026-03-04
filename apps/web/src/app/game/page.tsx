@@ -52,6 +52,7 @@ import { ArenaScreen } from './screens/ArenaScreen';
 import { GuildScreen } from '@/components/screens/GuildScreen';
 import { Templates } from '@/components/screens/Templates';
 import { TalentTree } from '@/components/screens/TalentTree';
+import { Quests } from '@/components/screens/Quests';
 import { CombatScreen } from './screens/CombatScreen';
 import { useGameController } from './useGameController';
 import { isMobKnown } from './combatHelpers';
@@ -238,6 +239,13 @@ export default function GamePage() {
     handleClaimAchievement,
     handleSetActiveTitle,
     loadAchievements,
+    quests,
+    questState,
+    questsLoading,
+    questsError,
+    loadQuests,
+    handleClaimQuestReward,
+    handleClaimDailyBonus,
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
     combatLogPrefetch,
@@ -283,6 +291,12 @@ export default function GamePage() {
       void loadAchievements();
     }
   }, [activeScreen, loadAchievements]);
+
+  useEffect(() => {
+    if (activeScreen === 'quests') {
+      void loadQuests();
+    }
+  }, [activeScreen, loadQuests]);
 
   useEffect(() => {
     if (activeScreen === 'casino') {
@@ -1008,6 +1022,17 @@ export default function GamePage() {
             onCategoryViewed={() => setAchievementCategory(null)}
           />
         );
+      case 'quests':
+        return (
+          <Quests
+            quests={quests}
+            questState={questState}
+            loading={questsLoading}
+            error={questsError}
+            onClaimReward={handleClaimQuestReward}
+            onClaimBonus={handleClaimDailyBonus}
+          />
+        );
       case 'leaderboard':
         return <Leaderboard playerId={player?.id ?? null} />;
       case 'guild':
@@ -1153,6 +1178,7 @@ export default function GamePage() {
               { id: 'zones', label: 'Map' },
               { id: 'worldEvents', label: 'Events' },
               { id: 'achievements', label: 'Achievements', badge: achievementUnclaimedCount },
+              { id: 'quests', label: 'Quests' },
               { id: 'leaderboard', label: 'Rankings' },
               { id: 'bestiary', label: 'Bestiary' },
               { id: 'skills', label: 'Skills' },
