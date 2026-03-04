@@ -54,7 +54,7 @@ import {
   removePersistedMob,
 } from '../../services/persistedMobService';
 import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
-import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
+import { buildPerActionScaling, getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
@@ -171,6 +171,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   ]);
   const equipmentStats = await getEquipmentStats(playerId);
 
+  // Per-action scaling for template combat engine
+  const perActionScaling = await buildPerActionScaling(playerId, {
+    equipmentStats,
+    attributes: progression.attributes,
+    weaponRequiredSkill: mainHandAttackSkill,
+  });
+
   // Guild combat modifiers
   const guildMods = await getPlayerGuildModifiers(playerId);
 
@@ -249,6 +256,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         stamina: currentStamina, maxStamina, staminaRegenPerRound,
         mana: currentMana, maxMana, manaRegenPerRound,
         unlockedActions: playerUnlockedActions,
+        perActionScaling,
       });
       const mobCombatant = mobToTemplateCombatant(prefixedMob);
 
@@ -779,6 +787,14 @@ export function registerStartRoutes(router: Router): void {
       ]);
 
       const equipmentStats = await getEquipmentStats(playerId);
+
+      // Per-action scaling for template combat engine
+      const perActionScaling = await buildPerActionScaling(playerId, {
+        equipmentStats,
+        attributes: progression.attributes,
+        weaponRequiredSkill: mainHandAttackSkill,
+      });
+
       const playerStats = buildPlayerCombatStats(
         hpState.currentHp,
         hpState.maxHp,
@@ -838,6 +854,7 @@ export function registerStartRoutes(router: Router): void {
         stamina: resourceState.stamina.current, maxStamina: resourceState.stamina.max, staminaRegenPerRound: resourceState.stamina.regenPerRound,
         mana: resourceState.mana.current, maxMana: resourceState.mana.max, manaRegenPerRound: resourceState.mana.regenPerRound,
         unlockedActions: zoneCombatSkillPoints.unlockedActions,
+        perActionScaling,
       });
       const mobCombatant = mobToTemplateCombatant(finalMob);
 

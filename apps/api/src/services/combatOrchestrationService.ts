@@ -9,6 +9,7 @@ import {
   type ActionDefinition,
   type CombatTemplateSlotData,
   type LootDrop,
+  type PerActionScaling,
 } from '@adventure/shared';
 import { Prisma } from '@adventure/database';
 import { rollAndGrantLootWithCapacity } from './lootService';
@@ -35,6 +36,7 @@ export function buildPlayerTemplateCombatant(params: {
   maxMana: number;
   manaRegenPerRound: number;
   unlockedActions: string[];
+  perActionScaling?: PerActionScaling;
 }): TemplateCombatant {
   const unlockedSet = new Set(params.unlockedActions);
   const filteredActions: Record<string, ActionDefinition> = {};
@@ -55,6 +57,7 @@ export function buildPlayerTemplateCombatant(params: {
     maxMana: params.maxMana,
     manaRegenPerRound: params.manaRegenPerRound,
     actionDefinitions: filteredActions,
+    perActionScaling: params.perActionScaling,
   };
 }
 
