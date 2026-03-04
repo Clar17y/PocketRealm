@@ -96,6 +96,8 @@ model Player {
   pvpScoutsSent        PvpScoutLog[] @relation("PvpScouter")
   pvpScoutsReceived    PvpScoutLog[] @relation("PvpScoutTarget")
   bossRotations        PlayerBossRotation[]
+  quests               PlayerQuest[]
+  questState           PlayerQuestState?
 
   @@map("players")
 }
@@ -990,4 +992,43 @@ model RouletteBet {
   @@index([roundId])
   @@index([playerId])
   @@map("roulette_bets")
+}
+
+// =============================================================================
+// QUESTS
+// =============================================================================
+
+model PlayerQuest {
+  id           String    @id @default(uuid())
+  playerId     String    @map("player_id")
+  questKey     String    @map("quest_key") @db.VarChar(64)
+  cadence      String    @db.VarChar(8)
+  targetValue  Int       @map("target_value")
+  currentValue Int       @default(0) @map("current_value")
+  rewardAmount Int       @map("reward_amount")
+  status       String    @default("active") @db.VarChar(16)
+  filterValue  String?   @map("filter_value") @db.VarChar(64)
+  assignedAt   DateTime  @default(now()) @map("assigned_at")
+  expiresAt    DateTime  @map("expires_at")
+  completedAt  DateTime? @map("completed_at")
+  claimedAt    DateTime? @map("claimed_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, status])
+  @@index([playerId, cadence, assignedAt])
+  @@map("player_quests")
+}
+
+model PlayerQuestState {
+  id                String   @id @default(uuid())
+  playerId          String   @unique @map("player_id")
+  lastDailyReset    DateTime @default(now()) @map("last_daily_reset")
+  lastWeeklyReset   DateTime @default(now()) @map("last_weekly_reset")
+  dailyBonusClaimed Boolean  @default(false) @map("daily_bonus_claimed")
+  questTokens       Int      @default(0) @map("quest_tokens")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@map("player_quest_state")
 }
