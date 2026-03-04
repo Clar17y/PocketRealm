@@ -11,7 +11,7 @@ import {
   filterAndWeightMobsByTier,
   runTemplateCombat,
 } from '@adventure/game-engine';
-import type { CombatOptions, PotionConsumed } from '@adventure/shared';
+import type { CombatOptions, CombatTemplateSlotData, PotionConsumed } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
@@ -45,6 +45,12 @@ import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 
 
+
+const POTION_ACTION_IDS = new Set(['use_hp_potion', 'use_stamina_potion', 'use_mana_potion']);
+
+function templateHasPotionActions(slots: CombatTemplateSlotData[]): boolean {
+  return slots.some(s => POTION_ACTION_IDS.has(s.actionId) || (s.thenActionId && POTION_ACTION_IDS.has(s.thenActionId)));
+}
 
 export const zonesRouter = Router();
 
@@ -303,15 +309,6 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     const ambushes = simulateTravelAmbushes(travelCost);
 
     if (ambushes.length > 0) {
-      // Auto-potion setup
-      const playerRecord = await prismaAny.player.findUnique({
-        where: { id: playerId },
-        select: { autoPotionThreshold: true },
-      });
-      const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
-      const potionPool = autoPotionThreshold > 0
-        ? await buildPotionPool(playerId, hpState.maxHp)
-        : [];
       const allPotionsConsumed: PotionConsumed[] = [];
 
       // Get player combat stats (same pattern as combat route)
@@ -345,6 +342,9 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         getSkillPoints(playerId),
       ]);
       const travelUnlockedActions = travelSkillPoints.unlockedActions;
+      const potionPool = templateHasPotionActions(playerTemplate)
+        ? await buildPotionPool(playerId, hpState.maxHp)
+        : [];
       let currentStamina = resourceState.stamina.current;
       let currentMana = resourceState.mana.current;
       const maxStamina = resourceState.stamina.max;
@@ -397,10 +397,9 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           unlockedActions: travelUnlockedActions,
         });
         const combatantB = mobToTemplateCombatant(prefixedMob);
-        let combatOptions: CombatOptions | undefined;
-        if (autoPotionThreshold > 0 && potionPool.length > 0) {
-          combatOptions = { autoPotionThreshold, potions: [...potionPool] };
-        }
+        const combatOptions: CombatOptions | undefined = potionPool.length > 0
+          ? { potions: [...potionPool] }
+          : undefined;
         const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
         currentHp = combatResult.combatantAHpRemaining;
         currentStamina = combatResult.combatantAStaminaRemaining;

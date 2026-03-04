@@ -18,6 +18,7 @@ import {
   COMBAT_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
   type CombatOptions,
+  type CombatTemplateSlotData,
   type LootDrop,
   type MobTemplate,
   type PotionConsumed,
@@ -38,6 +39,12 @@ import { getPlayerProgressionState } from '../../services/attributesService';
 import { getSkillPoints } from '../../services/skillPointService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, type EventModifierBadge } from '../../services/worldEventService';
+
+const POTION_ACTION_IDS = new Set(['use_hp_potion', 'use_stamina_potion', 'use_mana_potion']);
+
+function templateHasPotionActions(slots: CombatTemplateSlotData[]): boolean {
+  return slots.some(s => POTION_ACTION_IDS.has(s.actionId) || (s.thenActionId && POTION_ACTION_IDS.has(s.thenActionId)));
+}
 
 function tagEventsWithApplicability(
   events: Array<{ title: string; effectType: string; effectValue: number }>,
@@ -181,21 +188,16 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     await setHp(playerId, currentPlayerHp);
   }
 
-  // Build shared potion pool
-  const playerRecord = await prismaAny.player.findUnique({
-    where: { id: playerId },
-    select: { autoPotionThreshold: true },
-  });
-  const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
-  const potionPool = autoPotionThreshold > 0 ? await buildPotionPool(playerId, hpState.maxHp) : [];
-  const allPotionsConsumed: PotionConsumed[] = [];
-
   // Fetch player's active template, resource state, and unlocked actions
   const [playerTemplate, resourceState, skillPointState] = await Promise.all([
     getActiveTemplate(playerId),
     getResourceState(playerId),
     getSkillPoints(playerId),
   ]);
+
+  // Build shared potion pool when the template includes potion actions
+  const potionPool = templateHasPotionActions(playerTemplate) ? await buildPotionPool(playerId, hpState.maxHp) : [];
+  const allPotionsConsumed: PotionConsumed[] = [];
   const playerUnlockedActions = skillPointState.unlockedActions;
   let currentStamina = resourceState.stamina.current;
   let currentMana = resourceState.mana.current;
@@ -243,10 +245,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
       applyGuildCombatModifiers(playerStats, guildMods);
 
-      let combatOptions: CombatOptions | undefined;
-      if (autoPotionThreshold > 0 && potionPool.length > 0) {
-        combatOptions = { autoPotionThreshold, potions: [...potionPool] };
-      }
+      const combatOptions: CombatOptions | undefined = potionPool.length > 0
+        ? { potions: [...potionPool] }
+        : undefined;
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,
@@ -819,18 +820,6 @@ export function registerStartRoutes(router: Router): void {
         mobHpOverride = { currentHp: persisted.currentHp, maxHp: persisted.maxHp };
       }
 
-      // Auto-potion
-      const playerRecord = await prismaAny.player.findUnique({
-        where: { id: playerId },
-        select: { autoPotionThreshold: true },
-      });
-      const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
-      let combatOptions: CombatOptions | undefined;
-      if (autoPotionThreshold > 0) {
-        const potions = await buildPotionPool(playerId, hpState.maxHp);
-        combatOptions = { autoPotionThreshold, potions };
-      }
-
       const finalMob = mobHpOverride ? { ...prefixedMob, ...mobHpOverride } : prefixedMob;
 
       // Fetch player's active template, resource state, and unlocked actions
@@ -839,6 +828,11 @@ export function registerStartRoutes(router: Router): void {
         getResourceState(playerId),
         getSkillPoints(playerId),
       ]);
+
+      // Build potion pool when the template includes potion actions
+      const combatOptions: CombatOptions | undefined = templateHasPotionActions(playerTemplate)
+        ? { potions: await buildPotionPool(playerId, hpState.maxHp) }
+        : undefined;
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,

@@ -11,7 +11,7 @@ import type {
   ActionEffect,
   CombatAction,
 } from '@adventure/shared';
-import { COMBAT_ACTION_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
+import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
 import { resolveAction, resolveInteraction, type RoundInteraction } from './actionResolver';
 import {
   rollD20,
@@ -24,6 +24,7 @@ import {
 } from './damageCalculator';
 
 const MAX_ROUNDS = 100;
+const DEFEND_ACTION: ActionDefinition = BASE_ACTION_DEFINITIONS['defend'];
 
 // --- Public Types ---
 
@@ -715,7 +716,7 @@ export function runTemplateCombat(
     }
 
     // Resolve actions for both combatants
-    const resolvedA = resolveAction(
+    let resolvedA = resolveAction(
       combatantA.template,
       state.round,
       getHp(state, 'combatantA'),
@@ -728,7 +729,7 @@ export function runTemplateCombat(
       'combatantA',
       combatantA.actionDefinitions,
     );
-    const resolvedB = resolveAction(
+    let resolvedB = resolveAction(
       combatantB.template,
       state.round,
       getHp(state, 'combatantB'),
@@ -741,6 +742,22 @@ export function runTemplateCombat(
       'combatantB',
       combatantB.actionDefinitions,
     );
+
+    // Fall back to Defend if potion action would fail (no potions or potion sick)
+    if (resolvedA.action.potionType) {
+      const canUsePotion = !hasPotionSickness(state, 'combatantA') &&
+        availablePotions.some(p => p.potionType === resolvedA.action.potionType);
+      if (!canUsePotion) {
+        resolvedA = { action: DEFEND_ACTION, wasExhausted: true };
+      }
+    }
+    if (resolvedB.action.potionType) {
+      const canUsePotion = !hasPotionSickness(state, 'combatantB') &&
+        availablePotions.some(p => p.potionType === resolvedB.action.potionType);
+      if (!canUsePotion) {
+        resolvedB = { action: DEFEND_ACTION, wasExhausted: true };
+      }
+    }
 
     // Resolve RPS interaction
     const interaction = resolveInteraction(resolvedA, resolvedB);

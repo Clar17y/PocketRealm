@@ -602,11 +602,11 @@ describe('runTemplateCombat', () => {
         );
       }
 
-      // Verify sickness message appears (potion attempts while sick)
-      const sicknessEntries = result.log.filter(
-        (e) => e.actor === 'combatantA' && e.message.includes('still sick'),
+      // When potion sick, the action falls back to Defend (wasExhausted=true)
+      const defendFallbacks = result.log.filter(
+        (e) => e.actor === 'combatantA' && e.action === 'defend' && e.wasExhausted,
       );
-      expect(sicknessEntries.length).toBeGreaterThan(0);
+      expect(defendFallbacks.length).toBeGreaterThan(0);
     });
   });
 
@@ -726,11 +726,11 @@ describe('runTemplateCombat', () => {
       expect(result.potionsConsumed.length).toBeGreaterThanOrEqual(1);
       expect(result.potionsConsumed[0].name).toBe('Health Potion');
 
-      // Round 2: Stamina potion should be blocked by potion sickness from HP potion
-      const sicknessEntry = result.log.find(
-        (e) => e.round === 2 && e.actor === 'combatantA' && e.message.includes('still sick'),
+      // Round 2: Stamina potion should be blocked by potion sickness — falls back to Defend
+      const defendFallback = result.log.find(
+        (e) => e.round === 2 && e.actor === 'combatantA' && e.action === 'defend' && e.wasExhausted,
       );
-      expect(sicknessEntry).toBeDefined();
+      expect(defendFallback).toBeDefined();
     });
 
     it('mana potion is capped at max mana', () => {
@@ -758,7 +758,7 @@ describe('runTemplateCombat', () => {
       expect(result.potionsConsumed[0].healAmount).toBe(5);
     });
 
-    it('no matching potion type results in wasted action', () => {
+    it('no matching potion type falls back to Defend', () => {
       mockCombatRandom();
 
       const a = makeCombatant('Player', {
@@ -775,12 +775,12 @@ describe('runTemplateCombat', () => {
         ],
       });
 
-      // No mana potions available, so the mana potion action is wasted
+      // No mana potions available, so the action falls back to Defend
       expect(result.potionsConsumed).toHaveLength(0);
-      const wasteEntry = result.log.find(
-        (e) => e.round === 1 && e.actor === 'combatantA' && e.message.includes('has none left'),
+      const defendFallback = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'defend' && e.wasExhausted,
       );
-      expect(wasteEntry).toBeDefined();
+      expect(defendFallback).toBeDefined();
     });
   });
 
