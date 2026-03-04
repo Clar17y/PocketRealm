@@ -68,7 +68,7 @@ import {
   exchangeGold,
   placeRouletteBet,
 } from '@/lib/api';
-import type { CombatTemplateData, ResourceState } from '@adventure/shared';
+import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@adventure/shared';
 import type { RouletteBetType } from '@adventure/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
@@ -87,6 +87,15 @@ import { useQuests } from './hooks/useQuests';
 import { useCombatPlayback } from './hooks/useCombatPlayback';
 
 type AttributeType = keyof CharacterProgression['attributes'];
+
+function showQuestToasts(updates?: QuestProgressUpdate[]) {
+  if (!updates?.length) return;
+  const show = (window as unknown as Record<string, unknown>).__showQuestToast as
+    | ((update: QuestProgressUpdate) => void)
+    | undefined;
+  if (!show) return;
+  for (const update of updates) show(update);
+}
 
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [activeScreen, setActiveScreen] = useState<Screen>('home');
@@ -535,6 +544,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
+      showQuestToasts(data.questProgress);
 
       // Always trigger animated playback — even empty results get a brief progress bar
       setExplorationPlaybackData({
@@ -651,6 +661,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
+      showQuestToasts(data.questProgress);
 
       const rewards: LastCombat['rewards'] = {
         xp: data.rewards.xp,
@@ -856,6 +867,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
+      showQuestToasts(data.questProgress);
 
       const newLogs: ActivityLogEntry[] = [];
       const gatheredSkillName = data.xp?.skillType
@@ -935,6 +947,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
+      showQuestToasts(data.questProgress);
 
       const newLogs: ActivityLogEntry[] = [];
       const timestamp = nowStamp();

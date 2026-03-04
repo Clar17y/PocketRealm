@@ -1,3 +1,4 @@
+import type { QuestProgressUpdate } from '@adventure/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 
 // Shared event modifier types
@@ -128,6 +129,7 @@ export async function startExploration(zoneId: string, turns: number, tier?: num
     };
     pendingLootSessionIds?: string[];
     tax: TaxInfo | null;
+    questProgress?: QuestProgressUpdate[];
   }>('/api/v1/exploration/start', {
     method: 'POST',
     body: JSON.stringify({ zoneId, turns, ...(tier !== undefined && { tier }) }),
@@ -330,6 +332,7 @@ export interface CombatResponse {
     percent: number;
     turnsToExplore: number | null;
   };
+  questProgress?: QuestProgressUpdate[];
 }
 
 export interface CombatHistoryListItemResponse {
