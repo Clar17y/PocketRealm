@@ -28,8 +28,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankService';
 import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
-import { getPlayerGuildId } from '../../services/guildService';
-import { incrementContractProgress } from '../../services/guildContractService';
+import { trackProgress } from '../../services/progressService';
 import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
@@ -1004,9 +1003,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       familyIds: [...familyIdSet],
     });
 
-    // Guild contract progress: track exploration turns
-    const guildId = taxResult.guildId ?? await getPlayerGuildId(playerId);
-    if (guildId) void incrementContractProgress(guildId, 'exploration_turns', spentTurns).catch(() => {});
+    // Guild contract + quest progress: track exploration turns
+    void trackProgress(playerId, 'exploration_turns', spentTurns).catch(() => {});
 
     if (events.length === 0) {
       events.push({

@@ -7,6 +7,7 @@ import { exchangeTurnsForGold, getCurrentRound, placeBet, getRouletteHistory, ge
 import { assertInTown, trackAchievements } from '../utils/routeHelpers.js';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService.js';
 import type { RouletteBetType } from '@adventure/shared';
+import { trackProgress } from '../services/progressService';
 
 export const casinoRouter = Router();
 casinoRouter.use(authenticate);
@@ -56,6 +57,9 @@ casinoRouter.post('/roulette/bet', asyncHandler(async (req, res) => {
   await assertInTown(playerId);
 
   const result = await placeBet(playerId, betType as RouletteBetType, betValue, amount);
+
+  void trackProgress(playerId, 'casino_bets', 1).catch(() => {});
+  void trackProgress(playerId, 'casino_wagers', amount).catch(() => {});
 
   await trackAchievements(playerId, {
     totalBetsPlaced: 1,

@@ -16,7 +16,7 @@ import type { PendingLootItem } from './pendingLootService';
 import { grantSkillXp, type GrantXpResult } from './xpService';
 import { recordBestiaryKill } from '../utils/routeHelpers.js';
 import { addGuildXp, getPlayerGuildId } from './guildService';
-import { incrementContractProgress } from './guildContractService';
+import { trackProgress } from './progressService';
 import type { PlayerGuildModifiers } from './guildUpgradeService';
 import { mapTemplateCombatLog } from './combatLogMapper';
 import type { AttackSkill } from './combatStatsService';
@@ -119,8 +119,11 @@ export async function processCombatVictoryRewards(
     const guildId = await getPlayerGuildId(playerId);
     if (guildId) {
       await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
-      void incrementContractProgress(guildId, 'kill_count', 1).catch(() => {});
-      void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
+    }
+    void trackProgress(playerId, 'kill_count', 1).catch(() => {});
+    void trackProgress(playerId, 'kill_family', 1).catch(() => {});
+    if (mob.mobPrefix) {
+      void trackProgress(playerId, 'kill_prefix', 1, { prefix: mob.mobPrefix }).catch(() => {});
     }
   }
 

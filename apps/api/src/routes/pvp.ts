@@ -18,8 +18,7 @@ import {
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 import { paginationSchema } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
-import { getPlayerGuildId } from '../services/guildService';
-import { incrementContractProgress } from '../services/guildContractService';
+import { trackProgress } from '../services/progressService';
 
 export const pvpRouter = Router();
 pvpRouter.use(authenticate);
@@ -98,8 +97,7 @@ pvpRouter.post('/challenge', asyncHandler(async (req, res) => {
     });
     await emitAchievementNotifications(result.winnerId, pvpAchievements);
 
-    const winnerGuildId = await getPlayerGuildId(result.winnerId);
-    if (winnerGuildId) void incrementContractProgress(winnerGuildId, 'pvp_wins', 1).catch(() => {});
+    void trackProgress(result.winnerId, 'pvp_wins', 1).catch(() => {});
   }
 
   res.json(result);
