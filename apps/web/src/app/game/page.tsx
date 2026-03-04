@@ -224,6 +224,8 @@ export default function GamePage() {
     handleSetLowHpWarning,
     confirmRarity,
     handleSetConfirmRarity,
+    lootRevealRarity,
+    handleSetLootRevealRarity,
     handleQuickRest,
     guildTaxRate,
     showChangelog,
@@ -987,6 +989,8 @@ export default function GamePage() {
             onDefaultRefiningMaxChange={handleSetDefaultRefiningMax}
             confirmRarity={confirmRarity}
             onConfirmRarityChange={handleSetConfirmRarity}
+            lootRevealRarity={lootRevealRarity}
+            onLootRevealRarityChange={handleSetLootRevealRarity}
             onLogout={() => { logout(); router.push('/'); }}
           />
         );

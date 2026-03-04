@@ -21,6 +21,7 @@ export async function getPlayer() {
       defaultRefiningMax: boolean;
       lowHpWarning: boolean;
       confirmRarity: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+      lootRevealRarity: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
       gold: number;
       attributes: {
         vitality: number;
@@ -44,6 +45,7 @@ export interface PlayerSettings {
   defaultRefiningMax?: boolean;
   lowHpWarning?: boolean;
   confirmRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+  lootRevealRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 }
 
 export async function updatePlayerSettings(settings: PlayerSettings) {

@@ -40,6 +40,8 @@ interface SettingsProps {
   // Inventory
   confirmRarity: ConfirmRarity;
   onConfirmRarityChange: (value: ConfirmRarity) => void;
+  lootRevealRarity: ConfirmRarity;
+  onLootRevealRarityChange: (value: ConfirmRarity) => void;
 
   // Account
   onLogout: () => void;
@@ -72,6 +74,8 @@ export function Settings({
   onDefaultRefiningMaxChange,
   confirmRarity,
   onConfirmRarityChange,
+  lootRevealRarity,
+  onLootRevealRarityChange,
   onLogout,
 }: SettingsProps) {
   return (
@@ -223,6 +227,28 @@ export function Settings({
                 onClick={() => onConfirmRarityChange(r)}
                 className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors capitalize ${
                   confirmRarity === r
+                    ? 'bg-[var(--rpg-gold)] text-black'
+                    : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-border)]'
+                }`}
+              >
+                {r === 'none' ? 'Off' : r}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Loot Reveal Popup</p>
+          <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
+            Show an animated popup when items at or above this rarity are added to your backpack.
+          </p>
+          <div className="flex gap-2">
+            {(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary'] as const).map((r) => (
+              <button
+                key={r}
+                onClick={() => onLootRevealRarityChange(r)}
+                className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors capitalize ${
+                  lootRevealRarity === r
                     ? 'bg-[var(--rpg-gold)] text-black'
                     : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-border)]'
                 }`}

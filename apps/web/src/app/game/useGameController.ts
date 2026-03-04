@@ -216,6 +216,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     defaultRefiningMax,
     lowHpWarning,
     confirmRarity,
+    lootRevealRarity,
     guildTaxRate, setGuildTaxRate,
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
@@ -226,6 +227,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetDefaultRefiningMax,
     handleSetLowHpWarning,
     handleSetConfirmRarity,
+    handleSetLootRevealRarity,
     initSettingsFromServer,
   } = playerSettings;
   const [tutorialStep, setTutorialStep] = useState<number>(TUTORIAL_COMPLETED);
@@ -354,10 +356,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setInventoryCapacity(invRes.data.capacity ?? 24);
       setInventoryUsedSlots(invRes.data.usedSlots ?? 0);
       if (invRes.data.materialTotals) setMaterialTotals(invRes.data.materialTotals);
-      // Detect new uncommon+ items for loot reveal
-      if (hasLoadedOnceRef.current) {
+      // Detect new notable items for loot reveal
+      const RARITY_RANK: Record<string, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+      if (hasLoadedOnceRef.current && lootRevealRarity !== 'none') {
+        const minRank = RARITY_RANK[lootRevealRarity] ?? 1;
         const newNotableItems = invRes.data.items.filter(
-          item => !prevInventoryIdsRef.current.has(item.id) && item.rarity !== 'common'
+          item => !prevInventoryIdsRef.current.has(item.id) && RARITY_RANK[item.rarity] >= minRank
         );
         if (newNotableItems.length > 0) {
           setLootRevealItems(newNotableItems.map(i => ({
@@ -1644,6 +1648,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetLowHpWarning,
     confirmRarity,
     handleSetConfirmRarity,
+    lootRevealRarity,
+    handleSetLootRevealRarity,
     playbackActive,
     combatPlaybackData,
     combatPlaybackQueue,
