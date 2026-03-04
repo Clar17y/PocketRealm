@@ -1,4 +1,5 @@
-import { prisma } from '@adventure/database';
+import { prisma, Prisma } from '@adventure/database';
+import type { CombatTemplate, CombatTemplateSlot } from '@adventure/database';
 import type { CombatTemplateSlotData, CombatTemplateData, SlotCondition } from '@adventure/shared';
 import { ALWAYS_AVAILABLE_ACTION_IDS, SKILL_POINT_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
@@ -10,7 +11,7 @@ export interface CreateSlotInput {
   thenActionId?: string;
 }
 
-function toSlotData(slot: any): CombatTemplateSlotData {
+function toSlotData(slot: CombatTemplateSlot): CombatTemplateSlotData {
   return {
     id: slot.id,
     sortOrder: slot.sortOrder,
@@ -22,12 +23,12 @@ function toSlotData(slot: any): CombatTemplateSlotData {
         ...(slot.threshold != null ? { threshold: slot.threshold } : {}),
         ...(slot.effectName ? { effectName: slot.effectName } : {}),
       },
-      thenActionId: slot.thenActionId,
+      thenActionId: slot.thenActionId ?? undefined,
     } : {}),
   };
 }
 
-function toTemplateData(record: any): CombatTemplateData {
+function toTemplateData(record: CombatTemplate & { slots: CombatTemplateSlot[] }): CombatTemplateData {
   return {
     id: record.id,
     playerId: record.playerId,
@@ -104,7 +105,7 @@ export async function setActiveTemplate(playerId: string, templateId: string): P
   });
   if (!template) throw new AppError(404, 'Template not found', 'NOT_FOUND');
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.combatTemplate.updateMany({
       where: { playerId },
       data: { isActive: false },
@@ -128,16 +129,18 @@ export async function updateTemplate(
   });
   if (!template) throw new AppError(404, 'Template not found', 'NOT_FOUND');
 
-  if (name !== undefined) {
-    await prisma.combatTemplate.update({
-      where: { id: templateId },
-      data: { name },
-    });
-  }
-
   if (slots) {
     validateTemplateSlots(slots, unlockedActions);
-    await prisma.$transaction(async (tx: any) => {
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (name !== undefined) {
+      await tx.combatTemplate.update({
+        where: { id: templateId },
+        data: { name },
+      });
+    }
+    if (slots) {
       await tx.combatTemplateSlot.deleteMany({ where: { templateId } });
       await tx.combatTemplateSlot.createMany({
         data: slots.map((s, i) => ({
@@ -151,15 +154,14 @@ export async function updateTemplate(
           thenActionId: s.thenActionId ?? null,
         })),
       });
-    });
-  }
-
-  const record = await prisma.combatTemplate.findFirst({
-    where: { id: templateId, playerId },
-    include: { slots: { orderBy: { sortOrder: 'asc' } } },
+    }
   });
 
-  return toTemplateData(record);
+  const updated = await prisma.combatTemplate.findUniqueOrThrow({
+    where: { id: templateId },
+    include: { slots: { orderBy: { sortOrder: 'asc' } } },
+  });
+  return toTemplateData(updated);
 }
 
 export async function deleteTemplate(playerId: string, templateId: string): Promise<void> {

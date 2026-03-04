@@ -21,14 +21,28 @@ const conditionSchema = z.object({
   resource: z.enum(['hp', 'stamina', 'mana']).optional(),
   threshold: z.number().int().min(0).max(100).optional(),
   effectName: z.string().min(1).optional(),
-});
+}).refine(data => {
+  if (data.type === 'resource_below' || data.type === 'resource_above') {
+    return data.resource !== undefined && data.threshold !== undefined;
+  }
+  return true;
+}, { message: 'resource and threshold are required for resource conditions' }).refine(data => {
+  if (['has_buff', 'has_debuff', 'no_buff', 'no_debuff'].includes(data.type)) {
+    return data.effectName !== undefined;
+  }
+  return true;
+}, { message: 'effectName is required for buff/debuff conditions' });
 
 const slotSchema = z.object({
   sortOrder: z.number().int().min(0),
   actionId: z.string().min(1),
   condition: conditionSchema.optional(),
   thenActionId: z.string().min(1).optional(),
-});
+}).refine(data => {
+  if (data.condition && !data.thenActionId) return false;
+  if (!data.condition && data.thenActionId) return false;
+  return true;
+}, { message: 'condition and thenActionId must both be present or both absent' });
 
 const createSchema = z.object({
   name: z.string().min(1).max(64),

@@ -135,6 +135,9 @@ export function resolveBossRound(
   for (let i = 0; i < input.participants.length; i++) {
     const p = input.participants[i];
     const s = pState[i];
+    // Boss combat uses BossActiveEffect[] (different type from ActiveEffect[]),
+    // so player buff/debuff conditions won't trigger in boss fights.
+    // Resource conditions (HP/stamina/mana) still work correctly.
     const resolved = resolveAction(
       p.template,
       s.templateRound,

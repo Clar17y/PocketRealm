@@ -211,10 +211,9 @@ describe('setActiveTemplate', () => {
 describe('updateTemplate', () => {
   it('updates name only', async () => {
     const record = makeRecord({ name: 'Original' });
-    mockPrisma.combatTemplate.findFirst
-      .mockResolvedValueOnce(record)
-      .mockResolvedValueOnce(makeRecord({ name: 'Renamed' }));
+    mockPrisma.combatTemplate.findFirst.mockResolvedValueOnce(record);
     mockPrisma.combatTemplate.update.mockResolvedValue(makeRecord({ name: 'Renamed' }));
+    mockPrisma.combatTemplate.findUniqueOrThrow.mockResolvedValue(makeRecord({ name: 'Renamed' }));
 
     const result = await updateTemplate(PLAYER_ID, TEMPLATE_ID, 'Renamed');
 
@@ -230,9 +229,8 @@ describe('updateTemplate', () => {
       makeSlot({ id: 'new-1', sortOrder: 0, actionId: 'defend' }),
       makeSlot({ id: 'new-2', sortOrder: 1, actionId: 'normal_attack' }),
     ];
-    mockPrisma.combatTemplate.findFirst
-      .mockResolvedValueOnce(makeRecord())
-      .mockResolvedValueOnce(makeRecord({ slots: updatedSlots }));
+    mockPrisma.combatTemplate.findFirst.mockResolvedValueOnce(makeRecord());
+    mockPrisma.combatTemplate.findUniqueOrThrow.mockResolvedValue(makeRecord({ slots: updatedSlots }));
 
     const result = await updateTemplate(PLAYER_ID, TEMPLATE_ID, undefined, [
       { actionId: 'defend' },
