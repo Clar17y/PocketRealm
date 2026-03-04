@@ -39,7 +39,7 @@ describe('mobToTemplate', () => {
   it('returns [normal_attack] for a mob with no spells', () => {
     const mob = makeMob();
     const template = mobToTemplate(mob);
-    expect(template).toEqual([{ actionId: 'normal_attack' }]);
+    expect(template).toEqual([{ id: 'mob-slot-0', sortOrder: 0, actionId: 'normal_attack' }]);
   });
 
   it('creates correct template for a mob with spellPattern', () => {
@@ -48,9 +48,9 @@ describe('mobToTemplate', () => {
     });
     const template = mobToTemplate(mob);
     expect(template).toHaveLength(3);
-    expect(template[0]).toEqual({ actionId: 'normal_attack' });
-    expect(template[1]).toEqual({ actionId: 'normal_attack' });
-    expect(template[2]).toEqual({ actionId: 'mob_spell_fire_blast', label: 'Fire Blast' });
+    expect(template[0]).toEqual({ id: 'mob-slot-0', sortOrder: 0, actionId: 'normal_attack' });
+    expect(template[1]).toEqual({ id: 'mob-slot-1', sortOrder: 1, actionId: 'normal_attack' });
+    expect(template[2]).toEqual({ id: 'mob-slot-2', sortOrder: 2, actionId: 'mob_spell_fire_blast' });
   });
 
   it('merges prefix spells with mob spellPattern', () => {
@@ -62,9 +62,9 @@ describe('mobToTemplate', () => {
     ];
     const template = mobToTemplate(mob, prefixSpells);
     expect(template).toHaveLength(3);
-    expect(template[0]).toEqual({ actionId: 'mob_spell_bite', label: 'Bite' });
-    expect(template[1]).toEqual({ actionId: 'normal_attack' });
-    expect(template[2]).toEqual({ actionId: 'mob_spell_enrage', label: 'Enrage' });
+    expect(template[0]).toEqual({ id: 'mob-slot-0', sortOrder: 0, actionId: 'mob_spell_bite' });
+    expect(template[1]).toEqual({ id: 'mob-slot-1', sortOrder: 1, actionId: 'normal_attack' });
+    expect(template[2]).toEqual({ id: 'mob-slot-2', sortOrder: 2, actionId: 'mob_spell_enrage' });
   });
 
   it('sanitizes spell names into valid action IDs', () => {
@@ -187,7 +187,7 @@ describe('mobToTemplateCombatant', () => {
     expect(combatant.mana).toBe(Infinity);
     expect(combatant.maxMana).toBe(Infinity);
     expect(combatant.manaRegenPerRound).toBe(0);
-    expect(combatant.template).toEqual([{ actionId: 'normal_attack' }]);
+    expect(combatant.template).toEqual([{ id: 'mob-slot-0', sortOrder: 0, actionId: 'normal_attack' }]);
     expect(combatant.actionDefinitions).toBeDefined();
   });
 
@@ -248,7 +248,7 @@ describe('mobToTemplateCombatant', () => {
     const combatant = mobToTemplateCombatant(mob, prefixSpells);
 
     expect(combatant.template).toEqual([
-      { actionId: 'mob_spell_charge', label: 'Charge' },
+      { id: 'mob-slot-0', sortOrder: 0, actionId: 'mob_spell_charge' },
     ]);
     expect(combatant.actionDefinitions['mob_spell_charge']).toBeDefined();
   });

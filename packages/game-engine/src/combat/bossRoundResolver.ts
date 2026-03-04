@@ -1,7 +1,7 @@
 import type {
   CombatantStats,
   ActionDefinition,
-  CombatTemplateAction,
+  CombatTemplateSlotData,
   BossTemplateAction,
   BossActiveEffect,
   BossTargetMode,
@@ -29,7 +29,7 @@ import {
 export interface BossRoundParticipant {
   playerId: string;
   stats: CombatantStats;
-  template: CombatTemplateAction[];
+  template: CombatTemplateSlotData[];
   actionDefinitions: Record<string, ActionDefinition>;
   hp: number;
   maxHp: number;
@@ -138,8 +138,14 @@ export function resolveBossRound(
     const resolved = resolveAction(
       p.template,
       s.templateRound,
+      s.hp,
+      p.maxHp,
       s.stamina,
+      p.maxStamina,
       s.mana,
+      p.maxMana,
+      [],
+      'combatantA',
       p.actionDefinitions,
     );
     s.actionId = resolved.action.id;

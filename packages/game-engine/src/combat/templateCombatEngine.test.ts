@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, afterEach } from 'vitest';
-import type { CombatantStats, ActionDefinition, CombatTemplateAction } from '@adventure/shared';
+import type { CombatantStats, ActionDefinition, CombatTemplateSlotData } from '@adventure/shared';
 import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@adventure/shared';
 import { runTemplateCombat, type TemplateCombatant } from './templateCombatEngine';
 
@@ -23,8 +23,8 @@ function makeStats(overrides: Partial<CombatantStats> = {}): CombatantStats {
   };
 }
 
-function templateOf(...actionIds: string[]): CombatTemplateAction[] {
-  return actionIds.map((id) => ({ actionId: id }));
+function templateOf(...actionIds: string[]): CombatTemplateSlotData[] {
+  return actionIds.map((id, i) => ({ id: `slot-${i}`, sortOrder: i, actionId: id }));
 }
 
 function makeCombatant(

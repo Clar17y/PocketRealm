@@ -1,5 +1,5 @@
 import type {
-  CombatTemplateAction,
+  CombatTemplateSlotData,
   ActionDefinition,
   CombatOutcome,
   CombatLogEntry,
@@ -31,7 +31,7 @@ export interface TemplateCombatant {
   id: string;
   name: string;
   stats: CombatantStats;
-  template: CombatTemplateAction[];
+  template: CombatTemplateSlotData[];
   stamina: number;
   maxStamina: number;
   staminaRegenPerRound: number;
@@ -718,15 +718,27 @@ export function runTemplateCombat(
     const resolvedA = resolveAction(
       combatantA.template,
       state.round,
+      getHp(state, 'combatantA'),
+      state.combatantAMaxHp,
       getStamina(state, 'combatantA'),
+      state.combatantAMaxStamina,
       getMana(state, 'combatantA'),
+      state.combatantAMaxMana,
+      state.activeEffects,
+      'combatantA',
       combatantA.actionDefinitions,
     );
     const resolvedB = resolveAction(
       combatantB.template,
       state.round,
+      getHp(state, 'combatantB'),
+      state.combatantBMaxHp,
       getStamina(state, 'combatantB'),
+      state.combatantBMaxStamina,
       getMana(state, 'combatantB'),
+      state.combatantBMaxMana,
+      state.activeEffects,
+      'combatantB',
       combatantB.actionDefinitions,
     );
 

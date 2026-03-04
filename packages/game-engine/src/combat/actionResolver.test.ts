@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ActionDefinition, CombatTemplateAction } from '@adventure/shared';
+import type { ActionDefinition, CombatTemplateSlotData } from '@adventure/shared';
 import {
   BASE_ACTION_DEFINITIONS,
   COMBAT_ACTION_CONSTANTS,
@@ -12,8 +12,8 @@ import {
 
 // --- Helpers ---
 
-function templateOf(...actionIds: string[]): CombatTemplateAction[] {
-  return actionIds.map((id) => ({ actionId: id }));
+function slotsOf(...actionIds: string[]): CombatTemplateSlotData[] {
+  return actionIds.map((id, i) => ({ id: `slot-${i}`, sortOrder: i, actionId: id }));
 }
 
 function resolved(actionId: string, wasExhausted = false): ResolvedAction {
@@ -61,77 +61,77 @@ const customDefsWithBuff: Record<string, ActionDefinition> = {
 // ---------------------------------------------------------------------------
 
 describe('resolveAction', () => {
-  it('returns the correct action from template by round number', () => {
-    const template = templateOf('light_attack', 'normal_attack', 'heavy_attack');
+  it('returns the correct action from slots by round number', () => {
+    const slots = slotsOf('light_attack', 'normal_attack', 'heavy_attack');
 
-    const r1 = resolveAction(template, 1, 100, 100);
+    const r1 = resolveAction(slots, 1, 100, 100, 100, 100, 100, 100, [], 'combatantA');
     expect(r1.action.id).toBe('light_attack');
     expect(r1.wasExhausted).toBe(false);
 
-    const r2 = resolveAction(template, 2, 100, 100);
+    const r2 = resolveAction(slots, 2, 100, 100, 100, 100, 100, 100, [], 'combatantA');
     expect(r2.action.id).toBe('normal_attack');
 
-    const r3 = resolveAction(template, 3, 100, 100);
+    const r3 = resolveAction(slots, 3, 100, 100, 100, 100, 100, 100, [], 'combatantA');
     expect(r3.action.id).toBe('heavy_attack');
   });
 
-  it('loops template correctly (round 7 with 3-action template wraps to index 0)', () => {
-    const template = templateOf('light_attack', 'normal_attack', 'heavy_attack');
+  it('loops slots correctly (round 7 with 3-slot template wraps to index 0)', () => {
+    const slots = slotsOf('light_attack', 'normal_attack', 'heavy_attack');
     // round 7 → (7-1) % 3 = 0 → light_attack
-    const result = resolveAction(template, 7, 100, 100);
+    const result = resolveAction(slots, 7, 100, 100, 100, 100, 100, 100, [], 'combatantA');
     expect(result.action.id).toBe('light_attack');
   });
 
   it('loops to correct indices on various rounds', () => {
-    const template = templateOf('light_attack', 'defend', 'counter');
+    const slots = slotsOf('light_attack', 'defend', 'counter');
     // round 4 → index 0
-    expect(resolveAction(template, 4, 100, 100).action.id).toBe('light_attack');
+    expect(resolveAction(slots, 4, 100, 100, 100, 100, 100, 100, [], 'combatantA').action.id).toBe('light_attack');
     // round 5 → index 1
-    expect(resolveAction(template, 5, 100, 100).action.id).toBe('defend');
+    expect(resolveAction(slots, 5, 100, 100, 100, 100, 100, 100, [], 'combatantA').action.id).toBe('defend');
     // round 6 → index 2
-    expect(resolveAction(template, 6, 100, 100).action.id).toBe('counter');
+    expect(resolveAction(slots, 6, 100, 100, 100, 100, 100, 100, [], 'combatantA').action.id).toBe('counter');
   });
 
   it('falls back to Defend when stamina insufficient', () => {
     // heavy_attack costs 40 stamina
-    const template = templateOf('heavy_attack');
-    const result = resolveAction(template, 1, 10, 100);
+    const slots = slotsOf('heavy_attack');
+    const result = resolveAction(slots, 1, 100, 100, 10, 100, 100, 100, [], 'combatantA');
     expect(result.action.id).toBe('defend');
     expect(result.wasExhausted).toBe(true);
   });
 
   it('falls back to Defend when mana insufficient', () => {
     // ward costs mana
-    const template = templateOf('ward');
-    const result = resolveAction(template, 1, 100, 0);
+    const slots = slotsOf('ward');
+    const result = resolveAction(slots, 1, 100, 100, 100, 100, 0, 100, [], 'combatantA');
     expect(result.action.id).toBe('defend');
     expect(result.wasExhausted).toBe(true);
   });
 
   it('falls back to Defend when both stamina and mana insufficient', () => {
-    const template = templateOf('damage_spell');
-    const result = resolveAction(template, 1, 0, 0, customDefs);
+    const slots = slotsOf('damage_spell');
+    const result = resolveAction(slots, 1, 100, 100, 0, 100, 0, 100, [], 'combatantA', customDefs);
     expect(result.action.id).toBe('defend');
     expect(result.wasExhausted).toBe(true);
   });
 
   it('falls back to Defend when action ID not found', () => {
-    const template = templateOf('nonexistent_action');
-    const result = resolveAction(template, 1, 100, 100);
+    const slots = slotsOf('nonexistent_action');
+    const result = resolveAction(slots, 1, 100, 100, 100, 100, 100, 100, [], 'combatantA');
     expect(result.action.id).toBe('defend');
     expect(result.wasExhausted).toBe(true);
   });
 
   it('Defend is always affordable (0 cost)', () => {
-    const template = templateOf('defend');
-    const result = resolveAction(template, 1, 0, 0);
+    const slots = slotsOf('defend');
+    const result = resolveAction(slots, 1, 100, 100, 0, 100, 0, 100, [], 'combatantA');
     expect(result.action.id).toBe('defend');
     expect(result.wasExhausted).toBe(false);
   });
 
   it('uses custom action definitions when provided', () => {
-    const template = templateOf('damage_spell');
-    const result = resolveAction(template, 1, 100, 100, customDefs);
+    const slots = slotsOf('damage_spell');
+    const result = resolveAction(slots, 1, 100, 100, 100, 100, 100, 100, [], 'combatantA', customDefs);
     expect(result.action.id).toBe('damage_spell');
     expect(result.wasExhausted).toBe(false);
   });
@@ -140,33 +140,79 @@ describe('resolveAction', () => {
     const sparseCustom: Record<string, ActionDefinition> = {
       damage_spell: damageSpell,
     };
-    const template = templateOf('light_attack');
-    const result = resolveAction(template, 1, 100, 100, sparseCustom);
+    const slots = slotsOf('light_attack');
+    const result = resolveAction(slots, 1, 100, 100, 100, 100, 100, 100, [], 'combatantA', sparseCustom);
     expect(result.action.id).toBe('defend');
     expect(result.wasExhausted).toBe(true);
   });
 
   it('exactly at cost boundary is affordable', () => {
     // normal_attack costs 20 stamina, 0 mana
-    const template = templateOf('normal_attack');
+    const slots = slotsOf('normal_attack');
     const result = resolveAction(
-      template,
+      slots,
       1,
-      COMBAT_ACTION_CONSTANTS.NORMAL_ATTACK_STAMINA,
-      0,
+      100, 100,
+      COMBAT_ACTION_CONSTANTS.NORMAL_ATTACK_STAMINA, 100,
+      0, 100,
+      [], 'combatantA',
     );
     expect(result.action.id).toBe('normal_attack');
     expect(result.wasExhausted).toBe(false);
   });
 
   it('one stamina short of cost falls back', () => {
-    const template = templateOf('normal_attack');
+    const slots = slotsOf('normal_attack');
     const result = resolveAction(
-      template,
+      slots,
       1,
-      COMBAT_ACTION_CONSTANTS.NORMAL_ATTACK_STAMINA - 1,
-      0,
+      100, 100,
+      COMBAT_ACTION_CONSTANTS.NORMAL_ATTACK_STAMINA - 1, 100,
+      0, 100,
+      [], 'combatantA',
     );
+    expect(result.action.id).toBe('defend');
+    expect(result.wasExhausted).toBe(true);
+  });
+
+  // --- Conditional slot tests ---
+
+  it('uses thenActionId when condition is met', () => {
+    const slots: CombatTemplateSlotData[] = [{
+      id: 's1', sortOrder: 0, actionId: 'normal_attack',
+      condition: { type: 'resource_below', resource: 'hp', threshold: 50 },
+      thenActionId: 'defend',
+    }];
+    // HP 30/100 = 30% < 50% → condition true → defend
+    const result = resolveAction(slots, 1, 30, 100, 100, 100, 100, 100, [], 'combatantA');
+    expect(result.action.id).toBe('defend');
+  });
+
+  it('uses actionId (else) when condition is NOT met', () => {
+    const slots: CombatTemplateSlotData[] = [{
+      id: 's1', sortOrder: 0, actionId: 'normal_attack',
+      condition: { type: 'resource_below', resource: 'hp', threshold: 50 },
+      thenActionId: 'defend',
+    }];
+    // HP 80/100 = 80% → not below 50% → normal_attack
+    const result = resolveAction(slots, 1, 80, 100, 100, 100, 100, 100, [], 'combatantA');
+    expect(result.action.id).toBe('normal_attack');
+  });
+
+  it('unconditional slot (no condition) always uses actionId', () => {
+    const slots = slotsOf('heavy_attack');
+    const result = resolveAction(slots, 1, 100, 100, 100, 100, 100, 100, [], 'combatantA');
+    expect(result.action.id).toBe('heavy_attack');
+  });
+
+  it('falls back to Defend when conditional action is unaffordable', () => {
+    const slots: CombatTemplateSlotData[] = [{
+      id: 's1', sortOrder: 0, actionId: 'normal_attack',
+      condition: { type: 'resource_below', resource: 'hp', threshold: 50 },
+      thenActionId: 'heavy_attack',
+    }];
+    // HP 20% → condition true → heavy_attack but only 10 stamina (needs 40)
+    const result = resolveAction(slots, 1, 20, 100, 10, 100, 100, 100, [], 'combatantA');
     expect(result.action.id).toBe('defend');
     expect(result.wasExhausted).toBe(true);
   });
