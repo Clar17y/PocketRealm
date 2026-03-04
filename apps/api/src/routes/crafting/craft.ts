@@ -244,12 +244,13 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     if (guildId) {
       await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_CRAFT * quantity);
     }
-    void trackProgress(playerId, 'craft_items', quantity).catch(() => {});
+    const craftQuestProgress = await trackProgress(playerId, 'craft_items', quantity);
     const rareCount = craftedItemDetails.filter(
       (d) => d.rarity === 'rare' || d.rarity === 'epic' || d.rarity === 'legendary',
     ).length;
     if (rareCount > 0) {
-      void trackProgress(playerId, 'craft_rare', rareCount).catch(() => {});
+      const rareQuestProgress = await trackProgress(playerId, 'craft_rare', rareCount);
+      craftQuestProgress.push(...rareQuestProgress);
     }
 
     // --- Achievement tracking (counters + derived checks) ---
@@ -305,5 +306,6 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       craftedItemDetails,
       xp: serializeXpGrant(xpGrant),
       tax: taxInfoFromResult(taxResult),
+      ...(craftQuestProgress.length > 0 ? { questProgress: craftQuestProgress } : {}),
     });
 }));

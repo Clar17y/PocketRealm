@@ -23,6 +23,7 @@ import {
   type CombatOptions,
   type MobTemplate,
   type PotionConsumed,
+  type QuestProgressUpdate,
 } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankService';
@@ -187,6 +188,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       : [];
     const allPotionsConsumed: PotionConsumed[] = [];
     const ambushPendingLootSessionIds: string[] = [];
+    const allQuestProgress: QuestProgressUpdate[] = [];
 
     // Spend turns and apply guild tax atomically
     const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
@@ -377,6 +379,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           if (rewards.pendingLootSessionId) {
             ambushPendingLootSessionIds.push(rewards.pendingLootSessionId);
           }
+          allQuestProgress.push(...rewards.questProgress);
           xpGrant = rewards.xpGrant;
           xpGain = xpGrant.xpResult.xpAfterEfficiency;
 
@@ -1004,7 +1007,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     });
 
     // Guild contract + quest progress: track exploration turns
-    void trackProgress(playerId, 'exploration_turns', spentTurns).catch(() => {});
+    const explorationQuestProgress = await trackProgress(playerId, 'exploration_turns', spentTurns);
+    allQuestProgress.push(...explorationQuestProgress);
 
     if (events.length === 0) {
       events.push({
@@ -1038,5 +1042,6 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         turnsToExplore: explorationProgress.turnsToExplore,
       },
       tax: taxInfoFromResult(taxResult),
+      ...(allQuestProgress.length > 0 ? { questProgress: allQuestProgress } : {}),
     });
 }));

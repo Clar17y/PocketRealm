@@ -21,6 +21,7 @@ import {
   type LootDrop,
   type MobTemplate,
   type PotionConsumed,
+  type QuestProgressUpdate,
 } from '@adventure/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { enrichLootWithNames } from '../../services/lootService';
@@ -215,6 +216,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
   let sitePendingLootSessionId: string | null = null;
   const allSiteOverflow: import('../../services/pendingLootService').PendingLootItem[] = [];
+  const allQuestProgress: QuestProgressUpdate[] = [];
   const fightResults: FightResult[] = [];
   let lastCombatResult: ReturnType<typeof runTemplateCombat> | null = null;
   let lastPrefixedMob: (MobTemplate & { mobPrefix: string | null; mobDisplayName: string | null }) | null = null;
@@ -289,6 +291,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         });
         mobLoot = await enrichLootWithNames(rewards.loot);
         allSiteOverflow.push(...rewards.overflow);
+        allQuestProgress.push(...rewards.questProgress);
         mobXpGrant = rewards.xpGrant;
       }
 
@@ -685,6 +688,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     activeEvents: activeEventEffects.length > 0
       ? tagEventsWithApplicability(activeEventEffects, siteMobBadges)
       : undefined,
+    ...(allQuestProgress.length > 0 ? { questProgress: allQuestProgress } : {}),
   });
 }
 
@@ -859,6 +863,7 @@ export function registerStartRoutes(router: Router): void {
       let loot: LootDrop[] = [];
       let pendingLootSessionId: string | null = null;
       let xpGrant = null as null | GrantXpResult;
+      let zoneQuestProgress: QuestProgressUpdate[] = [];
       const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
       let fleeResult = null as null | ReturnType<typeof calculateFleeResult>;
       let respawnedTo: { townId: string; townName: string } | null = null;
@@ -884,6 +889,7 @@ export function registerStartRoutes(router: Router): void {
         loot = rewards.loot;
         pendingLootSessionId = rewards.pendingLootSessionId;
         xpGrant = rewards.xpGrant;
+        zoneQuestProgress = rewards.questProgress;
       } else if (combatResult.outcome === 'defeat') {
         await setAllResources(
           playerId,
@@ -1029,6 +1035,7 @@ export function registerStartRoutes(router: Router): void {
         activeEvents: activeEventEffects.length > 0
           ? tagEventsWithApplicability(activeEventEffects, zoneMobBadges)
           : undefined,
+        ...(zoneQuestProgress.length > 0 ? { questProgress: zoneQuestProgress } : {}),
       });
   }));
 }

@@ -9,6 +9,7 @@ import {
   type ActionDefinition,
   type CombatTemplateAction,
   type LootDrop,
+  type QuestProgressUpdate,
 } from '@adventure/shared';
 import { Prisma } from '@adventure/database';
 import { rollAndGrantLootWithCapacity } from './lootService';
@@ -96,6 +97,7 @@ export interface VictoryRewardResult {
   overflow: PendingLootItem[];
   pendingLootSessionId: string | null;
   xpGrant: GrantXpResult;
+  questProgress: QuestProgressUpdate[];
 }
 
 export async function processCombatVictoryRewards(
@@ -115,15 +117,20 @@ export async function processCombatVictoryRewards(
     await recordBestiaryKill(playerId, mob.id, mob.mobPrefix);
   }
 
+  const questProgress: QuestProgressUpdate[] = [];
+
   if (params.includeGuildCredit) {
     const guildId = await getPlayerGuildId(playerId);
     if (guildId) {
       await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
     }
-    void trackProgress(playerId, 'kill_count', 1).catch(() => {});
-    void trackProgress(playerId, 'kill_family', 1).catch(() => {});
+    const killProgress = await trackProgress(playerId, 'kill_count', 1);
+    questProgress.push(...killProgress);
+    const familyProgress = await trackProgress(playerId, 'kill_family', 1);
+    questProgress.push(...familyProgress);
     if (mob.mobPrefix) {
-      void trackProgress(playerId, 'kill_prefix', 1, { prefix: mob.mobPrefix }).catch(() => {});
+      const prefixProgress = await trackProgress(playerId, 'kill_prefix', 1, { prefix: mob.mobPrefix });
+      questProgress.push(...prefixProgress);
     }
   }
 
@@ -132,6 +139,7 @@ export async function processCombatVictoryRewards(
     overflow: lootResult.overflow,
     pendingLootSessionId: lootResult.pendingLootSessionId,
     xpGrant,
+    questProgress,
   };
 }
 

@@ -394,7 +394,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp, undefined, guildMods.xpBoost || undefined);
 
   // Guild contract + quest progress for gathering
-  void trackProgress(playerId, 'gather_actions', actions).catch(() => {});
+  const questProgress = await trackProgress(playerId, 'gather_actions', actions);
 
   // --- Gem crit rolls (one per gathering action) ---
   let gemCrit: { itemTemplateId: string; itemId: string; gemName: string; gemsFound: number; critChance: number } | null = null;
@@ -490,5 +490,6 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
         }
       : undefined,
     tax: taxInfoFromResult(taxResult),
+    ...(questProgress.length > 0 ? { questProgress } : {}),
   });
 }));
