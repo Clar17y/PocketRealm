@@ -576,7 +576,7 @@ export default function AdminScreen({ onAction }: { onAction?: () => void }) {
     <div className="rpg-screen-enter space-y-4">
       <div className="flex items-center gap-2 mb-2">
         <Shield className="w-5 h-5 text-[var(--rpg-gold)]" />
-        <h2 className="text-lg font-bold text-[var(--rpg-gold)]">Admin Panel</h2>
+        <h2 className="text-lg font-bold font-display text-[var(--rpg-gold)]">Admin Panel</h2>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">

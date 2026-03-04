@@ -229,7 +229,7 @@ export function Forge({
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Forge</h2>
+        <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Forge</h2>
         <div className="text-sm text-[var(--rpg-text-secondary)]">Luck: {equippedLuck}</div>
       </div>
 

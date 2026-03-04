@@ -258,7 +258,7 @@ export function TrainingGrounds({
         <div className="flex items-center gap-3 mb-1">
           <Swords size={28} className="text-[var(--rpg-gold)]" />
           <div>
-            <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">
+            <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">
               Training Grounds
             </h2>
             <p className="text-sm text-[var(--rpg-text-secondary)]">
@@ -396,7 +396,7 @@ function CooldownDisplay({ seconds }: { seconds: number }) {
   return (
     <div className="bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg p-3 text-center">
       <div className="text-xs text-[var(--rpg-text-secondary)] mb-1">Cooldown</div>
-      <div className="text-lg font-bold font-mono text-[var(--rpg-gold)]">
+      <div className="text-lg font-bold font-pixel text-[var(--rpg-gold)]">
         {formatTime(seconds)}
       </div>
     </div>

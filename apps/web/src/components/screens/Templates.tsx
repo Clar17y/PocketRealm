@@ -311,7 +311,7 @@ export function Templates({
                 if (!def) return null;
                 return (
                   <div key={i} className="flex items-center gap-2 p-2 rounded bg-[var(--rpg-background)] border border-[var(--rpg-border)]">
-                    <span className="text-xs font-mono text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">{i + 1}</span>
+                    <span className="text-xs font-pixel text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{def.name}</span>
@@ -396,7 +396,7 @@ export function Templates({
     <div className="rpg-screen-enter space-y-4">
       <TemplateTutorial />
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">Combat Templates</h2>
+        <h2 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">Combat Templates</h2>
         <PixelButton size="sm" variant="primary" onClick={handleNewTemplate}>
           <Plus size={14} className="mr-1 inline" /> New Template
         </PixelButton>

@@ -44,7 +44,7 @@ export function BossHistory() {
 
   return (
     <div className="rpg-screen-enter space-y-3">
-      <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Boss History</h2>
+      <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Boss History</h2>
 
       <div className="space-y-2">
         {entries.map((entry) => {

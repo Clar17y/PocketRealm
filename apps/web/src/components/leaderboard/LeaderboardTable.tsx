@@ -105,7 +105,7 @@ export function LeaderboardTable({
                   <span className="text-xs text-[var(--rpg-text-secondary)]">Lv.{entry.characterLevel}</span>
                 </div>
               </div>
-              <div className="text-right font-mono text-[var(--rpg-text-primary)] shrink-0">
+              <div className="text-right font-pixel text-[var(--rpg-text-primary)] shrink-0">
                 {formatScore(entry.score)}
               </div>
             </div>
@@ -141,7 +141,7 @@ export function LeaderboardTable({
                 <span className="text-xs text-[var(--rpg-text-secondary)] ml-1">Lv.{myRank.characterLevel}</span>
               </div>
             </div>
-            <div className="text-right font-mono text-[var(--rpg-text-primary)] shrink-0">
+            <div className="text-right font-pixel text-[var(--rpg-text-primary)] shrink-0">
               {formatScore(myRank.score)}
             </div>
           </div>

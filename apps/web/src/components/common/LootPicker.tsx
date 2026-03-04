@@ -77,8 +77,8 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
 
         <div className="text-sm text-[var(--rpg-text-secondary)] mb-3">
           {noSpace
-            ? <span className="text-[var(--rpg-red)] font-mono">0</span>
-            : <>Selected: <span className="font-mono text-[var(--rpg-gold)]">{selected.size}</span></>
+            ? <span className="text-[var(--rpg-red)] font-pixel">0</span>
+            : <>Selected: <span className="font-pixel text-[var(--rpg-gold)]">{selected.size}</span></>
           }
           {' '}/ {availableSlots} slots available
         </div>

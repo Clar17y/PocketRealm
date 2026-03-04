@@ -10,6 +10,7 @@ import { Coins, TrendingUp, MapPin, Sword, Pickaxe, Hammer, Heart, Crosshair, Sp
 import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
 import { ActivityLog } from '@/components/ActivityLog';
+import { Divider } from '@/components/common/Divider';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 
 interface DashboardProps {
@@ -89,7 +90,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
       )}
 
       {/* Turn Counter */}
-      <PixelCard>
+      <PixelCard variant="ornate">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-14 h-14 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
@@ -103,7 +104,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
             </div>
             <div>
               <div className="text-sm text-[var(--rpg-text-secondary)]">Available Turns</div>
-              <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">
+              <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">
                 {playerData.turns.toLocaleString()}
               </div>
             </div>
@@ -128,7 +129,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
 
       {/* Action Buttons */}
       <div>
-        <h2 className="text-lg font-semibold mb-3 text-[var(--rpg-text-primary)]">Actions</h2>
+        <h2 className="text-lg font-semibold font-display mb-3 text-[var(--rpg-text-primary)]">Actions</h2>
         <div className="grid grid-cols-2 gap-3">
           <div className="relative group">
             <PixelButton
@@ -205,13 +206,15 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
         </div>
       </div>
 
+      <Divider className="my-1" />
+
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3">
         <PixelCard padding="sm">
           <div className="flex flex-col items-center text-center">
             <Coins size={20} color="var(--rpg-gold)" className="mb-1" />
             <div className="text-xs text-[var(--rpg-text-secondary)]">Gold</div>
-            <div className="text-lg font-bold text-[var(--rpg-gold)] font-mono">
+            <div className="text-lg font-bold text-[var(--rpg-gold)] font-pixel">
               {playerData.gold.toLocaleString()}
             </div>
           </div>
@@ -221,7 +224,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
           <div className="flex flex-col items-center text-center">
             <TrendingUp size={20} color="var(--rpg-blue-light)" className="mb-1" />
             <div className="text-xs text-[var(--rpg-text-secondary)]">Total XP</div>
-            <div className="text-lg font-bold text-[var(--rpg-blue-light)] font-mono">
+            <div className="text-lg font-bold text-[var(--rpg-blue-light)] font-pixel">
               {playerData.currentXP.toLocaleString()}
             </div>
           </div>
@@ -239,7 +242,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
       </div>
 
       {/* Attributes */}
-      <PixelCard>
+      <PixelCard variant="framed">
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-sm text-[var(--rpg-text-secondary)]">Character Level</div>
@@ -253,7 +256,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
         <div className="mb-3">
           <div className="flex items-center justify-between text-xs text-[var(--rpg-text-secondary)] mb-1">
             <span>Level Progress</span>
-            <span className="font-mono">
+            <span className="font-pixel">
               {playerData.currentLevelXp.toLocaleString()} / {playerData.requiredLevelXp.toLocaleString()} XP
             </span>
           </div>
@@ -300,9 +303,11 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
         </div>
       </PixelCard>
 
+      <Divider className="my-1" />
+
       {/* Skills Grid */}
       <div>
-        <h2 className="text-lg font-semibold mb-3 text-[var(--rpg-text-primary)]">Skills</h2>
+        <h2 className="text-lg font-semibold font-display mb-3 text-[var(--rpg-text-primary)]">Skills</h2>
         <div className="grid grid-cols-4 gap-3">
           {skills.map((skill, index) => {
             const Icon = skill.icon;

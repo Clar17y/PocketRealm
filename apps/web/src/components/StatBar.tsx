@@ -78,7 +78,7 @@ export function StatBar({
         <div className="flex justify-between items-center mb-1 text-xs text-[var(--rpg-text-secondary)]">
           {label && <span>{label}</span>}
           {showNumbers && (
-            <span className="font-mono">
+            <span className="font-pixel">
               {current.toLocaleString()} / {max.toLocaleString()}
             </span>
           )}

@@ -202,7 +202,7 @@ export function ZoneMap({
   return (
     <div className="rpg-screen-enter space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">World Map</h2>
+        <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">World Map</h2>
         <MapPin size={20} color="var(--rpg-gold)" />
       </div>
 

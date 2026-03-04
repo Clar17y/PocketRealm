@@ -143,7 +143,7 @@ export function TalentTree({
       <SkillTreeTutorial />
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">Talent Tree</h2>
+        <h2 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">Talent Tree</h2>
         <span
           className="text-sm font-bold px-3 py-1 rounded-full border"
           style={{

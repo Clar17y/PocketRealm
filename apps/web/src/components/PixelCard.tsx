@@ -25,7 +25,7 @@ export function PixelCard({ children, className, padding = 'md', variant = 'defa
   return (
     <div
       className={cn(
-        'bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg',
+        'bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg relative',
         variantClasses[variant],
         paddingClasses[padding],
         className

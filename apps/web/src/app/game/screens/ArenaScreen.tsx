@@ -223,16 +223,16 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
     <PixelCard className="mb-4">
       <div className="flex items-center gap-3 mb-3">
         <Trophy size={24} className="text-[var(--rpg-gold)]" />
-        <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">Your Rating</h2>
+        <h2 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">Your Rating</h2>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-[var(--rpg-background)] rounded-lg p-2 text-center">
           <div className="text-xs text-[var(--rpg-text-secondary)]">Rating</div>
-          <div className="text-lg font-bold text-[var(--rpg-gold)] font-mono">{rating.rating}</div>
+          <div className="text-lg font-bold text-[var(--rpg-gold)] font-pixel">{rating.rating}</div>
         </div>
         <div className="bg-[var(--rpg-background)] rounded-lg p-2 text-center">
           <div className="text-xs text-[var(--rpg-text-secondary)]">Record</div>
-          <div className="text-lg font-bold font-mono">
+          <div className="text-lg font-bold font-pixel">
             <span className="text-[var(--rpg-green-light)]">{rating.wins}</span>
             <span className="text-[var(--rpg-text-secondary)]"> / </span>
             <span className="text-[var(--rpg-red)]">{rating.losses}</span>
@@ -244,11 +244,11 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
         </div>
         <div className="bg-[var(--rpg-background)] rounded-lg p-2 text-center">
           <div className="text-xs text-[var(--rpg-text-secondary)]">Win Streak</div>
-          <div className="text-lg font-bold text-[var(--rpg-text-primary)] font-mono">{rating.winStreak}</div>
+          <div className="text-lg font-bold text-[var(--rpg-text-primary)] font-pixel">{rating.winStreak}</div>
         </div>
         <div className="bg-[var(--rpg-background)] rounded-lg p-2 text-center">
           <div className="text-xs text-[var(--rpg-text-secondary)]">Best Rating</div>
-          <div className="text-lg font-bold text-[var(--rpg-gold)] font-mono">{rating.bestRating}</div>
+          <div className="text-lg font-bold text-[var(--rpg-gold)] font-pixel">{rating.bestRating}</div>
         </div>
       </div>
     </PixelCard>
@@ -284,7 +284,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
             {lastResult.attackerName} vs {lastResult.defenderName}
             {lastResult.isDraw && ' — 100 rounds, no winner'}
           </p>
-          <p className="text-sm font-mono mt-1">
+          <p className="text-sm font-pixel mt-1">
             Rating:{' '}
             <span className={lastResult.attackerRatingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}>
               {lastResult.attackerRatingChange >= 0 ? '+' : ''}{lastResult.attackerRatingChange}
@@ -482,7 +482,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-bold font-mono ${isDraw ? 'text-[var(--rpg-text-secondary)]' : ratingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
+                    <span className={`text-sm font-bold font-pixel ${isDraw ? 'text-[var(--rpg-text-secondary)]' : ratingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
                       {isDraw ? '—' : `${ratingChange >= 0 ? '+' : ''}${ratingChange}`}
                     </span>
                     <ChevronRight size={14} className={`text-[var(--rpg-text-secondary)] transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
@@ -579,7 +579,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`text-sm font-bold font-mono ${notif.defenderRatingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
+                <span className={`text-sm font-bold font-pixel ${notif.defenderRatingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
                   {notif.defenderRatingChange >= 0 ? '+' : ''}{notif.defenderRatingChange}
                 </span>
               </div>

@@ -165,7 +165,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
             )}
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-[var(--rpg-text-primary)] mb-1">
+            <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)] mb-1">
               {currentZone.name}
             </h2>
             <p className="text-sm text-[var(--rpg-text-secondary)] mb-2">
@@ -256,7 +256,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold text-[var(--rpg-text-primary)]">Turn Investment</h3>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">
+                  <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">
                     {turnInvestment[0].toLocaleString()}
                   </div>
                   {guildTaxRate > 0 && (
@@ -326,25 +326,25 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
             <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3">Expected Results</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="text-center">
-                <div className="text-2xl font-bold text-[var(--rpg-red)] font-mono">
+                <div className="text-2xl font-bold text-[var(--rpg-red)] font-pixel">
                   {expectedAmbushes < 1 ? expectedAmbushes.toFixed(1) : `~${Math.round(expectedAmbushes)}`}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">Ambushes</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-[var(--rpg-blue-light)] font-mono">
+                <div className="text-2xl font-bold text-[var(--rpg-blue-light)] font-pixel">
                   {expectedSites < 1 ? expectedSites.toFixed(2) : `~${Math.round(expectedSites)}`}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">Sites</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">
+                <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">
                   {expectedResources < 1 ? expectedResources.toFixed(2) : `~${Math.round(expectedResources)}`}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">Resources</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-[var(--rpg-purple)] font-mono">{hiddenCacheChance}%</div>
+                <div className="text-2xl font-bold text-[var(--rpg-purple)] font-pixel">{hiddenCacheChance}%</div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">Rare Find</div>
               </div>
             </div>

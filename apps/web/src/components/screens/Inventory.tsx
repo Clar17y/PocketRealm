@@ -263,11 +263,11 @@ export function Inventory({
   return (
     <div className="rpg-screen-enter space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Inventory</h2>
+        <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Inventory</h2>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 text-sm">
             <Coins size={14} className="text-[var(--rpg-gold)]" />
-            <span className="font-mono text-[var(--rpg-gold)]">{gold.toLocaleString()}</span>
+            <span className="font-pixel text-[var(--rpg-gold)]">{gold.toLocaleString()}</span>
           </div>
           <div className="text-sm text-[var(--rpg-text-secondary)]">{items.length} items</div>
         </div>
@@ -750,9 +750,9 @@ export function Inventory({
                     <div className="flex items-baseline justify-between text-xs mb-1">
                       <span className="text-[var(--rpg-text-secondary)]">Durability</span>
                       {selectedItem.durability.current <= 0 ? (
-                        <span className="text-[var(--rpg-red)] font-mono font-bold">BROKEN</span>
+                        <span className="text-[var(--rpg-red)] font-pixel font-bold">BROKEN</span>
                       ) : (
-                        <span className={`font-mono ${
+                        <span className={`font-pixel ${
                           (selectedItem.durability.current / selectedItem.durability.max) < 0.10
                             ? 'text-[var(--rpg-gold)]'
                             : 'text-[var(--rpg-text-primary)]'
@@ -777,7 +777,7 @@ export function Inventory({
                       <div className="flex items-center gap-2 text-sm">
                         <Sword size={16} className="text-[var(--rpg-red)]" />
                         <span className="text-[var(--rpg-text-secondary)]">Attack</span>
-                        <span className={`ml-auto font-mono ${signedClass(attack, 'text-[var(--rpg-red)]')}`}>
+                        <span className={`ml-auto font-pixel ${signedClass(attack, 'text-[var(--rpg-red)]')}`}>
                           {formatSignedStatValue('attack', attack)}
                         </span>
                       </div>
@@ -786,7 +786,7 @@ export function Inventory({
                       <div className="flex items-center gap-2 text-sm">
                         <Shield size={16} className="text-[var(--rpg-blue-light)]" />
                         <span className="text-[var(--rpg-text-secondary)]">Armor</span>
-                        <span className={`ml-auto font-mono ${signedClass(armor, 'text-[var(--rpg-blue-light)]')}`}>
+                        <span className={`ml-auto font-pixel ${signedClass(armor, 'text-[var(--rpg-blue-light)]')}`}>
                           {formatSignedStatValue('armor', armor)}
                         </span>
                       </div>
@@ -795,7 +795,7 @@ export function Inventory({
                       <div className="flex items-center gap-2 text-sm">
                         <Zap size={16} className="text-[var(--rpg-purple)]" />
                         <span className="text-[var(--rpg-text-secondary)]">Magic Def</span>
-                        <span className={`ml-auto font-mono ${signedClass(magicDefence, 'text-[var(--rpg-purple)]')}`}>
+                        <span className={`ml-auto font-pixel ${signedClass(magicDefence, 'text-[var(--rpg-purple)]')}`}>
                           {formatSignedStatValue('magicDefence', magicDefence)}
                         </span>
                       </div>
@@ -804,7 +804,7 @@ export function Inventory({
                       <div className="flex items-center gap-2 text-sm">
                         <Heart size={16} className="text-[var(--rpg-green-light)]" />
                         <span className="text-[var(--rpg-text-secondary)]">HP</span>
-                        <span className={`ml-auto font-mono ${signedClass(health, 'text-[var(--rpg-green-light)]')}`}>
+                        <span className={`ml-auto font-pixel ${signedClass(health, 'text-[var(--rpg-green-light)]')}`}>
                           {formatSignedStatValue('health', health)}
                         </span>
                       </div>
@@ -813,7 +813,7 @@ export function Inventory({
                       <div className="flex items-center gap-2 text-sm">
                         <Zap size={16} className="text-[var(--rpg-gold)]" />
                         <span className="text-[var(--rpg-text-secondary)]">Dodge</span>
-                        <span className={`ml-auto font-mono ${signedClass(dodge, 'text-[var(--rpg-gold)]')}`}>
+                        <span className={`ml-auto font-pixel ${signedClass(dodge, 'text-[var(--rpg-gold)]')}`}>
                           {formatSignedStatValue('dodge', dodge)}
                         </span>
                       </div>
@@ -822,7 +822,7 @@ export function Inventory({
                       <div className="flex items-center gap-2 text-sm">
                         <Crosshair size={16} className="text-[var(--rpg-blue-light)]" />
                         <span className="text-[var(--rpg-text-secondary)]">Accuracy</span>
-                        <span className={`ml-auto font-mono ${signedClass(accuracy, 'text-[var(--rpg-blue-light)]')}`}>
+                        <span className={`ml-auto font-pixel ${signedClass(accuracy, 'text-[var(--rpg-blue-light)]')}`}>
                           {formatSignedStatValue('accuracy', accuracy)}
                         </span>
                       </div>
@@ -836,7 +836,7 @@ export function Inventory({
                         <div className="flex items-center gap-2 text-sm">
                           <Backpack size={16} className="text-[var(--rpg-gold)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Inventory Slots</span>
-                          <span className="ml-auto font-mono text-[var(--rpg-gold)]">
+                          <span className="ml-auto font-pixel text-[var(--rpg-gold)]">
                             +{totalSlots}{rarityBonus > 0 && <span className="text-xs text-[var(--rpg-text-secondary)]"> ({inventorySlots}+{rarityBonus})</span>}
                           </span>
                         </div>
@@ -855,7 +855,7 @@ export function Inventory({
                           <div key={stat} className="flex items-center gap-2 text-sm">
                             <Icon size={16} className={color} />
                             <span className="text-[var(--rpg-text-secondary)]">{label}</span>
-                            <span className={`ml-auto font-mono ${value < 0 ? 'text-[var(--rpg-red)]' : color}`}>
+                            <span className={`ml-auto font-pixel ${value < 0 ? 'text-[var(--rpg-red)]' : color}`}>
                               {formatSignedStatValue(stat, value)}
                             </span>
                           </div>
@@ -877,7 +877,7 @@ export function Inventory({
             {canSell && selectedItem.sellPrice != null && selectedItem.sellPrice > 0 && (
               <div className="flex items-center gap-1 text-xs text-[var(--rpg-text-secondary)] mb-3">
                 <Coins size={12} className="text-[var(--rpg-gold)]" />
-                <span>Sell value: <span className="text-[var(--rpg-gold)] font-mono">{selectedItem.sellPrice * selectedItem.quantity}</span> gold{selectedItem.quantity > 1 && <span className="text-[var(--rpg-text-secondary)]"> ({selectedItem.sellPrice} ea)</span>}</span>
+                <span>Sell value: <span className="text-[var(--rpg-gold)] font-pixel">{selectedItem.sellPrice * selectedItem.quantity}</span> gold{selectedItem.quantity > 1 && <span className="text-[var(--rpg-text-secondary)]"> ({selectedItem.sellPrice} ea)</span>}</span>
               </div>
             )}
 

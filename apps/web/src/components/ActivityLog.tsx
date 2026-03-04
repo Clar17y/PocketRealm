@@ -29,7 +29,7 @@ export function ActivityLog({ entries, maxHeight = 'max-h-64' }: ActivityLogProp
 
   return (
     <PixelCard>
-      <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3">Recent Activity</h3>
+      <h3 className="font-semibold font-display text-[var(--rpg-text-primary)] mb-3">Recent Activity</h3>
       <div ref={scrollRef} className={`space-y-2 ${maxHeight} overflow-y-auto`}>
         {entries.length === 0 ? (
           <div className="text-sm text-[var(--rpg-text-secondary)] text-center py-4">
@@ -39,7 +39,7 @@ export function ActivityLog({ entries, maxHeight = 'max-h-64' }: ActivityLogProp
           entries.map((entry, index) => (
             <div key={index} className="flex gap-2 text-sm">
               <Clock size={14} className="text-[var(--rpg-text-secondary)] flex-shrink-0 mt-0.5" />
-              <span className="text-[var(--rpg-text-secondary)] flex-shrink-0 font-mono">
+              <span className="text-[var(--rpg-text-secondary)] flex-shrink-0 font-pixel">
                 {entry.timestamp}
               </span>
               <span className={TYPE_COLORS[entry.type]}>{entry.message}</span>

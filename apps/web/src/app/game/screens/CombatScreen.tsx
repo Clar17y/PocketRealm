@@ -458,7 +458,7 @@ export function CombatScreen({
           )}
 
           <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
-            <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Encounter Sites</h2>
+            <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Encounter Sites</h2>
 
             {combatXpRate && (
               <XpRateBadge skillName={combatXpRate.skillName} rate={combatXpRate.rate} />

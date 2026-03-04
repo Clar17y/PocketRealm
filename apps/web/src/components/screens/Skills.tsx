@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 import { SkillCard } from '@/components/SkillCard';
+import { Divider } from '@/components/common/Divider';
 
 interface Skill {
   id: string;
@@ -23,11 +24,13 @@ export function Skills({ skills }: SkillsProps) {
   return (
     <div className="rpg-screen-enter space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Skills</h2>
+        <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Skills</h2>
         <div className="text-sm text-[var(--rpg-text-secondary)]">
           Total Level: {skills.reduce((sum, skill) => sum + skill.level, 0)}
         </div>
       </div>
+
+      <Divider className="my-1" />
 
       <div className="space-y-3">
         {skills.map((skill, index) => (

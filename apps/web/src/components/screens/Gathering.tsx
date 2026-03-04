@@ -214,7 +214,7 @@ export function Gathering({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">{skillName}</h2>
+          <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">{skillName}</h2>
           <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-sm font-bold">
             Lv. {skillLevel}
           </div>
@@ -362,7 +362,7 @@ export function Gathering({
             <div className="flex justify-between items-center">
               <h3 className="font-semibold text-[var(--rpg-text-primary)]">Turn Investment</h3>
               <div className="text-right">
-                <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">{turnInvestment[0]}</div>
+                <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">{turnInvestment[0]}</div>
                 {guildTaxRate > 0 && (
                   <div className="text-xs text-[var(--rpg-text-secondary)]">
                     {calcEffectiveTurns(turnInvestment[0], guildTaxRate)} effective ({guildTaxRate}% tax)
@@ -410,7 +410,7 @@ export function Gathering({
             </div>
             <div className="flex-1">
               <div className="text-sm text-[var(--rpg-text-secondary)]">{selectedNode.name}</div>
-              <div className="text-3xl font-bold text-[var(--rpg-gold)] font-mono">{yieldInfo.totalYield}</div>
+              <div className="text-3xl font-bold text-[var(--rpg-gold)] font-pixel">{yieldInfo.totalYield}</div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
                 {yieldInfo.actions} action{yieldInfo.actions !== 1 ? 's' : ''} x {yieldInfo.baseYield} base
                 {yieldInfo.yieldMultiplier > 1 && (

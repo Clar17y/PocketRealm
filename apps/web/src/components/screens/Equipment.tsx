@@ -10,6 +10,7 @@ import { titleCaseFromSnake, fmtDur } from '@/lib/format';
 import { DURABILITY_CONSTANTS } from '@adventure/shared';
 import { numStat, formatSignedStatValue, signedClass, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
+import { Divider } from '@/components/common/Divider';
 
 interface EquippedItem {
   id: string;
@@ -203,7 +204,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
 
   return (
     <div className="rpg-screen-enter space-y-4">
-      <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Equipment</h2>
+      <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Equipment</h2>
 
       {/* Slot Selection Modal */}
       {activeSlotId && (
@@ -281,7 +282,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                           <div className="text-xs text-[var(--rpg-gold)]">{prettyWeightClass(currentItem.weightClass)}</div>
                         )}
                         {currentItem.maxDurability > 0 && (
-                          <div className={`text-xs font-mono ${currentItem.durability <= 0 ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text-secondary)]'}`}>
+                          <div className={`text-xs font-pixel ${currentItem.durability <= 0 ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text-secondary)]'}`}>
                             {currentItem.durability <= 0 ? 'BROKEN' : `${fmtDur(currentItem.durability)}/${currentItem.maxDurability}`}
                           </div>
                         )}
@@ -303,7 +304,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Sword size={16} className="text-[var(--rpg-red)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Attack</span>
-                          <span className={`ml-auto font-mono ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack'), 'text-[var(--rpg-red)]')}`}>
+                          <span className={`ml-auto font-pixel ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack'), 'text-[var(--rpg-red)]')}`}>
                             {formatSignedStatValue('attack', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack'))}
                           </span>
                         </div>
@@ -312,7 +313,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Shield size={16} className="text-[var(--rpg-blue-light)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Armor</span>
-                          <span className={`ml-auto font-mono ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor'), 'text-[var(--rpg-blue-light)]')}`}>
+                          <span className={`ml-auto font-pixel ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor'), 'text-[var(--rpg-blue-light)]')}`}>
                             {formatSignedStatValue('armor', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor'))}
                           </span>
                         </div>
@@ -321,7 +322,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Sparkles size={16} className="text-[var(--rpg-purple)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Magic Def</span>
-                          <span className={`ml-auto font-mono ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence'), 'text-[var(--rpg-purple)]')}`}>
+                          <span className={`ml-auto font-pixel ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence'), 'text-[var(--rpg-purple)]')}`}>
                             {formatSignedStatValue('magicDefence', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence'))}
                           </span>
                         </div>
@@ -330,7 +331,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Heart size={16} className="text-[var(--rpg-green-light)]" />
                           <span className="text-[var(--rpg-text-secondary)]">HP</span>
-                          <span className={`ml-auto font-mono ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health'), 'text-[var(--rpg-green-light)]')}`}>
+                          <span className={`ml-auto font-pixel ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health'), 'text-[var(--rpg-green-light)]')}`}>
                             {formatSignedStatValue('health', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health'))}
                           </span>
                         </div>
@@ -339,7 +340,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Zap size={16} className="text-[var(--rpg-gold)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Dodge</span>
-                          <span className={`ml-auto font-mono ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge'), 'text-[var(--rpg-gold)]')}`}>
+                          <span className={`ml-auto font-pixel ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge'), 'text-[var(--rpg-gold)]')}`}>
                             {formatSignedStatValue('dodge', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge'))}
                           </span>
                         </div>
@@ -348,7 +349,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Crosshair size={16} className="text-[var(--rpg-blue-light)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Accuracy</span>
-                          <span className={`ml-auto font-mono ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy'), 'text-[var(--rpg-blue-light)]')}`}>
+                          <span className={`ml-auto font-pixel ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy'), 'text-[var(--rpg-blue-light)]')}`}>
                             {formatSignedStatValue('accuracy', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy'))}
                           </span>
                         </div>
@@ -357,7 +358,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Backpack size={16} className="text-[var(--rpg-gold)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Inventory Slots</span>
-                          <span className="ml-auto font-mono text-[var(--rpg-gold)]">
+                          <span className="ml-auto font-pixel text-[var(--rpg-gold)]">
                             +{totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'inventorySlots')}
                           </span>
                         </div>
@@ -372,7 +373,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                       return (
                         <div className="mt-2 border-t border-[var(--rpg-border)] pt-2">
                           <div className="text-xs font-semibold text-[var(--rpg-gold)] mb-1">Bonus Stats</div>
-                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono">
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-pixel">
                             {bonusEntries.map(([stat, value]) => (
                               <span key={stat} className="text-[var(--rpg-green-light)]">
                                 {formatSignedStatValue(stat, value)} {prettyStatName(stat)}
@@ -490,7 +491,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                               )}
 
                               {diffs.length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono">
+                                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-pixel">
                                   {diffs.map((d) => (
                                     <span
                                       key={d.key}
@@ -572,7 +573,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                       <span className="text-[8px] font-bold text-[var(--rpg-red)] bg-[var(--rpg-red)]/10 px-1 rounded">BROKEN</span>
                     )}
                   </div>
-                  <span className="font-mono text-[var(--rpg-text-secondary)]">{r.turnCost}</span>
+                  <span className="font-pixel text-[var(--rpg-text-secondary)]">{r.turnCost}</span>
                 </div>
               ))}
             </div>
@@ -580,7 +581,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             <div className="border-t border-[var(--rpg-border)] pt-3 mb-3">
               <div className="flex justify-between text-sm font-bold">
                 <span className="text-[var(--rpg-text-primary)]">Total Cost</span>
-                <span className="font-mono text-[var(--rpg-gold)]">{totalRepairCost} turns</span>
+                <span className="font-pixel text-[var(--rpg-gold)]">{totalRepairCost} turns</span>
               </div>
             </div>
 
@@ -619,9 +620,11 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
         </ModalOverlay>
       )}
 
+      <Divider className="my-1" />
+
       {/* Stats Panel */}
-      <PixelCard>
-        <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-4">Total Stats</h3>
+      <PixelCard variant="framed">
+        <h3 className="font-semibold font-display text-[var(--rpg-text-primary)] mb-4">Total Stats</h3>
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
@@ -629,7 +632,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Attack</div>
-              <div className="text-2xl font-bold text-[var(--rpg-red)] font-mono">{stats.attack}</div>
+              <div className="text-2xl font-bold text-[var(--rpg-red)] font-pixel">{stats.attack}</div>
             </div>
           </div>
 
@@ -639,7 +642,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Defence</div>
-              <div className="text-2xl font-bold text-[var(--rpg-blue-light)] font-mono">{stats.defence}</div>
+              <div className="text-2xl font-bold text-[var(--rpg-blue-light)] font-pixel">{stats.defence}</div>
             </div>
           </div>
 
@@ -649,7 +652,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Magic Def</div>
-              <div className="text-2xl font-bold text-[var(--rpg-purple)] font-mono">{stats.magicDefence}</div>
+              <div className="text-2xl font-bold text-[var(--rpg-purple)] font-pixel">{stats.magicDefence}</div>
             </div>
           </div>
 
@@ -659,7 +662,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">HP</div>
-              <div className="text-2xl font-bold text-[var(--rpg-green-light)] font-mono">{stats.hp}</div>
+              <div className="text-2xl font-bold text-[var(--rpg-green-light)] font-pixel">{stats.hp}</div>
             </div>
           </div>
 
@@ -669,7 +672,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Dodge</div>
-              <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">{stats.dodge}</div>
+              <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">{stats.dodge}</div>
             </div>
           </div>
 
@@ -679,7 +682,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Accuracy</div>
-              <div className="text-2xl font-bold text-[var(--rpg-blue-light)] font-mono">{stats.accuracy}</div>
+              <div className="text-2xl font-bold text-[var(--rpg-blue-light)] font-pixel">{stats.accuracy}</div>
             </div>
           </div>
 
@@ -689,7 +692,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Crit Chance</div>
-              <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">{Math.round((0.05 + stats.critChance) * 100)}%</div>
+              <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">{Math.round((0.05 + stats.critChance) * 100)}%</div>
             </div>
           </div>
 
@@ -699,7 +702,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Crit Damage</div>
-              <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">{Math.round((1.5 + stats.critDamage) * 100)}%</div>
+              <div className="text-2xl font-bold text-[var(--rpg-gold)] font-pixel">{Math.round((1.5 + stats.critDamage) * 100)}%</div>
             </div>
           </div>
         </div>
@@ -707,7 +710,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
 
       {/* Equipped Items List */}
       <div className="space-y-2">
-        <h3 className="font-semibold text-[var(--rpg-text-primary)]">Equipped Items</h3>
+        <h3 className="font-semibold font-display text-[var(--rpg-text-primary)]">Equipped Items</h3>
         {slots
           .filter((slot) => slot.item !== null)
           .map((slot) => (
@@ -774,7 +777,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         if (bonusEntries.length === 0) return null;
 
                         return (
-                          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs font-mono">
+                          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs font-pixel">
                             {bonusEntries.map(([stat, value]) => (
                               <span key={stat} className={value < 0 ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-green-light)]'}>
                                 {formatSignedStatValue(stat, value)} {prettyStatName(stat)}

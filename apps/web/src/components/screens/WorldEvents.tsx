@@ -108,7 +108,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
   return (
     <div className="rpg-screen-enter space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold" style={{ color: 'var(--rpg-gold)' }}>
+        <h2 className="text-lg font-bold font-display" style={{ color: 'var(--rpg-gold)' }}>
           World Events
         </h2>
         <PixelButton onClick={refresh} disabled={loading} size="sm">
