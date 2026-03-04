@@ -35,7 +35,7 @@ function ResourceBar({
         style={{ width: `${pct}%` }}
       />
       <div className="absolute inset-0 flex items-center justify-between px-1.5">
-        <span className={`text-[10px] font-bold font-pixel ${textColor ?? 'text-white'} drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]`}>
+        <span className={`text-[10px] font-pixel ${textColor ?? 'text-white'} drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]`}>
           {label} {Math.floor(current)}/{max}
         </span>
         {typeof regenPerSecond === 'number' && regenPerSecond > 0 && (

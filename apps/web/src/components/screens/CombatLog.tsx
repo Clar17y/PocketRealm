@@ -46,7 +46,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
           <div className="flex-1">
             <div className="flex items-baseline gap-2 mb-1">
               <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">{enemy.name}</h2>
-              <span className="text-[16px] text-[var(--rpg-red)] font-semibold font-pixel">Lv. {enemy.level}</span>
+              <span className="text-[16px] text-[var(--rpg-red)] font-pixel">Lv. {enemy.level}</span>
             </div>
             <StatBar
               current={enemy.health}
@@ -125,12 +125,12 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="bg-[var(--rpg-surface)] rounded-lg p-3">
                       <Coins size={24} color="var(--rpg-gold)" className="mx-auto mb-1" />
-                      <div className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">{rewards.gold}</div>
+                      <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{rewards.gold}</div>
                       <div className="text-xs text-[var(--rpg-text-secondary)]">Gold</div>
                     </div>
                     <div className="bg-[var(--rpg-surface)] rounded-lg p-3">
                       <Sparkles size={24} color="var(--rpg-blue-light)" className="mx-auto mb-1" />
-                      <div className="text-[24px] font-bold text-[var(--rpg-blue-light)] font-pixel">{rewards.xp}</div>
+                      <div className="text-[24px] text-[var(--rpg-blue-light)] font-pixel">{rewards.xp}</div>
                       <div className="text-xs text-[var(--rpg-text-secondary)]">XP</div>
                     </div>
                   </div>
@@ -187,7 +187,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
 
               <div className="bg-[var(--rpg-background)] rounded-lg p-4 mb-4">
                 <h4 className="text-xs font-semibold text-[var(--rpg-text-secondary)] mb-3">DAMAGE TAKEN</h4>
-                <div className="text-4xl font-bold text-[var(--rpg-red)] font-pixel mb-1">
+                <div className="text-4xl text-[var(--rpg-red)] font-pixel mb-1">
                   {player.maxHealth - player.health}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">HP Lost in Battle</div>

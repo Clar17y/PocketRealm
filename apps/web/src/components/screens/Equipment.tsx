@@ -284,7 +284,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                           <div className="text-xs text-[var(--rpg-gold)]">{prettyWeightClass(currentItem.weightClass)}</div>
                         )}
                         {currentItem.maxDurability > 0 && (
-                          <div className={`text-[8px] font-pixel ${currentItem.durability <= 0 ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text-secondary)]'}`}>
+                          <div className={`text-[8px] font-pixel ${currentItem.durability <= 0 ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
                             {currentItem.durability <= 0 ? 'BROKEN' : `${fmtDur(currentItem.durability)}/${currentItem.maxDurability}`}
                           </div>
                         )}
@@ -634,7 +634,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Attack</div>
-              <div className="text-[24px] font-bold text-[var(--rpg-red)] font-pixel">{stats.attack}</div>
+              <div className="text-[24px] text-[var(--rpg-red)] font-pixel">{stats.attack}</div>
             </div>
           </div>
 
@@ -644,7 +644,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Defence</div>
-              <div className="text-[24px] font-bold text-[var(--rpg-blue-light)] font-pixel">{stats.defence}</div>
+              <div className="text-[24px] text-[var(--rpg-blue-light)] font-pixel">{stats.defence}</div>
             </div>
           </div>
 
@@ -654,7 +654,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Magic Def</div>
-              <div className="text-[24px] font-bold text-[var(--rpg-purple)] font-pixel">{stats.magicDefence}</div>
+              <div className="text-[24px] text-[var(--rpg-purple)] font-pixel">{stats.magicDefence}</div>
             </div>
           </div>
 
@@ -664,7 +664,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">HP</div>
-              <div className="text-[24px] font-bold text-[var(--rpg-green-light)] font-pixel">{stats.hp}</div>
+              <div className="text-[24px] text-[var(--rpg-green-light)] font-pixel">{stats.hp}</div>
             </div>
           </div>
 
@@ -674,7 +674,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Dodge</div>
-              <div className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">{stats.dodge}</div>
+              <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{stats.dodge}</div>
             </div>
           </div>
 
@@ -684,7 +684,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Accuracy</div>
-              <div className="text-[24px] font-bold text-[var(--rpg-blue-light)] font-pixel">{stats.accuracy}</div>
+              <div className="text-[24px] text-[var(--rpg-blue-light)] font-pixel">{stats.accuracy}</div>
             </div>
           </div>
 
@@ -694,7 +694,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Crit Chance</div>
-              <div className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">{Math.round((0.05 + stats.critChance) * 100)}%</div>
+              <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{Math.round((0.05 + stats.critChance) * 100)}%</div>
             </div>
           </div>
 
@@ -704,7 +704,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
             <div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">Crit Damage</div>
-              <div className="text-[24px] font-bold text-[var(--rpg-gold)] font-pixel">{Math.round((1.5 + stats.critDamage) * 100)}%</div>
+              <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{Math.round((1.5 + stats.critDamage) * 100)}%</div>
             </div>
           </div>
         </div>

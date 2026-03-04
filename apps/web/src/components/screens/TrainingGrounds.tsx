@@ -397,7 +397,7 @@ function CooldownDisplay({ seconds }: { seconds: number }) {
   return (
     <div className="bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg p-3 text-center">
       <div className="text-xs text-[var(--rpg-text-secondary)] mb-1">Cooldown</div>
-      <div className="text-[16px] font-bold font-pixel text-[var(--rpg-gold)]">
+      <div className="text-[16px] font-pixel text-[var(--rpg-gold)]">
         {formatTime(seconds)}
       </div>
     </div>

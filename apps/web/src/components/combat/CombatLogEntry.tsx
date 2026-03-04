@@ -123,10 +123,10 @@ export function CombatLogEntry({
                 <span className="text-[var(--rpg-blue-light)] text-xs font-semibold font-display">{entry.spellName}</span>
               ) : null}
               {entry.damage !== undefined && entry.damage > 0 && (
-                <span className={`font-pixel text-[16px] font-semibold ${entry.isCritical ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-red)]'}`}>{entry.damage} dmg</span>
+                <span className={`font-pixel text-[16px] ${entry.isCritical ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-red)]'}`}>{entry.damage} dmg</span>
               )}
               {entry.healAmount !== undefined && entry.healAmount > 0 && (
-                <span className="text-[var(--rpg-green-light)] font-pixel text-[16px] font-semibold">+{entry.healAmount} HP</span>
+                <span className="text-[var(--rpg-green-light)] font-pixel text-[16px]">+{entry.healAmount} HP</span>
               )}
               {entry.effectsApplied && entry.effectsApplied.length > 0 && !entry.damage && !entry.healAmount && (
                 <span className="text-[var(--rpg-blue-light)] text-xs">

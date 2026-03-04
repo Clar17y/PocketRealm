@@ -752,7 +752,7 @@ export function Inventory({
                     <div className="flex items-baseline justify-between text-xs mb-1">
                       <span className="text-[var(--rpg-text-secondary)]">Durability</span>
                       {selectedItem.durability.current <= 0 ? (
-                        <span className="text-[var(--rpg-red)] font-pixel text-[8px] font-bold">BROKEN</span>
+                        <span className="text-[var(--rpg-red)] font-pixel text-[8px]">BROKEN</span>
                       ) : (
                         <span className={`font-pixel text-[8px] ${
                           (selectedItem.durability.current / selectedItem.durability.max) < 0.10

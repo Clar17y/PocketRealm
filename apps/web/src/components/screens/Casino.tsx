@@ -116,7 +116,7 @@ function WinCelebration({ payout, isBigWin }: { payout: number; isBigWin: boolea
         </div>
       ))}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-[24px] font-bold font-pixel text-[var(--rpg-gold)] animate-bounce">
+        <div className="text-[24px] font-pixel text-[var(--rpg-gold)] animate-bounce">
           +{payout.toLocaleString()}g
         </div>
       </div>
@@ -375,7 +375,7 @@ export function Casino({
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Coins size={16} className="text-[var(--rpg-gold)]" />
-          <span className="font-bold text-[var(--rpg-gold)] font-pixel text-[16px]">{gold.toLocaleString()}</span>
+          <span className="text-[var(--rpg-gold)] font-pixel text-[16px]">{gold.toLocaleString()}</span>
           <span className="text-[var(--rpg-text-secondary)]">gold</span>
         </div>
       </div>
@@ -684,7 +684,7 @@ export function Casino({
         <PixelCard>
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-[var(--rpg-text-primary)] text-sm">My Bets</h3>
-            <span className={`font-pixel text-[16px] font-bold ${
+            <span className={`font-pixel text-[16px] ${
               sessionProfit >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'
             }`}>
               {sessionProfit >= 0 ? '+' : ''}{sessionProfit.toLocaleString()}g
@@ -699,9 +699,9 @@ export function Casino({
                   {bet.payout === null ? (
                     <span className="text-[var(--rpg-text-secondary)] italic">pending...</span>
                   ) : bet.payout > 0 ? (
-                    <span className="text-[var(--rpg-green-light)] font-pixel text-[8px] font-bold">+{(bet.payout - bet.amount).toLocaleString()}g</span>
+                    <span className="text-[var(--rpg-green-light)] font-pixel text-[8px]">+{(bet.payout - bet.amount).toLocaleString()}g</span>
                   ) : (
-                    <span className="text-[var(--rpg-red)] font-pixel text-[8px] font-bold">-{bet.amount.toLocaleString()}g</span>
+                    <span className="text-[var(--rpg-red)] font-pixel text-[8px]">-{bet.amount.toLocaleString()}g</span>
                   )}
                 </div>
               </div>

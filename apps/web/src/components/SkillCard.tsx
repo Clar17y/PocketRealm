@@ -50,7 +50,7 @@ export function SkillCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between mb-1">
           <h3 className="font-semibold font-display text-[var(--rpg-text-primary)]">{name}</h3>
-          <span className="text-[24px] font-bold text-[var(--rpg-gold)] ml-2 font-pixel">
+          <span className="text-[24px] text-[var(--rpg-gold)] ml-2 font-pixel">
             {level}
           </span>
         </div>
