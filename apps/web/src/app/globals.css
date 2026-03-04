@@ -139,6 +139,26 @@ body {
   100% { opacity: 0; }
 }
 
+/* Background noise texture overlay */
+.rpg-noise {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.04;
+  background: url('/textures/noise.svg');
+  mix-blend-mode: overlay;
+}
+
+/* Vignette edge-darkening effect */
+.rpg-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.4) 100%);
+}
+
 /* Hide scrollbar for horizontal scroll strips */
 .scrollbar-hide {
   -ms-overflow-style: none;

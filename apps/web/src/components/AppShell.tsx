@@ -23,6 +23,8 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
 
   return (
     <div className="min-h-dvh w-full bg-[var(--rpg-background)]/95 flex flex-col safe-area-top">
+      <div className="rpg-noise" />
+      <div className="rpg-vignette" />
       <ZoneBackground imageSrc={backgroundSrc} />
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 bg-[var(--rpg-surface)] border-b border-[var(--rpg-border)] z-40 pt-[env(safe-area-inset-top)]">
