@@ -42,6 +42,12 @@ export interface ActiveEffect {
   stat: string;
   modifier: number;
   remainingRounds: number;
+  /** Snapshotted flat DOT damage per round (resolved from flat + % at application time) */
+  resolvedDamagePerRound?: number;
+  /** Which defence reduces DOT ticks */
+  dotDamageType?: 'physical' | 'magic';
+  /** Snapshotted HOT healing per round */
+  resolvedHealPerRound?: number;
 }
 
 export interface CombatLogEntry {
