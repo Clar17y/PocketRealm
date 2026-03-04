@@ -71,6 +71,7 @@ import {
 import type { CombatTemplateData, ResourceState } from '@adventure/shared';
 import type { RouletteBetType } from '@adventure/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
+import { fmtDur } from '@/lib/format';
 import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
 export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
@@ -481,7 +482,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         entries.push({
           timestamp: nowStamp(),
           type: 'warning',
-          message: `Your ${loss.itemName} is about to break! (${loss.newDurability}/${loss.maxDurability})`,
+          message: `Your ${loss.itemName} is about to break! (${fmtDur(loss.newDurability!)}/${loss.maxDurability})`,
         });
       }
     }
@@ -867,14 +868,23 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       if (data.yieldBreakdown?.eventTitle && data.yieldBreakdown.eventModifier !== 1) {
         const isUp = data.yieldBreakdown.eventModifier > 1;
-        const bonusPct = Math.round(Math.abs(data.yieldBreakdown.eventModifier - 1) * 100);
-        const rawTotal = data.yieldBreakdown.rawTotalYield;
-        const yieldDiff = rawTotal != null ? data.results.totalYield - rawTotal : null;
-        newLogs.push({
-          timestamp: nowStamp(),
-          type: isUp ? 'success' : 'warning',
-          message: `${data.yieldBreakdown.eventTitle}: ${isUp ? '+' : '-'}${bonusPct}% yield ${isUp ? 'bonus' : 'penalty'}${yieldDiff != null ? ` (${yieldDiff > 0 ? '+' : ''}${yieldDiff} items)` : ''}`,
-        });
+        if (isUp) {
+          const bonusPct = Math.round((data.yieldBreakdown.eventModifier - 1) * 100);
+          const rawTotal = data.yieldBreakdown.rawTotalYield;
+          const yieldDiff = rawTotal != null ? data.results.totalYield - rawTotal : null;
+          newLogs.push({
+            timestamp: nowStamp(),
+            type: 'success',
+            message: `${data.yieldBreakdown.eventTitle}: +${bonusPct}% yield bonus${yieldDiff != null ? ` (+${yieldDiff} items)` : ''}`,
+          });
+        } else {
+          const turnPenaltyPct = Math.round((1 / data.yieldBreakdown.eventModifier - 1) * 100);
+          newLogs.push({
+            timestamp: nowStamp(),
+            type: 'warning',
+            message: `${data.yieldBreakdown.eventTitle}: +${turnPenaltyPct}% turn cost`,
+          });
+        }
       }
 
       if (data.gemCrit) {

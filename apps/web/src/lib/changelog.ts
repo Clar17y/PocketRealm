@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.24',
+    date: '2026-03-04',
+    title: 'Smarter Durability',
+    summary:
+      'Equipment durability now degrades per hit instead of per fight. Weapons lose 0.01 durability for each attack you land, and armour loses 0.01 for each hit you take — even blocked ones. A quick skirmish with a field mouse barely scratches your gear, while a drawn-out boss fight leaves a mark.',
+  },
+  {
     version: '0.23',
     date: '2026-03-02',
     title: 'Combat Rework: Templates, Resources & Skill Trees',

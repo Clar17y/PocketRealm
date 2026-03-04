@@ -1,11 +1,46 @@
 import { Prisma, prisma } from '@adventure/database';
-import { DURABILITY_CONSTANTS, type DurabilityLoss } from '@adventure/shared';
+import { DURABILITY_CONSTANTS, type CombatLogEntry, type CombatActor, type DurabilityLoss } from '@adventure/shared';
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+type CombatHitEntry = Pick<CombatLogEntry, 'actor' | 'damage' | 'evaded'>;
+
+/** Count hits that landed from a combat log for durability degradation. */
+export function countCombatHits(log: CombatHitEntry[]): {
+  playerHitsLanded: number;
+  mobHitsLanded: number;
+} {
+  let playerHitsLanded = 0;
+  let mobHitsLanded = 0;
+  for (const entry of log) {
+    if (!entry.evaded && entry.damage !== undefined) {
+      if (entry.actor === 'combatantA') playerHitsLanded++;
+      else if (entry.actor === 'combatantB') mobHitsLanded++;
+    }
+  }
+  return { playerHitsLanded, mobHitsLanded };
+}
+
+/**
+ * Degrade equipped durability based on a combat log.
+ * `perspective` controls which combatant the player is:
+ *  - 'combatantA' (default): player attacks → weapon wear, enemy attacks → armor wear
+ *  - 'combatantB': flipped for PvP defenders
+ */
 export async function degradeEquippedDurability(
   playerId: string,
-  amount: number = DURABILITY_CONSTANTS.COMBAT_DEGRADATION
+  combatLog: CombatHitEntry[],
+  perspective: CombatActor = 'combatantA',
 ): Promise<DurabilityLoss[]> {
-  if (!Number.isInteger(amount) || amount <= 0) return [];
+  const hits = countCombatHits(combatLog);
+  const myHits = perspective === 'combatantA' ? hits.playerHitsLanded : hits.mobHitsLanded;
+  const theirHits = perspective === 'combatantA' ? hits.mobHitsLanded : hits.playerHitsLanded;
+  const weaponDegradation = round2(myHits * DURABILITY_CONSTANTS.COMBAT_DEGRADATION);
+  const armorDegradation = round2(theirHits * DURABILITY_CONSTANTS.COMBAT_DEGRADATION);
+
+  if (weaponDegradation <= 0 && armorDegradation <= 0) return [];
 
   const equipped = await prisma.playerEquipment.findMany({
     where: { playerId, itemId: { not: null } },
@@ -25,8 +60,12 @@ export async function degradeEquippedDurability(
       if (!item) continue;
 
       const template = item.template;
-      const hasDurability = template.itemType === 'weapon' || template.itemType === 'armor';
-      if (!hasDurability) continue;
+      const isWeapon = template.itemType === 'weapon';
+      const isArmor = template.itemType === 'armor';
+      if (!isWeapon && !isArmor) continue;
+
+      const amount = isWeapon ? weaponDegradation : armorDegradation;
+      if (amount <= 0) continue;
 
       const maxDurability = item.maxDurability ?? template.maxDurability;
       const currentDurability = item.currentDurability ?? maxDurability;
@@ -42,7 +81,7 @@ export async function degradeEquippedDurability(
         });
       }
 
-      const newCurrent = Math.max(0, currentDurability - amount);
+      const newCurrent = round2(Math.max(0, currentDurability - amount));
 
       const wasBroken = currentDurability <= 0;
       const nowBroken = newCurrent <= 0;
@@ -54,7 +93,7 @@ export async function degradeEquippedDurability(
 
       losses.push({
         itemId: item.id,
-        amount,
+        amount: round2(amount),
         itemName: template.name,
         newDurability: newCurrent,
         maxDurability,
