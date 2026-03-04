@@ -8,10 +8,12 @@ import { StatBar } from '@/components/StatBar';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { Coins, TrendingUp, MapPin, Sword, Pickaxe, Hammer, Heart, Crosshair, Sparkles, Dice5, Wind } from 'lucide-react';
 import Image from 'next/image';
+import { getStaggerDelay } from '@/lib/animations';
 import { uiIconSrc } from '@/lib/assets';
 import { ActivityLog } from '@/components/ActivityLog';
 import { Divider } from '@/components/common/Divider';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface DashboardProps {
   playerData: {
@@ -74,7 +76,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
   };
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {/* Knockout Banner */}
       {playerData.isRecovering && (
         <KnockoutBanner action="taking any actions" recoveryCost={playerData.recoveryCost} />
@@ -277,7 +279,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
               <div
                 key={attribute}
                 className="rpg-stagger-item rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2 flex items-center justify-between gap-2"
-                style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
+                style={{ animationDelay: getStaggerDelay(index) }}
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -316,7 +318,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
                 key={index}
                 onClick={() => onNavigate('skills')}
                 className="rpg-stagger-item aspect-square bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg flex flex-col items-center justify-center gap-1 hover:border-[var(--rpg-gold)] transition-all active:scale-95"
-                style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
+                style={{ animationDelay: getStaggerDelay(index) }}
               >
                 {skill.imageSrc ? (
                   <div className="relative w-14 h-14 flex-shrink-0">
@@ -342,6 +344,6 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
       {/* Activity Log */}
       <ActivityLog entries={activityLog} />
 
-    </div>
+    </ScreenContainer>
   );
 }

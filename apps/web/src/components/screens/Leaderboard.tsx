@@ -10,6 +10,7 @@ import {
   type LeaderboardCategoryGroup,
 } from '@/lib/api';
 import { Trophy } from 'lucide-react';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface LeaderboardProps {
   playerId: string | null;
@@ -48,7 +49,7 @@ export function Leaderboard({ playerId }: LeaderboardProps) {
   const currentGroupCategories = groups.find((g) => g.name === activeGroup)?.categories ?? [];
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {/* Header */}
       <div className="flex items-center gap-2">
         <Trophy className="w-5 h-5 text-[var(--rpg-gold)]" />
@@ -106,6 +107,6 @@ export function Leaderboard({ playerId }: LeaderboardProps) {
           isGuildCategory={activeGroup === 'Guilds'}
         />
       </PixelCard>
-    </div>
+    </ScreenContainer>
   );
 }

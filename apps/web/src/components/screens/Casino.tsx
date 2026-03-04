@@ -19,6 +19,7 @@ import type {
   CasinoResultEvent,
 } from '@adventure/shared';
 import type { SessionBet } from '@/hooks/useCasinoSocket';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface CasinoProps {
   gold: number;
@@ -353,7 +354,7 @@ export function Casino({
   }
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {winAnimation && <WinCelebration {...winAnimation} />}
       <FirstVisitHowTo
         storageKey="howto_casino"
@@ -821,7 +822,7 @@ export function Casino({
         </PixelCard>
       )}
 
-    </div>
+    </ScreenContainer>
   );
 }
 

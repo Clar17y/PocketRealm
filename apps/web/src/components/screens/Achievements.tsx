@@ -6,6 +6,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { groupAchievementChains } from '@adventure/shared';
 import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
+import { ScreenContainer } from '../common/ScreenContainer';
 import type { PlayerAchievementProgress as SharedProgress } from '@adventure/shared';
 import type { PlayerAchievementProgress, AchievementRewardResponse } from '@/lib/api';
 
@@ -101,7 +102,7 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
   const unlockedTitles = achievements.filter((a) => a.unlocked && a.titleReward);
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {/* Completion counter */}
       <PixelCard padding="sm">
         <div className="flex items-center justify-between mb-1">
@@ -247,6 +248,6 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
           </p>
         )}
       </div>
-    </div>
+    </ScreenContainer>
   );
 }

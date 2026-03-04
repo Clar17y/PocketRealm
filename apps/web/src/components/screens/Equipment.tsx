@@ -8,9 +8,11 @@ import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, X, Zap } from 'luc
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
 import { DURABILITY_CONSTANTS } from '@adventure/shared';
+import { getStaggerDelay } from '@/lib/animations';
 import { numStat, formatSignedStatValue, signedClass, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { Divider } from '@/components/common/Divider';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface EquippedItem {
   id: string;
@@ -142,7 +144,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
     const item = getSlotInfo(slotId);
 
     return (
-      <div key={slotId} className="rpg-stagger-item" style={{ gridColumn: position.gridColumn, gridRow: position.gridRow, animationDelay: `${Math.min(index * 40, 400)}ms` }}>
+      <div key={slotId} className="rpg-stagger-item" style={{ gridColumn: position.gridColumn, gridRow: position.gridRow, animationDelay: getStaggerDelay(index) }}>
         <button
           onClick={() => {
             setActiveSlotId(slotId);
@@ -203,7 +205,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
   };
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Equipment</h2>
 
       {/* Slot Selection Modal */}
@@ -793,6 +795,6 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </PixelCard>
           ))}
       </div>
-    </div>
+    </ScreenContainer>
   );
 }

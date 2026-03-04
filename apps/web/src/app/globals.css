@@ -232,6 +232,10 @@ body {
   animation: screen-enter 0.25s ease-out both;
 }
 
+.rpg-gold-text-glow {
+  text-shadow: 0 0 12px var(--rpg-gold-glow);
+}
+
 /* Staggered list item reveal */
 @keyframes stagger-in {
   from {

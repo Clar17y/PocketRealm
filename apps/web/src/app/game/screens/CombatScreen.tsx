@@ -20,6 +20,7 @@ import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../gameController.types';
+import { ScreenContainer } from '@/components/common/ScreenContainer';
 
 interface CombatScreenProps {
   hpState: HpState;
@@ -206,7 +207,7 @@ export function CombatScreen({
   }, [buildShareText]);
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {/* Strategy Selection Modal */}
       {strategyModalSite && (
         <ModalOverlay>
@@ -605,7 +606,7 @@ export function CombatScreen({
       ) : (
         <CombatHistory />
       )}
-    </div>
+    </ScreenContainer>
   );
 }
 

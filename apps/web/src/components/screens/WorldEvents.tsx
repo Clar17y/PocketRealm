@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { BossEncounterPanel } from '@/components/BossEncounterPanel';
 import { formatTimeRemaining } from '@/lib/format';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 function effectLabel(effectType: string, effectValue: number): string {
   const sign = effectType.endsWith('_down') ? '-' : '+';
@@ -106,7 +107,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
     : events.filter((e) => e.scope === 'zone');
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold font-display" style={{ color: 'var(--rpg-gold)' }}>
           World Events
@@ -217,6 +218,6 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
           ))}
         </div>
       )}
-    </div>
+    </ScreenContainer>
   );
 }

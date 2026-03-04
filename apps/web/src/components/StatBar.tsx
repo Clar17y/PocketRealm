@@ -10,16 +10,6 @@ interface StatBarProps {
   className?: string;
 }
 
-const barColorHexMap: Record<string, string> = {
-  'bg-[var(--rpg-green-light)]': '#6aaa5a',
-  'bg-[var(--rpg-hp-warning)]': '#d4943a',
-  'bg-[var(--rpg-red)]': '#aa3a3a',
-  'bg-[var(--rpg-blue-light)]': '#5aaad4',
-  'bg-teal-400': '#2dd4bf',
-  'bg-[var(--rpg-gold)]': '#d4a84b',
-  'bg-[var(--rpg-text-secondary)]': '#8a8878',
-};
-
 export function StatBar({
   current,
   max,
@@ -46,6 +36,11 @@ export function StatBar({
         ? 'bg-[var(--rpg-hp-warning)]'
         : 'bg-[var(--rpg-red)]';
 
+  // Hex values must match CSS variables in globals.css
+  // Needed for dynamic box-shadow alpha (CSS variables can't be used inside rgba())
+  const healthGlowHex =
+    percentage > 60 ? '#6aaa5a' : percentage >= 40 ? '#d4943a' : '#aa3a3a';
+
   const colorClasses: Record<string, string> = {
     health: healthColor,
     mana: 'bg-[var(--rpg-blue-light)]',
@@ -56,7 +51,6 @@ export function StatBar({
   };
 
   const barColorClass = colorClasses[color];
-  const barColorHex = barColorHexMap[barColorClass] ?? '#6aaa5a';
 
   const sizeClasses = {
     sm: 'h-2',
@@ -68,7 +62,7 @@ export function StatBar({
   const fillStyle: React.CSSProperties = {
     width: `${percentage}%`,
     ...(color === 'health' && {
-      boxShadow: `0 0 ${Math.round(percentage * 0.08)}px ${barColorHex}33`,
+      boxShadow: `0 0 ${Math.round(percentage * 0.08)}px ${healthGlowHex}33`,
     }),
   };
 

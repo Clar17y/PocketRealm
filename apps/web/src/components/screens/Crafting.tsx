@@ -12,6 +12,7 @@ import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { xpRateColor } from '@/lib/format';
 import { XpRateTooltip } from '@/components/common/XpRateTooltip';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface Material {
   name: string;
@@ -110,7 +111,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
   };
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {/* Knockout Banner */}
       {isRecovering && (
         <KnockoutBanner action="crafting" recoveryCost={recoveryCost} />
@@ -422,7 +423,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
       )}
 
       <ActivityLog entries={activityLog} maxHeight="max-h-48" />
-    </div>
+    </ScreenContainer>
   );
 }
 

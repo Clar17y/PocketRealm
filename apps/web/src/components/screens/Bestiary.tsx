@@ -10,6 +10,7 @@ import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { getMobPrefixDefinition, getTierName } from '@adventure/shared';
 import { StatBar } from '@/components/StatBar';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface MonsterDrop {
   name: string;
@@ -187,7 +188,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
   });
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -497,6 +498,6 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
       ) : (
         <PrefixEncyclopedia prefixSummary={prefixSummary} />
       )}
-    </div>
+    </ScreenContainer>
   );
 }

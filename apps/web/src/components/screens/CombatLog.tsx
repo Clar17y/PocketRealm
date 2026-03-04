@@ -6,6 +6,7 @@ import { StatBar } from '@/components/StatBar';
 import { Skull, Trophy, Coins, Sparkles } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface CombatLogProps {
   enemy: {
@@ -34,7 +35,7 @@ interface CombatLogProps {
 
 export function CombatLog({ enemy, player, combatLog, status, rewards, onContinue }: CombatLogProps) {
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {/* Enemy Portrait */}
       <PixelCard className="relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-gradient-to-br from-[var(--rpg-red)] to-transparent" />
@@ -208,6 +209,6 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
           </PixelCard>
         </ModalOverlay>
       )}
-    </div>
+    </ScreenContainer>
   );
 }

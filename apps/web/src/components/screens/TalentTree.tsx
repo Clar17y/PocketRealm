@@ -10,6 +10,7 @@ import { ConfirmModal } from '@/components/common/ConfirmModal';
 import type { SkillPointState } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
 import { SkillTreeTutorial } from '@/components/common/SkillTreeTutorial';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface TalentTreeProps {
   skillPointState: SkillPointState;
@@ -139,7 +140,7 @@ export function TalentTree({
   const activeTabMeta = TREE_TABS.find(t => t.id === activeTree)!;
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <SkillTreeTutorial />
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -339,6 +340,6 @@ export function TalentTree({
           onCancel={() => setConfirmRespec(false)}
         />
       )}
-    </div>
+    </ScreenContainer>
   );
 }

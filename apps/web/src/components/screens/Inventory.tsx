@@ -17,6 +17,8 @@ import { rarityMeetsThreshold, type Rarity, type ConfirmRarity } from '@/lib/rar
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { StashTutorial } from '@/components/common/StashTutorial';
+import { getStaggerDelay } from '@/lib/animations';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface Item {
   id: string;
@@ -261,7 +263,7 @@ export function Inventory({
   const canDeposit = Boolean(onDeposit && isInTown && !isEquipped);
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Inventory</h2>
         <div className="flex items-center gap-3">
@@ -644,7 +646,7 @@ export function Inventory({
                   || (stashBatch.active && stashBatch.selection.has(item.id))
                   || (sellBatchMode.active && sellBatchMode.selection.has(item.id));
                 return (
-                  <div key={item.id} className="rpg-stagger-item relative" style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}>
+                  <div key={item.id} className="rpg-stagger-item relative" style={{ animationDelay: getStaggerDelay(index) }}>
                     <ItemCard
                       name={item.name}
                       icon={item.icon}
@@ -1050,6 +1052,6 @@ export function Inventory({
           onCancel={() => setConfirmAction(null)}
         />
       )}
-    </div>
+    </ScreenContainer>
   );
 }

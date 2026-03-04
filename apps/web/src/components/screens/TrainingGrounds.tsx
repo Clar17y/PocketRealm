@@ -10,6 +10,7 @@ import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
 import { getMobPrefixDefinition } from '@adventure/shared';
 import type { TrainingCombatResult } from '@/lib/api/training';
 import { monsterImageSrc } from '@/lib/assets';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface BestiaryMob {
   id: string;
@@ -242,7 +243,7 @@ export function TrainingGrounds({
 
   // Idle / selection phase
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <FirstVisitHowTo
         storageKey="howto_training"
         title="Training Grounds"
@@ -388,7 +389,7 @@ export function TrainingGrounds({
       <div className="text-center text-xs text-[var(--rpg-text-secondary)]">
         Training fights grant no XP, loot, or gold
       </div>
-    </div>
+    </ScreenContainer>
   );
 }
 

@@ -4,6 +4,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { Slider } from '@/components/ui/Slider';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { ConfirmRarity } from '@/lib/rarity';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface SettingsProps {
   username: string | undefined;
@@ -74,7 +75,7 @@ export function Settings({
   onLogout,
 }: SettingsProps) {
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Settings</h2>
       <p className="text-[var(--rpg-text-secondary)]">Username: {username}</p>
 
@@ -240,6 +241,6 @@ export function Settings({
       >
         Logout
       </button>
-    </div>
+    </ScreenContainer>
   );
 }

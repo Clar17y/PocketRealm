@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/Slider';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { Heart, AlertTriangle } from 'lucide-react';
 import * as api from '@/lib/api';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface RestProps {
   onComplete: () => void;
@@ -149,7 +150,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
   // Recovering mode
   if (hpState.isRecovering) {
     return (
-      <div className="rpg-screen-enter space-y-4">
+      <ScreenContainer>
         <PixelCard>
           <div className="flex items-center gap-3 mb-4">
             <AlertTriangle size={32} color="var(--rpg-red)" />
@@ -189,7 +190,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
             {isLoading ? 'Recovering...' : 'Recover'}
           </PixelButton>
         </PixelCard>
-      </div>
+      </ScreenContainer>
     );
   }
 
@@ -217,7 +218,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
   }) : null;
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <PixelCard>
         <div className="flex items-center gap-3 mb-4">
           <Heart size={32} color="var(--rpg-green-light)" />
@@ -327,6 +328,6 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
           </div>
         )}
       </PixelCard>
-    </div>
+    </ScreenContainer>
   );
 }

@@ -13,6 +13,7 @@ import { GuildSpecializationTab } from '@/components/guild/GuildSpecializationTa
 import { GuildSettings } from '@/components/guild/GuildSettings';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'projects' | 'specialization' | 'log' | 'settings';
 
@@ -48,10 +49,10 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
 
   if (loading) {
     return (
-      <div className="rpg-screen-enter space-y-4">
+      <ScreenContainer>
         <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Guild</h2>
         <LoadingCard />
-      </div>
+      </ScreenContainer>
     );
   }
 
@@ -67,7 +68,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
   }
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">
         [{guildData.guild.tag}] {guildData.guild.name}
       </h2>
@@ -123,6 +124,6 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
           setError={setError}
         />
       )}
-    </div>
+    </ScreenContainer>
   );
 }

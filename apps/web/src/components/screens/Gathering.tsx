@@ -17,6 +17,7 @@ import { effectiveTurns as calcEffectiveTurns, inflateCost } from '@/lib/taxCalc
 import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import type { EventModifierBadge } from '@/lib/api';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface ResourceNode {
   id: string;
@@ -205,7 +206,7 @@ export function Gathering({
   }) : null;
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {/* Knockout Banner */}
       {isRecovering && (
         <KnockoutBanner action="gathering" recoveryCost={recoveryCost} />
@@ -455,6 +456,6 @@ export function Gathering({
 
       {/* Gathering Log */}
       <ActivityLog entries={activityLog} maxHeight="max-h-48" />
-    </div>
+    </ScreenContainer>
   );
 }

@@ -8,6 +8,7 @@ import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameControl
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { MapPin, Star, Hourglass, Lock } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 function getMilestoneHint(percent: number): ReactNode {
   if (percent >= 75) return <p className="text-xs text-amber-400 mt-1 italic">Apex — The apex predator stirs...</p>;
@@ -200,7 +201,7 @@ export function ZoneMap({
     availableTurns >= inflateCost(selectedZone.travelCost, guildTaxRate);
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">World Map</h2>
         <MapPin size={20} color="var(--rpg-gold)" />
@@ -589,6 +590,6 @@ export function ZoneMap({
 
       {/* Activity log */}
       {activityLog && <ActivityLog entries={activityLog} />}
-    </div>
+    </ScreenContainer>
   );
 }

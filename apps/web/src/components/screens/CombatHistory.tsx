@@ -19,6 +19,7 @@ import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
 import { FightNavigationBar } from '@/components/common/FightNavigationBar';
 import { Pagination } from '@/components/common/Pagination';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 type OutcomeFilter = 'all' | CombatOutcomeResponse;
 
@@ -296,7 +297,7 @@ export function CombatHistory() {
   }, [shareText]);
 
   return (
-    <div className="rpg-screen-enter space-y-3">
+    <ScreenContainer spacing="y-3">
       <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
         <div className="text-[var(--rpg-text-primary)] font-semibold">Combat History</div>
 
@@ -502,6 +503,6 @@ export function CombatHistory() {
           )}
         </div>
       )}
-    </div>
+    </ScreenContainer>
   );
 }

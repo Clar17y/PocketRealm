@@ -13,6 +13,7 @@ import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { ForgeTutorial } from '@/components/common/ForgeTutorial';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 function SacrificePicker({
   items,
@@ -224,7 +225,7 @@ export function Forge({
   const baseEntries = statEntries(selected?.baseStats);
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 
@@ -449,7 +450,7 @@ export function Forge({
       )}
 
       <ActivityLog entries={activityLog} maxHeight="max-h-48" />
-    </div>
+    </ScreenContainer>
   );
 }
 

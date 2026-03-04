@@ -5,6 +5,7 @@ import { getBossHistory, type BossHistoryEntry } from '@/lib/api';
 import { Pagination } from '@/components/common/Pagination';
 import { BossRewardsDisplay } from '@/components/common/BossRewardsDisplay';
 import { monsterImageSrc } from '@/lib/assets';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 const PAGE_SIZE = 10;
 
@@ -43,7 +44,7 @@ export function BossHistory() {
   }
 
   return (
-    <div className="rpg-screen-enter space-y-3">
+    <ScreenContainer spacing="y-3">
       <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Boss History</h2>
 
       <div className="space-y-2">
@@ -133,6 +134,6 @@ export function BossHistory() {
       {totalPages > 1 && (
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       )}
-    </div>
+    </ScreenContainer>
   );
 }

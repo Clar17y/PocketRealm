@@ -27,6 +27,7 @@ import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
 import { Swords, Eye, Trophy, Bell, ChevronLeft, ChevronRight, Medal, Shield } from 'lucide-react';
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable';
 import { getLeaderboard, type LeaderboardResponse } from '@/lib/api';
+import { ScreenContainer } from '@/components/common/ScreenContainer';
 
 interface ArenaScreenProps {
   characterLevel: number;
@@ -600,7 +601,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
   }
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {levelGate}
       {ratingPanel}
       {resultPanel}
@@ -638,6 +639,6 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
           )}
         </PixelCard>
       )}
-    </div>
+    </ScreenContainer>
   );
 }

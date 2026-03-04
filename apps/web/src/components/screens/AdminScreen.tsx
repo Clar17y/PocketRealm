@@ -32,6 +32,7 @@ import {
   type AdminResourceNode,
 } from '@/lib/api';
 import { Shield } from 'lucide-react';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 type AdminTab = 'player' | 'items' | 'world' | 'zones' | 'resources';
 
@@ -573,7 +574,7 @@ export default function AdminScreen({ onAction }: { onAction?: () => void }) {
   const [tab, setTab] = useState<AdminTab>('player');
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <div className="flex items-center gap-2 mb-2">
         <Shield className="w-5 h-5 text-[var(--rpg-gold)]" />
         <h2 className="text-lg font-bold font-display text-[var(--rpg-gold)]">Admin Panel</h2>
@@ -597,6 +598,6 @@ export default function AdminScreen({ onAction }: { onAction?: () => void }) {
       {tab === 'world' && <WorldTab onAction={onAction} />}
       {tab === 'zones' && <ZonesTab onAction={onAction} />}
       {tab === 'resources' && <ResourcesTab onAction={onAction} />}
-    </div>
+    </ScreenContainer>
   );
 }

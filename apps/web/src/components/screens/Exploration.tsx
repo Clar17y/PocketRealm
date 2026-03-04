@@ -16,6 +16,7 @@ import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface ExplorationProps {
   currentZone: {
@@ -107,7 +108,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
   const { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance } = calculateProbabilities(effective);
 
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       {/* Low HP Warning Dialog */}
       {showLowHpWarning && typeof currentHp === 'number' && typeof maxHp === 'number' && (
         <LowHpWarningDialog
@@ -387,6 +388,6 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
 
       {/* Activity Log — always visible */}
       <ActivityLog entries={activityLog} />
-    </div>
+    </ScreenContainer>
   );
 }

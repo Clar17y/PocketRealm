@@ -55,7 +55,7 @@ export default function LoginPage() {
       <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-[var(--rpg-background)]" />
 
       <div className="relative z-10 w-full max-w-sm bg-[var(--rpg-surface)]/90 border border-[var(--rpg-border)] rounded-xl p-6 md:p-8 backdrop-blur-sm rpg-card-texture">
-        <h1 className="text-2xl font-bold font-display text-[var(--rpg-gold)] text-center mb-6" style={{ textShadow: '0 0 12px rgba(212,168,75,0.3)' }}>
+        <h1 className="text-2xl font-bold font-display text-[var(--rpg-gold)] text-center mb-6 rpg-gold-text-glow">
           Welcome Back
         </h1>
 

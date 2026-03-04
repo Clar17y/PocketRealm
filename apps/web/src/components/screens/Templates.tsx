@@ -14,6 +14,7 @@ import type { Screen } from '@/app/game/gameController.types';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@adventure/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateAction, ResourceState } from '@adventure/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 // --- Constants ---
 
@@ -393,7 +394,7 @@ export function Templates({
 
   // -- List view --
   return (
-    <div className="rpg-screen-enter space-y-4">
+    <ScreenContainer>
       <TemplateTutorial />
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">Combat Templates</h2>
@@ -449,6 +450,6 @@ export function Templates({
           ))}
         </div>
       )}
-    </div>
+    </ScreenContainer>
   );
 }
