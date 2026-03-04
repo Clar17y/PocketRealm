@@ -55,10 +55,10 @@ const CONDITION_OPTIONS: ConditionOption[] = [
   { value: 'stamina_above', label: 'Stamina above' },
   { value: 'mana_below', label: 'Mana below' },
   { value: 'mana_above', label: 'Mana above' },
-  { value: 'has_buff', label: 'Has buff' },
-  { value: 'has_debuff', label: 'Has debuff' },
-  { value: 'no_buff', label: 'No buff' },
-  { value: 'no_debuff', label: 'No debuff' },
+  { value: 'has_buff', label: 'Buff active' },
+  { value: 'has_debuff', label: 'Debuff active' },
+  { value: 'no_buff', label: 'Buff missing' },
+  { value: 'no_debuff', label: 'Debuff cleared' },
 ];
 
 function conditionToCombo(c: SlotCondition): string {
@@ -97,10 +97,10 @@ function isResourceCondition(c: SlotCondition): boolean {
 function conditionSummary(c: SlotCondition): string {
   if (c.type === 'resource_below' && c.resource) return `${c.resource.toUpperCase()} < ${c.threshold ?? 50}%`;
   if (c.type === 'resource_above' && c.resource) return `${c.resource.toUpperCase()} > ${c.threshold ?? 50}%`;
-  if (c.type === 'has_buff') return `Has buff${c.effectName ? `: ${c.effectName}` : ''}`;
-  if (c.type === 'has_debuff') return `Has debuff${c.effectName ? `: ${c.effectName}` : ''}`;
-  if (c.type === 'no_buff') return `No buff${c.effectName ? `: ${c.effectName}` : ''}`;
-  if (c.type === 'no_debuff') return `No debuff${c.effectName ? `: ${c.effectName}` : ''}`;
+  if (c.type === 'has_buff') return `${c.effectName ?? 'buff'} active`;
+  if (c.type === 'has_debuff') return `${c.effectName ?? 'debuff'} active`;
+  if (c.type === 'no_buff') return `${c.effectName ?? 'buff'} missing`;
+  if (c.type === 'no_debuff') return `${c.effectName ?? 'debuff'} cleared`;
   return c.type;
 }
 
@@ -572,16 +572,19 @@ export function Templates({
                                   className="w-full min-h-[44px] bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-2 text-sm text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-gold)]"
                                 >
                                   <option value="">Select effect...</option>
-                                  <optgroup label="Buffs">
-                                    {BUFF_EFFECTS.map(e => (
-                                      <option key={e.name} value={e.name}>{e.name} ({e.description})</option>
-                                    ))}
-                                  </optgroup>
-                                  <optgroup label="Debuffs &amp; Status">
-                                    {DEBUFF_EFFECTS.map(e => (
-                                      <option key={e.name} value={e.name}>{e.name} ({e.description})</option>
-                                    ))}
-                                  </optgroup>
+                                  {(slot.condition!.type === 'has_buff' || slot.condition!.type === 'no_buff') ? (
+                                    <optgroup label="Buffs">
+                                      {BUFF_EFFECTS.map(e => (
+                                        <option key={e.name} value={e.name}>{e.name} ({e.description})</option>
+                                      ))}
+                                    </optgroup>
+                                  ) : (
+                                    <optgroup label="Debuffs &amp; Status">
+                                      {DEBUFF_EFFECTS.map(e => (
+                                        <option key={e.name} value={e.name}>{e.name} ({e.description})</option>
+                                      ))}
+                                    </optgroup>
+                                  )}
                                 </select>
                               )}
                             </div>
