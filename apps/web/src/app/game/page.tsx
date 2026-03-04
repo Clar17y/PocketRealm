@@ -8,6 +8,7 @@ import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { LootPicker } from '@/components/common/LootPicker';
+import { LootReveal } from '@/components/common/LootReveal';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { SubNav } from '@/components/common/SubNav';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
@@ -264,6 +265,8 @@ export default function GamePage() {
     confirmAbandonLoot,
     abandonLootAndTravel,
     cancelAbandonLoot,
+    lootRevealItems,
+    handleDismissLootReveal,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -1094,6 +1097,9 @@ export default function GamePage() {
           onConfirm={abandonLootAndTravel}
           onCancel={cancelAbandonLoot}
         />
+      )}
+      {lootRevealItems && lootRevealItems.length > 0 && (
+        <LootReveal items={lootRevealItems} onContinue={handleDismissLootReveal} />
       )}
       {pendingLootSession && !pendingLootSession.minimized && (
         <LootPicker
