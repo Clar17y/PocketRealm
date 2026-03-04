@@ -89,8 +89,11 @@ function toQuestData(row: {
   return {
     id: row.id,
     questKey: row.questKey,
-    name: def?.name ?? row.questKey,
-    description: def?.description ?? '',
+    name: (def?.name ?? row.questKey)
+      .replace('{prefix}', row.filterValue ?? ''),
+    description: (def?.description ?? '')
+      .replace('{target}', String(row.targetValue))
+      .replace('{prefix}', row.filterValue ?? ''),
     category: def?.category ?? 'combat',
     cadence: row.cadence as 'daily' | 'weekly',
     targetValue: row.targetValue,
@@ -369,7 +372,7 @@ export async function incrementQuestProgress(
 export async function claimQuestReward(
   playerId: string,
   questId: string,
-): Promise<{ tokensAwarded: number }> {
+): Promise<{ tokensAwarded: number; newBalance: number }> {
   return prisma.$transaction(async (tx) => {
     const quest = await tx.playerQuest.findFirst({
       where: { id: questId, playerId, status: 'completed' },
@@ -386,12 +389,12 @@ export async function claimQuestReward(
     });
 
     // Award tokens
-    await tx.playerQuestState.update({
+    const updated = await tx.playerQuestState.update({
       where: { playerId },
       data: { questTokens: { increment: quest.rewardAmount } },
     });
 
-    return { tokensAwarded: quest.rewardAmount };
+    return { tokensAwarded: quest.rewardAmount, newBalance: updated.questTokens };
   });
 }
 
@@ -402,7 +405,7 @@ export async function claimQuestReward(
 export async function claimDailyBonus(
   playerId: string,
   now: Date = new Date(),
-): Promise<{ bonusTokens: number }> {
+): Promise<{ tokensAwarded: number; newBalance: number }> {
   const state = await getOrCreateQuestState(playerId);
 
   if (state.dailyBonusClaimed) {
@@ -434,7 +437,7 @@ export async function claimDailyBonus(
   const bonusTokens = DAILY_BONUS_BASE + Math.floor(level * DAILY_BONUS_PER_LEVEL);
 
   // Award bonus
-  await prisma.playerQuestState.update({
+  const updated = await prisma.playerQuestState.update({
     where: { playerId },
     data: {
       dailyBonusClaimed: true,
@@ -442,7 +445,7 @@ export async function claimDailyBonus(
     },
   });
 
-  return { bonusTokens };
+  return { tokensAwarded: bonusTokens, newBalance: updated.questTokens };
 }
 
 // ---------------------------------------------------------------------------

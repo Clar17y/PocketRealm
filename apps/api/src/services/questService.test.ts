@@ -248,6 +248,7 @@ describe('claimQuestReward', () => {
 
     const result = await claimQuestReward(PLAYER_ID, 'q1');
     expect(result.tokensAwarded).toBe(5);
+    expect(result.newBalance).toBe(47);
     expect(db.$transaction).toHaveBeenCalled();
   });
 
@@ -293,7 +294,8 @@ describe('claimDailyBonus', () => {
     });
 
     const result = await claimDailyBonus(PLAYER_ID, NOW);
-    expect(result.bonusTokens).toBeGreaterThan(0);
+    expect(result.tokensAwarded).toBeGreaterThan(0);
+    expect(result.newBalance).toBe(20);
     expect(db.playerQuestState.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { playerId: PLAYER_ID },
