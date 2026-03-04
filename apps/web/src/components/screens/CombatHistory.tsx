@@ -401,7 +401,7 @@ export function CombatHistory() {
                         : (entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')}
                     </span>
                     {entry.source === 'encounter_site' && entry.fightCount > 1 && (
-                      <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)] font-pixel">
+                      <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)] font-pixel font-normal">
                         {entry.fightCount} fights
                       </span>
                     )}

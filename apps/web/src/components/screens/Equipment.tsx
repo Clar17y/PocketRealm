@@ -583,7 +583,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             <div className="border-t border-[var(--rpg-border)] pt-3 mb-3">
               <div className="flex justify-between text-sm font-bold">
                 <span className="text-[var(--rpg-text-primary)]">Total Cost</span>
-                <span className="font-pixel text-[16px] text-[var(--rpg-gold)]">{totalRepairCost} turns</span>
+                <span className="font-pixel font-normal text-[16px] text-[var(--rpg-gold)]">{totalRepairCost} turns</span>
               </div>
             </div>
 

@@ -204,7 +204,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
           Arena Locked
         </p>
         <p className="text-sm text-[var(--rpg-text-secondary)]">
-          Reach character level <span className="font-pixel text-[16px]">{PVP_CONSTANTS.MIN_CHARACTER_LEVEL}</span> to compete in the Arena.
+          Reach character level <span className="font-pixel font-normal text-[16px]">{PVP_CONSTANTS.MIN_CHARACTER_LEVEL}</span> to compete in the Arena.
         </p>
         <div className="mt-3 w-full bg-[var(--rpg-background)] rounded-full h-2 overflow-hidden">
           <div

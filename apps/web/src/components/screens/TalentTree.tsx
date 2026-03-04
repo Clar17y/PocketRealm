@@ -191,7 +191,7 @@ export function TalentTree({
         return (
           <div key={tier}>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-bold text-[var(--rpg-text-primary)]">Tier <span className="font-pixel text-[16px]">{tier}</span></span>
+              <span className="text-sm font-bold text-[var(--rpg-text-primary)]">Tier <span className="font-pixel font-normal text-[16px]">{tier}</span></span>
               {gateLabel && (
                 <span className="text-[11px] text-[var(--rpg-text-secondary)]">
                   {gateLabel}

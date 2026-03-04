@@ -335,7 +335,7 @@ export function CombatScreen({
           {roomTransition && (
             <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)]/30 rounded-lg p-6 text-center">
               <div className="text-lg font-bold text-[var(--rpg-gold)] mb-1">
-                Entering Room <span className="font-pixel text-[16px]">{roomTransition.entering}</span>
+                Entering Room <span className="font-pixel font-normal text-[16px]">{roomTransition.entering}</span>
               </div>
               <div className="text-sm text-[var(--rpg-text-secondary)]">
                 Prepare for the next fight...
@@ -349,8 +349,8 @@ export function CombatScreen({
               {fightProgress && fightProgress.total > 1 && (
                 <div className="text-sm text-[var(--rpg-gold)] font-semibold mb-2">
                   {fightProgress.room
-                    ? <>Room <span className="font-pixel text-[16px]">{fightProgress.room}</span> — Fight <span className="font-pixel text-[16px]">{fightProgress.current}/{fightProgress.total}</span></>
-                    : <>Fight <span className="font-pixel text-[16px]">{fightProgress.current}/{fightProgress.total}</span></>
+                    ? <>Room <span className="font-pixel font-normal text-[16px]">{fightProgress.room}</span> — Fight <span className="font-pixel font-normal text-[16px]">{fightProgress.current}/{fightProgress.total}</span></>
+                    : <>Fight <span className="font-pixel font-normal text-[16px]">{fightProgress.current}/{fightProgress.total}</span></>
                   }
                 </div>
               )}

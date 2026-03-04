@@ -239,7 +239,7 @@ export function CombatPlayback({
             if (lastEntry.wasExhausted) return <span className="text-[var(--rpg-text-secondary)] italic">Exhausted &rarr; Defend</span>;
             if (lastEntry.action === 'potion') return <span className="text-[var(--rpg-green-light)]">🧪 {displayLabel ?? 'Potion'}: +{lastEntry.healAmount} HP</span>;
             if (lastEntry.evaded) return <span className="text-[var(--rpg-blue-light)]">Dodged!</span>;
-            if (lastEntry.isCritical) return <span className="text-[var(--rpg-gold)] font-bold">Critical Hit! <span className="font-pixel text-[16px]">{lastEntry.damage}</span> dmg</span>;
+            if (lastEntry.isCritical) return <span className="text-[var(--rpg-gold)] font-bold">Critical Hit! <span className="font-pixel font-normal text-[16px]">{lastEntry.damage}</span> dmg</span>;
             if (lastEntry.damage && lastEntry.damage > 0 && lastEntry.healAmount && lastEntry.healAmount > 0) {
               return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}<span className="font-pixel text-[16px] text-[var(--rpg-red)]">{lastEntry.damage}</span> dmg, <span className="font-pixel text-[16px] text-[var(--rpg-green-light)]">+{lastEntry.healAmount}</span> HP</span>;
             }
