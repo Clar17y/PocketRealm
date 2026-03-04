@@ -230,8 +230,8 @@ export type {
   GuildJoinRequestsResponse,
 } from './guild';
 
-export { getQuests, claimQuestReward, claimDailyBonus } from './quests';
-export type { QuestsResponse, ClaimRewardResponse, ClaimBonusResponse } from './quests';
+export { getQuests, claimQuestReward, claimDailyBonus, getQuestShop, purchaseQuestItem } from './quests';
+export type { QuestsResponse, ClaimRewardResponse, ClaimBonusResponse, ShopResponse, PurchaseResponse } from './quests';
 
 export { getSkillPointState, allocateSkillPoint, respecSkillPoints } from './skillPoints';
 export type { SkillPointState } from './skillPoints';

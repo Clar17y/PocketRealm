@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getActiveQuests, claimQuestReward, claimDailyBonus, getQuestState } from '../services/questService';
+import { getShopInventory, purchaseShopItem } from '../services/questShopService';
 
 export const questsRouter = Router();
 questsRouter.use(authenticate);
@@ -15,13 +16,21 @@ questsRouter.get('/', asyncHandler(async (req, res) => {
   res.json({ quests, state });
 }));
 
-// POST /api/v1/quests/:id/claim — claim completed quest reward
-const claimSchema = z.object({ id: z.string().uuid() });
-
-questsRouter.post('/:id/claim', asyncHandler(async (req, res) => {
+// GET /api/v1/quests/shop — get shop inventory + token balance
+questsRouter.get('/shop', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
-  const { id } = claimSchema.parse(req.params);
-  const result = await claimQuestReward(playerId, id);
+  const items = getShopInventory();
+  const state = await getQuestState(playerId);
+  res.json({ items, questTokens: state.questTokens });
+}));
+
+// POST /api/v1/quests/shop/buy — purchase a shop item
+const buySchema = z.object({ itemKey: z.string().min(1) });
+
+questsRouter.post('/shop/buy', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { itemKey } = buySchema.parse(req.body);
+  const result = await purchaseShopItem(playerId, itemKey);
   res.json(result);
 }));
 
@@ -29,5 +38,16 @@ questsRouter.post('/:id/claim', asyncHandler(async (req, res) => {
 questsRouter.post('/bonus', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const result = await claimDailyBonus(playerId);
+  res.json(result);
+}));
+
+// POST /api/v1/quests/:id/claim — claim completed quest reward
+// NOTE: Must come AFTER /shop and /bonus to avoid :id matching those paths
+const claimSchema = z.object({ id: z.string().uuid() });
+
+questsRouter.post('/:id/claim', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { id } = claimSchema.parse(req.params);
+  const result = await claimQuestReward(playerId, id);
   res.json(result);
 }));

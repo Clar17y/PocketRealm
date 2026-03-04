@@ -1,5 +1,5 @@
 import { fetchApi } from './core';
-import type { PlayerQuestData, PlayerQuestStateData } from '@adventure/shared';
+import type { PlayerQuestData, PlayerQuestStateData, QuestShopItem } from '@adventure/shared';
 
 export interface QuestsResponse {
   quests: PlayerQuestData[];
@@ -16,6 +16,15 @@ export interface ClaimBonusResponse {
   newBalance: number;
 }
 
+export interface ShopResponse {
+  items: QuestShopItem[];
+  questTokens: number;
+}
+
+export interface PurchaseResponse {
+  newBalance: number;
+}
+
 export async function getQuests() {
   return fetchApi<QuestsResponse>('/api/v1/quests');
 }
@@ -26,4 +35,15 @@ export async function claimQuestReward(questId: string) {
 
 export async function claimDailyBonus() {
   return fetchApi<ClaimBonusResponse>('/api/v1/quests/bonus', { method: 'POST' });
+}
+
+export async function getQuestShop() {
+  return fetchApi<ShopResponse>('/api/v1/quests/shop');
+}
+
+export async function purchaseQuestItem(itemKey: string) {
+  return fetchApi<PurchaseResponse>('/api/v1/quests/shop/buy', {
+    method: 'POST',
+    body: JSON.stringify({ itemKey }),
+  });
 }
