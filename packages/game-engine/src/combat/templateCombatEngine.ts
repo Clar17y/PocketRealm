@@ -257,7 +257,7 @@ function applyEffectTicks(
       const reduction = calculateDefenceReduction(defence);
       const tickDamage = Math.max(
         COMBAT_CONSTANTS.MIN_DAMAGE,
-        Math.round(effect.resolvedDamagePerRound * (1 - reduction)),
+        Math.floor(effect.resolvedDamagePerRound * (1 - reduction)),
       );
 
       applyDamage(state, targetKey, tickDamage);
@@ -371,6 +371,18 @@ function executeOffensiveAction(
     baseDamageMin = actionStats.damageMin;
     baseDamageMax = actionStats.damageMax;
     baseAccuracy = actionStats.accuracy;
+
+    // Re-apply buff/debuff modifiers from active effects (these were lost
+    // when per-action stats replaced the pre-computed effective stats)
+    for (const effect of state.activeEffects) {
+      if (effect.target !== actorKey) continue;
+      if (effect.stat === 'attack') { baseDamageMin += effect.modifier; baseDamageMax += effect.modifier; }
+      if (effect.stat === 'accuracy') baseAccuracy += effect.modifier;
+      if (effect.stat === 'damageMin') baseDamageMin += effect.modifier;
+      if (effect.stat === 'damageMax') baseDamageMax += effect.modifier;
+    }
+    baseDamageMin = Math.max(1, baseDamageMin);
+    baseDamageMax = Math.max(baseDamageMin, baseDamageMax);
   }
 
   const attackRoll = hitOverride === 'guaranteed_hit' ? 20 : rollD20();

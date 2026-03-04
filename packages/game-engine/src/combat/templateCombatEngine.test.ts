@@ -944,6 +944,76 @@ describe('runTemplateCombat', () => {
       expect(attackEntry?.rawDamage).toBe(9);
     });
 
+    it('buffs apply on top of per-action scaling stats', () => {
+      // Verify that buff modifiers (e.g. Battle Cry +15 attack) are applied
+      // even when per-action scaling overrides the base damage stats.
+      //
+      // Without buff: melee resolved totalAttack = 5+5+3 = 13
+      //   damageMin = 1 + floor(13/5) = 3, damageMax = 5 + floor(13/2) = 11
+      //   power_strike 1.3x: rawDamage = floor(3 * 1.3) = 3 (min roll)
+      //
+      // With Battle Cry (+15 attack → +15 damageMin, +15 damageMax):
+      //   damageMin = 3+15 = 18, damageMax = 11+15 = 26
+      //   power_strike 1.3x: rawDamage = floor(18 * 1.3) = 23 (min roll)
+      mockCombatRandom();
+
+      const a = makeCombatant('Mage', {
+        template: templateOf('power_strike'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({
+          hp: 500, maxHp: 500,
+          damageMin: 50, damageMax: 50, accuracy: 50,
+        }),
+        stamina: 500,
+        maxStamina: 500,
+        perActionScaling: magicScaling,
+      });
+      const b = makeCombatant('Target', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, defence: 0 }),
+      });
+
+      // Run combat without buff first to get baseline
+      const baseResult = runTemplateCombat(a, b);
+      const baseAttack = baseResult.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(baseAttack).toBeDefined();
+      expect(baseAttack?.rawDamage).toBe(3); // baseline: floor(3 * 1.3) = 3
+
+      // Now run with Battle Cry active: use battle_cry first round, power_strike second
+      vi.restoreAllMocks();
+      mockCombatRandom();
+
+      const buffedA = makeCombatant('Mage', {
+        template: templateOf('battle_cry', 'power_strike'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({
+          hp: 500, maxHp: 500,
+          damageMin: 50, damageMax: 50, accuracy: 50,
+        }),
+        stamina: 500,
+        maxStamina: 500,
+        perActionScaling: magicScaling,
+      });
+      const buffedB = makeCombatant('Target', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, defence: 0 }),
+      });
+
+      const buffResult = runTemplateCombat(buffedA, buffedB);
+
+      // Round 2 attack should have Battle Cry +15 applied
+      const buffAttack = buffResult.log.find(
+        (e) => e.round === 2 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(buffAttack).toBeDefined();
+      // With buff: damageMin = 3+15 = 18, rawDamage = floor(18 * 1.3) = 23
+      expect(buffAttack?.rawDamage).toBe(23);
+      // Verify the buff added exactly 20 raw damage (23 - 3 = 20, because floor(18*1.3) - floor(3*1.3))
+      expect(buffAttack!.rawDamage! - baseAttack!.rawDamage!).toBe(20);
+    });
+
     it('action damageType determines which defence is used', () => {
       // Create a custom action: melee scaling but magic damage type
       // This should hit magicDefence, not physical defence

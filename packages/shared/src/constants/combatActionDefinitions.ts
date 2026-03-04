@@ -400,7 +400,7 @@ const meteorStrike: ActionDefinition = {
 
 // --- Cross-Type Talent Actions ---
 
-const flame_sword: ActionDefinition = {
+const flameSword: ActionDefinition = {
   id: 'flame_sword',
   name: 'Flame Sword',
   description: 'Engulf your blade in fire, dealing magic damage that bypasses physical armour.',
@@ -422,7 +422,7 @@ const flame_sword: ActionDefinition = {
   },
 };
 
-const venomous_strike: ActionDefinition = {
+const venomousStrike: ActionDefinition = {
   id: 'venomous_strike',
   name: 'Venomous Strike',
   description: 'Coat your weapon in poison, applying a lingering toxin.',
@@ -444,7 +444,7 @@ const venomous_strike: ActionDefinition = {
   },
 };
 
-const rending_slash: ActionDefinition = {
+const rendingSlash: ActionDefinition = {
   id: 'rending_slash',
   name: 'Rending Slash',
   description: 'A brutal slash that causes deep bleeding.',
@@ -466,7 +466,7 @@ const rending_slash: ActionDefinition = {
   },
 };
 
-const flame_arrow: ActionDefinition = {
+const flameArrow: ActionDefinition = {
   id: 'flame_arrow',
   name: 'Flame Arrow',
   description: 'Ignite your arrow, scorching the target on impact.',
@@ -488,7 +488,7 @@ const flame_arrow: ActionDefinition = {
   },
 };
 
-const earth_spikes: ActionDefinition = {
+const earthSpikes: ActionDefinition = {
   id: 'earth_spikes',
   name: 'Earth Spikes',
   description: 'Conjure jagged stone that pierces armour, dealing physical damage.',
@@ -507,7 +507,7 @@ const earth_spikes: ActionDefinition = {
   },
 };
 
-const life_drain: ActionDefinition = {
+const lifeDrain: ActionDefinition = {
   id: 'life_drain',
   name: 'Life Drain',
   description: "Siphon the target's life force to heal yourself.",
@@ -629,12 +629,12 @@ export const BASE_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   regeneration,
   meteor_strike: meteorStrike,
   // Cross-type talents
-  flame_sword,
-  venomous_strike,
-  rending_slash,
-  flame_arrow,
-  earth_spikes,
-  life_drain,
+  flame_sword: flameSword,
+  venomous_strike: venomousStrike,
+  rending_slash: rendingSlash,
+  flame_arrow: flameArrow,
+  earth_spikes: earthSpikes,
+  life_drain: lifeDrain,
   curse,
   enfeeble,
   // General talents
