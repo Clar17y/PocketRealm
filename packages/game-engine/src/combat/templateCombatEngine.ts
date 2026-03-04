@@ -320,6 +320,28 @@ function actionToCombatAction(action: ActionDefinition): CombatAction {
   return 'spell';
 }
 
+function snapshotEffectValues(
+  effect: ActionEffect,
+  damageForPercentCalc?: number,
+): Pick<ActiveEffect, 'resolvedDamagePerRound' | 'dotDamageType' | 'resolvedHealPerRound'> {
+  const snapshot: Pick<ActiveEffect, 'resolvedDamagePerRound' | 'dotDamageType' | 'resolvedHealPerRound'> = {};
+
+  if (effect.damagePerRound || effect.damagePerRoundPercent) {
+    const dotFlat = effect.damagePerRound ?? 0;
+    const dotPercent = damageForPercentCalc
+      ? Math.floor(damageForPercentCalc * (effect.damagePerRoundPercent ?? 0) / 100)
+      : 0;
+    snapshot.resolvedDamagePerRound = dotFlat + dotPercent;
+    snapshot.dotDamageType = effect.dotDamageType ?? 'magic';
+  }
+
+  if (effect.healPerRound) {
+    snapshot.resolvedHealPerRound = effect.healPerRound;
+  }
+
+  return snapshot;
+}
+
 // --- Action Execution ---
 
 function executeOffensiveAction(
@@ -488,18 +510,7 @@ function executeOffensiveAction(
       remainingRounds: effect.duration,
     };
 
-    // Snapshot DOT damage
-    if (effect.damagePerRound || effect.damagePerRoundPercent) {
-      const dotFlat = effect.damagePerRound ?? 0;
-      const dotPercent = Math.floor(finalDamage * (effect.damagePerRoundPercent ?? 0) / 100);
-      newEffect.resolvedDamagePerRound = dotFlat + dotPercent;
-      newEffect.dotDamageType = effect.dotDamageType ?? 'magic';
-    }
-
-    // Snapshot HOT healing
-    if (effect.healPerRound) {
-      newEffect.resolvedHealPerRound = effect.healPerRound;
-    }
+    Object.assign(newEffect, snapshotEffectValues(action.effect, finalDamage));
 
     // Same-name effects refresh, not stack
     const existingIdx = state.activeEffects.findIndex(
@@ -587,14 +598,7 @@ function executeSupportiveAction(
       remainingRounds: effect.duration,
     };
 
-    // Snapshot HOT healing (no finalDamage for supportive actions, so damagePerRoundPercent N/A)
-    if (effect.damagePerRound) {
-      newEffect.resolvedDamagePerRound = effect.damagePerRound;
-      newEffect.dotDamageType = effect.dotDamageType ?? 'magic';
-    }
-    if (effect.healPerRound) {
-      newEffect.resolvedHealPerRound = effect.healPerRound;
-    }
+    Object.assign(newEffect, snapshotEffectValues(action.effect));
 
     // Same-name effects refresh, not stack
     const existingIdx = state.activeEffects.findIndex(
