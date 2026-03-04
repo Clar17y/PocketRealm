@@ -191,6 +191,31 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
+/* Stat bar shimmer sweep */
+@keyframes bar-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.rpg-bar-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.rpg-bar-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 100%
+  );
+  width: 50%;
+  animation: bar-shimmer 3s ease-in-out infinite;
+}
+
 /* Hide scrollbar for horizontal scroll strips */
 .scrollbar-hide {
   -ms-overflow-style: none;

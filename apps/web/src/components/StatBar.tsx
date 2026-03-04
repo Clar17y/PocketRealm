@@ -10,6 +10,16 @@ interface StatBarProps {
   className?: string;
 }
 
+const barColorHexMap: Record<string, string> = {
+  'bg-[var(--rpg-green-light)]': '#6aaa5a',
+  'bg-[var(--rpg-hp-warning)]': '#d4943a',
+  'bg-[var(--rpg-red)]': '#aa3a3a',
+  'bg-[var(--rpg-blue-light)]': '#5aaad4',
+  'bg-teal-400': '#2dd4bf',
+  'bg-[var(--rpg-gold)]': '#d4a84b',
+  'bg-[var(--rpg-text-secondary)]': '#8a8878',
+};
+
 export function StatBar({
   current,
   max,
@@ -28,8 +38,16 @@ export function StatBar({
         ? 'bg-[var(--rpg-gold)]'
         : 'bg-[var(--rpg-text-secondary)]';
 
-  const colorClasses = {
-    health: 'bg-[var(--rpg-green-light)]',
+  // HP uses tiered color: green > 60%, amber 40-60%, red < 40%
+  const healthColor =
+    percentage > 60
+      ? 'bg-[var(--rpg-green-light)]'
+      : percentage >= 40
+        ? 'bg-[var(--rpg-hp-warning)]'
+        : 'bg-[var(--rpg-red)]';
+
+  const colorClasses: Record<string, string> = {
+    health: healthColor,
     mana: 'bg-[var(--rpg-blue-light)]',
     stamina: 'bg-teal-400',
     xp: 'bg-[var(--rpg-gold)]',
@@ -37,10 +55,21 @@ export function StatBar({
     durability: durabilityColor,
   };
 
+  const barColorClass = colorClasses[color];
+  const barColorHex = barColorHexMap[barColorClass] ?? '#6aaa5a';
+
   const sizeClasses = {
     sm: 'h-2',
     md: 'h-3',
     lg: 'h-4',
+  };
+
+  // HP glow: dynamic box-shadow that scales with fill percentage
+  const fillStyle: React.CSSProperties = {
+    width: `${percentage}%`,
+    ...(color === 'health' && {
+      boxShadow: `0 0 ${Math.round(percentage * 0.08)}px ${barColorHex}33`,
+    }),
   };
 
   return (
@@ -55,11 +84,14 @@ export function StatBar({
           )}
         </div>
       )}
-      <div className={cn('w-full bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded overflow-hidden', sizeClasses[size])}>
+      <div className={cn('relative w-full bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded overflow-hidden', sizeClasses[size])}>
         <div
-          className={cn('h-full transition-all duration-300', colorClasses[color])}
-          style={{ width: `${percentage}%` }}
+          className={cn('h-full transition-all duration-300 rpg-bar-shimmer', barColorClass)}
+          style={fillStyle}
         />
+        {color === 'xp' && [25, 50, 75].map(pct => (
+          <div key={pct} className="absolute top-0 bottom-0 w-px bg-[var(--rpg-text-secondary)]/30" style={{ left: `${pct}%` }} />
+        ))}
       </div>
     </div>
   );
