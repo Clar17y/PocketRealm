@@ -176,7 +176,7 @@ export function CombatPlayback({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-center gap-2 font-bold text-[var(--rpg-text-primary)] flex-wrap">
+      <div className="flex items-center justify-center gap-2 font-bold text-[var(--rpg-text-primary)] flex-wrap font-display">
         {mobImageSrc && (
           <img src={mobImageSrc} alt={mobDisplayName} className="w-10 h-10 rounded object-cover" />
         )}
@@ -239,12 +239,12 @@ export function CombatPlayback({
             if (lastEntry.wasExhausted) return <span className="text-[var(--rpg-text-secondary)] italic">Exhausted &rarr; Defend</span>;
             if (lastEntry.action === 'potion') return <span className="text-[var(--rpg-green-light)]">🧪 {displayLabel ?? 'Potion'}: +{lastEntry.healAmount} HP</span>;
             if (lastEntry.evaded) return <span className="text-[var(--rpg-blue-light)]">Dodged!</span>;
-            if (lastEntry.isCritical) return <span className="text-[var(--rpg-gold)] font-bold">Critical Hit! {lastEntry.damage} dmg</span>;
+            if (lastEntry.isCritical) return <span className="text-[var(--rpg-gold)] font-bold">Critical Hit! <span className="font-pixel">{lastEntry.damage}</span> dmg</span>;
             if (lastEntry.damage && lastEntry.damage > 0 && lastEntry.healAmount && lastEntry.healAmount > 0) {
-              return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}{lastEntry.damage} dmg, +{lastEntry.healAmount} HP</span>;
+              return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}<span className="font-pixel text-[var(--rpg-red)]">{lastEntry.damage}</span> dmg, <span className="font-pixel text-[var(--rpg-green-light)]">+{lastEntry.healAmount}</span> HP</span>;
             }
-            if (lastEntry.damage && lastEntry.damage > 0) return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}{lastEntry.damage} dmg</span>;
-            if (lastEntry.healAmount && lastEntry.healAmount > 0) return <span className="text-[var(--rpg-green-light)]">{displayLabel ? `${displayLabel}: ` : ''}+{lastEntry.healAmount} HP</span>;
+            if (lastEntry.damage && lastEntry.damage > 0) return <span className="text-[var(--rpg-red)]">{displayLabel ? `${displayLabel}: ` : ''}<span className="font-pixel">{lastEntry.damage}</span> dmg</span>;
+            if (lastEntry.healAmount && lastEntry.healAmount > 0) return <span className="text-[var(--rpg-green-light)]">{displayLabel ? `${displayLabel}: ` : ''}<span className="font-pixel">+{lastEntry.healAmount}</span> HP</span>;
             if (lastEntry.effectsApplied && lastEntry.effectsApplied.length > 0) {
               const e = lastEntry.effectsApplied[0];
               return <span className="text-[var(--rpg-blue-light)]">
@@ -275,8 +275,8 @@ export function CombatPlayback({
 
       {/* Outcome display */}
       {phase !== 'playing' && (
-        <div className="text-center mt-4 space-y-3">
-          <div className={`text-xl font-bold ${outcome === 'victory' ? 'text-[var(--rpg-gold)]'
+        <div className={`text-center mt-4 space-y-3 rounded-lg p-3 ${outcome === 'victory' ? 'rpg-victory-pulse' : ''}`}>
+          <div className={`text-xl font-bold font-display ${outcome === 'victory' ? 'text-[var(--rpg-gold)]'
               : outcome === 'fled' || outcome === 'draw' ? 'text-[var(--rpg-gold)]'
                 : 'text-[var(--rpg-red)]'
             }`}>

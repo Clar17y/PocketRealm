@@ -115,18 +115,18 @@ export function CombatLogEntry({
           ) : (
             <>
               <span className="text-[var(--rpg-gold)] font-mono w-7 shrink-0">R{entry.round}</span>
-              <span className={`shrink-0 ${actorColor}`}>{isPlayerAction ? playerLabel : opponentLabel}</span>
+              <span className={`shrink-0 font-display ${actorColor}`}>{isPlayerAction ? playerLabel : opponentLabel}</span>
               {icon && <span className="shrink-0 text-xs">{icon}</span>}
               {entry.actionName ? (
-                <span className={`text-xs font-semibold ${getActionCategoryColor(entry)}`}>{entry.actionName}</span>
+                <span className={`text-xs font-semibold font-display ${getActionCategoryColor(entry)}`}>{entry.actionName}</span>
               ) : entry.spellName ? (
-                <span className="text-[var(--rpg-blue-light)] text-xs font-semibold">{entry.spellName}</span>
+                <span className="text-[var(--rpg-blue-light)] text-xs font-semibold font-display">{entry.spellName}</span>
               ) : null}
               {entry.damage !== undefined && entry.damage > 0 && (
-                <span className="text-[var(--rpg-text-primary)] font-mono font-semibold">{entry.damage} dmg</span>
+                <span className={`font-pixel font-semibold ${entry.isCritical ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-red)]'}`}>{entry.damage} dmg</span>
               )}
               {entry.healAmount !== undefined && entry.healAmount > 0 && (
-                <span className="text-[var(--rpg-green-light)] font-mono font-semibold">+{entry.healAmount} HP</span>
+                <span className="text-[var(--rpg-green-light)] font-pixel font-semibold">+{entry.healAmount} HP</span>
               )}
               {entry.effectsApplied && entry.effectsApplied.length > 0 && !entry.damage && !entry.healAmount && (
                 <span className="text-[var(--rpg-blue-light)] text-xs">

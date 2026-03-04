@@ -103,12 +103,12 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
       {/* Victory Modal */}
       {status === 'victory' && rewards && (
         <ModalOverlay opacity={90}>
-          <PixelCard className="max-w-sm w-full">
+          <PixelCard className="max-w-sm w-full rpg-victory-pulse">
             <div className="text-center">
               <div className="flex justify-center mb-3">
                 <Trophy size={56} color="var(--rpg-gold)" />
               </div>
-              <h3 className="text-3xl font-bold text-[var(--rpg-gold)] mb-2">Victory!</h3>
+              <h3 className="text-3xl font-bold font-display text-[var(--rpg-gold)] mb-2">Victory!</h3>
 
               <div className="flex justify-center mb-4">
                 <div className="w-20 h-20 rounded-lg bg-[var(--rpg-background)] border-2 border-[var(--rpg-gold)] flex items-center justify-center text-4xl">

@@ -9,18 +9,24 @@ interface ItemCardProps {
   quantity?: number;
   rarity?: Rarity;
   durability?: { current: number; max: number } | null;
+  animationDelay?: number;
   onClick?: () => void;
 }
 
-export function ItemCard({ name, icon, imageSrc, quantity, rarity = 'common', durability, onClick }: ItemCardProps) {
+export function ItemCard({ name, icon, imageSrc, quantity, rarity = 'common', durability, animationDelay, onClick }: ItemCardProps) {
   return (
     <button
       onClick={onClick}
       className={cn(
         'relative w-full aspect-square bg-[var(--rpg-surface)] rounded-lg border-2 transition-all hover:scale-105 active:scale-95',
-        RARITY_GLOW[rarity]
+        RARITY_GLOW[rarity],
+        animationDelay !== undefined && 'rpg-loot-reveal',
+        rarity === 'legendary' && animationDelay !== undefined && 'rpg-legendary-flash'
       )}
-      style={{ borderColor: RARITY_COLORS[rarity] }}
+      style={{
+        borderColor: RARITY_COLORS[rarity],
+        animationDelay: animationDelay !== undefined ? `${animationDelay}ms` : undefined,
+      }}
       title={name}
     >
       <div className="w-full h-full flex items-center justify-center p-2">

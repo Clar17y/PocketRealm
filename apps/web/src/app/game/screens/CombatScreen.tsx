@@ -384,7 +384,7 @@ export function CombatScreen({
 
           {/* Last Combat (detailed log — shown after playback completes) */}
           {!combatPlaybackData && lastCombat && (
-            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
+            <div className={`bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3 ${lastCombat.outcome === 'victory' ? 'rpg-victory-pulse' : ''}`}>
               {lastCombat.fights && lastCombat.fights.length > 1 && (
                 <FightNavigationBar
                   currentIndex={lastCombatFightIndex}
