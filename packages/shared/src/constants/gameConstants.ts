@@ -521,6 +521,20 @@ export const COMBAT_ACTION_CONSTANTS = {
   // General talent actions
   FORTIFY_STAMINA: 15,
   FORTIFY_MANA: 10,
+
+  // Cross-type talent actions
+  FLAME_SWORD_STAMINA: 25,
+  FLAME_SWORD_MANA: 15,
+  VENOMOUS_STRIKE_STAMINA: 25,
+  VENOMOUS_STRIKE_MANA: 10,
+  RENDING_SLASH_STAMINA: 30,
+  FLAME_ARROW_STAMINA: 20,
+  FLAME_ARROW_MANA: 15,
+  EARTH_SPIKES_STAMINA: 10,
+  EARTH_SPIKES_MANA: 30,
+  LIFE_DRAIN_MANA: 35,
+  CURSE_MANA: 20,
+  ENFEEBLE_MANA: 20,
 } as const;
 
 // =============================================================================

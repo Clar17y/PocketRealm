@@ -398,6 +398,166 @@ const meteorStrike: ActionDefinition = {
   isChanneling: true,
 };
 
+// --- Cross-Type Talent Actions ---
+
+const flame_sword: ActionDefinition = {
+  id: 'flame_sword',
+  name: 'Flame Sword',
+  description: 'Engulf your blade in fire, dealing magic damage that bypasses physical armour.',
+  actionType: 'skill_attack',
+  category: 'offensive',
+  scalingStat: 'melee',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.FLAME_SWORD_STAMINA, mana: COMBAT_ACTION_CONSTANTS.FLAME_SWORD_MANA },
+  damageMultiplier: 1.2,
+  damageType: 'magic',
+  effect: {
+    name: 'Burn',
+    stat: 'attack',
+    modifier: 0,
+    duration: 3,
+    isDebuff: true,
+    damagePerRound: 5,
+    damagePerRoundPercent: 15,
+    dotDamageType: 'magic',
+  },
+};
+
+const venomous_strike: ActionDefinition = {
+  id: 'venomous_strike',
+  name: 'Venomous Strike',
+  description: 'Coat your weapon in poison, applying a lingering toxin.',
+  actionType: 'skill_attack',
+  category: 'offensive',
+  scalingStat: 'melee',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.VENOMOUS_STRIKE_STAMINA, mana: COMBAT_ACTION_CONSTANTS.VENOMOUS_STRIKE_MANA },
+  damageMultiplier: 0.9,
+  damageType: 'physical',
+  effect: {
+    name: 'Poison',
+    stat: 'attack',
+    modifier: 0,
+    duration: 3,
+    isDebuff: true,
+    damagePerRound: 5,
+    damagePerRoundPercent: 20,
+    dotDamageType: 'magic',
+  },
+};
+
+const rending_slash: ActionDefinition = {
+  id: 'rending_slash',
+  name: 'Rending Slash',
+  description: 'A brutal slash that causes deep bleeding.',
+  actionType: 'skill_attack',
+  category: 'offensive',
+  scalingStat: 'melee',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.RENDING_SLASH_STAMINA, mana: 0 },
+  damageMultiplier: 1.1,
+  damageType: 'physical',
+  effect: {
+    name: 'Bleed',
+    stat: 'attack',
+    modifier: 0,
+    duration: 3,
+    isDebuff: true,
+    damagePerRound: 4,
+    damagePerRoundPercent: 15,
+    dotDamageType: 'physical',
+  },
+};
+
+const flame_arrow: ActionDefinition = {
+  id: 'flame_arrow',
+  name: 'Flame Arrow',
+  description: 'Ignite your arrow, scorching the target on impact.',
+  actionType: 'skill_attack',
+  category: 'offensive',
+  scalingStat: 'ranged',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.FLAME_ARROW_STAMINA, mana: COMBAT_ACTION_CONSTANTS.FLAME_ARROW_MANA },
+  damageMultiplier: 1.1,
+  damageType: 'magic',
+  effect: {
+    name: 'Burn',
+    stat: 'attack',
+    modifier: 0,
+    duration: 2,
+    isDebuff: true,
+    damagePerRound: 6,
+    damagePerRoundPercent: 15,
+    dotDamageType: 'magic',
+  },
+};
+
+const earth_spikes: ActionDefinition = {
+  id: 'earth_spikes',
+  name: 'Earth Spikes',
+  description: 'Conjure jagged stone that pierces armour, dealing physical damage.',
+  actionType: 'damage_spell',
+  category: 'offensive',
+  scalingStat: 'magic',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.EARTH_SPIKES_STAMINA, mana: COMBAT_ACTION_CONSTANTS.EARTH_SPIKES_MANA },
+  damageMultiplier: 1.3,
+  damageType: 'physical',
+  effect: {
+    name: 'Armor Break',
+    stat: 'defence',
+    modifier: -15,
+    duration: 3,
+    isDebuff: true,
+  },
+};
+
+const life_drain: ActionDefinition = {
+  id: 'life_drain',
+  name: 'Life Drain',
+  description: "Siphon the target's life force to heal yourself.",
+  actionType: 'damage_spell',
+  category: 'offensive',
+  scalingStat: 'magic',
+  cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.LIFE_DRAIN_MANA },
+  damageMultiplier: 1.0,
+  damageType: 'magic',
+  lifeLeechPercent: 25,
+};
+
+const curse: ActionDefinition = {
+  id: 'curse',
+  name: 'Curse',
+  description: "Weaken the target's magical resistance.",
+  actionType: 'debuff_spell',
+  category: 'offensive',
+  scalingStat: 'magic',
+  cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.CURSE_MANA },
+  damageMultiplier: 0.5,
+  damageType: 'magic',
+  effect: {
+    name: 'Curse',
+    stat: 'magicDefence',
+    modifier: -20,
+    duration: 4,
+    isDebuff: true,
+  },
+};
+
+const enfeeble: ActionDefinition = {
+  id: 'enfeeble',
+  name: 'Enfeeble',
+  description: "Sap the target's strength, reducing their attack power.",
+  actionType: 'debuff_spell',
+  category: 'offensive',
+  scalingStat: 'magic',
+  cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.ENFEEBLE_MANA },
+  damageMultiplier: 0.5,
+  damageType: 'magic',
+  effect: {
+    name: 'Enfeeble',
+    stat: 'attack',
+    modifier: -20,
+    duration: 4,
+    isDebuff: true,
+  },
+};
+
 // --- General Talent Actions ---
 
 const taunt: ActionDefinition = {
@@ -468,6 +628,15 @@ export const BASE_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   arcane_blast: arcaneBlast,
   regeneration,
   meteor_strike: meteorStrike,
+  // Cross-type talents
+  flame_sword,
+  venomous_strike,
+  rending_slash,
+  flame_arrow,
+  earth_spikes,
+  life_drain,
+  curse,
+  enfeeble,
   // General talents
   taunt,
   fortify,

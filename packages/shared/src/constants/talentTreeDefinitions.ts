@@ -70,6 +70,17 @@ const meleeNodes: TalentNodeDefinition[] = [
     prerequisites: ['melee_endurance_training'],
     passiveBonus: { stat: 'staminaRegen', value: 15, isPercent: true, description: '+15% stamina regen' },
   },
+  {
+    id: 'melee_venomous_strike',
+    tree: 'melee',
+    tier: 2,
+    name: 'Venomous Strike',
+    description: 'Coat your weapon in poison, applying a lingering toxin.',
+    pointCost: 2,
+    skillLevelGate: { skill: 'melee', level: 15 },
+    prerequisites: ['melee_endurance_training'],
+    unlocksAction: 'venomous_strike',
+  },
   // Tier 3 (20-30 pts, requires melee 35)
   {
     id: 'melee_devastating_blow',
@@ -104,6 +115,17 @@ const meleeNodes: TalentNodeDefinition[] = [
     prerequisites: ['melee_stamina_surge'],
     passiveBonus: { stat: 'weaponDamage', value: 10, isPercent: true, description: '+10% weapon damage' },
   },
+  {
+    id: 'melee_rending_slash',
+    tree: 'melee',
+    tier: 3,
+    name: 'Rending Slash',
+    description: 'A brutal slash that causes deep bleeding.',
+    pointCost: 3,
+    skillLevelGate: { skill: 'melee', level: 35 },
+    prerequisites: ['melee_stamina_surge'],
+    unlocksAction: 'rending_slash',
+  },
   // Tier 4 (35-50 pts, requires melee 60)
   {
     id: 'melee_execute',
@@ -137,6 +159,17 @@ const meleeNodes: TalentNodeDefinition[] = [
     skillLevelGate: { skill: 'melee', level: 60 },
     prerequisites: ['melee_weapon_mastery'],
     passiveBonus: { stat: 'debuffDuration', value: -1, description: 'Reduce debuff duration by 1 round' },
+  },
+  {
+    id: 'melee_flame_sword',
+    tree: 'melee',
+    tier: 4,
+    name: 'Flame Sword',
+    description: 'Engulf your blade in fire, dealing magic damage that bypasses physical armour.',
+    pointCost: 4,
+    skillLevelGate: { skill: 'melee', level: 60 },
+    prerequisites: ['melee_weapon_mastery'],
+    unlocksAction: 'flame_sword',
   },
   // Tier 5 (50-75 pts, requires melee 85)
   {
@@ -267,6 +300,17 @@ const rangedNodes: TalentNodeDefinition[] = [
     prerequisites: ['ranged_steady_hands'],
     passiveBonus: { stat: 'dodge', value: 10, isPercent: true, description: '+10% dodge' },
   },
+  {
+    id: 'ranged_flame_arrow',
+    tree: 'ranged',
+    tier: 3,
+    name: 'Flame Arrow',
+    description: 'Ignite your arrow, scorching the target on impact.',
+    pointCost: 3,
+    skillLevelGate: { skill: 'ranged', level: 35 },
+    prerequisites: ['ranged_steady_hands'],
+    unlocksAction: 'flame_arrow',
+  },
   // Tier 4 (requires ranged 60)
   {
     id: 'ranged_piercing_shot',
@@ -396,6 +440,28 @@ const magicNodes: TalentNodeDefinition[] = [
     prerequisites: ['magic_arcane_focus'],
     passiveBonus: { stat: 'manaRegen', value: 15, isPercent: true, description: '+15% mana regen' },
   },
+  {
+    id: 'magic_enfeeble',
+    tree: 'magic',
+    tier: 2,
+    name: 'Enfeeble',
+    description: "Sap the target's strength, reducing their attack power.",
+    pointCost: 2,
+    skillLevelGate: { skill: 'magic', level: 15 },
+    prerequisites: ['magic_fire_bolt'],
+    unlocksAction: 'enfeeble',
+  },
+  {
+    id: 'magic_curse',
+    tree: 'magic',
+    tier: 2,
+    name: 'Curse',
+    description: "Weaken the target's magical resistance.",
+    pointCost: 2,
+    skillLevelGate: { skill: 'magic', level: 15 },
+    prerequisites: ['magic_arcane_focus'],
+    unlocksAction: 'curse',
+  },
   // Tier 3 (requires magic 35)
   {
     id: 'magic_chain_lightning',
@@ -430,6 +496,17 @@ const magicNodes: TalentNodeDefinition[] = [
     prerequisites: ['magic_mana_flow'],
     passiveBonus: { stat: 'magicPenetration', value: 15, isPercent: true, description: 'Ignore 15% magic defence' },
   },
+  {
+    id: 'magic_earth_spikes',
+    tree: 'magic',
+    tier: 3,
+    name: 'Earth Spikes',
+    description: 'Conjure jagged stone that pierces armour, dealing physical damage.',
+    pointCost: 3,
+    skillLevelGate: { skill: 'magic', level: 35 },
+    prerequisites: ['magic_mana_flow'],
+    unlocksAction: 'earth_spikes',
+  },
   // Tier 4 (requires magic 60)
   {
     id: 'magic_arcane_blast',
@@ -463,6 +540,17 @@ const magicNodes: TalentNodeDefinition[] = [
     skillLevelGate: { skill: 'magic', level: 60 },
     prerequisites: ['magic_spell_penetration'],
     passiveBonus: { stat: 'wardCost', value: -10, description: 'Ward costs -10 mana' },
+  },
+  {
+    id: 'magic_life_drain',
+    tree: 'magic',
+    tier: 4,
+    name: 'Life Drain',
+    description: "Siphon the target's life force to heal yourself.",
+    pointCost: 4,
+    skillLevelGate: { skill: 'magic', level: 60 },
+    prerequisites: ['magic_spell_penetration'],
+    unlocksAction: 'life_drain',
   },
   // Tier 5 (requires magic 85)
   {
