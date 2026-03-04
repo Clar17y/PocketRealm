@@ -11,7 +11,7 @@ import {
   filterAndWeightMobsByTier,
   runTemplateCombat,
 } from '@adventure/game-engine';
-import type { CombatOptions, CombatTemplateSlotData, PotionConsumed } from '@adventure/shared';
+import type { CombatOptions, PotionConsumed } from '@adventure/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
@@ -24,7 +24,7 @@ import { buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatL
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
-import { buildPotionPool, deductConsumedPotions } from '../services/potionService';
+import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../services/potionService';
 import {
   ensureStarterDiscoveries,
   getDiscoveredZoneIds,
@@ -45,12 +45,6 @@ import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 
 
-
-const POTION_ACTION_IDS = new Set(['use_hp_potion', 'use_stamina_potion', 'use_mana_potion']);
-
-function templateHasPotionActions(slots: CombatTemplateSlotData[]): boolean {
-  return slots.some(s => POTION_ACTION_IDS.has(s.actionId) || (s.thenActionId && POTION_ACTION_IDS.has(s.thenActionId)));
-}
 
 export const zonesRouter = Router();
 

@@ -18,7 +18,6 @@ import {
   COMBAT_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
   type CombatOptions,
-  type CombatTemplateSlotData,
   type LootDrop,
   type MobTemplate,
   type PotionConsumed,
@@ -40,12 +39,6 @@ import { getSkillPoints } from '../../services/skillPointService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, type EventModifierBadge } from '../../services/worldEventService';
 
-const POTION_ACTION_IDS = new Set(['use_hp_potion', 'use_stamina_potion', 'use_mana_potion']);
-
-function templateHasPotionActions(slots: CombatTemplateSlotData[]): boolean {
-  return slots.some(s => POTION_ACTION_IDS.has(s.actionId) || (s.thenActionId && POTION_ACTION_IDS.has(s.thenActionId)));
-}
-
 function tagEventsWithApplicability(
   events: Array<{ title: string; effectType: string; effectValue: number }>,
   entityBadges: EventModifierBadge[],
@@ -60,7 +53,7 @@ import {
   checkPersistedMobReencounter,
   removePersistedMob,
 } from '../../services/persistedMobService';
-import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
+import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';

@@ -21,7 +21,6 @@ import {
   getUnlockedTiers,
   getHighestUnlockedTier,
   type CombatOptions,
-  type CombatTemplateSlotData,
   type MobTemplate,
   type PotionConsumed,
 } from '@adventure/shared';
@@ -49,7 +48,7 @@ import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { getIo } from '../../socket';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
-import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
+import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
 import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
@@ -71,12 +70,6 @@ import {
   type PendingAmbushCombatLog,
 } from './helpers';
 
-
-const POTION_ACTION_IDS = new Set(['use_hp_potion', 'use_stamina_potion', 'use_mana_potion']);
-
-function templateHasPotionActions(slots: CombatTemplateSlotData[]): boolean {
-  return slots.some(s => POTION_ACTION_IDS.has(s.actionId) || (s.thenActionId && POTION_ACTION_IDS.has(s.thenActionId)));
-}
 
 export const startRouter = Router();
 
