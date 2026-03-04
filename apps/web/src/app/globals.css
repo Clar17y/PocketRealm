@@ -256,3 +256,42 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Ornamental header bottom border */
+.rpg-header-border {
+  position: relative;
+}
+
+.rpg-header-border::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--rpg-gold) 20%,
+    var(--rpg-gold) 80%,
+    transparent 100%
+  );
+  opacity: 0.3;
+}
+
+/* Gold nav underline glow for active tab */
+.rpg-nav-active {
+  position: relative;
+}
+
+.rpg-nav-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: var(--rpg-gold);
+  box-shadow: 0 0 6px var(--rpg-gold-glow);
+  border-radius: 1px;
+}

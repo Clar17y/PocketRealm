@@ -22,7 +22,7 @@ const navItems: { id: string; label: string; icon: UiIconName }[] = [
 export function BottomNav({ activeTab, onNavigate, badgeTabs = new Set(), pulseTabs = new Set() }: BottomNavProps) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-[var(--rpg-surface)] border-t border-[var(--rpg-border)] z-40 safe-area-bottom">
-      <div className="max-w-lg mx-auto flex justify-around items-center h-16">
+      <div className="max-w-lg mx-auto flex justify-around items-center h-18">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
@@ -31,7 +31,7 @@ export function BottomNav({ activeTab, onNavigate, badgeTabs = new Set(), pulseT
               onClick={() => onNavigate(item.id)}
               className={cn(
                 'relative flex flex-col items-center justify-center w-full h-full transition-colors',
-                isActive ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-text-secondary)]'
+                isActive ? 'text-[var(--rpg-gold)] rpg-nav-active' : 'text-[var(--rpg-text-secondary)]'
               )}
             >
               <Image
@@ -47,7 +47,7 @@ export function BottomNav({ activeTab, onNavigate, badgeTabs = new Set(), pulseT
               {pulseTabs.has(item.id) && !isActive && (
                 <span className="absolute inset-0 m-auto w-10 h-10 tutorial-pulse" />
               )}
-              <span className="text-xs mt-1">{item.label}</span>
+              <span className="text-[10px] font-body mt-1">{item.label}</span>
             </button>
           );
         })}
