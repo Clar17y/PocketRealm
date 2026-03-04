@@ -11,7 +11,7 @@ import {
   activateTemplate,
 } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
-import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@adventure/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS } from '@adventure/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@adventure/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
 
@@ -92,6 +92,32 @@ function isResourceCondition(c: SlotCondition): boolean {
   return c.type === 'resource_below' || c.type === 'resource_above';
 }
 
+// --- Condition summary helper ---
+
+function conditionSummary(c: SlotCondition): string {
+  if (c.type === 'resource_below' && c.resource) return `${c.resource.toUpperCase()} < ${c.threshold ?? 50}%`;
+  if (c.type === 'resource_above' && c.resource) return `${c.resource.toUpperCase()} > ${c.threshold ?? 50}%`;
+  if (c.type === 'has_buff') return `Has buff${c.effectName ? `: ${c.effectName}` : ''}`;
+  if (c.type === 'has_debuff') return `Has debuff${c.effectName ? `: ${c.effectName}` : ''}`;
+  if (c.type === 'no_buff') return `No buff${c.effectName ? `: ${c.effectName}` : ''}`;
+  if (c.type === 'no_debuff') return `No debuff${c.effectName ? `: ${c.effectName}` : ''}`;
+  return c.type;
+}
+
+// --- Template preview helper ---
+
+function templatePreview(slots: CombatTemplateSlotData[]): string {
+  return slots.map(s => {
+    const def = BASE_ACTION_DEFINITIONS[s.actionId];
+    const name = def?.name ?? s.actionId;
+    if (s.condition && s.thenActionId) {
+      const thenName = BASE_ACTION_DEFINITIONS[s.thenActionId]?.name ?? s.thenActionId;
+      return `IF ${conditionSummary(s.condition)} \u2192 ${thenName}`;
+    }
+    return name;
+  }).join(' \u2192 ');
+}
+
 // --- Editor slot type ---
 
 interface EditorSlot {
@@ -100,7 +126,11 @@ interface EditorSlot {
   thenActionId?: string;
 }
 
-type PickerTarget = { type: 'main' } | { type: 'then'; index: number } | null;
+type PickerTarget =
+  | { type: 'add' }
+  | { type: 'then'; index: number }
+  | { type: 'else'; index: number }
+  | null;
 
 // --- Helpers ---
 
@@ -121,108 +151,6 @@ function ActionCostLabel({ cost }: { cost: { stamina: number; mana: number } }) 
       {cost.stamina > 0 && <span>Stam: {cost.stamina}</span>}
       {cost.mana > 0 && <span>Mana: {cost.mana}</span>}
       {cost.stamina === 0 && cost.mana === 0 && <span>Free</span>}
-    </div>
-  );
-}
-
-// --- Condition Editor ---
-
-function ConditionEditor({
-  slot,
-  index,
-  onUpdate,
-  onPickThenAction,
-}: {
-  slot: EditorSlot;
-  index: number;
-  onUpdate: (index: number, updates: Partial<EditorSlot>) => void;
-  onPickThenAction: (index: number) => void;
-}) {
-  const condition = slot.condition!;
-  const combo = conditionToCombo(condition);
-
-  const handleComboChange = (newCombo: string) => {
-    onUpdate(index, { condition: comboToCondition(newCombo, condition) });
-  };
-
-  const handleThresholdChange = (val: string) => {
-    const n = Math.max(0, Math.min(100, parseInt(val, 10) || 0));
-    onUpdate(index, { condition: { ...condition, threshold: n } });
-  };
-
-  const handleEffectNameChange = (val: string) => {
-    onUpdate(index, { condition: { ...condition, effectName: val } });
-  };
-
-  const handleRemoveCondition = () => {
-    onUpdate(index, { condition: undefined, thenActionId: undefined });
-  };
-
-  const thenDef = slot.thenActionId ? BASE_ACTION_DEFINITIONS[slot.thenActionId] : null;
-  const elseDef = BASE_ACTION_DEFINITIONS[slot.actionId];
-
-  return (
-    <div className="mt-1.5 pl-5 space-y-1.5">
-      {/* Condition select + threshold/effectName */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="text-[10px] text-[var(--rpg-gold)] font-bold uppercase">If</span>
-        <select
-          value={combo}
-          onChange={e => handleComboChange(e.target.value)}
-          className="bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-1 py-0.5 text-[11px] text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-gold)]"
-        >
-          {CONDITION_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        {isResourceCondition(condition) ? (
-          <div className="flex items-center gap-0.5">
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={condition.threshold ?? 50}
-              onChange={e => handleThresholdChange(e.target.value)}
-              className="w-12 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-1 py-0.5 text-[11px] text-[var(--rpg-text-primary)] text-center focus:outline-none focus:border-[var(--rpg-gold)]"
-            />
-            <span className="text-[10px] text-[var(--rpg-text-secondary)]">%</span>
-          </div>
-        ) : (
-          <input
-            type="text"
-            placeholder="effect name"
-            value={condition.effectName ?? ''}
-            onChange={e => handleEffectNameChange(e.target.value)}
-            className="w-24 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-1 py-0.5 text-[11px] text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-gold)]"
-          />
-        )}
-      </div>
-
-      {/* Then action */}
-      <div className="flex items-center gap-1.5 text-[11px]">
-        <span className="text-[var(--rpg-green-light)] font-bold">&#x2192;</span>
-        <span className="text-[var(--rpg-text-primary)]">{thenDef ? thenDef.name : <em className="text-[var(--rpg-text-secondary)]">not set</em>}</span>
-        <button
-          onClick={() => onPickThenAction(index)}
-          className="text-[10px] text-[var(--rpg-gold)] hover:text-[var(--rpg-text-primary)] underline"
-        >
-          {thenDef ? 'change' : 'pick'}
-        </button>
-      </div>
-
-      {/* Else action */}
-      <div className="flex items-center gap-1.5 text-[11px]">
-        <span className="text-[var(--rpg-text-secondary)] font-bold">else</span>
-        <span className="text-[var(--rpg-text-primary)]">{elseDef?.name ?? slot.actionId}</span>
-      </div>
-
-      {/* Remove condition */}
-      <button
-        onClick={handleRemoveCondition}
-        className="text-[10px] text-[var(--rpg-red)] hover:text-[#cc4444] underline"
-      >
-        Remove condition
-      </button>
     </div>
   );
 }
@@ -255,6 +183,7 @@ export function Templates({
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
 
   useEffect(() => {
     void onLoadTemplates();
@@ -277,6 +206,7 @@ export function Templates({
     setEditingTemplate(null);
     setEditorName('New Template');
     setEditorSlots([]);
+    setExpandedSlot(null);
     setError(null);
   }, []);
 
@@ -289,6 +219,7 @@ export function Templates({
       condition: s.condition,
       thenActionId: s.thenActionId,
     })));
+    setExpandedSlot(null);
     setError(null);
   }, []);
 
@@ -296,6 +227,7 @@ export function Templates({
     setEditingTemplate(null);
     setIsNew(false);
     setPickerTarget(null);
+    setExpandedSlot(null);
     setError(null);
   }, []);
 
@@ -309,19 +241,30 @@ export function Templates({
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
+    // Track expanded slot through the move
+    setExpandedSlot(prev => {
+      if (prev === index) return index + direction;
+      if (prev === index + direction) return index;
+      return prev;
+    });
   }, []);
 
   const removeSlot = useCallback((index: number) => {
     setEditorSlots(prev => prev.filter((_, i) => i !== index));
+    setExpandedSlot(null);
   }, []);
 
   const addAction = useCallback((actionId: string) => {
     if (!pickerTarget) return;
-    if (pickerTarget.type === 'main') {
+    if (pickerTarget.type === 'add') {
       setEditorSlots(prev => [...prev, { actionId }]);
-    } else {
+    } else if (pickerTarget.type === 'then') {
       setEditorSlots(prev => prev.map((s, i) =>
         i === pickerTarget.index ? { ...s, thenActionId: actionId } : s
+      ));
+    } else if (pickerTarget.type === 'else') {
+      setEditorSlots(prev => prev.map((s, i) =>
+        i === pickerTarget.index ? { ...s, actionId } : s
       ));
     }
     setPickerTarget(null);
@@ -406,7 +349,7 @@ export function Templates({
 
   const isEditing = editingTemplate !== null || isNew;
 
-  // Action picker — 9 base actions are always available; talent actions require unlockedActions
+  // Action picker -- base actions always available; talent actions require unlockedActions
   const unlockedSet = new Set(unlockedActions);
   const allActions = Object.values(BASE_ACTION_DEFINITIONS);
   const grouped: Record<string, ActionDefinition[]> = {};
@@ -416,8 +359,22 @@ export function Templates({
     if (grouped[group]) grouped[group].push(def);
   }
 
+  // --- Action picker view ---
+
   if (pickerTarget) {
-    const pickerTitle = pickerTarget.type === 'main' ? 'Add Action' : 'Pick "Then" Action';
+    let pickerTitle: string;
+    let pickerButtonLabel: string;
+    if (pickerTarget.type === 'add') {
+      pickerTitle = 'Add Action';
+      pickerButtonLabel = 'Add';
+    } else if (pickerTarget.type === 'then') {
+      pickerTitle = `Pick Then Action (Slot #${pickerTarget.index + 1})`;
+      pickerButtonLabel = 'Pick';
+    } else {
+      pickerTitle = `Pick Else Action (Slot #${pickerTarget.index + 1})`;
+      pickerButtonLabel = 'Pick';
+    }
+
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
@@ -452,7 +409,7 @@ export function Templates({
                         onClick={() => addAction(def.id)}
                         className="ml-2 shrink-0"
                       >
-                        {pickerTarget.type === 'main' ? 'Add' : 'Pick'}
+                        {pickerButtonLabel}
                       </PixelButton>
                     </div>
                   </PixelCard>
@@ -464,6 +421,8 @@ export function Templates({
       </div>
     );
   }
+
+  // --- Editor view ---
 
   if (isEditing) {
     return (
@@ -491,7 +450,7 @@ export function Templates({
             value={editorName}
             onChange={e => setEditorName(e.target.value)}
             maxLength={40}
-            className="w-full bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-2 py-1.5 text-sm text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-gold)]"
+            className="w-full bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-2 py-1.5 text-sm text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-gold)] min-h-[44px]"
           />
         </PixelCard>
 
@@ -499,7 +458,7 @@ export function Templates({
         <PixelCard padding="sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-[var(--rpg-text-secondary)]">Slots ({editorSlots.length})</span>
-            <PixelButton size="sm" variant="secondary" onClick={() => setPickerTarget({ type: 'main' })}>
+            <PixelButton size="sm" variant="secondary" onClick={() => setPickerTarget({ type: 'add' })}>
               <Plus size={14} className="mr-1 inline" /> Add Action
             </PixelButton>
           </div>
@@ -513,17 +472,28 @@ export function Templates({
                 const def = BASE_ACTION_DEFINITIONS[slot.actionId];
                 if (!def) return null;
                 const hasCondition = !!slot.condition;
+                const isExpanded = expandedSlot === i;
+                const thenDef = slot.thenActionId ? BASE_ACTION_DEFINITIONS[slot.thenActionId] : null;
+
                 return (
-                  <div key={i} className="p-2 rounded bg-[var(--rpg-background)] border border-[var(--rpg-border)]">
-                    {/* Main row */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">{i + 1}</span>
+                  <div key={i} className="rounded bg-[var(--rpg-background)] border border-[var(--rpg-border)]">
+                    {/* Collapsed row - always visible, tappable to expand */}
+                    <div
+                      className="flex items-center gap-2 p-2 cursor-pointer active:bg-[var(--rpg-surface)]"
+                      onClick={() => setExpandedSlot(isExpanded ? null : i)}
+                    >
+                      <span className="text-xs font-mono text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">
+                        {i + 1}
+                      </span>
                       <div className="flex-1 min-w-0">
                         {hasCondition ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-[var(--rpg-gold)] font-bold">IF</span>
+                            <span className="text-[10px] font-bold uppercase px-1 py-0.5 rounded border"
+                              style={{ color: 'var(--rpg-gold)', borderColor: 'var(--rpg-gold)' }}>
+                              IF
+                            </span>
                             <span className="text-sm text-[var(--rpg-text-primary)] truncate">
-                              {conditionSummary(slot.condition!)}
+                              {conditionSummary(slot.condition!)} &#x2192; {thenDef?.name ?? '?'}, else {def.name}
                             </span>
                           </div>
                         ) : (
@@ -532,47 +502,172 @@ export function Templates({
                             {groupBadge(ACTION_GROUPS[def.id] ?? 'Basic')}
                           </div>
                         )}
-                        {!hasCondition && <ActionCostLabel cost={def.cost} />}
                       </div>
                       <div className="flex gap-1 shrink-0">
                         <button
-                          onClick={() => moveSlot(i, -1)}
+                          onClick={e => { e.stopPropagation(); moveSlot(i, -1); }}
                           disabled={i === 0}
-                          className="p-1 text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
+                          className="min-w-[36px] min-h-[36px] p-2 flex items-center justify-center text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
                         >
                           <ArrowUp size={14} />
                         </button>
                         <button
-                          onClick={() => moveSlot(i, 1)}
+                          onClick={e => { e.stopPropagation(); moveSlot(i, 1); }}
                           disabled={i === editorSlots.length - 1}
-                          className="p-1 text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
+                          className="min-w-[36px] min-h-[36px] p-2 flex items-center justify-center text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
                         >
                           <ArrowDown size={14} />
                         </button>
                         <button
-                          onClick={() => removeSlot(i)}
-                          className="p-1 text-[var(--rpg-red)] hover:text-[#cc4444]"
+                          onClick={e => { e.stopPropagation(); removeSlot(i); }}
+                          className="min-w-[36px] min-h-[36px] p-2 flex items-center justify-center text-[var(--rpg-red)] hover:text-[#cc4444]"
                         >
                           <X size={14} />
                         </button>
                       </div>
                     </div>
 
-                    {/* Condition editor or toggle */}
-                    {hasCondition ? (
-                      <ConditionEditor
-                        slot={slot}
-                        index={i}
-                        onUpdate={updateSlot}
-                        onPickThenAction={(idx) => setPickerTarget({ type: 'then', index: idx })}
-                      />
-                    ) : (
-                      <button
-                        onClick={() => toggleCondition(i)}
-                        className="mt-1 ml-5 flex items-center gap-1 text-[10px] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)]"
-                      >
-                        <Plus size={10} /> Add condition
-                      </button>
+                    {/* Expanded panel */}
+                    {isExpanded && (
+                      <div className="border-t border-[var(--rpg-border)] p-3 space-y-3">
+                        {hasCondition ? (
+                          /* Expanded conditional slot */
+                          <>
+                            {/* Condition type select */}
+                            <div>
+                              <label className="text-[10px] text-[var(--rpg-text-secondary)] uppercase font-bold mb-1 block">Condition</label>
+                              <select
+                                value={conditionToCombo(slot.condition!)}
+                                onChange={e => updateSlot(i, { condition: comboToCondition(e.target.value, slot.condition) })}
+                                className="w-full min-h-[44px] bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-2 text-sm text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-gold)]"
+                              >
+                                {CONDITION_OPTIONS.map(o => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Value: threshold or effect name */}
+                            <div>
+                              <label className="text-[10px] text-[var(--rpg-text-secondary)] uppercase font-bold mb-1 block">Value</label>
+                              {isResourceCondition(slot.condition!) ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={slot.condition!.threshold ?? 50}
+                                    onChange={e => {
+                                      const n = Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0));
+                                      updateSlot(i, { condition: { ...slot.condition!, threshold: n } });
+                                    }}
+                                    className="w-20 min-h-[44px] bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-2 text-sm text-[var(--rpg-text-primary)] text-center focus:outline-none focus:border-[var(--rpg-gold)]"
+                                  />
+                                  <span className="text-sm text-[var(--rpg-text-secondary)]">%</span>
+                                </div>
+                              ) : (
+                                <select
+                                  value={slot.condition!.effectName ?? ''}
+                                  onChange={e => updateSlot(i, { condition: { ...slot.condition!, effectName: e.target.value } })}
+                                  className="w-full min-h-[44px] bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-2 text-sm text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-gold)]"
+                                >
+                                  <option value="">Select effect...</option>
+                                  <optgroup label="Buffs">
+                                    {BUFF_EFFECTS.map(e => (
+                                      <option key={e.name} value={e.name}>{e.name} ({e.description})</option>
+                                    ))}
+                                  </optgroup>
+                                  <optgroup label="Debuffs &amp; Status">
+                                    {DEBUFF_EFFECTS.map(e => (
+                                      <option key={e.name} value={e.name}>{e.name} ({e.description})</option>
+                                    ))}
+                                  </optgroup>
+                                </select>
+                              )}
+                            </div>
+
+                            {/* Then action row */}
+                            <div>
+                              <label className="text-[10px] text-[var(--rpg-text-secondary)] uppercase font-bold mb-1 block">
+                                <span className="text-[var(--rpg-green-light)]">Then</span> action
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <span className="flex-1 text-sm text-[var(--rpg-text-primary)]">
+                                  {thenDef ? thenDef.name : <em className="text-[var(--rpg-text-secondary)]">Not set</em>}
+                                </span>
+                                <PixelButton
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => setPickerTarget({ type: 'then', index: i })}
+                                >
+                                  Change
+                                </PixelButton>
+                              </div>
+                            </div>
+
+                            {/* Else action row */}
+                            <div>
+                              <label className="text-[10px] text-[var(--rpg-text-secondary)] uppercase font-bold mb-1 block">
+                                <span className="text-[var(--rpg-text-secondary)]">Else</span> action
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <span className="flex-1 text-sm text-[var(--rpg-text-primary)]">
+                                  {def.name}
+                                </span>
+                                <PixelButton
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => setPickerTarget({ type: 'else', index: i })}
+                                >
+                                  Change
+                                </PixelButton>
+                              </div>
+                            </div>
+
+                            {/* Remove condition */}
+                            <PixelButton
+                              size="sm"
+                              variant="danger"
+                              className="w-full"
+                              onClick={() => {
+                                updateSlot(i, { condition: undefined, thenActionId: undefined });
+                              }}
+                            >
+                              Remove Condition
+                            </PixelButton>
+                          </>
+                        ) : (
+                          /* Expanded unconditional slot */
+                          <>
+                            {/* Action info */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{def.name}</span>
+                              {groupBadge(ACTION_GROUPS[def.id] ?? 'Basic')}
+                            </div>
+                            <ActionCostLabel cost={def.cost} />
+
+                            {/* Change action */}
+                            <PixelButton
+                              size="sm"
+                              variant="secondary"
+                              className="w-full"
+                              onClick={() => setPickerTarget({ type: 'else', index: i })}
+                            >
+                              Change Action
+                            </PixelButton>
+
+                            {/* Add condition */}
+                            <PixelButton
+                              size="sm"
+                              variant="secondary"
+                              className="w-full"
+                              onClick={() => toggleCondition(i)}
+                            >
+                              <Plus size={14} className="mr-1 inline" /> Add Condition
+                            </PixelButton>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
@@ -660,6 +755,9 @@ export function Templates({
                       <span className="text-[10px] font-bold text-[var(--rpg-gold)] uppercase">Active</span>
                     )}
                   </div>
+                  <span className="text-[11px] text-[var(--rpg-text-secondary)] block truncate mt-0.5">
+                    {templatePreview(t.slots)}
+                  </span>
                   <span className="text-xs text-[var(--rpg-text-secondary)]">
                     {t.slots.length} slot{t.slots.length !== 1 ? 's' : ''}
                   </span>
@@ -684,16 +782,4 @@ export function Templates({
       )}
     </div>
   );
-}
-
-// --- Condition summary helper ---
-
-function conditionSummary(c: SlotCondition): string {
-  if (c.type === 'resource_below' && c.resource) return `${c.resource.toUpperCase()} < ${c.threshold ?? 50}%`;
-  if (c.type === 'resource_above' && c.resource) return `${c.resource.toUpperCase()} > ${c.threshold ?? 50}%`;
-  if (c.type === 'has_buff') return `Has buff${c.effectName ? `: ${c.effectName}` : ''}`;
-  if (c.type === 'has_debuff') return `Has debuff${c.effectName ? `: ${c.effectName}` : ''}`;
-  if (c.type === 'no_buff') return `No buff${c.effectName ? `: ${c.effectName}` : ''}`;
-  if (c.type === 'no_debuff') return `No debuff${c.effectName ? `: ${c.effectName}` : ''}`;
-  return c.type;
 }
