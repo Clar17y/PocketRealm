@@ -10,60 +10,8 @@ import {
   type QuestProgressUpdate,
 } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Start of the current UTC day (midnight). */
-function getDayStart(now: Date = new Date()): Date {
-  const d = new Date(now);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
-
-/** Start of the current UTC week (Monday midnight). */
-function getWeekStart(now: Date = new Date()): Date {
-  const d = new Date(now);
-  d.setUTCHours(0, 0, 0, 0);
-  const day = d.getUTCDay(); // 0=Sun, 1=Mon
-  const diff = day === 0 ? 6 : day - 1; // days since Monday
-  d.setUTCDate(d.getUTCDate() - diff);
-  return d;
-}
-
-/** Next UTC midnight after `now`. */
-function getNextDayStart(now: Date): Date {
-  const d = getDayStart(now);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d;
-}
-
-/** Next Monday UTC midnight after `now`. */
-function getNextWeekStart(now: Date): Date {
-  const ws = getWeekStart(now);
-  ws.setUTCDate(ws.getUTCDate() + 7);
-  return ws;
-}
-
-function getLevelBracket(level: number): 'low' | 'mid' | 'high' {
-  if (level <= 10) return 'low';
-  if (level <= 25) return 'mid';
-  return 'high';
-}
-
-function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-/** Shuffle array in place (Fisher-Yates). */
-function shuffle<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
-  }
-  return arr;
-}
+import { getDayStart, getWeekStart, getNextDayStart, getWeekEnd, getLevelBracket, selectWithCategorySpread } from '../utils/dateHelpers';
+import { randomIntInclusive } from '../utils/random';
 
 /** Map from questKey → QuestTemplateDefinition for fast lookup. */
 const TEMPLATE_BY_KEY = new Map<string, QuestTemplateDefinition>(
@@ -208,46 +156,14 @@ export async function generateDailyQuests(
 
   // Filter to daily templates (skip unlock condition filtering for now)
   const dailyDefs = QUEST_TEMPLATE_DEFINITIONS.filter((d) => d.cadence === 'daily');
-  const shuffled = shuffle([...dailyDefs]);
-
-  // Pick ensuring at least MIN_DAILY_CATEGORIES distinct categories
-  const selected: QuestTemplateDefinition[] = [];
-  const usedCategories = new Set<string>();
-
-  // First pass: pick from different categories
-  for (const def of shuffled) {
-    if (selected.length >= DAILY_COUNT) break;
-    if (!usedCategories.has(def.category) && usedCategories.size < MIN_DAILY_CATEGORIES) {
-      selected.push(def);
-      usedCategories.add(def.category);
-    }
-  }
-
-  // Second pass: fill remaining slots
-  for (const def of shuffled) {
-    if (selected.length >= DAILY_COUNT) break;
-    if (!selected.includes(def)) {
-      selected.push(def);
-      usedCategories.add(def.category);
-    }
-  }
-
-  // Ensure category spread: if only 1 category, swap last pick
-  if (usedCategories.size < MIN_DAILY_CATEGORIES && selected.length >= MIN_DAILY_CATEGORIES) {
-    const differentCatDef = shuffled.find(
-      (d) => !usedCategories.has(d.category) && !selected.includes(d),
-    );
-    if (differentCatDef) {
-      selected[selected.length - 1] = differentCatDef;
-    }
-  }
+  const selected = selectWithCategorySpread(dailyDefs, DAILY_COUNT, MIN_DAILY_CATEGORIES);
 
   // Create quest rows
   const created: PlayerQuestData[] = [];
   for (const def of selected) {
     const targetValue = def.targets[bracket];
     const [rewardMin, rewardMax] = def.rewards[bracket];
-    const rewardAmount = randomInt(rewardMin, rewardMax);
+    const rewardAmount = randomIntInclusive(rewardMin, rewardMax);
 
     // For prefix filter quests, pick a random prefix from the mob prefix definitions
     let filterValue: string | null = null;
@@ -286,7 +202,7 @@ export async function generateWeeklyQuest(
   now: Date = new Date(),
 ): Promise<PlayerQuestData[]> {
   const bracket = getLevelBracket(playerLevel);
-  const expiresAt = getNextWeekStart(now);
+  const expiresAt = getWeekEnd(getWeekStart(now));
 
   // Filter to weekly templates
   const weeklyDefs = QUEST_TEMPLATE_DEFINITIONS.filter((d) => d.cadence === 'weekly');
@@ -294,7 +210,7 @@ export async function generateWeeklyQuest(
 
   const targetValue = def.targets[bracket];
   const [rewardMin, rewardMax] = def.rewards[bracket];
-  const rewardAmount = randomInt(rewardMin, rewardMax);
+  const rewardAmount = randomIntInclusive(rewardMin, rewardMax);
 
   const row = await prisma.playerQuest.create({
     data: {
