@@ -634,7 +634,7 @@ export function Inventory({
           {/* Backpack Items */}
           <div className="space-y-2">
             <div className={`text-sm font-semibold ${usedSlots > capacity ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
-              Backpack (<span className="font-pixel font-normal text-[16px]">{usedSlots}/{capacity}</span>){usedSlots > capacity && ' — Over-encumbered!'}
+              Backpack ({usedSlots}/{capacity}){usedSlots > capacity && ' — Over-encumbered!'}
             </div>
             <div className="grid grid-cols-6 gap-2">
               {backpackItems.map((item, index) => {
