@@ -12,7 +12,7 @@ import {
 } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS } from '@adventure/shared';
-import type { ActionDefinition, CombatTemplateData, CombatTemplateAction, ResourceState } from '@adventure/shared';
+import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@adventure/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
 
 // --- Constants ---
@@ -41,6 +41,67 @@ const GROUP_COLORS: Record<string, string> = {
   General: 'var(--rpg-gold)',
 };
 
+// --- Condition helpers ---
+
+interface ConditionOption {
+  value: string;
+  label: string;
+}
+
+const CONDITION_OPTIONS: ConditionOption[] = [
+  { value: 'hp_below', label: 'HP below' },
+  { value: 'hp_above', label: 'HP above' },
+  { value: 'stamina_below', label: 'Stamina below' },
+  { value: 'stamina_above', label: 'Stamina above' },
+  { value: 'mana_below', label: 'Mana below' },
+  { value: 'mana_above', label: 'Mana above' },
+  { value: 'has_buff', label: 'Has buff' },
+  { value: 'has_debuff', label: 'Has debuff' },
+  { value: 'no_buff', label: 'No buff' },
+  { value: 'no_debuff', label: 'No debuff' },
+];
+
+function conditionToCombo(c: SlotCondition): string {
+  if (c.type === 'resource_below' && c.resource) return `${c.resource}_below`;
+  if (c.type === 'resource_above' && c.resource) return `${c.resource}_above`;
+  return c.type;
+}
+
+function comboToCondition(combo: string, prev?: SlotCondition): SlotCondition {
+  const resourceMap: Record<string, ConditionResourceType> = {
+    hp_below: 'hp', hp_above: 'hp',
+    stamina_below: 'stamina', stamina_above: 'stamina',
+    mana_below: 'mana', mana_above: 'mana',
+  };
+  const typeMap: Record<string, ConditionType> = {
+    hp_below: 'resource_below', hp_above: 'resource_above',
+    stamina_below: 'resource_below', stamina_above: 'resource_above',
+    mana_below: 'resource_below', mana_above: 'resource_above',
+    has_buff: 'has_buff', has_debuff: 'has_debuff',
+    no_buff: 'no_buff', no_debuff: 'no_debuff',
+  };
+  const type = typeMap[combo] ?? 'resource_below';
+  const resource = resourceMap[combo];
+  if (resource) {
+    return { type, resource, threshold: prev?.threshold ?? 50 };
+  }
+  return { type, effectName: prev?.effectName ?? '' };
+}
+
+function isResourceCondition(c: SlotCondition): boolean {
+  return c.type === 'resource_below' || c.type === 'resource_above';
+}
+
+// --- Editor slot type ---
+
+interface EditorSlot {
+  actionId: string;
+  condition?: SlotCondition;
+  thenActionId?: string;
+}
+
+type PickerTarget = { type: 'main' } | { type: 'then'; index: number } | null;
+
 // --- Helpers ---
 
 function groupBadge(group: string) {
@@ -60,6 +121,108 @@ function ActionCostLabel({ cost }: { cost: { stamina: number; mana: number } }) 
       {cost.stamina > 0 && <span>Stam: {cost.stamina}</span>}
       {cost.mana > 0 && <span>Mana: {cost.mana}</span>}
       {cost.stamina === 0 && cost.mana === 0 && <span>Free</span>}
+    </div>
+  );
+}
+
+// --- Condition Editor ---
+
+function ConditionEditor({
+  slot,
+  index,
+  onUpdate,
+  onPickThenAction,
+}: {
+  slot: EditorSlot;
+  index: number;
+  onUpdate: (index: number, updates: Partial<EditorSlot>) => void;
+  onPickThenAction: (index: number) => void;
+}) {
+  const condition = slot.condition!;
+  const combo = conditionToCombo(condition);
+
+  const handleComboChange = (newCombo: string) => {
+    onUpdate(index, { condition: comboToCondition(newCombo, condition) });
+  };
+
+  const handleThresholdChange = (val: string) => {
+    const n = Math.max(0, Math.min(100, parseInt(val, 10) || 0));
+    onUpdate(index, { condition: { ...condition, threshold: n } });
+  };
+
+  const handleEffectNameChange = (val: string) => {
+    onUpdate(index, { condition: { ...condition, effectName: val } });
+  };
+
+  const handleRemoveCondition = () => {
+    onUpdate(index, { condition: undefined, thenActionId: undefined });
+  };
+
+  const thenDef = slot.thenActionId ? BASE_ACTION_DEFINITIONS[slot.thenActionId] : null;
+  const elseDef = BASE_ACTION_DEFINITIONS[slot.actionId];
+
+  return (
+    <div className="mt-1.5 pl-5 space-y-1.5">
+      {/* Condition select + threshold/effectName */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-[10px] text-[var(--rpg-gold)] font-bold uppercase">If</span>
+        <select
+          value={combo}
+          onChange={e => handleComboChange(e.target.value)}
+          className="bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-1 py-0.5 text-[11px] text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-gold)]"
+        >
+          {CONDITION_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        {isResourceCondition(condition) ? (
+          <div className="flex items-center gap-0.5">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={condition.threshold ?? 50}
+              onChange={e => handleThresholdChange(e.target.value)}
+              className="w-12 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-1 py-0.5 text-[11px] text-[var(--rpg-text-primary)] text-center focus:outline-none focus:border-[var(--rpg-gold)]"
+            />
+            <span className="text-[10px] text-[var(--rpg-text-secondary)]">%</span>
+          </div>
+        ) : (
+          <input
+            type="text"
+            placeholder="effect name"
+            value={condition.effectName ?? ''}
+            onChange={e => handleEffectNameChange(e.target.value)}
+            className="w-24 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-1 py-0.5 text-[11px] text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-gold)]"
+          />
+        )}
+      </div>
+
+      {/* Then action */}
+      <div className="flex items-center gap-1.5 text-[11px]">
+        <span className="text-[var(--rpg-green-light)] font-bold">&#x2192;</span>
+        <span className="text-[var(--rpg-text-primary)]">{thenDef ? thenDef.name : <em className="text-[var(--rpg-text-secondary)]">not set</em>}</span>
+        <button
+          onClick={() => onPickThenAction(index)}
+          className="text-[10px] text-[var(--rpg-gold)] hover:text-[var(--rpg-text-primary)] underline"
+        >
+          {thenDef ? 'change' : 'pick'}
+        </button>
+      </div>
+
+      {/* Else action */}
+      <div className="flex items-center gap-1.5 text-[11px]">
+        <span className="text-[var(--rpg-text-secondary)] font-bold">else</span>
+        <span className="text-[var(--rpg-text-primary)]">{elseDef?.name ?? slot.actionId}</span>
+      </div>
+
+      {/* Remove condition */}
+      <button
+        onClick={handleRemoveCondition}
+        className="text-[10px] text-[var(--rpg-red)] hover:text-[#cc4444] underline"
+      >
+        Remove condition
+      </button>
     </div>
   );
 }
@@ -88,8 +251,8 @@ export function Templates({
   const [editingTemplate, setEditingTemplate] = useState<CombatTemplateData | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [editorName, setEditorName] = useState('');
-  const [editorActions, setEditorActions] = useState<CombatTemplateAction[]>([]);
-  const [showPicker, setShowPicker] = useState(false);
+  const [editorSlots, setEditorSlots] = useState<EditorSlot[]>([]);
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,7 +276,7 @@ export function Templates({
     setIsNew(true);
     setEditingTemplate(null);
     setEditorName('New Template');
-    setEditorActions([]);
+    setEditorSlots([]);
     setError(null);
   }, []);
 
@@ -121,21 +284,25 @@ export function Templates({
     setIsNew(false);
     setEditingTemplate(t);
     setEditorName(t.name);
-    setEditorActions([...t.actions]);
+    setEditorSlots(t.slots.map(s => ({
+      actionId: s.actionId,
+      condition: s.condition,
+      thenActionId: s.thenActionId,
+    })));
     setError(null);
   }, []);
 
   const handleCancel = useCallback(() => {
     setEditingTemplate(null);
     setIsNew(false);
-    setShowPicker(false);
+    setPickerTarget(null);
     setError(null);
   }, []);
 
   // -- Editor actions --
 
   const moveSlot = useCallback((index: number, direction: -1 | 1) => {
-    setEditorActions(prev => {
+    setEditorSlots(prev => {
       const next = [...prev];
       const target = index + direction;
       if (target < 0 || target >= next.length) return prev;
@@ -145,24 +312,60 @@ export function Templates({
   }, []);
 
   const removeSlot = useCallback((index: number) => {
-    setEditorActions(prev => prev.filter((_, i) => i !== index));
+    setEditorSlots(prev => prev.filter((_, i) => i !== index));
   }, []);
 
   const addAction = useCallback((actionId: string) => {
-    setEditorActions(prev => [...prev, { actionId }]);
-    setShowPicker(false);
+    if (!pickerTarget) return;
+    if (pickerTarget.type === 'main') {
+      setEditorSlots(prev => [...prev, { actionId }]);
+    } else {
+      setEditorSlots(prev => prev.map((s, i) =>
+        i === pickerTarget.index ? { ...s, thenActionId: actionId } : s
+      ));
+    }
+    setPickerTarget(null);
+  }, [pickerTarget]);
+
+  const updateSlot = useCallback((index: number, updates: Partial<EditorSlot>) => {
+    setEditorSlots(prev => prev.map((s, i) =>
+      i === index ? { ...s, ...updates } : s
+    ));
+  }, []);
+
+  const toggleCondition = useCallback((index: number) => {
+    setEditorSlots(prev => prev.map((s, i) => {
+      if (i !== index) return s;
+      if (s.condition) {
+        // Remove condition
+        return { actionId: s.actionId };
+      }
+      // Add default condition
+      return {
+        ...s,
+        condition: { type: 'resource_below' as ConditionType, resource: 'hp' as ConditionResourceType, threshold: 50 },
+      };
+    }));
   }, []);
 
   const handleSave = useCallback(async () => {
     if (!editorName.trim()) { setError('Name is required'); return; }
-    if (editorActions.length === 0) { setError('Add at least one action'); return; }
+    if (editorSlots.length === 0) { setError('Add at least one action'); return; }
+    // Validate: conditional slots must have thenActionId
+    const incomplete = editorSlots.some(s => s.condition && !s.thenActionId);
+    if (incomplete) { setError('All conditions need a "then" action'); return; }
     setSaving(true);
     setError(null);
     try {
+      const slots: Omit<CombatTemplateSlotData, 'id'>[] = editorSlots.map((s, i) => ({
+        sortOrder: i,
+        actionId: s.actionId,
+        ...(s.condition && s.thenActionId ? { condition: s.condition, thenActionId: s.thenActionId } : {}),
+      }));
       if (isNew) {
-        await createTemplate(editorName.trim(), editorActions);
+        await createTemplate(editorName.trim(), slots);
       } else if (editingTemplate) {
-        await updateTemplate(editingTemplate.id, editorName.trim(), editorActions);
+        await updateTemplate(editingTemplate.id, editorName.trim(), slots);
       }
       await onLoadTemplates();
       setEditingTemplate(null);
@@ -172,24 +375,23 @@ export function Templates({
     } finally {
       setSaving(false);
     }
-  }, [editorName, editorActions, isNew, editingTemplate, onLoadTemplates]);
+  }, [editorName, editorSlots, isNew, editingTemplate, onLoadTemplates]);
 
-  // -- Resource sustainability calc --
+  // -- Resource sustainability calc (worst-case per slot) --
 
-  const cycleCost = editorActions.reduce(
-    (acc, a) => {
-      const def = BASE_ACTION_DEFINITIONS[a.actionId];
-      if (!def) return acc;
-      return { stamina: acc.stamina + def.cost.stamina, mana: acc.mana + def.cost.mana };
+  const cycleCost = editorSlots.reduce(
+    (acc, s) => {
+      const mainDef = BASE_ACTION_DEFINITIONS[s.actionId];
+      const thenDef = s.thenActionId ? BASE_ACTION_DEFINITIONS[s.thenActionId] : null;
+      const staminaCost = Math.max(mainDef?.cost.stamina ?? 0, thenDef?.cost.stamina ?? 0);
+      const manaCost = Math.max(mainDef?.cost.mana ?? 0, thenDef?.cost.mana ?? 0);
+      return { stamina: acc.stamina + staminaCost, mana: acc.mana + manaCost };
     },
     { stamina: 0, mana: 0 },
   );
 
-  const staminaPerCycle = staminaState.regenPerRound * editorActions.length;
-  const manaPerCycle = manaState.regenPerRound * editorActions.length;
-  const staminaSustainable = cycleCost.stamina <= staminaPerCycle;
-  const manaSustainable = cycleCost.mana <= manaPerCycle;
-
+  const staminaPerCycle = staminaState.regenPerRound * editorSlots.length;
+  const manaPerCycle = manaState.regenPerRound * editorSlots.length;
   function sustainLabel(costPerCycle: number, regenPerCycle: number, pool: number, poolName: string) {
     if (costPerCycle === 0) return null;
     if (costPerCycle <= regenPerCycle) {
@@ -214,14 +416,15 @@ export function Templates({
     if (grouped[group]) grouped[group].push(def);
   }
 
-  if (showPicker) {
+  if (pickerTarget) {
+    const pickerTitle = pickerTarget.type === 'main' ? 'Add Action' : 'Pick "Then" Action';
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
-          <button onClick={() => setShowPicker(false)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]">
+          <button onClick={() => setPickerTarget(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]">
             <ChevronLeft size={20} />
           </button>
-          <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">Add Action</h2>
+          <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">{pickerTitle}</h2>
         </div>
         {GROUP_ORDER.map(group => (
           <div key={group}>
@@ -249,7 +452,7 @@ export function Templates({
                         onClick={() => addAction(def.id)}
                         className="ml-2 shrink-0"
                       >
-                        Add
+                        {pickerTarget.type === 'main' ? 'Add' : 'Pick'}
                       </PixelButton>
                     </div>
                   </PixelCard>
@@ -295,52 +498,82 @@ export function Templates({
         {/* Action slots */}
         <PixelCard padding="sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-[var(--rpg-text-secondary)]">Actions ({editorActions.length})</span>
-            <PixelButton size="sm" variant="secondary" onClick={() => setShowPicker(true)}>
+            <span className="text-xs text-[var(--rpg-text-secondary)]">Slots ({editorSlots.length})</span>
+            <PixelButton size="sm" variant="secondary" onClick={() => setPickerTarget({ type: 'main' })}>
               <Plus size={14} className="mr-1 inline" /> Add Action
             </PixelButton>
           </div>
-          {editorActions.length === 0 ? (
+          {editorSlots.length === 0 ? (
             <p className="text-sm text-[var(--rpg-text-secondary)] text-center py-4">
               No actions yet. Add actions to build your combat rotation.
             </p>
           ) : (
             <div className="space-y-1">
-              {editorActions.map((slot, i) => {
+              {editorSlots.map((slot, i) => {
                 const def = BASE_ACTION_DEFINITIONS[slot.actionId];
                 if (!def) return null;
+                const hasCondition = !!slot.condition;
                 return (
-                  <div key={i} className="flex items-center gap-2 p-2 rounded bg-[var(--rpg-background)] border border-[var(--rpg-border)]">
-                    <span className="text-xs font-mono text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">{i + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{def.name}</span>
-                        {groupBadge(ACTION_GROUPS[def.id] ?? 'Basic')}
+                  <div key={i} className="p-2 rounded bg-[var(--rpg-background)] border border-[var(--rpg-border)]">
+                    {/* Main row */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        {hasCondition ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-[var(--rpg-gold)] font-bold">IF</span>
+                            <span className="text-sm text-[var(--rpg-text-primary)] truncate">
+                              {conditionSummary(slot.condition!)}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{def.name}</span>
+                            {groupBadge(ACTION_GROUPS[def.id] ?? 'Basic')}
+                          </div>
+                        )}
+                        {!hasCondition && <ActionCostLabel cost={def.cost} />}
                       </div>
-                      <ActionCostLabel cost={def.cost} />
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          onClick={() => moveSlot(i, -1)}
+                          disabled={i === 0}
+                          className="p-1 text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
+                        >
+                          <ArrowUp size={14} />
+                        </button>
+                        <button
+                          onClick={() => moveSlot(i, 1)}
+                          disabled={i === editorSlots.length - 1}
+                          className="p-1 text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                        <button
+                          onClick={() => removeSlot(i)}
+                          className="p-1 text-[var(--rpg-red)] hover:text-[#cc4444]"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-1 shrink-0">
+
+                    {/* Condition editor or toggle */}
+                    {hasCondition ? (
+                      <ConditionEditor
+                        slot={slot}
+                        index={i}
+                        onUpdate={updateSlot}
+                        onPickThenAction={(idx) => setPickerTarget({ type: 'then', index: idx })}
+                      />
+                    ) : (
                       <button
-                        onClick={() => moveSlot(i, -1)}
-                        disabled={i === 0}
-                        className="p-1 text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
+                        onClick={() => toggleCondition(i)}
+                        className="mt-1 ml-5 flex items-center gap-1 text-[10px] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)]"
                       >
-                        <ArrowUp size={14} />
+                        <Plus size={10} /> Add condition
                       </button>
-                      <button
-                        onClick={() => moveSlot(i, 1)}
-                        disabled={i === editorActions.length - 1}
-                        className="p-1 text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
-                      >
-                        <ArrowDown size={14} />
-                      </button>
-                      <button
-                        onClick={() => removeSlot(i)}
-                        className="p-1 text-[var(--rpg-red)] hover:text-[#cc4444]"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -349,9 +582,9 @@ export function Templates({
         </PixelCard>
 
         {/* Resource preview */}
-        {editorActions.length > 0 && (
+        {editorSlots.length > 0 && (
           <PixelCard padding="sm">
-            <span className="text-xs text-[var(--rpg-text-secondary)] block mb-2">Resource Preview (per cycle of {editorActions.length} actions)</span>
+            <span className="text-xs text-[var(--rpg-text-secondary)] block mb-2">Resource Preview (worst-case per cycle of {editorSlots.length} slots)</span>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Stamina cost:</span>
@@ -428,7 +661,7 @@ export function Templates({
                     )}
                   </div>
                   <span className="text-xs text-[var(--rpg-text-secondary)]">
-                    {t.actions.length} action{t.actions.length !== 1 ? 's' : ''}
+                    {t.slots.length} slot{t.slots.length !== 1 ? 's' : ''}
                   </span>
                 </div>
                 <div className="flex gap-1 shrink-0">
@@ -451,4 +684,16 @@ export function Templates({
       )}
     </div>
   );
+}
+
+// --- Condition summary helper ---
+
+function conditionSummary(c: SlotCondition): string {
+  if (c.type === 'resource_below' && c.resource) return `${c.resource.toUpperCase()} < ${c.threshold ?? 50}%`;
+  if (c.type === 'resource_above' && c.resource) return `${c.resource.toUpperCase()} > ${c.threshold ?? 50}%`;
+  if (c.type === 'has_buff') return `Has buff${c.effectName ? `: ${c.effectName}` : ''}`;
+  if (c.type === 'has_debuff') return `Has debuff${c.effectName ? `: ${c.effectName}` : ''}`;
+  if (c.type === 'no_buff') return `No buff${c.effectName ? `: ${c.effectName}` : ''}`;
+  if (c.type === 'no_debuff') return `No debuff${c.effectName ? `: ${c.effectName}` : ''}`;
+  return c.type;
 }
