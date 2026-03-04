@@ -115,12 +115,12 @@ export function CombatLogEntry({
           ) : (
             <>
               <span className="text-[var(--rpg-gold)] font-pixel text-[16px] w-7 shrink-0">R{entry.round}</span>
-              <span className={`shrink-0 font-display ${actorColor}`}>{isPlayerAction ? playerLabel : opponentLabel}</span>
+              <span className={`shrink-0 font-almendra ${actorColor}`}>{isPlayerAction ? playerLabel : opponentLabel}</span>
               {icon && <span className="shrink-0 text-xs">{icon}</span>}
               {entry.actionName ? (
-                <span className={`text-xs font-semibold font-display ${getActionCategoryColor(entry)}`}>{entry.actionName}</span>
+                <span className={`text-xs font-semibold font-almendra ${getActionCategoryColor(entry)}`}>{entry.actionName}</span>
               ) : entry.spellName ? (
-                <span className="text-[var(--rpg-blue-light)] text-xs font-semibold font-display">{entry.spellName}</span>
+                <span className="text-[var(--rpg-blue-light)] text-xs font-semibold font-almendra">{entry.spellName}</span>
               ) : null}
               {entry.damage !== undefined && entry.damage > 0 && (
                 <span className={`font-pixel text-[16px] ${entry.isCritical ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-red)]'}`}>{entry.damage} dmg</span>

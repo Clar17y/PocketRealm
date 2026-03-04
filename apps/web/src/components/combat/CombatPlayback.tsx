@@ -176,7 +176,7 @@ export function CombatPlayback({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-center gap-2 font-bold text-[var(--rpg-text-primary)] flex-wrap font-display">
+      <div className="flex items-center justify-center gap-2 font-bold text-[var(--rpg-text-primary)] flex-wrap font-almendra">
         {mobImageSrc && (
           <img src={mobImageSrc} alt={mobDisplayName} className="w-10 h-10 rounded object-cover" />
         )}
@@ -276,7 +276,7 @@ export function CombatPlayback({
       {/* Outcome display */}
       {phase !== 'playing' && (
         <div className={`text-center mt-4 space-y-3 rounded-lg p-3 ${outcome === 'victory' ? 'rpg-victory-pulse' : ''}`}>
-          <div className={`text-xl font-bold font-display ${outcome === 'victory' ? 'text-[var(--rpg-gold)]'
+          <div className={`text-xl font-bold font-almendra ${outcome === 'victory' ? 'text-[var(--rpg-gold)]'
               : outcome === 'fled' || outcome === 'draw' ? 'text-[var(--rpg-gold)]'
                 : 'text-[var(--rpg-red)]'
             }`}>

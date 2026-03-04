@@ -192,7 +192,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Bestiary</h2>
+          <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Bestiary</h2>
           <BookOpen size={20} color="var(--rpg-gold)" />
         </div>
         <div className="flex gap-1">
@@ -315,7 +315,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         )}
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">{selectedMonster.name}</h3>
+                        <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedMonster.name}</h3>
                         <div className="text-xs text-[var(--rpg-text-secondary)]">Level <span className="font-pixel text-[8px]">{selectedMonster.level}</span></div>
                         <div className="text-xs text-[var(--rpg-gold)] mt-1">Defeated <span className="font-pixel text-[8px]">{selectedMonster.killCount}</span> times</div>
                         {selectedMonster.explorationTier && (

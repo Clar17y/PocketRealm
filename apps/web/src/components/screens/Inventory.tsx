@@ -265,7 +265,7 @@ export function Inventory({
   return (
     <ScreenContainer>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Inventory</h2>
+        <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Inventory</h2>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 text-sm">
             <Coins size={14} className="text-[var(--rpg-gold)]" />
@@ -719,7 +719,7 @@ export function Inventory({
                   )}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">{selectedItem.name}</h3>
+                  <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedItem.name}</h3>
                   {selectedItem.equippedSlot && (
                     <div className="text-xs text-[var(--rpg-gold)] mt-0.5">
                       Equipped: {prettySlot(selectedItem.equippedSlot)}

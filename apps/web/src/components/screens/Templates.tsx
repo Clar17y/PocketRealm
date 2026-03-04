@@ -397,7 +397,7 @@ export function Templates({
     <ScreenContainer>
       <TemplateTutorial />
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">Combat Templates</h2>
+        <h2 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">Combat Templates</h2>
         <PixelButton size="sm" variant="primary" onClick={handleNewTemplate}>
           <Plus size={14} className="mr-1 inline" /> New Template
         </PixelButton>
@@ -423,7 +423,7 @@ export function Templates({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold font-display text-[var(--rpg-text-primary)]">{t.name}</span>
+                    <span className="text-sm font-semibold font-almendra text-[var(--rpg-text-primary)]">{t.name}</span>
                     {t.isActive && (
                       <span className="text-[10px] font-bold text-[var(--rpg-gold)] uppercase">Active</span>
                     )}

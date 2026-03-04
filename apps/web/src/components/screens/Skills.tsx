@@ -26,7 +26,7 @@ export function Skills({ skills }: SkillsProps) {
   return (
     <ScreenContainer>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Skills</h2>
+        <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Skills</h2>
         <div className="text-sm text-[var(--rpg-text-secondary)]">
           Total Level: <span className="font-pixel text-[16px]">{skills.reduce((sum, skill) => sum + skill.level, 0)}</span>
         </div>

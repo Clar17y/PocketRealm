@@ -53,7 +53,7 @@ export function Leaderboard({ playerId }: LeaderboardProps) {
       {/* Header */}
       <div className="flex items-center gap-2">
         <Trophy className="w-5 h-5 text-[var(--rpg-gold)]" />
-        <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Leaderboards</h2>
+        <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Leaderboards</h2>
       </div>
 
       {/* Group tabs */}

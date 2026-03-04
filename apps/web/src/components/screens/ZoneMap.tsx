@@ -203,7 +203,7 @@ export function ZoneMap({
   return (
     <ScreenContainer>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">World Map</h2>
+        <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">World Map</h2>
         <MapPin size={20} color="var(--rpg-gold)" />
       </div>
 
@@ -415,7 +415,7 @@ export function ZoneMap({
           }}
         >
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold font-display text-[var(--rpg-text-primary)]">
+            <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)]">
               {selectedZone.name}
               {selectedZone.id === currentZoneId && (
                 <span className="ml-2 text-xs text-[var(--rpg-gold)]">(Current)</span>

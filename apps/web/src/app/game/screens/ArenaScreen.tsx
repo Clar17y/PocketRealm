@@ -224,7 +224,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
     <PixelCard className="mb-4">
       <div className="flex items-center gap-3 mb-3">
         <Trophy size={24} className="text-[var(--rpg-gold)]" />
-        <h2 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">Your Rating</h2>
+        <h2 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">Your Rating</h2>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-[var(--rpg-background)] rounded-lg p-2 text-center">
@@ -377,7 +377,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
-                  <span className="text-[var(--rpg-text-primary)] font-semibold font-display truncate">
+                  <span className="text-[var(--rpg-text-primary)] font-semibold font-almendra truncate">
                     {opponent.username}
                   </span>
                   {opponent.title && (
@@ -470,7 +470,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                       <span className={`text-sm font-bold ${isDraw ? 'text-[var(--rpg-gold)]' : won ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
                         {isDraw ? 'DRAW' : won ? 'WIN' : 'LOSS'}
                       </span>
-                      <span className="text-[var(--rpg-text-primary)] font-display">vs {opponentName}</span>
+                      <span className="text-[var(--rpg-text-primary)] font-almendra">vs {opponentName}</span>
                       {match.isRevenge && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
                           Revenge
@@ -566,7 +566,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                   <span className={`text-sm font-bold ${isDraw ? 'text-[var(--rpg-gold)]' : won ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
                     {isDraw ? 'DRAW' : won ? 'DEFENDED' : 'LOST'}
                   </span>
-                  <span className="text-[var(--rpg-text-primary)] font-display">
+                  <span className="text-[var(--rpg-text-primary)] font-almendra">
                     Attacked by {notif.attackerName}
                   </span>
                   {notif.isRevenge && (

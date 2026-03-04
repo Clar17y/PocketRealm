@@ -219,7 +219,7 @@ export function TrainingGrounds({
               {outcomeLabel}!
             </div>
             <div className="text-sm text-[var(--rpg-text-secondary)]">
-              vs <span className="font-display">{mobDisplayName}</span> — <span className="font-pixel text-[16px]">{combatResult.log.length}</span> rounds
+              vs <span className="font-almendra">{mobDisplayName}</span> — <span className="font-pixel text-[16px]">{combatResult.log.length}</span> rounds
             </div>
             <div className="bg-[var(--rpg-background)] rounded-lg px-4 py-2 inline-block">
               <span className="text-sm text-[var(--rpg-text-secondary)]">
@@ -259,7 +259,7 @@ export function TrainingGrounds({
         <div className="flex items-center gap-3 mb-1">
           <Swords size={28} className="text-[var(--rpg-gold)]" />
           <div>
-            <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">
+            <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">
               Training Grounds
             </h2>
             <p className="text-sm text-[var(--rpg-text-secondary)]">
@@ -303,7 +303,7 @@ export function TrainingGrounds({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold font-display text-[var(--rpg-text-primary)]">
+                        <span className="text-sm font-semibold font-almendra text-[var(--rpg-text-primary)]">
                           {mob.name}
                         </span>
                         <span className="text-xs text-[var(--rpg-text-secondary)]">

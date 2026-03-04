@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import { Almendra, Silkscreen, Nunito } from 'next/font/google';
+import { Almendra, Crimson_Text, Silkscreen } from 'next/font/google';
 import './globals.css';
 
-const almendra = Almendra({ weight: ['400', '700'], subsets: ['latin'], variable: '--font-display' });
-const silkscreen = Silkscreen({ weight: ['400', '700'], subsets: ['latin'], variable: '--font-pixel' });
-const nunito = Nunito({ subsets: ['latin'], variable: '--font-body' });
+const almendra = Almendra({ weight: ['400', '700'], style: ['normal', 'italic'], subsets: ['latin'], variable: '--font-almendra', display: 'swap' });
+const crimsonText = Crimson_Text({ weight: ['400', '600', '700'], style: ['normal', 'italic'], subsets: ['latin'], variable: '--font-crimson', display: 'swap' });
+const silkscreen = Silkscreen({ weight: ['400', '700'], subsets: ['latin'], variable: '--font-pixel', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'Adventure RPG — Turn-Based Async RPG',
@@ -26,7 +26,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${almendra.variable} ${silkscreen.variable} ${nunito.variable} font-body`}>{children}</body>
+      <body className={`${almendra.variable} ${crimsonText.variable} ${silkscreen.variable}`}>{children}</body>
     </html>
   );
 }

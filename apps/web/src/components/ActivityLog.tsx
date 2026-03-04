@@ -29,7 +29,7 @@ export function ActivityLog({ entries, maxHeight = 'max-h-64' }: ActivityLogProp
 
   return (
     <PixelCard>
-      <h3 className="font-semibold font-display text-[var(--rpg-text-primary)] mb-3">Recent Activity</h3>
+      <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)] mb-3">Recent Activity</h3>
       <div ref={scrollRef} className={`space-y-2 ${maxHeight} overflow-y-auto`}>
         {entries.length === 0 ? (
           <div className="text-sm text-[var(--rpg-text-secondary)] text-center py-4">

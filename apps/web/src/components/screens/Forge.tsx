@@ -230,7 +230,7 @@ export function Forge({
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Forge</h2>
+        <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Forge</h2>
         <div className="text-sm text-[var(--rpg-text-secondary)]">Luck: <span className="font-pixel text-[16px]">{equippedLuck}</span></div>
       </div>
 
@@ -287,7 +287,7 @@ export function Forge({
         <PixelCard className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-lg font-semibold font-display text-[var(--rpg-text-primary)]">{selected.name}</div>
+              <div className="text-lg font-semibold font-almendra text-[var(--rpg-text-primary)]">{selected.name}</div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
                 {titleCaseRarity(selected.rarity)} | Bonus slots {ITEM_RARITY_CONSTANTS.BONUS_SLOTS_BY_RARITY[selected.rarity]}
               </div>

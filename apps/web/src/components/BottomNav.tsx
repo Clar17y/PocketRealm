@@ -47,7 +47,7 @@ export function BottomNav({ activeTab, onNavigate, badgeTabs = new Set(), pulseT
               {pulseTabs.has(item.id) && !isActive && (
                 <span className="absolute inset-0 m-auto w-10 h-10 tutorial-pulse" />
               )}
-              <span className="text-[10px] font-body mt-1">{item.label}</span>
+              <span className="text-[10px] font-crimson mt-1">{item.label}</span>
             </button>
           );
         })}

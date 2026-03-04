@@ -166,7 +166,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
             )}
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)] mb-1">
+            <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)] mb-1">
               {currentZone.name}
             </h2>
             <p className="text-sm text-[var(--rpg-text-secondary)] mb-2">

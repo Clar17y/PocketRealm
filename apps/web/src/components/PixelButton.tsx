@@ -13,7 +13,7 @@ export const pixelButtonSizes = {
   lg: 'px-6 py-3 text-lg min-h-[56px]',
 } as const;
 
-export const pixelButtonBase = 'rounded-lg font-body font-semibold transition-all active:scale-95';
+export const pixelButtonBase = 'rounded-lg font-crimson font-semibold transition-all active:scale-95';
 
 interface PixelButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'gold';

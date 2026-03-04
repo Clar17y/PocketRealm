@@ -215,7 +215,7 @@ export function Gathering({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">{skillName}</h2>
+          <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">{skillName}</h2>
           <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-[16px] font-pixel">
             Lv. {skillLevel}
           </div>

@@ -45,7 +45,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
           </div>
           <div className="flex-1">
             <div className="flex items-baseline gap-2 mb-1">
-              <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">{enemy.name}</h2>
+              <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">{enemy.name}</h2>
               <span className="text-[16px] text-[var(--rpg-red)] font-pixel">Lv. {enemy.level}</span>
             </div>
             <StatBar
@@ -74,7 +74,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
 
       {/* Combat Log */}
       <PixelCard>
-        <h3 className="font-semibold font-display text-[var(--rpg-text-primary)] mb-3 flex items-center gap-2">
+        <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)] mb-3 flex items-center gap-2">
           <Skull size={18} />
           Combat Log
         </h3>
@@ -109,7 +109,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
               <div className="flex justify-center mb-3">
                 <Trophy size={56} color="var(--rpg-gold)" />
               </div>
-              <h3 className="text-3xl font-bold font-display text-[var(--rpg-gold)] mb-2">Victory!</h3>
+              <h3 className="text-3xl font-bold font-almendra text-[var(--rpg-gold)] mb-2">Victory!</h3>
 
               <div className="flex justify-center mb-4">
                 <div className="w-20 h-20 rounded-lg bg-[var(--rpg-background)] border-2 border-[var(--rpg-gold)] flex items-center justify-center text-4xl">
@@ -176,7 +176,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
               <div className="flex justify-center mb-3">
                 <Skull size={56} color="var(--rpg-red)" />
               </div>
-              <h3 className="text-3xl font-bold font-display text-[var(--rpg-red)] mb-2">Defeated...</h3>
+              <h3 className="text-3xl font-bold font-almendra text-[var(--rpg-red)] mb-2">Defeated...</h3>
 
               <div className="flex justify-center mb-4">
                 <div className="w-20 h-20 rounded-lg bg-[var(--rpg-background)] border-2 border-[var(--rpg-red)] flex items-center justify-center text-4xl">

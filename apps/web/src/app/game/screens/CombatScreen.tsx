@@ -406,7 +406,7 @@ export function CombatScreen({
                     alt={displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
                     className="w-8 h-8 rounded object-cover"
                   />
-                  Last Combat: <span className="font-display">{displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}</span>
+                  Last Combat: <span className="font-almendra">{displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={`text-sm font-semibold ${outcomeColor}`}>{outcomeLabel}</div>
@@ -459,7 +459,7 @@ export function CombatScreen({
           )}
 
           <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
-            <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Encounter Sites</h2>
+            <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Encounter Sites</h2>
 
             {combatXpRate && (
               <XpRateBadge skillName={combatXpRate.skillName} rate={combatXpRate.rate} />
@@ -540,7 +540,7 @@ export function CombatScreen({
                           />
                         )}
                         <div>
-                          <div className="flex items-center gap-1.5 flex-wrap text-[var(--rpg-text-primary)] font-semibold font-display">
+                          <div className="flex items-center gap-1.5 flex-wrap text-[var(--rpg-text-primary)] font-semibold font-almendra">
                             {e.siteName}
                             <EventBadges inline modifiers={e.eventModifiers} />
                           </div>
@@ -559,10 +559,10 @@ export function CombatScreen({
                             </span>
                           )}
                           <div className="text-xs text-[var(--rpg-text-secondary)]">
-                            Next monster: <span className="font-display">{nextMobLabel ?? 'None (site decayed)'}</span>
+                            Next monster: <span className="font-almendra">{nextMobLabel ?? 'None (site decayed)'}</span>
                           </div>
                         <div className="text-xs text-[var(--rpg-text-secondary)]">
-                          Zone: <span className="font-display">{e.zoneName}</span> | Decayed <span className="font-pixel text-[8px]">{e.decayedMobs}</span> | Found{' '}
+                          Zone: <span className="font-almendra">{e.zoneName}</span> | Decayed <span className="font-pixel text-[8px]">{e.decayedMobs}</span> | Found{' '}
                           {relativeTime(pendingClockMs - new Date(e.discoveredAt).getTime())}
                         </div>
                         </div>

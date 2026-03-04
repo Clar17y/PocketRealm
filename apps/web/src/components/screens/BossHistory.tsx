@@ -45,7 +45,7 @@ export function BossHistory() {
 
   return (
     <ScreenContainer spacing="y-3">
-      <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Boss History</h2>
+      <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Boss History</h2>
 
       <div className="space-y-2">
         {entries.map((entry) => {
@@ -70,10 +70,10 @@ export function BossHistory() {
                       alt={entry.mobName}
                       className="w-8 h-8 rounded object-cover shrink-0"
                     />
-                    <span className="text-[var(--rpg-text-primary)] font-semibold font-display">
+                    <span className="text-[var(--rpg-text-primary)] font-semibold font-almendra">
                       {entry.mobName} <span className="font-pixel font-normal">(Lv.{entry.mobLevel})</span>
                     </span>
-                    <span className="text-xs ml-2 text-[var(--rpg-text-secondary)] font-display">
+                    <span className="text-xs ml-2 text-[var(--rpg-text-secondary)] font-almendra">
                       {entry.zoneName}
                     </span>
                   </div>
@@ -98,7 +98,7 @@ export function BossHistory() {
                 <div className="mt-3 pt-2 border-t border-[var(--rpg-border)] text-xs space-y-2">
                   {entry.killedByUsername && (
                     <p style={{ color: 'var(--rpg-gold)' }}>
-                      Kill credit: <span className="font-display">{entry.killedByUsername}</span>
+                      Kill credit: <span className="font-almendra">{entry.killedByUsername}</span>
                     </p>
                   )}
                   <p>Total boss rounds: <span className="font-pixel text-[8px]">{entry.encounter.roundNumber}</span></p>

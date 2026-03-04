@@ -131,7 +131,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
 
       {/* Action Buttons */}
       <div>
-        <h2 className="text-lg font-semibold font-display mb-3 text-[var(--rpg-text-primary)]">Actions</h2>
+        <h2 className="text-lg font-semibold font-almendra mb-3 text-[var(--rpg-text-primary)]">Actions</h2>
         <div className="grid grid-cols-2 gap-3">
           <div className="relative group">
             <PixelButton
@@ -236,7 +236,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
           <div className="flex flex-col items-center text-center">
             <MapPin size={20} color="var(--rpg-purple)" className="mb-1" />
             <div className="text-xs text-[var(--rpg-text-secondary)]">Zone</div>
-            <div className="text-xs font-semibold font-display text-[var(--rpg-text-primary)] mt-1">
+            <div className="text-xs font-semibold font-almendra text-[var(--rpg-text-primary)] mt-1">
               {playerData.currentZone}
             </div>
           </div>
@@ -309,7 +309,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
 
       {/* Skills Grid */}
       <div>
-        <h2 className="text-lg font-semibold font-display mb-3 text-[var(--rpg-text-primary)]">Skills</h2>
+        <h2 className="text-lg font-semibold font-almendra mb-3 text-[var(--rpg-text-primary)]">Skills</h2>
         <div className="grid grid-cols-4 gap-3">
           {skills.map((skill, index) => {
             const Icon = skill.icon;

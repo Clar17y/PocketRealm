@@ -80,7 +80,7 @@ export function Settings({
 }: SettingsProps) {
   return (
     <ScreenContainer>
-      <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Settings</h2>
+      <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Settings</h2>
       <p className="text-[var(--rpg-text-secondary)]">Username: {username}</p>
 
       {/* Combat */}

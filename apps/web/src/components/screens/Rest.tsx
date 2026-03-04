@@ -155,7 +155,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
           <div className="flex items-center gap-3 mb-4">
             <AlertTriangle size={32} color="var(--rpg-red)" />
             <div>
-              <h2 className="text-xl font-bold font-display text-[var(--rpg-red)]">Knocked Out</h2>
+              <h2 className="text-xl font-bold font-almendra text-[var(--rpg-red)]">Knocked Out</h2>
               <p className="text-sm text-[var(--rpg-text-secondary)]">
                 You must recover before taking any actions
               </p>
@@ -223,7 +223,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
         <div className="flex items-center gap-3 mb-4">
           <Heart size={32} color="var(--rpg-green-light)" />
           <div>
-            <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Rest</h2>
+            <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Rest</h2>
             <p className="text-sm text-[var(--rpg-text-secondary)]">
               Spend turns to restore health
             </p>

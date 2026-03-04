@@ -41,7 +41,7 @@ function EventCard({ event }: { event: WorldEventResponse }) {
   return (
     <PixelCard className="p-3">
       <div className="flex items-center justify-between mb-1">
-        <span className="font-bold font-display" style={{ color: eventTypeColor(event.type) }}>
+        <span className="font-bold font-almendra" style={{ color: eventTypeColor(event.type) }}>
           {event.title}
         </span>
         <div className="flex items-center gap-2">
@@ -109,7 +109,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
   return (
     <ScreenContainer>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold font-display" style={{ color: 'var(--rpg-gold)' }}>
+        <h2 className="text-lg font-bold font-almendra" style={{ color: 'var(--rpg-gold)' }}>
           World Events
         </h2>
         <PixelButton onClick={refresh} disabled={loading} size="sm">
@@ -142,10 +142,10 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
                 onClick={() => setSelectedBossId(boss.id)}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-bold font-display" style={{ color: 'var(--rpg-red)' }}>
+                  <span className="font-bold font-almendra" style={{ color: 'var(--rpg-red)' }}>
                     {boss.mobName} <span className="font-pixel">(Lv.{boss.mobLevel})</span>
                   </span>
-                  <span className="text-xs opacity-70 font-display">
+                  <span className="text-xs opacity-70 font-almendra">
                     {boss.zoneName ?? 'Unknown Zone'}
                   </span>
                 </div>

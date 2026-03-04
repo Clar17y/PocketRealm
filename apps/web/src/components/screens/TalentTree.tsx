@@ -144,7 +144,7 @@ export function TalentTree({
       <SkillTreeTutorial />
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold font-display text-[var(--rpg-text-primary)]">Talent Tree</h2>
+        <h2 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">Talent Tree</h2>
         <span
           className="text-sm font-bold px-3 py-1 rounded-full border"
           style={{
@@ -234,7 +234,7 @@ export function TalentTree({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className="text-sm font-semibold font-display"
+                            className="text-sm font-semibold font-almendra"
                             style={{
                               color: isAllocated
                                 ? 'var(--rpg-green-light)'

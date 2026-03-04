@@ -7,9 +7,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        display: ['var(--font-display)', 'serif'],
+        almendra: ['var(--font-almendra)', 'Georgia', 'serif'],
+        crimson: ['var(--font-crimson)', 'Georgia', 'serif'],
         pixel: ['var(--font-pixel)', 'monospace'],
-        body: ['var(--font-body)', 'sans-serif'],
       },
       keyframes: {
         'error-flash': {

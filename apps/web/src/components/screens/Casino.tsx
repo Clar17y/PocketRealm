@@ -344,7 +344,7 @@ export function Casino({
       <PixelCard>
         <div className="text-center py-8">
           <Coins size={48} className="mx-auto mb-4 text-[var(--rpg-text-secondary)]" />
-          <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)] mb-2">Casino</h2>
+          <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)] mb-2">Casino</h2>
           <p className="text-[var(--rpg-text-secondary)]">
             You must be in a town to visit the casino.
           </p>
@@ -371,7 +371,7 @@ export function Casino({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Coins size={28} className="text-[var(--rpg-gold)]" />
-          <h2 className="text-xl font-bold font-display text-[var(--rpg-text-primary)]">Casino</h2>
+          <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Casino</h2>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Coins size={16} className="text-[var(--rpg-gold)]" />
@@ -666,7 +666,7 @@ export function Casino({
                   key={`${bet.playerName}-${i}`}
                   className="flex items-center justify-between text-sm py-1 px-2 rounded bg-[var(--rpg-background)]"
                 >
-                  <span className="text-[var(--rpg-text-primary)] font-display truncate mr-2">{bet.playerName}</span>
+                  <span className="text-[var(--rpg-text-primary)] font-almendra truncate mr-2">{bet.playerName}</span>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs text-[var(--rpg-text-secondary)]">
                       {formatBet(bet.betType, bet.betValue)}

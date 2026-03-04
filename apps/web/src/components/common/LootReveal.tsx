@@ -43,7 +43,7 @@ export function LootReveal({ items, onContinue }: LootRevealProps) {
     <div className="bg-black/70 fixed inset-0 z-50 flex items-center justify-center">
       <PixelCard variant="ornate" className="rpg-screen-enter max-w-sm w-full mx-4">
         <h2
-          className="font-display text-center text-lg mb-4"
+          className="font-almendra text-center text-lg mb-4"
           style={{ color: RARITY_COLORS[best] }}
         >
           {TITLE_BY_RARITY[best]}
@@ -70,13 +70,13 @@ export function LootReveal({ items, onContinue }: LootRevealProps) {
                 />
               ) : (
                 <div
-                  className="w-12 h-12 flex items-center justify-center mb-1 text-center font-display text-[8px] leading-tight"
+                  className="w-12 h-12 flex items-center justify-center mb-1 text-center font-almendra text-[8px] leading-tight"
                   style={{ color: RARITY_COLORS[item.rarity] }}
                 >
                   {item.name}
                 </div>
               )}
-              <span className="font-display text-[8px] text-center leading-tight text-[var(--rpg-text-primary)]">
+              <span className="font-almendra text-[8px] text-center leading-tight text-[var(--rpg-text-primary)]">
                 {item.name}
               </span>
               {item.quantity > 1 && (
