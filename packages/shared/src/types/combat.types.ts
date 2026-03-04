@@ -76,6 +76,7 @@ export interface CombatLogEntry {
   spellName?: string;
   healAmount?: number;
   healResourceType?: 'hp' | 'stamina' | 'mana';
+  leechHeal?: number;
   effectsApplied?: Array<{
     stat: string;
     modifier: number;

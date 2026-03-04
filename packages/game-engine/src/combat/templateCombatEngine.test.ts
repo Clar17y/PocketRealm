@@ -1246,4 +1246,145 @@ describe('runTemplateCombat', () => {
       expect(dotTicks[0].damage).toBe(11);
     });
   });
+
+  describe('life leech', () => {
+    it('heals attacker for percentage of damage dealt', () => {
+      // Attack always hits, min damage, no crit
+      mockCombatRandom();
+
+      const leechAttack: ActionDefinition = {
+        id: 'drain_strike',
+        name: 'Drain Strike',
+        description: 'Drains life from the target.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        lifeLeechPercent: 50,
+      };
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, drain_strike: leechAttack };
+
+      // Both use offensive actions so random call pattern stays aligned (3 calls each per round).
+      // damageMin/Max = 20, no defence, no crit → finalDamage = 20
+      // leech = floor(20 * 50 / 100) = 10
+      const a = makeCombatant('Player', {
+        template: templateOf('drain_strike'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 60, maxHp: 100, damageMin: 20, damageMax: 20 }),
+        stamina: 200,
+        maxStamina: 200,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      // Find the first attack log entry from Player with damage
+      const attackLog = result.log.find(
+        e => e.actor === 'combatantA' && e.damage !== undefined && e.damage > 0,
+      );
+      expect(attackLog).toBeDefined();
+      expect(attackLog!.damage).toBe(20);
+      expect(attackLog!.leechHeal).toBe(10);
+      expect(attackLog!.message).toContain('Leeches 10 HP');
+
+      // Player HP after leech: started at 60, +10 leech = 70
+      expect(attackLog!.combatantAHpAfter).toBe(70);
+    });
+
+    it('caps leech heal at missing HP (no overheal)', () => {
+      mockCombatRandom();
+
+      const leechAttack: ActionDefinition = {
+        id: 'drain_strike',
+        name: 'Drain Strike',
+        description: 'Drains life from the target.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        lifeLeechPercent: 100,
+      };
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, drain_strike: leechAttack };
+
+      // Attacker at full HP → leech = floor(20 * 100 / 100) = 20, but capped at 0 missing HP
+      const a = makeCombatant('Player', {
+        template: templateOf('drain_strike'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 100, maxHp: 100, damageMin: 20, damageMax: 20 }),
+        stamina: 200,
+        maxStamina: 200,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const attackLog = result.log.find(
+        e => e.actor === 'combatantA' && e.damage !== undefined && e.damage > 0,
+      );
+      expect(attackLog).toBeDefined();
+      expect(attackLog!.damage).toBe(20);
+      // No leech because attacker is at full HP
+      expect(attackLog!.leechHeal).toBeUndefined();
+      expect(attackLog!.message).not.toContain('Leeches');
+    });
+
+    it('does not leech on missed attacks', () => {
+      // Use a custom mock that always returns 0.0 after initiative, so every
+      // d20 is a natural 1 (always miss) regardless of call pattern alignment.
+      let callCount = 0;
+      vi.spyOn(Math, 'random').mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return 0.9; // initA (A goes first)
+        if (callCount === 2) return 0.1; // initB
+        return 0.0; // All subsequent: d20=1 (natural miss), damage=min, crit=no
+      });
+
+      const leechAttack: ActionDefinition = {
+        id: 'drain_strike',
+        name: 'Drain Strike',
+        description: 'Drains life from the target.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        lifeLeechPercent: 100,
+      };
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, drain_strike: leechAttack };
+
+      const a = makeCombatant('Player', {
+        template: templateOf('drain_strike'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 50, maxHp: 100, damageMin: 20, damageMax: 20, accuracy: 0 }),
+        stamina: 200,
+        maxStamina: 200,
+      });
+      // Goblin also uses an offensive action to keep random pattern consistent
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1, accuracy: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      // All of Player's attacks should miss (natural 1)
+      const playerAttacks = result.log.filter(
+        e => e.actor === 'combatantA' && e.action === 'attack',
+      );
+      expect(playerAttacks.length).toBeGreaterThan(0);
+      for (const entry of playerAttacks) {
+        expect(entry.leechHeal).toBeUndefined();
+        expect(entry.message).not.toContain('Leeches');
+        expect(entry.message).toContain('misses');
+      }
+    });
+  });
 });

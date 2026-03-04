@@ -423,8 +423,18 @@ function executeOffensiveAction(
 
   applyDamage(state, opponent(actorKey), finalDamage);
 
+  // Life leech -- heal attacker for % of damage dealt
+  let leechHeal = 0;
+  if (action.lifeLeechPercent && action.lifeLeechPercent > 0 && finalDamage > 0) {
+    const rawLeech = Math.floor(finalDamage * action.lifeLeechPercent / 100);
+    if (rawLeech > 0) {
+      leechHeal = applyHeal(state, actorKey, rawLeech);
+    }
+  }
+
   const armorReduction = Math.floor(rawDamage * actualMultiplier * calculateDefenceReduction(effectiveDefence));
   const critText = crit ? ' CRITICAL HIT!' : '';
+  const leechText = leechHeal > 0 ? ` Leeches ${leechHeal} HP!` : '';
 
   state.log.push({
     round: state.round,
@@ -436,6 +446,7 @@ function executeOffensiveAction(
     rawDamage,
     isCritical: crit,
     ...(crit ? { critMultiplier: actualMultiplier } : {}),
+    ...(leechHeal > 0 ? { leechHeal } : {}),
     accuracyModifier: accuracyBonus,
     targetDodge: targetStats.dodge,
     targetEvasion: targetStats.evasion,
@@ -443,7 +454,7 @@ function executeOffensiveAction(
     targetMagicDefence: actionDamageType === 'magic' ? targetStats.magicDefence : undefined,
     armorReduction: actionDamageType === 'magic' ? undefined : armorReduction,
     magicDefenceReduction: actionDamageType === 'magic' ? armorReduction : undefined,
-    message: `${actorName} uses ${action.name} on ${targetName} for ${finalDamage} damage!${critText}`,
+    message: `${actorName} uses ${action.name} on ${targetName} for ${finalDamage} damage!${critText}${leechText}`,
     combatantAAction,
     combatantBAction,
     wasExhausted,
