@@ -10,6 +10,7 @@ import type {
   CombatActor,
   ActionEffect,
   CombatAction,
+  PerActionScaling,
 } from '@adventure/shared';
 import { COMBAT_ACTION_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
 import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type RoundInteraction } from './actionResolver';
@@ -21,6 +22,7 @@ import {
   calculateFinalDamage,
   calculateDefenceReduction,
   rollInitiative,
+  resolveActionDamageStats,
 } from './damageCalculator';
 
 const MAX_ROUNDS = 100;
@@ -39,6 +41,8 @@ export interface TemplateCombatant {
   maxMana: number;
   manaRegenPerRound: number;
   actionDefinitions: Record<string, ActionDefinition>;
+  /** Per-action scaling data -- present for players, absent for mobs */
+  perActionScaling?: PerActionScaling;
 }
 
 export interface TemplateCombatLogEntry extends CombatLogEntry {
@@ -265,6 +269,7 @@ function executeOffensiveAction(
   combatantBAction: string,
   wasExhausted: boolean,
   interactionResult: string,
+  perActionScaling?: PerActionScaling,
 ): void {
   // Guaranteed miss (counter/ward blocked the attack)
   if (hitOverride === 'guaranteed_miss') {
@@ -284,8 +289,24 @@ function executeOffensiveAction(
     return;
   }
 
+  // Resolve per-action damage stats when scaling data is available (players),
+  // otherwise fall back to pre-computed combatant stats (mobs).
+  let baseDamageMin = actorStats.damageMin;
+  let baseDamageMax = actorStats.damageMax;
+  let baseAccuracy = actorStats.accuracy;
+
+  if (perActionScaling) {
+    const actionStats = resolveActionDamageStats(
+      action.scalingStat ?? 'weapon',
+      perActionScaling,
+    );
+    baseDamageMin = actionStats.damageMin;
+    baseDamageMax = actionStats.damageMax;
+    baseAccuracy = actionStats.accuracy;
+  }
+
   const attackRoll = hitOverride === 'guaranteed_hit' ? 20 : rollD20();
-  const accuracyBonus = actorStats.accuracy + (action.accuracyModifier ?? 0);
+  const accuracyBonus = baseAccuracy + (action.accuracyModifier ?? 0);
   const hits = hitOverride === 'guaranteed_hit' || doesAttackHit(attackRoll, accuracyBonus, targetStats.dodge, targetStats.evasion);
 
   if (!hits) {
@@ -309,12 +330,12 @@ function executeOffensiveAction(
     return;
   }
 
-  // Determine damage type — use action override or fall back to combatant stats
-  const damageType = action.damageType ?? actorStats.damageType;
-  const effectiveDefence = damageType === 'magic' ? targetStats.magicDefence : targetStats.defence;
+  // Determine damage type from the action, falling back to combatant stats
+  const actionDamageType = action.damageType ?? actorStats.damageType;
+  const effectiveDefence = actionDamageType === 'magic' ? targetStats.magicDefence : targetStats.defence;
 
   // Roll and apply damage multiplier from action
-  let rawDamage = rollDamage(actorStats.damageMin, actorStats.damageMax);
+  let rawDamage = rollDamage(baseDamageMin, baseDamageMax);
   const actionMultiplier = action.damageMultiplier ?? 1.0;
   rawDamage = Math.floor(rawDamage * actionMultiplier * interactionDamageMultiplier);
 
@@ -350,10 +371,10 @@ function executeOffensiveAction(
     accuracyModifier: accuracyBonus,
     targetDodge: targetStats.dodge,
     targetEvasion: targetStats.evasion,
-    targetDefence: damageType === 'magic' ? undefined : targetStats.defence,
-    targetMagicDefence: damageType === 'magic' ? targetStats.magicDefence : undefined,
-    armorReduction: damageType === 'magic' ? undefined : armorReduction,
-    magicDefenceReduction: damageType === 'magic' ? armorReduction : undefined,
+    targetDefence: actionDamageType === 'magic' ? undefined : targetStats.defence,
+    targetMagicDefence: actionDamageType === 'magic' ? targetStats.magicDefence : undefined,
+    armorReduction: actionDamageType === 'magic' ? undefined : armorReduction,
+    magicDefenceReduction: actionDamageType === 'magic' ? armorReduction : undefined,
     message: `${actorName} uses ${action.name} on ${targetName} for ${finalDamage} damage!${critText}`,
     combatantAAction,
     combatantBAction,
@@ -804,6 +825,7 @@ export function runTemplateCombat(
         combatantAAction, combatantBAction,
         resolvedA.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
+        combatantA.perActionScaling,
       );
       deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
       deductMana(state, 'combatantB', resolvedB.action.cost.mana);
@@ -815,6 +837,7 @@ export function runTemplateCombat(
         combatantAAction, combatantBAction,
         resolvedB.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
+        combatantB.perActionScaling,
       );
     } else {
       deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
@@ -826,6 +849,7 @@ export function runTemplateCombat(
         combatantAAction, combatantBAction,
         resolvedB.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
+        combatantB.perActionScaling,
       );
       deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
       deductMana(state, 'combatantA', resolvedA.action.cost.mana);
@@ -837,6 +861,7 @@ export function runTemplateCombat(
         combatantAAction, combatantBAction,
         resolvedA.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
+        combatantA.perActionScaling,
       );
     }
 
@@ -889,6 +914,7 @@ function executeAction(
   interactionResult: string,
   availablePotions: import('@adventure/shared').CombatPotion[],
   potionsConsumed: PotionConsumed[],
+  perActionScaling?: PerActionScaling,
 ): void {
   // Determine hit override, damage multiplier, and damage reduction for this actor
   const hitOverride = isAttacker ? interaction.attackerHitOverride : interaction.defenderHitOverride;
@@ -905,6 +931,7 @@ function executeAction(
       actorName, targetName,
       combatantAAction, combatantBAction,
       wasExhausted, interactionResult,
+      perActionScaling,
     );
   } else if (action.category === 'supportive') {
     executeSupportiveAction(

@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, afterEach } from 'vitest';
-import type { CombatantStats, ActionDefinition, CombatTemplateSlotData } from '@adventure/shared';
+import type { CombatantStats, ActionDefinition, CombatTemplateSlotData, PerActionScaling } from '@adventure/shared';
 import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@adventure/shared';
 import { runTemplateCombat, type TemplateCombatant } from './templateCombatEngine';
 
@@ -834,6 +834,166 @@ describe('runTemplateCombat', () => {
         expect(entry.combatantAStaminaAfter).toBeLessThanOrEqual(100);
         expect(entry.combatantAManaAfter).toBeLessThanOrEqual(50);
       }
+    });
+  });
+
+  describe('per-action scaling', () => {
+    // Shared perActionScaling data for a magic-focused player
+    const magicScaling: PerActionScaling = {
+      skillLevels: { melee: 5, ranged: 5, magic: 30 },
+      attributes: { strength: 3, dexterity: 3, intelligence: 25 },
+      weaponPower: { attack: 5, rangedPower: 5, magicPower: 24 },
+      equipmentAccuracy: 10,
+      weaponRequiredSkill: 'magic',
+    };
+
+    it('magic-scaling action uses magic stats for damage', () => {
+      // fire_bolt: scalingStat='magic', damageMultiplier=1.2, damageType='magic'
+      // magic resolved: totalAttack = 30 + 24 + 25 = 79
+      // damageMin = 1 + floor(79/5) = 16, damageMax = 5 + floor(79/2) = 44
+      // With min damage roll: rawDamage = floor(16 * 1.2) = 19
+      mockCombatRandom();
+
+      const a = makeCombatant('Mage', {
+        template: templateOf('fire_bolt'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({
+          hp: 500, maxHp: 500,
+          // Global stats are set low — per-action scaling should override
+          damageMin: 1, damageMax: 1, accuracy: 0,
+        }),
+        mana: 500,
+        maxMana: 500,
+        perActionScaling: magicScaling,
+      });
+      const b = makeCombatant('Target', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, magicDefence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      // Find A's first attack entry
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(attackEntry).toBeDefined();
+      // rawDamage = floor(16 * 1.2 * 1.0) = 19 (min roll, action multiplier, no interaction bonus)
+      // With defend's 35% reduction: floor(19 * 0.65) = 12
+      expect(attackEntry?.rawDamage).toBe(19);
+      expect(attackEntry?.damage).toBe(12);
+    });
+
+    it('melee-scaling action on magic-weapon user uses melee stats', () => {
+      // power_strike: scalingStat='melee', damageMultiplier=1.3
+      // melee resolved: totalAttack = 5 + 5 + 3 = 13
+      // damageMin = 1 + floor(13/5) = 3, damageMax = 5 + floor(13/2) = 11
+      // With min damage roll: rawDamage = floor(3 * 1.3) = 3
+      mockCombatRandom();
+
+      const a = makeCombatant('Mage', {
+        template: templateOf('power_strike'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({
+          hp: 500, maxHp: 500,
+          // High global stats that should be ignored with per-action scaling
+          damageMin: 50, damageMax: 50, accuracy: 50,
+        }),
+        stamina: 500,
+        maxStamina: 500,
+        perActionScaling: magicScaling,
+      });
+      const b = makeCombatant('Target', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, defence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(attackEntry).toBeDefined();
+      // rawDamage = floor(3 * 1.3 * 1.0) = 3 (min roll)
+      // With defend's 35% reduction: max(1, floor(3 * 0.65)) = max(1, 1) = 1
+      expect(attackEntry?.rawDamage).toBe(3);
+      expect(attackEntry?.damage).toBe(1);
+    });
+
+    it('mob without perActionScaling uses pre-computed stats', () => {
+      mockCombatRandom();
+
+      // Mob with no perActionScaling — should use stats.damageMin/Max directly
+      const a = makeCombatant('Mob', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 200, maxHp: 200, damageMin: 15, damageMax: 15 }),
+        // No perActionScaling
+      });
+      const b = makeCombatant('Target', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 200, maxHp: 200, damageMin: 5, damageMax: 5, defence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(attackEntry).toBeDefined();
+      // light_attack: damageMultiplier=0.6 → rawDamage = floor(15 * 0.6) = 9
+      expect(attackEntry?.rawDamage).toBe(9);
+    });
+
+    it('action damageType determines which defence is used', () => {
+      // Create a custom action: melee scaling but magic damage type
+      // This should hit magicDefence, not physical defence
+      const magicMelee: ActionDefinition = {
+        id: 'magic_melee',
+        name: 'Enchanted Strike',
+        description: 'A melee strike infused with magic energy.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        scalingStat: 'melee',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'magic',
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, magic_melee: magicMelee };
+
+      mockCombatRandom();
+
+      const a = makeCombatant('Fighter', {
+        template: templateOf('magic_melee'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 20, damageMax: 20 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      // Target has high physical defence but no magic defence
+      const b = makeCombatant('Target', {
+        template: templateOf('defend'),
+        stats: makeStats({
+          hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1,
+          defence: 200,       // High physical defence
+          magicDefence: 0,    // No magic defence
+        }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(attackEntry).toBeDefined();
+      // rawDamage = floor(20 * 1.0 * 1.0) = 20
+      expect(attackEntry?.rawDamage).toBe(20);
+      // Magic defence is 0 → no defence reduction → only defend's 35% reduction
+      // floor(20 * 0.65) = 13
+      expect(attackEntry?.damage).toBe(13);
+      // Log should show magicDefence, not physical defence
+      expect(attackEntry?.targetMagicDefence).toBe(0);
+      expect(attackEntry?.targetDefence).toBeUndefined();
     });
   });
 });
