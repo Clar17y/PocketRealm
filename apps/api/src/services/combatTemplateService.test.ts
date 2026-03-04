@@ -332,34 +332,8 @@ describe('validateTemplateSlots', () => {
     ).toThrow("Action 'unavailable_action' is not available");
   });
 
-  it('rejects resource_below without resource and threshold', () => {
-    expect(() =>
-      validateTemplateSlots([{
-        actionId: 'light_attack',
-        condition: { type: 'resource_below' } as any,
-        thenActionId: 'defend',
-      }]),
-    ).toThrow("Condition 'resource_below' requires resource and threshold");
-  });
-
-  it('rejects has_buff without effectName', () => {
-    expect(() =>
-      validateTemplateSlots([{
-        actionId: 'light_attack',
-        condition: { type: 'has_buff' } as any,
-        thenActionId: 'defend',
-      }]),
-    ).toThrow("Condition 'has_buff' requires effectName");
-  });
-
-  it('rejects condition without thenActionId', () => {
-    expect(() =>
-      validateTemplateSlots([{
-        actionId: 'light_attack',
-        condition: { type: 'resource_below', resource: 'hp', threshold: 50 },
-      }]),
-    ).toThrow('Slot with condition must have thenActionId');
-  });
+  // Condition field consistency (resource/threshold, effectName, thenActionId pairing)
+  // is validated by Zod schemas in the route layer, not the service layer.
 
   it('accepts valid conditional slot', () => {
     expect(() =>

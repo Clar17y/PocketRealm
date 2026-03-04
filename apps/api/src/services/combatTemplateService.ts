@@ -11,6 +11,18 @@ export interface CreateSlotInput {
   thenActionId?: string;
 }
 
+function toSlotCreateData(slot: CreateSlotInput, index: number) {
+  return {
+    sortOrder: slot.sortOrder ?? index,
+    actionId: slot.actionId,
+    conditionType: slot.condition?.type ?? null,
+    resource: slot.condition?.resource ?? null,
+    threshold: slot.condition?.threshold ?? null,
+    effectName: slot.condition?.effectName ?? null,
+    thenActionId: slot.thenActionId ?? null,
+  };
+}
+
 function toSlotData(slot: CombatTemplateSlot): CombatTemplateSlotData {
   return {
     id: slot.id,
@@ -60,15 +72,7 @@ export async function createTemplate(
       name,
       isActive: isFirst,
       slots: {
-        create: slots.map((s, i) => ({
-          sortOrder: s.sortOrder ?? i,
-          actionId: s.actionId,
-          conditionType: s.condition?.type ?? null,
-          resource: s.condition?.resource ?? null,
-          threshold: s.condition?.threshold ?? null,
-          effectName: s.condition?.effectName ?? null,
-          thenActionId: s.thenActionId ?? null,
-        })),
+        create: slots.map(toSlotCreateData),
       },
     },
     include: { slots: { orderBy: { sortOrder: 'asc' } } },
@@ -143,16 +147,7 @@ export async function updateTemplate(
     if (slots) {
       await tx.combatTemplateSlot.deleteMany({ where: { templateId } });
       await tx.combatTemplateSlot.createMany({
-        data: slots.map((s, i) => ({
-          templateId,
-          sortOrder: s.sortOrder ?? i,
-          actionId: s.actionId,
-          conditionType: s.condition?.type ?? null,
-          resource: s.condition?.resource ?? null,
-          threshold: s.condition?.threshold ?? null,
-          effectName: s.condition?.effectName ?? null,
-          thenActionId: s.thenActionId ?? null,
-        })),
+        data: slots.map((s, i) => ({ templateId, ...toSlotCreateData(s, i) })),
       });
     }
   });
@@ -194,40 +189,10 @@ export function validateTemplateSlots(
       throw new AppError(400, `Action '${slot.actionId}' is not available`, 'ACTION_UNAVAILABLE');
     }
 
-    if (slot.condition) {
-      const { type } = slot.condition;
-
-      if (type === 'resource_below' || type === 'resource_above') {
-        if (!slot.condition.resource || slot.condition.threshold == null) {
-          throw new AppError(
-            400,
-            `Condition '${type}' requires resource and threshold`,
-            'INVALID_CONDITION',
-          );
-        }
-      }
-
-      if (type === 'has_buff' || type === 'has_debuff' || type === 'no_buff' || type === 'no_debuff') {
-        if (!slot.condition.effectName) {
-          throw new AppError(
-            400,
-            `Condition '${type}' requires effectName`,
-            'INVALID_CONDITION',
-          );
-        }
-      }
-
-      if (!slot.thenActionId) {
-        throw new AppError(
-          400,
-          'Slot with condition must have thenActionId',
-          'INVALID_CONDITION',
-        );
-      }
-
-      if (!allAvailable.has(slot.thenActionId)) {
-        throw new AppError(400, `Action '${slot.thenActionId}' is not available`, 'ACTION_UNAVAILABLE');
-      }
+    // Condition field consistency (resource/threshold, effectName) is validated
+    // by Zod schemas in the route layer. Here we only check action availability.
+    if (slot.thenActionId && !allAvailable.has(slot.thenActionId)) {
+      throw new AppError(400, `Action '${slot.thenActionId}' is not available`, 'ACTION_UNAVAILABLE');
     }
   }
 }
