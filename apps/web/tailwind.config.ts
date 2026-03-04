@@ -6,6 +6,11 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        display: ['var(--font-display)', 'serif'],
+        pixel: ['var(--font-pixel)', 'monospace'],
+        body: ['var(--font-body)', 'sans-serif'],
+      },
       keyframes: {
         'error-flash': {
           '0%, 100%': { opacity: '1' },
