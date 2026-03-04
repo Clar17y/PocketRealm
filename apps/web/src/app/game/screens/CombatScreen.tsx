@@ -206,7 +206,7 @@ export function CombatScreen({
   }, [buildShareText]);
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       {/* Strategy Selection Modal */}
       {strategyModalSite && (
         <ModalOverlay>

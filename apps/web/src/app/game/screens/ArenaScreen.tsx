@@ -600,7 +600,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
   }
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       {levelGate}
       {ratingPanel}
       {resultPanel}

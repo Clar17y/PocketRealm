@@ -179,7 +179,7 @@ body {
   background-size: 64px 64px;
   mix-blend-mode: soft-light;
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
 }
 
 /* Gold frame for important cards */
@@ -331,4 +331,17 @@ body {
 
 .rpg-victory-pulse {
   animation: victory-pulse 1.5s ease-in-out 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rpg-screen-enter,
+  .rpg-stagger-item,
+  .rpg-loot-reveal,
+  .rpg-legendary-flash,
+  .rpg-victory-pulse {
+    animation: none !important;
+  }
+  .rpg-bar-shimmer::after {
+    animation: none !important;
+  }
 }
