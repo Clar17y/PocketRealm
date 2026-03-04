@@ -149,7 +149,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
   // Recovering mode
   if (hpState.isRecovering) {
     return (
-      <div className="space-y-4">
+      <div className="rpg-screen-enter space-y-4">
         <PixelCard>
           <div className="flex items-center gap-3 mb-4">
             <AlertTriangle size={32} color="var(--rpg-red)" />
@@ -217,7 +217,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
   }) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <PixelCard>
         <div className="flex items-center gap-3 mb-4">
           <Heart size={32} color="var(--rpg-green-light)" />

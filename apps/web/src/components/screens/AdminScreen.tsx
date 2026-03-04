@@ -573,7 +573,7 @@ export default function AdminScreen({ onAction }: { onAction?: () => void }) {
   const [tab, setTab] = useState<AdminTab>('player');
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <div className="flex items-center gap-2 mb-2">
         <Shield className="w-5 h-5 text-[var(--rpg-gold)]" />
         <h2 className="text-lg font-bold text-[var(--rpg-gold)]">Admin Panel</h2>

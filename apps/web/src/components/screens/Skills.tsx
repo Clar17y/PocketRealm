@@ -21,7 +21,7 @@ interface SkillsProps {
 
 export function Skills({ skills }: SkillsProps) {
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Skills</h2>
         <div className="text-sm text-[var(--rpg-text-secondary)]">
@@ -30,18 +30,19 @@ export function Skills({ skills }: SkillsProps) {
       </div>
 
       <div className="space-y-3">
-        {skills.map((skill) => (
-          <SkillCard
-            key={skill.id}
-            name={skill.name}
-            icon={skill.icon}
-            imageSrc={skill.imageSrc}
-            level={skill.level}
-            currentXP={skill.currentXP}
-            nextLevelXP={skill.nextLevelXP}
-            xpRate={skill.xpRate}
-            iconColor={skill.color}
-          />
+        {skills.map((skill, index) => (
+          <div key={skill.id} className="rpg-stagger-item" style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}>
+            <SkillCard
+              name={skill.name}
+              icon={skill.icon}
+              imageSrc={skill.imageSrc}
+              level={skill.level}
+              currentXP={skill.currentXP}
+              nextLevelXP={skill.nextLevelXP}
+              xpRate={skill.xpRate}
+              iconColor={skill.color}
+            />
+          </div>
         ))}
       </div>
     </div>

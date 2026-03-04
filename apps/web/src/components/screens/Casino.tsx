@@ -353,7 +353,7 @@ export function Casino({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       {winAnimation && <WinCelebration {...winAnimation} />}
       <FirstVisitHowTo
         storageKey="howto_casino"

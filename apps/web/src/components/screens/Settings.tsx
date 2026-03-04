@@ -74,7 +74,7 @@ export function Settings({
   onLogout,
 }: SettingsProps) {
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Settings</h2>
       <p className="text-[var(--rpg-text-secondary)]">Username: {username}</p>
 

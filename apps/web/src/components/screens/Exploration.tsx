@@ -107,7 +107,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
   const { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance } = calculateProbabilities(effective);
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       {/* Low HP Warning Dialog */}
       {showLowHpWarning && typeof currentHp === 'number' && typeof maxHp === 'number' && (
         <LowHpWarningDialog

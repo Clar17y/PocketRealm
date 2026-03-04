@@ -101,7 +101,7 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
   const unlockedTitles = achievements.filter((a) => a.unlocked && a.titleReward);
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       {/* Completion counter */}
       <PixelCard padding="sm">
         <div className="flex items-center justify-between mb-1">

@@ -106,7 +106,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
     : events.filter((e) => e.scope === 'zone');
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold" style={{ color: 'var(--rpg-gold)' }}>
           World Events

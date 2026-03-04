@@ -43,7 +43,7 @@ export function BossHistory() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="rpg-screen-enter space-y-3">
       <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Boss History</h2>
 
       <div className="space-y-2">

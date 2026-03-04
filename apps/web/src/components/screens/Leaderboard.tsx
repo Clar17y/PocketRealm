@@ -48,7 +48,7 @@ export function Leaderboard({ playerId }: LeaderboardProps) {
   const currentGroupCategories = groups.find((g) => g.name === activeGroup)?.categories ?? [];
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       {/* Header */}
       <div className="flex items-center gap-2">
         <Trophy className="w-5 h-5 text-[var(--rpg-gold)]" />

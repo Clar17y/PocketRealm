@@ -296,7 +296,7 @@ export function CombatHistory() {
   }, [shareText]);
 
   return (
-    <div className="space-y-3">
+    <div className="rpg-screen-enter space-y-3">
       <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
         <div className="text-[var(--rpg-text-primary)] font-semibold">Combat History</div>
 

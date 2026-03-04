@@ -224,7 +224,7 @@ export function Forge({
   const baseEntries = statEntries(selected?.baseStats);
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 

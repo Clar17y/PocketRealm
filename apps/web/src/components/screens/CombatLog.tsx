@@ -34,7 +34,7 @@ interface CombatLogProps {
 
 export function CombatLog({ enemy, player, combatLog, status, rewards, onContinue }: CombatLogProps) {
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       {/* Enemy Portrait */}
       <PixelCard className="relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-gradient-to-br from-[var(--rpg-red)] to-transparent" />

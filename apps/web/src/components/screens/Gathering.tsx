@@ -205,7 +205,7 @@ export function Gathering({
   }) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       {/* Knockout Banner */}
       {isRecovering && (
         <KnockoutBanner action="gathering" recoveryCost={recoveryCost} />

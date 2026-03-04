@@ -135,13 +135,13 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
     return slots.find((s) => s.id === slotId)?.item || null;
   };
 
-  const renderSlot = (slotId: string) => {
+  const renderSlot = (slotId: string, index: number) => {
     const position = slotPositions[slotId];
     if (!position) return null;
     const item = getSlotInfo(slotId);
 
     return (
-      <div key={slotId} style={{ gridColumn: position.gridColumn, gridRow: position.gridRow }}>
+      <div key={slotId} className="rpg-stagger-item" style={{ gridColumn: position.gridColumn, gridRow: position.gridRow, animationDelay: `${Math.min(index * 40, 400)}ms` }}>
         <button
           onClick={() => {
             setActiveSlotId(slotId);
@@ -202,7 +202,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
   };
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Equipment</h2>
 
       {/* Slot Selection Modal */}

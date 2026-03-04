@@ -139,7 +139,7 @@ export function TalentTree({
   const activeTabMeta = TREE_TABS.find(t => t.id === activeTree)!;
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <SkillTreeTutorial />
       {/* Header */}
       <div className="flex items-center justify-between">

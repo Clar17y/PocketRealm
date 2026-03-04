@@ -48,7 +48,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="rpg-screen-enter space-y-4">
         <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Guild</h2>
         <LoadingCard />
       </div>
@@ -67,7 +67,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
   }
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">
         [{guildData.guild.tag}] {guildData.guild.name}
       </h2>

@@ -242,7 +242,7 @@ export function TrainingGrounds({
 
   // Idle / selection phase
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <FirstVisitHowTo
         storageKey="howto_training"
         title="Training Grounds"

@@ -261,7 +261,7 @@ export function Inventory({
   const canDeposit = Boolean(onDeposit && isInTown && !isEquipped);
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Inventory</h2>
         <div className="flex items-center gap-3">
@@ -635,7 +635,7 @@ export function Inventory({
               Backpack ({usedSlots}/{capacity}){usedSlots > capacity && ' — Over-encumbered!'}
             </div>
             <div className="grid grid-cols-6 gap-2">
-              {backpackItems.map((item) => {
+              {backpackItems.map((item, index) => {
                 const isSalvageable = salvageBatch.active && item.salvageCost !== null;
                 const isStashable = stashBatch.active && !item.equippedSlot;
                 const isSellable = sellBatchMode.active && !item.equippedSlot && item.sellPrice != null && item.sellPrice > 0;
@@ -644,7 +644,7 @@ export function Inventory({
                   || (stashBatch.active && stashBatch.selection.has(item.id))
                   || (sellBatchMode.active && sellBatchMode.selection.has(item.id));
                 return (
-                  <div key={item.id} className="relative">
+                  <div key={item.id} className="rpg-stagger-item relative" style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}>
                     <ItemCard
                       name={item.name}
                       icon={item.icon}

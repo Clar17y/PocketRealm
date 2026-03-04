@@ -200,7 +200,7 @@ export function ZoneMap({
     availableTurns >= inflateCost(selectedZone.travelCost, guildTaxRate);
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">World Map</h2>
         <MapPin size={20} color="var(--rpg-gold)" />

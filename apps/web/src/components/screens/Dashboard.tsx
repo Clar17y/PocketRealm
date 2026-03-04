@@ -73,7 +73,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
   };
 
   return (
-    <div className="space-y-4">
+    <div className="rpg-screen-enter space-y-4">
       {/* Knockout Banner */}
       {playerData.isRecovering && (
         <KnockoutBanner action="taking any actions" recoveryCost={playerData.recoveryCost} />
@@ -266,14 +266,15 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
           />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {Object.entries(ATTRIBUTE_META).map(([key, meta]) => {
+          {Object.entries(ATTRIBUTE_META).map(([key, meta], index) => {
             const attribute = key as AttributeType;
             const Icon = meta.icon;
             const disabled = characterProgression.attributePoints <= 0 || allocating !== null;
             return (
               <div
                 key={attribute}
-                className="rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2 flex items-center justify-between gap-2"
+                className="rpg-stagger-item rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2 flex items-center justify-between gap-2"
+                style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -309,7 +310,8 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
               <button
                 key={index}
                 onClick={() => onNavigate('skills')}
-                className="aspect-square bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg flex flex-col items-center justify-center gap-1 hover:border-[var(--rpg-gold)] transition-all active:scale-95"
+                className="rpg-stagger-item aspect-square bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg flex flex-col items-center justify-center gap-1 hover:border-[var(--rpg-gold)] transition-all active:scale-95"
+                style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
               >
                 {skill.imageSrc ? (
                   <div className="relative w-14 h-14 flex-shrink-0">
