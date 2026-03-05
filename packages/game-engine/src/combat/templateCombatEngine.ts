@@ -11,8 +11,8 @@ import type {
   ActionEffect,
   CombatAction,
 } from '@adventure/shared';
-import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
-import { resolveAction, resolveInteraction, type RoundInteraction } from './actionResolver';
+import { COMBAT_ACTION_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
+import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type RoundInteraction } from './actionResolver';
 import {
   rollD20,
   rollDamage,
@@ -24,7 +24,6 @@ import {
 } from './damageCalculator';
 
 const MAX_ROUNDS = 100;
-const DEFEND_ACTION: ActionDefinition = BASE_ACTION_DEFINITIONS['defend'];
 
 // --- Public Types ---
 
@@ -748,14 +747,14 @@ export function runTemplateCombat(
       const canUsePotion = !hasPotionSickness(state, 'combatantA') &&
         availablePotions.some(p => p.potionType === resolvedA.action.potionType);
       if (!canUsePotion) {
-        resolvedA = { action: DEFEND_ACTION, wasExhausted: true };
+        resolvedA = { action: DEFEND_FALLBACK, wasExhausted: true };
       }
     }
     if (resolvedB.action.potionType) {
       const canUsePotion = !hasPotionSickness(state, 'combatantB') &&
         availablePotions.some(p => p.potionType === resolvedB.action.potionType);
       if (!canUsePotion) {
-        resolvedB = { action: DEFEND_ACTION, wasExhausted: true };
+        resolvedB = { action: DEFEND_FALLBACK, wasExhausted: true };
       }
     }
 

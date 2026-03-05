@@ -22,7 +22,7 @@ export interface RoundInteraction {
 
 // --- Helpers ---
 
-const DEFEND_FALLBACK: ActionDefinition = BASE_ACTION_DEFINITIONS['defend'];
+export const DEFEND_FALLBACK: ActionDefinition = BASE_ACTION_DEFINITIONS['defend'];
 
 function canAfford(
   action: ActionDefinition,
