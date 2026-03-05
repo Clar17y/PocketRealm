@@ -40,6 +40,10 @@ export const COMBAT_CONSTANTS = {
   /** Minimum damage that can be dealt (after armor) */
   MIN_DAMAGE: 1,
 
+  /** Weight of resource cost (stamina + mana) for XP splitting.
+   *  1 point of resource spent = this many "contribution points" alongside damage. */
+  RESOURCE_XP_WEIGHT: 0.5,
+
   /** Turn cost for a single encounter */
   ENCOUNTER_TURN_COST: 50,
 } as const;

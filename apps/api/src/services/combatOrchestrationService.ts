@@ -5,6 +5,7 @@ import {
 import {
   ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
+  COMBAT_CONSTANTS,
   GUILD_CONSTANTS,
   type ActionDefinition,
   type CombatTemplateSlotData,
@@ -92,6 +93,7 @@ export interface VictoryRewardParams {
   };
   attackSkill: AttackSkill;
   damageByScalingStat?: { melee: number; ranged: number; magic: number };
+  resourceCostByScalingStat?: { melee: number; ranged: number; magic: number };
   guildXpBoost?: number;
   includeGuildCredit?: boolean;
   includeBestiary?: boolean;
@@ -115,7 +117,7 @@ export async function processCombatVictoryRewards(
 
   const totalXp = Math.max(0, mob.xpReward);
   const xpGrants = await splitAndGrantXp(
-    playerId, totalXp, attackSkill, params.damageByScalingStat, params.guildXpBoost,
+    playerId, totalXp, attackSkill, params.damageByScalingStat, params.resourceCostByScalingStat, params.guildXpBoost,
   );
 
   if (params.includeBestiary !== false) {
@@ -144,33 +146,44 @@ export async function splitAndGrantXp(
   totalXp: number,
   fallbackSkill: AttackSkill,
   damageByScalingStat: { melee: number; ranged: number; magic: number } | undefined,
+  resourceCostByScalingStat: { melee: number; ranged: number; magic: number } | undefined,
   guildXpBoost: number | undefined,
 ): Promise<GrantXpResult[]> {
   const boost = guildXpBoost || undefined;
 
-  // No damage tracking or no damage dealt — grant all to fallback skill
-  const totalDamage = damageByScalingStat
-    ? damageByScalingStat.melee + damageByScalingStat.ranged + damageByScalingStat.magic
-    : 0;
-  if (!damageByScalingStat || totalDamage <= 0) {
+  // Compute contribution per skill: damage + weighted resource cost
+  const contribution = { melee: 0, ranged: 0, magic: 0 };
+  if (damageByScalingStat) {
+    contribution.melee += damageByScalingStat.melee;
+    contribution.ranged += damageByScalingStat.ranged;
+    contribution.magic += damageByScalingStat.magic;
+  }
+  if (resourceCostByScalingStat) {
+    const w = COMBAT_CONSTANTS.RESOURCE_XP_WEIGHT;
+    contribution.melee += resourceCostByScalingStat.melee * w;
+    contribution.ranged += resourceCostByScalingStat.ranged * w;
+    contribution.magic += resourceCostByScalingStat.magic * w;
+  }
+
+  const totalContribution = contribution.melee + contribution.ranged + contribution.magic;
+  if (totalContribution <= 0) {
     return [await grantSkillXp(playerId, fallbackSkill, totalXp, undefined, boost)];
   }
 
-  // Split proportionally by damage dealt
-  const skills = (['melee', 'ranged', 'magic'] as const).filter(s => damageByScalingStat[s] > 0);
+  // Find skills that contributed
+  const skills = (['melee', 'ranged', 'magic'] as const).filter(s => contribution[s] > 0);
   if (skills.length === 1) {
     return [await grantSkillXp(playerId, skills[0], totalXp, undefined, boost)];
   }
 
-  // Distribute with floor, give remainder to highest-damage skill
+  // Distribute with floor, give remainder to highest-contribution skill
   const xpBySkill: Record<string, number> = {};
   let allocated = 0;
   for (const skill of skills) {
-    xpBySkill[skill] = Math.floor(totalXp * damageByScalingStat[skill] / totalDamage);
+    xpBySkill[skill] = Math.floor(totalXp * contribution[skill] / totalContribution);
     allocated += xpBySkill[skill];
   }
-  // Assign remainder to the skill with most damage
-  const topSkill = skills.reduce((a, b) => damageByScalingStat[a] >= damageByScalingStat[b] ? a : b);
+  const topSkill = skills.reduce((a, b) => contribution[a] >= contribution[b] ? a : b);
   xpBySkill[topSkill] += totalXp - allocated;
 
   const results: GrantXpResult[] = [];

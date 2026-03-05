@@ -181,6 +181,7 @@ vi.mock('@adventure/game-engine', () => ({
     log: [],
     potionsConsumed: [],
     damageByScalingStat: { melee: 20, ranged: 0, magic: 0 },
+    resourceCostByScalingStat: { melee: 10, ranged: 0, magic: 0 },
   })),
   getScaledZoneExitChance: vi.fn(() => 0.01),
   selectTierWithBleedthrough: vi.fn(() => 1),

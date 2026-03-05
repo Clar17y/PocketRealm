@@ -431,6 +431,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
             mob: prefixedMob,
             attackSkill,
             damageByScalingStat: combatResult.damageByScalingStat,
+            resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           });
           const loot = rewards.loot;
           allTravelOverflow.push(...rewards.overflow);

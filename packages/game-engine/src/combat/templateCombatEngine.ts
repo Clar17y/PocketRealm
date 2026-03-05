@@ -77,6 +77,8 @@ export interface TemplateCombatResult {
   totalRounds: number;
   /** Damage dealt by combatantA grouped by resolved scaling stat. */
   damageByScalingStat: { melee: number; ranged: number; magic: number };
+  /** Resource cost (stamina + mana) spent by combatantA grouped by resolved scaling stat. */
+  resourceCostByScalingStat: { melee: number; ranged: number; magic: number };
 }
 
 // --- Internal State ---
@@ -103,6 +105,7 @@ interface TemplateCombatState {
   outcome: CombatOutcome | null;
   activeEffects: ActiveEffect[];
   combatantADamageByScalingStat: { melee: number; ranged: number; magic: number };
+  combatantAResourceCostByScalingStat: { melee: number; ranged: number; magic: number };
 }
 
 // --- Helpers ---
@@ -913,6 +916,7 @@ export function runTemplateCombat(
     outcome: null,
     activeEffects: [],
     combatantADamageByScalingStat: { melee: 0, ranged: 0, magic: 0 },
+    combatantAResourceCostByScalingStat: { melee: 0, ranged: 0, magic: 0 },
   };
 
   // Roll initiative
@@ -1103,6 +1107,7 @@ export function runTemplateCombat(
     potionsConsumed,
     totalRounds: state.round,
     damageByScalingStat: { ...state.combatantADamageByScalingStat },
+    resourceCostByScalingStat: { ...state.combatantAResourceCostByScalingStat },
   };
 }
 
@@ -1132,6 +1137,15 @@ function executeAction(
   // But actually: attackerDamageReduction = A's defend reduction (A takes less damage)
   // When A is executing their offensive action against B, B's defenderDamageReduction applies
   const dmgReduction = isAttacker ? interaction.defenderDamageReduction : interaction.attackerDamageReduction;
+
+  // Track resource cost by scaling stat for XP splitting (combatantA only)
+  if (actorKey === 'combatantA' && perActionScaling) {
+    const cost = action.cost.stamina + action.cost.mana;
+    if (cost > 0) {
+      const resolved = resolveScalingStat(action.scalingStat ?? 'weapon', perActionScaling.weaponRequiredSkill, perActionScaling.skillLevels);
+      state.combatantAResourceCostByScalingStat[resolved] += cost;
+    }
+  }
 
   if (action.category === 'offensive') {
     executeOffensiveAction(

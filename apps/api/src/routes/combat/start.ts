@@ -290,6 +290,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
           mob: prefixedMob,
           attackSkill,
           damageByScalingStat: combatResult.damageByScalingStat,
+          resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           guildXpBoost: guildMods.xpBoost,
           includeGuildCredit: true,
         });
@@ -884,6 +885,7 @@ export function registerStartRoutes(router: Router): void {
           mob: prefixedMob,
           attackSkill,
           damageByScalingStat: combatResult.damageByScalingStat,
+          resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           guildXpBoost: guildMods.xpBoost,
           includeGuildCredit: true,
           includeBestiary: false, // zone combat has its own bestiary logic (upserts on all outcomes)

@@ -382,6 +382,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             mob: prefixedMob,
             attackSkill,
             damageByScalingStat: combatResult.damageByScalingStat,
+            resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           });
           loot = rewards.loot;
           if (rewards.pendingLootSessionId) {
