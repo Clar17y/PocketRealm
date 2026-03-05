@@ -712,7 +712,24 @@ export function runTemplateCombat(
 
     // Resource regen at the start of each round (skip round 1)
     if (state.round > 1) {
+      const beforeA = { stamina: state.combatantAStamina, mana: state.combatantAMana };
+      const beforeB = { stamina: state.combatantBStamina, mana: state.combatantBMana };
       applyResourceRegen(state);
+      const aChanged = state.combatantAStamina !== beforeA.stamina || state.combatantAMana !== beforeA.mana;
+      const bChanged = state.combatantBStamina !== beforeB.stamina || state.combatantBMana !== beforeB.mana;
+      if (aChanged || bChanged) {
+        state.log.push({
+          round: state.round,
+          actor: 'combatantA',
+          actorName: combatantA.name,
+          action: 'regen',
+          message: 'Resources regenerate.',
+          combatantAAction: '',
+          combatantBAction: '',
+          ...hpSnapshot(state),
+          ...resourceSnapshot(state),
+        });
+      }
     }
 
     // Resolve actions for both combatants
@@ -774,8 +791,12 @@ export function runTemplateCombat(
     const combatantBAction = resolvedB.action.id;
     const interactionResult = describeInteraction(interaction);
 
-    // Execute actions in initiative order
+    // Execute actions in initiative order.
+    // Deduct each combatant's resource cost immediately before their action
+    // so the log entry snapshot reflects the cost at the right moment.
     if (aGoesFirst) {
+      deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
+      deductMana(state, 'combatantA', resolvedA.action.cost.mana);
       executeAction(
         state, 'combatantA', effectiveA, effectiveB,
         resolvedA.action, interaction, true,
@@ -784,6 +805,8 @@ export function runTemplateCombat(
         resolvedA.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
       );
+      deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
+      deductMana(state, 'combatantB', resolvedB.action.cost.mana);
       if (state.outcome) break;
       executeAction(
         state, 'combatantB', effectiveB, effectiveA,
@@ -794,6 +817,8 @@ export function runTemplateCombat(
         availablePotions, potionsConsumed,
       );
     } else {
+      deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
+      deductMana(state, 'combatantB', resolvedB.action.cost.mana);
       executeAction(
         state, 'combatantB', effectiveB, effectiveA,
         resolvedB.action, interaction, false,
@@ -802,6 +827,8 @@ export function runTemplateCombat(
         resolvedB.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
       );
+      deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
+      deductMana(state, 'combatantA', resolvedA.action.cost.mana);
       if (state.outcome) break;
       executeAction(
         state, 'combatantA', effectiveA, effectiveB,
@@ -812,12 +839,6 @@ export function runTemplateCombat(
         availablePotions, potionsConsumed,
       );
     }
-
-    // Deduct action costs AFTER both actions resolve (even if combat ended)
-    deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
-    deductMana(state, 'combatantA', resolvedA.action.cost.mana);
-    deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
-    deductMana(state, 'combatantB', resolvedB.action.cost.mana);
 
     if (state.outcome) break;
 

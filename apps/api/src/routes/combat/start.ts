@@ -229,6 +229,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       const prefixedMob = applyMobPrefix(modifiedMob, roomMob.prefix ?? null);
 
       const playerStartHp = currentPlayerHp;
+      const playerStartStamina = currentStamina;
+      const playerStartMana = currentMana;
       const playerStats = buildPlayerCombatStats(
         currentPlayerHp,
         hpState.maxHp,
@@ -296,6 +298,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         outcome: combatResult.outcome,
         playerMaxHp: combatResult.combatantAMaxHp,
         playerStartHp,
+        playerStartStamina,
+        playerStartMana,
         mobMaxHp: combatResult.combatantBMaxHp,
         log: mapTemplateCombatLog(combatResult.log),
         playerHpRemaining: combatResult.combatantAHpRemaining,
@@ -649,6 +653,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         outcome: f.outcome,
         playerMaxHp: f.playerMaxHp,
         playerStartHp: f.playerStartHp,
+        playerStartStamina: f.playerStartStamina,
+        playerStartMana: f.playerStartMana,
         mobMaxHp: f.mobMaxHp,
         ...(fightLogIds[i] ? { combatLogId: fightLogIds[i] } : { log: f.log }),
         playerHpRemaining: f.playerHpRemaining,
@@ -983,6 +989,8 @@ export function registerStartRoutes(router: Router): void {
           attackSkill,
           outcome: combatResult.outcome,
           playerMaxHp: combatResult.combatantAMaxHp,
+          playerStartStamina: resourceState.stamina.current,
+          playerStartMana: resourceState.mana.current,
           mobMaxHp: combatResult.combatantBMaxHp,
           log: mapTemplateCombatLog(combatResult.log),
           playerHpRemaining: combatResult.combatantAHpRemaining,

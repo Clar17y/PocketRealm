@@ -83,7 +83,7 @@ export function CombatLogEntry({
 }: CombatLogEntryProps) {
   const [expanded, setExpanded] = useState(false);
   const icon = getActionIcon(entry);
-  const hasDetails = entry.attackModifier !== undefined || entry.rawDamage !== undefined || entry.spellName !== undefined;
+  const hasDetails = entry.accuracyModifier !== undefined || entry.rawDamage !== undefined || entry.spellName !== undefined;
   const hitOutcome = resolveHitOutcome(entry);
 
   const isPlayerAction = entry.actor === 'combatantA';

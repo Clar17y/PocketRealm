@@ -68,6 +68,8 @@ export type CombatPlaybackItem = {
 export type CombatPlaybackQueueItem = CombatPlaybackItem & {
   room?: number;
   playerStartHp: number;
+  playerStartStamina?: number;
+  playerStartMana?: number;
   rewards: LastCombat['rewards'];
   activeEvents?: CombatActiveEvent[];
 };

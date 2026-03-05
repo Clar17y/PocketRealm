@@ -678,6 +678,10 @@ export default function GamePage() {
             guildTaxRate={guildTaxRate}
             undiscoveredZones={undiscoveredZones}
             combatLogPrefetch={combatLogPrefetch}
+            playerStartStamina={staminaState.current}
+            playerStartMana={manaState.current}
+            playerMaxStamina={staminaState.max}
+            playerMaxMana={manaState.max}
           />
         );
       case 'bestiary':

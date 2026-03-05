@@ -146,7 +146,7 @@ describe('runTemplateCombat', () => {
 
       // Verify template loops correctly
       const aEntries = result.log.filter(
-        (e) => e.actor === 'combatantA' && e.round >= 1 && e.round <= 12,
+        (e) => e.actor === 'combatantA' && e.action !== 'regen' && e.round >= 1 && e.round <= 12,
       );
 
       // Round 1 & 7 → index 0 → light_attack
@@ -420,9 +420,9 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b);
 
-      // Combat ends on death before cost deduction → resources unchanged
+      // Costs are deducted even on a killing blow
       expect(result.outcome).toBe('victory');
-      expect(result.combatantAStaminaRemaining).toBe(100);
+      expect(result.combatantAStaminaRemaining).toBe(100 - COMBAT_ACTION_CONSTANTS.LIGHT_ATTACK_STAMINA);
       expect(result.combatantAManaRemaining).toBe(50);
     });
 

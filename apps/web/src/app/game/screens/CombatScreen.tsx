@@ -61,6 +61,8 @@ interface CombatScreenProps {
     outcome: string;
     combatantAMaxHp: number;
     playerStartHp: number;
+    playerStartStamina?: number;
+    playerStartMana?: number;
     combatantBMaxHp: number;
     log: LastCombatLogEntry[] | null;
     rewards: LastCombat['rewards'];
@@ -365,6 +367,8 @@ export function CombatScreen({
                   log={combatPlaybackData.log}
                   rewards={combatPlaybackData.rewards}
                   activeEvents={combatPlaybackData.activeEvents}
+                  playerStartStamina={combatPlaybackData.playerStartStamina}
+                  playerStartMana={combatPlaybackData.playerStartMana}
                   playerMaxStamina={staminaState?.max}
                   playerMaxMana={manaState?.max}
                   speedMs={combatSpeedMs}

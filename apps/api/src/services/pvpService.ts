@@ -638,6 +638,8 @@ export async function challenge(
     defenderStyle,
     combat: { ...combatResult, log: mapTemplateCombatLog(combatResult.log) },
     attackerStartHp: hpState.currentHp,
+    attackerStartStamina: attackerResources.stamina.current,
+    attackerStartMana: attackerResources.mana.current,
     attackerKnockedOut,
     fleeOutcome,
     durability: {

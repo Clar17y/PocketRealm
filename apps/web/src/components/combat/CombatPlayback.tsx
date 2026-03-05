@@ -22,6 +22,8 @@ interface CombatPlaybackProps {
   rewards?: LastCombat['rewards'];
   activeEvents?: CombatActiveEvent[];
   playerLabel?: string;
+  playerStartStamina?: number;
+  playerStartMana?: number;
   playerMaxStamina?: number;
   playerMaxMana?: number;
   opponentMaxStamina?: number;
@@ -45,6 +47,8 @@ export function CombatPlayback({
   rewards,
   activeEvents,
   playerLabel = 'You',
+  playerStartStamina,
+  playerStartMana,
   playerMaxStamina = 100,
   playerMaxMana = 50,
   opponentMaxStamina = 100,
@@ -81,7 +85,7 @@ export function CombatPlayback({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Playback: reveal one entry every 800ms
+  // Playback: reveal one entry at a time
   useEffect(() => {
     if (phase !== 'playing' || revealedCount >= log.length) return;
 
@@ -156,7 +160,7 @@ export function CombatPlayback({
   // Don't render anything when auto-skipping victories — prevents a flash of HP bars
   if (autoSkip && phase === 'finished-auto') return null;
 
-  // Derive current HP from the last revealed entry
+  // Derive current HP from the last revealed entry (damage is always visible immediately)
   const currentPlayerHp = revealedCount === 0
     ? playerStartHp
     : (log[revealedCount - 1].combatantAHpAfter ?? playerStartHp);
@@ -164,14 +168,30 @@ export function CombatPlayback({
     ? mobMaxHp
     : (log[revealedCount - 1].combatantBHpAfter ?? mobMaxHp);
 
-  // Use combatant-indexed fields (always player's values) rather than actor-relative
-  // staminaAfter/manaAfter which alternate between player and mob per entry
-  const currentEntry = revealedCount > 0 ? log[revealedCount - 1] : null;
-  const rawEntry = currentEntry as Record<string, unknown> | null;
-  const currentStamina = (rawEntry?.combatantAStaminaAfter as number) ?? playerMaxStamina;
-  const currentMana = (rawEntry?.combatantAManaAfter as number) ?? playerMaxMana;
-  const opponentStamina = (rawEntry?.combatantBStaminaAfter as number) ?? opponentMaxStamina;
-  const opponentMana = (rawEntry?.combatantBManaAfter as number) ?? opponentMaxMana;
+  // Stamina/mana only update on entries where that combatant is the actor
+  // (or on regen entries which affect both), so resource costs appear exactly
+  // when the action is revealed — not a round early/late.
+  let currentStamina = playerStartStamina ?? playerMaxStamina;
+  let currentMana = playerStartMana ?? playerMaxMana;
+  let opponentStamina = opponentMaxStamina;
+  let opponentMana = opponentMaxMana;
+  let foundA = false;
+  let foundB = false;
+  for (let i = revealedCount - 1; i >= 0; i--) {
+    const entry = log[i];
+    const isRegen = entry.action === 'regen';
+    if (!foundA && (entry.actor === 'combatantA' || isRegen)) {
+      currentStamina = entry.combatantAStaminaAfter ?? playerMaxStamina;
+      currentMana = entry.combatantAManaAfter ?? playerMaxMana;
+      foundA = true;
+    }
+    if (!foundB && (entry.actor === 'combatantB' || isRegen)) {
+      opponentStamina = entry.combatantBStaminaAfter ?? opponentMaxStamina;
+      opponentMana = entry.combatantBManaAfter ?? opponentMaxMana;
+      foundB = true;
+    }
+    if (foundA && foundB) break;
+  }
 
   return (
     <div>
@@ -228,6 +248,9 @@ export function CombatPlayback({
         <div className="text-center text-sm mb-2">
           {(() => {
             const lastEntry = log[revealedCount - 1];
+            if (lastEntry.action === 'regen') {
+              return <span className="text-teal-400 italic">Resources regenerate</span>;
+            }
             const displayLabel = lastEntry.actionName ?? lastEntry.spellName;
             if (lastEntry.effectsExpired && lastEntry.effectsExpired.length > 0) {
               return <span className="text-[var(--rpg-text-secondary)] italic">
@@ -271,7 +294,7 @@ export function CombatPlayback({
 
       {/* Combat log (revealed entries) */}
       <div ref={logScrollRef} className="max-h-40 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
-        {log.slice(0, revealedCount).map((entry, idx) => (
+        {log.slice(0, revealedCount).filter(e => e.action !== 'regen').map((entry, idx) => (
           <CombatLogEntry
             key={idx}
             entry={entry}
