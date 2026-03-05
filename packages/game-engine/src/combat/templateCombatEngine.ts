@@ -808,13 +808,13 @@ export function runTemplateCombat(
       );
     }
 
-    if (state.outcome) break;
-
-    // Deduct action costs AFTER both actions resolve
+    // Deduct action costs AFTER both actions resolve (even if combat ended)
     deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
     deductMana(state, 'combatantA', resolvedA.action.cost.mana);
     deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
     deductMana(state, 'combatantB', resolvedB.action.cost.mana);
+
+    if (state.outcome) break;
 
     // Tick effects (decrement duration, remove expired)
     tickEffects(state);
