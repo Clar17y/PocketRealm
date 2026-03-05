@@ -191,7 +191,7 @@ model Item {
   templateId        String   @map("template_id")
   ownerId           String   @map("owner_id")
   rarity            String   @default("common") @db.VarChar(16)
-  currentDurability Int?     @map("current_durability")
+  currentDurability Float?   @map("current_durability")
   maxDurability     Int?     @map("max_durability")
   quantity          Int      @default(1)
   bonusStats        Json?    @map("bonus_stats")

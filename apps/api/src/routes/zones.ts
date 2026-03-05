@@ -406,7 +406,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           allPotionsConsumed.push(consumed);
         }
 
-        const durabilityLost = await degradeEquippedDurability(playerId);
+        const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
 
         // Resolve mob family for event badges + achievement tracking
         const familyMember = await prisma.mobFamilyMember.findFirst({

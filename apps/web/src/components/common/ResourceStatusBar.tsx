@@ -40,7 +40,7 @@ function ResourceBar({
         </span>
         {typeof regenPerSecond === 'number' && regenPerSecond > 0 && (
           <span className="text-[10px] font-mono text-white/70 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
-            +{regenPerSecond}/s
+            +{parseFloat(regenPerSecond.toFixed(2))}/s
           </span>
         )}
       </div>

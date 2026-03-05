@@ -12,7 +12,7 @@ import { serializeXpGrant, paginationSchema, buildPagination, assertCanAct, trac
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
-import { rollGemCritBatch, computeEventMinActions } from '@adventure/game-engine';
+import { rollGemCritBatch, computeEventTurnCost } from '@adventure/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
@@ -313,33 +313,30 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     ? Math.max(1, Math.floor(baseYieldPerAction * (1 + guildMods.gatheringYield)))
     : baseYieldPerAction;
 
-  // Minimum batch size so yield events always produce a visible reduction.
+  // yield_down → increase turn cost (so players still collect the full amount)
+  // yield_up  → bonus yield (applied after raw yield calculation)
   const eventMultiplier = zoneModifiers.resourceYieldMultiplier;
-  const eventMinActions = computeEventMinActions(eventMultiplier);
+  const turnCostPerAction = computeEventTurnCost(eventMultiplier);
 
   const { turnSpend, taxResult, actions, totalYield, rawTotalYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
     // Look up tax rate to calculate effective turns
     const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
     const effectiveTurns = calculateEffectiveTurns(body.turns, taxRate);
 
-    const maxActionsByTurns = Math.floor(effectiveTurns / GATHERING_CONSTANTS.BASE_TURN_COST);
+    const maxActionsByTurns = Math.floor(effectiveTurns / turnCostPerAction);
     const maxActionsByCapacity = Math.ceil(effectiveCapacity / guildYieldPerAction);
     const innerActions = Math.min(maxActionsByTurns, maxActionsByCapacity);
 
-    if (innerActions < eventMinActions) {
-      const minTurns = calculateInflatedCost(eventMinActions * GATHERING_CONSTANTS.BASE_TURN_COST, taxRate);
-      throw new AppError(400, `World events require at least ${minTurns} turns (${eventMinActions} actions) to gather here`, 'EVENT_MIN_ACTIONS');
-    }
     if (innerActions <= 0) {
       throw new AppError(400, 'Not enough turns after guild tax', 'INSUFFICIENT_TURNS');
     }
 
-    const baseTurns = innerActions * GATHERING_CONSTANTS.BASE_TURN_COST;
+    const baseTurns = innerActions * turnCostPerAction;
     const actualTurns = calculateInflatedCost(baseTurns, taxRate);
 
-    // Compute raw yield (before events), then apply event modifier to session total
+    // yield_up: apply bonus multiplier; yield_down: already penalised via turn cost
     const innerRawYield = Math.min(innerActions * guildYieldPerAction, effectiveCapacity);
-    const innerTotalYield = eventMultiplier !== 1
+    const innerTotalYield = eventMultiplier > 1
       ? Math.max(1, Math.floor(innerRawYield * eventMultiplier))
       : innerRawYield;
     const innerNewCapacity = effectiveCapacity - innerTotalYield;
@@ -490,6 +487,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
           totalYieldPerAction: baseYieldPerAction, // deprecated; kept for client compat
           rawTotalYield,
           eventModifier: zoneModifiers.resourceYieldMultiplier,
+          turnCostPerAction,
           eventTitle: activeEventEffects.find((e: { effectType: string }) => e.effectType === 'yield_up' || e.effectType === 'yield_down')?.title ?? null,
         }
       : undefined,

@@ -347,7 +347,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           allPotionsConsumed.push(consumed);
         }
 
-        const durabilityLost = await degradeEquippedDurability(playerId);
+        const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
 
         // Determine mob family once for event modifier badges (used in both victory and defeat paths)
         const ambushMobFamily = zoneFamilies.find((f: ZoneFamilyRow) =>

@@ -75,7 +75,7 @@ export const SKILL_CONSTANTS = {
   XP_BASE: 100,
 
   /** Exponent for XP curve: xp_for_level = base * (level ^ exponent) */
-  XP_EXPONENT: 1.5,
+  XP_EXPONENT: 1.8,
 
   /** Maximum level */
   MAX_LEVEL: 100,
@@ -84,7 +84,7 @@ export const SKILL_CONSTANTS = {
   XP_WINDOW_HOURS: 6,
 
   /** Daily XP cap for combat skills (divided by 4 windows = per-window cap) */
-  DAILY_CAP_COMBAT: 20_000,
+  DAILY_CAP_COMBAT: 14_000,
 
   /** Daily XP cap for gathering skills (divided by 4 windows = per-window cap) */
   DAILY_CAP_GATHERING: 30_000,
@@ -151,8 +151,8 @@ export const CHEST_CONSTANTS = {
 // =============================================================================
 
 export const DURABILITY_CONSTANTS = {
-  /** Durability lost per combat (per equipped item) */
-  COMBAT_DEGRADATION: 1,
+  /** Durability lost per hit landed/received */
+  COMBAT_DEGRADATION: 0.01,
 
   /** Turn cost to repair an item */
   REPAIR_TURN_COST: 100,
@@ -605,7 +605,7 @@ export const PVP_CONSTANTS = {
   CHALLENGE_TURN_COST: 500,
   SCOUT_TURN_COST: 100,
   REVENGE_TURN_COST: 250,
-  COOLDOWN_HOURS: 24,
+  COOLDOWN_HOURS: 6,
   MIN_OPPONENTS_SHOWN: 10,
   MIN_CHARACTER_LEVEL: 10,
 } as const;
@@ -1154,19 +1154,25 @@ export const GUILD_SPECIALIZATION_DEFINITIONS: readonly GuildSpecializationDefin
     name: 'Warfare',
     description: 'Focused on combat prowess and boss encounters.',
     tiers: [
-      { tier: 1, guildLevelGate: 10, bonuses: [
-        { effectType: 'xpBoost', value: 0.05 },
-        { effectType: 'combatDamage', value: 0.05 },
-      ]},
-      { tier: 2, guildLevelGate: 25, bonuses: [
-        { effectType: 'xpBoost', value: 0.10 },
-        { effectType: 'combatDamage', value: 0.10 },
-      ]},
-      { tier: 3, guildLevelGate: 40, bonuses: [
-        { effectType: 'xpBoost', value: 0.15 },
-        { effectType: 'combatDamage', value: 0.15 },
-        { effectType: 'defenseBoost', value: 0.05 },
-      ]},
+      {
+        tier: 1, guildLevelGate: 10, bonuses: [
+          { effectType: 'xpBoost', value: 0.05 },
+          { effectType: 'combatDamage', value: 0.05 },
+        ]
+      },
+      {
+        tier: 2, guildLevelGate: 25, bonuses: [
+          { effectType: 'xpBoost', value: 0.10 },
+          { effectType: 'combatDamage', value: 0.10 },
+        ]
+      },
+      {
+        tier: 3, guildLevelGate: 40, bonuses: [
+          { effectType: 'xpBoost', value: 0.15 },
+          { effectType: 'combatDamage', value: 0.15 },
+          { effectType: 'defenseBoost', value: 0.05 },
+        ]
+      },
     ],
   },
   {
@@ -1174,20 +1180,26 @@ export const GUILD_SPECIALIZATION_DEFINITIONS: readonly GuildSpecializationDefin
     name: 'Industry',
     description: 'Focused on crafting excellence and gathering efficiency.',
     tiers: [
-      { tier: 1, guildLevelGate: 10, bonuses: [
-        { effectType: 'craftingCrit', value: 0.05 },
-        { effectType: 'gatheringYield', value: 0.10 },
-      ]},
-      { tier: 2, guildLevelGate: 25, bonuses: [
-        { effectType: 'craftingCrit', value: 0.10 },
-        { effectType: 'gatheringYield', value: 0.20 },
-        { effectType: 'repairCostReduction', value: 0.10 },
-      ]},
-      { tier: 3, guildLevelGate: 40, bonuses: [
-        { effectType: 'craftingCrit', value: 0.15 },
-        { effectType: 'gatheringYield', value: 0.30 },
-        { effectType: 'repairCostReduction', value: 0.20 },
-      ]},
+      {
+        tier: 1, guildLevelGate: 10, bonuses: [
+          { effectType: 'craftingCrit', value: 0.05 },
+          { effectType: 'gatheringYield', value: 0.10 },
+        ]
+      },
+      {
+        tier: 2, guildLevelGate: 25, bonuses: [
+          { effectType: 'craftingCrit', value: 0.10 },
+          { effectType: 'gatheringYield', value: 0.20 },
+          { effectType: 'repairCostReduction', value: 0.10 },
+        ]
+      },
+      {
+        tier: 3, guildLevelGate: 40, bonuses: [
+          { effectType: 'craftingCrit', value: 0.15 },
+          { effectType: 'gatheringYield', value: 0.30 },
+          { effectType: 'repairCostReduction', value: 0.20 },
+        ]
+      },
     ],
   },
   {
@@ -1195,18 +1207,24 @@ export const GUILD_SPECIALIZATION_DEFINITIONS: readonly GuildSpecializationDefin
     name: 'Discovery',
     description: 'Focused on exploration and resource acquisition.',
     tiers: [
-      { tier: 1, guildLevelGate: 10, bonuses: [
-        { effectType: 'travelCostReduction', value: 0.10 },
-        { effectType: 'gatheringYield', value: 0.15 },
-      ]},
-      { tier: 2, guildLevelGate: 25, bonuses: [
-        { effectType: 'travelCostReduction', value: 0.20 },
-        { effectType: 'gatheringYield', value: 0.30 },
-      ]},
-      { tier: 3, guildLevelGate: 40, bonuses: [
-        { effectType: 'travelCostReduction', value: 0.30 },
-        { effectType: 'gatheringYield', value: 0.50 },
-      ]},
+      {
+        tier: 1, guildLevelGate: 10, bonuses: [
+          { effectType: 'travelCostReduction', value: 0.10 },
+          { effectType: 'gatheringYield', value: 0.15 },
+        ]
+      },
+      {
+        tier: 2, guildLevelGate: 25, bonuses: [
+          { effectType: 'travelCostReduction', value: 0.20 },
+          { effectType: 'gatheringYield', value: 0.30 },
+        ]
+      },
+      {
+        tier: 3, guildLevelGate: 40, bonuses: [
+          { effectType: 'travelCostReduction', value: 0.30 },
+          { effectType: 'gatheringYield', value: 0.50 },
+        ]
+      },
     ],
   },
 ] as const;
