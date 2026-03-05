@@ -12,8 +12,10 @@ import { normalizePlayerAttributes } from '../services/attributesService';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity } from '@adventure/game-engine';
 import {
   CHARACTER_CONSTANTS,
+  SKILL_CONSTANTS,
   EXPLORATION_CONSTANTS,
   WORLD_EVENT_TEMPLATES,
+  ALL_SKILLS,
   type PlayerAttributes,
   type ItemRarity,
   type EquipmentSlot,
@@ -53,6 +55,24 @@ router.post('/player/level', asyncHandler(async (req, res) => {
     },
   });
   res.json({ success: true, level, characterXp: xp });
+}));
+
+const setSkillLevelSchema = z.object({
+  skillType: z.enum(ALL_SKILLS as [string, ...string[]]),
+  level: z.number().int().min(1).max(SKILL_CONSTANTS.MAX_LEVEL),
+});
+
+router.post('/set-skill-level', asyncHandler(async (req, res) => {
+  const { skillType, level } = setSkillLevelSchema.parse(req.body);
+  const xp = xpForLevel(level);
+
+  await prisma.playerSkill.upsert({
+    where: { playerId_skillType: { playerId: req.player!.playerId, skillType } },
+    update: { level, xp: BigInt(xp) },
+    create: { playerId: req.player!.playerId, skillType, level, xp: BigInt(xp) },
+  });
+
+  res.json({ success: true, skillType, level });
 }));
 
 const grantXpSchema = z.object({ amount: z.number().int().min(1) });
