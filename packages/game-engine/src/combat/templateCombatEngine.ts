@@ -623,6 +623,7 @@ function executePotionAction(
     action: 'potion',
     spellName: potion.name,
     healAmount: actualRestore,
+    healResourceType: potionType,
     effectsApplied: [{
       stat: 'potionSickness',
       modifier: 0,

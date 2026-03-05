@@ -237,14 +237,25 @@ export function CombatPlayback({
             if (lastEntry.interactionResult === 'countered') return <span className="text-[var(--rpg-gold)] font-bold">Countered!</span>;
             if (lastEntry.interactionResult === 'warded') return <span className="text-purple-400 font-bold">Warded!</span>;
             if (lastEntry.wasExhausted) return <span className="text-[var(--rpg-text-secondary)] italic">Exhausted &rarr; Defend</span>;
-            if (lastEntry.action === 'potion') return <span className="text-[var(--rpg-green-light)]">🧪 {displayLabel ?? 'Potion'}: +{lastEntry.healAmount} HP</span>;
+            if (lastEntry.action === 'potion') {
+              const rt = lastEntry.healResourceType;
+              const color = rt === 'stamina' ? 'text-teal-400' : rt === 'mana' ? 'text-[var(--rpg-blue-light)]' : 'text-[var(--rpg-green-light)]';
+              const label = rt === 'stamina' ? 'STA' : rt === 'mana' ? 'MP' : 'HP';
+              return <span className={color}>🧪 {displayLabel ?? 'Potion'}: +{lastEntry.healAmount} {label}</span>;
+            }
             if (lastEntry.evaded) return <span className="text-[var(--rpg-blue-light)]">Dodged!</span>;
             if (lastEntry.isCritical) return <span className="text-[var(--rpg-gold)] font-bold">Critical Hit! {lastEntry.damage} dmg</span>;
             if (lastEntry.damage && lastEntry.damage > 0 && lastEntry.healAmount && lastEntry.healAmount > 0) {
-              return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}{lastEntry.damage} dmg, +{lastEntry.healAmount} HP</span>;
+              const rl = lastEntry.healResourceType === 'stamina' ? 'STA' : lastEntry.healResourceType === 'mana' ? 'MP' : 'HP';
+              return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}{lastEntry.damage} dmg, +{lastEntry.healAmount} {rl}</span>;
             }
             if (lastEntry.damage && lastEntry.damage > 0) return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}{lastEntry.damage} dmg</span>;
-            if (lastEntry.healAmount && lastEntry.healAmount > 0) return <span className="text-[var(--rpg-green-light)]">{displayLabel ? `${displayLabel}: ` : ''}+{lastEntry.healAmount} HP</span>;
+            if (lastEntry.healAmount && lastEntry.healAmount > 0) {
+              const rt2 = lastEntry.healResourceType;
+              const c2 = rt2 === 'stamina' ? 'text-teal-400' : rt2 === 'mana' ? 'text-[var(--rpg-blue-light)]' : 'text-[var(--rpg-green-light)]';
+              const l2 = rt2 === 'stamina' ? 'STA' : rt2 === 'mana' ? 'MP' : 'HP';
+              return <span className={c2}>{displayLabel ? `${displayLabel}: ` : ''}+{lastEntry.healAmount} {l2}</span>;
+            }
             if (lastEntry.effectsApplied && lastEntry.effectsApplied.length > 0) {
               const e = lastEntry.effectsApplied[0];
               return <span className="text-[var(--rpg-blue-light)]">
