@@ -577,21 +577,21 @@ function executePotionAction(
     } else {
       state.combatantBHp = Math.min(maxHp, state.combatantBHp + potion.healAmount);
     }
-    actualRestore = getHp(state, actorKey) - hpBefore;
+    actualRestore = Math.round(getHp(state, actorKey) - hpBefore);
     resourceLabel = 'HP';
   } else if (potionType === 'stamina') {
     const before = getStamina(state, actorKey);
     const maxStam = getMaxStamina(state, actorKey);
     const newStam = Math.min(before + potion.healAmount, maxStam);
     setStamina(state, actorKey, newStam);
-    actualRestore = newStam - before;
+    actualRestore = Math.round(newStam - before);
     resourceLabel = 'Stamina';
   } else {
     const before = getMana(state, actorKey);
     const maxM = getMaxMana(state, actorKey);
     const newMana = Math.min(before + potion.healAmount, maxM);
     setMana(state, actorKey, newMana);
-    actualRestore = newMana - before;
+    actualRestore = Math.round(newMana - before);
     resourceLabel = 'Mana';
   }
 
