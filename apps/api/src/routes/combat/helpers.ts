@@ -237,6 +237,8 @@ export interface FightResult {
   outcome: string;
   playerMaxHp: number;
   playerStartHp: number;
+  playerStartStamina: number;
+  playerStartMana: number;
   mobMaxHp: number;
   log: unknown[];
   playerHpRemaining: number;

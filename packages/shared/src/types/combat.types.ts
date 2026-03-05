@@ -82,7 +82,7 @@ export interface CombatLogEntry {
   }>;
 }
 
-export type CombatAction = 'attack' | 'spell' | 'defend' | 'flee' | 'potion' | 'regen';
+export type CombatAction = 'attack' | 'spell' | 'defend' | 'counter' | 'ward' | 'flee' | 'potion' | 'heal' | 'regen';
 
 export type CombatOutcome = 'victory' | 'defeat' | 'fled' | 'draw';
 
