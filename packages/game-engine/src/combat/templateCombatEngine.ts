@@ -1,5 +1,5 @@
 import type {
-  CombatTemplateAction,
+  CombatTemplateSlotData,
   ActionDefinition,
   CombatOutcome,
   CombatLogEntry,
@@ -12,7 +12,7 @@ import type {
   CombatAction,
 } from '@adventure/shared';
 import { COMBAT_ACTION_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
-import { resolveAction, resolveInteraction, type RoundInteraction } from './actionResolver';
+import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type RoundInteraction } from './actionResolver';
 import {
   rollD20,
   rollDamage,
@@ -31,7 +31,7 @@ export interface TemplateCombatant {
   id: string;
   name: string;
   stats: CombatantStats;
-  template: CombatTemplateAction[];
+  template: CombatTemplateSlotData[];
   stamina: number;
   maxStamina: number;
   staminaRegenPerRound: number;
@@ -577,21 +577,21 @@ function executePotionAction(
     } else {
       state.combatantBHp = Math.min(maxHp, state.combatantBHp + potion.healAmount);
     }
-    actualRestore = getHp(state, actorKey) - hpBefore;
+    actualRestore = Math.round(getHp(state, actorKey) - hpBefore);
     resourceLabel = 'HP';
   } else if (potionType === 'stamina') {
     const before = getStamina(state, actorKey);
     const maxStam = getMaxStamina(state, actorKey);
     const newStam = Math.min(before + potion.healAmount, maxStam);
     setStamina(state, actorKey, newStam);
-    actualRestore = newStam - before;
+    actualRestore = Math.round(newStam - before);
     resourceLabel = 'Stamina';
   } else {
     const before = getMana(state, actorKey);
     const maxM = getMaxMana(state, actorKey);
     const newMana = Math.min(before + potion.healAmount, maxM);
     setMana(state, actorKey, newMana);
-    actualRestore = newMana - before;
+    actualRestore = Math.round(newMana - before);
     resourceLabel = 'Mana';
   }
 
@@ -623,6 +623,7 @@ function executePotionAction(
     action: 'potion',
     spellName: potion.name,
     healAmount: actualRestore,
+    healResourceType: potionType,
     effectsApplied: [{
       stat: 'potionSickness',
       modifier: 0,
@@ -711,24 +712,73 @@ export function runTemplateCombat(
 
     // Resource regen at the start of each round (skip round 1)
     if (state.round > 1) {
+      const beforeA = { stamina: state.combatantAStamina, mana: state.combatantAMana };
+      const beforeB = { stamina: state.combatantBStamina, mana: state.combatantBMana };
       applyResourceRegen(state);
+      const aChanged = state.combatantAStamina !== beforeA.stamina || state.combatantAMana !== beforeA.mana;
+      const bChanged = state.combatantBStamina !== beforeB.stamina || state.combatantBMana !== beforeB.mana;
+      if (aChanged || bChanged) {
+        state.log.push({
+          round: state.round,
+          actor: 'combatantA',
+          actorName: combatantA.name,
+          action: 'regen',
+          message: 'Resources regenerate.',
+          combatantAAction: '',
+          combatantBAction: '',
+          ...hpSnapshot(state),
+          ...resourceSnapshot(state),
+        });
+      }
     }
 
     // Resolve actions for both combatants
-    const resolvedA = resolveAction(
+    let resolvedA = resolveAction(
       combatantA.template,
       state.round,
+      getHp(state, 'combatantA'),
+      state.combatantAMaxHp,
       getStamina(state, 'combatantA'),
+      state.combatantAMaxStamina,
       getMana(state, 'combatantA'),
+      state.combatantAMaxMana,
+      state.activeEffects,
+      'combatantA',
       combatantA.actionDefinitions,
     );
-    const resolvedB = resolveAction(
+    let resolvedB = resolveAction(
       combatantB.template,
       state.round,
+      getHp(state, 'combatantB'),
+      state.combatantBMaxHp,
       getStamina(state, 'combatantB'),
+      state.combatantBMaxStamina,
       getMana(state, 'combatantB'),
+      state.combatantBMaxMana,
+      state.activeEffects,
+      'combatantB',
       combatantB.actionDefinitions,
     );
+
+    // When a potion action can't fire (sick or empty), try the other branch first, then Defend
+    if (resolvedA.action.potionType) {
+      const canUsePotion = !hasPotionSickness(state, 'combatantA') &&
+        availablePotions.some(p => p.potionType === resolvedA.action.potionType);
+      if (!canUsePotion) {
+        resolvedA = resolvedA.alternateAction
+          ? { action: resolvedA.alternateAction, wasExhausted: false }
+          : { action: DEFEND_FALLBACK, wasExhausted: true };
+      }
+    }
+    if (resolvedB.action.potionType) {
+      const canUsePotion = !hasPotionSickness(state, 'combatantB') &&
+        availablePotions.some(p => p.potionType === resolvedB.action.potionType);
+      if (!canUsePotion) {
+        resolvedB = resolvedB.alternateAction
+          ? { action: resolvedB.alternateAction, wasExhausted: false }
+          : { action: DEFEND_FALLBACK, wasExhausted: true };
+      }
+    }
 
     // Resolve RPS interaction
     const interaction = resolveInteraction(resolvedA, resolvedB);
@@ -741,8 +791,12 @@ export function runTemplateCombat(
     const combatantBAction = resolvedB.action.id;
     const interactionResult = describeInteraction(interaction);
 
-    // Execute actions in initiative order
+    // Execute actions in initiative order.
+    // Deduct each combatant's resource cost immediately before their action
+    // so the log entry snapshot reflects the cost at the right moment.
     if (aGoesFirst) {
+      deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
+      deductMana(state, 'combatantA', resolvedA.action.cost.mana);
       executeAction(
         state, 'combatantA', effectiveA, effectiveB,
         resolvedA.action, interaction, true,
@@ -751,6 +805,8 @@ export function runTemplateCombat(
         resolvedA.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
       );
+      deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
+      deductMana(state, 'combatantB', resolvedB.action.cost.mana);
       if (state.outcome) break;
       executeAction(
         state, 'combatantB', effectiveB, effectiveA,
@@ -761,6 +817,8 @@ export function runTemplateCombat(
         availablePotions, potionsConsumed,
       );
     } else {
+      deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
+      deductMana(state, 'combatantB', resolvedB.action.cost.mana);
       executeAction(
         state, 'combatantB', effectiveB, effectiveA,
         resolvedB.action, interaction, false,
@@ -769,6 +827,8 @@ export function runTemplateCombat(
         resolvedB.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
       );
+      deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
+      deductMana(state, 'combatantA', resolvedA.action.cost.mana);
       if (state.outcome) break;
       executeAction(
         state, 'combatantA', effectiveA, effectiveB,
@@ -781,12 +841,6 @@ export function runTemplateCombat(
     }
 
     if (state.outcome) break;
-
-    // Deduct action costs AFTER both actions resolve
-    deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
-    deductMana(state, 'combatantA', resolvedA.action.cost.mana);
-    deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
-    deductMana(state, 'combatantB', resolvedB.action.cost.mana);
 
     // Tick effects (decrement duration, remove expired)
     tickEffects(state);

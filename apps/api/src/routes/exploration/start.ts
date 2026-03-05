@@ -48,7 +48,7 @@ import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { getIo } from '../../socket';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
-import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
+import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
 import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
@@ -173,19 +173,15 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       }
     }
 
-    // Auto-potion setup + tutorial detection
+    // Tutorial detection
     const playerRecord = await prismaAny.player.findUnique({
       where: { id: playerId },
-      select: { autoPotionThreshold: true, tutorialStep: true },
+      select: { tutorialStep: true },
     });
     const isTutorialExplore = playerRecord?.tutorialStep === 1;
-    const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
 
     // Tutorial explore step: force 100 turns and a single guaranteed ambush
     const turnsToSpend = isTutorialExplore ? 100 : body.turns;
-    const potionPool = autoPotionThreshold > 0
-      ? await buildPotionPool(playerId, hpState.maxHp)
-      : [];
     const allPotionsConsumed: PotionConsumed[] = [];
     const ambushPendingLootSessionIds: string[] = [];
 
@@ -242,6 +238,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       getSkillPoints(playerId),
     ]);
     const explorationUnlockedActions = explorationSkillPoints.unlockedActions;
+    const potionPool = templateHasPotionActions(playerTemplate)
+      ? await buildPotionPool(playerId, hpState.maxHp)
+      : [];
     let currentStamina = resourceState.stamina.current;
     let currentMana = resourceState.mana.current;
     const maxStamina = resourceState.stamina.max;
@@ -321,10 +320,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           equipmentStats
         );
 
-        let combatOptions: CombatOptions | undefined;
-        if (autoPotionThreshold > 0 && potionPool.length > 0) {
-          combatOptions = { autoPotionThreshold, potions: [...potionPool] };
-        }
+        const combatOptions: CombatOptions | undefined = potionPool.length > 0
+          ? { potions: [...potionPool] }
+          : undefined;
 
         const combatantA = buildPlayerTemplateCombatant({
           playerId,

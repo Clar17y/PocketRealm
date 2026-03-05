@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.25',
+    date: '2026-03-05',
+    title: 'Conditional Templates & Combat Playback Polish',
+    summary:
+      'Combat templates now support if/then conditions — set slots to trigger different actions based on HP, stamina, mana, or active buffs/debuffs. Resource bars during combat playback are now perfectly synced: stamina and mana update exactly when each action fires, not a round late. A visible regen phase between rounds shows bars ticking up so resource costs make sense. Bars start at your actual stamina/mana instead of flashing from full. Potion slots try the other template branch before falling back to Defend when potions run out. The combat log miss dropdown (showing roll, accuracy, dodge threshold) is back — it was broken by a stale field name.',
+  },
+  {
     version: '0.24',
     date: '2026-03-04',
     title: 'Smarter Durability',

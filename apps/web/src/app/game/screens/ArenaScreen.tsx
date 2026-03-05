@@ -262,7 +262,13 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
         outcome={lastResult.isDraw ? 'draw' : lastResult.winnerId === playerId ? 'victory' : 'defeat'}
         playerMaxHp={lastResult.combat.combatantAMaxHp}
         playerStartHp={lastResult.attackerStartHp}
+        playerStartStamina={lastResult.attackerStartStamina}
+        playerStartMana={lastResult.attackerStartMana}
+        playerMaxStamina={lastResult.combat.combatantAMaxStamina}
+        playerMaxMana={lastResult.combat.combatantAMaxMana}
         mobMaxHp={lastResult.combat.combatantBMaxHp}
+        opponentMaxStamina={lastResult.combat.combatantBMaxStamina}
+        opponentMaxMana={lastResult.combat.combatantBMaxMana}
         log={lastResult.combat.log}
         playerLabel={lastResult.attackerName}
         showOpponentResources

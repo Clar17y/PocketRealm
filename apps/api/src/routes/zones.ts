@@ -24,7 +24,7 @@ import { buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatL
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
-import { buildPotionPool, deductConsumedPotions } from '../services/potionService';
+import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../services/potionService';
 import {
   ensureStarterDiscoveries,
   getDiscoveredZoneIds,
@@ -303,15 +303,6 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     const ambushes = simulateTravelAmbushes(travelCost);
 
     if (ambushes.length > 0) {
-      // Auto-potion setup
-      const playerRecord = await prismaAny.player.findUnique({
-        where: { id: playerId },
-        select: { autoPotionThreshold: true },
-      });
-      const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
-      const potionPool = autoPotionThreshold > 0
-        ? await buildPotionPool(playerId, hpState.maxHp)
-        : [];
       const allPotionsConsumed: PotionConsumed[] = [];
 
       // Get player combat stats (same pattern as combat route)
@@ -345,6 +336,9 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         getSkillPoints(playerId),
       ]);
       const travelUnlockedActions = travelSkillPoints.unlockedActions;
+      const potionPool = templateHasPotionActions(playerTemplate)
+        ? await buildPotionPool(playerId, hpState.maxHp)
+        : [];
       let currentStamina = resourceState.stamina.current;
       let currentMana = resourceState.mana.current;
       const maxStamina = resourceState.stamina.max;
@@ -397,10 +391,9 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           unlockedActions: travelUnlockedActions,
         });
         const combatantB = mobToTemplateCombatant(prefixedMob);
-        let combatOptions: CombatOptions | undefined;
-        if (autoPotionThreshold > 0 && potionPool.length > 0) {
-          combatOptions = { autoPotionThreshold, potions: [...potionPool] };
-        }
+        const combatOptions: CombatOptions | undefined = potionPool.length > 0
+          ? { potions: [...potionPool] }
+          : undefined;
         const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
         currentHp = combatResult.combatantAHpRemaining;
         currentStamina = combatResult.combatantAStaminaRemaining;

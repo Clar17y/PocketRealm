@@ -206,7 +206,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
   const playerSettings = usePlayerSettings();
   const {
-    autoPotionThreshold, setAutoPotionThreshold,
     combatLogSpeedMs, setCombatLogSpeedMs,
     explorationSpeedMs, setExplorationSpeedMs,
     autoSkipKnownCombat,
@@ -219,7 +218,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
     handleSetAutoSkipKnownCombat,
-    handleSetAutoPotionThreshold,
     handleSetDefaultExploreTurns,
     handleSetQuickRestHealPercent,
     handleSetDefaultRefiningMax,
@@ -670,7 +668,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       // Build playback queue from fights[] or single-element queue for zone combat
       if (data.combat.fights && data.combat.fights.length > 0) {
-        const queue = data.combat.fights.map((fight) => {
+        const queue = data.combat.fights.map((fight, idx) => {
           const fightLogId = fight.combatLogId;
           return {
             room: fight.room,
@@ -681,6 +679,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
             outcome: fight.outcome,
             combatantAMaxHp: fight.playerMaxHp,
             playerStartHp: fight.playerStartHp,
+            playerStartStamina: fight.playerStartStamina,
+            playerStartMana: fight.playerStartMana,
             combatantBMaxHp: fight.mobMaxHp,
             log: fight.log?.length ? (fight.log as LastCombatLogEntry[]) : null,
             combatLogId: fightLogId,
@@ -730,6 +730,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           outcome: data.combat.outcome,
           combatantAMaxHp: data.combat.playerMaxHp,
           playerStartHp: hpBefore,
+          playerStartStamina: data.combat.playerStartStamina,
+          playerStartMana: data.combat.playerStartMana,
           combatantBMaxHp: data.combat.mobMaxHp,
           log: data.combat.log?.length ? (data.combat.log as LastCombatLogEntry[]) : null,
           combatLogId,
@@ -1600,8 +1602,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     templates,
     handleLoadTemplates,
     pvpNotificationCount,
-    autoPotionThreshold,
-    setAutoPotionThreshold,
     combatLogSpeedMs,
     setCombatLogSpeedMs,
     explorationSpeedMs,
@@ -1677,7 +1677,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     loadAll,
     loadTurnsAndHp,
     loadPvpNotificationCount,
-    handleSetAutoPotionThreshold,
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
     handleSetAutoSkipKnownCombat,

@@ -69,6 +69,7 @@ export interface CombatLogEntry {
   combatantBHpAfter?: number;
   spellName?: string;
   healAmount?: number;
+  healResourceType?: 'hp' | 'stamina' | 'mana';
   effectsApplied?: Array<{
     stat: string;
     modifier: number;
@@ -81,7 +82,7 @@ export interface CombatLogEntry {
   }>;
 }
 
-export type CombatAction = 'attack' | 'spell' | 'defend' | 'flee' | 'potion';
+export type CombatAction = 'attack' | 'spell' | 'defend' | 'counter' | 'ward' | 'flee' | 'potion' | 'heal' | 'regen';
 
 export type CombatOutcome = 'victory' | 'defeat' | 'fled' | 'draw';
 
@@ -111,7 +112,6 @@ export interface CombatPotion {
 }
 
 export interface CombatOptions {
-  autoPotionThreshold?: number;
   potions?: CombatPotion[];
 }
 

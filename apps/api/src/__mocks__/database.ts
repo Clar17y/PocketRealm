@@ -69,6 +69,7 @@ export const prisma = {
   guildContract: mockModel(),
   guildLog: mockModel(),
   combatTemplate: mockModel(),
+  combatTemplateSlot: mockModel(),
   skillPointAllocation: mockModel(),
   pvpScoutLog: mockModel(),
   playerBossRotation: mockModel(),

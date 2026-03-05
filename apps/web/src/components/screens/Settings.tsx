@@ -14,9 +14,6 @@ interface SettingsProps {
   onCombatLogSpeedCommit: (value: number) => void;
   autoSkipKnownCombat: boolean;
   onAutoSkipKnownCombatChange: (value: boolean) => void;
-  autoPotionThreshold: number;
-  onAutoPotionThresholdChange: (value: number) => void;
-  onAutoPotionThresholdCommit: (value: number) => void;
   lowHpWarning: boolean;
   onLowHpWarningChange: (value: boolean) => void;
 
@@ -54,9 +51,6 @@ export function Settings({
   onCombatLogSpeedCommit,
   autoSkipKnownCombat,
   onAutoSkipKnownCombatChange,
-  autoPotionThreshold,
-  onAutoPotionThresholdChange,
-  onAutoPotionThresholdCommit,
   lowHpWarning,
   onLowHpWarningChange,
   explorationSpeedMs,
@@ -104,23 +98,6 @@ export function Settings({
                 <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Skip playback for mob+prefix combos you&apos;ve killed before</p>
               </div>
               <ToggleSwitch checked={autoSkipKnownCombat} onChange={onAutoSkipKnownCombatChange} />
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Auto-Potion Threshold</p>
-            <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
-              Drink a health potion when HP drops below this threshold during combat.
-            </p>
-            <div className="flex items-center gap-3">
-              <Slider min={0} max={100} step={5}
-                value={[autoPotionThreshold]}
-                onValueChange={(val) => onAutoPotionThresholdChange(val[0])}
-                onValueCommit={(val) => onAutoPotionThresholdCommit(val[0])}
-              />
-              <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
-                {autoPotionThreshold === 0 ? 'Off' : `${autoPotionThreshold}%`}
-              </span>
             </div>
           </div>
 

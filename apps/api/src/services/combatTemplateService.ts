@@ -1,15 +1,52 @@
-import { prisma } from '@adventure/database';
-import type { CombatTemplateAction, CombatTemplateData } from '@adventure/shared';
+import { prisma, Prisma } from '@adventure/database';
+import type { CombatTemplate, CombatTemplateSlot } from '@adventure/database';
+import type { CombatTemplateSlotData, CombatTemplateData, SlotCondition } from '@adventure/shared';
 import { ALWAYS_AVAILABLE_ACTION_IDS, SKILL_POINT_CONSTANTS } from '@adventure/shared';
 import { AppError } from '../middleware/errorHandler';
 
-function toTemplateData(record: any): CombatTemplateData {
+export interface CreateSlotInput {
+  sortOrder?: number;
+  actionId: string;
+  condition?: SlotCondition;
+  thenActionId?: string;
+}
+
+function toSlotCreateData(slot: CreateSlotInput, index: number) {
+  return {
+    sortOrder: slot.sortOrder ?? index,
+    actionId: slot.actionId,
+    conditionType: slot.condition?.type ?? null,
+    resource: slot.condition?.resource ?? null,
+    threshold: slot.condition?.threshold ?? null,
+    effectName: slot.condition?.effectName ?? null,
+    thenActionId: slot.thenActionId ?? null,
+  };
+}
+
+function toSlotData(slot: CombatTemplateSlot): CombatTemplateSlotData {
+  return {
+    id: slot.id,
+    sortOrder: slot.sortOrder,
+    actionId: slot.actionId,
+    ...(slot.conditionType ? {
+      condition: {
+        type: slot.conditionType,
+        ...(slot.resource ? { resource: slot.resource } : {}),
+        ...(slot.threshold != null ? { threshold: slot.threshold } : {}),
+        ...(slot.effectName ? { effectName: slot.effectName } : {}),
+      },
+      thenActionId: slot.thenActionId ?? undefined,
+    } : {}),
+  };
+}
+
+function toTemplateData(record: CombatTemplate & { slots: CombatTemplateSlot[] }): CombatTemplateData {
   return {
     id: record.id,
     playerId: record.playerId,
     name: record.name,
     isActive: record.isActive,
-    actions: record.actions as CombatTemplateAction[],
+    slots: (record.slots ?? []).map(toSlotData),
     createdAt: record.createdAt instanceof Date ? record.createdAt.toISOString() : record.createdAt,
     updatedAt: record.updatedAt instanceof Date ? record.updatedAt.toISOString() : record.updatedAt,
   };
@@ -18,7 +55,7 @@ function toTemplateData(record: any): CombatTemplateData {
 export async function createTemplate(
   playerId: string,
   name: string,
-  actions: CombatTemplateAction[],
+  slots: CreateSlotInput[],
   unlockedActions: string[] = [],
 ): Promise<CombatTemplateData> {
   const count = await prisma.combatTemplate.count({ where: { playerId } });
@@ -26,7 +63,7 @@ export async function createTemplate(
     throw new AppError(400, `Maximum ${SKILL_POINT_CONSTANTS.MAX_TEMPLATES} templates allowed`, 'TEMPLATE_LIMIT');
   }
 
-  validateTemplateActions(actions, unlockedActions);
+  validateTemplateSlots(slots, unlockedActions);
 
   const isFirst = count === 0;
   const record = await prisma.combatTemplate.create({
@@ -34,8 +71,11 @@ export async function createTemplate(
       playerId,
       name,
       isActive: isFirst,
-      actions: actions as any,
+      slots: {
+        create: slots.map(toSlotCreateData),
+      },
     },
+    include: { slots: { orderBy: { sortOrder: 'asc' } } },
   });
 
   return toTemplateData(record);
@@ -45,20 +85,22 @@ export async function getTemplates(playerId: string): Promise<CombatTemplateData
   const records = await prisma.combatTemplate.findMany({
     where: { playerId },
     orderBy: { createdAt: 'asc' },
+    include: { slots: { orderBy: { sortOrder: 'asc' } } },
   });
   return records.map(toTemplateData);
 }
 
-export async function getActiveTemplate(playerId: string): Promise<CombatTemplateAction[]> {
+export async function getActiveTemplate(playerId: string): Promise<CombatTemplateSlotData[]> {
   const record = await prisma.combatTemplate.findFirst({
     where: { playerId, isActive: true },
+    include: { slots: { orderBy: { sortOrder: 'asc' } } },
   });
 
   if (!record) {
-    return [{ actionId: SKILL_POINT_CONSTANTS.DEFAULT_ACTION_ID }];
+    return [{ id: 'default', sortOrder: 0, actionId: SKILL_POINT_CONSTANTS.DEFAULT_ACTION_ID }];
   }
 
-  return record.actions as unknown as CombatTemplateAction[];
+  return record.slots.map(toSlotData);
 }
 
 export async function setActiveTemplate(playerId: string, templateId: string): Promise<void> {
@@ -67,7 +109,7 @@ export async function setActiveTemplate(playerId: string, templateId: string): P
   });
   if (!template) throw new AppError(404, 'Template not found', 'NOT_FOUND');
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.combatTemplate.updateMany({
       where: { playerId },
       data: { isActive: false },
@@ -83,7 +125,7 @@ export async function updateTemplate(
   playerId: string,
   templateId: string,
   name?: string,
-  actions?: CombatTemplateAction[],
+  slots?: CreateSlotInput[],
   unlockedActions: string[] = [],
 ): Promise<CombatTemplateData> {
   const template = await prisma.combatTemplate.findFirst({
@@ -91,20 +133,30 @@ export async function updateTemplate(
   });
   if (!template) throw new AppError(404, 'Template not found', 'NOT_FOUND');
 
-  if (actions) {
-    validateTemplateActions(actions, unlockedActions);
+  if (slots) {
+    validateTemplateSlots(slots, unlockedActions);
   }
 
-  const data: any = {};
-  if (name !== undefined) data.name = name;
-  if (actions !== undefined) data.actions = actions as any;
-
-  const record = await prisma.combatTemplate.update({
-    where: { id: templateId },
-    data,
+  await prisma.$transaction(async (tx) => {
+    if (name !== undefined) {
+      await tx.combatTemplate.update({
+        where: { id: templateId },
+        data: { name },
+      });
+    }
+    if (slots) {
+      await tx.combatTemplateSlot.deleteMany({ where: { templateId } });
+      await tx.combatTemplateSlot.createMany({
+        data: slots.map((s, i) => ({ templateId, ...toSlotCreateData(s, i) })),
+      });
+    }
   });
 
-  return toTemplateData(record);
+  const updated = await prisma.combatTemplate.findUniqueOrThrow({
+    where: { id: templateId },
+    include: { slots: { orderBy: { sortOrder: 'asc' } } },
+  });
+  return toTemplateData(updated);
 }
 
 export async function deleteTemplate(playerId: string, templateId: string): Promise<void> {
@@ -119,11 +171,11 @@ export async function deleteTemplate(playerId: string, templateId: string): Prom
   await prisma.combatTemplate.delete({ where: { id: templateId } });
 }
 
-export function validateTemplateActions(
-  actions: CombatTemplateAction[],
+export function validateTemplateSlots(
+  slots: CreateSlotInput[],
   unlockedActions: string[] = [],
 ): void {
-  if (actions.length === 0) {
+  if (slots.length === 0) {
     throw new AppError(400, 'Template must have at least one action', 'EMPTY_TEMPLATE');
   }
 
@@ -132,9 +184,15 @@ export function validateTemplateActions(
     ...unlockedActions,
   ]);
 
-  for (const action of actions) {
-    if (!allAvailable.has(action.actionId)) {
-      throw new AppError(400, `Action '${action.actionId}' is not available`, 'ACTION_UNAVAILABLE');
+  for (const slot of slots) {
+    if (!allAvailable.has(slot.actionId)) {
+      throw new AppError(400, `Action '${slot.actionId}' is not available`, 'ACTION_UNAVAILABLE');
+    }
+
+    // Condition field consistency (resource/threshold, effectName) is validated
+    // by Zod schemas in the route layer. Here we only check action availability.
+    if (slot.thenActionId && !allAvailable.has(slot.thenActionId)) {
+      throw new AppError(400, `Action '${slot.thenActionId}' is not available`, 'ACTION_UNAVAILABLE');
     }
   }
 }

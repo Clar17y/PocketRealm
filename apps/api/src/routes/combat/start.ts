@@ -53,7 +53,7 @@ import {
   checkPersistedMobReencounter,
   removePersistedMob,
 } from '../../services/persistedMobService';
-import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
+import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
 import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
@@ -181,21 +181,16 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     await setHp(playerId, currentPlayerHp);
   }
 
-  // Build shared potion pool
-  const playerRecord = await prismaAny.player.findUnique({
-    where: { id: playerId },
-    select: { autoPotionThreshold: true },
-  });
-  const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
-  const potionPool = autoPotionThreshold > 0 ? await buildPotionPool(playerId, hpState.maxHp) : [];
-  const allPotionsConsumed: PotionConsumed[] = [];
-
   // Fetch player's active template, resource state, and unlocked actions
   const [playerTemplate, resourceState, skillPointState] = await Promise.all([
     getActiveTemplate(playerId),
     getResourceState(playerId),
     getSkillPoints(playerId),
   ]);
+
+  // Build shared potion pool when the template includes potion actions
+  const potionPool = templateHasPotionActions(playerTemplate) ? await buildPotionPool(playerId, hpState.maxHp) : [];
+  const allPotionsConsumed: PotionConsumed[] = [];
   const playerUnlockedActions = skillPointState.unlockedActions;
   let currentStamina = resourceState.stamina.current;
   let currentMana = resourceState.mana.current;
@@ -234,6 +229,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       const prefixedMob = applyMobPrefix(modifiedMob, roomMob.prefix ?? null);
 
       const playerStartHp = currentPlayerHp;
+      const playerStartStamina = currentStamina;
+      const playerStartMana = currentMana;
       const playerStats = buildPlayerCombatStats(
         currentPlayerHp,
         hpState.maxHp,
@@ -243,10 +240,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
       applyGuildCombatModifiers(playerStats, guildMods);
 
-      let combatOptions: CombatOptions | undefined;
-      if (autoPotionThreshold > 0 && potionPool.length > 0) {
-        combatOptions = { autoPotionThreshold, potions: [...potionPool] };
-      }
+      const combatOptions: CombatOptions | undefined = potionPool.length > 0
+        ? { potions: [...potionPool] }
+        : undefined;
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,
@@ -302,6 +298,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         outcome: combatResult.outcome,
         playerMaxHp: combatResult.combatantAMaxHp,
         playerStartHp,
+        playerStartStamina,
+        playerStartMana,
         mobMaxHp: combatResult.combatantBMaxHp,
         log: mapTemplateCombatLog(combatResult.log),
         playerHpRemaining: combatResult.combatantAHpRemaining,
@@ -655,6 +653,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         outcome: f.outcome,
         playerMaxHp: f.playerMaxHp,
         playerStartHp: f.playerStartHp,
+        playerStartStamina: f.playerStartStamina,
+        playerStartMana: f.playerStartMana,
         mobMaxHp: f.mobMaxHp,
         ...(fightLogIds[i] ? { combatLogId: fightLogIds[i] } : { log: f.log }),
         playerHpRemaining: f.playerHpRemaining,
@@ -819,18 +819,6 @@ export function registerStartRoutes(router: Router): void {
         mobHpOverride = { currentHp: persisted.currentHp, maxHp: persisted.maxHp };
       }
 
-      // Auto-potion
-      const playerRecord = await prismaAny.player.findUnique({
-        where: { id: playerId },
-        select: { autoPotionThreshold: true },
-      });
-      const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
-      let combatOptions: CombatOptions | undefined;
-      if (autoPotionThreshold > 0) {
-        const potions = await buildPotionPool(playerId, hpState.maxHp);
-        combatOptions = { autoPotionThreshold, potions };
-      }
-
       const finalMob = mobHpOverride ? { ...prefixedMob, ...mobHpOverride } : prefixedMob;
 
       // Fetch player's active template, resource state, and unlocked actions
@@ -839,6 +827,11 @@ export function registerStartRoutes(router: Router): void {
         getResourceState(playerId),
         getSkillPoints(playerId),
       ]);
+
+      // Build potion pool when the template includes potion actions
+      const combatOptions: CombatOptions | undefined = templateHasPotionActions(playerTemplate)
+        ? { potions: await buildPotionPool(playerId, hpState.maxHp) }
+        : undefined;
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,
@@ -996,6 +989,8 @@ export function registerStartRoutes(router: Router): void {
           attackSkill,
           outcome: combatResult.outcome,
           playerMaxHp: combatResult.combatantAMaxHp,
+          playerStartStamina: resourceState.stamina.current,
+          playerStartMana: resourceState.mana.current,
           mobMaxHp: combatResult.combatantBMaxHp,
           log: mapTemplateCombatLog(combatResult.log),
           playerHpRemaining: combatResult.combatantAHpRemaining,

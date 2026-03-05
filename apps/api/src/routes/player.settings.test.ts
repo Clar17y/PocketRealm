@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 // Reproduce the exact schema from player.ts for direct testing
 const settingsSchema = z.object({
-  autoPotionThreshold: z.number().int().min(0).max(100).optional(),
   combatLogSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   explorationSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   autoSkipKnownCombat: z.boolean().optional(),
@@ -14,10 +13,6 @@ const settingsSchema = z.object({
 
 describe('player settings', () => {
   describe('settingsSchema validation', () => {
-    it('accepts valid autoPotionThreshold', () => {
-      expect(() => settingsSchema.parse({ autoPotionThreshold: 50 })).not.toThrow();
-    });
-
     it('accepts valid combatLogSpeedMs (multiple of 100)', () => {
       expect(() => settingsSchema.parse({ combatLogSpeedMs: 300 })).not.toThrow();
     });

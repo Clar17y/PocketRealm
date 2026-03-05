@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { CombatantStats, ActionDefinition, CombatTemplateAction, BossTemplateAction } from '@adventure/shared';
+import type { CombatantStats, ActionDefinition, CombatTemplateSlotData, BossTemplateAction } from '@adventure/shared';
 import { BASE_ACTION_DEFINITIONS, BOSS_ACTION_DEFINITIONS } from '@adventure/shared';
 import { resolveBossRound } from './bossRoundResolver';
 import type { BossRoundParticipant, BossState, BossRoundInput } from './bossRoundResolver';
@@ -16,11 +16,19 @@ function makeStats(overrides: Partial<CombatantStats> = {}): CombatantStats {
   };
 }
 
+function slotOf(actionId: string, index = 0): CombatTemplateSlotData {
+  return { id: `slot-${index}`, sortOrder: index, actionId };
+}
+
+function slotsOf(...actionIds: string[]): CombatTemplateSlotData[] {
+  return actionIds.map((id, i) => slotOf(id, i));
+}
+
 function makeParticipant(overrides: Partial<BossRoundParticipant> = {}): BossRoundParticipant {
   return {
     playerId: 'p1',
     stats: makeStats(),
-    template: [{ actionId: 'normal_attack' }],
+    template: [slotOf('normal_attack')],
     actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
     hp: 100,
     maxHp: 100,
@@ -80,10 +88,7 @@ const alwaysCritRng = {
 describe('resolveBossRound', () => {
   describe('template advancement and resource fallback', () => {
     it('picks action from template at the correct round index', () => {
-      const template: CombatTemplateAction[] = [
-        { actionId: 'light_attack' },
-        { actionId: 'heavy_attack' },
-      ];
+      const template = slotsOf('light_attack', 'heavy_attack');
       const p = makeParticipant({ template, templateRound: 2 });
       const result = resolveBossRound(makeInput({ participants: [p] }), alwaysHitRng);
       // Round 2 → index 1 → heavy_attack
@@ -98,7 +103,7 @@ describe('resolveBossRound', () => {
     });
 
     it('wraps template on overflow (cyclic)', () => {
-      const template: CombatTemplateAction[] = [{ actionId: 'normal_attack' }];
+      const template = slotsOf('normal_attack');
       const p = makeParticipant({ template, templateRound: 5 });
       const result = resolveBossRound(makeInput({ participants: [p] }), alwaysHitRng);
       expect(result.participantResults[0].actionId).toBe('normal_attack');
@@ -171,7 +176,7 @@ describe('resolveBossRound', () => {
   describe('defensive stances', () => {
     it('counter blocks physical boss attack', () => {
       const p = makeParticipant({
-        template: [{ actionId: 'counter' }],
+        template: slotsOf('counter'),
         stamina: 100,
       });
       const boss = makeBoss({
@@ -183,7 +188,7 @@ describe('resolveBossRound', () => {
 
     it('ward blocks magic boss attack', () => {
       const p = makeParticipant({
-        template: [{ actionId: 'ward' }],
+        template: slotsOf('ward'),
         mana: 100,
       });
       const boss = makeBoss({
@@ -195,11 +200,11 @@ describe('resolveBossRound', () => {
 
     it('defend reduces boss damage', () => {
       const pDefend = makeParticipant({
-        template: [{ actionId: 'defend' }],
+        template: slotsOf('defend'),
         hp: 200, maxHp: 200,
       });
       const pNoDefend = makeParticipant({
-        template: [{ actionId: 'normal_attack' }],
+        template: slotsOf('normal_attack'),
         hp: 200, maxHp: 200,
       });
       const boss = makeBoss({
@@ -215,7 +220,7 @@ describe('resolveBossRound', () => {
 
     it('counter does NOT block magic boss attack', () => {
       const p = makeParticipant({
-        template: [{ actionId: 'counter' }],
+        template: slotsOf('counter'),
         stamina: 100,
         hp: 200, maxHp: 200,
       });
@@ -242,12 +247,12 @@ describe('resolveBossRound', () => {
         playerId: 'tank',
         hp: 200, maxHp: 200,
         stamina: 100, maxStamina: 100,
-        template: [{ actionId: 'taunt' }],
+        template: slotsOf('taunt'),
         actionDefinitions: { ...BASE_ACTION_DEFINITIONS, taunt: tauntAction },
       });
       const dps = makeParticipant({
         playerId: 'dps',
-        template: [{ actionId: 'normal_attack' }],
+        template: slotsOf('normal_attack'),
       });
       const threatTable = initThreatTable(['tank', 'dps']);
       threatTable[1].threat = 1000; // DPS has much higher threat
@@ -277,7 +282,7 @@ describe('resolveBossRound', () => {
         hp: 50,
         maxHp: 100,
         mana: 100,
-        template: [{ actionId: 'heal_self' }],
+        template: slotsOf('heal_self'),
         actionDefinitions: { ...BASE_ACTION_DEFINITIONS, heal_self: healAction },
       });
       const boss = makeBoss({
@@ -294,7 +299,7 @@ describe('resolveBossRound', () => {
       const p = makeParticipant({
         stamina: 50, maxStamina: 100, staminaRegenPerRound: 10,
         mana: 20, maxMana: 50, manaRegenPerRound: 5,
-        template: [{ actionId: 'defend' }],
+        template: slotsOf('defend'),
       });
       const boss = makeBoss({
         template: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
@@ -308,7 +313,7 @@ describe('resolveBossRound', () => {
       const p = makeParticipant({
         stamina: 95, maxStamina: 100, staminaRegenPerRound: 10,
         mana: 48, maxMana: 50, manaRegenPerRound: 5,
-        template: [{ actionId: 'defend' }],
+        template: slotsOf('defend'),
       });
       const boss = makeBoss({
         template: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
@@ -423,18 +428,18 @@ describe('resolveBossRound', () => {
         playerId: 'tank',
         hp: 150, maxHp: 200, // damaged from previous round — healer can heal
         stamina: 100, maxStamina: 100,
-        template: [{ actionId: 'taunt' }],
+        template: slotsOf('taunt'),
         actionDefinitions: { ...BASE_ACTION_DEFINITIONS, taunt: tauntAction },
       });
       const dps = makeParticipant({
         playerId: 'dps',
         stats: makeStats({ damageMin: 15, damageMax: 20 }),
-        template: [{ actionId: 'normal_attack' }],
+        template: slotsOf('normal_attack'),
       });
       const healer = makeParticipant({
         playerId: 'healer',
         mana: 100, maxMana: 100,
-        template: [{ actionId: 'heal_ally' }],
+        template: slotsOf('heal_ally'),
         actionDefinitions: { ...BASE_ACTION_DEFINITIONS, heal_ally: healAllyAction },
       });
 

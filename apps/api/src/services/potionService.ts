@@ -1,5 +1,11 @@
 import { Prisma, prisma } from '@adventure/database';
-import type { CombatPotion, ConsumableEffect, ConsumableEffectType, PotionConsumed } from '@adventure/shared';
+import type { CombatPotion, CombatTemplateSlotData, ConsumableEffect, ConsumableEffectType, PotionConsumed } from '@adventure/shared';
+
+const POTION_ACTION_IDS = new Set(['use_hp_potion', 'use_stamina_potion', 'use_mana_potion']);
+
+export function templateHasPotionActions(slots: CombatTemplateSlotData[]): boolean {
+  return slots.some(s => POTION_ACTION_IDS.has(s.actionId) || (s.thenActionId && POTION_ACTION_IDS.has(s.thenActionId)));
+}
 
 function getEffectPotionType(effectType: ConsumableEffectType): 'hp' | 'stamina' | 'mana' {
   switch (effectType) {

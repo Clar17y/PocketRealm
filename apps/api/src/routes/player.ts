@@ -40,7 +40,6 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       characterLevel: true,
       attributePoints: true,
       attributes: true,
-      autoPotionThreshold: true,
       tutorialStep: true,
       combatLogSpeedMs: true,
       explorationSpeedMs: true,
@@ -133,13 +132,12 @@ playerRouter.post('/attributes', asyncHandler(async (req, res) => {
 }));
 
 const SETTINGS_FIELDS = [
-  'autoPotionThreshold', 'combatLogSpeedMs', 'explorationSpeedMs',
+  'combatLogSpeedMs', 'explorationSpeedMs',
   'autoSkipKnownCombat', 'defaultExploreTurns', 'quickRestHealPercent', 'defaultRefiningMax',
   'lowHpWarning', 'confirmRarity',
 ] as const;
 
 const settingsSchema = z.object({
-  autoPotionThreshold: z.number().int().min(0).max(100).optional(),
   combatLogSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   explorationSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   autoSkipKnownCombat: z.boolean().optional(),

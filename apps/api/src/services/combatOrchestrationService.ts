@@ -7,7 +7,7 @@ import {
   BASE_ACTION_DEFINITIONS,
   GUILD_CONSTANTS,
   type ActionDefinition,
-  type CombatTemplateAction,
+  type CombatTemplateSlotData,
   type LootDrop,
 } from '@adventure/shared';
 import { Prisma } from '@adventure/database';
@@ -27,7 +27,7 @@ export function buildPlayerTemplateCombatant(params: {
   playerId: string;
   username: string;
   playerStats: ReturnType<typeof buildPlayerCombatStats>;
-  template: CombatTemplateAction[];
+  template: CombatTemplateSlotData[];
   stamina: number;
   maxStamina: number;
   staminaRegenPerRound: number;
