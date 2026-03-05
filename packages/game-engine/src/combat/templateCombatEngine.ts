@@ -413,6 +413,12 @@ function executeOffensiveAction(
       if (effect.stat === 'damageMin') baseDamageMin += effect.modifier;
       if (effect.stat === 'damageMax') baseDamageMax += effect.modifier;
     }
+    // Apply guild damage multiplier
+    if (perActionScaling.guildDamageMultiplier && perActionScaling.guildDamageMultiplier > 0) {
+      baseDamageMin = Math.round(baseDamageMin * (1 + perActionScaling.guildDamageMultiplier));
+      baseDamageMax = Math.round(baseDamageMax * (1 + perActionScaling.guildDamageMultiplier));
+    }
+
     baseDamageMin = Math.max(1, baseDamageMin);
     baseDamageMax = Math.max(baseDamageMin, baseDamageMax);
   }

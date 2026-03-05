@@ -320,6 +320,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         equipmentStats,
         attributes: progression.attributes,
         weaponRequiredSkill: mainHandAttackSkill,
+        guildDamageMultiplier: guildMods.combatDamage,
       });
 
       // Get mob pool from current zone, filtered by exploration tier

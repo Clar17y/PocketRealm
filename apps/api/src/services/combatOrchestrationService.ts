@@ -67,6 +67,8 @@ export function applyGuildCombatModifiers(
   playerStats: ReturnType<typeof buildPlayerCombatStats>,
   guildMods: Pick<PlayerGuildModifiers, 'combatDamage' | 'defenseBoost'>,
 ): void {
+  // Note: combatDamage is now applied via PerActionScaling.guildDamageMultiplier
+  // in the per-action path. The fallback stats still get the boost for mobs/legacy.
   if (guildMods.combatDamage > 0) {
     playerStats.damageMin = Math.round(playerStats.damageMin * (1 + guildMods.combatDamage));
     playerStats.damageMax = Math.round(playerStats.damageMax * (1 + guildMods.combatDamage));
@@ -137,7 +139,7 @@ export async function processCombatVictoryRewards(
   };
 }
 
-async function splitAndGrantXp(
+export async function splitAndGrantXp(
   playerId: string,
   totalXp: number,
   fallbackSkill: AttackSkill,

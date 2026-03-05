@@ -101,6 +101,11 @@ vi.mock('../../services/combatStatsService', () => ({
     weaponRequiredSkill: 'melee',
   }),
 }));
+vi.mock('../../services/guildUpgradeService', () => ({
+  getPlayerGuildModifiers: vi.fn().mockResolvedValue({
+    combatDamage: 0, defenseBoost: 0, xpBoost: 0, travelCostReduction: 0,
+  }),
+}));
 vi.mock('../../services/combatTemplateService', () => ({
   getActiveTemplate: vi.fn().mockResolvedValue([{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }]),
 }));

@@ -29,6 +29,7 @@ import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankSe
 import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildId } from '../../services/guildService';
+import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { incrementContractProgress } from '../../services/guildContractService';
 import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
@@ -127,10 +128,12 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const attackSkill: AttackSkill = mainHandAttackSkill ?? 'melee';
     const attackLevel = await getSkillLevel(playerId, attackSkill);
 
+    const guildMods = await getPlayerGuildModifiers(playerId);
     const perActionScaling = await buildPerActionScaling(playerId, {
       equipmentStats,
       attributes: progression.attributes,
       weaponRequiredSkill: mainHandAttackSkill,
+      guildDamageMultiplier: guildMods.combatDamage,
     });
 
     const explorationProgress = await getExplorationPercent(playerId, body.zoneId);

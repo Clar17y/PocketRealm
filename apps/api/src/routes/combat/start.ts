@@ -171,15 +171,16 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   ]);
   const equipmentStats = await getEquipmentStats(playerId);
 
+  // Guild combat modifiers
+  const guildMods = await getPlayerGuildModifiers(playerId);
+
   // Per-action scaling for template combat engine
   const perActionScaling = await buildPerActionScaling(playerId, {
     equipmentStats,
     attributes: progression.attributes,
     weaponRequiredSkill: mainHandAttackSkill,
+    guildDamageMultiplier: guildMods.combatDamage,
   });
-
-  // Guild combat modifiers
-  const guildMods = await getPlayerGuildModifiers(playerId);
 
   // Apply room carry HP
   let currentPlayerHp = hpState.currentHp;
@@ -781,11 +782,15 @@ export function registerStartRoutes(router: Router): void {
 
       const equipmentStats = await getEquipmentStats(playerId);
 
+      // Guild combat modifiers
+      const guildMods = await getPlayerGuildModifiers(playerId);
+
       // Per-action scaling for template combat engine
       const perActionScaling = await buildPerActionScaling(playerId, {
         equipmentStats,
         attributes: progression.attributes,
         weaponRequiredSkill: mainHandAttackSkill,
+        guildDamageMultiplier: guildMods.combatDamage,
       });
 
       const playerStats = buildPlayerCombatStats(
@@ -799,8 +804,6 @@ export function registerStartRoutes(router: Router): void {
         equipmentStats
       );
 
-      // Guild combat modifiers
-      const guildMods = await getPlayerGuildModifiers(playerId);
       applyGuildCombatModifiers(playerStats, guildMods);
 
       const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);

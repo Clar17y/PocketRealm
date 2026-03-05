@@ -32,6 +32,8 @@ export interface PerActionScaling {
   weaponPower: { attack: number; rangedPower: number; magicPower: number };
   equipmentAccuracy: number;
   weaponRequiredSkill: 'melee' | 'ranged' | 'magic' | null;
+  /** Guild damage multiplier (e.g. 0.05 = +5% damage). Applied to per-action damage. */
+  guildDamageMultiplier?: number;
 }
 
 // --- Action Definition ---

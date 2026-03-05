@@ -32,6 +32,7 @@ export async function buildPerActionScaling(
     equipmentStats: EquipmentStats;
     attributes: { strength: number; dexterity: number; intelligence: number };
     weaponRequiredSkill: AttackSkill | null;
+    guildDamageMultiplier?: number;
   },
 ): Promise<PerActionScaling> {
   const [meleeLevel, rangedLevel, magicLevel] = await Promise.all([
@@ -56,6 +57,7 @@ export async function buildPerActionScaling(
       },
       equipmentAccuracy: equipmentStats.accuracy,
       weaponRequiredSkill,
+      guildDamageMultiplier: preloaded.guildDamageMultiplier,
     };
   }
 
