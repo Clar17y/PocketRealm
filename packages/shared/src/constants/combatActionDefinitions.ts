@@ -398,7 +398,8 @@ const meteorStrike: ActionDefinition = {
   isChanneling: true,
 };
 
-// --- Cross-Type Talent Actions ---
+// --- Cross-Type Talent Actions (categorised by unlock tree) ---
+// Melee tree:
 
 const flameSword: ActionDefinition = {
   id: 'flame_sword',

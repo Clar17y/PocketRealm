@@ -23,11 +23,14 @@ const ACTION_GROUPS: Record<string, string> = {
   use_hp_potion: 'Basic', use_stamina_potion: 'Basic', use_mana_potion: 'Basic',
   power_strike: 'Melee', cleave: 'Melee', battle_cry: 'Melee',
   devastating_blow: 'Melee', berserker_rage: 'Melee', execute: 'Melee', titans_wrath: 'Melee',
+  venomous_strike: 'Melee', rending_slash: 'Melee', flame_sword: 'Melee',
   aimed_shot: 'Ranged', crippling_shot: 'Ranged', eagle_eye: 'Ranged',
   volley: 'Ranged', snipers_mark: 'Ranged', piercing_shot: 'Ranged', death_mark: 'Ranged',
+  flame_arrow: 'Ranged',
   fire_bolt: 'Magic', minor_heal: 'Magic', frost_nova: 'Magic',
   enhanced_fortitude: 'Magic', chain_lightning: 'Magic', heal_ally: 'Magic',
   arcane_blast: 'Magic', regeneration: 'Magic', meteor_strike: 'Magic',
+  earth_spikes: 'Magic', life_drain: 'Magic', curse: 'Magic', enfeeble: 'Magic',
   taunt: 'General', fortify: 'General',
 };
 
