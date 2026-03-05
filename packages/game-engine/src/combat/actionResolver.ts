@@ -7,6 +7,8 @@ import { evaluateCondition } from './conditionEvaluator';
 export interface ResolvedAction {
   action: ActionDefinition;
   wasExhausted: boolean;
+  /** The other branch's action (else when condition matched, then when it didn't) */
+  alternateAction?: ActionDefinition;
 }
 
 export interface RoundInteraction {
@@ -65,11 +67,18 @@ export function resolveAction(
   const actionId = conditionMet && slot.thenActionId ? slot.thenActionId : slot.actionId;
   const definition = actionDefinitions[actionId];
 
+  // Resolve the other branch's action (for potion fallback in engine)
+  const altId = slot.condition && slot.thenActionId
+    ? (conditionMet ? slot.actionId : slot.thenActionId)
+    : undefined;
+  const altDef = altId ? actionDefinitions[altId] : undefined;
+  const alternateAction = altDef && canAfford(altDef, currentStamina, currentMana) ? altDef : undefined;
+
   if (!definition || !canAfford(definition, currentStamina, currentMana)) {
     return { action: DEFEND_FALLBACK, wasExhausted: true };
   }
 
-  return { action: definition, wasExhausted: false };
+  return { action: definition, wasExhausted: false, alternateAction };
 }
 
 /**

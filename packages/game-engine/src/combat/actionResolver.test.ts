@@ -216,6 +216,36 @@ describe('resolveAction', () => {
     expect(result.action.id).toBe('defend');
     expect(result.wasExhausted).toBe(true);
   });
+
+  it('provides alternateAction from the other branch of a conditional slot', () => {
+    const slots: CombatTemplateSlotData[] = [{
+      id: 's1', sortOrder: 0, actionId: 'normal_attack',
+      condition: { type: 'resource_below', resource: 'hp', threshold: 50 },
+      thenActionId: 'use_hp_potion',
+    }];
+    // HP 30% → condition true → use_hp_potion, alternate should be normal_attack
+    const result = resolveAction(slots, 1, 30, 100, 100, 100, 100, 100, [], 'combatantA');
+    expect(result.action.id).toBe('use_hp_potion');
+    expect(result.alternateAction?.id).toBe('normal_attack');
+  });
+
+  it('alternateAction is undefined for unconditional slots', () => {
+    const slots = slotsOf('normal_attack');
+    const result = resolveAction(slots, 1, 100, 100, 100, 100, 100, 100, [], 'combatantA');
+    expect(result.alternateAction).toBeUndefined();
+  });
+
+  it('alternateAction is undefined when other branch is unaffordable', () => {
+    const slots: CombatTemplateSlotData[] = [{
+      id: 's1', sortOrder: 0, actionId: 'heavy_attack',
+      condition: { type: 'resource_below', resource: 'hp', threshold: 50 },
+      thenActionId: 'use_hp_potion',
+    }];
+    // HP 30% → condition true → use_hp_potion, alternate would be heavy_attack but only 10 stamina
+    const result = resolveAction(slots, 1, 30, 100, 10, 100, 100, 100, [], 'combatantA');
+    expect(result.action.id).toBe('use_hp_potion');
+    expect(result.alternateAction).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

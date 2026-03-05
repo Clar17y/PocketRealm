@@ -743,19 +743,23 @@ export function runTemplateCombat(
       combatantB.actionDefinitions,
     );
 
-    // Fall back to Defend if potion action would fail (no potions or potion sick)
+    // When a potion action can't fire (sick or empty), try the other branch first, then Defend
     if (resolvedA.action.potionType) {
       const canUsePotion = !hasPotionSickness(state, 'combatantA') &&
         availablePotions.some(p => p.potionType === resolvedA.action.potionType);
       if (!canUsePotion) {
-        resolvedA = { action: DEFEND_FALLBACK, wasExhausted: true };
+        resolvedA = resolvedA.alternateAction
+          ? { action: resolvedA.alternateAction, wasExhausted: false }
+          : { action: DEFEND_FALLBACK, wasExhausted: true };
       }
     }
     if (resolvedB.action.potionType) {
       const canUsePotion = !hasPotionSickness(state, 'combatantB') &&
         availablePotions.some(p => p.potionType === resolvedB.action.potionType);
       if (!canUsePotion) {
-        resolvedB = { action: DEFEND_FALLBACK, wasExhausted: true };
+        resolvedB = resolvedB.alternateAction
+          ? { action: resolvedB.alternateAction, wasExhausted: false }
+          : { action: DEFEND_FALLBACK, wasExhausted: true };
       }
     }
 
