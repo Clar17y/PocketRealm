@@ -26,7 +26,7 @@ const ACTION_GROUPS: Record<string, string> = {
   venomous_strike: 'Melee', rending_slash: 'Melee', flame_sword: 'Melee',
   aimed_shot: 'Ranged', crippling_shot: 'Ranged', eagle_eye: 'Ranged',
   volley: 'Ranged', snipers_mark: 'Ranged', piercing_shot: 'Ranged', death_mark: 'Ranged',
-  flame_arrow: 'Ranged',
+  flame_arrow: 'Ranged', barbed_arrow: 'Ranged', shadow_arrow: 'Ranged',
   fire_bolt: 'Magic', minor_heal: 'Magic', frost_nova: 'Magic',
   enhanced_fortitude: 'Magic', chain_lightning: 'Magic', heal_ally: 'Magic',
   arcane_blast: 'Magic', regeneration: 'Magic', meteor_strike: 'Magic',

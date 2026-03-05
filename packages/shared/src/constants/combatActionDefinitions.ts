@@ -489,6 +489,45 @@ const flameArrow: ActionDefinition = {
   },
 };
 
+// Ranged tree:
+
+const barbedArrow: ActionDefinition = {
+  id: 'barbed_arrow',
+  name: 'Barbed Arrow',
+  description: 'A serrated arrowhead tears flesh, causing deep bleeding.',
+  actionType: 'skill_attack',
+  category: 'offensive',
+  scalingStat: 'ranged',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.BARBED_ARROW_STAMINA, mana: 0 },
+  damageMultiplier: 0.9,
+  damageType: 'physical',
+  effect: {
+    name: 'Bleed',
+    stat: 'attack',
+    modifier: 0,
+    duration: 3,
+    isDebuff: true,
+    damagePerRound: 4,
+    damagePerRoundPercent: 15,
+    dotDamageType: 'physical',
+  },
+};
+
+const shadowArrow: ActionDefinition = {
+  id: 'shadow_arrow',
+  name: 'Shadow Arrow',
+  description: 'An arrow infused with dark energy that siphons life on impact.',
+  actionType: 'skill_attack',
+  category: 'offensive',
+  scalingStat: 'ranged',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.SHADOW_ARROW_STAMINA, mana: COMBAT_ACTION_CONSTANTS.SHADOW_ARROW_MANA },
+  damageMultiplier: 1.2,
+  damageType: 'magic',
+  lifeLeechPercent: 25,
+};
+
+// Magic tree:
+
 const earthSpikes: ActionDefinition = {
   id: 'earth_spikes',
   name: 'Earth Spikes',
@@ -634,6 +673,8 @@ export const BASE_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   venomous_strike: venomousStrike,
   rending_slash: rendingSlash,
   flame_arrow: flameArrow,
+  barbed_arrow: barbedArrow,
+  shadow_arrow: shadowArrow,
   earth_spikes: earthSpikes,
   life_drain: lifeDrain,
   curse,

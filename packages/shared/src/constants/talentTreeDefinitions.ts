@@ -266,6 +266,17 @@ const rangedNodes: TalentNodeDefinition[] = [
     prerequisites: ['ranged_quick_draw'],
     passiveBonus: { stat: 'critDamage', value: 15, isPercent: true, description: '+15% crit damage' },
   },
+  {
+    id: 'ranged_barbed_arrow',
+    tree: 'ranged',
+    tier: 2,
+    name: 'Barbed Arrow',
+    description: 'A serrated arrowhead tears flesh, causing deep bleeding.',
+    pointCost: 2,
+    skillLevelGate: { skill: 'ranged', level: 15 },
+    prerequisites: ['ranged_aimed_shot'],
+    unlocksAction: 'barbed_arrow',
+  },
   // Tier 3 (requires ranged 35)
   {
     id: 'ranged_volley',
@@ -344,6 +355,17 @@ const rangedNodes: TalentNodeDefinition[] = [
     skillLevelGate: { skill: 'ranged', level: 60 },
     prerequisites: ['ranged_evasive_maneuver'],
     passiveBonus: { stat: 'evasion', value: 15, isPercent: true, description: '+15% evasion' },
+  },
+  {
+    id: 'ranged_shadow_arrow',
+    tree: 'ranged',
+    tier: 4,
+    name: 'Shadow Arrow',
+    description: 'An arrow infused with dark energy that siphons life on impact.',
+    pointCost: 4,
+    skillLevelGate: { skill: 'ranged', level: 60 },
+    prerequisites: ['ranged_flame_arrow'],
+    unlocksAction: 'shadow_arrow',
   },
   // Tier 5 (requires ranged 85)
   {
