@@ -246,5 +246,5 @@ export interface FightResult {
   xp: number;
   loot: LootDropWithName[];
   durabilityLost: Awaited<ReturnType<typeof degradeEquippedDurability>>;
-  skillXp: Awaited<ReturnType<typeof grantSkillXp>> | null;
+  skillXpGrants: Awaited<ReturnType<typeof grantSkillXp>>[];
 }

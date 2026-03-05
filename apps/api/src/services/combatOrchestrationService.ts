@@ -89,6 +89,7 @@ export interface VictoryRewardParams {
     mobPrefix: string | null;
   };
   attackSkill: AttackSkill;
+  damageByScalingStat?: { melee: number; ranged: number; magic: number };
   guildXpBoost?: number;
   includeGuildCredit?: boolean;
   includeBestiary?: boolean;
@@ -98,7 +99,7 @@ export interface VictoryRewardResult {
   loot: LootDrop[];
   overflow: PendingLootItem[];
   pendingLootSessionId: string | null;
-  xpGrant: GrantXpResult;
+  xpGrants: GrantXpResult[];
 }
 
 export async function processCombatVictoryRewards(
@@ -109,9 +110,10 @@ export async function processCombatVictoryRewards(
   const lootResult = await rollAndGrantLootWithCapacity(
     playerId, mob.id, mob.level, mob.dropChanceMultiplier,
   );
-  const xpGrant = await grantSkillXp(
-    playerId, attackSkill, Math.max(0, mob.xpReward),
-    undefined, params.guildXpBoost || undefined,
+
+  const totalXp = Math.max(0, mob.xpReward);
+  const xpGrants = await splitAndGrantXp(
+    playerId, totalXp, attackSkill, params.damageByScalingStat, params.guildXpBoost,
   );
 
   if (params.includeBestiary !== false) {
@@ -131,8 +133,51 @@ export async function processCombatVictoryRewards(
     loot: lootResult.drops,
     overflow: lootResult.overflow,
     pendingLootSessionId: lootResult.pendingLootSessionId,
-    xpGrant,
+    xpGrants,
   };
+}
+
+async function splitAndGrantXp(
+  playerId: string,
+  totalXp: number,
+  fallbackSkill: AttackSkill,
+  damageByScalingStat: { melee: number; ranged: number; magic: number } | undefined,
+  guildXpBoost: number | undefined,
+): Promise<GrantXpResult[]> {
+  const boost = guildXpBoost || undefined;
+
+  // No damage tracking or no damage dealt — grant all to fallback skill
+  const totalDamage = damageByScalingStat
+    ? damageByScalingStat.melee + damageByScalingStat.ranged + damageByScalingStat.magic
+    : 0;
+  if (!damageByScalingStat || totalDamage <= 0) {
+    return [await grantSkillXp(playerId, fallbackSkill, totalXp, undefined, boost)];
+  }
+
+  // Split proportionally by damage dealt
+  const skills = (['melee', 'ranged', 'magic'] as const).filter(s => damageByScalingStat[s] > 0);
+  if (skills.length === 1) {
+    return [await grantSkillXp(playerId, skills[0], totalXp, undefined, boost)];
+  }
+
+  // Distribute with floor, give remainder to highest-damage skill
+  const xpBySkill: Record<string, number> = {};
+  let allocated = 0;
+  for (const skill of skills) {
+    xpBySkill[skill] = Math.floor(totalXp * damageByScalingStat[skill] / totalDamage);
+    allocated += xpBySkill[skill];
+  }
+  // Assign remainder to the skill with most damage
+  const topSkill = skills.reduce((a, b) => damageByScalingStat[a] >= damageByScalingStat[b] ? a : b);
+  xpBySkill[topSkill] += totalXp - allocated;
+
+  const results: GrantXpResult[] = [];
+  for (const skill of skills) {
+    if (xpBySkill[skill] > 0) {
+      results.push(await grantSkillXp(playerId, skill, xpBySkill[skill], undefined, boost));
+    }
+  }
+  return results;
 }
 
 // ── Build combat activity log result ─────────────────────────────────
@@ -156,7 +201,7 @@ export interface CombatLogResultParams {
     baseXp: number;
     loot: unknown[];
     durabilityLost: unknown[];
-    skillXp: unknown | null;
+    skillXpGrants: unknown[];
   };
   eventModifiers: unknown[];
   potionsConsumed?: unknown[];

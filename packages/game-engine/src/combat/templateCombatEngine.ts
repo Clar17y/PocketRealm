@@ -75,6 +75,8 @@ export interface TemplateCombatResult {
   combatantBManaRemaining: number;
   potionsConsumed: PotionConsumed[];
   totalRounds: number;
+  /** Damage dealt by combatantA grouped by resolved scaling stat. */
+  damageByScalingStat: { melee: number; ranged: number; magic: number };
 }
 
 // --- Internal State ---
@@ -100,6 +102,7 @@ interface TemplateCombatState {
   log: TemplateCombatLogEntry[];
   outcome: CombatOutcome | null;
   activeEffects: ActiveEffect[];
+  combatantADamageByScalingStat: { melee: number; ranged: number; magic: number };
 }
 
 // --- Helpers ---
@@ -262,6 +265,12 @@ function applyEffectTicks(
       );
 
       applyDamage(state, targetKey, tickDamage);
+
+      // Track DOT damage by scaling stat (combatantA dealing to combatantB)
+      if (targetKey === 'combatantB' && tickDamage > 0) {
+        const dotStat = effect.dotDamageType === 'physical' ? 'melee' : 'magic';
+        state.combatantADamageByScalingStat[dotStat] += tickDamage;
+      }
 
       state.log.push({
         round: state.round,
@@ -433,14 +442,18 @@ function executeOffensiveAction(
     return;
   }
 
+  // Resolve scaling stat for this action (used for damage type + XP tracking)
+  const resolvedScaling = perActionScaling
+    ? resolveScalingStat(action.scalingStat ?? 'weapon', perActionScaling.weaponRequiredSkill, perActionScaling.skillLevels)
+    : null;
+
   // Determine damage type from the action.
   // If the action doesn't specify, resolve from scalingStat:
   // - 'weapon' scalingStat → use weapon's combat style (magic weapons deal magic damage)
   // - explicit scalingStat → default to 'physical' (cross-type actions set damageType explicitly)
   let actionDamageType: 'physical' | 'magic' = action.damageType ?? 'physical';
-  if (!action.damageType && perActionScaling && (action.scalingStat ?? 'weapon') === 'weapon') {
-    const resolved = resolveScalingStat('weapon', perActionScaling.weaponRequiredSkill, perActionScaling.skillLevels);
-    actionDamageType = resolved === 'magic' ? 'magic' : 'physical';
+  if (!action.damageType && (action.scalingStat ?? 'weapon') === 'weapon' && resolvedScaling) {
+    actionDamageType = resolvedScaling === 'magic' ? 'magic' : 'physical';
   }
   const effectiveDefence = actionDamageType === 'magic' ? targetStats.magicDefence : targetStats.defence;
 
@@ -464,6 +477,12 @@ function executeOffensiveAction(
   }
 
   applyDamage(state, opponent(actorKey), finalDamage);
+
+  // Track damage by scaling stat for XP splitting (combatantA only)
+  if (actorKey === 'combatantA' && finalDamage > 0) {
+    const xpStat = resolvedScaling ?? (actorStats.damageType === 'magic' ? 'magic' : 'melee');
+    state.combatantADamageByScalingStat[xpStat] += finalDamage;
+  }
 
   // Life leech -- heal attacker for % of damage dealt
   let leechHeal = 0;
@@ -887,6 +906,7 @@ export function runTemplateCombat(
     log: [],
     outcome: null,
     activeEffects: [],
+    combatantADamageByScalingStat: { melee: 0, ranged: 0, magic: 0 },
   };
 
   // Roll initiative
@@ -1076,6 +1096,7 @@ export function runTemplateCombat(
     combatantBManaRemaining: state.combatantBMana,
     potionsConsumed,
     totalRounds: state.round,
+    damageByScalingStat: { ...state.combatantADamageByScalingStat },
   };
 }
 

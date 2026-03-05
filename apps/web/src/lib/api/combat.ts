@@ -254,7 +254,7 @@ export interface CombatResultResponse {
       } | null;
     } | null;
     durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
-    skillXp: SkillXpGrantResponse | null;
+    skillXpGrants: SkillXpGrantResponse[];
   };
 }
 
@@ -277,7 +277,7 @@ export interface CombatFightResult {
   xp: number;
   loot: Array<{ itemTemplateId: string; quantity: number; rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'; itemName?: string | null }>;
   durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
-  skillXp: SkillXpGrantResponse | null;
+  skillXpGrants: SkillXpGrantResponse[];
 }
 
 export interface CombatResponse {
@@ -332,7 +332,7 @@ export interface CombatResponse {
       fullClearBonus?: boolean;
     } | null;
     durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
-    skillXp: SkillXpGrantResponse | null;
+    skillXpGrants: SkillXpGrantResponse[];
   };
   pendingLootSessionId?: string | null;
   pendingLootItems?: Array<{ templateName: string; rarity: string; quantity: number }>;

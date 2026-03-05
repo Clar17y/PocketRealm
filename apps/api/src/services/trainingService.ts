@@ -7,7 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { getEquipmentStats } from './equipmentService';
 import { getPlayerProgressionState } from './attributesService';
 import { getHpState } from './hpService';
-import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from './combatStatsService';
+import { getMainHandAttackSkill, getSkillLevel, buildPerActionScaling, type AttackSkill } from './combatStatsService';
 import { toMobTemplate } from '../utils/routeHelpers.js';
 import { buildPlayerTemplateCombatant } from './combatOrchestrationService';
 import { mapTemplateCombatLog } from './combatLogMapper';
@@ -88,6 +88,12 @@ export async function simulateFight(
     equipmentStats,
   );
 
+  const perActionScaling = await buildPerActionScaling(playerId, {
+    equipmentStats,
+    attributes: progression.attributes,
+    weaponRequiredSkill: mainHandAttackSkill,
+  });
+
   // Build player TemplateCombatant
   const playerCombatant = buildPlayerTemplateCombatant({
     playerId,
@@ -101,6 +107,7 @@ export async function simulateFight(
     maxMana: resourceState.mana.max,
     manaRegenPerRound: resourceState.mana.regenPerRound,
     unlockedActions: skillPointState.unlockedActions,
+    perActionScaling,
   });
 
   // Build mob TemplateCombatant

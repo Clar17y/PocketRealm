@@ -93,6 +93,13 @@ vi.mock('../../services/potionService', () => ({
 vi.mock('../../services/combatStatsService', () => ({
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
   getSkillLevel: vi.fn().mockResolvedValue(1),
+  buildPerActionScaling: vi.fn().mockResolvedValue({
+    skillLevels: { melee: 1, ranged: 1, magic: 1 },
+    attributes: { strength: 0, dexterity: 0, intelligence: 0 },
+    weaponPower: { attack: 5, rangedPower: 0, magicPower: 0 },
+    equipmentAccuracy: 0,
+    weaponRequiredSkill: 'melee',
+  }),
 }));
 vi.mock('../../services/combatTemplateService', () => ({
   getActiveTemplate: vi.fn().mockResolvedValue([{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }]),
@@ -168,6 +175,7 @@ vi.mock('@adventure/game-engine', () => ({
     combatantBManaRemaining: 50,
     log: [],
     potionsConsumed: [],
+    damageByScalingStat: { melee: 20, ranged: 0, magic: 0 },
   })),
   getScaledZoneExitChance: vi.fn(() => 0.01),
   selectTierWithBleedthrough: vi.fn(() => 1),
