@@ -165,6 +165,7 @@ export interface CombatLogEntryResponse {
   combatantBManaAfter?: number;
   spellName?: string;
   healAmount?: number;
+  healResourceType?: 'hp' | 'stamina' | 'mana';
   effectsApplied?: Array<{
     stat: string;
     modifier: number;
