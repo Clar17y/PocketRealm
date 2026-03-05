@@ -23,6 +23,7 @@ import {
   calculateDefenceReduction,
   rollInitiative,
   resolveActionDamageStats,
+  resolveScalingStat,
 } from './damageCalculator';
 
 const MAX_ROUNDS = 100;
@@ -432,8 +433,15 @@ function executeOffensiveAction(
     return;
   }
 
-  // Determine damage type from the action, falling back to combatant stats
-  const actionDamageType = action.damageType ?? actorStats.damageType;
+  // Determine damage type from the action.
+  // If the action doesn't specify, resolve from scalingStat:
+  // - 'weapon' scalingStat → use weapon's combat style (magic weapons deal magic damage)
+  // - explicit scalingStat → default to 'physical' (cross-type actions set damageType explicitly)
+  let actionDamageType: 'physical' | 'magic' = action.damageType ?? 'physical';
+  if (!action.damageType && perActionScaling && (action.scalingStat ?? 'weapon') === 'weapon') {
+    const resolved = resolveScalingStat('weapon', perActionScaling.weaponRequiredSkill, perActionScaling.skillLevels);
+    actionDamageType = resolved === 'magic' ? 'magic' : 'physical';
+  }
   const effectiveDefence = actionDamageType === 'magic' ? targetStats.magicDefence : targetStats.defence;
 
   // Roll and apply damage multiplier from action
