@@ -88,13 +88,14 @@ vi.mock('../../services/persistedMobService', () => ({
 vi.mock('../../services/potionService', () => ({
   buildPotionPool: vi.fn().mockResolvedValue([]),
   deductConsumedPotions: vi.fn(),
+  templateHasPotionActions: vi.fn().mockReturnValue(false),
 }));
 vi.mock('../../services/combatStatsService', () => ({
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
   getSkillLevel: vi.fn().mockResolvedValue(1),
 }));
 vi.mock('../../services/combatTemplateService', () => ({
-  getActiveTemplate: vi.fn().mockResolvedValue([]),
+  getActiveTemplate: vi.fn().mockResolvedValue([{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }]),
 }));
 vi.mock('../../services/skillPointService', () => ({
   getSkillPoints: vi.fn().mockResolvedValue({
