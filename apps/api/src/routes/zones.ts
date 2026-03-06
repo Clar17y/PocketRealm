@@ -43,6 +43,7 @@ import { applyGuildTax, getPlayerTaxRate, calculateInflatedCost, taxInfoFromResu
 
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
+import { trackProgress } from '../services/progressService';
 
 
 
@@ -257,6 +258,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       });
       newDiscoveries = discoveredZones;
     }
+
+    void trackProgress(playerId, 'zone_travel', 1).catch(() => {});
 
     res.json({
       zone: { id: destinationZone.id, name: destinationZone.name, zoneType: destinationZone.zoneType },
@@ -682,6 +685,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     where: { id: playerId },
     data: updateData,
   });
+
+  void trackProgress(playerId, 'zone_travel', 1).catch(() => {});
 
   // --- Achievement tracking (counters + derived checks) ---
   const travelCounters: Record<string, number> = {};

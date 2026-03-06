@@ -16,8 +16,7 @@ import { rollGemCritBatch, computeEventTurnCost } from '@pocketrealm/game-engine
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
-import { getPlayerGuildId } from '../services/guildService';
-import { incrementContractProgress } from '../services/guildContractService';
+import { trackProgress } from '../services/progressService';
 
 export const gatheringRouter = Router();
 
@@ -398,9 +397,8 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const rawXp = actions * xpPerAction;
   const xpGrant = await grantSkillXp(playerId, skillRequired, rawXp, undefined, guildMods.xpBoost || undefined);
 
-  // Guild contract progress for gathering
-  const guildId = await getPlayerGuildId(playerId);
-  if (guildId) void incrementContractProgress(guildId, 'gather_actions', actions).catch(() => {});
+  // Guild contract + quest progress for gathering
+  const questProgress = await trackProgress(playerId, 'gather_actions', actions);
 
   // --- Gem crit rolls (one per gathering action) ---
   let gemCrit: { itemTemplateId: string; itemId: string; gemName: string; gemsFound: number; critChance: number } | null = null;
@@ -496,5 +494,6 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
         }
       : undefined,
     tax: taxInfoFromResult(taxResult),
+    ...(questProgress.length > 0 ? { questProgress } : {}),
   });
 }));

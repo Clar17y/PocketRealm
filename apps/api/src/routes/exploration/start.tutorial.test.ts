@@ -11,11 +11,8 @@ vi.mock('../../services/guildTaxService', () => ({
   ),
   taxInfoFromResult: vi.fn().mockReturnValue(null),
 }));
-vi.mock('../../services/guildService', () => ({
-  getPlayerGuildId: vi.fn().mockResolvedValue(null),
-}));
-vi.mock('../../services/guildContractService', () => ({
-  incrementContractProgress: vi.fn().mockResolvedValue(undefined),
+vi.mock('../../services/progressService', () => ({
+  trackProgress: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('../../services/hpService', () => ({
   getHpState: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),

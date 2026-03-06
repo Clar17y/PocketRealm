@@ -27,6 +27,7 @@ import { Rest } from '@/components/screens/Rest';
 import { WorldEvents } from '@/components/screens/WorldEvents';
 import { Achievements } from '@/components/screens/Achievements';
 import { AchievementToast } from '@/components/AchievementToast';
+import { QuestToast } from '@/components/QuestToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
 import { Settings } from '@/components/screens/Settings';
@@ -53,6 +54,7 @@ import { ArenaScreen } from './screens/ArenaScreen';
 import { GuildScreen } from '@/components/screens/GuildScreen';
 import { Templates } from '@/components/screens/Templates';
 import { TalentTree } from '@/components/screens/TalentTree';
+import { Quests } from '@/components/screens/Quests';
 import { CombatScreen } from './screens/CombatScreen';
 import { useGameController } from './useGameController';
 import { isMobKnown } from './combatHelpers';
@@ -238,6 +240,14 @@ export default function GamePage() {
     handleClaimAchievement,
     handleSetActiveTitle,
     loadAchievements,
+    quests,
+    questState,
+    questsLoading,
+    questsError,
+    loadQuests,
+    handleClaimQuestReward,
+    handleClaimDailyBonus,
+    handleRerollQuest,
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
     combatLogPrefetch,
@@ -285,6 +295,12 @@ export default function GamePage() {
       void loadAchievements();
     }
   }, [activeScreen, loadAchievements]);
+
+  useEffect(() => {
+    if (activeScreen === 'quests') {
+      void loadQuests();
+    }
+  }, [activeScreen, loadQuests]);
 
   useEffect(() => {
     if (activeScreen === 'casino') {
@@ -1017,6 +1033,18 @@ export default function GamePage() {
             onCategoryViewed={() => setAchievementCategory(null)}
           />
         );
+      case 'quests':
+        return (
+          <Quests
+            quests={quests}
+            questState={questState}
+            loading={questsLoading}
+            error={questsError}
+            onClaimReward={handleClaimQuestReward}
+            onClaimBonus={handleClaimDailyBonus}
+            onReroll={handleRerollQuest}
+          />
+        );
       case 'leaderboard':
         return <Leaderboard playerId={player?.id ?? null} />;
       case 'guild':
@@ -1165,6 +1193,7 @@ export default function GamePage() {
               { id: 'zones', label: 'Map' },
               { id: 'worldEvents', label: 'Events' },
               { id: 'achievements', label: 'Achievements', badge: achievementUnclaimedCount },
+              { id: 'quests', label: 'Quests', badge: quests.filter(q => q.status === 'completed').length },
               { id: 'leaderboard', label: 'Rankings' },
               { id: 'bestiary', label: 'Bestiary' },
               { id: 'skills', label: 'Skills' },
@@ -1251,7 +1280,7 @@ export default function GamePage() {
       <BottomNav
         activeTab={getActiveTab()}
         onNavigate={handleNavigate}
-        badgeTabs={achievementUnclaimedCount > 0 ? new Set(['home']) : undefined}
+        badgeTabs={(achievementUnclaimedCount > 0 || quests.some(q => q.status === 'completed')) ? new Set(['home']) : undefined}
         pulseTabs={tutorialPulseTabs}
       />
       <TutorialDialog
@@ -1265,6 +1294,7 @@ export default function GamePage() {
         }}
       />
       <AchievementToast onNavigate={(category) => { setAchievementCategory(category); setActiveScreen('achievements'); }} />
+      <QuestToast />
     </>
   );
 }

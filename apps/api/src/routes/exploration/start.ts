@@ -23,14 +23,14 @@ import {
   type CombatOptions,
   type MobTemplate,
   type PotionConsumed,
+  type QuestProgressUpdate,
 } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankService';
 import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
-import { getPlayerGuildId } from '../../services/guildService';
+import { trackProgress } from '../../services/progressService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
-import { incrementContractProgress } from '../../services/guildContractService';
 import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
@@ -193,6 +193,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const turnsToSpend = isTutorialExplore ? 100 : body.turns;
     const allPotionsConsumed: PotionConsumed[] = [];
     const ambushPendingLootSessionIds: string[] = [];
+    const allQuestProgress: QuestProgressUpdate[] = [];
 
     // Spend turns and apply guild tax atomically
     const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
@@ -388,6 +389,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           if (rewards.pendingLootSessionId) {
             ambushPendingLootSessionIds.push(rewards.pendingLootSessionId);
           }
+          allQuestProgress.push(...rewards.questProgress);
           xpGrants = rewards.xpGrants;
           xpGain = xpGrants.reduce((sum, g) => sum + g.xpResult.xpAfterEfficiency, 0);
 
@@ -1014,9 +1016,15 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       familyIds: [...familyIdSet],
     });
 
-    // Guild contract progress: track exploration turns
-    const guildId = taxResult.guildId ?? await getPlayerGuildId(playerId);
-    if (guildId) void incrementContractProgress(guildId, 'exploration_turns', spentTurns).catch(() => {});
+    // Guild contract + quest progress: track exploration turns
+    const explorationQuestProgress = await trackProgress(playerId, 'exploration_turns', spentTurns);
+    allQuestProgress.push(...explorationQuestProgress);
+
+    // Track chest_open quest progress for hidden caches found
+    if (hiddenCaches.length > 0) {
+      const chestProgress = await trackProgress(playerId, 'chest_open', hiddenCaches.length);
+      allQuestProgress.push(...chestProgress);
+    }
 
     if (events.length === 0) {
       events.push({
@@ -1050,5 +1058,6 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         turnsToExplore: explorationProgress.turnsToExplore,
       },
       tax: taxInfoFromResult(taxResult),
+      ...(allQuestProgress.length > 0 ? { questProgress: allQuestProgress } : {}),
     });
 }));

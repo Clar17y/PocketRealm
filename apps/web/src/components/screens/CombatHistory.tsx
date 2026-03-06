@@ -259,11 +259,11 @@ export function CombatHistory() {
   }, [siteFights]);
 
   const playerMaxHp = useMemo(
-    () => selectedDetail ? resolvePlayerMaxHp(selectedDetail.log, selectedDetail.playerMaxHp) : undefined,
+    () => selectedDetail ? resolvePlayerMaxHp(selectedDetail.log ?? [], selectedDetail.playerMaxHp) : undefined,
     [selectedDetail]
   );
   const mobMaxHp = useMemo(
-    () => selectedDetail ? resolveMobMaxHp(selectedDetail.log, selectedDetail.mobMaxHp) : undefined,
+    () => selectedDetail ? resolveMobMaxHp(selectedDetail.log ?? [], selectedDetail.mobMaxHp) : undefined,
     [selectedDetail]
   );
 

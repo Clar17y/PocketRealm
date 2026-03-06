@@ -7,6 +7,7 @@ import type {
   GuildProjectDefinition,
   GuildSpecializationDefinition,
 } from '../types/guild.types';
+import type { QuestTemplateDefinition, QuestShopItem } from '../types/quest.types';
 
 // =============================================================================
 // TURN ECONOMY
@@ -1273,3 +1274,57 @@ export const CASINO_CONSTANTS = {
 export const TRAINING_CONSTANTS = {
   COOLDOWN_SECONDS: 60,
 } as const;
+
+// =============================================================================
+// QUEST SYSTEM
+// =============================================================================
+
+export const QUEST_CONSTANTS = {
+  DAILY_COUNT: 3,
+  WEEKLY_COUNT: 1,
+  DAILY_BONUS_BASE: 5,
+  DAILY_BONUS_PER_LEVEL: 0.5,
+  MIN_DAILY_CATEGORIES: 2,
+  REROLLS_PER_DAY: 1,
+} as const;
+
+export const QUEST_TEMPLATE_DEFINITIONS: readonly QuestTemplateDefinition[] = [
+  // Daily — Combat
+  { key: 'kill_mobs',       name: 'Slay Monsters',      description: 'Kill {target} monsters',                     category: 'combat',      cadence: 'daily',  progressType: 'kill_count',        targets: { low: 15, mid: 30, high: 60 },       rewards: { low: [3, 5], mid: [4, 6], high: [6, 8] } },
+  { key: 'kill_prefix',     name: 'Hunt the {prefix}',   description: 'Kill {target} {prefix} monsters',           category: 'combat',      cadence: 'daily',  progressType: 'kill_prefix',       targets: { low: 2, mid: 4, high: 8 },          rewards: { low: [5, 8], mid: [7, 10], high: [9, 12] }, filter: 'prefix', unlockCondition: 'has_prefix_kills' },
+  // Daily — Exploration
+  { key: 'explore_turns',   name: 'Explore the Wilds',   description: 'Spend {target} turns exploring',            category: 'exploration', cadence: 'daily',  progressType: 'exploration_turns', targets: { low: 200, mid: 500, high: 1000 },   rewards: { low: [3, 5], mid: [4, 6], high: [6, 8] } },
+  { key: 'open_chests',     name: 'Treasure Seeker',     description: 'Open {target} treasure chests',             category: 'exploration', cadence: 'daily',  progressType: 'chest_open',        targets: { low: 2, mid: 4, high: 8 },          rewards: { low: [4, 6], mid: [5, 8], high: [7, 10] } },
+  { key: 'travel_zones',    name: 'Wanderer',            description: 'Travel to {target} zones',        category: 'exploration', cadence: 'daily',  progressType: 'zone_travel',       targets: { low: 2, mid: 3, high: 5 },          rewards: { low: [3, 4], mid: [4, 5], high: [5, 6] }, unlockCondition: 'multi_zone' },
+  // Daily — Gathering
+  { key: 'gather_resources', name: 'Resource Run',       description: 'Gather resources {target} times',           category: 'gathering',   cadence: 'daily',  progressType: 'gather_actions',    targets: { low: 15, mid: 30, high: 60 },       rewards: { low: [3, 5], mid: [4, 6], high: [6, 8] } },
+  // Daily — Crafting
+  { key: 'craft_items',     name: 'Busy Hands',          description: 'Craft {target} items',                      category: 'crafting',    cadence: 'daily',  progressType: 'craft_items',       targets: { low: 8, mid: 15, high: 25 },        rewards: { low: [3, 5], mid: [4, 6], high: [6, 8] } },
+  // Daily — PvP
+  { key: 'pvp_wins',        name: 'Arena Victor',        description: 'Win {target} arena fights',                 category: 'pvp',         cadence: 'daily',  progressType: 'pvp_wins',          targets: { low: 2, mid: 3, high: 5 },          rewards: { low: [5, 7], mid: [6, 8], high: [8, 10] }, unlockCondition: 'pvp_unlocked' },
+  { key: 'pvp_damage',      name: 'Arena Brawler',       description: 'Deal {target} damage in the arena',         category: 'pvp',         cadence: 'daily',  progressType: 'pvp_damage',        targets: { low: 300, mid: 800, high: 2000 },   rewards: { low: [4, 6], mid: [5, 7], high: [6, 8] }, unlockCondition: 'pvp_unlocked' },
+  // Daily — Casino
+  { key: 'casino_wager',    name: 'High Roller',         description: 'Wager {target} gold at the casino',         category: 'casino',      cadence: 'daily',  progressType: 'casino_wagers',     targets: { low: 100, mid: 500, high: 2000 },   rewards: { low: [3, 5], mid: [4, 6], high: [6, 8] }, unlockCondition: 'casino_accessible' },
+  { key: 'casino_bets',     name: 'Gambler',             description: 'Place {target} bets at the casino',         category: 'casino',      cadence: 'daily',  progressType: 'casino_bets',       targets: { low: 5, mid: 12, high: 25 },        rewards: { low: [3, 4], mid: [4, 5], high: [5, 6] }, unlockCondition: 'casino_accessible' },
+  // Weekly
+  { key: 'weekly_kills',    name: 'Weekly Bounty',       description: 'Kill {target} monsters this week',          category: 'combat',      cadence: 'weekly', progressType: 'kill_count',        targets: { low: 75, mid: 200, high: 500 },     rewards: { low: [15, 20], mid: [18, 25], high: [22, 30] } },
+  { key: 'weekly_gather',   name: 'Stockpile',           description: 'Gather resources {target} times this week', category: 'gathering',   cadence: 'weekly', progressType: 'gather_actions',    targets: { low: 75, mid: 200, high: 400 },     rewards: { low: [15, 20], mid: [18, 25], high: [22, 30] } },
+  { key: 'weekly_explore',  name: 'Cartographer',        description: 'Spend {target} turns exploring this week',  category: 'exploration', cadence: 'weekly', progressType: 'exploration_turns', targets: { low: 1000, mid: 3000, high: 8000 }, rewards: { low: [15, 20], mid: [18, 25], high: [22, 30] } },
+  { key: 'weekly_craft',    name: 'Quality Crafter',     description: 'Craft {target} rare+ items this week',      category: 'crafting',    cadence: 'weekly', progressType: 'craft_rare',        targets: { low: 2, mid: 5, high: 10 },         rewards: { low: [15, 20], mid: [18, 25], high: [22, 30] } },
+] as const;
+
+// =============================================================================
+// QUEST SHOP
+// =============================================================================
+
+export const QUEST_SHOP_ITEMS: readonly QuestShopItem[] = [
+  // Permanent items
+  { key: 'minor_health_potion',  name: 'Minor Health Potion',    description: 'Restores a small amount of HP',               cost: 5,   category: 'consumable', permanent: true },
+  { key: 'health_potion',        name: 'Health Potion',          description: 'Restores a moderate amount of HP',            cost: 10,  category: 'consumable', permanent: true },
+  { key: 'repair_kit',           name: 'Repair Kit',             description: 'Repairs equipped gear without gold cost',     cost: 12,  category: 'utility',    permanent: true },
+  { key: 'xp_scroll_small',      name: 'Minor XP Scroll',       description: 'Grants a small amount of character XP',       cost: 15,  category: 'utility',    permanent: true },
+  { key: 'xp_scroll_large',      name: 'Major XP Scroll',       description: 'Grants a large amount of character XP',       cost: 30,  category: 'utility',    permanent: true },
+  // Rotating items (shown only some weeks -- for now, show all)
+  { key: 'rare_material_bundle', name: 'Rare Material Bundle',   description: 'A bundle of assorted rare crafting materials', cost: 25,  category: 'material',   permanent: false },
+  { key: 'stat_reset_scroll',    name: 'Stat Reset Scroll',      description: 'Reset your attribute points',                 cost: 40,  category: 'utility',    permanent: false },
+] as const;

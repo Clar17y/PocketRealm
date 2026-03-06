@@ -70,7 +70,7 @@ import {
   exchangeGold,
   placeRouletteBet,
 } from '@/lib/api';
-import type { CombatTemplateData, ResourceState } from '@pocketrealm/shared';
+import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
@@ -85,9 +85,19 @@ import { useBestiary } from './hooks/useBestiary';
 import { useGathering } from './hooks/useGathering';
 import { useEncounterSites } from './hooks/useEncounterSites';
 import { useAchievements } from './hooks/useAchievements';
+import { useQuests } from './hooks/useQuests';
 import { useCombatPlayback } from './hooks/useCombatPlayback';
 
 type AttributeType = keyof CharacterProgression['attributes'];
+
+function showQuestToasts(updates?: QuestProgressUpdate[]) {
+  if (!updates?.length) return;
+  const show = (window as unknown as Record<string, unknown>).__showQuestToast as
+    | ((update: QuestProgressUpdate) => void)
+    | undefined;
+  if (!show) return;
+  for (const update of updates) show(update);
+}
 
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [activeScreen, setActiveScreen] = useState<Screen>('home');
@@ -413,6 +423,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleClaimAchievement, handleSetActiveTitle,
   } = achievements;
 
+  const {
+    quests, questState, questsLoading, questsError,
+    loadQuests, handleClaimQuestReward, handleClaimDailyBonus, handleRerollQuest,
+  } = useQuests();
+
   const advanceTutorial = useCallback(async (fromStep: number) => {
     if (tutorialStep !== fromStep) return;
     const nextStep = fromStep + 1;
@@ -470,7 +485,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount]);
 
   const getActiveTab = () => {
-    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
+    if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'quests', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
     if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
     if (['combat', 'arena', 'templates', 'talentTree'].includes(activeScreen)) return 'combat';
@@ -558,6 +573,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
+      showQuestToasts(data.questProgress);
 
       // Always trigger animated playback — even empty results get a brief progress bar
       setExplorationPlaybackData({
@@ -674,6 +690,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
+      showQuestToasts(data.questProgress);
 
       const rewards: LastCombat['rewards'] = {
         xp: data.rewards.xp,
@@ -854,6 +871,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
+      showQuestToasts(data.questProgress);
 
       const newLogs: ActivityLogEntry[] = [];
       const gatheredSkillName = data.xp?.skillType
@@ -933,6 +951,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
+      showQuestToasts(data.questProgress);
 
       const newLogs: ActivityLogEntry[] = [];
       const timestamp = nowStamp();
@@ -1638,6 +1657,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleClaimAchievement,
     handleSetActiveTitle,
     loadAchievements,
+
+    // Quests
+    quests,
+    questState,
+    questsLoading,
+    questsError,
+    loadQuests,
+    handleClaimQuestReward,
+    handleClaimDailyBonus,
+    handleRerollQuest,
 
     // Tutorial
     tutorialStep, skipTutorial, advanceTutorial,

@@ -21,7 +21,7 @@ import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
-import { incrementContractProgress } from '../../services/guildContractService';
+import { trackProgress } from '../../services/progressService';
 import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
 import {
   prismaAny,
@@ -239,17 +239,18 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
 
     const xpGrant = await grantSkillXp(playerId, recipe.skillType, recipe.xpReward * quantity);
 
-    // --- Guild XP & contract progress ---
+    // --- Guild XP & contract/quest progress ---
     const guildId = await getPlayerGuildId(playerId);
     if (guildId) {
       await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_CRAFT * quantity);
-      await incrementContractProgress(guildId, 'craft_items', quantity);
-      const rareCount = craftedItemDetails.filter(
-        (d) => d.rarity === 'rare' || d.rarity === 'epic' || d.rarity === 'legendary',
-      ).length;
-      if (rareCount > 0) {
-        await incrementContractProgress(guildId, 'craft_rare', rareCount);
-      }
+    }
+    const craftQuestProgress = await trackProgress(playerId, 'craft_items', quantity);
+    const rareCount = craftedItemDetails.filter(
+      (d) => d.rarity === 'rare' || d.rarity === 'epic' || d.rarity === 'legendary',
+    ).length;
+    if (rareCount > 0) {
+      const rareQuestProgress = await trackProgress(playerId, 'craft_rare', rareCount);
+      craftQuestProgress.push(...rareQuestProgress);
     }
 
     // --- Achievement tracking (counters + derived checks) ---
@@ -305,5 +306,6 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       craftedItemDetails,
       xp: serializeXpGrant(xpGrant),
       tax: taxInfoFromResult(taxResult),
+      ...(craftQuestProgress.length > 0 ? { questProgress: craftQuestProgress } : {}),
     });
 }));
