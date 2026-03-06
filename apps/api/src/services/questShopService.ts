@@ -8,24 +8,7 @@ import { AppError } from '../middleware/errorHandler';
 import { getWeekStart, getLevelBracket } from '../utils/dateHelpers';
 import { randomIntInclusive } from '../utils/random';
 
-interface ShopItemData {
-  id: string;
-  key: string;
-  name: string;
-  description: string;
-  cost: number;
-  category: string;
-  weeklyLimit: number | null;
-  lifetimeLimit: number | null;
-  buffType: string | null;
-  buffValue: number | null;
-  buffUses: number | null;
-  sortOrder: number;
-  purchasedThisWeek: number;
-  purchasedAllTime: number;
-  hasActiveBuff: boolean;
-  canPurchase: boolean;
-}
+import type { ShopItemData } from '@pocketrealm/shared';
 
 interface PurchaseParams {
   targetZoneId?: string;
@@ -87,10 +70,10 @@ export async function getShopItems(playerId: string) {
       buffType: item.buffType,
       buffValue: item.buffValue,
       buffUses: item.buffUses,
+      enabled: true,
       sortOrder: item.sortOrder,
-      purchasedThisWeek,
-      purchasedAllTime,
-      hasActiveBuff: hasBuff,
+      purchasesThisWeek: purchasedThisWeek,
+      purchasesLifetime: purchasedAllTime,
       canPurchase: canAfford && withinWeekly && withinLifetime && noBuffStacking,
     };
   });

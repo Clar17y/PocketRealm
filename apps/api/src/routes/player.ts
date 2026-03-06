@@ -172,9 +172,9 @@ playerRouter.patch('/settings', asyncHandler(async (req, res) => {
     }
     const zone = await prismaAny.zone.findUniqueOrThrow({
       where: { id: body.homeTownId },
-      select: { type: true },
+      select: { zoneType: true },
     });
-    if (zone.type !== 'town') {
+    if (zone.zoneType !== 'town') {
       throw new AppError(400, 'Can only set a town as home', 'NOT_A_TOWN');
     }
   }

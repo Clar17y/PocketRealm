@@ -169,7 +169,8 @@ function BuffBadge({ buff }: { buff: PlayerBuffData }) {
           {buff.shopItemName}
         </span>
         <span className="text-[10px] text-[var(--rpg-text-secondary)] ml-1.5">
-          {buff.remainingUses} uses left (+{buff.bonusValue}%)
+          {buff.remainingUses} uses left{' '}
+          {buff.bonusValue >= 2 ? `(${buff.bonusValue}x chance)` : buff.bonusValue === 1 ? '(Active)' : `(+${Math.round(buff.bonusValue * 100)}%)`}
         </span>
       </div>
     </div>
@@ -226,7 +227,9 @@ function ShopItemCard({
   // Buff details
   let buffText: string | null = null;
   if (item.buffType && item.buffValue != null && item.buffUses != null) {
-    buffText = `+${item.buffValue}% for ${item.buffUses} uses`;
+    const v = item.buffValue!;
+    const label = v >= 2 ? `${v}x chance` : v === 1 ? 'Active' : `+${Math.round(v * 100)}%`;
+    buffText = `${label} for ${item.buffUses} uses`;
   }
 
   return (
@@ -341,7 +344,7 @@ function ShopTab({ questTokens }: { questTokens: number }) {
   const categoryOrder: ShopItemData['category'][] = ['reset', 'upgrade', 'buff', 'utility', 'prestige'];
   for (const cat of categoryOrder) {
     const items = shopItems
-      .filter((i) => i.category === cat && i.enabled)
+      .filter((i) => i.category === cat)
       .sort((a, b) => a.sortOrder - b.sortOrder);
     if (items.length > 0) {
       groupedItems.set(cat, items);

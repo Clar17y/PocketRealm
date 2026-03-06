@@ -167,11 +167,10 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         },
       });
 
-      // Consume buffs after successful forge
-      if (forgeLuckBonus > 0 || hasForgeProtection) {
+      // Consume forge_luck on success (it modified the chance); forge_protection not consumed (wasn't needed)
+      if (forgeLuckBonus > 0) {
         await prisma.$transaction(async (tx) => {
-          if (forgeLuckBonus > 0) await consumeBuff(tx, playerId, 'forge_luck');
-          if (hasForgeProtection) await consumeBuff(tx, playerId, 'forge_protection');
+          await consumeBuff(tx, playerId, 'forge_luck');
         });
       }
 

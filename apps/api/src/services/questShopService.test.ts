@@ -76,8 +76,8 @@ describe('getShopItems', () => {
     expect(result.questTokens).toBe(10);
     expect(result.items).toHaveLength(1);
     expect(result.items[0].canPurchase).toBe(true);
-    expect(result.items[0].purchasedThisWeek).toBe(0);
-    expect(result.items[0].purchasedAllTime).toBe(0);
+    expect(result.items[0].purchasesThisWeek).toBe(0);
+    expect(result.items[0].purchasesLifetime).toBe(0);
   });
 
   it('marks canPurchase false when buff already active', async () => {
@@ -94,7 +94,6 @@ describe('getShopItems', () => {
 
     const result = await getShopItems(PLAYER_ID);
     expect(result.items[0].canPurchase).toBe(false);
-    expect(result.items[0].hasActiveBuff).toBe(true);
   });
 });
 
