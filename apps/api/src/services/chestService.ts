@@ -1,4 +1,4 @@
-import { Prisma } from '@adventure/database';
+import { Prisma } from '@pocketrealm/database';
 import {
   getChestRarityForEncounterSize,
   getChestRecipeChanceForEncounterSize,
@@ -6,8 +6,8 @@ import {
   rollChestMaterialRolls,
   type ChestRarity,
   type EncounterSiteSize,
-} from '@adventure/game-engine';
-import { FULL_CLEAR_CONSTANTS, type LootDrop } from '@adventure/shared';
+} from '@pocketrealm/game-engine';
+import { FULL_CLEAR_CONSTANTS, type LootDrop } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantDropsTx, type DropTableEntry, type DropGrantResult } from './dropRollingService';
 

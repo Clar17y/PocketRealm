@@ -4,7 +4,7 @@ import {
   type ItemRarity,
   type ItemStats,
   type ItemType,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { getEligibleBonusStats, rollBonusStat } from '../crafting/craftingCrit';
 import { clamp, randomUnit } from '../utils/math';
 

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Prisma, prisma } from '@adventure/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { createActivityLog } from '../../services/activityLogService';
 import {
   CRAFTING_CONSTANTS,
@@ -8,11 +8,11 @@ import {
   type ItemRarity,
   type ItemStats,
   type ItemType,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import {
   calculateCraftingCrit,
   rollBonusStatsForRarity,
-} from '@adventure/game-engine';
+} from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';

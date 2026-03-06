@@ -4,12 +4,13 @@ import { useState, useMemo, useCallback } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Lock, CheckCircle, Sparkles, Zap } from 'lucide-react';
-import { SKILL_POINT_CONSTANTS } from '@adventure/shared';
-import type { TalentNodeDefinition, TalentTree as TalentTreeName } from '@adventure/shared';
+import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
+import type { TalentNodeDefinition, TalentTree as TalentTreeName } from '@pocketrealm/shared';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import type { SkillPointState } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
 import { SkillTreeTutorial } from '@/components/common/SkillTreeTutorial';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface TalentTreeProps {
   skillPointState: SkillPointState;
@@ -139,11 +140,11 @@ export function TalentTree({
   const activeTabMeta = TREE_TABS.find(t => t.id === activeTree)!;
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       <SkillTreeTutorial />
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">Talent Tree</h2>
+        <h2 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">Talent Tree</h2>
         <span
           className="text-sm font-bold px-3 py-1 rounded-full border"
           style={{
@@ -152,7 +153,7 @@ export function TalentTree({
             backgroundColor: 'rgba(201, 169, 101, 0.1)',
           }}
         >
-          {availablePoints} point{availablePoints !== 1 ? 's' : ''} available
+          <span className="font-pixel text-[12px]">{availablePoints}</span> point{availablePoints !== 1 ? 's' : ''} available
         </span>
       </div>
 
@@ -190,7 +191,7 @@ export function TalentTree({
         return (
           <div key={tier}>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-bold text-[var(--rpg-text-primary)]">Tier {tier}</span>
+              <span className="text-sm font-bold text-[var(--rpg-text-primary)]">Tier <span className="font-pixel font-normal text-[12px]">{tier}</span></span>
               {gateLabel && (
                 <span className="text-[11px] text-[var(--rpg-text-secondary)]">
                   {gateLabel}
@@ -233,7 +234,7 @@ export function TalentTree({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className="text-sm font-semibold"
+                            className="text-sm font-semibold font-almendra"
                             style={{
                               color: isAllocated
                                 ? 'var(--rpg-green-light)'
@@ -252,7 +253,7 @@ export function TalentTree({
                               borderWidth: 1,
                             }}
                           >
-                            {node.pointCost} pt{node.pointCost !== 1 ? 's' : ''}
+                            <span className="font-pixel text-[12px]">{node.pointCost}</span> pt{node.pointCost !== 1 ? 's' : ''}
                           </span>
                           {isAllocated && (
                             <span className="text-[10px] font-bold text-[var(--rpg-green-light)] uppercase">
@@ -339,6 +340,6 @@ export function TalentTree({
           onCancel={() => setConfirmRespec(false)}
         />
       )}
-    </div>
+    </ScreenContainer>
   );
 }

@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { BossEncounterPanel } from '@/components/BossEncounterPanel';
 import { formatTimeRemaining } from '@/lib/format';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 function effectLabel(effectType: string, effectValue: number): string {
   const sign = effectType.endsWith('_down') ? '-' : '+';
@@ -40,7 +41,7 @@ function EventCard({ event }: { event: WorldEventResponse }) {
   return (
     <PixelCard className="p-3">
       <div className="flex items-center justify-between mb-1">
-        <span className="font-bold" style={{ color: eventTypeColor(event.type) }}>
+        <span className="font-bold font-almendra" style={{ color: eventTypeColor(event.type) }}>
           {event.title}
         </span>
         <div className="flex items-center gap-2">
@@ -106,9 +107,9 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
     : events.filter((e) => e.scope === 'zone');
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold" style={{ color: 'var(--rpg-gold)' }}>
+        <h2 className="text-lg font-bold font-almendra" style={{ color: 'var(--rpg-gold)' }}>
           World Events
         </h2>
         <PixelButton onClick={refresh} disabled={loading} size="sm">
@@ -141,17 +142,17 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
                 onClick={() => setSelectedBossId(boss.id)}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-bold" style={{ color: 'var(--rpg-red)' }}>
-                    {boss.mobName} (Lv.{boss.mobLevel})
+                  <span className="font-bold font-almendra" style={{ color: 'var(--rpg-red)' }}>
+                    {boss.mobName} <span className="font-pixel text-[12px]">(Lv.{boss.mobLevel})</span>
                   </span>
-                  <span className="text-xs opacity-70">
+                  <span className="text-xs opacity-70 font-almendra">
                     {boss.zoneName ?? 'Unknown Zone'}
                   </span>
                 </div>
                 <div className="mb-2">
                   <div className="flex justify-between text-xs mb-1">
                     <span>HP</span>
-                    <span>{Math.round(hpPercent)}%</span>
+                    <span className="font-pixel text-[8px]">{Math.round(hpPercent)}%</span>
                   </div>
                   <div className="w-full h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }}>
                     <div
@@ -164,7 +165,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
                   </div>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span>Round {boss.roundNumber} — {boss.status}</span>
+                  <span>Round <span className="font-pixel text-[8px]">{boss.roundNumber}</span> — {boss.status}</span>
                   {boss.nextRoundAt && (
                     <span>Next round: {formatTimeRemaining(boss.nextRoundAt)}</span>
                   )}
@@ -217,6 +218,6 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
           ))}
         </div>
       )}
-    </div>
+    </ScreenContainer>
   );
 }

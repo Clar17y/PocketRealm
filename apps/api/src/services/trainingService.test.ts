@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TRAINING_CONSTANTS } from '@adventure/shared';
+import { TRAINING_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('./equipmentService', () => ({
   getEquipmentStats: vi.fn().mockResolvedValue({
@@ -32,6 +32,13 @@ vi.mock('./hpService', () => ({
 vi.mock('./combatStatsService', () => ({
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
   getSkillLevel: vi.fn().mockResolvedValue(5),
+  buildPerActionScaling: vi.fn().mockResolvedValue({
+    skillLevels: { melee: 5, ranged: 1, magic: 1 },
+    attributes: { strength: 5, dexterity: 0, intelligence: 0 },
+    weaponPower: { attack: 10, rangedPower: 0, magicPower: 0 },
+    equipmentAccuracy: 5,
+    weaponRequiredSkill: 'melee',
+  }),
 }));
 
 vi.mock('./combatTemplateService', () => ({
@@ -76,7 +83,7 @@ vi.mock('./combatLogMapper', () => ({
   mapTemplateCombatLog: vi.fn().mockImplementation((log: unknown[]) => log),
 }));
 
-vi.mock('@adventure/game-engine', () => ({
+vi.mock('@pocketrealm/game-engine', () => ({
   runTemplateCombat: vi.fn().mockReturnValue({
     outcome: 'victory',
     log: [],
@@ -220,7 +227,7 @@ describe('simulateFight', () => {
       prefix: 'Fierce',
     });
 
-    const { applyMobPrefix } = await import('@adventure/game-engine');
+    const { applyMobPrefix } = await import('@pocketrealm/game-engine');
 
     const result = await simulateFight('p1', 'mob-1', 'Fierce');
 

@@ -3,7 +3,7 @@ import {
   applyMobEventModifiers,
   applyResourceEventModifiers,
 } from './applyEventModifiers';
-import type { ActiveZoneModifiers, MobTemplate } from '@adventure/shared';
+import type { ActiveZoneModifiers, MobTemplate } from '@pocketrealm/shared';
 
 const baseMob: MobTemplate = {
   id: 'mob-1',

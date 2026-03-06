@@ -1,4 +1,4 @@
-import { EXPLORATION_CONSTANTS } from '@adventure/shared';
+import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 
 export function getScaledZoneExitChance(baseChance: number, explorationPercent: number): number {
   if (baseChance <= 0) return 0;

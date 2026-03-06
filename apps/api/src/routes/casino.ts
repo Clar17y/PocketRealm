@@ -2,11 +2,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../utils/asyncHandler';
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { exchangeTurnsForGold, getCurrentRound, placeBet, getRouletteHistory, getRouletteStats } from '../services/casinoService';
 import { assertInTown, trackAchievements } from '../utils/routeHelpers.js';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService.js';
-import type { RouletteBetType } from '@adventure/shared';
+import type { RouletteBetType } from '@pocketrealm/shared';
 import { trackProgress } from '../services/progressService';
 
 export const casinoRouter = Router();

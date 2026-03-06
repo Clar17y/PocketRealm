@@ -8,6 +8,7 @@ export * from './combat/templateCombatEngine';
 export * from './combat/mobTemplateConverter';
 export * from './combat/threatSystem';
 export * from './combat/bossContribution';
+export * from './combat/conditionEvaluator';
 
 // Turns
 export * from './turns/turnCalculator';

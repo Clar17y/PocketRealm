@@ -9,7 +9,7 @@ import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { SubNav } from '@/components/common/SubNav';
 import { Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, ShoppingBag } from 'lucide-react';
 import { getQuestShop, purchaseQuestItem } from '@/lib/api';
-import type { PlayerQuestData, PlayerQuestStateData, QuestCategory, QuestShopItem } from '@adventure/shared';
+import type { PlayerQuestData, PlayerQuestStateData, QuestCategory, QuestShopItem } from '@pocketrealm/shared';
 
 interface QuestsProps {
   quests: PlayerQuestData[];

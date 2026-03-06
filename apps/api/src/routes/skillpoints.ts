@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { getSkillPoints, allocatePoints, respecPoints } from '../services/skillPointService';
 import { asyncHandler } from '../utils/asyncHandler';
-import { TALENT_TREE_DEFINITIONS } from '@adventure/shared';
+import { TALENT_TREE_DEFINITIONS } from '@pocketrealm/shared';
 
 export const skillPointsRouter = Router();
 skillPointsRouter.use(authenticate);

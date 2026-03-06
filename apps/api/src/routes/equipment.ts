@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { EquipmentSlot } from '@adventure/shared';
+import type { EquipmentSlot } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { equipItem, ensureEquipmentSlots, unequipSlot } from '../services/equipmentService';
 import { assertNotRecovering } from '../utils/routeHelpers.js';

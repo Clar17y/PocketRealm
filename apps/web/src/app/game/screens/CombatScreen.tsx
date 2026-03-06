@@ -18,8 +18,9 @@ import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
-import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
+import { getMobPrefixDefinition, HP_CONSTANTS } from '@pocketrealm/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../gameController.types';
+import { ScreenContainer } from '@/components/common/ScreenContainer';
 
 interface CombatScreenProps {
   hpState: HpState;
@@ -61,6 +62,8 @@ interface CombatScreenProps {
     outcome: string;
     combatantAMaxHp: number;
     playerStartHp: number;
+    playerStartStamina?: number;
+    playerStartMana?: number;
     combatantBMaxHp: number;
     log: LastCombatLogEntry[] | null;
     rewards: LastCombat['rewards'];
@@ -206,7 +209,7 @@ export function CombatScreen({
   }, [buildShareText]);
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       {/* Strategy Selection Modal */}
       {strategyModalSite && (
         <ModalOverlay>
@@ -334,7 +337,7 @@ export function CombatScreen({
           {roomTransition && (
             <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)]/30 rounded-lg p-6 text-center">
               <div className="text-lg font-bold text-[var(--rpg-gold)] mb-1">
-                Entering Room {roomTransition.entering}
+                Entering Room <span className="font-pixel font-normal text-[12px]">{roomTransition.entering}</span>
               </div>
               <div className="text-sm text-[var(--rpg-text-secondary)]">
                 Prepare for the next fight...
@@ -348,8 +351,8 @@ export function CombatScreen({
               {fightProgress && fightProgress.total > 1 && (
                 <div className="text-sm text-[var(--rpg-gold)] font-semibold mb-2">
                   {fightProgress.room
-                    ? `Room ${fightProgress.room} — Fight ${fightProgress.current}/${fightProgress.total}`
-                    : `Fight ${fightProgress.current}/${fightProgress.total}`
+                    ? <>Room <span className="font-pixel font-normal text-[12px]">{fightProgress.room}</span> — Fight <span className="font-pixel font-normal text-[12px]">{fightProgress.current}/{fightProgress.total}</span></>
+                    : <>Fight <span className="font-pixel font-normal text-[12px]">{fightProgress.current}/{fightProgress.total}</span></>
                   }
                 </div>
               )}
@@ -365,6 +368,8 @@ export function CombatScreen({
                   log={combatPlaybackData.log}
                   rewards={combatPlaybackData.rewards}
                   activeEvents={combatPlaybackData.activeEvents}
+                  playerStartStamina={combatPlaybackData.playerStartStamina}
+                  playerStartMana={combatPlaybackData.playerStartMana}
                   playerMaxStamina={staminaState?.max}
                   playerMaxMana={manaState?.max}
                   speedMs={combatSpeedMs}
@@ -384,7 +389,7 @@ export function CombatScreen({
 
           {/* Last Combat (detailed log — shown after playback completes) */}
           {!combatPlaybackData && lastCombat && (
-            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
+            <div className={`bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3 ${lastCombat.outcome === 'victory' ? 'rpg-victory-pulse' : ''}`}>
               {lastCombat.fights && lastCombat.fights.length > 1 && (
                 <FightNavigationBar
                   currentIndex={lastCombatFightIndex}
@@ -405,7 +410,7 @@ export function CombatScreen({
                     alt={displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
                     className="w-8 h-8 rounded object-cover"
                   />
-                  Last Combat: {displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}
+                  Last Combat: <span className="font-almendra">{displayedFight?.mobDisplayName ?? lastCombat.mobDisplayName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={`text-sm font-semibold ${outcomeColor}`}>{outcomeLabel}</div>
@@ -458,7 +463,7 @@ export function CombatScreen({
           )}
 
           <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
-            <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Encounter Sites</h2>
+            <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Encounter Sites</h2>
 
             {combatXpRate && (
               <XpRateBadge skillName={combatXpRate.skillName} rate={combatXpRate.rate} />
@@ -539,18 +544,18 @@ export function CombatScreen({
                           />
                         )}
                         <div>
-                          <div className="flex items-center gap-1.5 flex-wrap text-[var(--rpg-text-primary)] font-semibold">
+                          <div className="flex items-center gap-1.5 flex-wrap text-[var(--rpg-text-primary)] font-semibold font-almendra">
                             {e.siteName}
                             <EventBadges inline modifiers={e.eventModifiers} />
                           </div>
                           <span className="text-xs text-[var(--rpg-text-secondary)]">
                             {e.totalRooms > 1
-                              ? `Room ${e.currentRoom}/${e.totalRooms} · ${e.aliveMobs}/${e.totalMobs} mobs`
-                              : `${e.aliveMobs}/${e.totalMobs} mobs`
+                              ? <>Room <span className="font-pixel text-[8px]">{e.currentRoom}/{e.totalRooms}</span> · <span className="font-pixel text-[8px]">{e.aliveMobs}/{e.totalMobs}</span> mobs</>
+                              : <><span className="font-pixel text-[8px]">{e.aliveMobs}/{e.totalMobs}</span> mobs</>
                             }
                           </span>
                           <span className={`text-xs ${e.totalTurnCost > currentTurns ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
-                            {' · '}Cost: {e.totalTurnCost.toLocaleString()} turns
+                            {' · '}Cost: <span className="font-pixel text-[8px]">{e.totalTurnCost.toLocaleString()}</span> turns
                           </span>
                           {e.clearStrategy && (
                             <span className="text-xs text-[var(--rpg-gold)] ml-2">
@@ -558,10 +563,10 @@ export function CombatScreen({
                             </span>
                           )}
                           <div className="text-xs text-[var(--rpg-text-secondary)]">
-                            Next monster: {nextMobLabel ?? 'None (site decayed)'}
+                            Next monster: <span className="font-almendra">{nextMobLabel ?? 'None (site decayed)'}</span>
                           </div>
                         <div className="text-xs text-[var(--rpg-text-secondary)]">
-                          Zone: {e.zoneName} | Decayed {e.decayedMobs} | Found{' '}
+                          Zone: <span className="font-almendra">{e.zoneName}</span> | Decayed <span className="font-pixel text-[8px]">{e.decayedMobs}</span> | Found{' '}
                           {relativeTime(pendingClockMs - new Date(e.discoveredAt).getTime())}
                         </div>
                         </div>
@@ -605,7 +610,7 @@ export function CombatScreen({
       ) : (
         <CombatHistory />
       )}
-    </div>
+    </ScreenContainer>
   );
 }
 

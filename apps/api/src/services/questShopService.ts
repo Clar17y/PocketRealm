@@ -1,5 +1,5 @@
-import { prisma } from '@adventure/database';
-import { QUEST_SHOP_ITEMS, type QuestShopItem } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import { QUEST_SHOP_ITEMS, type QuestShopItem } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
 export function getShopInventory(): QuestShopItem[] {

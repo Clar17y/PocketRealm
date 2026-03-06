@@ -7,7 +7,7 @@ import {
   PROCESSING_SKILLS,
   CRAFTING_SKILLS,
   SkillXpResult,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 
@@ -110,7 +110,7 @@ export function applyXpGain(
   skillType: SkillType
 ): SkillXpResult {
   const efficiency = calculateEfficiency(windowXpGained, skillType);
-  const xpAfterEfficiency = Math.floor(rawXpGain * efficiency);
+  const xpAfterEfficiency = Math.round(rawXpGain * efficiency);
 
   const newTotalXp = currentXp + xpAfterEfficiency;
   const newLevel = levelFromXp(newTotalXp);

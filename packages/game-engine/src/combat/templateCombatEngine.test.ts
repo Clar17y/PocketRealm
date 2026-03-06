@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, afterEach } from 'vitest';
-import type { CombatantStats, ActionDefinition, CombatTemplateAction } from '@adventure/shared';
-import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@adventure/shared';
+import type { CombatantStats, ActionDefinition, CombatTemplateSlotData, PerActionScaling } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
 import { runTemplateCombat, type TemplateCombatant } from './templateCombatEngine';
 
 // --- Helpers ---
@@ -23,8 +23,8 @@ function makeStats(overrides: Partial<CombatantStats> = {}): CombatantStats {
   };
 }
 
-function templateOf(...actionIds: string[]): CombatTemplateAction[] {
-  return actionIds.map((id) => ({ actionId: id }));
+function templateOf(...actionIds: string[]): CombatTemplateSlotData[] {
+  return actionIds.map((id, i) => ({ id: `slot-${i}`, sortOrder: i, actionId: id }));
 }
 
 function makeCombatant(
@@ -146,7 +146,7 @@ describe('runTemplateCombat', () => {
 
       // Verify template loops correctly
       const aEntries = result.log.filter(
-        (e) => e.actor === 'combatantA' && e.round >= 1 && e.round <= 12,
+        (e) => e.actor === 'combatantA' && e.action !== 'regen' && e.round >= 1 && e.round <= 12,
       );
 
       // Round 1 & 7 → index 0 → light_attack
@@ -420,9 +420,9 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b);
 
-      // Combat ends on death before cost deduction → resources unchanged
+      // Costs are deducted even on a killing blow
       expect(result.outcome).toBe('victory');
-      expect(result.combatantAStaminaRemaining).toBe(100);
+      expect(result.combatantAStaminaRemaining).toBe(100 - COMBAT_ACTION_CONSTANTS.LIGHT_ATTACK_STAMINA);
       expect(result.combatantAManaRemaining).toBe(50);
     });
 
@@ -602,11 +602,11 @@ describe('runTemplateCombat', () => {
         );
       }
 
-      // Verify sickness message appears (potion attempts while sick)
-      const sicknessEntries = result.log.filter(
-        (e) => e.actor === 'combatantA' && e.message.includes('still sick'),
+      // When potion sick, the action falls back to Defend (wasExhausted=true)
+      const defendFallbacks = result.log.filter(
+        (e) => e.actor === 'combatantA' && e.action === 'defend' && e.wasExhausted,
       );
-      expect(sicknessEntries.length).toBeGreaterThan(0);
+      expect(defendFallbacks.length).toBeGreaterThan(0);
     });
   });
 
@@ -726,11 +726,11 @@ describe('runTemplateCombat', () => {
       expect(result.potionsConsumed.length).toBeGreaterThanOrEqual(1);
       expect(result.potionsConsumed[0].name).toBe('Health Potion');
 
-      // Round 2: Stamina potion should be blocked by potion sickness from HP potion
-      const sicknessEntry = result.log.find(
-        (e) => e.round === 2 && e.actor === 'combatantA' && e.message.includes('still sick'),
+      // Round 2: Stamina potion should be blocked by potion sickness — falls back to Defend
+      const defendFallback = result.log.find(
+        (e) => e.round === 2 && e.actor === 'combatantA' && e.action === 'defend' && e.wasExhausted,
       );
-      expect(sicknessEntry).toBeDefined();
+      expect(defendFallback).toBeDefined();
     });
 
     it('mana potion is capped at max mana', () => {
@@ -758,7 +758,7 @@ describe('runTemplateCombat', () => {
       expect(result.potionsConsumed[0].healAmount).toBe(5);
     });
 
-    it('no matching potion type results in wasted action', () => {
+    it('no matching potion type falls back to Defend', () => {
       mockCombatRandom();
 
       const a = makeCombatant('Player', {
@@ -775,12 +775,12 @@ describe('runTemplateCombat', () => {
         ],
       });
 
-      // No mana potions available, so the mana potion action is wasted
+      // No mana potions available, so the action falls back to Defend
       expect(result.potionsConsumed).toHaveLength(0);
-      const wasteEntry = result.log.find(
-        (e) => e.round === 1 && e.actor === 'combatantA' && e.message.includes('has none left'),
+      const defendFallback = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'defend' && e.wasExhausted,
       );
-      expect(wasteEntry).toBeDefined();
+      expect(defendFallback).toBeDefined();
     });
   });
 
@@ -833,6 +833,627 @@ describe('runTemplateCombat', () => {
       for (const entry of result.log) {
         expect(entry.combatantAStaminaAfter).toBeLessThanOrEqual(100);
         expect(entry.combatantAManaAfter).toBeLessThanOrEqual(50);
+      }
+    });
+  });
+
+  describe('per-action scaling', () => {
+    // Shared perActionScaling data for a magic-focused player
+    const magicScaling: PerActionScaling = {
+      skillLevels: { melee: 5, ranged: 5, magic: 30 },
+      attributes: { strength: 3, dexterity: 3, intelligence: 25 },
+      weaponPower: { attack: 5, rangedPower: 5, magicPower: 24 },
+      equipmentAccuracy: 10,
+      weaponRequiredSkill: 'magic',
+    };
+
+    it('magic-scaling action uses magic stats for damage', () => {
+      // fire_bolt: scalingStat='magic', damageMultiplier=1.2, damageType='magic'
+      // magic resolved: totalAttack = 30 + 24 + 25 = 79
+      // damageMin = 1 + floor(79/5) = 16, damageMax = 5 + floor(79/2) = 44
+      // With min damage roll: rawDamage = floor(16 * 1.2) = 19
+      mockCombatRandom();
+
+      const a = makeCombatant('Mage', {
+        template: templateOf('fire_bolt'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({
+          hp: 500, maxHp: 500,
+          // Global stats are set low — per-action scaling should override
+          damageMin: 1, damageMax: 1, accuracy: 0,
+        }),
+        mana: 500,
+        maxMana: 500,
+        perActionScaling: magicScaling,
+      });
+      const b = makeCombatant('Target', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, magicDefence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      // Find A's first attack entry
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(attackEntry).toBeDefined();
+      // rawDamage = floor(16 * 1.2 * 1.0) = 19 (min roll, action multiplier, no interaction bonus)
+      // With defend's 35% reduction: floor(19 * 0.65) = 12
+      expect(attackEntry?.rawDamage).toBe(19);
+      expect(attackEntry?.damage).toBe(12);
+    });
+
+    it('melee-scaling action on magic-weapon user uses melee stats', () => {
+      // power_strike: scalingStat='melee', damageMultiplier=1.3
+      // melee resolved: totalAttack = 5 + 5 + 3 = 13
+      // damageMin = 1 + floor(13/5) = 3, damageMax = 5 + floor(13/2) = 11
+      // With min damage roll: rawDamage = floor(3 * 1.3) = 3
+      mockCombatRandom();
+
+      const a = makeCombatant('Mage', {
+        template: templateOf('power_strike'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({
+          hp: 500, maxHp: 500,
+          // High global stats that should be ignored with per-action scaling
+          damageMin: 50, damageMax: 50, accuracy: 50,
+        }),
+        stamina: 500,
+        maxStamina: 500,
+        perActionScaling: magicScaling,
+      });
+      const b = makeCombatant('Target', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, defence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(attackEntry).toBeDefined();
+      // rawDamage = floor(3 * 1.3 * 1.0) = 3 (min roll)
+      // With defend's 35% reduction: max(1, floor(3 * 0.65)) = max(1, 1) = 1
+      expect(attackEntry?.rawDamage).toBe(3);
+      expect(attackEntry?.damage).toBe(1);
+    });
+
+    it('mob without perActionScaling uses pre-computed stats', () => {
+      mockCombatRandom();
+
+      // Mob with no perActionScaling — should use stats.damageMin/Max directly
+      const a = makeCombatant('Mob', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 200, maxHp: 200, damageMin: 15, damageMax: 15 }),
+        // No perActionScaling
+      });
+      const b = makeCombatant('Target', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 200, maxHp: 200, damageMin: 5, damageMax: 5, defence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(attackEntry).toBeDefined();
+      // light_attack: damageMultiplier=0.6 → rawDamage = floor(15 * 0.6) = 9
+      expect(attackEntry?.rawDamage).toBe(9);
+    });
+
+    it('buffs apply on top of per-action scaling stats', () => {
+      // Verify that buff modifiers (e.g. Battle Cry +15 attack) are applied
+      // even when per-action scaling overrides the base damage stats.
+      //
+      // Without buff: melee resolved totalAttack = 5+5+3 = 13
+      //   damageMin = 1 + floor(13/5) = 3, damageMax = 5 + floor(13/2) = 11
+      //   power_strike 1.3x: rawDamage = floor(3 * 1.3) = 3 (min roll)
+      //
+      // With Battle Cry (+15 attack → +15 damageMin, +15 damageMax):
+      //   damageMin = 3+15 = 18, damageMax = 11+15 = 26
+      //   power_strike 1.3x: rawDamage = floor(18 * 1.3) = 23 (min roll)
+      mockCombatRandom();
+
+      const a = makeCombatant('Mage', {
+        template: templateOf('power_strike'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({
+          hp: 500, maxHp: 500,
+          damageMin: 50, damageMax: 50, accuracy: 50,
+        }),
+        stamina: 500,
+        maxStamina: 500,
+        perActionScaling: magicScaling,
+      });
+      const b = makeCombatant('Target', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, defence: 0 }),
+      });
+
+      // Run combat without buff first to get baseline
+      const baseResult = runTemplateCombat(a, b);
+      const baseAttack = baseResult.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(baseAttack).toBeDefined();
+      expect(baseAttack?.rawDamage).toBe(3); // baseline: floor(3 * 1.3) = 3
+
+      // Now run with Battle Cry active: use battle_cry first round, power_strike second
+      vi.restoreAllMocks();
+      mockCombatRandom();
+
+      const buffedA = makeCombatant('Mage', {
+        template: templateOf('battle_cry', 'power_strike'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({
+          hp: 500, maxHp: 500,
+          damageMin: 50, damageMax: 50, accuracy: 50,
+        }),
+        stamina: 500,
+        maxStamina: 500,
+        perActionScaling: magicScaling,
+      });
+      const buffedB = makeCombatant('Target', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, defence: 0 }),
+      });
+
+      const buffResult = runTemplateCombat(buffedA, buffedB);
+
+      // Round 2 attack should have Battle Cry +15 applied
+      const buffAttack = buffResult.log.find(
+        (e) => e.round === 2 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(buffAttack).toBeDefined();
+      // With buff: damageMin = 3+15 = 18, rawDamage = floor(18 * 1.3) = 23
+      expect(buffAttack?.rawDamage).toBe(23);
+      // Verify the buff added exactly 20 raw damage (23 - 3 = 20, because floor(18*1.3) - floor(3*1.3))
+      expect(buffAttack!.rawDamage! - baseAttack!.rawDamage!).toBe(20);
+    });
+
+    it('action damageType determines which defence is used', () => {
+      // Create a custom action: melee scaling but magic damage type
+      // This should hit magicDefence, not physical defence
+      const magicMelee: ActionDefinition = {
+        id: 'magic_melee',
+        name: 'Enchanted Strike',
+        description: 'A melee strike infused with magic energy.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        scalingStat: 'melee',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'magic',
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, magic_melee: magicMelee };
+
+      mockCombatRandom();
+
+      const a = makeCombatant('Fighter', {
+        template: templateOf('magic_melee'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 20, damageMax: 20 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      // Target has high physical defence but no magic defence
+      const b = makeCombatant('Target', {
+        template: templateOf('defend'),
+        stats: makeStats({
+          hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1,
+          defence: 200,       // High physical defence
+          magicDefence: 0,    // No magic defence
+        }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(attackEntry).toBeDefined();
+      // rawDamage = floor(20 * 1.0 * 1.0) = 20
+      expect(attackEntry?.rawDamage).toBe(20);
+      // Magic defence is 0 → no defence reduction → only defend's 35% reduction
+      // floor(20 * 0.65) = 13
+      expect(attackEntry?.damage).toBe(13);
+      // Log should show magicDefence, not physical defence
+      expect(attackEntry?.targetMagicDefence).toBe(0);
+      expect(attackEntry?.targetDefence).toBeUndefined();
+    });
+  });
+
+  describe('DOT/HOT tick system', () => {
+    it('DOT deals damage each round', () => {
+      mockCombatRandom();
+
+      const poisonAttack: ActionDefinition = {
+        id: 'poison_strike',
+        name: 'Poison Strike',
+        description: 'An attack that poisons the target.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 15, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        effect: {
+          name: 'Poison',
+          stat: 'attack',
+          modifier: 0,
+          duration: 4,
+          isDebuff: true,
+          damagePerRound: 10,
+          dotDamageType: 'magic',
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, poison_strike: poisonAttack };
+
+      const a = makeCombatant('Player', {
+        template: templateOf('poison_strike', 'light_attack', 'light_attack', 'light_attack'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 10, damageMax: 10 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1, magicDefence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      // Should have DOT tick entries in the log
+      const dotTicks = result.log.filter(e => e.tickType === 'dot_tick');
+      expect(dotTicks.length).toBeGreaterThan(0);
+
+      // DOT should deal damage
+      for (const tick of dotTicks) {
+        expect(tick.damage).toBeGreaterThan(0);
+        expect(tick.spellName).toBe('Poison');
+        expect(tick.message).toContain('magic damage');
+      }
+    });
+
+    it('HOT heals each round via supportive action', () => {
+      mockCombatRandom();
+
+      const regenSpell: ActionDefinition = {
+        id: 'regeneration',
+        name: 'Regeneration',
+        description: 'Heal over time.',
+        actionType: 'buff',
+        category: 'supportive',
+        cost: { stamina: 5, mana: 20 },
+        isChanneling: true,
+        effect: {
+          name: 'Regeneration',
+          stat: 'defence',
+          modifier: 0,
+          duration: 4,
+          healPerRound: 8,
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, regeneration: regenSpell };
+
+      const a = makeCombatant('Player', {
+        template: templateOf('regeneration', 'light_attack', 'light_attack', 'light_attack'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 60, maxHp: 100, damageMin: 5, damageMax: 5 }),
+        mana: 500,
+        maxMana: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const hotTicks = result.log.filter(e => e.tickType === 'hot_tick');
+      expect(hotTicks.length).toBeGreaterThan(0);
+
+      for (const tick of hotTicks) {
+        expect(tick.healAmount).toBeGreaterThan(0);
+        expect(tick.spellName).toBe('Regeneration');
+        expect(tick.message).toContain('heals');
+      }
+    });
+
+    it('DOT can kill target', () => {
+      mockCombatRandom();
+
+      // Strong DOT on a low-HP target that defends (takes no direct damage to die from)
+      const strongDotAttack: ActionDefinition = {
+        id: 'deadly_poison',
+        name: 'Deadly Poison',
+        description: 'Lethal poison.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 0.1,
+        damageType: 'physical',
+        effect: {
+          name: 'Deadly Poison',
+          stat: 'attack',
+          modifier: 0,
+          duration: 10,
+          isDebuff: true,
+          damagePerRound: 50,
+          dotDamageType: 'magic',
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, deadly_poison: strongDotAttack };
+
+      const a = makeCombatant('Player', {
+        template: templateOf('deadly_poison', 'defend', 'defend', 'defend'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 10, damageMax: 10 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 80, maxHp: 80, damageMin: 1, damageMax: 1, magicDefence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      expect(result.outcome).toBe('victory');
+      expect(result.combatantBHpRemaining).toBe(0);
+
+      // Verify DOT ticks appear in the log
+      const dotTicks = result.log.filter(e => e.tickType === 'dot_tick');
+      expect(dotTicks.length).toBeGreaterThan(0);
+    });
+
+    it('same-name DOT refreshes duration instead of stacking', () => {
+      mockCombatRandom();
+
+      const poisonAttack: ActionDefinition = {
+        id: 'poison_strike',
+        name: 'Poison Strike',
+        description: 'Poisons the target.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        effect: {
+          name: 'Poison',
+          stat: 'attack',
+          modifier: 0,
+          duration: 3,
+          isDebuff: true,
+          damagePerRound: 10,
+          dotDamageType: 'magic',
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, poison_strike: poisonAttack };
+
+      // Both rounds use poison_strike → second application should refresh, not stack
+      const a = makeCombatant('Player', {
+        template: templateOf('poison_strike'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 10, damageMax: 10 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1, magicDefence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      // If DOTs stacked, each tick after round 2 would deal 20 damage (10+10).
+      // With refresh, each tick should only deal 10.
+      const dotTicks = result.log.filter(e => e.tickType === 'dot_tick');
+      expect(dotTicks.length).toBeGreaterThan(0);
+
+      // All DOT ticks should deal the same amount (10 damage with 0 magic defence)
+      const uniqueDamages = new Set(dotTicks.map(e => e.damage));
+      expect(uniqueDamages.size).toBe(1);
+      expect(dotTicks[0].damage).toBe(10);
+    });
+
+    it('DOT snapshot uses % of triggering hit damage', () => {
+      mockCombatRandom();
+
+      const percentDotAttack: ActionDefinition = {
+        id: 'burning_strike',
+        name: 'Burning Strike',
+        description: 'Sets the target on fire.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 15, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        effect: {
+          name: 'Burning',
+          stat: 'attack',
+          modifier: 0,
+          duration: 3,
+          isDebuff: true,
+          damagePerRound: 5,
+          damagePerRoundPercent: 50,
+          dotDamageType: 'physical',
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, burning_strike: percentDotAttack };
+
+      // With damageMin/Max = 20, no defence, no crit, damageMultiplier=1.0:
+      // finalDamage = 20
+      // DOT per round = 5 (flat) + floor(20 * 50 / 100) = 5 + 10 = 15
+      const a = makeCombatant('Player', {
+        template: templateOf('burning_strike', 'defend', 'defend', 'defend'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 20, damageMax: 20 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1, defence: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const dotTicks = result.log.filter(e => e.tickType === 'dot_tick');
+      expect(dotTicks.length).toBeGreaterThan(0);
+
+      // The initial hit has defend's 35% reduction: floor(20 * 0.65) = 13
+      // DOT snapshot: flat 5 + floor(13 * 50 / 100) = 5 + 6 = 11
+      // DOT tick with 0 physical defence → damage = 11
+      expect(dotTicks[0].damage).toBe(11);
+    });
+  });
+
+  describe('life leech', () => {
+    it('heals attacker for percentage of damage dealt', () => {
+      // Attack always hits, min damage, no crit
+      mockCombatRandom();
+
+      const leechAttack: ActionDefinition = {
+        id: 'drain_strike',
+        name: 'Drain Strike',
+        description: 'Drains life from the target.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        lifeLeechPercent: 50,
+      };
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, drain_strike: leechAttack };
+
+      // Both use offensive actions so random call pattern stays aligned (3 calls each per round).
+      // damageMin/Max = 20, no defence, no crit → finalDamage = 20
+      // leech = floor(20 * 50 / 100) = 10
+      const a = makeCombatant('Player', {
+        template: templateOf('drain_strike'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 60, maxHp: 100, damageMin: 20, damageMax: 20 }),
+        stamina: 200,
+        maxStamina: 200,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      // Find the first attack log entry from Player with damage
+      const attackLog = result.log.find(
+        e => e.actor === 'combatantA' && e.damage !== undefined && e.damage > 0,
+      );
+      expect(attackLog).toBeDefined();
+      expect(attackLog!.damage).toBe(20);
+      expect(attackLog!.leechHeal).toBe(10);
+      expect(attackLog!.message).toContain('Leeches 10 HP');
+
+      // Player HP after leech: started at 60, +10 leech = 70
+      expect(attackLog!.combatantAHpAfter).toBe(70);
+    });
+
+    it('caps leech heal at missing HP (no overheal)', () => {
+      mockCombatRandom();
+
+      const leechAttack: ActionDefinition = {
+        id: 'drain_strike',
+        name: 'Drain Strike',
+        description: 'Drains life from the target.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        lifeLeechPercent: 100,
+      };
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, drain_strike: leechAttack };
+
+      // Attacker at full HP → leech = floor(20 * 100 / 100) = 20, but capped at 0 missing HP
+      const a = makeCombatant('Player', {
+        template: templateOf('drain_strike'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 100, maxHp: 100, damageMin: 20, damageMax: 20 }),
+        stamina: 200,
+        maxStamina: 200,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      const attackLog = result.log.find(
+        e => e.actor === 'combatantA' && e.damage !== undefined && e.damage > 0,
+      );
+      expect(attackLog).toBeDefined();
+      expect(attackLog!.damage).toBe(20);
+      // No leech because attacker is at full HP
+      expect(attackLog!.leechHeal).toBeUndefined();
+      expect(attackLog!.message).not.toContain('Leeches');
+    });
+
+    it('does not leech on missed attacks', () => {
+      // Use a custom mock that always returns 0.0 after initiative, so every
+      // d20 is a natural 1 (always miss) regardless of call pattern alignment.
+      let callCount = 0;
+      vi.spyOn(Math, 'random').mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return 0.9; // initA (A goes first)
+        if (callCount === 2) return 0.1; // initB
+        return 0.0; // All subsequent: d20=1 (natural miss), damage=min, crit=no
+      });
+
+      const leechAttack: ActionDefinition = {
+        id: 'drain_strike',
+        name: 'Drain Strike',
+        description: 'Drains life from the target.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        lifeLeechPercent: 100,
+      };
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, drain_strike: leechAttack };
+
+      const a = makeCombatant('Player', {
+        template: templateOf('drain_strike'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 50, maxHp: 100, damageMin: 20, damageMax: 20, accuracy: 0 }),
+        stamina: 200,
+        maxStamina: 200,
+      });
+      // Goblin also uses an offensive action to keep random pattern consistent
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1, accuracy: 0 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+
+      // All of Player's attacks should miss (natural 1)
+      const playerAttacks = result.log.filter(
+        e => e.actor === 'combatantA' && e.action === 'attack',
+      );
+      expect(playerAttacks.length).toBeGreaterThan(0);
+      for (const entry of playerAttacks) {
+        expect(entry.leechHeal).toBeUndefined();
+        expect(entry.message).not.toContain('Leeches');
+        expect(entry.message).toContain('misses');
       }
     });
   });

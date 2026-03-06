@@ -7,7 +7,7 @@ export const auth = {
   passwordInput: (page: Page) => page.locator('#password'),
   usernameInput: (page: Page) => page.locator('#username'),
   loginButton: (page: Page) => page.getByRole('button', { name: 'Enter World' }),
-  registerButton: (page: Page) => page.getByRole('button', { name: 'Begin Adventure' }),
+  registerButton: (page: Page) => page.getByRole('button', { name: 'Begin Journey' }),
   errorMessage: (page: Page) => page.locator('[class*="error"]'),
 };
 

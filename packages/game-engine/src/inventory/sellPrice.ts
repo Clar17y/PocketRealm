@@ -1,5 +1,5 @@
-import { SELL_CONSTANTS } from '@adventure/shared';
-import type { ItemRarity } from '@adventure/shared';
+import { SELL_CONSTANTS } from '@pocketrealm/shared';
+import type { ItemRarity } from '@pocketrealm/shared';
 
 export interface SellPriceInput {
   baseSellPrice: number | null;

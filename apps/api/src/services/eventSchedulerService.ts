@@ -1,10 +1,10 @@
 import type { Server as SocketServer } from 'socket.io';
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import {
   WORLD_EVENT_CONSTANTS,
   WORLD_EVENT_TEMPLATES,
   type WorldEventTemplate,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { expireStaleEvents, spawnWorldEvent } from './worldEventService';
 import { createBossEncounter, checkAndResolveDueBossRounds } from './bossEncounterService';
 import { emitSystemMessage } from './systemMessageService';

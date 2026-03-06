@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Prisma, prisma } from '@adventure/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { prismaAny } from '../../utils/prismaAny.js';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
@@ -14,7 +14,7 @@ import {
   selectTierWithBleedthrough,
   simulateExploration,
   validateExplorationTurns,
-} from '@adventure/game-engine';
+} from '@pocketrealm/game-engine';
 import {
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
@@ -24,12 +24,15 @@ import {
   type MobTemplate,
   type PotionConsumed,
   type QuestProgressUpdate,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankService';
 import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { trackProgress } from '../../services/progressService';
+import { getPlayerGuildId } from '../../services/guildService';
+import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
+import { incrementContractProgress } from '../../services/guildContractService';
 import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
@@ -48,11 +51,11 @@ import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { getIo } from '../../socket';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
-import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
+import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
 import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
-import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
+import { getMainHandAttackSkill, getSkillLevel, buildPerActionScaling, type AttackSkill } from '../../services/combatStatsService';
 import {
   startSchema,
   pickWeighted,
@@ -127,6 +130,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const attackSkill: AttackSkill = mainHandAttackSkill ?? 'melee';
     const attackLevel = await getSkillLevel(playerId, attackSkill);
 
+    const guildMods = await getPlayerGuildModifiers(playerId);
+    const perActionScaling = await buildPerActionScaling(playerId, {
+      equipmentStats,
+      attributes: progression.attributes,
+      weaponRequiredSkill: mainHandAttackSkill,
+      guildDamageMultiplier: guildMods.combatDamage,
+    });
+
     const explorationProgress = await getExplorationPercent(playerId, body.zoneId);
     const zoneTiers = zone.explorationTiers as Record<string, number> | null;
 
@@ -173,19 +184,15 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       }
     }
 
-    // Auto-potion setup + tutorial detection
+    // Tutorial detection
     const playerRecord = await prismaAny.player.findUnique({
       where: { id: playerId },
-      select: { autoPotionThreshold: true, tutorialStep: true },
+      select: { tutorialStep: true },
     });
     const isTutorialExplore = playerRecord?.tutorialStep === 1;
-    const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
 
     // Tutorial explore step: force 100 turns and a single guaranteed ambush
     const turnsToSpend = isTutorialExplore ? 100 : body.turns;
-    const potionPool = autoPotionThreshold > 0
-      ? await buildPotionPool(playerId, hpState.maxHp)
-      : [];
     const allPotionsConsumed: PotionConsumed[] = [];
     const ambushPendingLootSessionIds: string[] = [];
     const allQuestProgress: QuestProgressUpdate[] = [];
@@ -243,6 +250,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       getSkillPoints(playerId),
     ]);
     const explorationUnlockedActions = explorationSkillPoints.unlockedActions;
+    const potionPool = templateHasPotionActions(playerTemplate)
+      ? await buildPotionPool(playerId, hpState.maxHp)
+      : [];
     let currentStamina = resourceState.stamina.current;
     let currentMana = resourceState.mana.current;
     const maxStamina = resourceState.stamina.max;
@@ -322,10 +332,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           equipmentStats
         );
 
-        let combatOptions: CombatOptions | undefined;
-        if (autoPotionThreshold > 0 && potionPool.length > 0) {
-          combatOptions = { autoPotionThreshold, potions: [...potionPool] };
-        }
+        const combatOptions: CombatOptions | undefined = potionPool.length > 0
+          ? { potions: [...potionPool] }
+          : undefined;
 
         const combatantA = buildPlayerTemplateCombatant({
           playerId,
@@ -339,6 +348,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           maxMana,
           manaRegenPerRound,
           unlockedActions: explorationUnlockedActions,
+          perActionScaling,
         });
         const combatantB = mobToTemplateCombatant(prefixedMob);
         const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
@@ -362,7 +372,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
         let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
         let xpGain = 0;
-        let xpGrant: GrantXpResult | null = null;
+        let xpGrants: GrantXpResult[] = [];
 
         if (combatResult.outcome === 'victory') {
           currentHp = combatResult.combatantAHpRemaining;
@@ -374,14 +384,16 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             playerId,
             mob: prefixedMob,
             attackSkill,
+            damageByScalingStat: combatResult.damageByScalingStat,
+            resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           });
           loot = rewards.loot;
           if (rewards.pendingLootSessionId) {
             ambushPendingLootSessionIds.push(rewards.pendingLootSessionId);
           }
           allQuestProgress.push(...rewards.questProgress);
-          xpGrant = rewards.xpGrant;
-          xpGain = xpGrant.xpResult.xpAfterEfficiency;
+          xpGrants = rewards.xpGrants;
+          xpGain = xpGrants.reduce((sum, g) => sum + g.xpResult.xpAfterEfficiency, 0);
 
           pendingCombatLogs.push({
             turnsSpent: 0,
@@ -398,7 +410,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 baseXp: prefixedMob.xpReward,
                 loot,
                 durabilityLost,
-                skillXp: xpGrant ? serializeXpGrant(xpGrant) : null,
+                skillXpGrants: xpGrants.map(serializeXpGrant),
               },
               eventModifiers: ambushEventModifiers,
             }),
@@ -468,7 +480,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 baseXp: 0,
                 loot: [],
                 durabilityLost,
-                skillXp: null,
+                skillXpGrants: [],
               },
               eventModifiers: ambushEventModifiers,
             }),

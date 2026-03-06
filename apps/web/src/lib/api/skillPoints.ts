@@ -1,5 +1,5 @@
 import { fetchApi } from './core';
-import type { TalentNodeDefinition } from '@adventure/shared';
+import type { TalentNodeDefinition } from '@pocketrealm/shared';
 
 export interface SkillPointState {
   totalPointsEarned: number;

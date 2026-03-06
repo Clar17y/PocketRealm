@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { prisma } from '@adventure/database';
-import { estimateExploration, validateExplorationTurns } from '@adventure/game-engine';
+import { prisma } from '@pocketrealm/database';
+import { estimateExploration, validateExplorationTurns } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns } from '../../services/guildTaxService';

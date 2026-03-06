@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@adventure/shared', '@adventure/game-engine'],
+  transpilePackages: ['@pocketrealm/shared', '@pocketrealm/game-engine'],
 };
 
 module.exports = nextConfig;

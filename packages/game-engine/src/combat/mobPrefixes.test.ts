@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { MobTemplate } from '@adventure/shared';
+import type { MobTemplate } from '@pocketrealm/shared';
 import { applyMobPrefix, generatePrefixSpells, rollMobPrefix } from './mobPrefixes';
 
 describe('rollMobPrefix', () => {

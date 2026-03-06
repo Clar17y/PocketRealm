@@ -1,4 +1,4 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import {
   QUEST_TEMPLATE_DEFINITIONS,
   QUEST_CONSTANTS,
@@ -8,7 +8,7 @@ import {
   type PlayerQuestData,
   type PlayerQuestStateData,
   type QuestProgressUpdate,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getDayStart, getWeekStart, getNextDayStart, getWeekEnd, getLevelBracket, selectWithCategorySpread } from '../utils/dateHelpers';
 import { randomIntInclusive } from '../utils/random';

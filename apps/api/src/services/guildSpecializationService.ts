@@ -1,9 +1,9 @@
-import { prisma, Prisma } from '@adventure/database';
+import { prisma, Prisma } from '@pocketrealm/database';
 import {
   GUILD_CONSTANTS,
   GUILD_SPECIALIZATION_DEFINITIONS,
   type GuildSpecialization,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { requireRole } from './guildService';
 

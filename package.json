@@ -1,5 +1,5 @@
 {
-  "name": "adventure-rpg",
+  "name": "pocketrealm",
   "version": "0.1.0",
   "private": true,
   "workspaces": [
@@ -22,7 +22,7 @@
     "typecheck": "tsc -b",
     "lint": "eslint . --ext .ts,.tsx",
     "test": "npm run test --workspaces --if-present",
-    "test:engine": "npm run build -w @adventure/shared && npm run test -w packages/game-engine",
+    "test:engine": "npm run build -w @pocketrealm/shared && npm run test -w packages/game-engine",
     "test:api": "npm run test -w apps/api",
     "db:generate": "npm run generate -w packages/database",
     "db:migrate": "npm run migrate -w packages/database",

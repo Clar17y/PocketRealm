@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HP_CONSTANTS } from '@adventure/shared';
+import { HP_CONSTANTS } from '@pocketrealm/shared';
 import {
   calculateMaxHp,
   calculateRegenPerSecond,

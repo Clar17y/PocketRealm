@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '@adventure/database';
-import { calculateCurrentTurns, calculateTimeToCapMs, spendTurns } from '@adventure/game-engine';
+import { prisma } from '@pocketrealm/database';
+import { calculateCurrentTurns, calculateTimeToCapMs, spendTurns } from '@pocketrealm/game-engine';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { asyncHandler } from '../utils/asyncHandler';

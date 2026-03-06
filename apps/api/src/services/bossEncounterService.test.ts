@@ -33,7 +33,7 @@ vi.mock('./bossLootService', () => ({
 vi.mock('./combatTemplateService', () => ({
   getActiveTemplate: vi.fn().mockResolvedValue([{ actionId: 'normal_attack' }]),
 }));
-vi.mock('@adventure/game-engine', () => ({
+vi.mock('@pocketrealm/game-engine', () => ({
   resolveBossRound: vi.fn().mockReturnValue({
     bossDefeated: false,
     allPlayersDead: false,

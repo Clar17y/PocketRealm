@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { Prisma } from '@adventure/database';
-import { EXPLORATION_CONSTANTS } from '@adventure/shared';
-import type { PotionConsumed, EncounterSiteSize, EncounterMobRole, EncounterMobStatus, EncounterMobSlot } from '@adventure/shared';
+import { Prisma } from '@pocketrealm/database';
+import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
+import type { PotionConsumed, EncounterSiteSize, EncounterMobRole, EncounterMobStatus, EncounterMobSlot } from '@pocketrealm/shared';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { grantSkillXp } from '../../services/xpService';
 import type { LootDropWithName } from '../../services/lootService';
@@ -237,6 +237,8 @@ export interface FightResult {
   outcome: string;
   playerMaxHp: number;
   playerStartHp: number;
+  playerStartStamina: number;
+  playerStartMana: number;
   mobMaxHp: number;
   log: unknown[];
   playerHpRemaining: number;
@@ -244,5 +246,5 @@ export interface FightResult {
   xp: number;
   loot: LootDropWithName[];
   durabilityLost: Awaited<ReturnType<typeof degradeEquippedDurability>>;
-  skillXp: Awaited<ReturnType<typeof grantSkillXp>> | null;
+  skillXpGrants: Awaited<ReturnType<typeof grantSkillXp>>[];
 }

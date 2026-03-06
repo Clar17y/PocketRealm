@@ -23,11 +23,13 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
 
   return (
     <div className="min-h-dvh w-full bg-[var(--rpg-background)]/95 flex flex-col safe-area-top">
+      <div className="rpg-noise" />
+      <div className="rpg-vignette" />
       <ZoneBackground imageSrc={backgroundSrc} />
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 bg-[var(--rpg-surface)] border-b border-[var(--rpg-border)] z-40 pt-[env(safe-area-inset-top)]">
+      <header className="fixed top-0 left-0 right-0 bg-[var(--rpg-surface)] border-b border-[var(--rpg-border)] z-40 pt-[env(safe-area-inset-top)] rpg-header-border">
         <div className="max-w-lg mx-auto h-14 px-4 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-[var(--rpg-gold)]">Adventure</h1>
+          <h1 className="text-lg font-bold text-[var(--rpg-gold)] font-almendra rpg-gold-text-glow">PocketRealm</h1>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm">
               <Image
@@ -37,7 +39,7 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
                 height={24}
                 className="image-rendering-pixelated"
               />
-              <span className="font-mono text-[var(--rpg-gold)]">{turns.toLocaleString()}</span>
+              <span className="font-pixel text-[12px] text-[var(--rpg-gold)]">{turns.toLocaleString()}</span>
             </div>
             {username && (
               <div
@@ -109,10 +111,10 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
       </header>
 
       {/* Spacer to push content below fixed header */}
-      <div className="h-14 shrink-0 mt-[env(safe-area-inset-top)]" />
+      <div className="h-4 shrink-0 mt-[env(safe-area-inset-top)]" />
 
       {/* Main Content */}
-      <main className="w-full max-w-lg mx-auto px-4 py-4 pb-24 flex-1">
+      <main className="w-full max-w-lg mx-auto px-4 pt-2 pb-24 flex-1">
         {children}
       </main>
     </div>

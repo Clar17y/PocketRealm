@@ -10,15 +10,16 @@ import {
   CASINO_CONSTANTS,
   getNumberColor,
   getNumbersForBet,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import type {
   RouletteBetType,
   RouletteRoundState,
   RouletteHistoryEntry,
   RoulettePublicBet,
   CasinoResultEvent,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import type { SessionBet } from '@/hooks/useCasinoSocket';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface CasinoProps {
   gold: number;
@@ -115,7 +116,7 @@ function WinCelebration({ payout, isBigWin }: { payout: number; isBigWin: boolea
         </div>
       ))}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-2xl font-bold text-[var(--rpg-gold)] animate-bounce">
+        <div className="text-[24px] font-pixel text-[var(--rpg-gold)] animate-bounce">
           +{payout.toLocaleString()}g
         </div>
       </div>
@@ -343,7 +344,7 @@ export function Casino({
       <PixelCard>
         <div className="text-center py-8">
           <Coins size={48} className="mx-auto mb-4 text-[var(--rpg-text-secondary)]" />
-          <h2 className="text-xl font-bold text-[var(--rpg-text-primary)] mb-2">Casino</h2>
+          <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)] mb-2">Casino</h2>
           <p className="text-[var(--rpg-text-secondary)]">
             You must be in a town to visit the casino.
           </p>
@@ -353,7 +354,7 @@ export function Casino({
   }
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       {winAnimation && <WinCelebration {...winAnimation} />}
       <FirstVisitHowTo
         storageKey="howto_casino"
@@ -370,11 +371,11 @@ export function Casino({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Coins size={28} className="text-[var(--rpg-gold)]" />
-          <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Casino</h2>
+          <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Casino</h2>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Coins size={16} className="text-[var(--rpg-gold)]" />
-          <span className="font-bold text-[var(--rpg-gold)] font-mono">{gold.toLocaleString()}</span>
+          <span className="text-[var(--rpg-gold)] font-pixel text-[12px]">{gold.toLocaleString()}</span>
           <span className="text-[var(--rpg-text-secondary)]">gold</span>
         </div>
       </div>
@@ -393,9 +394,9 @@ export function Casino({
           Gold Exchange
         </h3>
         <div className="flex items-center gap-2 text-xs text-[var(--rpg-text-secondary)] mb-3">
-          <span>Rate: {CASINO_CONSTANTS.GOLD_EXCHANGE_RATE} turn = {CASINO_CONSTANTS.GOLD_EXCHANGE_RATE} gold</span>
+          <span>Rate: <span className="font-pixel text-[8px]">{CASINO_CONSTANTS.GOLD_EXCHANGE_RATE}</span> turn = <span className="font-pixel text-[8px]">{CASINO_CONSTANTS.GOLD_EXCHANGE_RATE}</span> gold</span>
           <span className="mx-1">|</span>
-          <span>{turns.toLocaleString()} turns available</span>
+          <span><span className="font-pixel text-[8px]">{turns.toLocaleString()}</span> turns available</span>
         </div>
         <div className="flex gap-2">
           <input
@@ -404,7 +405,7 @@ export function Casino({
             max={turns}
             value={exchangeTurns}
             onChange={(e) => setExchangeTurns(Math.max(1, parseInt(e.target.value) || 0))}
-            className="flex-1 px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-sm font-mono"
+            className="flex-1 px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-[12px] font-pixel"
             placeholder="Turns to exchange"
           />
           <PixelButton
@@ -612,7 +613,7 @@ export function Casino({
                 max={Math.min(CASINO_CONSTANTS.ROULETTE_MAX_BET, gold)}
                 value={betAmount}
                 onChange={(e) => setBetAmount(Math.max(1, parseInt(e.target.value) || 0))}
-                className="w-full px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-sm font-mono"
+                className="w-full px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-[12px] font-pixel"
               />
             </div>
             <div className="flex items-end gap-1">
@@ -665,12 +666,12 @@ export function Casino({
                   key={`${bet.playerName}-${i}`}
                   className="flex items-center justify-between text-sm py-1 px-2 rounded bg-[var(--rpg-background)]"
                 >
-                  <span className="text-[var(--rpg-text-primary)] truncate mr-2">{bet.playerName}</span>
+                  <span className="text-[var(--rpg-text-primary)] font-almendra truncate mr-2">{bet.playerName}</span>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs text-[var(--rpg-text-secondary)]">
                       {formatBet(bet.betType, bet.betValue)}
                     </span>
-                    <span className="font-mono text-[var(--rpg-gold)]">{bet.amount}g</span>
+                    <span className="font-pixel text-[12px] text-[var(--rpg-gold)]">{bet.amount}g</span>
                   </div>
                 </div>
               ))}
@@ -683,7 +684,7 @@ export function Casino({
         <PixelCard>
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-[var(--rpg-text-primary)] text-sm">My Bets</h3>
-            <span className={`font-mono text-sm font-bold ${
+            <span className={`font-pixel text-[12px] ${
               sessionProfit >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'
             }`}>
               {sessionProfit >= 0 ? '+' : ''}{sessionProfit.toLocaleString()}g
@@ -694,13 +695,13 @@ export function Casino({
               <div key={bet.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-[var(--rpg-background)]">
                 <span className="text-[var(--rpg-text-secondary)]">{formatBet(bet.betType, bet.betValue)}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-[var(--rpg-text-secondary)] font-mono">{bet.amount}g</span>
+                  <span className="text-[var(--rpg-text-secondary)] font-pixel text-[8px]">{bet.amount}g</span>
                   {bet.payout === null ? (
                     <span className="text-[var(--rpg-text-secondary)] italic">pending...</span>
                   ) : bet.payout > 0 ? (
-                    <span className="text-[var(--rpg-green-light)] font-mono font-bold">+{(bet.payout - bet.amount).toLocaleString()}g</span>
+                    <span className="text-[var(--rpg-green-light)] font-pixel text-[8px]">+{(bet.payout - bet.amount).toLocaleString()}g</span>
                   ) : (
-                    <span className="text-[var(--rpg-red)] font-mono font-bold">-{bet.amount.toLocaleString()}g</span>
+                    <span className="text-[var(--rpg-red)] font-pixel text-[8px]">-{bet.amount.toLocaleString()}g</span>
                   )}
                 </div>
               </div>
@@ -746,15 +747,15 @@ export function Casino({
           <div className="flex items-center gap-3 mt-3 text-xs text-[var(--rpg-text-secondary)]">
             <span className="flex items-center gap-1">
               <span className={`w-2.5 h-2.5 rounded-full ${colorPipClass('red')}`} />
-              {history.filter((h) => getNumberColor(h.result) === 'red').length}
+              <span className="font-pixel text-[8px]">{history.filter((h) => getNumberColor(h.result) === 'red').length}</span>
             </span>
             <span className="flex items-center gap-1">
               <span className={`w-2.5 h-2.5 rounded-full ${colorPipClass('black')}`} />
-              {history.filter((h) => getNumberColor(h.result) === 'black').length}
+              <span className="font-pixel text-[8px]">{history.filter((h) => getNumberColor(h.result) === 'black').length}</span>
             </span>
             <span className="flex items-center gap-1">
               <span className={`w-2.5 h-2.5 rounded-full ${colorPipClass('green')}`} />
-              {history.filter((h) => getNumberColor(h.result) === 'green').length}
+              <span className="font-pixel text-[8px]">{history.filter((h) => getNumberColor(h.result) === 'green').length}</span>
             </span>
           </div>
         </PixelCard>
@@ -787,7 +788,7 @@ export function Casino({
                           style={{ width: `${Math.min(100, (s.count / (CASINO_CONSTANTS.ROULETTE_STATS_DEPTH / 37)) * 50)}%` }}
                         />
                       </div>
-                      <span className="text-[10px] font-mono text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
+                      <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
                     </div>
                   ))}
               </div>
@@ -812,7 +813,7 @@ export function Casino({
                           style={{ width: `${Math.min(100, (s.count / (CASINO_CONSTANTS.ROULETTE_STATS_DEPTH / 37)) * 50)}%` }}
                         />
                       </div>
-                      <span className="text-[10px] font-mono text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
+                      <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-4 text-right">{s.count}</span>
                     </div>
                   ))}
               </div>
@@ -821,7 +822,7 @@ export function Casino({
         </PixelCard>
       )}
 
-    </div>
+    </ScreenContainer>
   );
 }
 
@@ -833,7 +834,7 @@ function RoundPhaseIndicator({ phase, timeRemaining }: { phase: string; timeRema
       return (
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[var(--rpg-green-light)] animate-pulse" />
-          <span className="text-sm text-[var(--rpg-green-light)] font-mono">{timeRemaining}s</span>
+          <span className="text-[12px] text-[var(--rpg-green-light)] font-pixel">{timeRemaining}s</span>
           <span className="text-xs text-[var(--rpg-text-secondary)]">betting open</span>
         </div>
       );

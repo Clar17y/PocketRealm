@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { getQuests, claimQuestReward, claimDailyBonus } from '@/lib/api';
-import type { PlayerQuestData, PlayerQuestStateData } from '@adventure/shared';
+import type { PlayerQuestData, PlayerQuestStateData } from '@pocketrealm/shared';
 
 export function useQuests() {
   const [quests, setQuests] = useState<PlayerQuestData[]>([]);

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { EXPLORATION_CONSTANTS } from '@adventure/shared';
+import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 import {
   cumulativeProbability,
   estimateExploration,

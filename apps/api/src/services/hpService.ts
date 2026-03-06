@@ -1,4 +1,4 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { prismaAny } from '../utils/prismaAny.js';
 import {
   calculateMaxHp,
@@ -8,8 +8,8 @@ import {
   calculateRestHealing,
   calculateRecoveryCost,
   calculateRecoveryExitHp,
-} from '@adventure/game-engine';
-import type { HpState, RestResult, RecoveryResult } from '@adventure/shared';
+} from '@pocketrealm/game-engine';
+import type { HpState, RestResult, RecoveryResult } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getEquipmentStats } from './equipmentService';
 import { spendPlayerTurnsTx } from './turnBankService';

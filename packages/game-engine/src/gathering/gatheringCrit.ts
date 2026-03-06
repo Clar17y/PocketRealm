@@ -1,4 +1,4 @@
-import { GEM_CRIT_CONSTANTS } from '@adventure/shared';
+import { GEM_CRIT_CONSTANTS } from '@pocketrealm/shared';
 
 export interface GemCritInput {
   skillLevel: number;

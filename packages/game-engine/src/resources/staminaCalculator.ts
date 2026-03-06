@@ -1,4 +1,4 @@
-import { STAMINA_CONSTANTS } from '@adventure/shared';
+import { STAMINA_CONSTANTS } from '@pocketrealm/shared';
 
 export interface StaminaCalculationInput {
   meleeLevel: number;

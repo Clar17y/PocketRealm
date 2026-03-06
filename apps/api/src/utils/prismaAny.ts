@@ -1,4 +1,4 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 
 /**
  * Untyped Prisma client for models not yet in the generated schema.

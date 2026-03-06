@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { prisma } from '@adventure/database';
-import { getAllMobPrefixes, BOSS_TEMPLATES } from '@adventure/shared';
-import type { BossRotationReveal } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import { getAllMobPrefixes, BOSS_TEMPLATES } from '@pocketrealm/shared';
+import type { BossRotationReveal } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { prismaAny } from '../utils/prismaAny.js';
 import { calculateExplorationPercent } from '../services/zoneExplorationService';

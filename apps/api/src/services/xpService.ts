@@ -1,7 +1,7 @@
-import { prisma } from '@adventure/database';
-import type { SkillType, SkillXpResult } from '@adventure/shared';
-import { SKILL_POINT_CONSTANTS } from '@adventure/shared';
-import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, shouldResetWindowCap } from '@adventure/game-engine';
+import { prisma } from '@pocketrealm/database';
+import type { SkillType, SkillXpResult } from '@pocketrealm/shared';
+import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
+import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { getPlayerGuildModifiers } from './guildUpgradeService';
 
 export interface GrantXpResult {

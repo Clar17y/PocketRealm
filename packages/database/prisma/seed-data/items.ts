@@ -1,5 +1,5 @@
 import { IDS } from './ids';
-import { POTION_CONSTANTS } from '@adventure/shared';
+import { POTION_CONSTANTS } from '@pocketrealm/shared';
 
 type ConsumableEffectJson = { type: 'heal_flat' | 'heal_percent' | 'restore_stamina' | 'restore_mana'; value: number };
 

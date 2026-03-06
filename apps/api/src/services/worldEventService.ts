@@ -1,4 +1,4 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import {
   WORLD_EVENT_CONSTANTS,
   type ActiveZoneModifiers,
@@ -7,7 +7,7 @@ import {
   type WorldEventScope,
   type WorldEventStatus,
   type WorldEventType,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 
 function toWorldEventData(row: {
   id: string;

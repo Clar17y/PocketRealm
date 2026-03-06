@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import type { QuestProgressUpdate } from '@adventure/shared';
+import type { QuestProgressUpdate } from '@pocketrealm/shared';
 
 interface QuestToastItem {
   id: string;

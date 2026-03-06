@@ -6,6 +6,11 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        almendra: ['var(--font-almendra)', 'Georgia', 'serif'],
+        crimson: ['var(--font-crimson)', 'Georgia', 'serif'],
+        pixel: ['var(--font-pixel)', 'monospace'],
+      },
       keyframes: {
         'error-flash': {
           '0%, 100%': { opacity: '1' },

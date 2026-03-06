@@ -1,5 +1,5 @@
-import type { Prisma } from '@adventure/database';
-import { DURABILITY_CONSTANTS } from '@adventure/shared';
+import type { Prisma } from '@pocketrealm/database';
+import { DURABILITY_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 

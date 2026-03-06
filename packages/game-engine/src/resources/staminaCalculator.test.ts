@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STAMINA_CONSTANTS } from '@adventure/shared';
+import { STAMINA_CONSTANTS } from '@pocketrealm/shared';
 import {
   calculateMaxStamina,
   calculateStaminaRegenPerSecond,

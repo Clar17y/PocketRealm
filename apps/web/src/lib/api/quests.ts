@@ -1,5 +1,5 @@
 import { fetchApi } from './core';
-import type { PlayerQuestData, PlayerQuestStateData, QuestShopItem } from '@adventure/shared';
+import type { PlayerQuestData, PlayerQuestStateData, QuestShopItem } from '@pocketrealm/shared';
 
 export interface QuestsResponse {
   quests: PlayerQuestData[];

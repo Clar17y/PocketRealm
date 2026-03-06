@@ -1,4 +1,4 @@
-import { Prisma, prisma } from '@adventure/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 
 /** Create an activity log entry. Returns the created record (including id). */
 export async function createActivityLog(params: {

@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '@adventure/database';
-import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID } from '@adventure/shared';
-import { shouldResetWindowCap } from '@adventure/game-engine';
+import { prisma } from '@pocketrealm/database';
+import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
+import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { ensureEquipmentSlots } from '../services/equipmentService';
@@ -40,7 +40,6 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       characterLevel: true,
       attributePoints: true,
       attributes: true,
-      autoPotionThreshold: true,
       tutorialStep: true,
       combatLogSpeedMs: true,
       explorationSpeedMs: true,
@@ -50,6 +49,7 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       defaultRefiningMax: true,
       lowHpWarning: true,
       confirmRarity: true,
+      lootRevealRarity: true,
       activeTitle: true,
       gold: true,
     },
@@ -133,13 +133,12 @@ playerRouter.post('/attributes', asyncHandler(async (req, res) => {
 }));
 
 const SETTINGS_FIELDS = [
-  'autoPotionThreshold', 'combatLogSpeedMs', 'explorationSpeedMs',
+  'combatLogSpeedMs', 'explorationSpeedMs',
   'autoSkipKnownCombat', 'defaultExploreTurns', 'quickRestHealPercent', 'defaultRefiningMax',
-  'lowHpWarning', 'confirmRarity',
+  'lowHpWarning', 'confirmRarity', 'lootRevealRarity',
 ] as const;
 
 const settingsSchema = z.object({
-  autoPotionThreshold: z.number().int().min(0).max(100).optional(),
   combatLogSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   explorationSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   autoSkipKnownCombat: z.boolean().optional(),
@@ -148,6 +147,7 @@ const settingsSchema = z.object({
   defaultRefiningMax: z.boolean().optional(),
   lowHpWarning: z.boolean().optional(),
   confirmRarity: z.enum(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
+  lootRevealRarity: z.enum(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
 }).refine(data => Object.values(data).some(v => v !== undefined), { message: 'At least one setting required' });
 
 /**

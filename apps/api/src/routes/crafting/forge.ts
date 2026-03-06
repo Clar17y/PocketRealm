@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { Prisma, prisma } from '@adventure/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { createActivityLog } from '../../services/activityLogService';
-import type { EquipmentSlot, ItemStats } from '@adventure/shared';
+import type { EquipmentSlot, ItemStats } from '@pocketrealm/shared';
 import {
   calculateForgeUpgradeSuccessChance,
   getEligibleBonusStats,
@@ -10,7 +10,7 @@ import {
   getNextRarity,
   rollBonusStat,
   rollBonusStatsForRarity,
-} from '@adventure/game-engine';
+} from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';

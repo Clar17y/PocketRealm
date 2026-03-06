@@ -94,6 +94,13 @@ export async function adminSetAttributes(data: { attributePoints?: number; attri
   });
 }
 
+export async function adminSetSkillLevel(skillType: string, level: number) {
+  return fetchApi<{ success: boolean }>('/api/v1/admin/set-skill-level', {
+    method: 'POST',
+    body: JSON.stringify({ skillType, level }),
+  });
+}
+
 export async function adminGetItemTemplates(search?: string, type?: string) {
   const params = new URLSearchParams();
   if (search) params.set('search', search);

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CASINO_CONSTANTS } from '@adventure/shared';
+import { CASINO_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('./turnBankService', () => ({
   spendPlayerTurnsTx: vi.fn().mockResolvedValue({
@@ -13,7 +13,7 @@ vi.mock('./turnBankService', () => ({
 
 vi.mock('../socket', () => ({ getIo: () => null }));
 
-vi.mock('@adventure/game-engine', () => ({
+vi.mock('@pocketrealm/game-engine', () => ({
   validateBet: vi.fn().mockReturnValue({ valid: true }),
   generateSpinResult: vi.fn().mockReturnValue(17),
   isWinningBet: vi.fn().mockReturnValue(false),
@@ -37,7 +37,7 @@ import {
   placeBet,
   getRouletteHistory,
 } from './casinoService';
-import { validateBet, generateSpinResult, isWinningBet, calculatePayout } from '@adventure/game-engine';
+import { validateBet, generateSpinResult, isWinningBet, calculatePayout } from '@pocketrealm/game-engine';
 
 const mockRedis = redis as unknown as Record<string, ReturnType<typeof vi.fn>>;
 const mockValidateBet = validateBet as ReturnType<typeof vi.fn>;

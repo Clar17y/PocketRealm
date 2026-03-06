@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Prisma } from '@adventure/database';
-import { HIDDEN_CACHE_CONSTANTS } from '@adventure/shared';
+import { Prisma } from '@pocketrealm/database';
+import { HIDDEN_CACHE_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('./inventoryService', () => ({
   addStackableItemTx: vi.fn().mockResolvedValue(undefined),

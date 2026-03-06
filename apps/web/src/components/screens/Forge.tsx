@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ITEM_RARITY_CONSTANTS } from '@adventure/shared';
-import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@adventure/game-engine';
+import { ITEM_RARITY_CONSTANTS } from '@pocketrealm/shared';
+import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@pocketrealm/game-engine';
 import { Anvil, Sparkles, TrendingUp } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -13,6 +13,7 @@ import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { ForgeTutorial } from '@/components/common/ForgeTutorial';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 function SacrificePicker({
   items,
@@ -224,13 +225,13 @@ export function Forge({
   const baseEntries = statEntries(selected?.baseStats);
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Forge</h2>
-        <div className="text-sm text-[var(--rpg-text-secondary)]">Luck: {equippedLuck}</div>
+        <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Forge</h2>
+        <div className="text-sm text-[var(--rpg-text-secondary)]">Luck: <span className="font-pixel text-[12px]">{equippedLuck}</span></div>
       </div>
 
       {noFacility && (
@@ -286,7 +287,7 @@ export function Forge({
         <PixelCard className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-lg font-semibold text-[var(--rpg-text-primary)]">{selected.name}</div>
+              <div className="text-lg font-semibold font-almendra text-[var(--rpg-text-primary)]">{selected.name}</div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
                 {titleCaseRarity(selected.rarity)} | Bonus slots {ITEM_RARITY_CONSTANTS.BONUS_SLOTS_BY_RARITY[selected.rarity]}
               </div>
@@ -449,7 +450,7 @@ export function Forge({
       )}
 
       <ActivityLog entries={activityLog} maxHeight="max-h-48" />
-    </div>
+    </ScreenContainer>
   );
 }
 

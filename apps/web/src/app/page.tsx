@@ -21,13 +21,13 @@ export default function Home() {
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-[var(--rpg-background)]" />
         <div className="relative z-10 text-center px-4 max-w-2xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold mb-4 text-[var(--rpg-gold)] drop-shadow-lg">
-            Adventure RPG
+          <h1 className="text-5xl md:text-7xl font-bold mb-4 text-[var(--rpg-gold)] drop-shadow-lg font-almendra rpg-gold-text-glow">
+            PocketRealm
           </h1>
-          <p className="text-xl md:text-2xl text-[var(--rpg-text-primary)] mb-2">
+          <p className="text-xl md:text-2xl font-crimson text-[var(--rpg-text-primary)] mb-2">
             A turn-based RPG that respects your time.
           </p>
-          <p className="text-base md:text-lg text-[var(--rpg-text-secondary)] mb-8">
+          <p className="text-base md:text-lg font-crimson text-[var(--rpg-text-secondary)] mb-8">
             Explore. Fight. Craft. Progress — at your own pace.
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
@@ -65,7 +65,7 @@ export default function Home() {
             ].map((feature) => (
               <div
                 key={feature.title}
-                className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-6 text-center"
+                className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-6 text-center rpg-card-texture"
               >
                 <Image
                   src={feature.icon}
@@ -74,8 +74,8 @@ export default function Home() {
                   height={64}
                   className="mx-auto mb-4 image-rendering-pixelated"
                 />
-                <h3 className="text-lg font-bold text-[var(--rpg-gold)] mb-2">{feature.title}</h3>
-                <p className="text-sm text-[var(--rpg-text-secondary)]">{feature.desc}</p>
+                <h3 className="text-lg font-bold font-almendra text-[var(--rpg-gold)] mb-2">{feature.title}</h3>
+                <p className="text-sm font-crimson text-[var(--rpg-text-secondary)]">{feature.desc}</p>
               </div>
             ))}
           </div>
@@ -85,7 +85,7 @@ export default function Home() {
       {/* Zone Showcase */}
       <section className="py-20 px-4">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center text-[var(--rpg-gold)] mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold font-almendra text-center text-[var(--rpg-gold)] mb-12 rpg-gold-text-glow">
             11 Zones to Discover
           </h2>
           <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
@@ -109,7 +109,7 @@ export default function Home() {
                   loading="lazy"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                <span className="absolute bottom-3 left-3 text-[var(--rpg-gold)] font-bold text-sm">
+                <span className="absolute bottom-3 left-3 text-[var(--rpg-gold)] font-bold text-sm font-almendra">
                   {zone.name}
                 </span>
               </div>
@@ -121,7 +121,7 @@ export default function Home() {
       {/* Monster Parade */}
       <section className="py-20 px-4">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center text-[var(--rpg-gold)] mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold font-almendra text-center text-[var(--rpg-gold)] mb-12 rpg-gold-text-glow">
             80+ Monsters. 2 World Bosses. Good Luck.
           </h2>
           <div className="flex justify-center items-end gap-6 md:gap-10 flex-wrap">
@@ -142,7 +142,7 @@ export default function Home() {
                   className="drop-shadow-[0_0_12px_rgba(212,168,75,0.3)] image-rendering-pixelated"
                   loading="lazy"
                 />
-                <span className="text-xs text-[var(--rpg-text-secondary)]">{monster.name}</span>
+                <span className="text-xs font-crimson text-[var(--rpg-text-secondary)]">{monster.name}</span>
               </div>
             ))}
           </div>
@@ -153,13 +153,13 @@ export default function Home() {
       <section className="py-20 px-4">
         <div className="max-w-3xl mx-auto">
           <div className="border border-rpg-gold/40 rounded-xl p-8 md:p-12 bg-gradient-to-b from-rpg-gold/5 to-transparent">
-            <h2 className="text-3xl md:text-4xl font-bold text-center text-[var(--rpg-gold)] mb-2">
+            <h2 className="text-3xl md:text-4xl font-bold font-almendra text-center text-[var(--rpg-gold)] mb-2 rpg-gold-text-glow">
               Go Champion
             </h2>
-            <p className="text-center text-2xl font-bold text-[var(--rpg-text-primary)] mb-2">
+            <p className="text-center text-2xl font-bold font-crimson text-[var(--rpg-text-primary)] mb-2">
               £4.99/month
             </p>
-            <p className="text-center text-[var(--rpg-text-secondary)] mb-8">
+            <p className="text-center font-crimson text-[var(--rpg-text-secondary)] mb-8">
               Everything you do, 10% better.
             </p>
 
@@ -184,7 +184,7 @@ export default function Home() {
                 'Rainbow Champion title',
                 'Leaderboard badge',
               ].map((perk) => (
-                <div key={perk} className="flex items-center gap-2 text-[var(--rpg-text-primary)]">
+                <div key={perk} className="flex items-center gap-2 font-crimson text-[var(--rpg-text-primary)]">
                   <span className="text-[var(--rpg-gold)]">+</span>
                   {perk}
                 </div>
@@ -193,7 +193,7 @@ export default function Home() {
 
             <div className="text-center">
               <a href="/register" className={linkGold}>Become Champion</a>
-              <p className="text-xs text-[var(--rpg-text-secondary)] mt-3">
+              <p className="text-xs font-crimson text-[var(--rpg-text-secondary)] mt-3">
                 No combat advantages. No pay-to-win. Just efficiency.
               </p>
             </div>
@@ -204,14 +204,14 @@ export default function Home() {
       {/* Footer CTA */}
       <section className="py-20 px-4 border-t border-[var(--rpg-border)]">
         <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-[var(--rpg-text-primary)] mb-8">
-            Your Adventure Starts Now
+          <h2 className="text-3xl md:text-4xl font-bold font-almendra text-[var(--rpg-gold)] mb-8 rpg-gold-text-glow">
+            Your Journey Starts Now
           </h2>
           <div className="flex gap-4 justify-center mb-6 flex-wrap">
             <a href="/register" className={linkPrimary}>Play Free</a>
             <a href="/register" className={linkGold}>Become Champion</a>
           </div>
-          <a href="/login" className="text-sm text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors">
+          <a href="/login" className="text-sm font-crimson text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors">
             Already playing? Log in
           </a>
         </div>

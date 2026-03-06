@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 export default defineConfig({
   resolve: {
     alias: {
-      '@adventure/shared': resolve(__dirname, '../shared/src/index.ts'),
+      '@pocketrealm/shared': resolve(__dirname, '../shared/src/index.ts'),
     },
   },
   test: {

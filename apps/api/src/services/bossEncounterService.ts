@@ -1,5 +1,5 @@
 import type { Server as SocketServer } from 'socket.io';
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import {
   WORLD_EVENT_CONSTANTS,
   BASE_ACTION_DEFINITIONS,
@@ -12,7 +12,7 @@ import {
   type BossParticipantStatus,
   type BossPlayerReward,
   type BossRoundSummary,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import {
   resolveBossRound as resolveBossRoundEngine,
   buildPlayerCombatStats,
@@ -25,7 +25,7 @@ import {
   type BossState,
   type BossRoundInput,
   type BossRoundResult,
-} from '@adventure/game-engine';
+} from '@pocketrealm/game-engine';
 import { emitSystemMessage } from './systemMessageService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { getEquipmentStats } from './equipmentService';

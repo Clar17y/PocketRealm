@@ -1,5 +1,5 @@
-import type { ProgressType, QuestProgressUpdate } from '@adventure/shared';
-import type { GuildContractType } from '@adventure/shared';
+import type { ProgressType, QuestProgressUpdate } from '@pocketrealm/shared';
+import type { GuildContractType } from '@pocketrealm/shared';
 import { getPlayerGuildId } from './guildService';
 import { incrementContractProgress } from './guildContractService';
 import { incrementQuestProgress } from './questService';

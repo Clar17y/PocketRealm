@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { MobTemplate } from '@adventure/shared';
-import { COMBAT_CONSTANTS } from '@adventure/shared';
+import type { MobTemplate } from '@pocketrealm/shared';
+import { COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import {
   buildPlayerCombatStats,
   calculateFinalDamage,
@@ -8,10 +8,115 @@ import {
   doesAttackHit,
   isCriticalHit,
   mobToCombatantStats,
+  resolveScalingStat,
+  resolveActionDamageStats,
   rollD20,
   rollDamage,
   rollInitiative,
 } from './damageCalculator';
+
+import type { PerActionScaling } from '@pocketrealm/shared';
+
+const baseScaling: PerActionScaling = {
+  skillLevels: { melee: 10, ranged: 20, magic: 30 },
+  attributes: { strength: 5, dexterity: 15, intelligence: 25 },
+  weaponPower: { attack: 10, rangedPower: 16, magicPower: 24 },
+  equipmentAccuracy: 5,
+  weaponRequiredSkill: 'magic',
+};
+
+describe('resolveScalingStat', () => {
+  it('returns concrete stat as-is for melee/ranged/magic', () => {
+    const skills = { melee: 10, ranged: 20, magic: 30 };
+    expect(resolveScalingStat('melee', null, skills)).toBe('melee');
+    expect(resolveScalingStat('ranged', null, skills)).toBe('ranged');
+    expect(resolveScalingStat('magic', null, skills)).toBe('magic');
+  });
+
+  it('weapon resolves to weaponRequiredSkill when present', () => {
+    const skills = { melee: 10, ranged: 20, magic: 30 };
+    expect(resolveScalingStat('weapon', 'ranged', skills)).toBe('ranged');
+    expect(resolveScalingStat('weapon', 'melee', skills)).toBe('melee');
+    expect(resolveScalingStat('weapon', 'magic', skills)).toBe('magic');
+  });
+
+  it('weapon resolves to highest skill when no weapon', () => {
+    expect(resolveScalingStat('weapon', null, { melee: 5, ranged: 10, magic: 20 })).toBe('magic');
+    expect(resolveScalingStat('weapon', null, { melee: 5, ranged: 20, magic: 10 })).toBe('ranged');
+    expect(resolveScalingStat('weapon', null, { melee: 20, ranged: 5, magic: 10 })).toBe('melee');
+  });
+
+  it('weapon with tied skills picks melee (first in priority)', () => {
+    expect(resolveScalingStat('weapon', null, { melee: 10, ranged: 10, magic: 10 })).toBe('melee');
+    expect(resolveScalingStat('weapon', null, { melee: 10, ranged: 10, magic: 5 })).toBe('melee');
+    expect(resolveScalingStat('weapon', null, { melee: 5, ranged: 10, magic: 10 })).toBe('ranged');
+  });
+});
+
+describe('resolveActionDamageStats', () => {
+  it('melee scaling uses melee level + attack + strength', () => {
+    // totalAttack = 10 + 10 + 5 = 25, damageMin = 1+5 = 6, damageMax = 5+12 = 17
+    // accuracy = floor(10/2) + 5 + 5 = 15
+    const result = resolveActionDamageStats('melee', baseScaling);
+    expect(result.damageMin).toBe(6);
+    expect(result.damageMax).toBe(17);
+    expect(result.accuracy).toBe(15);
+  });
+
+  it('ranged scaling uses ranged level + rangedPower + dexterity', () => {
+    // totalAttack = 20 + 16 + 15 = 51, damageMin = 1+10 = 11, damageMax = 5+25 = 30
+    // accuracy = floor(20/2) + 5 + 15 = 30
+    const result = resolveActionDamageStats('ranged', baseScaling);
+    expect(result.damageMin).toBe(11);
+    expect(result.damageMax).toBe(30);
+    expect(result.accuracy).toBe(30);
+  });
+
+  it('magic scaling uses magic level + magicPower + intelligence', () => {
+    // totalAttack = 30 + 24 + 25 = 79, damageMin = 1+15 = 16, damageMax = 5+39 = 44
+    // accuracy = floor(30/2) + 5 + 25 = 45
+    const result = resolveActionDamageStats('magic', baseScaling);
+    expect(result.damageMin).toBe(16);
+    expect(result.damageMax).toBe(44);
+    expect(result.accuracy).toBe(45);
+  });
+
+  it('weapon scaling resolves via weaponRequiredSkill', () => {
+    // weaponRequiredSkill = 'magic', so same as magic scaling
+    const result = resolveActionDamageStats('weapon', baseScaling);
+    expect(result.damageMin).toBe(16);
+    expect(result.damageMax).toBe(44);
+    expect(result.accuracy).toBe(45);
+  });
+
+  it('weapon scaling with no weapon uses highest skill', () => {
+    const noWeapon: PerActionScaling = {
+      ...baseScaling,
+      weaponRequiredSkill: null,
+    };
+    // highest skill is magic (30), so resolves to magic
+    const result = resolveActionDamageStats('weapon', noWeapon);
+    expect(result.damageMin).toBe(16);
+    expect(result.damageMax).toBe(44);
+    expect(result.accuracy).toBe(45);
+  });
+
+  it('zero stats produce minimum damage (1-5)', () => {
+    const zeroScaling: PerActionScaling = {
+      skillLevels: { melee: 0, ranged: 0, magic: 0 },
+      attributes: { strength: 0, dexterity: 0, intelligence: 0 },
+      weaponPower: { attack: 0, rangedPower: 0, magicPower: 0 },
+      equipmentAccuracy: 0,
+      weaponRequiredSkill: null,
+    };
+    // totalAttack = 0, damageMin = 1+0 = 1, damageMax = 5+0 = 5
+    // accuracy = 0+0+0 = 0
+    const result = resolveActionDamageStats('melee', zeroScaling);
+    expect(result.damageMin).toBe(1);
+    expect(result.damageMax).toBe(5);
+    expect(result.accuracy).toBe(0);
+  });
+});
 
 describe('isCriticalHit', () => {
   afterEach(() => {

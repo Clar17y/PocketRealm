@@ -4,7 +4,6 @@ import type { ConfirmRarity } from '@/lib/rarity';
 
 /** Shape accepted by initSettingsFromServer — matches the player API response fields. */
 export interface ServerSettingsPayload {
-  autoPotionThreshold?: number | null;
   combatLogSpeedMs?: number | null;
   explorationSpeedMs?: number | null;
   autoSkipKnownCombat?: boolean | null;
@@ -13,10 +12,10 @@ export interface ServerSettingsPayload {
   defaultRefiningMax?: boolean | null;
   lowHpWarning?: boolean | null;
   confirmRarity?: ConfirmRarity | null;
+  lootRevealRarity?: ConfirmRarity | null;
 }
 
 export function usePlayerSettings() {
-  const [autoPotionThreshold, setAutoPotionThreshold] = useState(0);
   const [combatLogSpeedMs, setCombatLogSpeedMs] = useState(800);
   const [explorationSpeedMs, setExplorationSpeedMs] = useState(800);
   const [autoSkipKnownCombat, setAutoSkipKnownCombat] = useState(false);
@@ -25,6 +24,7 @@ export function usePlayerSettings() {
   const [defaultRefiningMax, setDefaultRefiningMax] = useState(false);
   const [lowHpWarning, setLowHpWarning] = useState(true);
   const [confirmRarity, setConfirmRarity] = useState<ConfirmRarity>('uncommon');
+  const [lootRevealRarity, setLootRevealRarity] = useState<ConfirmRarity>('uncommon');
   const [guildTaxRate, setGuildTaxRate] = useState(0);
 
   // --- generic persist helper ---------------------------------------------------
@@ -37,8 +37,6 @@ export function usePlayerSettings() {
 
   // --- individual handlers (persist to server) ----------------------------------
 
-  const handleSetAutoPotionThreshold = (value: number) =>
-    handleSetSetting('autoPotionThreshold', value, setAutoPotionThreshold, autoPotionThreshold);
   const handleSetCombatLogSpeed = (value: number) =>
     handleSetSetting('combatLogSpeedMs', value, setCombatLogSpeedMs, combatLogSpeedMs);
   const handleSetExplorationSpeed = (value: number) =>
@@ -55,11 +53,12 @@ export function usePlayerSettings() {
     handleSetSetting('lowHpWarning', value, setLowHpWarning, lowHpWarning);
   const handleSetConfirmRarity = (value: ConfirmRarity) =>
     handleSetSetting('confirmRarity', value, setConfirmRarity, confirmRarity);
+  const handleSetLootRevealRarity = (value: ConfirmRarity) =>
+    handleSetSetting('lootRevealRarity', value, setLootRevealRarity, lootRevealRarity);
 
   // --- server hydration ---------------------------------------------------------
 
   const initSettingsFromServer = (s: ServerSettingsPayload) => {
-    setAutoPotionThreshold(s.autoPotionThreshold ?? 0);
     setCombatLogSpeedMs(s.combatLogSpeedMs ?? 800);
     setExplorationSpeedMs(s.explorationSpeedMs ?? 800);
     setAutoSkipKnownCombat(s.autoSkipKnownCombat ?? false);
@@ -68,11 +67,11 @@ export function usePlayerSettings() {
     setDefaultRefiningMax(s.defaultRefiningMax ?? false);
     setLowHpWarning(s.lowHpWarning ?? true);
     setConfirmRarity(s.confirmRarity ?? 'uncommon');
+    setLootRevealRarity(s.lootRevealRarity ?? 'uncommon');
   };
 
   return {
     // Values
-    autoPotionThreshold,
     combatLogSpeedMs,
     explorationSpeedMs,
     autoSkipKnownCombat,
@@ -81,12 +80,12 @@ export function usePlayerSettings() {
     defaultRefiningMax,
     lowHpWarning,
     confirmRarity,
+    lootRevealRarity,
     guildTaxRate,
 
     // Raw setters for optimistic / external updates
     setCombatLogSpeedMs,
     setExplorationSpeedMs,
-    setAutoPotionThreshold,
     setDefaultExploreTurns,
     setQuickRestHealPercent,
     setGuildTaxRate,
@@ -95,12 +94,12 @@ export function usePlayerSettings() {
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
     handleSetAutoSkipKnownCombat,
-    handleSetAutoPotionThreshold,
     handleSetDefaultExploreTurns,
     handleSetQuickRestHealPercent,
     handleSetDefaultRefiningMax,
     handleSetLowHpWarning,
     handleSetConfirmRarity,
+    handleSetLootRevealRarity,
 
     // Initialization
     initSettingsFromServer,

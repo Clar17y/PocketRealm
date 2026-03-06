@@ -4,6 +4,8 @@ import { PixelCard } from '@/components/PixelCard';
 import { Slider } from '@/components/ui/Slider';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { ConfirmRarity } from '@/lib/rarity';
+import { RaritySelector } from '../common/RaritySelector';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface SettingsProps {
   username: string | undefined;
@@ -14,9 +16,6 @@ interface SettingsProps {
   onCombatLogSpeedCommit: (value: number) => void;
   autoSkipKnownCombat: boolean;
   onAutoSkipKnownCombatChange: (value: boolean) => void;
-  autoPotionThreshold: number;
-  onAutoPotionThresholdChange: (value: number) => void;
-  onAutoPotionThresholdCommit: (value: number) => void;
   lowHpWarning: boolean;
   onLowHpWarningChange: (value: boolean) => void;
 
@@ -39,6 +38,8 @@ interface SettingsProps {
   // Inventory
   confirmRarity: ConfirmRarity;
   onConfirmRarityChange: (value: ConfirmRarity) => void;
+  lootRevealRarity: ConfirmRarity;
+  onLootRevealRarityChange: (value: ConfirmRarity) => void;
 
   // Account
   onLogout: () => void;
@@ -54,9 +55,6 @@ export function Settings({
   onCombatLogSpeedCommit,
   autoSkipKnownCombat,
   onAutoSkipKnownCombatChange,
-  autoPotionThreshold,
-  onAutoPotionThresholdChange,
-  onAutoPotionThresholdCommit,
   lowHpWarning,
   onLowHpWarningChange,
   explorationSpeedMs,
@@ -71,11 +69,13 @@ export function Settings({
   onDefaultRefiningMaxChange,
   confirmRarity,
   onConfirmRarityChange,
+  lootRevealRarity,
+  onLootRevealRarityChange,
   onLogout,
 }: SettingsProps) {
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Settings</h2>
+    <ScreenContainer>
+      <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Settings</h2>
       <p className="text-[var(--rpg-text-secondary)]">Username: {username}</p>
 
       {/* Combat */}
@@ -91,7 +91,7 @@ export function Settings({
                 onValueChange={(val) => onCombatLogSpeedChange(val[0])}
                 onValueCommit={(val) => onCombatLogSpeedCommit(val[0])}
               />
-              <span className="text-xs font-mono text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
+              <span className="text-[8px] font-pixel text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
                 {speedLabel(combatLogSpeedMs)}
               </span>
             </div>
@@ -104,23 +104,6 @@ export function Settings({
                 <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Skip playback for mob+prefix combos you&apos;ve killed before</p>
               </div>
               <ToggleSwitch checked={autoSkipKnownCombat} onChange={onAutoSkipKnownCombatChange} />
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Auto-Potion Threshold</p>
-            <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
-              Drink a health potion when HP drops below this threshold during combat.
-            </p>
-            <div className="flex items-center gap-3">
-              <Slider min={0} max={100} step={5}
-                value={[autoPotionThreshold]}
-                onValueChange={(val) => onAutoPotionThresholdChange(val[0])}
-                onValueCommit={(val) => onAutoPotionThresholdCommit(val[0])}
-              />
-              <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
-                {autoPotionThreshold === 0 ? 'Off' : `${autoPotionThreshold}%`}
-              </span>
             </div>
           </div>
 
@@ -149,7 +132,7 @@ export function Settings({
                 onValueChange={(val) => onExplorationSpeedChange(val[0])}
                 onValueCommit={(val) => onExplorationSpeedCommit(val[0])}
               />
-              <span className="text-xs font-mono text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
+              <span className="text-[8px] font-pixel text-[var(--rpg-text-primary)] w-20 text-right shrink-0">
                 {speedLabel(explorationSpeedMs)}
               </span>
             </div>
@@ -163,7 +146,7 @@ export function Settings({
                 onValueChange={(val) => onDefaultExploreTurnsChange(val[0])}
                 onValueCommit={(val) => onDefaultExploreTurnsCommit(val[0])}
               />
-              <span className="text-sm font-mono text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
+              <span className="text-[12px] font-pixel text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
                 {defaultExploreTurns.toLocaleString()}
               </span>
             </div>
@@ -210,26 +193,20 @@ export function Settings({
       {/* Inventory */}
       <PixelCard>
         <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Inventory</h3>
-        <div>
-          <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Confirm Before Drop / Salvage / Sell</p>
-          <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
-            Show a confirmation dialog when destroying items at or above this rarity.
-          </p>
-          <div className="flex gap-2">
-            {(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary'] as const).map((r) => (
-              <button
-                key={r}
-                onClick={() => onConfirmRarityChange(r)}
-                className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors capitalize ${
-                  confirmRarity === r
-                    ? 'bg-[var(--rpg-gold)] text-black'
-                    : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-border)]'
-                }`}
-              >
-                {r === 'none' ? 'Off' : r}
-              </button>
-            ))}
-          </div>
+        <RaritySelector
+          label="Confirm Before Drop / Salvage / Sell"
+          description="Show a confirmation dialog when destroying items at or above this rarity."
+          value={confirmRarity}
+          onChange={onConfirmRarityChange}
+        />
+
+        <div className="mt-4">
+          <RaritySelector
+            label="Loot Reveal Popup"
+            description="Show an animated popup when items at or above this rarity are added to your backpack."
+            value={lootRevealRarity}
+            onChange={onLootRevealRarityChange}
+          />
         </div>
       </PixelCard>
 
@@ -240,6 +217,6 @@ export function Settings({
       >
         Logout
       </button>
-    </div>
+    </ScreenContainer>
   );
 }

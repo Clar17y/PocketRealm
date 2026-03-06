@@ -8,6 +8,7 @@ import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { LootPicker } from '@/components/common/LootPicker';
+import { LootReveal } from '@/components/common/LootReveal';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { SubNav } from '@/components/common/SubNav';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
@@ -36,8 +37,8 @@ import { PixelButton } from '@/components/PixelButton';
 import { rarityFromTier } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
 import { buildRecipeDiscountLookup, getDiscountedCost, getRecipeSkillInfo } from '@/lib/recipeDiscount';
-import { CRAFTING_CONSTANTS, TURN_CONSTANTS, type SkillType } from '@adventure/shared';
-import { calculateEfficiency, xpForLevel } from '@adventure/game-engine';
+import { CRAFTING_CONSTANTS, TURN_CONSTANTS, type SkillType } from '@pocketrealm/shared';
+import { calculateEfficiency, xpForLevel } from '@pocketrealm/game-engine';
 import { Sword, Shield, Crosshair, Sparkles, Pickaxe, Hammer, Leaf, FlaskConical, Axe, Scissors, Anvil, Gem } from 'lucide-react';
 import { TutorialBanner } from '@/components/TutorialBanner';
 import { TutorialDialog } from '@/components/TutorialDialog';
@@ -203,9 +204,6 @@ export default function GamePage() {
     handleEquipItem,
     handleUnequipSlot,
     handleAllocateAttribute,
-    handleSetAutoPotionThreshold,
-    autoPotionThreshold,
-    setAutoPotionThreshold,
     combatLogSpeedMs,
     setCombatLogSpeedMs,
     handleSetCombatLogSpeed,
@@ -225,6 +223,8 @@ export default function GamePage() {
     handleSetLowHpWarning,
     confirmRarity,
     handleSetConfirmRarity,
+    lootRevealRarity,
+    handleSetLootRevealRarity,
     handleQuickRest,
     guildTaxRate,
     showChangelog,
@@ -273,6 +273,8 @@ export default function GamePage() {
     confirmAbandonLoot,
     abandonLootAndTravel,
     cancelAbandonLoot,
+    lootRevealItems,
+    handleDismissLootReveal,
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
@@ -696,6 +698,10 @@ export default function GamePage() {
             guildTaxRate={guildTaxRate}
             undiscoveredZones={undiscoveredZones}
             combatLogPrefetch={combatLogPrefetch}
+            playerStartStamina={staminaState.current}
+            playerStartMana={manaState.current}
+            playerMaxStamina={staminaState.max}
+            playerMaxMana={manaState.max}
           />
         );
       case 'bestiary':
@@ -982,9 +988,6 @@ export default function GamePage() {
             onCombatLogSpeedCommit={handleSetCombatLogSpeed}
             autoSkipKnownCombat={autoSkipKnownCombat}
             onAutoSkipKnownCombatChange={handleSetAutoSkipKnownCombat}
-            autoPotionThreshold={autoPotionThreshold}
-            onAutoPotionThresholdChange={setAutoPotionThreshold}
-            onAutoPotionThresholdCommit={handleSetAutoPotionThreshold}
             lowHpWarning={lowHpWarning}
             onLowHpWarningChange={handleSetLowHpWarning}
             explorationSpeedMs={explorationSpeedMs}
@@ -999,6 +1002,8 @@ export default function GamePage() {
             onDefaultRefiningMaxChange={handleSetDefaultRefiningMax}
             confirmRarity={confirmRarity}
             onConfirmRarityChange={handleSetConfirmRarity}
+            lootRevealRarity={lootRevealRarity}
+            onLootRevealRarityChange={handleSetLootRevealRarity}
             onLogout={() => { logout(); router.push('/'); }}
           />
         );
@@ -1120,6 +1125,9 @@ export default function GamePage() {
           onConfirm={abandonLootAndTravel}
           onCancel={cancelAbandonLoot}
         />
+      )}
+      {lootRevealItems && lootRevealItems.length > 0 && (
+        <LootReveal items={lootRevealItems} onContinue={handleDismissLootReveal} />
       )}
       {pendingLootSession && !pendingLootSession.minimized && (
         <LootPicker

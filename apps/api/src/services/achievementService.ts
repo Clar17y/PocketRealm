@@ -1,12 +1,12 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { createActivityLog } from './activityLogService';
 import {
   ALL_ACHIEVEMENTS,
   ACHIEVEMENTS_BY_STAT_KEY,
   ACHIEVEMENTS_BY_FAMILY_KEY,
   ACHIEVEMENTS_BY_ID,
-} from '@adventure/shared';
-import type { AchievementDef, PlayerAchievementProgress } from '@adventure/shared';
+} from '@pocketrealm/shared';
+import type { AchievementDef, PlayerAchievementProgress } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getIo } from '../socket';
 import { resolveAllStats, resolveFamilyKills, resolveAllFamilyKills, resolveStats } from './statsService';

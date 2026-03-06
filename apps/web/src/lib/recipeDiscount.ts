@@ -1,4 +1,4 @@
-import { calculateCraftingTurnDiscount } from '@adventure/game-engine';
+import { calculateCraftingTurnDiscount } from '@pocketrealm/game-engine';
 
 interface RecipeInfo {
   skillType: string;

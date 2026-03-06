@@ -10,7 +10,7 @@ import {
   claimDailyBonus,
   getQuestState,
 } from './questService';
-import { QUEST_CONSTANTS } from '@adventure/shared';
+import { QUEST_CONSTANTS } from '@pocketrealm/shared';
 
 const PLAYER_ID = 'player-1';
 // Wednesday 2026-02-25 at noon UTC

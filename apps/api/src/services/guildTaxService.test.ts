@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPrisma } from '../__test__/setup';
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { applyGuildTax, applyGuildTaxTx } from './guildTaxService';
 
 beforeEach(() => {

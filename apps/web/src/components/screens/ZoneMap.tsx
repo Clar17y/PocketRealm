@@ -8,6 +8,7 @@ import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameControl
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { MapPin, Star, Hourglass, Lock } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 function getMilestoneHint(percent: number): ReactNode {
   if (percent >= 75) return <p className="text-xs text-amber-400 mt-1 italic">Apex — The apex predator stirs...</p>;
@@ -61,6 +62,10 @@ interface ZoneMapProps {
   guildTaxRate?: number;
   undiscoveredZones?: Array<{ id: string; name: string; explorationThreshold: number; fromZoneId: string }>;
   combatLogPrefetch?: CombatLogPrefetch;
+  playerStartStamina?: number;
+  playerStartMana?: number;
+  playerMaxStamina?: number;
+  playerMaxMana?: number;
 }
 
 /** BFS from the starter zone to compute shortest-path tier for each zone. */
@@ -126,6 +131,10 @@ export function ZoneMap({
   guildTaxRate = 0,
   undiscoveredZones,
   combatLogPrefetch,
+  playerStartStamina,
+  playerStartMana,
+  playerMaxStamina,
+  playerMaxMana,
 }: ZoneMapProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
@@ -200,9 +209,9 @@ export function ZoneMap({
     availableTurns >= inflateCost(selectedZone.travelCost, guildTaxRate);
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">World Map</h2>
+        <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">World Map</h2>
         <MapPin size={20} color="var(--rpg-gold)" />
       </div>
 
@@ -414,7 +423,7 @@ export function ZoneMap({
           }}
         >
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-[var(--rpg-text-primary)]">
+            <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)]">
               {selectedZone.name}
               {selectedZone.id === currentZoneId && (
                 <span className="ml-2 text-xs text-[var(--rpg-gold)]">(Current)</span>
@@ -453,8 +462,8 @@ export function ZoneMap({
           {selectedZone.exploration && selectedZone.exploration.turnsToExplore && (
             <div className="mb-3">
               <div className="flex justify-between text-xs text-[var(--rpg-text-secondary)] mb-1">
-                <span>{Math.floor(selectedZone.exploration.percent)}% Explored</span>
-                <span>{selectedZone.exploration.turnsExplored.toLocaleString()} / {selectedZone.exploration.turnsToExplore.toLocaleString()}</span>
+                <span><span className="font-pixel text-[8px]">{Math.floor(selectedZone.exploration.percent)}%</span> Explored</span>
+                <span className="font-pixel text-[8px]">{selectedZone.exploration.turnsExplored.toLocaleString()} / {selectedZone.exploration.turnsToExplore.toLocaleString()}</span>
               </div>
               <div className="h-2 rounded-full bg-[var(--rpg-background)] overflow-hidden">
                 <div
@@ -583,12 +592,16 @@ export function ZoneMap({
             onSkip={onTravelPlaybackSkip!}
             onPushLog={onPushLog}
             combatLogPrefetch={combatLogPrefetch}
+            playerStartStamina={playerStartStamina}
+            playerStartMana={playerStartMana}
+            playerMaxStamina={playerMaxStamina}
+            playerMaxMana={playerMaxMana}
           />
         </div>
       )}
 
       {/* Activity log */}
       {activityLog && <ActivityLog entries={activityLog} />}
-    </div>
+    </ScreenContainer>
   );
 }

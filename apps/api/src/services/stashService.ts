@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@adventure/database';
+import { prisma, Prisma } from '@pocketrealm/database';
 import { AppError } from '../middleware/errorHandler';
 import { getInventoryState } from './inventoryService';
 

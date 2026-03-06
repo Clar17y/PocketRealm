@@ -11,7 +11,6 @@ export async function getPlayer() {
       characterXp: number;
       characterLevel: number;
       attributePoints: number;
-      autoPotionThreshold: number;
       tutorialStep: number;
       combatLogSpeedMs: number;
       explorationSpeedMs: number;
@@ -21,6 +20,7 @@ export async function getPlayer() {
       defaultRefiningMax: boolean;
       lowHpWarning: boolean;
       confirmRarity: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+      lootRevealRarity: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
       gold: number;
       attributes: {
         vitality: number;
@@ -35,7 +35,6 @@ export async function getPlayer() {
 }
 
 export interface PlayerSettings {
-  autoPotionThreshold?: number;
   combatLogSpeedMs?: number;
   explorationSpeedMs?: number;
   autoSkipKnownCombat?: boolean;
@@ -44,6 +43,7 @@ export interface PlayerSettings {
   defaultRefiningMax?: boolean;
   lowHpWarning?: boolean;
   confirmRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+  lootRevealRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 }
 
 export async function updatePlayerSettings(settings: PlayerSettings) {

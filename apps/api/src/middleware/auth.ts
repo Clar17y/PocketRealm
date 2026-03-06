@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { AppError } from './errorHandler';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';

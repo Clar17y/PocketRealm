@@ -1,15 +1,15 @@
-import { Prisma, prisma } from '@adventure/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import {
   buildPlayerCombatStats, calculateMaxHp,
   runTemplateCombat, calculateMaxStamina, calculateStaminaRegenPerRound,
   calculateMaxMana, calculateManaRegenPerRound,
-} from '@adventure/game-engine';
-import type { TemplateCombatant } from '@adventure/game-engine';
+} from '@pocketrealm/game-engine';
+import type { TemplateCombatant } from '@pocketrealm/game-engine';
 import {
   PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, BASE_ACTION_DEFINITIONS,
   TALENT_TREE_DEFINITIONS,
   type SkillType, type ActionDefinition,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { buildPagination, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { getSkillLevel } from './combatStatsService.js';
@@ -638,6 +638,8 @@ export async function challenge(
     defenderStyle,
     combat: { ...combatResult, log: mapTemplateCombatLog(combatResult.log) },
     attackerStartHp: hpState.currentHp,
+    attackerStartStamina: attackerResources.stamina.current,
+    attackerStartMana: attackerResources.mana.current,
     attackerKnockedOut,
     fleeOutcome,
     durability: {

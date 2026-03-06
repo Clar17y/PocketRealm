@@ -10,13 +10,14 @@ import { titleCaseFromSnake, xpRateColor } from '@/lib/format';
 import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 import { Pickaxe, MapPin } from 'lucide-react';
 import { TurnPresets } from '@/components/common/TurnPresets';
-import { GATHERING_CONSTANTS } from '@adventure/shared';
-import { computeResourceYieldMultiplier, computeEventTurnCost } from '@adventure/game-engine';
+import { GATHERING_CONSTANTS } from '@pocketrealm/shared';
+import { computeResourceYieldMultiplier, computeEventTurnCost } from '@pocketrealm/game-engine';
 import { EventBadges } from '@/components/common/EventBadge';
 import { effectiveTurns as calcEffectiveTurns, inflateCost } from '@/lib/taxCalc';
 import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import type { EventModifierBadge } from '@/lib/api';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface ResourceNode {
   id: string;
@@ -205,7 +206,7 @@ export function Gathering({
   }) : null;
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       {/* Knockout Banner */}
       {isRecovering && (
         <KnockoutBanner action="gathering" recoveryCost={recoveryCost} />
@@ -214,8 +215,8 @@ export function Gathering({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">{skillName}</h2>
-          <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-sm font-bold">
+          <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">{skillName}</h2>
+          <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-[12px] font-pixel">
             Lv. {skillLevel}
           </div>
         </div>
@@ -224,7 +225,7 @@ export function Gathering({
             XP Rate
             <XpRateTooltip />
           </div>
-          <div className="text-sm font-bold" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
+          <div className="text-[12px] font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>
 
@@ -308,7 +309,7 @@ export function Gathering({
                         </h4>
                         <EventBadges inline modifiers={node.eventModifiers} />
                       </div>
-                      <span className="text-xs text-[var(--rpg-text-secondary)]">Lv. {node.levelRequired}</span>
+                      <span className="text-[8px] text-[var(--rpg-text-secondary)] font-pixel">Lv. {node.levelRequired}</span>
                     </div>
                     {/* Zone indicator */}
                     <div className="flex items-center gap-1 mt-0.5">
@@ -326,14 +327,14 @@ export function Gathering({
                       />
                     </div>
                     <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs text-[var(--rpg-text-secondary)]">
+                      <span className="text-[8px] text-[var(--rpg-text-secondary)] font-pixel">
                         {node.remainingCapacity} / {node.maxCapacity} remaining
                       </span>
                       <div className="flex items-center gap-2">
                         {node.weathered && (
                           <span className="text-xs text-[var(--rpg-text-secondary)]">Weathered</span>
                         )}
-                        <span className="text-xs text-[var(--rpg-gold)]">
+                        <span className="text-[8px] text-[var(--rpg-gold)] font-pixel">
                           {Math.max(node.baseYield, GATHERING_CONSTANTS.BASE_YIELD)}/action
                         </span>
                       </div>
@@ -362,7 +363,7 @@ export function Gathering({
             <div className="flex justify-between items-center">
               <h3 className="font-semibold text-[var(--rpg-text-primary)]">Turn Investment</h3>
               <div className="text-right">
-                <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">{turnInvestment[0]}</div>
+                <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{turnInvestment[0]}</div>
                 {guildTaxRate > 0 && (
                   <div className="text-xs text-[var(--rpg-text-secondary)]">
                     {calcEffectiveTurns(turnInvestment[0], guildTaxRate)} effective ({guildTaxRate}% tax)
@@ -410,7 +411,7 @@ export function Gathering({
             </div>
             <div className="flex-1">
               <div className="text-sm text-[var(--rpg-text-secondary)]">{selectedNode.name}</div>
-              <div className="text-3xl font-bold text-[var(--rpg-gold)] font-mono">{yieldInfo.totalYield}</div>
+              <div className="text-[32px] text-[var(--rpg-gold)] font-pixel">{yieldInfo.totalYield}</div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
                 {yieldInfo.actions} action{yieldInfo.actions !== 1 ? 's' : ''} x {yieldInfo.baseYield} base
                 {yieldInfo.yieldMultiplier > 1 && (
@@ -455,6 +456,6 @@ export function Gathering({
 
       {/* Gathering Log */}
       <ActivityLog entries={activityLog} maxHeight="max-h-48" />
-    </div>
+    </ScreenContainer>
   );
 }

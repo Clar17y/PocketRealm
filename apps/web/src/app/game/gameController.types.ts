@@ -69,6 +69,8 @@ export type CombatPlaybackItem = {
 export type CombatPlaybackQueueItem = CombatPlaybackItem & {
   room?: number;
   playerStartHp: number;
+  playerStartStamina?: number;
+  playerStartMana?: number;
   rewards: LastCombat['rewards'];
   activeEvents?: CombatActiveEvent[];
 };
@@ -118,7 +120,7 @@ export interface LastCombat {
       } | null;
       fullClearBonus?: boolean;
     } | null;
-    skillXp: {
+    skillXpGrants: Array<{
       skillType: string;
       xpGained: number;
       xpAfterEfficiency: number;
@@ -131,7 +133,7 @@ export interface LastCombat {
       characterLevelAfter: number;
       attributePointsAfter: number;
       characterLeveledUp: boolean;
-    } | null;
+    }>;
   };
 }
 

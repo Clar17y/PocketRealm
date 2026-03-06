@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MANA_CONSTANTS } from '@adventure/shared';
+import { MANA_CONSTANTS } from '@pocketrealm/shared';
 import {
   calculateMaxMana,
   calculateManaRegenPerSecond,

@@ -6,6 +6,7 @@ import { StatBar } from '@/components/StatBar';
 import { Skull, Trophy, Coins, Sparkles } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface CombatLogProps {
   enemy: {
@@ -34,7 +35,7 @@ interface CombatLogProps {
 
 export function CombatLog({ enemy, player, combatLog, status, rewards, onContinue }: CombatLogProps) {
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       {/* Enemy Portrait */}
       <PixelCard className="relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-gradient-to-br from-[var(--rpg-red)] to-transparent" />
@@ -44,8 +45,8 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
           </div>
           <div className="flex-1">
             <div className="flex items-baseline gap-2 mb-1">
-              <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">{enemy.name}</h2>
-              <span className="text-sm text-[var(--rpg-red)] font-semibold">Lv. {enemy.level}</span>
+              <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">{enemy.name}</h2>
+              <span className="text-[12px] text-[var(--rpg-red)] font-pixel">Lv. {enemy.level}</span>
             </div>
             <StatBar
               current={enemy.health}
@@ -73,7 +74,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
 
       {/* Combat Log */}
       <PixelCard>
-        <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3 flex items-center gap-2">
+        <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)] mb-3 flex items-center gap-2">
           <Skull size={18} />
           Combat Log
         </h3>
@@ -103,12 +104,12 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
       {/* Victory Modal */}
       {status === 'victory' && rewards && (
         <ModalOverlay opacity={90}>
-          <PixelCard className="max-w-sm w-full">
+          <PixelCard className="max-w-sm w-full rpg-victory-pulse">
             <div className="text-center">
               <div className="flex justify-center mb-3">
                 <Trophy size={56} color="var(--rpg-gold)" />
               </div>
-              <h3 className="text-3xl font-bold text-[var(--rpg-gold)] mb-2">Victory!</h3>
+              <h3 className="text-3xl font-bold font-almendra text-[var(--rpg-gold)] mb-2">Victory!</h3>
 
               <div className="flex justify-center mb-4">
                 <div className="w-20 h-20 rounded-lg bg-[var(--rpg-background)] border-2 border-[var(--rpg-gold)] flex items-center justify-center text-4xl">
@@ -124,12 +125,12 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="bg-[var(--rpg-surface)] rounded-lg p-3">
                       <Coins size={24} color="var(--rpg-gold)" className="mx-auto mb-1" />
-                      <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">{rewards.gold}</div>
+                      <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{rewards.gold}</div>
                       <div className="text-xs text-[var(--rpg-text-secondary)]">Gold</div>
                     </div>
                     <div className="bg-[var(--rpg-surface)] rounded-lg p-3">
                       <Sparkles size={24} color="var(--rpg-blue-light)" className="mx-auto mb-1" />
-                      <div className="text-2xl font-bold text-[var(--rpg-blue-light)] font-mono">{rewards.xp}</div>
+                      <div className="text-[24px] text-[var(--rpg-blue-light)] font-pixel">{rewards.xp}</div>
                       <div className="text-xs text-[var(--rpg-text-secondary)]">XP</div>
                     </div>
                   </div>
@@ -175,7 +176,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
               <div className="flex justify-center mb-3">
                 <Skull size={56} color="var(--rpg-red)" />
               </div>
-              <h3 className="text-3xl font-bold text-[var(--rpg-red)] mb-2">Defeated...</h3>
+              <h3 className="text-3xl font-bold font-almendra text-[var(--rpg-red)] mb-2">Defeated...</h3>
 
               <div className="flex justify-center mb-4">
                 <div className="w-20 h-20 rounded-lg bg-[var(--rpg-background)] border-2 border-[var(--rpg-red)] flex items-center justify-center text-4xl">
@@ -186,7 +187,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
 
               <div className="bg-[var(--rpg-background)] rounded-lg p-4 mb-4">
                 <h4 className="text-xs font-semibold text-[var(--rpg-text-secondary)] mb-3">DAMAGE TAKEN</h4>
-                <div className="text-4xl font-bold text-[var(--rpg-red)] font-mono mb-1">
+                <div className="text-[32px] text-[var(--rpg-red)] font-pixel mb-1">
                   {player.maxHealth - player.health}
                 </div>
                 <div className="text-xs text-[var(--rpg-text-secondary)]">HP Lost in Battle</div>
@@ -208,6 +209,6 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
           </PixelCard>
         </ModalOverlay>
       )}
-    </div>
+    </ScreenContainer>
   );
 }

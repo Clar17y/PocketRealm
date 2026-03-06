@@ -1,5 +1,5 @@
-import type { ActiveZoneModifiers, MobTemplate } from '@adventure/shared';
-import { GATHERING_CONSTANTS } from '@adventure/shared';
+import type { ActiveZoneModifiers, MobTemplate } from '@pocketrealm/shared';
+import { GATHERING_CONSTANTS } from '@pocketrealm/shared';
 
 /**
  * Apply active zone mob modifiers to a mob template (damage/hp multipliers).

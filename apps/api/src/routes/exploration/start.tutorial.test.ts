@@ -85,13 +85,26 @@ vi.mock('../../services/persistedMobService', () => ({
 vi.mock('../../services/potionService', () => ({
   buildPotionPool: vi.fn().mockResolvedValue([]),
   deductConsumedPotions: vi.fn(),
+  templateHasPotionActions: vi.fn().mockReturnValue(false),
 }));
 vi.mock('../../services/combatStatsService', () => ({
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
   getSkillLevel: vi.fn().mockResolvedValue(1),
+  buildPerActionScaling: vi.fn().mockResolvedValue({
+    skillLevels: { melee: 1, ranged: 1, magic: 1 },
+    attributes: { strength: 0, dexterity: 0, intelligence: 0 },
+    weaponPower: { attack: 5, rangedPower: 0, magicPower: 0 },
+    equipmentAccuracy: 0,
+    weaponRequiredSkill: 'melee',
+  }),
+}));
+vi.mock('../../services/guildUpgradeService', () => ({
+  getPlayerGuildModifiers: vi.fn().mockResolvedValue({
+    combatDamage: 0, defenseBoost: 0, xpBoost: 0, travelCostReduction: 0,
+  }),
 }));
 vi.mock('../../services/combatTemplateService', () => ({
-  getActiveTemplate: vi.fn().mockResolvedValue([]),
+  getActiveTemplate: vi.fn().mockResolvedValue([{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }]),
 }));
 vi.mock('../../services/skillPointService', () => ({
   getSkillPoints: vi.fn().mockResolvedValue({
@@ -144,7 +157,7 @@ vi.mock('../../utils/routeHelpers.js', () => ({
   trackAchievements: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@adventure/game-engine', () => ({
+vi.mock('@pocketrealm/game-engine', () => ({
   applyMobEventModifiers: vi.fn((mob: any) => mob),
   applyMobPrefix: vi.fn((mob: any, prefix: any) => ({ ...mob, mobPrefix: prefix, mobDisplayName: prefix ? `${prefix} ${mob.name}` : mob.name })),
   buildPlayerCombatStats: vi.fn(() => ({ attack: 10, accuracy: 10, defence: 5, magicDefence: 0, speed: 5, hp: 100, critChance: 0.05, critDamage: 1.5 })),
@@ -164,6 +177,8 @@ vi.mock('@adventure/game-engine', () => ({
     combatantBManaRemaining: 50,
     log: [],
     potionsConsumed: [],
+    damageByScalingStat: { melee: 20, ranged: 0, magic: 0 },
+    resourceCostByScalingStat: { melee: 10, ranged: 0, magic: 0 },
   })),
   getScaledZoneExitChance: vi.fn(() => 0.01),
   selectTierWithBleedthrough: vi.fn(() => 1),
@@ -173,7 +188,7 @@ vi.mock('@adventure/game-engine', () => ({
 
 import { mockPrisma } from '../../__test__/setup';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
-import { applyMobPrefix, simulateExploration, runTemplateCombat } from '@adventure/game-engine';
+import { applyMobPrefix, simulateExploration, runTemplateCombat } from '@pocketrealm/game-engine';
 import { startRouter } from './start';
 
 const mockSpendPlayerTurnsTx = spendPlayerTurnsTx as ReturnType<typeof vi.fn>;
@@ -219,7 +234,7 @@ function setupZoneAndMobs(tutorialStep: number) {
   mockPrisma.resourceNode.findMany.mockResolvedValue([]);
   mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
   mockPrisma.zoneConnection.findMany.mockResolvedValue([]);
-  mockPrisma.player.findUnique.mockResolvedValue({ autoPotionThreshold: 0, tutorialStep });
+  mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep });
   mockPrisma.playerBestiary.upsert.mockResolvedValue({});
   mockPrisma.activityLog.create.mockResolvedValue({ id: 'log-1' });
 }

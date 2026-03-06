@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SKILL_POINT_CONSTANTS } from '@adventure/shared';
+import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 import { mockPrisma } from '../__test__/setup';
 import { grantSkillXp } from './xpService';
 const now = new Date('2025-06-01T12:00:00Z');
@@ -97,7 +97,7 @@ describe('grantSkillXp', () => {
   });
 
   it('returns skillPointsGained equal to POINTS_PER_LEVEL when skill levels up', async () => {
-    // Level 2 requires 282 XP (floor(100 * 2^1.5)), so 300 raw XP triggers level-up
+    // Level 2 requires 348 XP (floor(100 * 2^1.8)), so 400 raw XP triggers level-up
     mockPrisma.playerSkill.findUnique.mockResolvedValue({
       xp: BigInt(0),
       level: 1,
@@ -112,7 +112,7 @@ describe('grantSkillXp', () => {
     mockPrisma.playerSkill.update.mockResolvedValue({});
     mockPrisma.player.update.mockResolvedValue({});
 
-    const result = await grantSkillXp('p1', 'melee', 300, now);
+    const result = await grantSkillXp('p1', 'melee', 400, now);
     expect(result.newLevel).toBe(2);
     expect(result.skillPointsGained).toBe(SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL);
   });

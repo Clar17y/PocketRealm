@@ -71,7 +71,7 @@ describe('formatCombatShareText', () => {
       ],
       rewards: {
         xp: 100,
-        skillXp: { skillType: 'melee', xpAfterEfficiency: 50 },
+        skillXpGrants: [{ skillType: 'melee', xpAfterEfficiency: 50 }],
         loot: [{ itemTemplateId: 'gold-coin', quantity: 10, itemName: 'Gold Coin' }],
       },
       playerMaxHp: 100,
@@ -79,7 +79,7 @@ describe('formatCombatShareText', () => {
     };
 
     const text = formatCombatShareText(input);
-    expect(text).toContain('Adventure Combat Log');
+    expect(text).toContain('PocketRealm Combat Log');
     expect(text).toContain('Outcome: victory');
     expect(text).toContain('Mob: Goblin');
     expect(text).toContain('Zone: Dark Forest');

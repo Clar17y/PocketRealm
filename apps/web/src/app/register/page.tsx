@@ -55,14 +55,14 @@ export default function RegisterPage() {
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-[var(--rpg-background)]" />
 
-      <div className="relative z-10 w-full max-w-sm bg-[var(--rpg-surface)]/90 border border-[var(--rpg-border)] rounded-xl p-6 md:p-8 backdrop-blur-sm">
-        <h1 className="text-2xl font-bold text-[var(--rpg-gold)] text-center mb-6">
+      <div className="relative z-10 w-full max-w-sm bg-[var(--rpg-surface)]/90 border border-[var(--rpg-border)] rounded-xl p-6 md:p-8 backdrop-blur-sm rpg-card-texture">
+        <h1 className="text-2xl font-bold font-almendra text-[var(--rpg-gold)] text-center mb-6 rpg-gold-text-glow">
           Create Your Character
         </h1>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <label htmlFor="username" className="text-sm text-[var(--rpg-text-secondary)]">
+            <label htmlFor="username" className="text-sm font-crimson text-[var(--rpg-text-secondary)]">
               Username
             </label>
             <input
@@ -79,7 +79,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="email" className="text-sm text-[var(--rpg-text-secondary)]">
+            <label htmlFor="email" className="text-sm font-crimson text-[var(--rpg-text-secondary)]">
               Email
             </label>
             <input
@@ -93,7 +93,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="password" className="text-sm text-[var(--rpg-text-secondary)]">
+            <label htmlFor="password" className="text-sm font-crimson text-[var(--rpg-text-secondary)]">
               Password
             </label>
             <input
@@ -112,7 +112,7 @@ export default function RegisterPage() {
           )}
 
           <PixelButton type="submit" variant="primary" disabled={loading} className="mt-2">
-            {loading ? 'Creating account...' : 'Begin Adventure'}
+            {loading ? 'Creating account...' : 'Begin Journey'}
           </PixelButton>
         </form>
 

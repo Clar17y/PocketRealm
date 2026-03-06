@@ -16,7 +16,7 @@ export const RARITY_COLORS: Record<Rarity, string> = {
   legendary: '#d4a84b',
 };
 
-const RARITY_RANK: Record<string, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+export const RARITY_RANK: Record<string, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
 
 export type ConfirmRarity = Rarity | 'none';
 
