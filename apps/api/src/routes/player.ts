@@ -13,6 +13,7 @@ import {
 } from '../services/attributesService';
 import { trackAchievements } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
+import { getActiveBuffs } from '../services/buffService';
 
 import { prismaAny } from '../utils/prismaAny.js';
 
@@ -210,6 +211,13 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
   }
 
   res.json({ tutorialStep: body.step });
+}));
+
+// GET /api/v1/player/buffs — list active buffs
+playerRouter.get('/buffs', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const buffs = await getActiveBuffs(playerId);
+  res.json({ buffs });
 }));
 
 /**
