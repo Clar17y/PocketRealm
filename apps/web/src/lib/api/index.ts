@@ -240,3 +240,26 @@ export { exchangeGold, getRouletteRound, placeRouletteBet, getRouletteHistory, g
 export type { GoldExchangeResponse, PlaceBetResponse, RouletteNumberStat } from './casino';
 export { startTrainingFight, getTrainingCooldown } from './training';
 export type { TrainingFightResponse, TrainingCooldownResponse } from './training';
+
+export {
+  getFriendsList,
+  sendFriendRequest,
+  searchPlayerByUsername,
+  getIncomingFriendRequests,
+  getOutgoingFriendRequests,
+  acceptFriendRequest,
+  declineFriendRequest,
+  unfriend,
+  getFriendProfile,
+  sparFriend,
+  blockPlayer,
+  unblockPlayer,
+  getBlockList,
+  sendFriendMail,
+  getFriendMailInbox,
+  getFriendMailSent,
+  getFriendMailUnreadCount,
+  readFriendMail,
+  deleteFriendMail,
+} from './friends';
+export type { SparResponse } from './friends';
