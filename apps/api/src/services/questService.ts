@@ -2,6 +2,7 @@ import { prisma } from '@pocketrealm/database';
 import {
   QUEST_TEMPLATE_DEFINITIONS,
   QUEST_CONSTANTS,
+  PVP_CONSTANTS,
   getAllMobPrefixes,
   type ProgressType,
   type QuestTemplateDefinition,
@@ -12,6 +13,43 @@ import {
 import { AppError } from '../middleware/errorHandler';
 import { getDayStart, getWeekStart, getNextDayStart, getWeekEnd, getLevelBracket, selectWithCategorySpread } from '../utils/dateHelpers';
 import { randomIntInclusive } from '../utils/random';
+
+// ---------------------------------------------------------------------------
+// Unlock condition checks
+// ---------------------------------------------------------------------------
+
+async function getEligibleTemplates(
+  playerId: string,
+  playerLevel: number,
+  cadence: 'daily' | 'weekly',
+): Promise<QuestTemplateDefinition[]> {
+  const allDefs = QUEST_TEMPLATE_DEFINITIONS.filter((d) => d.cadence === cadence);
+
+  // Determine which unlock conditions are met
+  const hasUnlock = new Set<string>();
+
+  // PvP: requires minimum character level
+  if (playerLevel >= PVP_CONSTANTS.MIN_CHARACTER_LEVEL) {
+    hasUnlock.add('pvp_unlocked');
+  }
+
+  // Casino: always accessible (town-gated at use time, not assignment)
+  hasUnlock.add('casino_accessible');
+
+  // Multi-zone: requires 2+ discovered zones
+  const zoneCount = await prisma.playerZoneDiscovery.count({ where: { playerId } });
+  if (zoneCount >= 2) {
+    hasUnlock.add('multi_zone');
+  }
+
+  // Prefix kills: requires at least 1 prefix encounter
+  const prefixCount = await prisma.playerBestiaryPrefix.count({ where: { playerId }, take: 1 });
+  if (prefixCount > 0) {
+    hasUnlock.add('has_prefix_kills');
+  }
+
+  return allDefs.filter((d) => !d.unlockCondition || hasUnlock.has(d.unlockCondition));
+}
 
 /** Map from questKey → QuestTemplateDefinition for fast lookup. */
 const TEMPLATE_BY_KEY = new Map<string, QuestTemplateDefinition>(
@@ -154,9 +192,8 @@ export async function generateDailyQuests(
   const bracket = getLevelBracket(playerLevel);
   const expiresAt = getNextDayStart(now);
 
-  // Filter to daily templates (skip unlock condition filtering for now)
-  const dailyDefs = QUEST_TEMPLATE_DEFINITIONS.filter((d) => d.cadence === 'daily');
-  const selected = selectWithCategorySpread(dailyDefs, DAILY_COUNT, MIN_DAILY_CATEGORIES);
+  const eligible = await getEligibleTemplates(playerId, playerLevel, 'daily');
+  const selected = selectWithCategorySpread(eligible, DAILY_COUNT, MIN_DAILY_CATEGORIES);
 
   // Create quest rows
   const created: PlayerQuestData[] = [];
@@ -204,9 +241,8 @@ export async function generateWeeklyQuest(
   const bracket = getLevelBracket(playerLevel);
   const expiresAt = getWeekEnd(getWeekStart(now));
 
-  // Filter to weekly templates
-  const weeklyDefs = QUEST_TEMPLATE_DEFINITIONS.filter((d) => d.cadence === 'weekly');
-  const def = weeklyDefs[Math.floor(Math.random() * weeklyDefs.length)]!;
+  const eligible = await getEligibleTemplates(playerId, playerLevel, 'weekly');
+  const def = eligible[Math.floor(Math.random() * eligible.length)]!;
 
   const targetValue = def.targets[bracket];
   const [rewardMin, rewardMax] = def.rewards[bracket];
