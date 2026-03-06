@@ -70,6 +70,7 @@ interface GatheringProps {
   guildTaxRate?: number;
   isOverEncumbered?: boolean;
   backpackFull?: boolean;
+  ownedResourceNames?: Set<string>;
 }
 
 export function Gathering({
@@ -96,6 +97,7 @@ export function Gathering({
   guildTaxRate = 0,
   isOverEncumbered = false,
   backpackFull = false,
+  ownedResourceNames,
 }: GatheringProps) {
   const getEventYieldMultiplier = (node: ResourceNode) =>
     computeResourceYieldMultiplier(node.eventModifiers ?? []);
@@ -278,7 +280,9 @@ export function Gathering({
           const isSelected = selectedNode?.id === node.id;
           const canGather = skillLevel >= node.levelRequired;
           const isInZone = currentZoneId === node.zoneId;
-          const canSelect = canGather && isInZone && !isRecovering && !isOverEncumbered && !backpackFull;
+          const wouldStack = ownedResourceNames?.has(node.name) ?? false;
+          const blockedByFull = backpackFull && !wouldStack;
+          const canSelect = canGather && isInZone && !isRecovering && !isOverEncumbered && !blockedByFull;
           const capacityPct = Math.round((node.remainingCapacity / node.maxCapacity) * 100);
 
           return (
@@ -439,20 +443,24 @@ export function Gathering({
       )}
 
       {/* Start Button */}
-      {selectedNode && (
-        <PixelButton
-          variant="gold"
-          size="lg"
-          className="w-full"
-          onClick={() => onStartGathering(selectedNode.id, turnInvestment[0])}
-          disabled={isOverEncumbered || isRecovering || backpackFull || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <Pickaxe size={20} />
-            {isOverEncumbered ? 'Over-Encumbered' : isRecovering ? 'Recover First' : backpackFull ? 'Backpack Full' : availableTurns < sliderMin ? `Need ${sliderMin} turns` : `Start ${skillName}`}
-          </div>
-        </PixelButton>
-      )}
+      {selectedNode && (() => {
+        const selectedWouldStack = ownedResourceNames?.has(selectedNode.name) ?? false;
+        const selectedBlockedByFull = backpackFull && !selectedWouldStack;
+        return (
+          <PixelButton
+            variant="gold"
+            size="lg"
+            className="w-full"
+            onClick={() => onStartGathering(selectedNode.id, turnInvestment[0])}
+            disabled={isOverEncumbered || isRecovering || selectedBlockedByFull || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <Pickaxe size={20} />
+              {isOverEncumbered ? 'Over-Encumbered' : isRecovering ? 'Recover First' : selectedBlockedByFull ? 'Backpack Full' : availableTurns < sliderMin ? `Need ${sliderMin} turns` : `Start ${skillName}`}
+            </div>
+          </PixelButton>
+        );
+      })()}
 
       {/* Gathering Log */}
       <ActivityLog entries={activityLog} maxHeight="max-h-48" />

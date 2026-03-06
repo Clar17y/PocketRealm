@@ -6,9 +6,9 @@ import { createActivityLog } from '../services/activityLogService';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
-import { addStackableItemTx, getInventoryState } from '../services/inventoryService';
+import { addStackableItemTx, getInventoryState, assertNotOverEncumbered } from '../services/inventoryService';
 import { grantSkillXp } from '../services/xpService';
-import { serializeXpGrant, paginationSchema, buildPagination, assertCanAct, trackAchievements } from '../utils/routeHelpers.js';
+import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
@@ -236,8 +236,8 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = mineSchema.parse(req.body);
 
-  // Pre-flight: not recovering, not over-encumbered
-  const hpState = await assertCanAct(playerId);
+  // Pre-flight: not recovering (encumbrance checked after stack check)
+  const hpState = await assertNotRecovering(playerId);
 
   // Find the player's discovered node
   const playerNode = await prisma.playerResourceNode.findUnique({
@@ -286,7 +286,11 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const existingStack = await prisma.item.findFirst({
     where: { ownerId: playerId, templateId: resourceTemplateId, inStash: false },
   });
-  if (!existingStack) {
+  if (existingStack) {
+    // Resource will stack onto existing item — no new slot needed, skip encumbrance check
+  } else {
+    // Need a new slot: enforce both over-encumbered and full-backpack checks
+    await assertNotOverEncumbered(playerId);
     const { availableSlots } = await getInventoryState(playerId);
     if (availableSlots <= 0) {
       throw new AppError(400, 'Backpack is full. Make space before gathering.', 'BACKPACK_FULL');

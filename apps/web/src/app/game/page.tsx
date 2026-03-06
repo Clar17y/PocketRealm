@@ -367,6 +367,9 @@ export default function GamePage() {
   const activeCraftingSkillData = skills.find((s) => s.skillType === activeCraftingSkill);
   const filteredGatheringNodes = gatheringNodes.filter((n) => n.skillRequired === activeGatheringSkill);
   const filteredCraftingRecipes = craftingRecipes.filter((recipe) => recipe.skillType === activeCraftingSkill);
+  const ownedResourceNames = new Set(
+    inventory.filter((i) => i.template.stackable && i.template.itemType === 'resource' && !i.equippedSlot).map((i) => i.template.name),
+  );
 
   const renderScreen = () => {
     switch (activeScreen) {
@@ -884,6 +887,7 @@ export default function GamePage() {
               isRecovering={hpState.isRecovering}
               isOverEncumbered={isOverEncumbered}
               backpackFull={backpackFull}
+              ownedResourceNames={ownedResourceNames}
               recoveryCost={hpState.recoveryCost}
               guildTaxRate={guildTaxRate}
             />
