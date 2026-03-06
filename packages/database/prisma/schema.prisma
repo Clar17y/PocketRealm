@@ -96,6 +96,8 @@ model Player {
   bossRotations        PlayerBossRotation[]
   quests               PlayerQuest[]
   questState           PlayerQuestState?
+  shopPurchases        PlayerShopPurchase[]
+  buffs                PlayerBuff[]
 
   @@map("players")
 }
@@ -1062,4 +1064,58 @@ model PlayerQuestState {
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@map("player_quest_state")
+}
+
+// =============================================================================
+// QUEST SHOP
+// =============================================================================
+
+model ShopItem {
+  id            String  @id @default(uuid())
+  key           String  @unique @db.VarChar(64)
+  name          String  @db.VarChar(128)
+  description   String  @db.VarChar(512)
+  cost          Int
+  category      String  @db.VarChar(16)
+  weeklyLimit   Int?    @map("weekly_limit")
+  lifetimeLimit Int?    @map("lifetime_limit")
+  buffType      String? @map("buff_type") @db.VarChar(32)
+  buffValue     Float?  @map("buff_value")
+  buffUses      Int?    @map("buff_uses")
+  enabled       Boolean @default(true)
+  sortOrder     Int     @default(0) @map("sort_order")
+
+  purchases PlayerShopPurchase[]
+  buffs     PlayerBuff[]
+
+  @@map("shop_items")
+}
+
+model PlayerShopPurchase {
+  id          String   @id @default(uuid())
+  playerId    String   @map("player_id")
+  shopItemId  String   @map("shop_item_id")
+  purchasedAt DateTime @default(now()) @map("purchased_at")
+
+  player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, shopItemId, purchasedAt])
+  @@map("player_shop_purchases")
+}
+
+model PlayerBuff {
+  id            String   @id @default(uuid())
+  playerId      String   @map("player_id")
+  buffType      String   @map("buff_type") @db.VarChar(32)
+  remainingUses Int      @map("remaining_uses")
+  bonusValue    Float    @map("bonus_value")
+  shopItemId    String   @map("shop_item_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, buffType])
+  @@map("player_buffs")
 }
