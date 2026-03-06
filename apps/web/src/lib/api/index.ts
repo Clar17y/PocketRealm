@@ -231,6 +231,9 @@ export type {
   GuildJoinRequestsResponse,
 } from './guild';
 
+export { getQuests, claimQuestReward, claimDailyBonus, getQuestShop, purchaseQuestItem, rerollQuest } from './quests';
+export type { QuestsResponse, ClaimRewardResponse, ClaimBonusResponse, ShopResponse, PurchaseResponse, RerollQuestResponse } from './quests';
+
 export { getSkillPointState, allocateSkillPoint, respecSkillPoints } from './skillPoints';
 export type { SkillPointState } from './skillPoints';
 export { exchangeGold, getRouletteRound, placeRouletteBet, getRouletteHistory, getRouletteStats } from './casino';

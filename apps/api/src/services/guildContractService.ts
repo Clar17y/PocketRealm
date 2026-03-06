@@ -6,35 +6,8 @@ import {
   type GuildContractType,
 } from '@pocketrealm/shared';
 import { addGuildXp, checkGuildAchievementsForAllMembers } from './guildService';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getWeekStart(now: Date = new Date()): Date {
-  const d = new Date(now);
-  d.setUTCHours(0, 0, 0, 0);
-  const day = d.getUTCDay(); // 0=Sun, 1=Mon
-  const diff = day === 0 ? 6 : day - 1; // days since Monday
-  d.setUTCDate(d.getUTCDate() - diff);
-  return d;
-}
-
-function getWeekEnd(weekStart: Date): Date {
-  const d = new Date(weekStart);
-  d.setUTCDate(d.getUTCDate() + 7);
-  return d;
-}
-
-function getLevelBracket(guildLevel: number): 'low' | 'mid' | 'high' {
-  if (guildLevel <= 10) return 'low';
-  if (guildLevel <= 25) return 'mid';
-  return 'high';
-}
-
-function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+import { getWeekStart, getWeekEnd, getLevelBracket, selectWithCategorySpread } from '../utils/dateHelpers';
+import { randomIntInclusive } from '../utils/random';
 
 function toContractData(row: {
   id: string;
@@ -75,42 +48,7 @@ export async function generateWeeklyContracts(guildId: string, now: Date = new D
   const bracket = getLevelBracket(guild.level);
   const { CONTRACTS_PER_WEEK, MIN_CATEGORIES, REWARD_GUILD_XP_MIN, REWARD_GUILD_XP_MAX, REWARD_TREASURY_MIN, REWARD_TREASURY_MAX } = GUILD_CONTRACT_CONSTANTS;
 
-  // Pick contracts ensuring at least MIN_CATEGORIES distinct categories
-  const allDefs = [...GUILD_CONTRACT_DEFINITIONS];
-  const selected: typeof allDefs = [];
-  const usedCategories = new Set<string>();
-
-  // Shuffle
-  for (let i = allDefs.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [allDefs[i], allDefs[j]] = [allDefs[j]!, allDefs[i]!];
-  }
-
-  // First pass: pick from different categories
-  for (const def of allDefs) {
-    if (selected.length >= CONTRACTS_PER_WEEK) break;
-    if (!usedCategories.has(def.category) && usedCategories.size < MIN_CATEGORIES) {
-      selected.push(def);
-      usedCategories.add(def.category);
-    }
-  }
-
-  // Second pass: fill remaining slots
-  for (const def of allDefs) {
-    if (selected.length >= CONTRACTS_PER_WEEK) break;
-    if (!selected.includes(def)) {
-      selected.push(def);
-      usedCategories.add(def.category);
-    }
-  }
-
-  // Ensure category spread: if only 1 category, swap last pick
-  if (usedCategories.size < MIN_CATEGORIES && selected.length >= MIN_CATEGORIES) {
-    const differentCatDef = allDefs.find((d) => !usedCategories.has(d.category) && !selected.includes(d));
-    if (differentCatDef) {
-      selected[selected.length - 1] = differentCatDef;
-    }
-  }
+  const selected = selectWithCategorySpread([...GUILD_CONTRACT_DEFINITIONS], CONTRACTS_PER_WEEK, MIN_CATEGORIES);
 
   const contracts = await prisma.$transaction(async (tx: any) => {
     const created: any[] = [];
@@ -122,8 +60,8 @@ export async function generateWeeklyContracts(guildId: string, now: Date = new D
           targetValue: def.targets[bracket],
           currentValue: 0,
           status: 'active',
-          rewardGuildXp: randomInt(REWARD_GUILD_XP_MIN, REWARD_GUILD_XP_MAX),
-          rewardTreasuryTurns: randomInt(REWARD_TREASURY_MIN, REWARD_TREASURY_MAX),
+          rewardGuildXp: randomIntInclusive(REWARD_GUILD_XP_MIN, REWARD_GUILD_XP_MAX),
+          rewardTreasuryTurns: randomIntInclusive(REWARD_TREASURY_MIN, REWARD_TREASURY_MAX),
           weekStartedAt: weekStart,
           expiresAt: weekEnd,
         },

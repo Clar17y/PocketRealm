@@ -10,6 +10,7 @@ import {
   type ActionDefinition,
   type CombatTemplateSlotData,
   type LootDrop,
+  type QuestProgressUpdate,
   type PerActionScaling,
 } from '@pocketrealm/shared';
 import { Prisma } from '@pocketrealm/database';
@@ -18,7 +19,7 @@ import type { PendingLootItem } from './pendingLootService';
 import { grantSkillXp, type GrantXpResult } from './xpService';
 import { recordBestiaryKill } from '../utils/routeHelpers.js';
 import { addGuildXp, getPlayerGuildId } from './guildService';
-import { incrementContractProgress } from './guildContractService';
+import { trackProgress } from './progressService';
 import type { PlayerGuildModifiers } from './guildUpgradeService';
 import { mapTemplateCombatLog } from './combatLogMapper';
 import type { AttackSkill } from './combatStatsService';
@@ -95,7 +96,6 @@ export interface VictoryRewardParams {
   damageByScalingStat?: { melee: number; ranged: number; magic: number };
   resourceCostByScalingStat?: { melee: number; ranged: number; magic: number };
   guildXpBoost?: number;
-  includeGuildCredit?: boolean;
   includeBestiary?: boolean;
 }
 
@@ -104,6 +104,7 @@ export interface VictoryRewardResult {
   overflow: PendingLootItem[];
   pendingLootSessionId: string | null;
   xpGrants: GrantXpResult[];
+  questProgress: QuestProgressUpdate[];
 }
 
 export async function processCombatVictoryRewards(
@@ -124,13 +125,19 @@ export async function processCombatVictoryRewards(
     await recordBestiaryKill(playerId, mob.id, mob.mobPrefix);
   }
 
-  if (params.includeGuildCredit) {
-    const guildId = await getPlayerGuildId(playerId);
-    if (guildId) {
-      await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
-      void incrementContractProgress(guildId, 'kill_count', 1).catch(() => {});
-      void incrementContractProgress(guildId, 'kill_family', 1).catch(() => {});
-    }
+  // Guild XP + quest/contract progress for all combat victories
+  const guildId = await getPlayerGuildId(playerId);
+  if (guildId) {
+    await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
+  }
+  const questProgress: QuestProgressUpdate[] = [];
+  const killProgress = await trackProgress(playerId, 'kill_count', 1);
+  questProgress.push(...killProgress);
+  const familyProgress = await trackProgress(playerId, 'kill_family', 1);
+  questProgress.push(...familyProgress);
+  if (mob.mobPrefix) {
+    const prefixProgress = await trackProgress(playerId, 'kill_prefix', 1, { prefix: mob.mobPrefix });
+    questProgress.push(...prefixProgress);
   }
 
   return {
@@ -138,6 +145,7 @@ export async function processCombatVictoryRewards(
     overflow: lootResult.overflow,
     pendingLootSessionId: lootResult.pendingLootSessionId,
     xpGrants,
+    questProgress,
   };
 }
 

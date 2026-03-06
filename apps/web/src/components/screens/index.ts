@@ -14,3 +14,4 @@ export { Achievements } from './Achievements';
 export { GuildScreen } from './GuildScreen';
 export { Templates } from './Templates';
 export { TalentTree } from './TalentTree';
+export { Quests } from './Quests';

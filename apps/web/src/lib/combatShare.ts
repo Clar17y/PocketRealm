@@ -50,8 +50,9 @@ export function resolveMobMaxHp(log: ShareCombatLogEntry[], explicit?: number): 
 }
 
 export function formatCombatShareText(input: CombatShareInput): string {
-  const playerMaxHp = resolvePlayerMaxHp(input.log, input.playerMaxHp);
-  const mobMaxHp = resolveMobMaxHp(input.log, input.mobMaxHp);
+  const log = input.log ?? [];
+  const playerMaxHp = resolvePlayerMaxHp(log, input.playerMaxHp);
+  const mobMaxHp = resolveMobMaxHp(log, input.mobMaxHp);
 
   const lines: string[] = [];
   lines.push('PocketRealm Combat Log');
@@ -62,7 +63,7 @@ export function formatCombatShareText(input: CombatShareInput): string {
   lines.push('');
   lines.push('Rounds');
 
-  for (const entry of input.log) {
+  for (const entry of log) {
     const actor = entry.actor === 'combatantA' ? (entry.actorName ?? 'You') : (entry.actorName ?? 'Mob');
     const dmg = entry.damage !== undefined ? ` ${entry.damage} dmg` : '';
     const status = entry.evaded ? ' Dodged' : (entry.roll !== undefined && entry.damage === undefined ? ' Miss' : '');

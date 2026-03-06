@@ -1,3 +1,4 @@
+import type { QuestProgressUpdate } from '@pocketrealm/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 import type { EventModifierBadge } from './combat';
 
@@ -207,6 +208,7 @@ export async function mine(playerNodeId: string, turns: number, currentZoneId: s
       eventTitle: string | null;
     };
     tax: TaxInfo | null;
+    questProgress?: QuestProgressUpdate[];
   }>('/api/v1/gathering/mine', {
     method: 'POST',
     body: JSON.stringify({ playerNodeId, turns, currentZoneId }),
@@ -278,6 +280,7 @@ export async function craft(recipeId: string, quantity: number = 1) {
       characterLeveledUp: boolean;
     };
     tax: TaxInfo | null;
+    questProgress?: QuestProgressUpdate[];
   }>('/api/v1/crafting/craft', {
     method: 'POST',
     body: JSON.stringify({ recipeId, quantity }),

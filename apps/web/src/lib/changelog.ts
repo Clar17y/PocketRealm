@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.28',
+    date: '2026-03-06',
+    title: 'Daily & Weekly Quests',
+    summary:
+      'A new quest system gives you a reason to log in every day. Three daily quests and one weekly quest are randomly assigned from 16 templates across combat, exploration, crafting, gathering, PvP, and casino. Targets scale with your level. Complete quests to earn Quest Tokens — a new currency for an upcoming exclusive shop. Finish all three dailies for a bonus payout. Don\'t like a quest? Use your free daily reroll to swap it. Progress toasts pop up in real-time as you fight, craft, gather, and explore. Quest availability respects game progression — PvP quests only appear once you\'ve unlocked the arena, prefix hunts require bestiary experience. All combat victories now count toward guild contracts and quests, including exploration and travel ambushes.',
+  },
+  {
     version: '0.27',
     date: '2026-03-06',
     title: 'Visual Overhaul',
