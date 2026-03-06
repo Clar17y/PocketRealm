@@ -240,6 +240,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const lastEventLogTimeRef = useRef(0);
   const prevInventoryIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedOnceRef = useRef(false);
+  const lootRevealRarityRef = useRef(lootRevealRarity);
+  lootRevealRarityRef.current = lootRevealRarity;
   const [lootRevealItems, setLootRevealItems] = useState<Array<{
     name: string;
     rarity: 'uncommon' | 'rare' | 'epic' | 'legendary';
@@ -358,8 +360,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       if (invRes.data.materialTotals) setMaterialTotals(invRes.data.materialTotals);
       // Detect new notable items for loot reveal
       const RARITY_RANK: Record<string, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
-      if (hasLoadedOnceRef.current && lootRevealRarity !== 'none') {
-        const minRank = RARITY_RANK[lootRevealRarity] ?? 1;
+      if (hasLoadedOnceRef.current && lootRevealRarityRef.current !== 'none') {
+        const minRank = RARITY_RANK[lootRevealRarityRef.current] ?? 1;
         const newNotableItems = invRes.data.items.filter(
           item => !prevInventoryIdsRef.current.has(item.id) && RARITY_RANK[item.rarity] >= minRank
         );
