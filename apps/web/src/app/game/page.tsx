@@ -167,6 +167,9 @@ export default function GamePage() {
     templates,
     handleLoadTemplates,
     pvpNotificationCount,
+    incomingFriendRequestCount,
+    mailUnreadCount,
+    loadFriendCounts,
     playbackActive,
     combatPlaybackData,
     combatPlaybackQueue,
@@ -1055,6 +1058,10 @@ export default function GamePage() {
             onTurnsChanged={() => void loadTurnsAndHp()}
           />
         );
+      case 'friends':
+        return <div className="text-[var(--rpg-text-primary)] p-4">Friends screen coming soon</div>;
+      case 'mail':
+        return <div className="text-[var(--rpg-text-primary)] p-4">Mail screen coming soon</div>;
       case 'templates':
         return (
           <Templates
@@ -1245,6 +1252,18 @@ export default function GamePage() {
           />
         )}
 
+        {getActiveTab() === 'social' && (
+          <SubNav
+            tabs={[
+              { id: 'guild', label: 'Guild' },
+              { id: 'friends', label: 'Friends', badge: incomingFriendRequestCount },
+              { id: 'mail', label: 'Mail', badge: mailUnreadCount },
+            ]}
+            activeId={activeScreen}
+            onSelect={(id) => setActiveScreen(id as Screen)}
+          />
+        )}
+
         {actionError && (
           <div
             ref={errorRef}
@@ -1280,7 +1299,12 @@ export default function GamePage() {
       <BottomNav
         activeTab={getActiveTab()}
         onNavigate={handleNavigate}
-        badgeTabs={(achievementUnclaimedCount > 0 || quests.some(q => q.status === 'completed')) ? new Set(['home']) : undefined}
+        badgeTabs={useMemo(() => {
+          const tabs = new Set<string>();
+          if (achievementUnclaimedCount > 0 || quests.some(q => q.status === 'completed')) tabs.add('home');
+          if (incomingFriendRequestCount > 0 || mailUnreadCount > 0) tabs.add('social');
+          return tabs.size > 0 ? tabs : undefined;
+        }, [achievementUnclaimedCount, quests, incomingFriendRequestCount, mailUnreadCount])}
         pulseTabs={tutorialPulseTabs}
       />
       <TutorialDialog
