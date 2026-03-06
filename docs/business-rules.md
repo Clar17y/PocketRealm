@@ -57,7 +57,7 @@ Every turn-spending action is validated: positive integer, sufficient balance, g
 ## Combat Flow & Cascading Effects
 
 ### On Combat Victory
-1. Grant skill XP (for attack skill used) → may trigger skill level up
+1. Split XP across combat skills (melee/ranged/magic) proportional to damage dealt + resource cost spent per skill type → may trigger skill level ups
 2. Skill level up → grant character XP → may trigger character level up
 3. Character level up → grant attribute points
 4. Record bestiary kill (mob + prefix variant)
@@ -116,10 +116,32 @@ Every turn-spending action is validated: positive integer, sufficient balance, g
 ### Systems That Grant XP
 | System | Skill Type |
 |--------|-----------|
-| Combat victory | Attack skill used (melee/ranged/magic) |
+| Combat victory | Split across melee/ranged/magic by damage dealt + resource cost per action type |
 | Boss defeat | Per contributor |
 | Crafting | Crafting skill for recipe |
 | Gathering | Gathering skill (mining/foraging/woodcutting) |
+
+### Per-Action Scaling
+- Each combat action has a `scalingStat` (melee/ranged/magic/weapon)
+- `weapon` resolves to equipped weapon's `requiredSkill`; explicit stats ignore weapon type
+- Accuracy uses the action's stat: strength (melee), dexterity (ranged), intelligence (magic)
+- Damage uses matching weapon power: `attack` (melee), `rangedPower` (ranged), `magicPower` (magic)
+- `equipmentAccuracy` is universal — applies to all action types
+- Guild `combatDamage` modifier applied via `PerActionScaling.guildDamageMultiplier`
+
+### Combat XP Splitting
+- Contribution per skill = damage dealt + (resource cost × `COMBAT_CONSTANTS.RESOURCE_XP_WEIGHT`)
+- XP split proportionally by contribution; remainder goes to highest contributor
+- Heals, buffs, and missed attacks contribute via resource cost (mana/stamina spent)
+- DOT tick damage credits the source action's scaling stat (not the damage type)
+- XP rounding uses `Math.round` to minimize loss from splitting
+
+### DOT/HOT Effects
+- Actions can apply damage-over-time (DOT) or heal-over-time (HOT) effects
+- Damage is snapshotted at application: flat amount + % of initial hit damage
+- DOT ticks respect target defence/magic defence based on `dotDamageType`
+- Same-name effects refresh duration (don't stack)
+- Life leech: some offensive actions heal the attacker for a % of damage dealt (capped at max HP)
 
 ## Encounter Site Lifecycle
 
