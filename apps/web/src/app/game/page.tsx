@@ -1066,6 +1066,7 @@ export default function GamePage() {
             playerId={player?.id ?? null}
             onTurnsChanged={() => void loadTurnsAndHp()}
             onFriendCountsChanged={() => void loadFriendCounts()}
+            combatSpeedMs={combatLogSpeedMs}
           />
         );
       case 'mail':

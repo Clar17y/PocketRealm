@@ -15,6 +15,15 @@ export interface SparResponse {
   defenderHpRemaining: number;
   combat: {
     outcome: CombatOutcomeResponse;
+    combatantAMaxHp: number;
+    combatantBMaxHp: number;
+    combatantAMaxStamina: number;
+    combatantBMaxStamina: number;
+    combatantAMaxMana: number;
+    combatantBMaxMana: number;
+    attackerStartHp: number;
+    attackerStartStamina: number;
+    attackerStartMana: number;
     log: CombatLogEntryResponse[];
   };
 }

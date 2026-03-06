@@ -13,7 +13,9 @@ import {
   getBlockList,
   unblockPlayer,
   blockPlayer,
+  sparFriend,
 } from '@/lib/api';
+import type { SparResponse } from '@/lib/api';
 import type { FriendListEntry, FriendRequest, BlockedPlayer } from '@pocketrealm/shared';
 import { FRIEND_CONSTANTS } from '@pocketrealm/shared';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
@@ -22,6 +24,8 @@ import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
+import { FriendProfileModal } from '@/components/friends/FriendProfileModal';
+import { CombatPlayback } from '@/components/combat/CombatPlayback';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,7 +35,7 @@ interface FriendsScreenProps {
   playerId: string | null;
   onTurnsChanged: () => void;
   onFriendCountsChanged?: () => void;
-  onOpenProfile?: (friendshipId: string) => void;
+  combatSpeedMs?: number;
 }
 
 type FriendsView = 'list' | 'incoming' | 'outgoing' | 'blocked';
@@ -57,9 +61,9 @@ function formatRelativeTime(dateStr: string): string {
 
 export function FriendsScreen({
   playerId,
-  onTurnsChanged: _onTurnsChanged,
+  onTurnsChanged,
   onFriendCountsChanged,
-  onOpenProfile,
+  combatSpeedMs,
 }: FriendsScreenProps) {
   // --- data state ---
   const [friends, setFriends] = useState<FriendListEntry[]>([]);
@@ -71,6 +75,13 @@ export function FriendsScreen({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<FriendsView>('list');
+
+  // --- profile modal state ---
+  const [selectedFriendshipId, setSelectedFriendshipId] = useState<string | null>(null);
+
+  // --- spar state ---
+  const [sparResult, setSparResult] = useState<SparResponse | null>(null);
+  const [sparPlaybackActive, setSparPlaybackActive] = useState(false);
 
   // --- search state ---
   const [searchUsername, setSearchUsername] = useState('');
@@ -112,7 +123,7 @@ export function FriendsScreen({
       if (res.error) return;
       setIncomingRequests(res.data?.requests ?? []);
     } catch {
-      // silent — tab-specific load
+      // silent -- tab-specific load
     }
   }, []);
 
@@ -297,6 +308,36 @@ export function FriendsScreen({
     }
   }
 
+  // --- Spar handler ---
+  async function handleSpar(friendshipId: string) {
+    setActionBusy(true);
+    setError(null);
+    try {
+      const result = await sparFriend(friendshipId);
+      if (result.data) {
+        setSparResult(result.data);
+        setSparPlaybackActive(true);
+        setSelectedFriendshipId(null); // close profile modal
+      } else if (result.error) {
+        setError(result.error.message);
+      }
+    } finally {
+      setActionBusy(false);
+      onTurnsChanged();
+    }
+  }
+
+  // --- Send mail handler (placeholder -- closes modal for now) ---
+  function handleSendMail(_recipientId: string, _recipientName: string) {
+    setSelectedFriendshipId(null);
+  }
+
+  // --- Dismiss spar playback ---
+  function dismissSparPlayback() {
+    setSparPlaybackActive(false);
+    setSparResult(null);
+  }
+
   // -----------------------------------------------------------------------
   // Derived
   // -----------------------------------------------------------------------
@@ -334,6 +375,36 @@ export function FriendsScreen({
   }
 
   // -----------------------------------------------------------------------
+  // Spar result summary (shown after playback completes)
+  // -----------------------------------------------------------------------
+
+  const sparResultSummary = sparResult && !sparPlaybackActive && (
+    <PixelCard className="mb-4">
+      <div className="text-center py-2">
+        <div className={`text-xl font-bold font-almendra mb-1 ${
+          sparResult.isDraw ? 'text-[var(--rpg-gold)]'
+            : sparResult.winnerId === playerId ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'
+        }`}>
+          {sparResult.isDraw ? 'Draw!' : sparResult.winnerId === playerId ? 'Victory!' : 'Defeat!'}
+        </div>
+        <p className="text-sm text-[var(--rpg-text-secondary)]">
+          {sparResult.attackerName} vs {sparResult.defenderName}
+          {sparResult.isDraw && ' -- 100 rounds, no winner'}
+        </p>
+        <div className="flex items-center justify-center gap-3 mt-2">
+          <button
+            type="button"
+            onClick={() => setSparResult(null)}
+            className="text-xs text-[var(--rpg-text-secondary)] underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </PixelCard>
+  );
+
+  // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
 
@@ -344,6 +415,35 @@ export function FriendsScreen({
       </h2>
 
       {error && <ErrorBanner message={error} />}
+
+      {/* Spar combat playback */}
+      {sparPlaybackActive && sparResult && (
+        <PixelCard className="mb-4">
+          <CombatPlayback
+            mobDisplayName={sparResult.defenderName}
+            outcome={sparResult.isDraw ? 'draw' : sparResult.winnerId === playerId ? 'victory' : 'defeat'}
+            playerMaxHp={sparResult.combat.combatantAMaxHp}
+            playerStartHp={sparResult.combat.attackerStartHp}
+            playerStartStamina={sparResult.combat.attackerStartStamina}
+            playerStartMana={sparResult.combat.attackerStartMana}
+            playerMaxStamina={sparResult.combat.combatantAMaxStamina}
+            playerMaxMana={sparResult.combat.combatantAMaxMana}
+            mobMaxHp={sparResult.combat.combatantBMaxHp}
+            opponentMaxStamina={sparResult.combat.combatantBMaxStamina}
+            opponentMaxMana={sparResult.combat.combatantBMaxMana}
+            log={sparResult.combat.log}
+            playerLabel={sparResult.attackerName}
+            showOpponentResources
+            defeatButtonLabel="Continue"
+            speedMs={combatSpeedMs}
+            onComplete={dismissSparPlayback}
+            onSkip={dismissSparPlayback}
+          />
+        </PixelCard>
+      )}
+
+      {/* Spar result summary (after playback) */}
+      {sparResultSummary}
 
       {/* Add Friend search */}
       <PixelCard padding="sm">
@@ -424,7 +524,7 @@ export function FriendsScreen({
                 key={f.friendshipId}
                 padding="sm"
                 className="cursor-pointer hover:border-[var(--rpg-gold)] transition-colors"
-                onClick={() => onOpenProfile?.(f.friendshipId)}
+                onClick={() => setSelectedFriendshipId(f.friendshipId)}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -592,6 +692,26 @@ export function FriendsScreen({
             ))
           )}
         </div>
+      )}
+
+      {/* Friend profile modal */}
+      {selectedFriendshipId && (
+        <FriendProfileModal
+          friendshipId={selectedFriendshipId}
+          onClose={() => setSelectedFriendshipId(null)}
+          onSpar={handleSpar}
+          onSendMail={handleSendMail}
+          onUnfriend={() => {
+            setSelectedFriendshipId(null);
+            void loadFriends();
+            onFriendCountsChanged?.();
+          }}
+          onBlock={() => {
+            setSelectedFriendshipId(null);
+            void loadFriends();
+            onFriendCountsChanged?.();
+          }}
+        />
       )}
     </ScreenContainer>
   );

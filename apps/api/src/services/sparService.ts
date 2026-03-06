@@ -186,6 +186,15 @@ export interface SparResult {
   defenderHpRemaining: number;
   combat: {
     outcome: string;
+    combatantAMaxHp: number;
+    combatantBMaxHp: number;
+    combatantAMaxStamina: number;
+    combatantBMaxStamina: number;
+    combatantAMaxMana: number;
+    combatantBMaxMana: number;
+    attackerStartHp: number;
+    attackerStartStamina: number;
+    attackerStartMana: number;
     log: ReturnType<typeof mapTemplateCombatLog>;
   };
 }
@@ -207,6 +216,11 @@ export async function runSpar(
     buildSparCombatant(defenderId, defender.username, false),
   ]);
 
+  // Capture attacker start resources before combat resolves
+  const attackerStartHp = attackerCombatant.stats.hp;
+  const attackerStartStamina = attackerCombatant.stamina;
+  const attackerStartMana = attackerCombatant.mana;
+
   const result = runTemplateCombat(attackerCombatant, defenderCombatant);
 
   const isDraw = result.outcome === 'draw';
@@ -226,6 +240,15 @@ export async function runSpar(
     defenderHpRemaining: result.combatantBHpRemaining,
     combat: {
       outcome: result.outcome,
+      combatantAMaxHp: result.combatantAMaxHp,
+      combatantBMaxHp: result.combatantBMaxHp,
+      combatantAMaxStamina: result.combatantAMaxStamina,
+      combatantBMaxStamina: result.combatantBMaxStamina,
+      combatantAMaxMana: result.combatantAMaxMana,
+      combatantBMaxMana: result.combatantBMaxMana,
+      attackerStartHp,
+      attackerStartStamina,
+      attackerStartMana,
       log: mapTemplateCombatLog(result.log),
     },
   };
