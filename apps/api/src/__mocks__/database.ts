@@ -77,6 +77,7 @@ export const prisma = {
   rouletteBet: mockModel(),
   playerQuest: mockModel(),
   playerQuestState: mockModel(),
+  playerBuff: mockModel(),
   $transaction: vi.fn((fnOrArray: ((tx: any) => Promise<any>) | any[]) => {
     if (typeof fnOrArray === 'function') return fnOrArray(prisma);
     return Promise.all(fnOrArray);
