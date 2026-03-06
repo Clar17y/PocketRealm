@@ -100,6 +100,22 @@ pvpRouter.post('/challenge', asyncHandler(async (req, res) => {
     void trackProgress(result.winnerId, 'pvp_wins', 1).catch(() => {});
   }
 
+  // Track pvp_damage for both combatants (quest: "Deal X damage in the arena")
+  const log = result.combat?.log ?? [];
+  const attackerDamage = log
+    .filter((e: { actor: string; damage?: number }) => e.actor === 'combatantA' && e.damage)
+    .reduce((sum: number, e: { damage?: number }) => sum + (e.damage ?? 0), 0);
+  const defenderDamage = log
+    .filter((e: { actor: string; damage?: number }) => e.actor === 'combatantB' && e.damage)
+    .reduce((sum: number, e: { damage?: number }) => sum + (e.damage ?? 0), 0);
+
+  if (attackerDamage > 0) {
+    void trackProgress(playerId, 'pvp_damage', attackerDamage).catch(() => {});
+  }
+  if (defenderDamage > 0) {
+    void trackProgress(body.targetId, 'pvp_damage', defenderDamage).catch(() => {});
+  }
+
   res.json(result);
 }));
 

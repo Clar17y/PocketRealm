@@ -30,9 +30,7 @@ import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankSe
 import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { trackProgress } from '../../services/progressService';
-import { getPlayerGuildId } from '../../services/guildService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
-import { incrementContractProgress } from '../../services/guildContractService';
 import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
@@ -1021,6 +1019,12 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     // Guild contract + quest progress: track exploration turns
     const explorationQuestProgress = await trackProgress(playerId, 'exploration_turns', spentTurns);
     allQuestProgress.push(...explorationQuestProgress);
+
+    // Track chest_open quest progress for hidden caches found
+    if (hiddenCaches.length > 0) {
+      const chestProgress = await trackProgress(playerId, 'chest_open', hiddenCaches.length);
+      allQuestProgress.push(...chestProgress);
+    }
 
     if (events.length === 0) {
       events.push({

@@ -135,9 +135,9 @@ export async function getActiveQuests(
   // Daily reset check
   const needsDailyReset = state.lastDailyReset < todayStart;
   if (needsDailyReset) {
-    // Expire old active dailies
+    // Expire old active and unclaimed completed dailies
     await prisma.playerQuest.updateMany({
-      where: { playerId, cadence: 'daily', status: 'active' },
+      where: { playerId, cadence: 'daily', status: { in: ['active', 'completed'] } },
       data: { status: 'expired' },
     });
 
@@ -154,9 +154,9 @@ export async function getActiveQuests(
   // Weekly reset check
   const needsWeeklyReset = state.lastWeeklyReset < weekStart;
   if (needsWeeklyReset) {
-    // Expire old active weeklies
+    // Expire old active and unclaimed completed weeklies
     await prisma.playerQuest.updateMany({
-      where: { playerId, cadence: 'weekly', status: 'active' },
+      where: { playerId, cadence: 'weekly', status: { in: ['active', 'completed'] } },
       data: { status: 'expired' },
     });
 
@@ -170,11 +170,12 @@ export async function getActiveQuests(
     });
   }
 
-  // Return active + completed + claimed quests (not expired)
+  // Return active + completed + claimed quests from the current period only
   const quests = await prisma.playerQuest.findMany({
     where: {
       playerId,
       status: { in: ['active', 'completed', 'claimed'] },
+      expiresAt: { gt: now },
     },
     orderBy: { assignedAt: 'desc' },
   });
