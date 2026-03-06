@@ -78,6 +78,9 @@ export const prisma = {
   playerQuest: mockModel(),
   playerQuestState: mockModel(),
   playerBuff: mockModel(),
+  shopItem: mockModel(),
+  playerShopPurchase: mockModel(),
+  guildJoinRequest: mockModel(),
   $transaction: vi.fn((fnOrArray: ((tx: any) => Promise<any>) | any[]) => {
     if (typeof fnOrArray === 'function') return fnOrArray(prisma);
     return Promise.all(fnOrArray);
