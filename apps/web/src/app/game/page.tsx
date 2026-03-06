@@ -53,6 +53,7 @@ import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
 import { GuildScreen } from '@/components/screens/GuildScreen';
 import { FriendsScreen } from '@/components/screens/FriendsScreen';
+import { MailScreen } from '@/components/screens/MailScreen';
 import { Templates } from '@/components/screens/Templates';
 import { TalentTree } from '@/components/screens/TalentTree';
 import { Quests } from '@/components/screens/Quests';
@@ -1068,7 +1069,7 @@ export default function GamePage() {
           />
         );
       case 'mail':
-        return <div className="text-[var(--rpg-text-primary)] p-4">Mail screen coming soon</div>;
+        return <MailScreen playerId={player?.id ?? null} onMailCountChanged={() => void loadFriendCounts()} />;
       case 'templates':
         return (
           <Templates
