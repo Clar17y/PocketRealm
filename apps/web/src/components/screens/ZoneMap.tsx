@@ -62,6 +62,10 @@ interface ZoneMapProps {
   guildTaxRate?: number;
   undiscoveredZones?: Array<{ id: string; name: string; explorationThreshold: number; fromZoneId: string }>;
   combatLogPrefetch?: CombatLogPrefetch;
+  playerStartStamina?: number;
+  playerStartMana?: number;
+  playerMaxStamina?: number;
+  playerMaxMana?: number;
 }
 
 /** BFS from the starter zone to compute shortest-path tier for each zone. */
@@ -127,6 +131,10 @@ export function ZoneMap({
   guildTaxRate = 0,
   undiscoveredZones,
   combatLogPrefetch,
+  playerStartStamina,
+  playerStartMana,
+  playerMaxStamina,
+  playerMaxMana,
 }: ZoneMapProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
@@ -584,6 +592,10 @@ export function ZoneMap({
             onSkip={onTravelPlaybackSkip!}
             onPushLog={onPushLog}
             combatLogPrefetch={combatLogPrefetch}
+            playerStartStamina={playerStartStamina}
+            playerStartMana={playerStartMana}
+            playerMaxStamina={playerMaxStamina}
+            playerMaxMana={playerMaxMana}
           />
         </div>
       )}

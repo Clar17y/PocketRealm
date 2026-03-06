@@ -40,9 +40,6 @@ model Player {
   currentMana         Int      @default(50) @map("current_mana")
   lastManaRegenAt     DateTime @default(now()) @map("last_mana_regen_at")
 
-  // Auto-Potion
-  autoPotionThreshold Int @default(0) @map("auto_potion_threshold")
-
   // Tutorial
   tutorialStep    Int      @default(0) @map("tutorial_step")
 
@@ -912,19 +909,51 @@ model GuildJoinRequest {
 // COMBAT TEMPLATES
 // =============================================================================
 
+enum ConditionType {
+  resource_below
+  resource_above
+  has_buff
+  has_debuff
+  no_buff
+  no_debuff
+}
+
+enum ResourceType {
+  hp
+  stamina
+  mana
+}
+
 model CombatTemplate {
   id        String   @id @default(uuid())
   playerId  String   @map("player_id")
   name      String   @db.VarChar(64)
   isActive  Boolean  @default(false) @map("is_active")
-  actions   Json     // CombatTemplateAction[]
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  slots  CombatTemplateSlot[]
 
   @@index([playerId, isActive])
   @@map("combat_templates")
+}
+
+model CombatTemplateSlot {
+  id            String         @id @default(uuid())
+  templateId    String         @map("template_id")
+  sortOrder     Int            @map("sort_order")
+  actionId      String         @map("action_id")
+  conditionType ConditionType? @map("condition_type")
+  resource      ResourceType?
+  threshold     Int?
+  effectName    String?        @map("effect_name")
+  thenActionId  String?        @map("then_action_id")
+
+  template CombatTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId, sortOrder])
+  @@map("combat_template_slots")
 }
 
 // =============================================================================

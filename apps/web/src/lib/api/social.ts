@@ -82,12 +82,18 @@ export interface PvpChallengeResponse {
     outcome: CombatOutcomeResponse;
     combatantAMaxHp: number;
     combatantBMaxHp: number;
+    combatantAMaxStamina: number;
+    combatantBMaxStamina: number;
+    combatantAMaxMana: number;
+    combatantBMaxMana: number;
     combatantAHpRemaining: number;
     combatantBHpRemaining: number;
     log: CombatLogEntryResponse[];
     potionsConsumed: Array<{ tier: number; healAmount: number; round: number }>;
   };
   attackerStartHp: number;
+  attackerStartStamina?: number;
+  attackerStartMana?: number;
   attackerKnockedOut: boolean;
   fleeOutcome: 'clean_escape' | 'wounded_escape' | 'knockout' | null;
 }

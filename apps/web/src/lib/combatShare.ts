@@ -11,10 +11,10 @@ export interface ShareCombatLogEntry {
 
 export interface ShareCombatRewards {
   xp: number;
-  skillXp?: {
+  skillXpGrants?: Array<{
     skillType: string;
     xpAfterEfficiency: number;
-  } | null;
+  }>;
   loot: Array<{ itemTemplateId: string; quantity: number; itemName?: string | null }>;
 }
 
@@ -75,8 +75,8 @@ export function formatCombatShareText(input: CombatShareInput): string {
   lines.push('Rewards');
   lines.push(`XP: ${input.rewards.xp}`);
 
-  if (input.rewards.skillXp) {
-    lines.push(`${input.rewards.skillXp.skillType}: +${input.rewards.skillXp.xpAfterEfficiency} XP`);
+  for (const grant of input.rewards.skillXpGrants ?? []) {
+    lines.push(`${grant.skillType}: +${grant.xpAfterEfficiency} XP`);
   }
 
   if (input.rewards.loot.length > 0) {

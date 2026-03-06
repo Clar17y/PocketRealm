@@ -27,6 +27,10 @@ interface TurnPlaybackProps {
   combatLogPrefetch?: CombatLogPrefetch;
   autoSkipKnownCombat?: boolean;
   bestiaryMobs?: BestiarySkipEntry[];
+  playerStartStamina?: number;
+  playerStartMana?: number;
+  playerMaxStamina?: number;
+  playerMaxMana?: number;
 }
 
 export function TurnPlayback({
@@ -45,6 +49,10 @@ export function TurnPlayback({
   combatLogPrefetch,
   autoSkipKnownCombat,
   bestiaryMobs,
+  playerStartStamina,
+  playerStartMana,
+  playerMaxStamina,
+  playerMaxMana,
 }: TurnPlaybackProps) {
   const [combatEvent, setCombatEvent] = useState<ExplorationPlaybackEvent | null>(null);
   const [resumeFromCombat, setResumeFromCombat] = useState(false);
@@ -187,6 +195,10 @@ export function TurnPlayback({
               activeEvents={(combatEvent.details?.eventModifiers as EventModifierBadge[] | undefined)?.map(m => ({
                 ...m, appliedToThisMob: true,
               }))}
+              playerStartStamina={playerStartStamina}
+              playerStartMana={playerStartMana}
+              playerMaxStamina={playerMaxStamina}
+              playerMaxMana={playerMaxMana}
               autoSkip={!!shouldAutoSkip}
               speedMs={combatSpeedMs}
               onComplete={() => {

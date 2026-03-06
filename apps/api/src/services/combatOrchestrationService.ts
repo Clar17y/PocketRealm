@@ -5,10 +5,12 @@ import {
 import {
   ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
+  COMBAT_CONSTANTS,
   GUILD_CONSTANTS,
   type ActionDefinition,
-  type CombatTemplateAction,
+  type CombatTemplateSlotData,
   type LootDrop,
+  type PerActionScaling,
 } from '@adventure/shared';
 import { Prisma } from '@adventure/database';
 import { rollAndGrantLootWithCapacity } from './lootService';
@@ -27,7 +29,7 @@ export function buildPlayerTemplateCombatant(params: {
   playerId: string;
   username: string;
   playerStats: ReturnType<typeof buildPlayerCombatStats>;
-  template: CombatTemplateAction[];
+  template: CombatTemplateSlotData[];
   stamina: number;
   maxStamina: number;
   staminaRegenPerRound: number;
@@ -35,6 +37,7 @@ export function buildPlayerTemplateCombatant(params: {
   maxMana: number;
   manaRegenPerRound: number;
   unlockedActions: string[];
+  perActionScaling?: PerActionScaling;
 }): TemplateCombatant {
   const unlockedSet = new Set(params.unlockedActions);
   const filteredActions: Record<string, ActionDefinition> = {};
@@ -55,6 +58,7 @@ export function buildPlayerTemplateCombatant(params: {
     maxMana: params.maxMana,
     manaRegenPerRound: params.manaRegenPerRound,
     actionDefinitions: filteredActions,
+    perActionScaling: params.perActionScaling,
   };
 }
 
@@ -64,6 +68,8 @@ export function applyGuildCombatModifiers(
   playerStats: ReturnType<typeof buildPlayerCombatStats>,
   guildMods: Pick<PlayerGuildModifiers, 'combatDamage' | 'defenseBoost'>,
 ): void {
+  // Note: combatDamage is now applied via PerActionScaling.guildDamageMultiplier
+  // in the per-action path. The fallback stats still get the boost for mobs/legacy.
   if (guildMods.combatDamage > 0) {
     playerStats.damageMin = Math.round(playerStats.damageMin * (1 + guildMods.combatDamage));
     playerStats.damageMax = Math.round(playerStats.damageMax * (1 + guildMods.combatDamage));
@@ -86,6 +92,8 @@ export interface VictoryRewardParams {
     mobPrefix: string | null;
   };
   attackSkill: AttackSkill;
+  damageByScalingStat?: { melee: number; ranged: number; magic: number };
+  resourceCostByScalingStat?: { melee: number; ranged: number; magic: number };
   guildXpBoost?: number;
   includeGuildCredit?: boolean;
   includeBestiary?: boolean;
@@ -95,7 +103,7 @@ export interface VictoryRewardResult {
   loot: LootDrop[];
   overflow: PendingLootItem[];
   pendingLootSessionId: string | null;
-  xpGrant: GrantXpResult;
+  xpGrants: GrantXpResult[];
 }
 
 export async function processCombatVictoryRewards(
@@ -106,9 +114,10 @@ export async function processCombatVictoryRewards(
   const lootResult = await rollAndGrantLootWithCapacity(
     playerId, mob.id, mob.level, mob.dropChanceMultiplier,
   );
-  const xpGrant = await grantSkillXp(
-    playerId, attackSkill, Math.max(0, mob.xpReward),
-    undefined, params.guildXpBoost || undefined,
+
+  const totalXp = Math.max(0, mob.xpReward);
+  const xpGrants = await splitAndGrantXp(
+    playerId, totalXp, attackSkill, params.damageByScalingStat, params.resourceCostByScalingStat, params.guildXpBoost,
   );
 
   if (params.includeBestiary !== false) {
@@ -128,8 +137,62 @@ export async function processCombatVictoryRewards(
     loot: lootResult.drops,
     overflow: lootResult.overflow,
     pendingLootSessionId: lootResult.pendingLootSessionId,
-    xpGrant,
+    xpGrants,
   };
+}
+
+export async function splitAndGrantXp(
+  playerId: string,
+  totalXp: number,
+  fallbackSkill: AttackSkill,
+  damageByScalingStat: { melee: number; ranged: number; magic: number } | undefined,
+  resourceCostByScalingStat: { melee: number; ranged: number; magic: number } | undefined,
+  guildXpBoost: number | undefined,
+): Promise<GrantXpResult[]> {
+  const boost = guildXpBoost || undefined;
+
+  // Compute contribution per skill: damage + weighted resource cost
+  const contribution = { melee: 0, ranged: 0, magic: 0 };
+  if (damageByScalingStat) {
+    contribution.melee += damageByScalingStat.melee;
+    contribution.ranged += damageByScalingStat.ranged;
+    contribution.magic += damageByScalingStat.magic;
+  }
+  if (resourceCostByScalingStat) {
+    const w = COMBAT_CONSTANTS.RESOURCE_XP_WEIGHT;
+    contribution.melee += resourceCostByScalingStat.melee * w;
+    contribution.ranged += resourceCostByScalingStat.ranged * w;
+    contribution.magic += resourceCostByScalingStat.magic * w;
+  }
+
+  const totalContribution = contribution.melee + contribution.ranged + contribution.magic;
+  if (totalContribution <= 0) {
+    return [await grantSkillXp(playerId, fallbackSkill, totalXp, undefined, boost)];
+  }
+
+  // Find skills that contributed
+  const skills = (['melee', 'ranged', 'magic'] as const).filter(s => contribution[s] > 0);
+  if (skills.length === 1) {
+    return [await grantSkillXp(playerId, skills[0], totalXp, undefined, boost)];
+  }
+
+  // Distribute with floor, give remainder to highest-contribution skill
+  const xpBySkill: Record<string, number> = {};
+  let allocated = 0;
+  for (const skill of skills) {
+    xpBySkill[skill] = Math.floor(totalXp * contribution[skill] / totalContribution);
+    allocated += xpBySkill[skill];
+  }
+  const topSkill = skills.reduce((a, b) => contribution[a] >= contribution[b] ? a : b);
+  xpBySkill[topSkill] += totalXp - allocated;
+
+  const results: GrantXpResult[] = [];
+  for (const skill of skills) {
+    if (xpBySkill[skill] > 0) {
+      results.push(await grantSkillXp(playerId, skill, xpBySkill[skill], undefined, boost));
+    }
+  }
+  return results;
 }
 
 // ── Build combat activity log result ─────────────────────────────────
@@ -153,7 +216,7 @@ export interface CombatLogResultParams {
     baseXp: number;
     loot: unknown[];
     durabilityLost: unknown[];
-    skillXp: unknown | null;
+    skillXpGrants: unknown[];
   };
   eventModifiers: unknown[];
   potionsConsumed?: unknown[];

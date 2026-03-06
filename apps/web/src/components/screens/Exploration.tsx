@@ -198,6 +198,10 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           onSkip={onPlaybackSkip!}
           onPushLog={onPushLog}
           combatLogPrefetch={combatLogPrefetch}
+          playerStartStamina={currentStamina}
+          playerStartMana={currentMana}
+          playerMaxStamina={maxStamina}
+          playerMaxMana={maxMana}
         />
       )}
 

@@ -11,7 +11,6 @@ export async function getPlayer() {
       characterXp: number;
       characterLevel: number;
       attributePoints: number;
-      autoPotionThreshold: number;
       tutorialStep: number;
       combatLogSpeedMs: number;
       explorationSpeedMs: number;
@@ -36,7 +35,6 @@ export async function getPlayer() {
 }
 
 export interface PlayerSettings {
-  autoPotionThreshold?: number;
   combatLogSpeedMs?: number;
   explorationSpeedMs?: number;
   autoSkipKnownCombat?: boolean;

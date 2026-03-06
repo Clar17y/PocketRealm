@@ -24,6 +24,18 @@ export type DefensiveAction =
 
 export type CombatActionType = OffensiveAction | SupportiveAction | DefensiveAction;
 
+export type ScalingStat = 'melee' | 'ranged' | 'magic' | 'weapon';
+
+export interface PerActionScaling {
+  skillLevels: { melee: number; ranged: number; magic: number };
+  attributes: { strength: number; dexterity: number; intelligence: number };
+  weaponPower: { attack: number; rangedPower: number; magicPower: number };
+  equipmentAccuracy: number;
+  weaponRequiredSkill: 'melee' | 'ranged' | 'magic' | null;
+  /** Guild damage multiplier (e.g. 0.05 = +5% damage). Applied to per-action damage. */
+  guildDamageMultiplier?: number;
+}
+
 // --- Action Definition ---
 export interface ActionCost {
   stamina: number;
@@ -64,6 +76,12 @@ export interface ActionDefinition {
   tauntDuration?: number;
   /** Potion type consumed */
   potionType?: 'hp' | 'stamina' | 'mana';
+  /** Which skill/attribute/weapon stat drives this action's damage.
+   * 'weapon' = resolved from equipped weapon's requiredSkill at combat time.
+   * Defaults to 'weapon' if omitted. */
+  scalingStat?: ScalingStat;
+  /** Heal attacker for this % of actual damage dealt (after defence) */
+  lifeLeechPercent?: number;
 }
 
 export interface ActionEffect {
@@ -79,9 +97,37 @@ export interface ActionEffect {
   /** Whether this is a DoT/HoT */
   damagePerRound?: number;
   healPerRound?: number;
+  /** % of triggering hit's final damage added to DOT (snapshotted at application) */
+  damagePerRoundPercent?: number;
+  /** Which defence stat reduces DOT ticks */
+  dotDamageType?: 'physical' | 'magic';
+}
+
+// --- Condition Types ---
+
+export type ConditionType =
+  | 'resource_below'
+  | 'resource_above'
+  | 'has_buff'
+  | 'has_debuff'
+  | 'no_buff'
+  | 'no_debuff';
+
+export type ConditionResourceType = 'hp' | 'stamina' | 'mana';
+
+export interface SlotCondition {
+  type: ConditionType;
+  /** Required for resource_below/resource_above */
+  resource?: ConditionResourceType;
+  /** 0-100, required for resource_below/resource_above */
+  threshold?: number;
+  /** Required for buff/debuff conditions */
+  effectName?: string;
 }
 
 // --- Combat Template ---
+
+/** @deprecated Used by mob templates only. Player templates use CombatTemplateSlotData. */
 export interface CombatTemplateAction {
   /** Action definition ID (references an unlocked ability) */
   actionId: string;
@@ -89,12 +135,23 @@ export interface CombatTemplateAction {
   label?: string;
 }
 
+export interface CombatTemplateSlotData {
+  id: string;
+  sortOrder: number;
+  /** Default/else action */
+  actionId: string;
+  /** Optional if/then condition */
+  condition?: SlotCondition;
+  /** Action when condition is true */
+  thenActionId?: string;
+}
+
 export interface CombatTemplateData {
   id: string;
   playerId: string;
   name: string;
   isActive: boolean;
-  actions: CombatTemplateAction[];
+  slots: CombatTemplateSlotData[];
   createdAt: string;
   updatedAt: string;
 }

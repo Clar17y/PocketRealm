@@ -4,7 +4,6 @@ import type { ConfirmRarity } from '@/lib/rarity';
 
 /** Shape accepted by initSettingsFromServer — matches the player API response fields. */
 export interface ServerSettingsPayload {
-  autoPotionThreshold?: number | null;
   combatLogSpeedMs?: number | null;
   explorationSpeedMs?: number | null;
   autoSkipKnownCombat?: boolean | null;
@@ -17,7 +16,6 @@ export interface ServerSettingsPayload {
 }
 
 export function usePlayerSettings() {
-  const [autoPotionThreshold, setAutoPotionThreshold] = useState(0);
   const [combatLogSpeedMs, setCombatLogSpeedMs] = useState(800);
   const [explorationSpeedMs, setExplorationSpeedMs] = useState(800);
   const [autoSkipKnownCombat, setAutoSkipKnownCombat] = useState(false);
@@ -39,8 +37,6 @@ export function usePlayerSettings() {
 
   // --- individual handlers (persist to server) ----------------------------------
 
-  const handleSetAutoPotionThreshold = (value: number) =>
-    handleSetSetting('autoPotionThreshold', value, setAutoPotionThreshold, autoPotionThreshold);
   const handleSetCombatLogSpeed = (value: number) =>
     handleSetSetting('combatLogSpeedMs', value, setCombatLogSpeedMs, combatLogSpeedMs);
   const handleSetExplorationSpeed = (value: number) =>
@@ -63,7 +59,6 @@ export function usePlayerSettings() {
   // --- server hydration ---------------------------------------------------------
 
   const initSettingsFromServer = (s: ServerSettingsPayload) => {
-    setAutoPotionThreshold(s.autoPotionThreshold ?? 0);
     setCombatLogSpeedMs(s.combatLogSpeedMs ?? 800);
     setExplorationSpeedMs(s.explorationSpeedMs ?? 800);
     setAutoSkipKnownCombat(s.autoSkipKnownCombat ?? false);
@@ -77,7 +72,6 @@ export function usePlayerSettings() {
 
   return {
     // Values
-    autoPotionThreshold,
     combatLogSpeedMs,
     explorationSpeedMs,
     autoSkipKnownCombat,
@@ -92,7 +86,6 @@ export function usePlayerSettings() {
     // Raw setters for optimistic / external updates
     setCombatLogSpeedMs,
     setExplorationSpeedMs,
-    setAutoPotionThreshold,
     setDefaultExploreTurns,
     setQuickRestHealPercent,
     setGuildTaxRate,
@@ -101,7 +94,6 @@ export function usePlayerSettings() {
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
     handleSetAutoSkipKnownCombat,
-    handleSetAutoPotionThreshold,
     handleSetDefaultExploreTurns,
     handleSetQuickRestHealPercent,
     handleSetDefaultRefiningMax,

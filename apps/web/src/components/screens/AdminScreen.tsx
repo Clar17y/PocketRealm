@@ -8,6 +8,7 @@ import {
   adminSetLevel,
   adminGrantXp,
   adminSetAttributes,
+  adminSetSkillLevel,
   adminGetItemTemplates,
   adminGrantItem,
   adminGetEventTemplates,
@@ -77,6 +78,8 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
   const [xp, setXp] = useState(10000);
   const [attrPoints, setAttrPoints] = useState(10);
   const [attrs, setAttrs] = useState({ vitality: 0, strength: 0, dexterity: 0, intelligence: 0, luck: 0, evasion: 0 });
+  const [skillType, setSkillType] = useState('melee');
+  const [skillLevel, setSkillLevel] = useState(10);
   const { busy, msg, act } = useAdminAction(onAction);
 
   return (
@@ -137,6 +140,26 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
           onClick={() => act('Set attributes', () => adminSetAttributes({ attributes: attrs }), 'Overwrite all attribute values?')}>
           Set Attributes
         </PixelButton>
+      </PixelCard>
+
+      <PixelCard>
+        <h3 className="text-sm font-semibold text-[var(--rpg-gold)] mb-3">Set Skill Level</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+          <select value={skillType} onChange={(e) => setSkillType(e.target.value)}
+            className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm text-[var(--rpg-text-primary)]">
+            {['melee', 'ranged', 'magic', 'mining', 'foraging', 'woodcutting', 'refining', 'tanning', 'weaving',
+              'weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring', 'alchemy', 'jewelcrafting'].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <input type="number" value={skillLevel} min={1} max={100}
+            onChange={(e) => setSkillLevel(Number(e.target.value))}
+            className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-20 text-[var(--rpg-text-primary)]" />
+          <PixelButton size="sm" disabled={busy}
+            onClick={() => act(`Set ${skillType} to ${skillLevel}`, () => adminSetSkillLevel(skillType, skillLevel), `Set ${skillType} to level ${skillLevel}?`)}>
+            Set Level
+          </PixelButton>
+        </div>
       </PixelCard>
 
       <StatusMsg msg={msg} />

@@ -1,11 +1,14 @@
-import type { ActionDefinition, CombatTemplateAction } from '@adventure/shared';
+import type { ActionDefinition, CombatTemplateSlotData, ActiveEffect, CombatActor } from '@adventure/shared';
 import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@adventure/shared';
+import { evaluateCondition } from './conditionEvaluator';
 
 // --- Result Types ---
 
 export interface ResolvedAction {
   action: ActionDefinition;
   wasExhausted: boolean;
+  /** The other branch's action (else when condition matched, then when it didn't) */
+  alternateAction?: ActionDefinition;
 }
 
 export interface RoundInteraction {
@@ -21,7 +24,7 @@ export interface RoundInteraction {
 
 // --- Helpers ---
 
-const DEFEND_FALLBACK: ActionDefinition = BASE_ACTION_DEFINITIONS['defend'];
+export const DEFEND_FALLBACK: ActionDefinition = BASE_ACTION_DEFINITIONS['defend'];
 
 function canAfford(
   action: ActionDefinition,
@@ -36,30 +39,46 @@ function canAfford(
 // --- Public API ---
 
 /**
- * Pick the action for a given round from the template, checking resource costs.
- * Falls back to Defend (wasExhausted = true) when the combatant cannot afford
- * the chosen action or the action ID is unrecognised.
+ * Pick the action for a given round from the template slots, evaluating
+ * conditions and checking resource costs. Falls back to Defend
+ * (wasExhausted = true) when the combatant cannot afford the chosen
+ * action or the action ID is unrecognised.
  */
 export function resolveAction(
-  template: CombatTemplateAction[],
+  slots: CombatTemplateSlotData[],
   roundNumber: number,
+  currentHp: number,
+  maxHp: number,
   currentStamina: number,
+  maxStamina: number,
   currentMana: number,
+  maxMana: number,
+  activeEffects: ActiveEffect[],
+  actorKey: CombatActor,
   actionDefinitions: Record<string, ActionDefinition> = BASE_ACTION_DEFINITIONS,
 ): ResolvedAction {
-  const index = (roundNumber - 1) % template.length;
-  const templateEntry = template[index];
-  const definition = actionDefinitions[templateEntry.actionId];
+  const index = (roundNumber - 1) % slots.length;
+  const slot = slots[index];
 
-  if (!definition) {
+  const conditionMet = evaluateCondition(
+    slot.condition, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, activeEffects, actorKey,
+  );
+
+  const actionId = conditionMet && slot.thenActionId ? slot.thenActionId : slot.actionId;
+  const definition = actionDefinitions[actionId];
+
+  // Resolve the other branch's action (for potion fallback in engine)
+  const altId = slot.condition && slot.thenActionId
+    ? (conditionMet ? slot.actionId : slot.thenActionId)
+    : undefined;
+  const altDef = altId ? actionDefinitions[altId] : undefined;
+  const alternateAction = altDef && canAfford(altDef, currentStamina, currentMana) ? altDef : undefined;
+
+  if (!definition || !canAfford(definition, currentStamina, currentMana)) {
     return { action: DEFEND_FALLBACK, wasExhausted: true };
   }
 
-  if (!canAfford(definition, currentStamina, currentMana)) {
-    return { action: DEFEND_FALLBACK, wasExhausted: true };
-  }
-
-  return { action: definition, wasExhausted: false };
+  return { action: definition, wasExhausted: false, alternateAction };
 }
 
 /**

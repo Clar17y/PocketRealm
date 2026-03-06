@@ -9,7 +9,7 @@ import {
   setActiveTemplate,
   updateTemplate,
   deleteTemplate,
-  validateTemplateActions,
+  validateTemplateSlots,
 } from './combatTemplateService';
 
 beforeEach(() => {
@@ -19,13 +19,28 @@ beforeEach(() => {
 const PLAYER_ID = 'player-1';
 const TEMPLATE_ID = 'template-1';
 
+function makeSlot(overrides: Record<string, any> = {}) {
+  return {
+    id: 'slot-1',
+    templateId: TEMPLATE_ID,
+    sortOrder: 0,
+    actionId: 'light_attack',
+    conditionType: null,
+    resource: null,
+    threshold: null,
+    effectName: null,
+    thenActionId: null,
+    ...overrides,
+  };
+}
+
 function makeRecord(overrides: Record<string, any> = {}) {
   return {
     id: TEMPLATE_ID,
     playerId: PLAYER_ID,
     name: 'My Template',
     isActive: false,
-    actions: [{ actionId: 'light_attack' }],
+    slots: [makeSlot()],
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
@@ -44,11 +59,24 @@ describe('createTemplate', () => {
         playerId: PLAYER_ID,
         name: 'My Template',
         isActive: true,
-        actions: [{ actionId: 'light_attack' }],
+        slots: {
+          create: [{
+            sortOrder: 0,
+            actionId: 'light_attack',
+            conditionType: null,
+            resource: null,
+            threshold: null,
+            effectName: null,
+            thenActionId: null,
+          }],
+        },
       },
+      include: { slots: { orderBy: { sortOrder: 'asc' } } },
     });
     expect(result.isActive).toBe(true);
     expect(result.id).toBe(TEMPLATE_ID);
+    expect(result.slots).toHaveLength(1);
+    expect(result.slots[0].actionId).toBe('light_attack');
   });
 
   it('creates second template as NOT active', async () => {
@@ -59,8 +87,35 @@ describe('createTemplate', () => {
 
     expect(mockPrisma.combatTemplate.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ isActive: false }),
+      include: { slots: { orderBy: { sortOrder: 'asc' } } },
     });
     expect(result.isActive).toBe(false);
+  });
+
+  it('creates template with conditional slot', async () => {
+    const slotWithCondition = makeSlot({
+      conditionType: 'resource_below',
+      resource: 'hp',
+      threshold: 30,
+      thenActionId: 'defend',
+    });
+    mockPrisma.combatTemplate.count.mockResolvedValue(0);
+    mockPrisma.combatTemplate.create.mockResolvedValue(
+      makeRecord({ isActive: true, slots: [slotWithCondition] }),
+    );
+
+    const result = await createTemplate(PLAYER_ID, 'Conditional', [{
+      actionId: 'light_attack',
+      condition: { type: 'resource_below', resource: 'hp', threshold: 30 },
+      thenActionId: 'defend',
+    }]);
+
+    expect(result.slots[0].condition).toEqual({
+      type: 'resource_below',
+      resource: 'hp',
+      threshold: 30,
+    });
+    expect(result.slots[0].thenActionId).toBe('defend');
   });
 
   it('rejects when over MAX_TEMPLATES limit', async () => {
@@ -93,6 +148,7 @@ describe('getTemplates', () => {
     expect(mockPrisma.combatTemplate.findMany).toHaveBeenCalledWith({
       where: { playerId: PLAYER_ID },
       orderBy: { createdAt: 'asc' },
+      include: { slots: { orderBy: { sortOrder: 'asc' } } },
     });
     expect(result).toHaveLength(2);
     expect(result[0].name).toBe('First');
@@ -101,13 +157,19 @@ describe('getTemplates', () => {
 });
 
 describe('getActiveTemplate', () => {
-  it('returns active template actions', async () => {
-    const actions = [{ actionId: 'heavy_attack' }, { actionId: 'defend' }];
-    mockPrisma.combatTemplate.findFirst.mockResolvedValue(makeRecord({ isActive: true, actions }));
+  it('returns active template slots', async () => {
+    const slots = [
+      makeSlot({ id: 'slot-1', sortOrder: 0, actionId: 'heavy_attack' }),
+      makeSlot({ id: 'slot-2', sortOrder: 1, actionId: 'defend' }),
+    ];
+    mockPrisma.combatTemplate.findFirst.mockResolvedValue(makeRecord({ isActive: true, slots }));
 
     const result = await getActiveTemplate(PLAYER_ID);
 
-    expect(result).toEqual(actions);
+    expect(result).toEqual([
+      { id: 'slot-1', sortOrder: 0, actionId: 'heavy_attack' },
+      { id: 'slot-2', sortOrder: 1, actionId: 'defend' },
+    ]);
   });
 
   it('returns default when no active template', async () => {
@@ -115,7 +177,11 @@ describe('getActiveTemplate', () => {
 
     const result = await getActiveTemplate(PLAYER_ID);
 
-    expect(result).toEqual([{ actionId: SKILL_POINT_CONSTANTS.DEFAULT_ACTION_ID }]);
+    expect(result).toEqual([{
+      id: 'default',
+      sortOrder: 0,
+      actionId: SKILL_POINT_CONSTANTS.DEFAULT_ACTION_ID,
+    }]);
   });
 });
 
@@ -143,21 +209,62 @@ describe('setActiveTemplate', () => {
 });
 
 describe('updateTemplate', () => {
-  it('updates name and/or actions', async () => {
-    mockPrisma.combatTemplate.findFirst.mockResolvedValue(makeRecord());
-    const updatedActions = [{ actionId: 'defend' }, { actionId: 'normal_attack' }];
-    mockPrisma.combatTemplate.update.mockResolvedValue(
-      makeRecord({ name: 'Renamed', actions: updatedActions }),
-    );
+  it('updates name only', async () => {
+    const record = makeRecord({ name: 'Original' });
+    mockPrisma.combatTemplate.findFirst.mockResolvedValueOnce(record);
+    mockPrisma.combatTemplate.update.mockResolvedValue(makeRecord({ name: 'Renamed' }));
+    mockPrisma.combatTemplate.findUniqueOrThrow.mockResolvedValue(makeRecord({ name: 'Renamed' }));
 
-    const result = await updateTemplate(PLAYER_ID, TEMPLATE_ID, 'Renamed', updatedActions);
+    const result = await updateTemplate(PLAYER_ID, TEMPLATE_ID, 'Renamed');
 
     expect(mockPrisma.combatTemplate.update).toHaveBeenCalledWith({
       where: { id: TEMPLATE_ID },
-      data: { name: 'Renamed', actions: updatedActions },
+      data: { name: 'Renamed' },
     });
     expect(result.name).toBe('Renamed');
-    expect(result.actions).toEqual(updatedActions);
+  });
+
+  it('replaces slots via delete + createMany', async () => {
+    const updatedSlots = [
+      makeSlot({ id: 'new-1', sortOrder: 0, actionId: 'defend' }),
+      makeSlot({ id: 'new-2', sortOrder: 1, actionId: 'normal_attack' }),
+    ];
+    mockPrisma.combatTemplate.findFirst.mockResolvedValueOnce(makeRecord());
+    mockPrisma.combatTemplate.findUniqueOrThrow.mockResolvedValue(makeRecord({ slots: updatedSlots }));
+
+    const result = await updateTemplate(PLAYER_ID, TEMPLATE_ID, undefined, [
+      { actionId: 'defend' },
+      { actionId: 'normal_attack' },
+    ]);
+
+    expect(mockPrisma.combatTemplateSlot.deleteMany).toHaveBeenCalledWith({
+      where: { templateId: TEMPLATE_ID },
+    });
+    expect(mockPrisma.combatTemplateSlot.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          templateId: TEMPLATE_ID,
+          sortOrder: 0,
+          actionId: 'defend',
+          conditionType: null,
+          resource: null,
+          threshold: null,
+          effectName: null,
+          thenActionId: null,
+        },
+        {
+          templateId: TEMPLATE_ID,
+          sortOrder: 1,
+          actionId: 'normal_attack',
+          conditionType: null,
+          resource: null,
+          threshold: null,
+          effectName: null,
+          thenActionId: null,
+        },
+      ],
+    });
+    expect(result.slots).toHaveLength(2);
   });
 
   it('rejects non-existent template', async () => {
@@ -189,23 +296,62 @@ describe('deleteTemplate', () => {
   });
 });
 
-describe('validateTemplateActions', () => {
+describe('validateTemplateSlots', () => {
   it('accepts base actions', () => {
     expect(() =>
-      validateTemplateActions([{ actionId: 'light_attack' }, { actionId: 'defend' }]),
+      validateTemplateSlots([{ actionId: 'light_attack' }, { actionId: 'defend' }]),
     ).not.toThrow();
   });
 
   it('rejects empty template', () => {
-    expect(() => validateTemplateActions([])).toThrow('Template must have at least one action');
+    expect(() => validateTemplateSlots([])).toThrow('Template must have at least one action');
   });
 
   it('accepts unlocked talent actions', () => {
     expect(() =>
-      validateTemplateActions(
+      validateTemplateSlots(
         [{ actionId: 'talent_fireball' }],
         ['talent_fireball'],
       ),
+    ).not.toThrow();
+  });
+
+  it('rejects unavailable actionId', () => {
+    expect(() =>
+      validateTemplateSlots([{ actionId: 'nonexistent' }]),
+    ).toThrow("Action 'nonexistent' is not available");
+  });
+
+  it('validates thenActionId against available actions', () => {
+    expect(() =>
+      validateTemplateSlots([{
+        actionId: 'light_attack',
+        condition: { type: 'resource_below', resource: 'hp', threshold: 50 },
+        thenActionId: 'unavailable_action',
+      }]),
+    ).toThrow("Action 'unavailable_action' is not available");
+  });
+
+  // Condition field consistency (resource/threshold, effectName, thenActionId pairing)
+  // is validated by Zod schemas in the route layer, not the service layer.
+
+  it('accepts valid conditional slot', () => {
+    expect(() =>
+      validateTemplateSlots([{
+        actionId: 'light_attack',
+        condition: { type: 'resource_below', resource: 'hp', threshold: 30 },
+        thenActionId: 'defend',
+      }]),
+    ).not.toThrow();
+  });
+
+  it('accepts valid buff condition slot', () => {
+    expect(() =>
+      validateTemplateSlots([{
+        actionId: 'normal_attack',
+        condition: { type: 'has_debuff', effectName: 'poison' },
+        thenActionId: 'heal_self',
+      }], ['heal_self']),
     ).not.toThrow();
   });
 });

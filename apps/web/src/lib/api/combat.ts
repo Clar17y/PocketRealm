@@ -1,4 +1,5 @@
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
+import type { CombatAction } from '@adventure/shared';
 
 // Shared event modifier types
 export interface EventModifierBadge {
@@ -140,7 +141,7 @@ export interface CombatLogEntryResponse {
   round: number;
   actor: 'combatantA' | 'combatantB';
   actorName?: string;
-  action: string;
+  action: CombatAction;
   message: string;
   roll?: number;
   damage?: number;
@@ -158,8 +159,13 @@ export interface CombatLogEntryResponse {
   critMultiplier?: number;
   combatantAHpAfter?: number;
   combatantBHpAfter?: number;
+  combatantAStaminaAfter?: number;
+  combatantBStaminaAfter?: number;
+  combatantAManaAfter?: number;
+  combatantBManaAfter?: number;
   spellName?: string;
   healAmount?: number;
+  healResourceType?: 'hp' | 'stamina' | 'mana';
   effectsApplied?: Array<{
     stat: string;
     modifier: number;
@@ -218,6 +224,8 @@ export interface CombatResultResponse {
   attackSkill: 'melee' | 'ranged' | 'magic';
   outcome: CombatOutcomeResponse;
   playerMaxHp: number;
+  playerStartStamina?: number;
+  playerStartMana?: number;
   mobMaxHp: number;
   log: CombatLogEntryResponse[];
   eventModifiers?: EventModifierBadge[];
@@ -246,7 +254,7 @@ export interface CombatResultResponse {
       } | null;
     } | null;
     durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
-    skillXp: SkillXpGrantResponse | null;
+    skillXpGrants: SkillXpGrantResponse[];
   };
 }
 
@@ -259,6 +267,8 @@ export interface CombatFightResult {
   outcome: string;
   playerMaxHp: number;
   playerStartHp: number;
+  playerStartStamina?: number;
+  playerStartMana?: number;
   mobMaxHp: number;
   log?: CombatLogEntryResponse[];
   combatLogId?: string;
@@ -267,7 +277,7 @@ export interface CombatFightResult {
   xp: number;
   loot: Array<{ itemTemplateId: string; quantity: number; rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'; itemName?: string | null }>;
   durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
-  skillXp: SkillXpGrantResponse | null;
+  skillXpGrants: SkillXpGrantResponse[];
 }
 
 export interface CombatResponse {
@@ -283,6 +293,8 @@ export interface CombatResponse {
     encounterSiteCleared?: boolean;
     outcome: CombatOutcomeResponse;
     playerMaxHp: number;
+    playerStartStamina?: number;
+    playerStartMana?: number;
     mobMaxHp: number;
     log?: CombatLogEntryResponse[];
     combatLogId?: string;
@@ -320,7 +332,7 @@ export interface CombatResponse {
       fullClearBonus?: boolean;
     } | null;
     durabilityLost: Array<{ itemId: string; amount: number; itemName?: string; newDurability?: number; maxDurability?: number; isBroken?: boolean; crossedWarningThreshold?: boolean }>;
-    skillXp: SkillXpGrantResponse | null;
+    skillXpGrants: SkillXpGrantResponse[];
   };
   pendingLootSessionId?: string | null;
   pendingLootItems?: Array<{ templateName: string; rarity: string; quantity: number }>;

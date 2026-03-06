@@ -207,7 +207,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
   const playerSettings = usePlayerSettings();
   const {
-    autoPotionThreshold, setAutoPotionThreshold,
     combatLogSpeedMs, setCombatLogSpeedMs,
     explorationSpeedMs, setExplorationSpeedMs,
     autoSkipKnownCombat,
@@ -221,7 +220,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
     handleSetAutoSkipKnownCombat,
-    handleSetAutoPotionThreshold,
     handleSetDefaultExploreTurns,
     handleSetQuickRestHealPercent,
     handleSetDefaultRefiningMax,
@@ -681,27 +679,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         xp: data.rewards.xp,
         loot: data.rewards.loot,
         siteCompletion: data.rewards.siteCompletion ?? null,
-        skillXp: data.rewards.skillXp
-          ? {
-              skillType: data.rewards.skillXp.skillType,
-              xpGained: data.rewards.skillXp.xpGained,
-              xpAfterEfficiency: data.rewards.skillXp.xpAfterEfficiency,
-              efficiency: data.rewards.skillXp.efficiency,
-              leveledUp: data.rewards.skillXp.leveledUp,
-              newLevel: data.rewards.skillXp.newLevel,
-              characterXpGain: data.rewards.skillXp.characterXpGain,
-              characterXpAfter: data.rewards.skillXp.characterXpAfter,
-              characterLevelBefore: data.rewards.skillXp.characterLevelBefore,
-              characterLevelAfter: data.rewards.skillXp.characterLevelAfter,
-              attributePointsAfter: data.rewards.skillXp.attributePointsAfter,
-              characterLeveledUp: data.rewards.skillXp.characterLeveledUp,
-            }
-          : null,
+        skillXpGrants: data.rewards.skillXpGrants ?? [],
       };
 
       // Build playback queue from fights[] or single-element queue for zone combat
       if (data.combat.fights && data.combat.fights.length > 0) {
-        const queue = data.combat.fights.map((fight) => {
+        const queue = data.combat.fights.map((fight, idx) => {
           const fightLogId = fight.combatLogId;
           return {
             room: fight.room,
@@ -712,6 +695,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
             outcome: fight.outcome,
             combatantAMaxHp: fight.playerMaxHp,
             playerStartHp: fight.playerStartHp,
+            playerStartStamina: fight.playerStartStamina,
+            playerStartMana: fight.playerStartMana,
             combatantBMaxHp: fight.mobMaxHp,
             log: fight.log?.length ? (fight.log as LastCombatLogEntry[]) : null,
             combatLogId: fightLogId,
@@ -720,22 +705,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
               xp: fight.xp,
               loot: fight.loot,
               siteCompletion: null as LastCombat['rewards']['siteCompletion'],
-              skillXp: fight.skillXp
-                ? {
-                    skillType: fight.skillXp.skillType,
-                    xpGained: fight.skillXp.xpGained,
-                    xpAfterEfficiency: fight.skillXp.xpAfterEfficiency,
-                    efficiency: fight.skillXp.efficiency,
-                    leveledUp: fight.skillXp.leveledUp,
-                    newLevel: fight.skillXp.newLevel,
-                    characterXpGain: fight.skillXp.characterXpGain,
-                    characterXpAfter: fight.skillXp.characterXpAfter,
-                    characterLevelBefore: fight.skillXp.characterLevelBefore,
-                    characterLevelAfter: fight.skillXp.characterLevelAfter,
-                    attributePointsAfter: fight.skillXp.attributePointsAfter,
-                    characterLeveledUp: fight.skillXp.characterLeveledUp,
-                  }
-                : null,
+              skillXpGrants: fight.skillXpGrants ?? [],
             } satisfies LastCombat['rewards'],
           };
         });
@@ -761,6 +731,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           outcome: data.combat.outcome,
           combatantAMaxHp: data.combat.playerMaxHp,
           playerStartHp: hpBefore,
+          playerStartStamina: data.combat.playerStartStamina,
+          playerStartMana: data.combat.playerStartMana,
           combatantBMaxHp: data.combat.mobMaxHp,
           log: data.combat.log?.length ? (data.combat.log as LastCombatLogEntry[]) : null,
           combatLogId,
@@ -800,10 +772,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         }
       }
 
-      const skillXp = data.rewards?.skillXp;
-      if (skillXp?.leveledUp) {
-        const skillName = skillXp.skillType.charAt(0).toUpperCase() + skillXp.skillType.slice(1);
-        pushLog({ timestamp: nowStamp(), type: 'success', message: `🎉 ${skillName} leveled up to ${skillXp.newLevel}!` });
+      for (const grant of data.rewards?.skillXpGrants ?? []) {
+        if (grant.leveledUp) {
+          const skillName = grant.skillType.charAt(0).toUpperCase() + grant.skillType.slice(1);
+          pushLog({ timestamp: nowStamp(), type: 'success', message: `🎉 ${skillName} leveled up to ${grant.newLevel}!` });
+        }
       }
 
       logDurabilityWarnings(data.rewards.durabilityLost);
@@ -1635,8 +1608,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     templates,
     handleLoadTemplates,
     pvpNotificationCount,
-    autoPotionThreshold,
-    setAutoPotionThreshold,
     combatLogSpeedMs,
     setCombatLogSpeedMs,
     explorationSpeedMs,
@@ -1714,7 +1685,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     loadAll,
     loadTurnsAndHp,
     loadPvpNotificationCount,
-    handleSetAutoPotionThreshold,
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
     handleSetAutoSkipKnownCombat,

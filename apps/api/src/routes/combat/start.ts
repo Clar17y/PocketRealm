@@ -53,8 +53,8 @@ import {
   checkPersistedMobReencounter,
   removePersistedMob,
 } from '../../services/persistedMobService';
-import { buildPotionPool, deductConsumedPotions } from '../../services/potionService';
-import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
+import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
+import { buildPerActionScaling, getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
@@ -174,6 +174,14 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   // Guild combat modifiers
   const guildMods = await getPlayerGuildModifiers(playerId);
 
+  // Per-action scaling for template combat engine
+  const perActionScaling = await buildPerActionScaling(playerId, {
+    equipmentStats,
+    attributes: progression.attributes,
+    weaponRequiredSkill: mainHandAttackSkill,
+    guildDamageMultiplier: guildMods.combatDamage,
+  });
+
   // Apply room carry HP
   let currentPlayerHp = hpState.currentHp;
   if (site.roomCarryHp !== null && site.roomCarryHp !== undefined) {
@@ -181,21 +189,16 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     await setHp(playerId, currentPlayerHp);
   }
 
-  // Build shared potion pool
-  const playerRecord = await prismaAny.player.findUnique({
-    where: { id: playerId },
-    select: { autoPotionThreshold: true },
-  });
-  const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
-  const potionPool = autoPotionThreshold > 0 ? await buildPotionPool(playerId, hpState.maxHp) : [];
-  const allPotionsConsumed: PotionConsumed[] = [];
-
   // Fetch player's active template, resource state, and unlocked actions
   const [playerTemplate, resourceState, skillPointState] = await Promise.all([
     getActiveTemplate(playerId),
     getResourceState(playerId),
     getSkillPoints(playerId),
   ]);
+
+  // Build shared potion pool when the template includes potion actions
+  const potionPool = templateHasPotionActions(playerTemplate) ? await buildPotionPool(playerId, hpState.maxHp) : [];
+  const allPotionsConsumed: PotionConsumed[] = [];
   const playerUnlockedActions = skillPointState.unlockedActions;
   let currentStamina = resourceState.stamina.current;
   let currentMana = resourceState.mana.current;
@@ -234,6 +237,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       const prefixedMob = applyMobPrefix(modifiedMob, roomMob.prefix ?? null);
 
       const playerStartHp = currentPlayerHp;
+      const playerStartStamina = currentStamina;
+      const playerStartMana = currentMana;
       const playerStats = buildPlayerCombatStats(
         currentPlayerHp,
         hpState.maxHp,
@@ -243,16 +248,16 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
       applyGuildCombatModifiers(playerStats, guildMods);
 
-      let combatOptions: CombatOptions | undefined;
-      if (autoPotionThreshold > 0 && potionPool.length > 0) {
-        combatOptions = { autoPotionThreshold, potions: [...potionPool] };
-      }
+      const combatOptions: CombatOptions | undefined = potionPool.length > 0
+        ? { potions: [...potionPool] }
+        : undefined;
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,
         stamina: currentStamina, maxStamina, staminaRegenPerRound,
         mana: currentMana, maxMana, manaRegenPerRound,
         unlockedActions: playerUnlockedActions,
+        perActionScaling,
       });
       const mobCombatant = mobToTemplateCombatant(prefixedMob);
 
@@ -274,7 +279,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
       // Per-mob post-combat rewards (only on victory)
       let mobLoot: LootDropWithName[] = [];
-      let mobXpGrant: GrantXpResult | null = null;
+      let mobXpGrants: GrantXpResult[] = [];
       const mobXpAwarded = combatResult.outcome === 'victory' ? Math.max(0, prefixedMob.xpReward) : 0;
       const mobDurabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
 
@@ -284,12 +289,14 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
           playerId,
           mob: prefixedMob,
           attackSkill,
+          damageByScalingStat: combatResult.damageByScalingStat,
+          resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           guildXpBoost: guildMods.xpBoost,
           includeGuildCredit: true,
         });
         mobLoot = await enrichLootWithNames(rewards.loot);
         allSiteOverflow.push(...rewards.overflow);
-        mobXpGrant = rewards.xpGrant;
+        mobXpGrants = rewards.xpGrants;
       }
 
       fightResults.push({
@@ -302,6 +309,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         outcome: combatResult.outcome,
         playerMaxHp: combatResult.combatantAMaxHp,
         playerStartHp,
+        playerStartStamina,
+        playerStartMana,
         mobMaxHp: combatResult.combatantBMaxHp,
         log: mapTemplateCombatLog(combatResult.log),
         playerHpRemaining: combatResult.combatantAHpRemaining,
@@ -309,7 +318,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         xp: mobXpAwarded,
         loot: mobLoot,
         durabilityLost: mobDurabilityLost,
-        skillXp: mobXpGrant,
+        skillXpGrants: mobXpGrants,
       });
 
       // Carry HP
@@ -469,12 +478,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     const achievementKeys = ['totalKills', 'totalUniqueMonsterKills', 'totalTurnsSpent', 'totalBestiaryCompleted'];
     if (siteCompletionRewards?.recipeUnlocked) achievementKeys.push('totalRecipesLearned');
 
-    // Check skill level achievements from last XP grant
-    const lastXpGrant = [...fightResults].reverse().find(f => f.skillXp)?.skillXp;
-    if (lastXpGrant?.newLevel) achievementKeys.push('highestSkillLevel');
-    if (lastXpGrant?.characterLevelAfter && lastXpGrant.characterLevelAfter > (lastXpGrant.characterLevelBefore ?? 0)) {
-      achievementKeys.push('highestCharacterLevel');
-    }
+    // Check skill level achievements from last XP grants
+    const lastXpGrants = [...fightResults].reverse().find(f => f.skillXpGrants.length > 0)?.skillXpGrants ?? [];
+    if (lastXpGrants.some(g => g.newLevel > (g.characterLevelBefore ?? 0))) achievementKeys.push('highestSkillLevel');
+    if (lastXpGrants.some(g => g.characterLeveledUp)) achievementKeys.push('highestCharacterLevel');
 
     // Resolve mob family
     const firstMobTemplateId = fightResults[0]?.mobTemplateId;
@@ -513,7 +520,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     }
   }
   const aggregatedLoot = [...lootMap.values()];
-  const lastVictoryXpGrant = [...fightResults].reverse().find(f => f.skillXp)?.skillXp ?? null;
+  const lastVictoryXpGrants = [...fightResults].reverse().find(f => f.skillXpGrants.length > 0)?.skillXpGrants ?? [];
 
   const siteCompletionWithNames = siteCompletionRewards
     ? {
@@ -559,9 +566,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         loot: aggregatedLoot,
         siteCompletion: siteCompletionWithNames,
         durabilityLost: aggregatedDurabilityLost,
-        skillXp: lastVictoryXpGrant
-          ? serializeXpGrant(lastVictoryXpGrant)
-          : null,
+        skillXpGrants: lastVictoryXpGrants.map(serializeXpGrant),
       },
       eventModifiers: siteMobBadges,
     },
@@ -598,7 +603,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
             baseXp: fight.xp,
             loot: fight.loot,
             durabilityLost: fight.durabilityLost,
-            skillXp: fight.skillXp ? serializeXpGrant(fight.skillXp) : null,
+            skillXpGrants: fight.skillXpGrants.map(serializeXpGrant),
           },
           eventModifiers: siteMobBadges,
         },
@@ -655,6 +660,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         outcome: f.outcome,
         playerMaxHp: f.playerMaxHp,
         playerStartHp: f.playerStartHp,
+        playerStartStamina: f.playerStartStamina,
+        playerStartMana: f.playerStartMana,
         mobMaxHp: f.mobMaxHp,
         ...(fightLogIds[i] ? { combatLogId: fightLogIds[i] } : { log: f.log }),
         playerHpRemaining: f.playerHpRemaining,
@@ -662,9 +669,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         xp: f.xp,
         loot: f.loot,
         durabilityLost: f.durabilityLost,
-        skillXp: f.skillXp
-          ? serializeXpGrant(f.skillXp)
-          : null,
+        skillXpGrants: f.skillXpGrants.map(serializeXpGrant),
       })),
     },
     rewards: {
@@ -672,9 +677,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       loot: aggregatedLoot,
       siteCompletion: siteCompletionWithNames,
       durabilityLost: aggregatedDurabilityLost,
-      skillXp: lastVictoryXpGrant
-        ? serializeXpGrant(lastVictoryXpGrant)
-        : null,
+      skillXpGrants: lastVictoryXpGrants.map(serializeXpGrant),
     },
     pendingLootSessionId: sitePendingLootSessionId,
     explorationProgress: {
@@ -779,6 +782,18 @@ export function registerStartRoutes(router: Router): void {
       ]);
 
       const equipmentStats = await getEquipmentStats(playerId);
+
+      // Guild combat modifiers
+      const guildMods = await getPlayerGuildModifiers(playerId);
+
+      // Per-action scaling for template combat engine
+      const perActionScaling = await buildPerActionScaling(playerId, {
+        equipmentStats,
+        attributes: progression.attributes,
+        weaponRequiredSkill: mainHandAttackSkill,
+        guildDamageMultiplier: guildMods.combatDamage,
+      });
+
       const playerStats = buildPlayerCombatStats(
         hpState.currentHp,
         hpState.maxHp,
@@ -790,8 +805,6 @@ export function registerStartRoutes(router: Router): void {
         equipmentStats
       );
 
-      // Guild combat modifiers
-      const guildMods = await getPlayerGuildModifiers(playerId);
       applyGuildCombatModifiers(playerStats, guildMods);
 
       const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
@@ -819,18 +832,6 @@ export function registerStartRoutes(router: Router): void {
         mobHpOverride = { currentHp: persisted.currentHp, maxHp: persisted.maxHp };
       }
 
-      // Auto-potion
-      const playerRecord = await prismaAny.player.findUnique({
-        where: { id: playerId },
-        select: { autoPotionThreshold: true },
-      });
-      const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
-      let combatOptions: CombatOptions | undefined;
-      if (autoPotionThreshold > 0) {
-        const potions = await buildPotionPool(playerId, hpState.maxHp);
-        combatOptions = { autoPotionThreshold, potions };
-      }
-
       const finalMob = mobHpOverride ? { ...prefixedMob, ...mobHpOverride } : prefixedMob;
 
       // Fetch player's active template, resource state, and unlocked actions
@@ -840,11 +841,17 @@ export function registerStartRoutes(router: Router): void {
         getSkillPoints(playerId),
       ]);
 
+      // Build potion pool when the template includes potion actions
+      const combatOptions: CombatOptions | undefined = templateHasPotionActions(playerTemplate)
+        ? { potions: await buildPotionPool(playerId, hpState.maxHp) }
+        : undefined;
+
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,
         stamina: resourceState.stamina.current, maxStamina: resourceState.stamina.max, staminaRegenPerRound: resourceState.stamina.regenPerRound,
         mana: resourceState.mana.current, maxMana: resourceState.mana.max, manaRegenPerRound: resourceState.mana.regenPerRound,
         unlockedActions: zoneCombatSkillPoints.unlockedActions,
+        perActionScaling,
       });
       const mobCombatant = mobToTemplateCombatant(finalMob);
 
@@ -858,7 +865,7 @@ export function registerStartRoutes(router: Router): void {
 
       let loot: LootDrop[] = [];
       let pendingLootSessionId: string | null = null;
-      let xpGrant = null as null | GrantXpResult;
+      let xpGrants: GrantXpResult[] = [];
       const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
       let fleeResult = null as null | ReturnType<typeof calculateFleeResult>;
       let respawnedTo: { townId: string; townName: string } | null = null;
@@ -877,13 +884,15 @@ export function registerStartRoutes(router: Router): void {
           playerId,
           mob: prefixedMob,
           attackSkill,
+          damageByScalingStat: combatResult.damageByScalingStat,
+          resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           guildXpBoost: guildMods.xpBoost,
           includeGuildCredit: true,
           includeBestiary: false, // zone combat has its own bestiary logic (upserts on all outcomes)
         });
         loot = rewards.loot;
         pendingLootSessionId = rewards.pendingLootSessionId;
-        xpGrant = rewards.xpGrant;
+        xpGrants = rewards.xpGrants;
       } else if (combatResult.outcome === 'defeat') {
         await setAllResources(
           playerId,
@@ -935,8 +944,8 @@ export function registerStartRoutes(router: Router): void {
         if (zoneMobFamilyId) familyIds.push(zoneMobFamilyId);
 
         const achievementKeys = ['totalKills', 'totalUniqueMonsterKills', 'totalTurnsSpent', 'totalBestiaryCompleted'];
-        if (xpGrant?.newLevel) achievementKeys.push('highestSkillLevel');
-        if (xpGrant?.characterLevelAfter && xpGrant.characterLevelAfter > (xpGrant.characterLevelBefore ?? 0)) achievementKeys.push('highestCharacterLevel');
+        if (xpGrants.some(g => g.newLevel > (g.characterLevelBefore ?? 0))) achievementKeys.push('highestSkillLevel');
+        if (xpGrants.some(g => g.characterLeveledUp)) achievementKeys.push('highestCharacterLevel');
 
         await trackAchievements(playerId, {}, { statKeys: achievementKeys, familyIds });
       } else {
@@ -974,9 +983,7 @@ export function registerStartRoutes(router: Router): void {
             loot: lootWithNames,
             siteCompletion: null,
             durabilityLost,
-            skillXp: xpGrant
-              ? serializeXpGrant(xpGrant)
-              : null,
+            skillXpGrants: xpGrants.map(serializeXpGrant),
           },
           eventModifiers: zoneMobBadges,
         },
@@ -996,6 +1003,8 @@ export function registerStartRoutes(router: Router): void {
           attackSkill,
           outcome: combatResult.outcome,
           playerMaxHp: combatResult.combatantAMaxHp,
+          playerStartStamina: resourceState.stamina.current,
+          playerStartMana: resourceState.mana.current,
           mobMaxHp: combatResult.combatantBMaxHp,
           log: mapTemplateCombatLog(combatResult.log),
           playerHpRemaining: combatResult.combatantAHpRemaining,
@@ -1016,9 +1025,7 @@ export function registerStartRoutes(router: Router): void {
           loot: lootWithNames,
           siteCompletion: null,
           durabilityLost,
-          skillXp: xpGrant
-            ? serializeXpGrant(xpGrant)
-            : null,
+          skillXpGrants: xpGrants.map(serializeXpGrant),
         },
         pendingLootSessionId,
         explorationProgress: {

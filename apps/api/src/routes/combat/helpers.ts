@@ -237,6 +237,8 @@ export interface FightResult {
   outcome: string;
   playerMaxHp: number;
   playerStartHp: number;
+  playerStartStamina: number;
+  playerStartMana: number;
   mobMaxHp: number;
   log: unknown[];
   playerHpRemaining: number;
@@ -244,5 +246,5 @@ export interface FightResult {
   xp: number;
   loot: LootDropWithName[];
   durabilityLost: Awaited<ReturnType<typeof degradeEquippedDurability>>;
-  skillXp: Awaited<ReturnType<typeof grantSkillXp>> | null;
+  skillXpGrants: Awaited<ReturnType<typeof grantSkillXp>>[];
 }

@@ -59,7 +59,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
         getTemplates(),
       ]);
       if (activeRes.data) {
-        setActiveTemplateActionCount(activeRes.data.actions.length);
+        setActiveTemplateActionCount(activeRes.data.slots.length);
       }
       if (templatesRes.data) {
         const active = templatesRes.data.templates.find((t) => t.isActive);

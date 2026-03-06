@@ -24,14 +24,14 @@ import { buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatL
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
-import { buildPotionPool, deductConsumedPotions } from '../services/potionService';
+import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../services/potionService';
 import {
   ensureStarterDiscoveries,
   getDiscoveredZoneIds,
   discoverZonesFromTown,
   respawnToHomeTown,
 } from '../services/zoneDiscoveryService';
-import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../services/combatStatsService';
+import { getMainHandAttackSkill, getSkillLevel, buildPerActionScaling, type AttackSkill } from '../services/combatStatsService';
 import { getActiveTemplate } from '../services/combatTemplateService';
 import { getResourceState, setAllResources } from '../services/resourceService';
 import { getSkillPoints } from '../services/skillPointService';
@@ -303,15 +303,6 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     const ambushes = simulateTravelAmbushes(travelCost);
 
     if (ambushes.length > 0) {
-      // Auto-potion setup
-      const playerRecord = await prismaAny.player.findUnique({
-        where: { id: playerId },
-        select: { autoPotionThreshold: true },
-      });
-      const autoPotionThreshold = playerRecord?.autoPotionThreshold ?? 0;
-      const potionPool = autoPotionThreshold > 0
-        ? await buildPotionPool(playerId, hpState.maxHp)
-        : [];
       const allPotionsConsumed: PotionConsumed[] = [];
 
       // Get player combat stats (same pattern as combat route)
@@ -324,6 +315,13 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         getActiveEventsForZone(currentZoneId),
         getActiveWorldWideEvents(),
       ]);
+
+      const perActionScaling = await buildPerActionScaling(playerId, {
+        equipmentStats,
+        attributes: progression.attributes,
+        weaponRequiredSkill: mainHandAttackSkill,
+        guildDamageMultiplier: guildMods.combatDamage,
+      });
 
       // Get mob pool from current zone, filtered by exploration tier
       const mobTemplates = await prisma.mobTemplate.findMany({ where: { zoneId: currentZoneId } });
@@ -345,6 +343,9 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         getSkillPoints(playerId),
       ]);
       const travelUnlockedActions = travelSkillPoints.unlockedActions;
+      const potionPool = templateHasPotionActions(playerTemplate)
+        ? await buildPotionPool(playerId, hpState.maxHp)
+        : [];
       let currentStamina = resourceState.stamina.current;
       let currentMana = resourceState.mana.current;
       const maxStamina = resourceState.stamina.max;
@@ -395,12 +396,12 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           maxMana,
           manaRegenPerRound,
           unlockedActions: travelUnlockedActions,
+          perActionScaling,
         });
         const combatantB = mobToTemplateCombatant(prefixedMob);
-        let combatOptions: CombatOptions | undefined;
-        if (autoPotionThreshold > 0 && potionPool.length > 0) {
-          combatOptions = { autoPotionThreshold, potions: [...potionPool] };
-        }
+        const combatOptions: CombatOptions | undefined = potionPool.length > 0
+          ? { potions: [...potionPool] }
+          : undefined;
         const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
         currentHp = combatResult.combatantAHpRemaining;
         currentStamina = combatResult.combatantAStaminaRemaining;
@@ -429,10 +430,12 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
             playerId,
             mob: prefixedMob,
             attackSkill,
+            damageByScalingStat: combatResult.damageByScalingStat,
+            resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           });
           const loot = rewards.loot;
           allTravelOverflow.push(...rewards.overflow);
-          const xpGain = rewards.xpGrant.xpResult.xpAfterEfficiency;
+          const xpGain = rewards.xpGrants.reduce((sum, g) => sum + g.xpResult.xpAfterEfficiency, 0);
           await setHp(playerId, currentHp);
 
           // Track ambush kill for achievement checks
@@ -458,7 +461,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                 baseXp: prefixedMob.xpReward,
                 loot,
                 durabilityLost,
-                skillXp: serializeXpGrant(rewards.xpGrant),
+                skillXpGrants: rewards.xpGrants.map(serializeXpGrant),
               },
               eventModifiers: travelMobBadges,
             }),
@@ -505,7 +508,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                 encounterSiteId: null,
                 attackSkill,
                 combatResult,
-                rewards: { xp: 0, baseXp: 0, loot: [], durabilityLost, skillXp: null },
+                rewards: { xp: 0, baseXp: 0, loot: [], durabilityLost, skillXpGrants: [] },
                 eventModifiers: travelMobBadges,
               }),
             });
@@ -566,7 +569,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
                 encounterSiteId: null,
                 attackSkill,
                 combatResult,
-                rewards: { xp: 0, baseXp: 0, loot: [], durabilityLost, skillXp: null },
+                rewards: { xp: 0, baseXp: 0, loot: [], durabilityLost, skillXpGrants: [] },
                 eventModifiers: travelMobBadges,
               }),
             });

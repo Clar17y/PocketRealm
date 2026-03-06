@@ -88,13 +88,26 @@ vi.mock('../../services/persistedMobService', () => ({
 vi.mock('../../services/potionService', () => ({
   buildPotionPool: vi.fn().mockResolvedValue([]),
   deductConsumedPotions: vi.fn(),
+  templateHasPotionActions: vi.fn().mockReturnValue(false),
 }));
 vi.mock('../../services/combatStatsService', () => ({
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
   getSkillLevel: vi.fn().mockResolvedValue(1),
+  buildPerActionScaling: vi.fn().mockResolvedValue({
+    skillLevels: { melee: 1, ranged: 1, magic: 1 },
+    attributes: { strength: 0, dexterity: 0, intelligence: 0 },
+    weaponPower: { attack: 5, rangedPower: 0, magicPower: 0 },
+    equipmentAccuracy: 0,
+    weaponRequiredSkill: 'melee',
+  }),
+}));
+vi.mock('../../services/guildUpgradeService', () => ({
+  getPlayerGuildModifiers: vi.fn().mockResolvedValue({
+    combatDamage: 0, defenseBoost: 0, xpBoost: 0, travelCostReduction: 0,
+  }),
 }));
 vi.mock('../../services/combatTemplateService', () => ({
-  getActiveTemplate: vi.fn().mockResolvedValue([]),
+  getActiveTemplate: vi.fn().mockResolvedValue([{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }]),
 }));
 vi.mock('../../services/skillPointService', () => ({
   getSkillPoints: vi.fn().mockResolvedValue({
@@ -167,6 +180,8 @@ vi.mock('@adventure/game-engine', () => ({
     combatantBManaRemaining: 50,
     log: [],
     potionsConsumed: [],
+    damageByScalingStat: { melee: 20, ranged: 0, magic: 0 },
+    resourceCostByScalingStat: { melee: 10, ranged: 0, magic: 0 },
   })),
   getScaledZoneExitChance: vi.fn(() => 0.01),
   selectTierWithBleedthrough: vi.fn(() => 1),
@@ -222,7 +237,7 @@ function setupZoneAndMobs(tutorialStep: number) {
   mockPrisma.resourceNode.findMany.mockResolvedValue([]);
   mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
   mockPrisma.zoneConnection.findMany.mockResolvedValue([]);
-  mockPrisma.player.findUnique.mockResolvedValue({ autoPotionThreshold: 0, tutorialStep });
+  mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep });
   mockPrisma.playerBestiary.upsert.mockResolvedValue({});
   mockPrisma.activityLog.create.mockResolvedValue({ id: 'log-1' });
 }

@@ -202,9 +202,6 @@ export default function GamePage() {
     handleEquipItem,
     handleUnequipSlot,
     handleAllocateAttribute,
-    handleSetAutoPotionThreshold,
-    autoPotionThreshold,
-    setAutoPotionThreshold,
     combatLogSpeedMs,
     setCombatLogSpeedMs,
     handleSetCombatLogSpeed,
@@ -686,6 +683,10 @@ export default function GamePage() {
             guildTaxRate={guildTaxRate}
             undiscoveredZones={undiscoveredZones}
             combatLogPrefetch={combatLogPrefetch}
+            playerStartStamina={staminaState.current}
+            playerStartMana={manaState.current}
+            playerMaxStamina={staminaState.max}
+            playerMaxMana={manaState.max}
           />
         );
       case 'bestiary':
@@ -972,9 +973,6 @@ export default function GamePage() {
             onCombatLogSpeedCommit={handleSetCombatLogSpeed}
             autoSkipKnownCombat={autoSkipKnownCombat}
             onAutoSkipKnownCombatChange={handleSetAutoSkipKnownCombat}
-            autoPotionThreshold={autoPotionThreshold}
-            onAutoPotionThresholdChange={setAutoPotionThreshold}
-            onAutoPotionThresholdCommit={handleSetAutoPotionThreshold}
             lowHpWarning={lowHpWarning}
             onLowHpWarningChange={handleSetLowHpWarning}
             explorationSpeedMs={explorationSpeedMs}

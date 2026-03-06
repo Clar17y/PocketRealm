@@ -42,6 +42,14 @@ export interface ActiveEffect {
   stat: string;
   modifier: number;
   remainingRounds: number;
+  /** Snapshotted flat DOT damage per round (resolved from flat + % at application time) */
+  resolvedDamagePerRound?: number;
+  /** Which defence reduces DOT ticks */
+  dotDamageType?: 'physical' | 'magic';
+  /** Snapshotted HOT healing per round */
+  resolvedHealPerRound?: number;
+  /** Which combat skill applied this effect (for XP attribution of DOT ticks) */
+  sourceScalingStat?: 'melee' | 'ranged' | 'magic';
 }
 
 export interface CombatLogEntry {
@@ -69,6 +77,8 @@ export interface CombatLogEntry {
   combatantBHpAfter?: number;
   spellName?: string;
   healAmount?: number;
+  healResourceType?: 'hp' | 'stamina' | 'mana';
+  leechHeal?: number;
   effectsApplied?: Array<{
     stat: string;
     modifier: number;
@@ -81,7 +91,7 @@ export interface CombatLogEntry {
   }>;
 }
 
-export type CombatAction = 'attack' | 'spell' | 'defend' | 'flee' | 'potion';
+export type CombatAction = 'attack' | 'spell' | 'defend' | 'counter' | 'ward' | 'flee' | 'potion' | 'heal' | 'regen';
 
 export type CombatOutcome = 'victory' | 'defeat' | 'fled' | 'draw';
 
@@ -111,7 +121,6 @@ export interface CombatPotion {
 }
 
 export interface CombatOptions {
-  autoPotionThreshold?: number;
   potions?: CombatPotion[];
 }
 

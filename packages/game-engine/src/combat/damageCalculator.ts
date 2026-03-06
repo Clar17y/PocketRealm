@@ -1,4 +1,4 @@
-import { CHARACTER_CONSTANTS, COMBAT_CONSTANTS, CombatantStats, MobTemplate, type PlayerAttributes } from '@adventure/shared';
+import { CHARACTER_CONSTANTS, COMBAT_CONSTANTS, CombatantStats, MobTemplate, type PlayerAttributes, type ScalingStat, type PerActionScaling } from '@adventure/shared';
 import { clamp } from '../utils/math';
 
 function finiteOrFallback(value: number, fallback: number): number {
@@ -114,6 +114,66 @@ export function mobToCombatantStats(
     damageMax: mob.damageMax,
     speed: 0,
     damageType: mob.damageType,
+  };
+}
+
+type ConcreteScalingStat = 'melee' | 'ranged' | 'magic';
+
+/**
+ * Resolve a ScalingStat to a concrete combat skill.
+ * 'weapon' defers to the equipped weapon's required skill, or falls back
+ * to the player's highest combat skill (ties: melee > ranged > magic).
+ */
+export function resolveScalingStat(
+  scalingStat: ScalingStat,
+  weaponRequiredSkill: 'melee' | 'ranged' | 'magic' | null,
+  skillLevels: { melee: number; ranged: number; magic: number }
+): ConcreteScalingStat {
+  if (scalingStat === 'melee' || scalingStat === 'ranged' || scalingStat === 'magic') {
+    return scalingStat;
+  }
+  // scalingStat === 'weapon'
+  if (weaponRequiredSkill) return weaponRequiredSkill;
+
+  // No weapon equipped -- pick highest skill (priority: melee > ranged > magic)
+  const { melee, ranged, magic } = skillLevels;
+  if (melee >= ranged && melee >= magic) return 'melee';
+  if (ranged >= magic) return 'ranged';
+  return 'magic';
+}
+
+/**
+ * Compute per-action damage/accuracy stats from a ScalingStat and player scaling data.
+ */
+export function resolveActionDamageStats(
+  scalingStat: ScalingStat,
+  scaling: PerActionScaling
+): { damageMin: number; damageMax: number; accuracy: number } {
+  const resolved = resolveScalingStat(scalingStat, scaling.weaponRequiredSkill, scaling.skillLevels);
+
+  const skillLevel = scaling.skillLevels[resolved];
+
+  const weaponPower =
+    resolved === 'melee'  ? scaling.weaponPower.attack :
+    resolved === 'ranged' ? scaling.weaponPower.rangedPower :
+                            scaling.weaponPower.magicPower;
+
+  const attributeBonus =
+    resolved === 'melee'  ? scaling.attributes.strength * CHARACTER_CONSTANTS.MELEE_DAMAGE_PER_STRENGTH :
+    resolved === 'ranged' ? scaling.attributes.dexterity * CHARACTER_CONSTANTS.RANGED_DAMAGE_PER_DEXTERITY :
+                            scaling.attributes.intelligence * CHARACTER_CONSTANTS.MAGIC_DAMAGE_PER_INTELLIGENCE;
+
+  const totalAttack = skillLevel + weaponPower + attributeBonus;
+
+  const accuracyAttrBonus =
+    resolved === 'melee'  ? scaling.attributes.strength * CHARACTER_CONSTANTS.ACCURACY_PER_STRENGTH :
+    resolved === 'ranged' ? scaling.attributes.dexterity * CHARACTER_CONSTANTS.ACCURACY_PER_DEXTERITY :
+                            scaling.attributes.intelligence * CHARACTER_CONSTANTS.ACCURACY_PER_INTELLIGENCE;
+
+  return {
+    damageMin: 1 + Math.floor(totalAttack / 5),
+    damageMax: 5 + Math.floor(totalAttack / 2),
+    accuracy: Math.floor(skillLevel / 2) + scaling.equipmentAccuracy + accuracyAttrBonus,
   };
 }
 

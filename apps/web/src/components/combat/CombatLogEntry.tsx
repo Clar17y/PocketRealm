@@ -83,7 +83,7 @@ export function CombatLogEntry({
 }: CombatLogEntryProps) {
   const [expanded, setExpanded] = useState(false);
   const icon = getActionIcon(entry);
-  const hasDetails = entry.attackModifier !== undefined || entry.rawDamage !== undefined || entry.spellName !== undefined;
+  const hasDetails = entry.accuracyModifier !== undefined || entry.rawDamage !== undefined || entry.spellName !== undefined;
   const hitOutcome = resolveHitOutcome(entry);
 
   const isPlayerAction = entry.actor === 'combatantA';
@@ -126,7 +126,9 @@ export function CombatLogEntry({
                 <span className={`font-pixel text-[16px] ${entry.isCritical ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-red)]'}`}>{entry.damage} dmg</span>
               )}
               {entry.healAmount !== undefined && entry.healAmount > 0 && (
-                <span className="text-[var(--rpg-green-light)] font-pixel text-[16px]">+{entry.healAmount} HP</span>
+                <span className={`font-pixel text-[16px] ${entry.healResourceType === 'stamina' ? 'text-teal-400' : entry.healResourceType === 'mana' ? 'text-[var(--rpg-blue-light)]' : 'text-[var(--rpg-green-light)]'}`}>
+                  +{entry.healAmount} {entry.healResourceType === 'stamina' ? 'STA' : entry.healResourceType === 'mana' ? 'MP' : 'HP'}
+                </span>
               )}
               {entry.effectsApplied && entry.effectsApplied.length > 0 && !entry.damage && !entry.healAmount && (
                 <span className="text-[var(--rpg-blue-light)] text-xs">
@@ -225,7 +227,7 @@ export function CombatLogEntry({
             </div>
           )}
           {entry.healAmount !== undefined && entry.healAmount > 0 && (
-            <div>Heals {entry.healAmount} HP</div>
+            <div>Restores {entry.healAmount} {entry.healResourceType === 'stamina' ? 'Stamina' : entry.healResourceType === 'mana' ? 'Mana' : 'HP'}</div>
           )}
           {(entry.staminaCost !== undefined || entry.manaCost !== undefined) && (
             <div>

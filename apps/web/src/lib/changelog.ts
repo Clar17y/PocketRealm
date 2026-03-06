@@ -7,11 +7,25 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: '0.25',
-    date: '2026-03-04',
+    version: '0.27',
+    date: '2026-03-06',
     title: 'Visual Overhaul',
     summary:
       'The entire UI has been refreshed with a fantasy RPG aesthetic. Almendra calligraphic font for headings and entity names, Silkscreen pixel font for game numbers, and Crimson Text for body text. Warmer torchlit colour palette replaces the old cool greys. Cards now have layered shadows, parchment texture, and optional gold framing with corner ornaments. A subtle noise grain and vignette add atmosphere. Stat bars shimmer and glow — HP bars shift from green to amber to red as health drops. Screen transitions fade and slide in, list items stagger on reveal, and combat victories pulse gold. Uncommon and rarer loot drops now trigger an animated reveal popup. The header sports an ornamental gold border and the bottom nav glows under the active tab. All animations respect prefers-reduced-motion.',
+  },
+  {
+    version: '0.26',
+    date: '2026-03-05',
+    title: 'Per-Action Scaling & XP Splitting',
+    summary:
+      'Combat actions now scale independently — Power Strike always uses your melee skill and Fire Bolt always uses magic, regardless of which weapon you hold. Equip a staff and use melee talents? They\'ll hit based on your melee level and strength, not your magic. Combat XP is now split proportionally across the skills you actually use: a fight mixing Power Strike and Fire Bolt awards both melee and magic XP based on how much damage each dealt. 8 new cross-type talent actions let you blend combat styles — Flame Sword deals magic damage with melee scaling, Venomous Strike poisons with a melee hit, and Life Drain heals you while casting. DOT and HOT effects tick between rounds with snapshotted damage. Equipment accuracy is universal and boosts all action types equally.',
+  },
+  {
+    version: '0.25',
+    date: '2026-03-05',
+    title: 'Conditional Templates & Combat Playback Polish',
+    summary:
+      'Combat templates now support if/then conditions — set slots to trigger different actions based on HP, stamina, mana, or active buffs/debuffs. Resource bars during combat playback are now perfectly synced: stamina and mana update exactly when each action fires, not a round late. A visible regen phase between rounds shows bars ticking up so resource costs make sense. Bars start at your actual stamina/mana instead of flashing from full. Potion slots try the other template branch before falling back to Defend when potions run out. The combat log miss dropdown (showing roll, accuracy, dodge threshold) is back — it was broken by a stale field name.',
   },
   {
     version: '0.24',
