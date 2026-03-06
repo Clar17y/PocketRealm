@@ -64,12 +64,11 @@ describe('blockService', () => {
       });
     });
 
-    it('creates block, removes friendship, and declines pending requests in transaction', async () => {
+    it('creates block, removes friendship, and deletes pending requests in transaction', async () => {
       mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       mockPrisma.playerBlock.findUnique.mockResolvedValue(null);
       mockPrisma.playerBlock.create.mockResolvedValue({});
       mockPrisma.friendship.deleteMany.mockResolvedValue({ count: 1 });
-      mockPrisma.friendship.updateMany.mockResolvedValue({ count: 0 });
 
       await blockPlayer(PLAYER_ID, TARGET_ID);
 
@@ -77,6 +76,7 @@ describe('blockService', () => {
       expect(mockPrisma.playerBlock.create).toHaveBeenCalledWith({
         data: { blockerId: PLAYER_ID, blockedId: TARGET_ID },
       });
+      // Removes accepted friendships
       expect(mockPrisma.friendship.deleteMany).toHaveBeenCalledWith({
         where: {
           status: 'accepted',
@@ -86,14 +86,17 @@ describe('blockService', () => {
           ],
         },
       });
-      expect(mockPrisma.friendship.updateMany).toHaveBeenCalledWith({
+      // Deletes pending requests in both directions (no orphan "declined" rows)
+      expect(mockPrisma.friendship.deleteMany).toHaveBeenCalledWith({
         where: {
-          senderId: TARGET_ID,
-          receiverId: PLAYER_ID,
           status: 'pending',
+          OR: [
+            { senderId: TARGET_ID, receiverId: PLAYER_ID },
+            { senderId: PLAYER_ID, receiverId: TARGET_ID },
+          ],
         },
-        data: { status: 'declined' },
       });
+      expect(mockPrisma.friendship.updateMany).not.toHaveBeenCalled();
     });
   });
 

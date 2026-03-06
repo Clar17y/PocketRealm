@@ -98,7 +98,7 @@ export async function sparFriend(friendshipId: string) {
 // ---------------------------------------------------------------------------
 
 export async function blockPlayer(targetId: string) {
-  return fetchApi<{ blockId: string }>('/api/v1/friends/block', {
+  return fetchApi<{ success: boolean }>('/api/v1/friends/block', {
     method: 'POST',
     body: JSON.stringify({ targetId }),
   });
@@ -111,7 +111,7 @@ export async function unblockPlayer(blockId: string) {
 }
 
 export async function getBlockList() {
-  return fetchApi<{ blocked: BlockedPlayer[] }>('/api/v1/friends/block');
+  return fetchApi<{ blocks: BlockedPlayer[] }>('/api/v1/friends/block');
 }
 
 // ---------------------------------------------------------------------------
@@ -126,17 +126,15 @@ export async function sendFriendMail(recipientId: string, subject: string, body:
 }
 
 export async function getFriendMailInbox(page = 1) {
-  return fetchApi<{
-    mail: FriendMailEntry[];
-    pagination: { page: number; pageSize: number; total: number; totalPages: number };
-  }>(`/api/v1/friends/mail/inbox?page=${page}`);
+  return fetchApi<{ mails: FriendMailEntry[]; total: number }>(
+    `/api/v1/friends/mail/inbox?page=${page}`,
+  );
 }
 
 export async function getFriendMailSent(page = 1) {
-  return fetchApi<{
-    mail: FriendMailEntry[];
-    pagination: { page: number; pageSize: number; total: number; totalPages: number };
-  }>(`/api/v1/friends/mail/sent?page=${page}`);
+  return fetchApi<{ mails: FriendMailEntry[]; total: number }>(
+    `/api/v1/friends/mail/sent?page=${page}`,
+  );
 }
 
 export async function getFriendMailUnreadCount() {

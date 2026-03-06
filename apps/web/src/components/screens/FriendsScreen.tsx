@@ -141,7 +141,7 @@ export function FriendsScreen({
     try {
       const res = await getBlockList();
       if (res.error) return;
-      setBlocks(res.data?.blocked ?? []);
+      setBlocks(res.data?.blocks ?? []);
     } catch {
       // silent
     }

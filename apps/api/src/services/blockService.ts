@@ -47,14 +47,15 @@ export async function blockPlayer(blockerId: string, targetId: string): Promise<
       },
     });
 
-    // Decline any pending requests from the blocked player
-    await tx.friendship.updateMany({
+    // Delete any pending requests between the two players (both directions)
+    await tx.friendship.deleteMany({
       where: {
-        senderId: targetId,
-        receiverId: blockerId,
         status: 'pending',
+        OR: [
+          { senderId: targetId, receiverId: blockerId },
+          { senderId: blockerId, receiverId: targetId },
+        ],
       },
-      data: { status: 'declined' },
     });
   });
 }

@@ -124,8 +124,13 @@ export async function declineFriendRequest(
   playerId: string,
   friendshipId: string,
 ): Promise<void> {
+  // Allow either sender (cancel) or receiver (decline) to remove a pending request
   const friendship = await prisma.friendship.findFirst({
-    where: { id: friendshipId, receiverId: playerId, status: 'pending' },
+    where: {
+      id: friendshipId,
+      status: 'pending',
+      OR: [{ senderId: playerId }, { receiverId: playerId }],
+    },
     select: { id: true },
   });
   if (!friendship) {

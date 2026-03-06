@@ -121,6 +121,25 @@ export async function sendMail(
       }
     }
 
+    // Prune sender's sent mail if over limit (soft-delete oldest)
+    const sentCount = await tx.friendMail.count({
+      where: { senderId, isDeletedBySender: false, isSystem: false },
+    });
+    if (sentCount > MAIL_CONSTANTS.MAX_SENT_SIZE) {
+      const oldestSent = await tx.friendMail.findMany({
+        where: { senderId, isDeletedBySender: false, isSystem: false },
+        orderBy: { createdAt: 'asc' },
+        take: sentCount - MAIL_CONSTANTS.MAX_SENT_SIZE,
+        select: { id: true },
+      });
+      if (oldestSent.length > 0) {
+        await tx.friendMail.updateMany({
+          where: { id: { in: oldestSent.map((m) => m.id) } },
+          data: { isDeletedBySender: true },
+        });
+      }
+    }
+
     return created;
   });
 

@@ -232,12 +232,40 @@ describe('friendService', () => {
   // declineFriendRequest
   // ---------------------------------------------------------------------------
   describe('declineFriendRequest', () => {
-    it('deletes pending request', async () => {
+    it('deletes pending request when receiver declines', async () => {
       mockPrisma.friendship.findFirst.mockResolvedValue({ id: FRIENDSHIP_ID });
       mockPrisma.friendship.delete.mockResolvedValue({});
 
       await declineFriendRequest(PLAYER_ID, FRIENDSHIP_ID);
 
+      expect(mockPrisma.friendship.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: FRIENDSHIP_ID,
+          status: 'pending',
+          OR: [{ senderId: PLAYER_ID }, { receiverId: PLAYER_ID }],
+        },
+        select: { id: true },
+      });
+      expect(mockPrisma.friendship.delete).toHaveBeenCalledWith({
+        where: { id: FRIENDSHIP_ID },
+      });
+    });
+
+    it('deletes pending request when sender cancels', async () => {
+      mockPrisma.friendship.findFirst.mockResolvedValue({ id: FRIENDSHIP_ID });
+      mockPrisma.friendship.delete.mockResolvedValue({});
+
+      // Sender cancels their own outgoing request
+      await declineFriendRequest(TARGET_ID, FRIENDSHIP_ID);
+
+      expect(mockPrisma.friendship.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: FRIENDSHIP_ID,
+          status: 'pending',
+          OR: [{ senderId: TARGET_ID }, { receiverId: TARGET_ID }],
+        },
+        select: { id: true },
+      });
       expect(mockPrisma.friendship.delete).toHaveBeenCalledWith({
         where: { id: FRIENDSHIP_ID },
       });

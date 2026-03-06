@@ -69,14 +69,16 @@ export function MailScreen({
   // Loaders
   // -----------------------------------------------------------------------
 
+  const PAGE_SIZE = 20;
+
   const loadInbox = useCallback(async (page: number) => {
     try {
       const res = await getFriendMailInbox(page);
       if (res.error) { setError(res.error.message); return; }
       if (res.data) {
-        setInbox(res.data.mail);
-        setInboxTotal(res.data.pagination.total);
-        setInboxTotalPages(res.data.pagination.totalPages);
+        setInbox(res.data.mails);
+        setInboxTotal(res.data.total);
+        setInboxTotalPages(Math.ceil(res.data.total / PAGE_SIZE));
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load inbox');
@@ -88,9 +90,9 @@ export function MailScreen({
       const res = await getFriendMailSent(page);
       if (res.error) { setError(res.error.message); return; }
       if (res.data) {
-        setSent(res.data.mail);
-        setSentTotal(res.data.pagination.total);
-        setSentTotalPages(res.data.pagination.totalPages);
+        setSent(res.data.mails);
+        setSentTotal(res.data.total);
+        setSentTotalPages(Math.ceil(res.data.total / PAGE_SIZE));
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load sent mail');
