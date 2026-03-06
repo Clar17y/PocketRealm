@@ -371,16 +371,19 @@ export async function claimDailyBonus(
 
   // Check that all daily quests for today are claimed
   const todayStart = getDayStart(now);
-  const unclaimedDailies = await prisma.playerQuest.count({
-    where: {
-      playerId,
-      cadence: 'daily',
-      assignedAt: { gte: todayStart },
-      status: { not: 'claimed' },
-    },
+  const totalDailies = await prisma.playerQuest.count({
+    where: { playerId, cadence: 'daily', assignedAt: { gte: todayStart } },
   });
 
-  if (unclaimedDailies > 0) {
+  if (totalDailies === 0) {
+    throw new AppError(400, 'No daily quests assigned yet', 'NO_DAILIES');
+  }
+
+  const claimedDailies = await prisma.playerQuest.count({
+    where: { playerId, cadence: 'daily', assignedAt: { gte: todayStart }, status: 'claimed' },
+  });
+
+  if (claimedDailies < totalDailies) {
     throw new AppError(400, 'Not all daily quests are claimed', 'INCOMPLETE_DAILIES');
   }
 
@@ -444,8 +447,9 @@ export async function rerollQuest(
   const bracket = getLevelBracket(playerLevel);
 
   // Get eligible templates excluding already-assigned quest keys
+  const periodStart = quest.cadence === 'weekly' ? getWeekStart(now) : getDayStart(now);
   const currentQuests = await prisma.playerQuest.findMany({
-    where: { playerId, cadence: quest.cadence, status: { not: 'expired' }, assignedAt: { gte: getDayStart(now) } },
+    where: { playerId, cadence: quest.cadence, status: { not: 'expired' }, assignedAt: { gte: periodStart } },
     select: { questKey: true },
   });
   const currentKeys = new Set(currentQuests.map(q => q.questKey));

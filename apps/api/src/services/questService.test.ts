@@ -284,8 +284,9 @@ describe('claimDailyBonus', () => {
       lastWeeklyReset: WEEK_START,
     };
     db.playerQuestState.upsert.mockResolvedValue(state);
-    // All 3 dailies are claimed
-    db.playerQuest.count.mockResolvedValue(0); // 0 non-claimed dailies
+    // 3 total dailies, all 3 claimed
+    db.playerQuest.count.mockResolvedValueOnce(3); // totalDailies
+    db.playerQuest.count.mockResolvedValueOnce(3); // claimedDailies
     // Player level 10 → bonus = DAILY_BONUS_BASE + floor(10 * DAILY_BONUS_PER_LEVEL) = 5 + 5 = 10
     db.player.findUnique.mockResolvedValue({ characterLevel: 10 });
     db.playerQuestState.update.mockResolvedValue({
@@ -330,8 +331,9 @@ describe('claimDailyBonus', () => {
       lastDailyReset: DAY_START,
       lastWeeklyReset: WEEK_START,
     });
-    // 1 non-claimed daily remains
-    db.playerQuest.count.mockResolvedValue(1);
+    // 3 total dailies, only 2 claimed
+    db.playerQuest.count.mockResolvedValueOnce(3); // totalDailies
+    db.playerQuest.count.mockResolvedValueOnce(2); // claimedDailies
 
     await expect(claimDailyBonus(PLAYER_ID, NOW)).rejects.toThrow(
       /not all daily quests/i,
