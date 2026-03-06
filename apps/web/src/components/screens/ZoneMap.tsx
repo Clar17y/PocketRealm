@@ -6,7 +6,7 @@ import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
-import { MapPin, Star, Hourglass, Lock } from 'lucide-react';
+import { MapPin, Star, Hourglass, Lock, Home } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';
 import { ScreenContainer } from '../common/ScreenContainer';
 
@@ -66,6 +66,8 @@ interface ZoneMapProps {
   playerStartMana?: number;
   playerMaxStamina?: number;
   playerMaxMana?: number;
+  homeTownId?: string | null;
+  onSetHomeTown?: (zoneId: string) => void;
 }
 
 /** BFS from the starter zone to compute shortest-path tier for each zone. */
@@ -135,6 +137,8 @@ export function ZoneMap({
   playerStartMana,
   playerMaxStamina,
   playerMaxMana,
+  homeTownId,
+  onSetHomeTown,
 }: ZoneMapProps) {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
@@ -504,6 +508,29 @@ export function ZoneMap({
               </div>
             );
           })()}
+
+          {/* Home town button — only for town zones */}
+          {selectedZone.zoneType === 'town' && onSetHomeTown && (
+            <div className="mb-2">
+              {homeTownId === selectedZone.id ? (
+                <div className="flex items-center gap-1.5 text-xs text-[var(--rpg-gold)]">
+                  <Home size={12} />
+                  <span>Current Home Town</span>
+                </div>
+              ) : (
+                <PixelButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => onSetHomeTown(selectedZone.id)}
+                >
+                  <div className="flex items-center gap-1">
+                    <Home size={12} />
+                    Set as Home Town
+                  </div>
+                </PixelButton>
+              )}
+            </div>
+          )}
 
           {selectedZone.id === currentZoneId && (
             <PixelButton

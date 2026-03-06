@@ -227,6 +227,8 @@ export default function GamePage() {
     handleSetLootRevealRarity,
     handleQuickRest,
     guildTaxRate,
+    homeTownId,
+    handleSetHomeTown,
     showChangelog,
     dismissChangelog,
     openChangelog,
@@ -706,6 +708,8 @@ export default function GamePage() {
             playerStartMana={manaState.current}
             playerMaxStamina={staminaState.max}
             playerMaxMana={manaState.max}
+            homeTownId={homeTownId}
+            onSetHomeTown={(zoneId) => void handleSetHomeTown(zoneId)}
           />
         );
       case 'bestiary':

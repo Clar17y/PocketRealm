@@ -53,6 +53,7 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       lootRevealRarity: true,
       activeTitle: true,
       gold: true,
+      homeTownId: true,
     },
   });
 

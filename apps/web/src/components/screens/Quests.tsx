@@ -6,9 +6,12 @@ import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { SubNav } from '@/components/common/SubNav';
-import { Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, ShoppingBag, RefreshCw } from 'lucide-react';
-import { getQuestShop, purchaseQuestItem } from '@/lib/api';
-import type { PlayerQuestData, PlayerQuestStateData, QuestCategory, QuestShopItem } from '@pocketrealm/shared';
+import {
+  Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, RefreshCw,
+  Wrench, Zap, Package, Crown, Shield,
+} from 'lucide-react';
+import { getShopItems, purchaseShopItem, getPlayerBuffs } from '@/lib/api';
+import type { PlayerQuestData, PlayerQuestStateData, QuestCategory, ShopItemData, PlayerBuffData } from '@pocketrealm/shared';
 import { QUEST_CONSTANTS } from '@pocketrealm/shared';
 
 interface QuestsProps {
@@ -43,6 +46,14 @@ const SHOP_TABS = [
   { id: 'quests', label: 'Quests' },
   { id: 'shop', label: 'Shop' },
 ] as const;
+
+const SHOP_CATEGORY_CONFIG: Record<ShopItemData['category'], { label: string; icon: typeof Sword; color: string }> = {
+  reset: { label: 'Reset Scrolls', icon: RefreshCw, color: 'var(--rpg-blue-light)' },
+  upgrade: { label: 'Upgrade Scrolls', icon: Wrench, color: 'var(--rpg-gold)' },
+  buff: { label: 'Buff Scrolls', icon: Zap, color: 'var(--rpg-green-light)' },
+  utility: { label: 'Utility', icon: Package, color: 'var(--rpg-text-secondary)' },
+  prestige: { label: 'Prestige', icon: Crown, color: 'var(--rpg-purple)' },
+};
 
 function QuestProgressBar({ current, max, completed }: { current: number; max: number; completed: boolean }) {
   const pct = Math.min((current / max) * 100, 100);
@@ -148,46 +159,99 @@ function QuestCard({
   );
 }
 
-const SHOP_CATEGORY_COLORS: Record<QuestShopItem['category'], string> = {
-  consumable: 'var(--rpg-green-light)',
-  material: 'var(--rpg-blue-light)',
-  recipe: 'var(--rpg-purple)',
-  utility: 'var(--rpg-gold)',
-};
+// Buff badge for active buffs display
+function BuffBadge({ buff }: { buff: PlayerBuffData }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)]">
+      <Shield size={14} className="text-[var(--rpg-green-light)] flex-shrink-0" />
+      <div className="min-w-0">
+        <span className="text-xs text-[var(--rpg-text-primary)] truncate">
+          {buff.shopItemName}
+        </span>
+        <span className="text-[10px] text-[var(--rpg-text-secondary)] ml-1.5">
+          {buff.remainingUses} uses left (+{buff.bonusValue}%)
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ActiveBuffsPanel({ buffs }: { buffs: PlayerBuffData[] }) {
+  if (buffs.length === 0) {
+    return (
+      <PixelCard padding="sm">
+        <div className="text-xs text-[var(--rpg-text-secondary)] text-center py-1">
+          No active buffs
+        </div>
+      </PixelCard>
+    );
+  }
+
+  return (
+    <PixelCard padding="sm">
+      <div className="text-xs font-medium text-[var(--rpg-text-secondary)] mb-2">Active Buffs</div>
+      <div className="space-y-1">
+        {buffs.map((buff) => (
+          <BuffBadge key={buff.id} buff={buff} />
+        ))}
+      </div>
+    </PixelCard>
+  );
+}
 
 function ShopItemCard({
   item,
   tokens,
   onBuy,
-  buyingKey,
+  buyingId,
 }: {
-  item: QuestShopItem;
+  item: ShopItemData;
   tokens: number;
-  onBuy: (key: string) => void;
-  buyingKey: string | null;
+  onBuy: (item: ShopItemData) => void;
+  buyingId: string | null;
 }) {
   const canAfford = tokens >= item.cost;
-  const isBuying = buyingKey === item.key;
-  const categoryColor = SHOP_CATEGORY_COLORS[item.category];
+  const isBuying = buyingId === item.id;
+  const config = SHOP_CATEGORY_CONFIG[item.category];
+  const Icon = config.icon;
+
+  // Purchase limit info
+  let limitText: string | null = null;
+  if (item.weeklyLimit != null) {
+    limitText = `${item.purchasesThisWeek ?? 0}/${item.weeklyLimit} this week`;
+  } else if (item.lifetimeLimit != null) {
+    limitText = `${item.purchasesLifetime ?? 0}/${item.lifetimeLimit} lifetime`;
+  }
+
+  // Buff details
+  let buffText: string | null = null;
+  if (item.buffType && item.buffValue != null && item.buffUses != null) {
+    buffText = `+${item.buffValue}% for ${item.buffUses} uses`;
+  }
 
   return (
     <PixelCard padding="sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <ShoppingBag size={16} style={{ color: categoryColor, flexShrink: 0 }} />
+            <Icon size={16} style={{ color: config.color, flexShrink: 0 }} />
             <span className="font-medium text-[var(--rpg-text-primary)] truncate">
               {item.name}
             </span>
-            {!item.permanent && (
+            {limitText && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]">
-                Limited
+                {limitText}
               </span>
             )}
           </div>
           <p className="text-xs text-[var(--rpg-text-secondary)] ml-6">
             {item.description}
           </p>
+          {buffText && (
+            <p className="text-[10px] text-[var(--rpg-green-light)] ml-6 mt-0.5">
+              {buffText}
+            </p>
+          )}
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
           <div className="flex items-center gap-1 text-sm font-mono">
@@ -199,9 +263,10 @@ function ShopItemCard({
           <PixelButton
             variant="secondary"
             size="sm"
-            disabled
+            onClick={() => onBuy(item)}
+            disabled={!item.canPurchase || !canAfford || isBuying}
           >
-            Coming Soon
+            {isBuying ? '...' : 'Buy'}
           </PixelButton>
         </div>
       </div>
@@ -210,22 +275,27 @@ function ShopItemCard({
 }
 
 function ShopTab({ questTokens }: { questTokens: number }) {
-  const [shopItems, setShopItems] = useState<QuestShopItem[]>([]);
+  const [shopItems, setShopItems] = useState<ShopItemData[]>([]);
   const [tokens, setTokens] = useState(questTokens);
   const [shopLoading, setShopLoading] = useState(true);
   const [shopError, setShopError] = useState<string | null>(null);
-  const [buyingKey, setBuyingKey] = useState<string | null>(null);
+  const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [buffs, setBuffs] = useState<PlayerBuffData[]>([]);
+  const [purchaseMessage, setPurchaseMessage] = useState<string | null>(null);
 
   const loadShop = useCallback(async () => {
     setShopLoading(true);
     setShopError(null);
     try {
-      const res = await getQuestShop();
-      if (res.data) {
-        setShopItems(res.data.items);
-        setTokens(res.data.questTokens);
-      } else if (res.error) {
-        setShopError(res.error.message);
+      const [shopRes, buffsRes] = await Promise.all([getShopItems(), getPlayerBuffs()]);
+      if (shopRes.data) {
+        setShopItems(shopRes.data.items);
+        setTokens(shopRes.data.questTokens);
+      } else if (shopRes.error) {
+        setShopError(shopRes.error.message);
+      }
+      if (buffsRes.data) {
+        setBuffs(buffsRes.data.buffs);
       }
     } catch {
       setShopError('Failed to load shop');
@@ -238,15 +308,23 @@ function ShopTab({ questTokens }: { questTokens: number }) {
     void loadShop();
   }, [loadShop]);
 
-  const handleBuy = async (itemKey: string) => {
-    setBuyingKey(itemKey);
+  const handleBuy = async (item: ShopItemData) => {
+    setBuyingId(item.id);
+    setPurchaseMessage(null);
     try {
-      const res = await purchaseQuestItem(itemKey);
+      const res = await purchaseShopItem(item.id);
       if (res.data) {
         setTokens(res.data.newBalance);
+        setPurchaseMessage(`Purchased ${item.name}!`);
+        // Refresh shop state and buffs
+        void loadShop();
+      } else if (res.error) {
+        setPurchaseMessage(res.error.message);
       }
+    } catch {
+      setPurchaseMessage('Purchase failed');
     } finally {
-      setBuyingKey(null);
+      setBuyingId(null);
     }
   };
 
@@ -258,8 +336,17 @@ function ShopTab({ questTokens }: { questTokens: number }) {
     return <ErrorBanner message={shopError} />;
   }
 
-  const permanentItems = shopItems.filter(i => i.permanent);
-  const rotatingItems = shopItems.filter(i => !i.permanent);
+  // Group items by category, preserving sortOrder
+  const groupedItems = new Map<ShopItemData['category'], ShopItemData[]>();
+  const categoryOrder: ShopItemData['category'][] = ['reset', 'upgrade', 'buff', 'utility', 'prestige'];
+  for (const cat of categoryOrder) {
+    const items = shopItems
+      .filter((i) => i.category === cat && i.enabled)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    if (items.length > 0) {
+      groupedItems.set(cat, items);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -276,41 +363,43 @@ function ShopTab({ questTokens }: { questTokens: number }) {
         </div>
       </PixelCard>
 
-      {/* Permanent items */}
-      {permanentItems.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold mb-3 text-[var(--rpg-text-primary)]">Always Available</h2>
-          <div className="space-y-2">
-            {permanentItems.map(item => (
-              <ShopItemCard
-                key={item.key}
-                item={item}
-                tokens={tokens}
-                onBuy={(key) => void handleBuy(key)}
-                buyingKey={buyingKey}
-              />
-            ))}
-          </div>
+      {/* Active buffs */}
+      <ActiveBuffsPanel buffs={buffs} />
+
+      {/* Purchase feedback */}
+      {purchaseMessage && (
+        <div className="text-xs text-center text-[var(--rpg-text-secondary)] py-1">
+          {purchaseMessage}
         </div>
       )}
 
-      {/* Rotating items */}
-      {rotatingItems.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold mb-3 text-[var(--rpg-text-primary)]">Limited Stock</h2>
-          <div className="space-y-2">
-            {rotatingItems.map(item => (
-              <ShopItemCard
-                key={item.key}
-                item={item}
-                tokens={tokens}
-                onBuy={(key) => void handleBuy(key)}
-                buyingKey={buyingKey}
-              />
-            ))}
+      {/* Items grouped by category */}
+      {categoryOrder.map((cat) => {
+        const items = groupedItems.get(cat);
+        if (!items) return null;
+        const config = SHOP_CATEGORY_CONFIG[cat];
+        const CatIcon = config.icon;
+
+        return (
+          <div key={cat}>
+            <h2 className="text-sm font-semibold mb-2 text-[var(--rpg-text-primary)] flex items-center gap-1.5">
+              <CatIcon size={14} style={{ color: config.color }} />
+              {config.label}
+            </h2>
+            <div className="space-y-2">
+              {items.map((item) => (
+                <ShopItemCard
+                  key={item.id}
+                  item={item}
+                  tokens={tokens}
+                  onBuy={(i) => void handleBuy(i)}
+                  buyingId={buyingId}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })}
 
       {shopItems.length === 0 && (
         <p className="text-center text-[var(--rpg-text-secondary)] py-8">

@@ -1677,6 +1677,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Guild
     guildTaxRate,
 
+    // Home Town
+    homeTownId: playerSettings.homeTownId,
+    handleSetHomeTown: playerSettings.handleSetHomeTown,
+
     // Changelog
     showChangelog,
     dismissChangelog,
