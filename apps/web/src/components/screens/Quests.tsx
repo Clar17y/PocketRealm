@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
-import { StatBar } from '@/components/StatBar';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { SubNav } from '@/components/common/SubNav';
-import { Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, ShoppingBag } from 'lucide-react';
+import { Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, ShoppingBag, RefreshCw } from 'lucide-react';
 import { getQuestShop, purchaseQuestItem } from '@/lib/api';
 import type { PlayerQuestData, PlayerQuestStateData, QuestCategory, QuestShopItem } from '@pocketrealm/shared';
+import { QUEST_CONSTANTS } from '@pocketrealm/shared';
 
 interface QuestsProps {
   quests: PlayerQuestData[];
@@ -18,6 +18,7 @@ interface QuestsProps {
   error: string | null;
   onClaimReward: (questId: string) => Promise<void>;
   onClaimBonus: () => Promise<void>;
+  onReroll: (questId: string) => Promise<void>;
 }
 
 const CATEGORY_ICONS: Record<QuestCategory, typeof Sword> = {
@@ -43,20 +44,47 @@ const SHOP_TABS = [
   { id: 'shop', label: 'Shop' },
 ] as const;
 
+function QuestProgressBar({ current, max, completed }: { current: number; max: number; completed: boolean }) {
+  const pct = Math.min((current / max) * 100, 100);
+  return (
+    <div className="w-full">
+      <div className="flex justify-end mb-1">
+        <span className="font-pixel text-[8px] text-[var(--rpg-text-secondary)]">
+          {current.toLocaleString()} / {max.toLocaleString()}
+        </span>
+      </div>
+      <div className="relative w-full h-2 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded overflow-hidden">
+        <div
+          className={`h-full transition-all duration-300 rpg-bar-shimmer ${completed ? 'bg-[var(--rpg-gold)]' : 'bg-[var(--rpg-gold)]'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function QuestCard({
   quest,
   onClaim,
+  onReroll,
   claimingId,
+  rerollingId,
+  canReroll,
 }: {
   quest: PlayerQuestData;
   onClaim: (questId: string) => void;
+  onReroll: (questId: string) => void;
   claimingId: string | null;
+  rerollingId: string | null;
+  canReroll: boolean;
 }) {
   const Icon = CATEGORY_ICONS[quest.category] ?? Sword;
   const color = CATEGORY_COLORS[quest.category] ?? 'var(--rpg-text-primary)';
   const isClaimed = quest.status === 'claimed';
   const isCompleted = quest.status === 'completed';
+  const isActive = quest.status === 'active';
   const isClaiming = claimingId === quest.id;
+  const isRerolling = rerollingId === quest.id;
 
   return (
     <PixelCard padding="sm">
@@ -72,31 +100,47 @@ function QuestCard({
                 {isClaimed && (
                   <span className="text-[var(--rpg-green-light)] flex-shrink-0">&#x2713;</span>
                 )}
+                {!isClaimed && (
+                  <span className="flex items-center gap-0.5 text-[10px] text-[var(--rpg-gold)] flex-shrink-0">
+                    <Coins size={10} />
+                    {quest.rewardAmount}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-[var(--rpg-text-secondary)]">
                 {quest.description}
               </p>
             </div>
           </div>
-          {isCompleted && (
-            <PixelButton
-              variant="gold"
-              size="sm"
-              onClick={() => onClaim(quest.id)}
-              disabled={isClaiming}
-            >
-              {isClaiming ? '...' : `+${quest.rewardAmount} Claim`}
-            </PixelButton>
-          )}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {isActive && canReroll && (
+              <button
+                className="p-1 rounded text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-surface)] transition-colors disabled:opacity-40"
+                onClick={() => onReroll(quest.id)}
+                disabled={isRerolling}
+                title="Reroll quest"
+              >
+                <RefreshCw size={14} className={isRerolling ? 'animate-spin' : ''} />
+              </button>
+            )}
+            {isCompleted && (
+              <PixelButton
+                variant="gold"
+                size="sm"
+                onClick={() => onClaim(quest.id)}
+                disabled={isClaiming}
+              >
+                {isClaiming ? '...' : `+${quest.rewardAmount} Claim`}
+              </PixelButton>
+            )}
+          </div>
         </div>
 
         {!isClaimed && (
-          <StatBar
+          <QuestProgressBar
             current={quest.currentValue}
             max={quest.targetValue}
-            color={isCompleted ? 'gold' : 'xp'}
-            size="sm"
-            showNumbers
+            completed={isCompleted}
           />
         )}
       </div>
@@ -278,9 +322,10 @@ function ShopTab({ questTokens }: { questTokens: number }) {
   );
 }
 
-export function Quests({ quests, questState, loading, error, onClaimReward, onClaimBonus }: QuestsProps) {
+export function Quests({ quests, questState, loading, error, onClaimReward, onClaimBonus, onReroll }: QuestsProps) {
   const [activeTab, setActiveTab] = useState('quests');
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [rerollingId, setRerollingId] = useState<string | null>(null);
   const [claimingBonus, setClaimingBonus] = useState(false);
 
   const dailyQuests = quests.filter((q) => q.cadence === 'daily');
@@ -288,6 +333,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
 
   const allDailiesClaimed = dailyQuests.length > 0 && dailyQuests.every((q) => q.status === 'claimed');
   const canClaimBonus = allDailiesClaimed && questState && !questState.dailyBonusClaimed;
+  const canReroll = (questState?.rerollsUsed ?? 0) < QUEST_CONSTANTS.REROLLS_PER_DAY;
 
   const handleClaim = async (questId: string) => {
     setClaimingId(questId);
@@ -295,6 +341,15 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
       await onClaimReward(questId);
     } finally {
       setClaimingId(null);
+    }
+  };
+
+  const handleReroll = async (questId: string) => {
+    setRerollingId(questId);
+    try {
+      await onReroll(questId);
+    } finally {
+      setRerollingId(null);
     }
   };
 
@@ -314,6 +369,8 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
   if (error) {
     return <ErrorBanner message={error} />;
   }
+
+  const rerollsRemaining = QUEST_CONSTANTS.REROLLS_PER_DAY - (questState?.rerollsUsed ?? 0);
 
   return (
     <div className="space-y-4">
@@ -335,23 +392,31 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
                   </div>
                 </div>
               </div>
-              <PixelButton
-                variant="gold"
-                size="sm"
-                onClick={() => void handleClaimBonus()}
-                disabled={!canClaimBonus || claimingBonus}
-              >
-                <div className="flex items-center gap-1">
-                  <Gift size={14} />
-                  {claimingBonus
-                    ? '...'
-                    : questState?.dailyBonusClaimed
-                      ? 'Bonus Claimed'
-                      : !allDailiesClaimed
-                        ? 'Complete Dailies'
-                        : 'Claim Bonus'}
-                </div>
-              </PixelButton>
+              <div className="flex items-center gap-3">
+                {rerollsRemaining > 0 && (
+                  <span className="text-[10px] text-[var(--rpg-text-secondary)] flex items-center gap-1">
+                    <RefreshCw size={10} />
+                    {rerollsRemaining} reroll{rerollsRemaining !== 1 ? 's' : ''}
+                  </span>
+                )}
+                <PixelButton
+                  variant="gold"
+                  size="sm"
+                  onClick={() => void handleClaimBonus()}
+                  disabled={!canClaimBonus || claimingBonus}
+                >
+                  <div className="flex items-center gap-1">
+                    <Gift size={14} />
+                    {claimingBonus
+                      ? '...'
+                      : questState?.dailyBonusClaimed
+                        ? 'Bonus Claimed'
+                        : !allDailiesClaimed
+                          ? 'Complete Dailies'
+                          : 'Claim Bonus'}
+                  </div>
+                </PixelButton>
+              </div>
             </div>
           </PixelCard>
 
@@ -365,7 +430,10 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
                     key={quest.id}
                     quest={quest}
                     onClaim={(id) => void handleClaim(id)}
+                    onReroll={(id) => void handleReroll(id)}
                     claimingId={claimingId}
+                    rerollingId={rerollingId}
+                    canReroll={canReroll}
                   />
                 ))}
               </div>
@@ -382,7 +450,10 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
                     key={quest.id}
                     quest={quest}
                     onClaim={(id) => void handleClaim(id)}
+                    onReroll={(id) => void handleReroll(id)}
                     claimingId={claimingId}
+                    rerollingId={rerollingId}
+                    canReroll={canReroll}
                   />
                 ))}
               </div>

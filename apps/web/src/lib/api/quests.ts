@@ -47,3 +47,11 @@ export async function purchaseQuestItem(itemKey: string) {
     body: JSON.stringify({ itemKey }),
   });
 }
+
+export interface RerollQuestResponse {
+  quest: PlayerQuestData;
+}
+
+export async function rerollQuest(questId: string) {
+  return fetchApi<RerollQuestResponse>(`/api/v1/quests/${questId}/reroll`, { method: 'POST' });
+}

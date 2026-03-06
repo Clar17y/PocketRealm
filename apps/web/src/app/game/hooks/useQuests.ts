@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { getQuests, claimQuestReward, claimDailyBonus } from '@/lib/api';
+import { getQuests, claimQuestReward, claimDailyBonus, rerollQuest } from '@/lib/api';
 import type { PlayerQuestData, PlayerQuestStateData } from '@pocketrealm/shared';
 
 export function useQuests() {
@@ -51,6 +51,20 @@ export function useQuests() {
     }
   }, []);
 
+  const handleRerollQuest = useCallback(async (questId: string) => {
+    const res = await rerollQuest(questId);
+    if (res.data) {
+      // Replace old quest with new one in local state
+      setQuests((prev) =>
+        prev.map((q) => (q.id === questId ? res.data!.quest : q)),
+      );
+      // Increment rerollsUsed in local state
+      setQuestState((prev) =>
+        prev ? { ...prev, rerollsUsed: prev.rerollsUsed + 1 } : prev,
+      );
+    }
+  }, []);
+
   return {
     quests,
     questState,
@@ -59,5 +73,6 @@ export function useQuests() {
     loadQuests,
     handleClaimQuestReward,
     handleClaimDailyBonus,
+    handleRerollQuest,
   } as const;
 }

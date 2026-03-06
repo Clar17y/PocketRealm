@@ -1056,6 +1056,7 @@ model PlayerQuestState {
   lastDailyReset    DateTime @default(now()) @map("last_daily_reset")
   lastWeeklyReset   DateTime @default(now()) @map("last_weekly_reset")
   dailyBonusClaimed Boolean  @default(false) @map("daily_bonus_claimed")
+  rerollsUsed       Int      @default(0) @map("rerolls_used")
   questTokens       Int      @default(0) @map("quest_tokens")
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)

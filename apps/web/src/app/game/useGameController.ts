@@ -425,7 +425,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const {
     quests, questState, questsLoading, questsError,
-    loadQuests, handleClaimQuestReward, handleClaimDailyBonus,
+    loadQuests, handleClaimQuestReward, handleClaimDailyBonus, handleRerollQuest,
   } = useQuests();
 
   const advanceTutorial = useCallback(async (fromStep: number) => {
@@ -1666,6 +1666,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     loadQuests,
     handleClaimQuestReward,
     handleClaimDailyBonus,
+    handleRerollQuest,
 
     // Tutorial
     tutorialStep, skipTutorial, advanceTutorial,

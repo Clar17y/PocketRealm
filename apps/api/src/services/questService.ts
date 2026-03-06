@@ -144,7 +144,7 @@ export async function getActiveQuests(
     // Update state
     await prisma.playerQuestState.update({
       where: { playerId },
-      data: { lastDailyReset: todayStart, dailyBonusClaimed: false },
+      data: { lastDailyReset: todayStart, dailyBonusClaimed: false, rerollsUsed: 0 },
     });
   }
 
@@ -409,7 +409,92 @@ export async function getQuestState(playerId: string): Promise<PlayerQuestStateD
   return {
     questTokens: state.questTokens,
     dailyBonusClaimed: state.dailyBonusClaimed,
+    rerollsUsed: state.rerollsUsed,
     lastDailyReset: state.lastDailyReset.toISOString(),
     lastWeeklyReset: state.lastWeeklyReset.toISOString(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// rerollQuest
+// ---------------------------------------------------------------------------
+
+export async function rerollQuest(
+  playerId: string,
+  questId: string,
+  now: Date = new Date(),
+): Promise<PlayerQuestData> {
+  const state = await getOrCreateQuestState(playerId);
+
+  if (state.rerollsUsed >= QUEST_CONSTANTS.REROLLS_PER_DAY) {
+    throw new AppError(400, 'No rerolls remaining today', 'NO_REROLLS');
+  }
+
+  // Find the quest to reroll — must be active (not completed/claimed)
+  const quest = await prisma.playerQuest.findFirst({
+    where: { id: questId, playerId, status: 'active' },
+  });
+  if (!quest) throw new AppError(400, 'Quest not found or not active', 'QUEST_NOT_ACTIVE');
+
+  // Get player level for bracket
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { characterLevel: true },
+  });
+  const playerLevel = player?.characterLevel ?? 1;
+  const bracket = getLevelBracket(playerLevel);
+
+  // Get eligible templates for this cadence, excluding already-assigned quest keys
+  const currentQuests = await prisma.playerQuest.findMany({
+    where: { playerId, cadence: quest.cadence, status: { not: 'expired' }, assignedAt: { gte: getDayStart(now) } },
+    select: { questKey: true },
+  });
+  const currentKeys = new Set(currentQuests.map(q => q.questKey));
+
+  const eligible = await getEligibleTemplates(playerId, playerLevel, quest.cadence as 'daily' | 'weekly');
+  const available = eligible.filter(d => !currentKeys.has(d.key));
+
+  if (available.length === 0) {
+    throw new AppError(400, 'No alternative quests available', 'NO_ALTERNATIVES');
+  }
+
+  // Pick a random replacement
+  const newDef = available[Math.floor(Math.random() * available.length)]!;
+  const targetValue = newDef.targets[bracket];
+  const [rewardMin, rewardMax] = newDef.rewards[bracket];
+  const rewardAmount = randomIntInclusive(rewardMin, rewardMax);
+
+  let filterValue: string | null = null;
+  if (newDef.filter === 'prefix') {
+    const prefixes = getAllMobPrefixes();
+    filterValue = prefixes[Math.floor(Math.random() * prefixes.length)]!.key;
+  }
+
+  // Delete old quest, create new one, increment rerollsUsed — in transaction
+  const newQuest = await prisma.$transaction(async (tx) => {
+    await tx.playerQuest.delete({ where: { id: questId } });
+
+    const created = await tx.playerQuest.create({
+      data: {
+        playerId,
+        questKey: newDef.key,
+        cadence: quest.cadence,
+        targetValue,
+        currentValue: 0,
+        rewardAmount,
+        status: 'active',
+        filterValue,
+        expiresAt: quest.expiresAt, // keep same expiry as original
+      },
+    });
+
+    await tx.playerQuestState.update({
+      where: { playerId },
+      data: { rerollsUsed: { increment: 1 } },
+    });
+
+    return created;
+  });
+
+  return toQuestData(newQuest);
 }

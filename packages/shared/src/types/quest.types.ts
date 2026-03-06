@@ -59,6 +59,7 @@ export interface PlayerQuestData {
 export interface PlayerQuestStateData {
   questTokens: number;
   dailyBonusClaimed: boolean;
+  rerollsUsed: number;
   lastDailyReset: string;
   lastWeeklyReset: string;
 }

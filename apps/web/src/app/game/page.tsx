@@ -247,6 +247,7 @@ export default function GamePage() {
     loadQuests,
     handleClaimQuestReward,
     handleClaimDailyBonus,
+    handleRerollQuest,
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
     combatLogPrefetch,
@@ -1037,6 +1038,7 @@ export default function GamePage() {
             error={questsError}
             onClaimReward={handleClaimQuestReward}
             onClaimBonus={handleClaimDailyBonus}
+            onReroll={handleRerollQuest}
           />
         );
       case 'leaderboard':

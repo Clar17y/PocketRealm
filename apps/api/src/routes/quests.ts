@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../utils/asyncHandler';
-import { getActiveQuests, claimQuestReward, claimDailyBonus, getQuestState } from '../services/questService';
+import { getActiveQuests, claimQuestReward, claimDailyBonus, getQuestState, rerollQuest } from '../services/questService';
 import { getShopInventory, purchaseShopItem } from '../services/questShopService';
 
 export const questsRouter = Router();
@@ -41,13 +41,21 @@ questsRouter.post('/bonus', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
-// POST /api/v1/quests/:id/claim — claim completed quest reward
-// NOTE: Must come AFTER /shop and /bonus to avoid :id matching those paths
-const claimSchema = z.object({ id: z.string().uuid() });
+// NOTE: Parameterized routes must come AFTER /shop and /bonus to avoid :id matching those paths
+const paramIdSchema = z.object({ id: z.string().uuid() });
 
+// POST /api/v1/quests/:id/reroll — reroll an active quest
+questsRouter.post('/:id/reroll', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { id } = paramIdSchema.parse(req.params);
+  const newQuest = await rerollQuest(playerId, id);
+  res.json({ quest: newQuest });
+}));
+
+// POST /api/v1/quests/:id/claim — claim completed quest reward
 questsRouter.post('/:id/claim', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
-  const { id } = claimSchema.parse(req.params);
+  const { id } = paramIdSchema.parse(req.params);
   const result = await claimQuestReward(playerId, id);
   res.json(result);
 }));
