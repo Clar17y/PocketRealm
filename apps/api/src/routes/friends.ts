@@ -16,7 +16,7 @@ import {
 } from '../services/friendService';
 import { blockPlayer, unblockPlayer, getBlockList } from '../services/blockService';
 import { sendMail, getInbox, getSentMail, readMail, deleteMail, getUnreadCount } from '../services/friendMailService';
-import { validateSpar, spendSparTurns } from '../services/sparService';
+import { validateSpar, spendSparTurns, runSpar } from '../services/sparService';
 import { getIo } from '../socket';
 
 export const friendsRouter = Router();
@@ -112,7 +112,8 @@ friendsRouter.post('/:id/spar', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { attackerId, defenderId } = await validateSpar(playerId, req.params.id);
   await spendSparTurns(attackerId);
-  res.json({ attackerId, defenderId, message: 'Spar initiated' });
+  const result = await runSpar(attackerId, req.player!.username, defenderId);
+  res.json(result);
 }));
 
 // ── Block ────────────────────────────────────────────────────────────
