@@ -71,7 +71,7 @@ describe('formatCombatShareText', () => {
       ],
       rewards: {
         xp: 100,
-        skillXp: { skillType: 'melee', xpAfterEfficiency: 50 },
+        skillXpGrants: [{ skillType: 'melee', xpAfterEfficiency: 50 }],
         loot: [{ itemTemplateId: 'gold-coin', quantity: 10, itemName: 'Gold Coin' }],
       },
       playerMaxHp: 100,

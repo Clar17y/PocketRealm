@@ -110,7 +110,7 @@ export function applyXpGain(
   skillType: SkillType
 ): SkillXpResult {
   const efficiency = calculateEfficiency(windowXpGained, skillType);
-  const xpAfterEfficiency = Math.floor(rawXpGain * efficiency);
+  const xpAfterEfficiency = Math.round(rawXpGain * efficiency);
 
   const newTotalXp = currentXp + xpAfterEfficiency;
   const newLevel = levelFromXp(newTotalXp);

@@ -32,6 +32,13 @@ vi.mock('./hpService', () => ({
 vi.mock('./combatStatsService', () => ({
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
   getSkillLevel: vi.fn().mockResolvedValue(5),
+  buildPerActionScaling: vi.fn().mockResolvedValue({
+    skillLevels: { melee: 5, ranged: 1, magic: 1 },
+    attributes: { strength: 5, dexterity: 0, intelligence: 0 },
+    weaponPower: { attack: 10, rangedPower: 0, magicPower: 0 },
+    equipmentAccuracy: 5,
+    weaponRequiredSkill: 'melee',
+  }),
 }));
 
 vi.mock('./combatTemplateService', () => ({

@@ -11,25 +11,23 @@ import {
   activateTemplate,
 } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
-import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS } from '@adventure/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@adventure/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@adventure/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
 
 // --- Constants ---
 
+// Base actions are always "Basic"; talent actions derive their group from the tree they unlock in
 const ACTION_GROUPS: Record<string, string> = {
   light_attack: 'Basic', normal_attack: 'Basic', heavy_attack: 'Basic',
   defend: 'Basic', counter: 'Basic', ward: 'Basic',
   use_hp_potion: 'Basic', use_stamina_potion: 'Basic', use_mana_potion: 'Basic',
-  power_strike: 'Melee', cleave: 'Melee', battle_cry: 'Melee',
-  devastating_blow: 'Melee', berserker_rage: 'Melee', execute: 'Melee', titans_wrath: 'Melee',
-  aimed_shot: 'Ranged', crippling_shot: 'Ranged', eagle_eye: 'Ranged',
-  volley: 'Ranged', snipers_mark: 'Ranged', piercing_shot: 'Ranged', death_mark: 'Ranged',
-  fire_bolt: 'Magic', minor_heal: 'Magic', frost_nova: 'Magic',
-  enhanced_fortitude: 'Magic', chain_lightning: 'Magic', heal_ally: 'Magic',
-  arcane_blast: 'Magic', regeneration: 'Magic', meteor_strike: 'Magic',
-  taunt: 'General', fortify: 'General',
 };
+for (const node of getAllTalentNodes()) {
+  if (node.unlocksAction) {
+    ACTION_GROUPS[node.unlocksAction] = node.tree.charAt(0).toUpperCase() + node.tree.slice(1);
+  }
+}
 
 const GROUP_ORDER = ['Basic', 'Melee', 'Ranged', 'Magic', 'General'];
 

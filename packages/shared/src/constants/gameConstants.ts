@@ -40,6 +40,10 @@ export const COMBAT_CONSTANTS = {
   /** Minimum damage that can be dealt (after armor) */
   MIN_DAMAGE: 1,
 
+  /** Weight of resource cost (stamina + mana) for XP splitting.
+   *  1 point of resource spent = this many "contribution points" alongside damage. */
+  RESOURCE_XP_WEIGHT: 0.5,
+
   /** Turn cost for a single encounter */
   ENCOUNTER_TURN_COST: 50,
 } as const;
@@ -521,6 +525,23 @@ export const COMBAT_ACTION_CONSTANTS = {
   // General talent actions
   FORTIFY_STAMINA: 15,
   FORTIFY_MANA: 10,
+
+  // Cross-type talent actions
+  FLAME_SWORD_STAMINA: 25,
+  FLAME_SWORD_MANA: 15,
+  VENOMOUS_STRIKE_STAMINA: 25,
+  VENOMOUS_STRIKE_MANA: 10,
+  RENDING_SLASH_STAMINA: 30,
+  FLAME_ARROW_STAMINA: 20,
+  FLAME_ARROW_MANA: 15,
+  BARBED_ARROW_STAMINA: 20,
+  SHADOW_ARROW_STAMINA: 15,
+  SHADOW_ARROW_MANA: 25,
+  EARTH_SPIKES_STAMINA: 10,
+  EARTH_SPIKES_MANA: 30,
+  LIFE_DRAIN_MANA: 35,
+  CURSE_MANA: 20,
+  ENFEEBLE_MANA: 20,
 } as const;
 
 // =============================================================================

@@ -10,8 +10,9 @@ import type {
   CombatActor,
   ActionEffect,
   CombatAction,
+  PerActionScaling,
 } from '@adventure/shared';
-import { COMBAT_ACTION_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
+import { COMBAT_ACTION_CONSTANTS, COMBAT_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
 import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type RoundInteraction } from './actionResolver';
 import {
   rollD20,
@@ -21,6 +22,8 @@ import {
   calculateFinalDamage,
   calculateDefenceReduction,
   rollInitiative,
+  resolveActionDamageStats,
+  resolveScalingStat,
 } from './damageCalculator';
 
 const MAX_ROUNDS = 100;
@@ -39,6 +42,8 @@ export interface TemplateCombatant {
   maxMana: number;
   manaRegenPerRound: number;
   actionDefinitions: Record<string, ActionDefinition>;
+  /** Per-action scaling data -- present for players, absent for mobs */
+  perActionScaling?: PerActionScaling;
 }
 
 export interface TemplateCombatLogEntry extends CombatLogEntry {
@@ -50,6 +55,7 @@ export interface TemplateCombatLogEntry extends CombatLogEntry {
   combatantBManaAfter: number;
   wasExhausted?: boolean;
   interactionResult?: string;
+  tickType?: 'dot_tick' | 'hot_tick';
 }
 
 export interface TemplateCombatResult {
@@ -69,6 +75,10 @@ export interface TemplateCombatResult {
   combatantBManaRemaining: number;
   potionsConsumed: PotionConsumed[];
   totalRounds: number;
+  /** Damage dealt by combatantA grouped by resolved scaling stat. */
+  damageByScalingStat: { melee: number; ranged: number; magic: number };
+  /** Resource cost (stamina + mana) spent by combatantA grouped by resolved scaling stat. */
+  resourceCostByScalingStat: { melee: number; ranged: number; magic: number };
 }
 
 // --- Internal State ---
@@ -94,6 +104,8 @@ interface TemplateCombatState {
   log: TemplateCombatLogEntry[];
   outcome: CombatOutcome | null;
   activeEffects: ActiveEffect[];
+  combatantADamageByScalingStat: { melee: number; ranged: number; magic: number };
+  combatantAResourceCostByScalingStat: { melee: number; ranged: number; magic: number };
 }
 
 // --- Helpers ---
@@ -235,6 +247,79 @@ function tickEffects(state: TemplateCombatState): void {
   state.activeEffects = remaining;
 }
 
+function applyEffectTicks(
+  state: TemplateCombatState,
+  combatantA: TemplateCombatant,
+  combatantB: TemplateCombatant,
+): void {
+  for (const effect of state.activeEffects) {
+    // DOT tick
+    if (effect.resolvedDamagePerRound && effect.resolvedDamagePerRound > 0) {
+      const targetKey = effect.target;
+      const target = targetKey === 'combatantA' ? combatantA : combatantB;
+      const effectiveStats = getEffectiveStats(target.stats, state.activeEffects, targetKey);
+      const defence = effect.dotDamageType === 'physical'
+        ? effectiveStats.defence
+        : effectiveStats.magicDefence;
+      const reduction = calculateDefenceReduction(defence);
+      const tickDamage = Math.max(
+        COMBAT_CONSTANTS.MIN_DAMAGE,
+        Math.floor(effect.resolvedDamagePerRound * (1 - reduction)),
+      );
+
+      applyDamage(state, targetKey, tickDamage);
+
+      // Track DOT damage by scaling stat (combatantA dealing to combatantB)
+      if (targetKey === 'combatantB' && tickDamage > 0) {
+        const dotStat = effect.sourceScalingStat ?? (effect.dotDamageType === 'physical' ? 'melee' : 'magic');
+        state.combatantADamageByScalingStat[dotStat] += tickDamage;
+      }
+
+      state.log.push({
+        round: state.round,
+        actor: targetKey === 'combatantA' ? 'combatantB' : 'combatantA',
+        actorName: targetKey === 'combatantA' ? combatantB.name : combatantA.name,
+        action: 'spell',
+        spellName: effect.name,
+        damage: tickDamage,
+        message: `${effect.name} deals ${tickDamage} ${effect.dotDamageType ?? 'magic'} damage to ${target.name}`,
+        tickType: 'dot_tick',
+        combatantAAction: '',
+        combatantBAction: '',
+        ...hpSnapshot(state),
+        ...resourceSnapshot(state),
+      });
+    }
+
+    // HOT tick
+    if (effect.resolvedHealPerRound && effect.resolvedHealPerRound > 0) {
+      const targetKey = effect.target;
+      const target = targetKey === 'combatantA' ? combatantA : combatantB;
+      const currentHp = getHp(state, targetKey);
+      const maxHeal = target.stats.maxHp - currentHp;
+      const actualHeal = Math.min(effect.resolvedHealPerRound, maxHeal);
+
+      if (actualHeal > 0) {
+        applyHeal(state, targetKey, actualHeal);
+        state.log.push({
+          round: state.round,
+          actor: targetKey,
+          actorName: target.name,
+          action: 'spell',
+          spellName: effect.name,
+          healAmount: actualHeal,
+          message: `${effect.name} heals ${target.name} for ${actualHeal} HP`,
+          tickType: 'hot_tick',
+          combatantAAction: '',
+          combatantBAction: '',
+          ...hpSnapshot(state),
+          ...resourceSnapshot(state),
+        });
+      }
+    }
+  }
+}
+
 function hasPotionSickness(state: TemplateCombatState, actor: CombatActor): boolean {
   return state.activeEffects.some(
     (e) => e.target === actor && e.stat === 'potionSickness',
@@ -246,6 +331,28 @@ function actionToCombatAction(action: ActionDefinition): CombatAction {
   if (action.category === 'defensive') return 'defend';
   if (action.actionType === 'use_potion') return 'potion';
   return 'spell';
+}
+
+function snapshotEffectValues(
+  effect: ActionEffect,
+  damageForPercentCalc?: number,
+): Pick<ActiveEffect, 'resolvedDamagePerRound' | 'dotDamageType' | 'resolvedHealPerRound'> {
+  const snapshot: Pick<ActiveEffect, 'resolvedDamagePerRound' | 'dotDamageType' | 'resolvedHealPerRound'> = {};
+
+  if (effect.damagePerRound || effect.damagePerRoundPercent) {
+    const dotFlat = effect.damagePerRound ?? 0;
+    const dotPercent = damageForPercentCalc
+      ? Math.floor(damageForPercentCalc * (effect.damagePerRoundPercent ?? 0) / 100)
+      : 0;
+    snapshot.resolvedDamagePerRound = dotFlat + dotPercent;
+    snapshot.dotDamageType = effect.dotDamageType ?? 'magic';
+  }
+
+  if (effect.healPerRound) {
+    snapshot.resolvedHealPerRound = effect.healPerRound;
+  }
+
+  return snapshot;
 }
 
 // --- Action Execution ---
@@ -265,6 +372,7 @@ function executeOffensiveAction(
   combatantBAction: string,
   wasExhausted: boolean,
   interactionResult: string,
+  perActionScaling?: PerActionScaling,
 ): void {
   // Guaranteed miss (counter/ward blocked the attack)
   if (hitOverride === 'guaranteed_miss') {
@@ -284,8 +392,42 @@ function executeOffensiveAction(
     return;
   }
 
+  // Resolve per-action damage stats when scaling data is available (players),
+  // otherwise fall back to pre-computed combatant stats (mobs).
+  let baseDamageMin = actorStats.damageMin;
+  let baseDamageMax = actorStats.damageMax;
+  let baseAccuracy = actorStats.accuracy;
+
+  if (perActionScaling) {
+    const actionStats = resolveActionDamageStats(
+      action.scalingStat ?? 'weapon',
+      perActionScaling,
+    );
+    baseDamageMin = actionStats.damageMin;
+    baseDamageMax = actionStats.damageMax;
+    baseAccuracy = actionStats.accuracy;
+
+    // Re-apply buff/debuff modifiers from active effects (these were lost
+    // when per-action stats replaced the pre-computed effective stats)
+    for (const effect of state.activeEffects) {
+      if (effect.target !== actorKey) continue;
+      if (effect.stat === 'attack') { baseDamageMin += effect.modifier; baseDamageMax += effect.modifier; }
+      if (effect.stat === 'accuracy') baseAccuracy += effect.modifier;
+      if (effect.stat === 'damageMin') baseDamageMin += effect.modifier;
+      if (effect.stat === 'damageMax') baseDamageMax += effect.modifier;
+    }
+    // Apply guild damage multiplier
+    if (perActionScaling.guildDamageMultiplier && perActionScaling.guildDamageMultiplier > 0) {
+      baseDamageMin = Math.round(baseDamageMin * (1 + perActionScaling.guildDamageMultiplier));
+      baseDamageMax = Math.round(baseDamageMax * (1 + perActionScaling.guildDamageMultiplier));
+    }
+
+    baseDamageMin = Math.max(1, baseDamageMin);
+    baseDamageMax = Math.max(baseDamageMin, baseDamageMax);
+  }
+
   const attackRoll = hitOverride === 'guaranteed_hit' ? 20 : rollD20();
-  const accuracyBonus = actorStats.accuracy + (action.accuracyModifier ?? 0);
+  const accuracyBonus = baseAccuracy + (action.accuracyModifier ?? 0);
   const hits = hitOverride === 'guaranteed_hit' || doesAttackHit(attackRoll, accuracyBonus, targetStats.dodge, targetStats.evasion);
 
   if (!hits) {
@@ -309,12 +451,23 @@ function executeOffensiveAction(
     return;
   }
 
-  // Determine damage type — use action override or fall back to combatant stats
-  const damageType = action.damageType ?? actorStats.damageType;
-  const effectiveDefence = damageType === 'magic' ? targetStats.magicDefence : targetStats.defence;
+  // Resolve scaling stat for this action (used for damage type + XP tracking)
+  const resolvedScaling = perActionScaling
+    ? resolveScalingStat(action.scalingStat ?? 'weapon', perActionScaling.weaponRequiredSkill, perActionScaling.skillLevels)
+    : null;
+
+  // Determine damage type from the action.
+  // If the action doesn't specify, resolve from scalingStat:
+  // - 'weapon' scalingStat → use weapon's combat style (magic weapons deal magic damage)
+  // - explicit scalingStat → default to 'physical' (cross-type actions set damageType explicitly)
+  let actionDamageType: 'physical' | 'magic' = action.damageType ?? 'physical';
+  if (!action.damageType && (action.scalingStat ?? 'weapon') === 'weapon' && resolvedScaling) {
+    actionDamageType = resolvedScaling === 'magic' ? 'magic' : 'physical';
+  }
+  const effectiveDefence = actionDamageType === 'magic' ? targetStats.magicDefence : targetStats.defence;
 
   // Roll and apply damage multiplier from action
-  let rawDamage = rollDamage(actorStats.damageMin, actorStats.damageMax);
+  let rawDamage = rollDamage(baseDamageMin, baseDamageMax);
   const actionMultiplier = action.damageMultiplier ?? 1.0;
   rawDamage = Math.floor(rawDamage * actionMultiplier * interactionDamageMultiplier);
 
@@ -334,8 +487,26 @@ function executeOffensiveAction(
 
   applyDamage(state, opponent(actorKey), finalDamage);
 
+  // Resolved scaling stat for XP attribution (damage tracking + DOT source)
+  const xpStat = resolvedScaling ?? (actorStats.damageType === 'magic' ? 'magic' as const : 'melee' as const);
+
+  // Track damage by scaling stat for XP splitting (combatantA only)
+  if (actorKey === 'combatantA' && finalDamage > 0) {
+    state.combatantADamageByScalingStat[xpStat] += finalDamage;
+  }
+
+  // Life leech -- heal attacker for % of damage dealt
+  let leechHeal = 0;
+  if (action.lifeLeechPercent && action.lifeLeechPercent > 0 && finalDamage > 0) {
+    const rawLeech = Math.floor(finalDamage * action.lifeLeechPercent / 100);
+    if (rawLeech > 0) {
+      leechHeal = applyHeal(state, actorKey, rawLeech);
+    }
+  }
+
   const armorReduction = Math.floor(rawDamage * actualMultiplier * calculateDefenceReduction(effectiveDefence));
   const critText = crit ? ' CRITICAL HIT!' : '';
+  const leechText = leechHeal > 0 ? ` Leeches ${leechHeal} HP!` : '';
 
   state.log.push({
     round: state.round,
@@ -347,14 +518,15 @@ function executeOffensiveAction(
     rawDamage,
     isCritical: crit,
     ...(crit ? { critMultiplier: actualMultiplier } : {}),
+    ...(leechHeal > 0 ? { leechHeal } : {}),
     accuracyModifier: accuracyBonus,
     targetDodge: targetStats.dodge,
     targetEvasion: targetStats.evasion,
-    targetDefence: damageType === 'magic' ? undefined : targetStats.defence,
-    targetMagicDefence: damageType === 'magic' ? targetStats.magicDefence : undefined,
-    armorReduction: damageType === 'magic' ? undefined : armorReduction,
-    magicDefenceReduction: damageType === 'magic' ? armorReduction : undefined,
-    message: `${actorName} uses ${action.name} on ${targetName} for ${finalDamage} damage!${critText}`,
+    targetDefence: actionDamageType === 'magic' ? undefined : targetStats.defence,
+    targetMagicDefence: actionDamageType === 'magic' ? targetStats.magicDefence : undefined,
+    armorReduction: actionDamageType === 'magic' ? undefined : armorReduction,
+    magicDefenceReduction: actionDamageType === 'magic' ? armorReduction : undefined,
+    message: `${actorName} uses ${action.name} on ${targetName} for ${finalDamage} damage!${critText}${leechText}`,
     combatantAAction,
     combatantBAction,
     wasExhausted,
@@ -362,6 +534,43 @@ function executeOffensiveAction(
     ...hpSnapshot(state),
     ...resourceSnapshot(state),
   });
+
+  // Apply effect (DOT debuff on the target)
+  if (action.effect) {
+    const effect = action.effect;
+    const targetKey = effect.isDebuff !== false ? opponent(actorKey) : actorKey;
+
+    const newEffect: ActiveEffect = {
+      name: effect.name,
+      target: targetKey,
+      stat: effect.stat,
+      modifier: effect.modifier,
+      remainingRounds: effect.duration,
+      sourceScalingStat: xpStat,
+    };
+
+    Object.assign(newEffect, snapshotEffectValues(action.effect, finalDamage));
+
+    // Same-name effects refresh, not stack
+    const existingIdx = state.activeEffects.findIndex(
+      e => e.name === newEffect.name && e.target === newEffect.target,
+    );
+    if (existingIdx >= 0) {
+      state.activeEffects[existingIdx] = { ...state.activeEffects[existingIdx], ...newEffect };
+    } else {
+      // Debuffs always apply; buffs respect cap
+      if (effect.isDebuff) {
+        state.activeEffects.push(newEffect);
+      } else {
+        const activeBufCount = state.activeEffects.filter(
+          (e) => e.target === actorKey && e.stat !== 'potionSickness' && e.modifier >= 0,
+        ).length;
+        if (activeBufCount < COMBAT_ACTION_CONSTANTS.MAX_ACTIVE_BUFFS) {
+          state.activeEffects.push(newEffect);
+        }
+      }
+    }
+  }
 
   // Check for kill
   if (getHp(state, opponent(actorKey)) <= 0) {
@@ -420,20 +629,36 @@ function executeSupportiveAction(
     const effect = action.effect;
     const target = effect.isDebuff ? opponent(actorKey) : actorKey;
 
-    if (!effect.isDebuff) {
+    const newEffect: ActiveEffect = {
+      name: effect.name,
+      target,
+      stat: effect.stat,
+      modifier: effect.modifier,
+      remainingRounds: effect.duration,
+    };
+
+    Object.assign(newEffect, snapshotEffectValues(action.effect));
+
+    // Same-name effects refresh, not stack
+    const existingIdx = state.activeEffects.findIndex(
+      e => e.name === newEffect.name && e.target === newEffect.target,
+    );
+    if (existingIdx >= 0) {
+      state.activeEffects[existingIdx] = { ...state.activeEffects[existingIdx], ...newEffect };
+      appliedEffects.push({
+        stat: effect.stat,
+        modifier: effect.modifier,
+        duration: effect.duration,
+        target,
+      });
+    } else if (!effect.isDebuff) {
       const activeBufCount = state.activeEffects.filter(
         (e) => e.target === actorKey && e.stat !== 'potionSickness' && e.modifier >= 0,
       ).length;
       if (activeBufCount >= COMBAT_ACTION_CONSTANTS.MAX_ACTIVE_BUFFS) {
         // At buff cap — skip applying the new buff
       } else {
-        state.activeEffects.push({
-          name: effect.name,
-          target,
-          stat: effect.stat,
-          modifier: effect.modifier,
-          remainingRounds: effect.duration,
-        });
+        state.activeEffects.push(newEffect);
         appliedEffects.push({
           stat: effect.stat,
           modifier: effect.modifier,
@@ -443,13 +668,7 @@ function executeSupportiveAction(
       }
     } else {
       // Debuffs are always applied (no cap)
-      state.activeEffects.push({
-        name: effect.name,
-        target,
-        stat: effect.stat,
-        modifier: effect.modifier,
-        remainingRounds: effect.duration,
-      });
+      state.activeEffects.push(newEffect);
       appliedEffects.push({
         stat: effect.stat,
         modifier: effect.modifier,
@@ -699,6 +918,8 @@ export function runTemplateCombat(
     log: [],
     outcome: null,
     activeEffects: [],
+    combatantADamageByScalingStat: { melee: 0, ranged: 0, magic: 0 },
+    combatantAResourceCostByScalingStat: { melee: 0, ranged: 0, magic: 0 },
   };
 
   // Roll initiative
@@ -804,6 +1025,7 @@ export function runTemplateCombat(
         combatantAAction, combatantBAction,
         resolvedA.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
+        combatantA.perActionScaling,
       );
       deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
       deductMana(state, 'combatantB', resolvedB.action.cost.mana);
@@ -815,6 +1037,7 @@ export function runTemplateCombat(
         combatantAAction, combatantBAction,
         resolvedB.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
+        combatantB.perActionScaling,
       );
     } else {
       deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
@@ -826,6 +1049,7 @@ export function runTemplateCombat(
         combatantAAction, combatantBAction,
         resolvedB.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
+        combatantB.perActionScaling,
       );
       deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
       deductMana(state, 'combatantA', resolvedA.action.cost.mana);
@@ -837,10 +1061,26 @@ export function runTemplateCombat(
         combatantAAction, combatantBAction,
         resolvedA.wasExhausted, interactionResult,
         availablePotions, potionsConsumed,
+        combatantA.perActionScaling,
       );
     }
 
     if (state.outcome) break;
+
+    // Apply DOT/HOT ticks
+    applyEffectTicks(state, combatantA, combatantB);
+
+    // Check for DOT death
+    if (getHp(state, 'combatantA') <= 0 || getHp(state, 'combatantB') <= 0) {
+      if (getHp(state, 'combatantA') <= 0 && getHp(state, 'combatantB') <= 0) {
+        state.outcome = 'draw';
+      } else if (getHp(state, 'combatantA') <= 0) {
+        state.outcome = 'defeat';
+      } else {
+        state.outcome = 'victory';
+      }
+      break;
+    }
 
     // Tick effects (decrement duration, remove expired)
     tickEffects(state);
@@ -869,6 +1109,8 @@ export function runTemplateCombat(
     combatantBManaRemaining: state.combatantBMana,
     potionsConsumed,
     totalRounds: state.round,
+    damageByScalingStat: { ...state.combatantADamageByScalingStat },
+    resourceCostByScalingStat: { ...state.combatantAResourceCostByScalingStat },
   };
 }
 
@@ -889,6 +1131,7 @@ function executeAction(
   interactionResult: string,
   availablePotions: import('@adventure/shared').CombatPotion[],
   potionsConsumed: PotionConsumed[],
+  perActionScaling?: PerActionScaling,
 ): void {
   // Determine hit override, damage multiplier, and damage reduction for this actor
   const hitOverride = isAttacker ? interaction.attackerHitOverride : interaction.defenderHitOverride;
@@ -898,6 +1141,15 @@ function executeAction(
   // When A is executing their offensive action against B, B's defenderDamageReduction applies
   const dmgReduction = isAttacker ? interaction.defenderDamageReduction : interaction.attackerDamageReduction;
 
+  // Track resource cost by scaling stat for XP splitting (combatantA only)
+  if (actorKey === 'combatantA' && perActionScaling) {
+    const cost = action.cost.stamina + action.cost.mana;
+    if (cost > 0) {
+      const resolved = resolveScalingStat(action.scalingStat ?? 'weapon', perActionScaling.weaponRequiredSkill, perActionScaling.skillLevels);
+      state.combatantAResourceCostByScalingStat[resolved] += cost;
+    }
+  }
+
   if (action.category === 'offensive') {
     executeOffensiveAction(
       state, actorKey, actorStats, targetStats, action,
@@ -905,6 +1157,7 @@ function executeAction(
       actorName, targetName,
       combatantAAction, combatantBAction,
       wasExhausted, interactionResult,
+      perActionScaling,
     );
   } else if (action.category === 'supportive') {
     executeSupportiveAction(

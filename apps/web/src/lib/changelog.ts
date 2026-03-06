@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.26',
+    date: '2026-03-05',
+    title: 'Per-Action Scaling & XP Splitting',
+    summary:
+      'Combat actions now scale independently — Power Strike always uses your melee skill and Fire Bolt always uses magic, regardless of which weapon you hold. Equip a staff and use melee talents? They\'ll hit based on your melee level and strength, not your magic. Combat XP is now split proportionally across the skills you actually use: a fight mixing Power Strike and Fire Bolt awards both melee and magic XP based on how much damage each dealt. 8 new cross-type talent actions let you blend combat styles — Flame Sword deals magic damage with melee scaling, Venomous Strike poisons with a melee hit, and Life Drain heals you while casting. DOT and HOT effects tick between rounds with snapshotted damage. Equipment accuracy is universal and boosts all action types equally.',
+  },
+  {
     version: '0.25',
     date: '2026-03-05',
     title: 'Conditional Templates & Combat Playback Polish',

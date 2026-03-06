@@ -29,6 +29,7 @@ import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankSe
 import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildId } from '../../services/guildService';
+import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { incrementContractProgress } from '../../services/guildContractService';
 import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
@@ -52,7 +53,7 @@ import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from
 import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
-import { getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
+import { getMainHandAttackSkill, getSkillLevel, buildPerActionScaling, type AttackSkill } from '../../services/combatStatsService';
 import {
   startSchema,
   pickWeighted,
@@ -126,6 +127,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
     const attackSkill: AttackSkill = mainHandAttackSkill ?? 'melee';
     const attackLevel = await getSkillLevel(playerId, attackSkill);
+
+    const guildMods = await getPlayerGuildModifiers(playerId);
+    const perActionScaling = await buildPerActionScaling(playerId, {
+      equipmentStats,
+      attributes: progression.attributes,
+      weaponRequiredSkill: mainHandAttackSkill,
+      guildDamageMultiplier: guildMods.combatDamage,
+    });
 
     const explorationProgress = await getExplorationPercent(playerId, body.zoneId);
     const zoneTiers = zone.explorationTiers as Record<string, number> | null;
@@ -336,6 +345,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           maxMana,
           manaRegenPerRound,
           unlockedActions: explorationUnlockedActions,
+          perActionScaling,
         });
         const combatantB = mobToTemplateCombatant(prefixedMob);
         const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
@@ -359,7 +369,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
         let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
         let xpGain = 0;
-        let xpGrant: GrantXpResult | null = null;
+        let xpGrants: GrantXpResult[] = [];
 
         if (combatResult.outcome === 'victory') {
           currentHp = combatResult.combatantAHpRemaining;
@@ -371,13 +381,15 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             playerId,
             mob: prefixedMob,
             attackSkill,
+            damageByScalingStat: combatResult.damageByScalingStat,
+            resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           });
           loot = rewards.loot;
           if (rewards.pendingLootSessionId) {
             ambushPendingLootSessionIds.push(rewards.pendingLootSessionId);
           }
-          xpGrant = rewards.xpGrant;
-          xpGain = xpGrant.xpResult.xpAfterEfficiency;
+          xpGrants = rewards.xpGrants;
+          xpGain = xpGrants.reduce((sum, g) => sum + g.xpResult.xpAfterEfficiency, 0);
 
           pendingCombatLogs.push({
             turnsSpent: 0,
@@ -394,7 +406,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 baseXp: prefixedMob.xpReward,
                 loot,
                 durabilityLost,
-                skillXp: xpGrant ? serializeXpGrant(xpGrant) : null,
+                skillXpGrants: xpGrants.map(serializeXpGrant),
               },
               eventModifiers: ambushEventModifiers,
             }),
@@ -464,7 +476,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 baseXp: 0,
                 loot: [],
                 durabilityLost,
-                skillXp: null,
+                skillXpGrants: [],
               },
               eventModifiers: ambushEventModifiers,
             }),

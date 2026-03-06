@@ -119,7 +119,7 @@ export interface LastCombat {
       } | null;
       fullClearBonus?: boolean;
     } | null;
-    skillXp: {
+    skillXpGrants: Array<{
       skillType: string;
       xpGained: number;
       xpAfterEfficiency: number;
@@ -132,7 +132,7 @@ export interface LastCombat {
       characterLevelAfter: number;
       attributePointsAfter: number;
       characterLeveledUp: boolean;
-    } | null;
+    }>;
   };
 }
 

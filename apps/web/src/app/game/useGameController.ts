@@ -648,22 +648,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         xp: data.rewards.xp,
         loot: data.rewards.loot,
         siteCompletion: data.rewards.siteCompletion ?? null,
-        skillXp: data.rewards.skillXp
-          ? {
-              skillType: data.rewards.skillXp.skillType,
-              xpGained: data.rewards.skillXp.xpGained,
-              xpAfterEfficiency: data.rewards.skillXp.xpAfterEfficiency,
-              efficiency: data.rewards.skillXp.efficiency,
-              leveledUp: data.rewards.skillXp.leveledUp,
-              newLevel: data.rewards.skillXp.newLevel,
-              characterXpGain: data.rewards.skillXp.characterXpGain,
-              characterXpAfter: data.rewards.skillXp.characterXpAfter,
-              characterLevelBefore: data.rewards.skillXp.characterLevelBefore,
-              characterLevelAfter: data.rewards.skillXp.characterLevelAfter,
-              attributePointsAfter: data.rewards.skillXp.attributePointsAfter,
-              characterLeveledUp: data.rewards.skillXp.characterLeveledUp,
-            }
-          : null,
+        skillXpGrants: data.rewards.skillXpGrants ?? [],
       };
 
       // Build playback queue from fights[] or single-element queue for zone combat
@@ -689,22 +674,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
               xp: fight.xp,
               loot: fight.loot,
               siteCompletion: null as LastCombat['rewards']['siteCompletion'],
-              skillXp: fight.skillXp
-                ? {
-                    skillType: fight.skillXp.skillType,
-                    xpGained: fight.skillXp.xpGained,
-                    xpAfterEfficiency: fight.skillXp.xpAfterEfficiency,
-                    efficiency: fight.skillXp.efficiency,
-                    leveledUp: fight.skillXp.leveledUp,
-                    newLevel: fight.skillXp.newLevel,
-                    characterXpGain: fight.skillXp.characterXpGain,
-                    characterXpAfter: fight.skillXp.characterXpAfter,
-                    characterLevelBefore: fight.skillXp.characterLevelBefore,
-                    characterLevelAfter: fight.skillXp.characterLevelAfter,
-                    attributePointsAfter: fight.skillXp.attributePointsAfter,
-                    characterLeveledUp: fight.skillXp.characterLeveledUp,
-                  }
-                : null,
+              skillXpGrants: fight.skillXpGrants ?? [],
             } satisfies LastCombat['rewards'],
           };
         });
@@ -771,10 +741,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         }
       }
 
-      const skillXp = data.rewards?.skillXp;
-      if (skillXp?.leveledUp) {
-        const skillName = skillXp.skillType.charAt(0).toUpperCase() + skillXp.skillType.slice(1);
-        pushLog({ timestamp: nowStamp(), type: 'success', message: `🎉 ${skillName} leveled up to ${skillXp.newLevel}!` });
+      for (const grant of data.rewards?.skillXpGrants ?? []) {
+        if (grant.leveledUp) {
+          const skillName = grant.skillType.charAt(0).toUpperCase() + grant.skillType.slice(1);
+          pushLog({ timestamp: nowStamp(), type: 'success', message: `🎉 ${skillName} leveled up to ${grant.newLevel}!` });
+        }
       }
 
       logDurabilityWarnings(data.rewards.durabilityLost);
