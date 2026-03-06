@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DURABILITY_CONSTANTS } from '@adventure/shared';
+import { DURABILITY_CONSTANTS } from '@pocketrealm/shared';
 
 import { mockPrisma } from '../__test__/setup';
 import { degradeEquippedDurability, countCombatHits } from './durabilityService';

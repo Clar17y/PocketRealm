@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TRAINING_CONSTANTS } from '@adventure/shared';
+import { TRAINING_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('./equipmentService', () => ({
   getEquipmentStats: vi.fn().mockResolvedValue({
@@ -83,7 +83,7 @@ vi.mock('./combatLogMapper', () => ({
   mapTemplateCombatLog: vi.fn().mockImplementation((log: unknown[]) => log),
 }));
 
-vi.mock('@adventure/game-engine', () => ({
+vi.mock('@pocketrealm/game-engine', () => ({
   runTemplateCombat: vi.fn().mockReturnValue({
     outcome: 'victory',
     log: [],
@@ -227,7 +227,7 @@ describe('simulateFight', () => {
       prefix: 'Fierce',
     });
 
-    const { applyMobPrefix } = await import('@adventure/game-engine');
+    const { applyMobPrefix } = await import('@pocketrealm/game-engine');
 
     const result = await simulateFight('p1', 'mob-1', 'Fierce');
 

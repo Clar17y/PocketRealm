@@ -11,7 +11,7 @@ vi.mock('./turnBankService', () => ({
 }));
 
 import { mockPrisma } from '../__test__/setup';
-import { SKILL_POINT_CONSTANTS, ALWAYS_AVAILABLE_ACTION_IDS } from '@adventure/shared';
+import { SKILL_POINT_CONSTANTS, ALWAYS_AVAILABLE_ACTION_IDS } from '@pocketrealm/shared';
 import { spendPlayerTurnsTx } from './turnBankService';
 import {
   getSkillPoints,

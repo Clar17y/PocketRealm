@@ -3,7 +3,7 @@ import type {
   RouletteRoundState,
   RouletteBetType,
   RouletteHistoryEntry,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 
 export interface GoldExchangeResponse {
   turnsSpent: number;

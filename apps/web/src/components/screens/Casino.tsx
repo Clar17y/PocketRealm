@@ -10,14 +10,14 @@ import {
   CASINO_CONSTANTS,
   getNumberColor,
   getNumbersForBet,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import type {
   RouletteBetType,
   RouletteRoundState,
   RouletteHistoryEntry,
   RoulettePublicBet,
   CasinoResultEvent,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import type { SessionBet } from '@/hooks/useCasinoSocket';
 import { ScreenContainer } from '../common/ScreenContainer';
 
@@ -375,7 +375,7 @@ export function Casino({
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Coins size={16} className="text-[var(--rpg-gold)]" />
-          <span className="text-[var(--rpg-gold)] font-pixel text-[16px]">{gold.toLocaleString()}</span>
+          <span className="text-[var(--rpg-gold)] font-pixel text-[12px]">{gold.toLocaleString()}</span>
           <span className="text-[var(--rpg-text-secondary)]">gold</span>
         </div>
       </div>
@@ -405,7 +405,7 @@ export function Casino({
             max={turns}
             value={exchangeTurns}
             onChange={(e) => setExchangeTurns(Math.max(1, parseInt(e.target.value) || 0))}
-            className="flex-1 px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-[16px] font-pixel"
+            className="flex-1 px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-[12px] font-pixel"
             placeholder="Turns to exchange"
           />
           <PixelButton
@@ -613,7 +613,7 @@ export function Casino({
                 max={Math.min(CASINO_CONSTANTS.ROULETTE_MAX_BET, gold)}
                 value={betAmount}
                 onChange={(e) => setBetAmount(Math.max(1, parseInt(e.target.value) || 0))}
-                className="w-full px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-[16px] font-pixel"
+                className="w-full px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-[12px] font-pixel"
               />
             </div>
             <div className="flex items-end gap-1">
@@ -671,7 +671,7 @@ export function Casino({
                     <span className="text-xs text-[var(--rpg-text-secondary)]">
                       {formatBet(bet.betType, bet.betValue)}
                     </span>
-                    <span className="font-pixel text-[16px] text-[var(--rpg-gold)]">{bet.amount}g</span>
+                    <span className="font-pixel text-[12px] text-[var(--rpg-gold)]">{bet.amount}g</span>
                   </div>
                 </div>
               ))}
@@ -684,7 +684,7 @@ export function Casino({
         <PixelCard>
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-[var(--rpg-text-primary)] text-sm">My Bets</h3>
-            <span className={`font-pixel text-[16px] ${
+            <span className={`font-pixel text-[12px] ${
               sessionProfit >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'
             }`}>
               {sessionProfit >= 0 ? '+' : ''}{sessionProfit.toLocaleString()}g
@@ -834,7 +834,7 @@ function RoundPhaseIndicator({ phase, timeRemaining }: { phase: string; timeRema
       return (
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[var(--rpg-green-light)] animate-pulse" />
-          <span className="text-[16px] text-[var(--rpg-green-light)] font-pixel">{timeRemaining}s</span>
+          <span className="text-[12px] text-[var(--rpg-green-light)] font-pixel">{timeRemaining}s</span>
           <span className="text-xs text-[var(--rpg-text-secondary)]">betting open</span>
         </div>
       );

@@ -1,10 +1,10 @@
-import { prisma, Prisma } from '@adventure/database';
+import { prisma, Prisma } from '@pocketrealm/database';
 import {
   GUILD_PROJECT_DEFINITIONS,
   GUILD_PROJECT_CONSTANTS,
   getCategoryForTemplate,
   type GuildProjectDefinition,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { requireRole } from './guildService';
 import { spendPlayerTurnsTx } from './turnBankService';

@@ -1,8 +1,8 @@
-import { prisma, Prisma } from '@adventure/database';
+import { prisma, Prisma } from '@pocketrealm/database';
 import {
   GUILD_CONSTANTS, GuildData, GuildMemberData, GuildLogEntry, GuildSearchResult,
   type GuildRecruitmentMode, type GuildRole, type GuildSpecialization,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns } from './turnBankService';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';

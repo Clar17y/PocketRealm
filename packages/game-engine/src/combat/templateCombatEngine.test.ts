@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, afterEach } from 'vitest';
-import type { CombatantStats, ActionDefinition, CombatTemplateSlotData, PerActionScaling } from '@adventure/shared';
-import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@adventure/shared';
+import type { CombatantStats, ActionDefinition, CombatTemplateSlotData, PerActionScaling } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
 import { runTemplateCombat, type TemplateCombatant } from './templateCombatEngine';
 
 // --- Helpers ---

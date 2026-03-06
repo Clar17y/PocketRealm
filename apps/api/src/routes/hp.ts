@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { getHpState, rest, recover } from '../services/hpService';
 import { getTurnState } from '../services/turnBankService';
-import { calculateHealPerTurn, calculateRecoveryExitHp } from '@adventure/game-engine';
+import { calculateHealPerTurn, calculateRecoveryExitHp } from '@pocketrealm/game-engine';
 import { getPlayerProgressionState } from '../services/attributesService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';

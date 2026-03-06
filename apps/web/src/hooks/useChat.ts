@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@adventure/shared';
-import { CHAT_CONSTANTS } from '@adventure/shared';
+import type { ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@pocketrealm/shared';
+import { CHAT_CONSTANTS } from '@pocketrealm/shared';
 import { getSocket, connectSocket, disconnectSocket } from '@/lib/socket';
 import { getChatHistory } from '@/lib/api';
 

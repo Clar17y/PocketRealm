@@ -1,7 +1,7 @@
 import type { Server, Socket } from 'socket.io';
-import { prisma } from '@adventure/database';
-import { ACHIEVEMENTS_BY_ID, CHAT_CONSTANTS } from '@adventure/shared';
-import type { ChatChannelType, ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import { ACHIEVEMENTS_BY_ID, CHAT_CONSTANTS } from '@pocketrealm/shared';
+import type { ChatChannelType, ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@pocketrealm/shared';
 import { checkRateLimit, saveMessage } from '../services/chatService';
 
 // In-memory pinned messages keyed by channelId (ephemeral, lost on server restart)

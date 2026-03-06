@@ -34,7 +34,7 @@ import { createSocketServer, getIo } from './socket';
 import { checkAndResolveDueBossRounds } from './services/bossEncounterService';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
 import { refreshAllLeaderboards } from './services/leaderboardService';
-import { LEADERBOARD_CONSTANTS } from '@adventure/shared';
+import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -124,7 +124,7 @@ const server = http.createServer(app);
 createSocketServer(server, isAllowedCorsOrigin);
 
 server.listen(PORT, () => {
-  console.log(`Adventure API running on port ${PORT}`);
+  console.log(`PocketRealm API running on port ${PORT}`);
 
   // Boss round resolution timer (every 60 seconds)
   setInterval(() => {

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Prisma, prisma } from '@adventure/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { authenticate } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -9,7 +9,7 @@ import { addStackableItem } from '../services/inventoryService';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { normalizePlayerAttributes } from '../services/attributesService';
-import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity } from '@adventure/game-engine';
+import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity } from '@pocketrealm/game-engine';
 import {
   CHARACTER_CONSTANTS,
   SKILL_CONSTANTS,
@@ -21,7 +21,7 @@ import {
   type EquipmentSlot,
   type ItemType,
   type ItemStats,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 
 const router = Router();
 router.use(authenticate, requireAdmin);

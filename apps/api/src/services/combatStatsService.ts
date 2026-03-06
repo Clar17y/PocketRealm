@@ -1,5 +1,5 @@
-import { prisma } from '@adventure/database';
-import type { PerActionScaling, SkillType } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import type { PerActionScaling, SkillType } from '@pocketrealm/shared';
 import type { EquipmentStats } from './equipmentService';
 
 export type AttackSkill = 'melee' | 'ranged' | 'magic';

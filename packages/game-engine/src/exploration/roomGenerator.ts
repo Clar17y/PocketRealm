@@ -1,5 +1,5 @@
-import { ROOM_CONSTANTS } from '@adventure/shared';
-import type { EncounterSiteSize } from '@adventure/shared';
+import { ROOM_CONSTANTS } from '@pocketrealm/shared';
+import type { EncounterSiteSize } from '@pocketrealm/shared';
 
 interface RoomLayout {
   roomNumber: number;

@@ -29,7 +29,7 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 bg-[var(--rpg-surface)] border-b border-[var(--rpg-border)] z-40 pt-[env(safe-area-inset-top)] rpg-header-border">
         <div className="max-w-lg mx-auto h-14 px-4 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-[var(--rpg-gold)] font-almendra rpg-gold-text-glow">Adventure</h1>
+          <h1 className="text-lg font-bold text-[var(--rpg-gold)] font-almendra rpg-gold-text-glow">PocketRealm</h1>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm">
               <Image
@@ -39,7 +39,7 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
                 height={24}
                 className="image-rendering-pixelated"
               />
-              <span className="font-pixel text-[16px] text-[var(--rpg-gold)]">{turns.toLocaleString()}</span>
+              <span className="font-pixel text-[12px] text-[var(--rpg-gold)]">{turns.toLocaleString()}</span>
             </div>
             {username && (
               <div

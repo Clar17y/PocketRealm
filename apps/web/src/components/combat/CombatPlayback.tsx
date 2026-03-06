@@ -267,17 +267,17 @@ export function CombatPlayback({
               return <span className={color}>🧪 {displayLabel ?? 'Potion'}: +{lastEntry.healAmount} {label}</span>;
             }
             if (lastEntry.evaded) return <span className="text-[var(--rpg-blue-light)]">Dodged!</span>;
-            if (lastEntry.isCritical) return <span className="text-[var(--rpg-gold)] font-bold">Critical Hit! <span className="font-pixel font-normal text-[16px]">{lastEntry.damage}</span> dmg</span>;
+            if (lastEntry.isCritical) return <span className="text-[var(--rpg-gold)] font-bold">Critical Hit! <span className="font-pixel font-normal text-[12px]">{lastEntry.damage}</span> dmg</span>;
             if (lastEntry.damage && lastEntry.damage > 0 && lastEntry.healAmount && lastEntry.healAmount > 0) {
               const rl = lastEntry.healResourceType === 'stamina' ? 'STA' : lastEntry.healResourceType === 'mana' ? 'MP' : 'HP';
-              return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}<span className="font-pixel text-[16px] text-[var(--rpg-red)]">{lastEntry.damage}</span> dmg, <span className="font-pixel text-[16px] text-[var(--rpg-green-light)]">+{lastEntry.healAmount}</span> {rl}</span>;
+              return <span className="text-[var(--rpg-text-primary)]">{displayLabel ? `${displayLabel}: ` : ''}<span className="font-pixel text-[12px] text-[var(--rpg-red)]">{lastEntry.damage}</span> dmg, <span className="font-pixel text-[12px] text-[var(--rpg-green-light)]">+{lastEntry.healAmount}</span> {rl}</span>;
             }
-            if (lastEntry.damage && lastEntry.damage > 0) return <span className="text-[var(--rpg-red)]">{displayLabel ? `${displayLabel}: ` : ''}<span className="font-pixel text-[16px]">{lastEntry.damage}</span> dmg</span>;
+            if (lastEntry.damage && lastEntry.damage > 0) return <span className="text-[var(--rpg-red)]">{displayLabel ? `${displayLabel}: ` : ''}<span className="font-pixel text-[12px]">{lastEntry.damage}</span> dmg</span>;
             if (lastEntry.healAmount && lastEntry.healAmount > 0) {
               const rt2 = lastEntry.healResourceType;
               const c2 = rt2 === 'stamina' ? 'text-teal-400' : rt2 === 'mana' ? 'text-[var(--rpg-blue-light)]' : 'text-[var(--rpg-green-light)]';
               const l2 = rt2 === 'stamina' ? 'STA' : rt2 === 'mana' ? 'MP' : 'HP';
-              return <span className={c2}>{displayLabel ? `${displayLabel}: ` : ''}<span className="font-pixel text-[16px]">+{lastEntry.healAmount}</span> {l2}</span>;
+              return <span className={c2}>{displayLabel ? `${displayLabel}: ` : ''}<span className="font-pixel text-[12px]">+{lastEntry.healAmount}</span> {l2}</span>;
             }
             if (lastEntry.effectsApplied && lastEntry.effectsApplied.length > 0) {
               const e = lastEntry.effectsApplied[0];

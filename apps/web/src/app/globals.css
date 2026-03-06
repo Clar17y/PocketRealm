@@ -241,9 +241,8 @@ body {
   text-shadow: 0 0 12px var(--rpg-gold-glow);
 }
 
-/* Silkscreen is an 8px-grid bitmap font — only renders cleanly at multiples of 8.
-   Disable anti-aliasing so 1px strokes (4, %) stay crisp.
-   Use text-[8px], text-[16px], or text-[24px] instead of text-xs/sm/lg. */
+/* Silkscreen bitmap font — disable anti-aliasing so 1px strokes stay crisp.
+   Avoid bold weight (renders poorly). */
 .font-pixel,
 [class*="font-pixel"] {
   -webkit-font-smoothing: none;

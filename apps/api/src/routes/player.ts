@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '@adventure/database';
-import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID } from '@adventure/shared';
-import { shouldResetWindowCap } from '@adventure/game-engine';
+import { prisma } from '@pocketrealm/database';
+import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
+import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { ensureEquipmentSlots } from '../services/equipmentService';

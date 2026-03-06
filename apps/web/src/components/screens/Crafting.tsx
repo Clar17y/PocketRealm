@@ -130,7 +130,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
             XP Rate
             <XpRateTooltip />
           </div>
-          <div className="text-[16px] font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
+          <div className="text-[12px] font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>
 
@@ -271,7 +271,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
               selectedBaseStats.map(([stat, value]) => (
                 <div key={stat} className="flex items-center justify-between text-sm">
                   <span className="text-[var(--rpg-text-primary)]">{prettyStatName(stat)}</span>
-                  <span className="text-[var(--rpg-green-light)] font-pixel text-[16px]">+{formatStatValue(stat, value)}</span>
+                  <span className="text-[var(--rpg-green-light)] font-pixel text-[12px]">+{formatStatValue(stat, value)}</span>
                 </div>
               ))
             )}
@@ -298,7 +298,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                     <div className="flex justify-between items-baseline">
                       <span className="text-sm text-[var(--rpg-text-primary)]">{material.name}</span>
                       <span
-                        className={`text-[16px] font-pixel ${
+                        className={`text-[12px] font-pixel ${
                           hasEnough ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'
                         }`}
                       >
@@ -375,7 +375,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                 >
                   <Minus size={14} />
                 </button>
-                <span className="text-[16px] font-pixel text-[var(--rpg-gold)] w-10 text-center">{quantity}</span>
+                <span className="text-[12px] font-pixel text-[var(--rpg-gold)] w-10 text-center">{quantity}</span>
                 <button
                   onClick={() => setQuantity((q) => Math.min(selectedMax, q + 1))}
                   disabled={quantity >= selectedMax}

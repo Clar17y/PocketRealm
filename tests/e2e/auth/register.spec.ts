@@ -9,7 +9,7 @@ test.describe('Register', () => {
     await page.locator('#username').fill(`e2e_reg_${id}`);
     await page.locator('#email').fill(`e2e_reg_${id}@test.com`);
     await page.locator('#password').fill('TestPassword123!');
-    await page.getByRole('button', { name: 'Begin Adventure' }).click();
+    await page.getByRole('button', { name: 'Begin Journey' }).click();
     await page.waitForURL('/game');
     await expect(page.getByText('Available Turns')).toBeVisible();
   });
@@ -25,7 +25,7 @@ test.describe('Register', () => {
     await page.locator('#username').fill(username);
     await page.locator('#email').fill(email1);
     await page.locator('#password').fill('TestPassword123!');
-    await page.getByRole('button', { name: 'Begin Adventure' }).click();
+    await page.getByRole('button', { name: 'Begin Journey' }).click();
     await page.waitForURL('/game');
 
     // Clear tokens and try duplicate
@@ -37,7 +37,7 @@ test.describe('Register', () => {
     await page.locator('#username').fill(username);
     await page.locator('#email').fill(email2);
     await page.locator('#password').fill('TestPassword123!');
-    await page.getByRole('button', { name: 'Begin Adventure' }).click();
+    await page.getByRole('button', { name: 'Begin Journey' }).click();
     await expect(page.locator('p[class*="rpg-red"]')).toBeVisible();
   });
 
@@ -46,7 +46,7 @@ test.describe('Register', () => {
     await page.locator('#username').fill('ab');
     await page.locator('#email').fill('short@test.com');
     await page.locator('#password').fill('TestPassword123!');
-    await page.getByRole('button', { name: 'Begin Adventure' }).click();
+    await page.getByRole('button', { name: 'Begin Journey' }).click();
     // HTML5 validation prevents submission — check we're still on register
     await expect(page).toHaveURL(/\/register/);
   });
@@ -56,7 +56,7 @@ test.describe('Register', () => {
     await page.locator('#username').fill('validuser');
     await page.locator('#email').fill('weak@test.com');
     await page.locator('#password').fill('short');
-    await page.getByRole('button', { name: 'Begin Adventure' }).click();
+    await page.getByRole('button', { name: 'Begin Journey' }).click();
     await expect(page).toHaveURL(/\/register/);
   });
 
@@ -67,7 +67,7 @@ test.describe('Register', () => {
     await page.locator('#username').fill(`e2e_redir_${id}`);
     await page.locator('#email').fill(`e2e_redir_${id}@test.com`);
     await page.locator('#password').fill('TestPassword123!');
-    await page.getByRole('button', { name: 'Begin Adventure' }).click();
+    await page.getByRole('button', { name: 'Begin Journey' }).click();
     await page.waitForURL('/game');
 
     // Try to visit register again

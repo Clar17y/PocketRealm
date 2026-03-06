@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import {
   ALL_SKILLS,
   CRAFTING_CONSTANTS,
@@ -8,8 +8,8 @@ import {
   type ItemStats,
   type ItemType,
   type SkillType,
-} from '@adventure/shared';
-import { calculateCraftingTurnDiscount } from '@adventure/game-engine';
+} from '@pocketrealm/shared';
+import { calculateCraftingTurnDiscount } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { getSkillLevel } from '../../services/combatStatsService.js';
 

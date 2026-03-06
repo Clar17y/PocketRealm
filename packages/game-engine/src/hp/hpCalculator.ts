@@ -1,4 +1,4 @@
-import { HP_CONSTANTS } from '@adventure/shared';
+import { HP_CONSTANTS } from '@pocketrealm/shared';
 
 export interface HpCalculationInput {
   vitalityLevel: number;

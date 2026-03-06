@@ -112,7 +112,7 @@ export default function RegisterPage() {
           )}
 
           <PixelButton type="submit" variant="primary" disabled={loading} className="mt-2">
-            {loading ? 'Creating account...' : 'Begin Adventure'}
+            {loading ? 'Creating account...' : 'Begin Journey'}
           </PixelButton>
         </form>
 

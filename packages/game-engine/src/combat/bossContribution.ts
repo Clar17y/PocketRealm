@@ -1,4 +1,4 @@
-import { BOSS_ENCOUNTER_CONSTANTS } from '@adventure/shared';
+import { BOSS_ENCOUNTER_CONSTANTS } from '@pocketrealm/shared';
 
 export interface BossContributionInput {
   totalDamage: number;

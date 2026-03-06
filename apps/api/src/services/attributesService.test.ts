@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_PLAYER_ATTRIBUTES } from '@adventure/shared';
+import { DEFAULT_PLAYER_ATTRIBUTES } from '@pocketrealm/shared';
 
 import { mockPrisma } from '../__test__/setup';
 import {

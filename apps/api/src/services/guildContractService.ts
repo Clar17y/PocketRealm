@@ -1,10 +1,10 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import {
   GUILD_CONTRACT_DEFINITIONS,
   GUILD_CONTRACT_CONSTANTS,
   type GuildContractData,
   type GuildContractType,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { addGuildXp, checkGuildAchievementsForAllMembers } from './guildService';
 
 // ---------------------------------------------------------------------------

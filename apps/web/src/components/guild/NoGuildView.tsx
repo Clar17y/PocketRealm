@@ -10,7 +10,7 @@ import {
   createGuild, searchGuilds, joinGuild, requestJoinGuild,
   type GuildResponse,
 } from '@/lib/api';
-import { GUILD_CONSTANTS } from '@adventure/shared';
+import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 

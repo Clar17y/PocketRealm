@@ -8,7 +8,7 @@ import {
   getGuildJoinRequests, acceptJoinRequest, rejectJoinRequest,
   type GuildResponse, type GuildJoinRequestResponse,
 } from '@/lib/api';
-import { GUILD_CONSTANTS } from '@adventure/shared';
+import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 
 // ---------------------------------------------------------------------------
 // Join Requests (sub-section of settings)

@@ -1,5 +1,5 @@
-import type { ActionDefinition, CombatTemplateSlotData, ActiveEffect, CombatActor } from '@adventure/shared';
-import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@adventure/shared';
+import type { ActionDefinition, CombatTemplateSlotData, ActiveEffect, CombatActor } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
 import { evaluateCondition } from './conditionEvaluator';
 
 // --- Result Types ---

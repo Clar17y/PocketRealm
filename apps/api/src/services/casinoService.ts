@@ -1,5 +1,5 @@
-import { prisma } from '@adventure/database';
-import { CASINO_CONSTANTS, getNumberColor } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import { CASINO_CONSTANTS, getNumberColor } from '@pocketrealm/shared';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
@@ -10,7 +10,7 @@ import {
   calculatePayout,
   validateBet,
   generateSpinResult,
-} from '@adventure/game-engine';
+} from '@pocketrealm/game-engine';
 import type {
   RouletteBetType,
   RouletteRoundState,
@@ -18,7 +18,7 @@ import type {
   CasinoBetEvent,
   CasinoResultEvent,
   CasinoPhaseEvent,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 
 export interface GoldExchangeResult {
   turnsSpent: number;

@@ -1,5 +1,5 @@
 import type { Server as SocketServer } from 'socket.io';
-import type { ChatChannelType, ChatMessageEvent } from '@adventure/shared';
+import type { ChatChannelType, ChatMessageEvent } from '@pocketrealm/shared';
 import { saveMessage } from './chatService';
 
 const SYSTEM_PLAYER_ID = '00000000-0000-0000-0000-000000000000';

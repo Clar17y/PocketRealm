@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { Prisma } from '@adventure/database';
-import { EXPLORATION_CONSTANTS } from '@adventure/shared';
-import type { PotionConsumed, EncounterSiteSize, EncounterMobRole, EncounterMobStatus, EncounterMobSlot } from '@adventure/shared';
+import { Prisma } from '@pocketrealm/database';
+import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
+import type { PotionConsumed, EncounterSiteSize, EncounterMobRole, EncounterMobStatus, EncounterMobSlot } from '@pocketrealm/shared';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { grantSkillXp } from '../../services/xpService';
 import type { LootDropWithName } from '../../services/lootService';

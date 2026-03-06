@@ -1,5 +1,5 @@
 import { fetchApi } from './core';
-import type { CombatTemplateSlotData, CombatTemplateData } from '@adventure/shared';
+import type { CombatTemplateSlotData, CombatTemplateData } from '@pocketrealm/shared';
 
 export async function getTemplates() {
   return fetchApi<{ templates: CombatTemplateData[] }>('/api/v1/templates');

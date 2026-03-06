@@ -5,8 +5,8 @@ import type {
   BossTemplateAction,
   BossActiveEffect,
   BossTargetMode,
-} from '@adventure/shared';
-import { COMBAT_CONSTANTS } from '@adventure/shared';
+} from '@pocketrealm/shared';
+import { COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import { resolveAction } from './actionResolver';
 import {
   addDamageThreat,

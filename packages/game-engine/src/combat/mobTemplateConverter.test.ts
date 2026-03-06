@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { MobTemplate, SpellAction } from '@adventure/shared';
-import { BASE_ACTION_DEFINITIONS } from '@adventure/shared';
+import type { MobTemplate, SpellAction } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 import {
   mobToTemplate,
   buildMobActionDefinitions,

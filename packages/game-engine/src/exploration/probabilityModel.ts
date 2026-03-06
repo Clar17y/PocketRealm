@@ -1,4 +1,4 @@
-import { EXPLORATION_CONSTANTS, WORLD_EVENT_CONSTANTS } from '@adventure/shared';
+import { EXPLORATION_CONSTANTS, WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 
 export type ExplorationOutcomeType =
   | 'ambush'

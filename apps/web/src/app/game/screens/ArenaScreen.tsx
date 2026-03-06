@@ -22,7 +22,7 @@ import {
 } from '@/lib/api';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
-import { PVP_CONSTANTS } from '@adventure/shared';
+import { PVP_CONSTANTS } from '@pocketrealm/shared';
 import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
 import { Swords, Eye, Trophy, Bell, ChevronLeft, ChevronRight, Medal, Shield } from 'lucide-react';
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable';
@@ -204,7 +204,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
           Arena Locked
         </p>
         <p className="text-sm text-[var(--rpg-text-secondary)]">
-          Reach character level <span className="font-pixel font-normal text-[16px]">{PVP_CONSTANTS.MIN_CHARACTER_LEVEL}</span> to compete in the Arena.
+          Reach character level <span className="font-pixel font-normal text-[12px]">{PVP_CONSTANTS.MIN_CHARACTER_LEVEL}</span> to compete in the Arena.
         </p>
         <div className="mt-3 w-full bg-[var(--rpg-background)] rounded-full h-2 overflow-hidden">
           <div
@@ -229,11 +229,11 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-[var(--rpg-background)] rounded-lg p-2 text-center">
           <div className="text-xs text-[var(--rpg-text-secondary)]">Rating</div>
-          <div className="text-[16px] text-[var(--rpg-gold)] font-pixel">{rating.rating}</div>
+          <div className="text-[12px] text-[var(--rpg-gold)] font-pixel">{rating.rating}</div>
         </div>
         <div className="bg-[var(--rpg-background)] rounded-lg p-2 text-center">
           <div className="text-xs text-[var(--rpg-text-secondary)]">Record</div>
-          <div className="text-[16px] font-pixel">
+          <div className="text-[12px] font-pixel">
             <span className="text-[var(--rpg-green-light)]">{rating.wins}</span>
             <span className="text-[var(--rpg-text-secondary)]"> / </span>
             <span className="text-[var(--rpg-red)]">{rating.losses}</span>
@@ -245,11 +245,11 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
         </div>
         <div className="bg-[var(--rpg-background)] rounded-lg p-2 text-center">
           <div className="text-xs text-[var(--rpg-text-secondary)]">Win Streak</div>
-          <div className="text-[16px] text-[var(--rpg-text-primary)] font-pixel">{rating.winStreak}</div>
+          <div className="text-[12px] text-[var(--rpg-text-primary)] font-pixel">{rating.winStreak}</div>
         </div>
         <div className="bg-[var(--rpg-background)] rounded-lg p-2 text-center">
           <div className="text-xs text-[var(--rpg-text-secondary)]">Best Rating</div>
-          <div className="text-[16px] text-[var(--rpg-gold)] font-pixel">{rating.bestRating}</div>
+          <div className="text-[12px] text-[var(--rpg-gold)] font-pixel">{rating.bestRating}</div>
         </div>
       </div>
     </PixelCard>
@@ -291,7 +291,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
             {lastResult.attackerName} vs {lastResult.defenderName}
             {lastResult.isDraw && ' — 100 rounds, no winner'}
           </p>
-          <p className="text-[16px] font-pixel mt-1">
+          <p className="text-[12px] font-pixel mt-1">
             Rating:{' '}
             <span className={lastResult.attackerRatingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}>
               {lastResult.attackerRatingChange >= 0 ? '+' : ''}{lastResult.attackerRatingChange}
@@ -489,7 +489,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-[16px] font-pixel ${isDraw ? 'text-[var(--rpg-text-secondary)]' : ratingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
+                    <span className={`text-[12px] font-pixel ${isDraw ? 'text-[var(--rpg-text-secondary)]' : ratingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
                       {isDraw ? '—' : `${ratingChange >= 0 ? '+' : ''}${ratingChange}`}
                     </span>
                     <ChevronRight size={14} className={`text-[var(--rpg-text-secondary)] transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
@@ -535,7 +535,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
           >
             <ChevronLeft size={18} />
           </button>
-          <span className="text-[16px] text-[var(--rpg-text-secondary)] font-pixel">
+          <span className="text-[12px] text-[var(--rpg-text-secondary)] font-pixel">
             {historyPagination.page} / {historyPagination.totalPages}
           </span>
           <button
@@ -586,7 +586,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`text-[16px] font-pixel ${notif.defenderRatingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
+                <span className={`text-[12px] font-pixel ${notif.defenderRatingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}`}>
                   {notif.defenderRatingChange >= 0 ? '+' : ''}{notif.defenderRatingChange}
                 </span>
               </div>

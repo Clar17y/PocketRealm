@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '@adventure/database';
-import { getMobPrefixDefinition, COMBAT_CONSTANTS } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import { getMobPrefixDefinition, COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { buildPagination } from '../../utils/routeHelpers.js';

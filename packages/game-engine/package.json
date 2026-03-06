@@ -1,5 +1,5 @@
 {
-  "name": "@adventure/game-engine",
+  "name": "@pocketrealm/game-engine",
   "version": "0.1.0",
   "private": true,
   "main": "./dist/index.js",
@@ -10,7 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@adventure/shared": "*",
+    "@pocketrealm/shared": "*",
     "@typescript-eslint/eslint-plugin": "8.54.0",
     "@typescript-eslint/parser": "8.54.0",
     "eslint": "9.39.2",

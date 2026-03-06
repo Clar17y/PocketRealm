@@ -1,5 +1,5 @@
-import { CHEST_CONSTANTS } from '@adventure/shared';
-import type { EncounterSiteSize } from '@adventure/shared';
+import { CHEST_CONSTANTS } from '@pocketrealm/shared';
+import type { EncounterSiteSize } from '@pocketrealm/shared';
 export type { EncounterSiteSize };
 export type ChestRarity = 'common' | 'uncommon' | 'rare';
 

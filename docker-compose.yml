@@ -3,11 +3,11 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: adventure-postgres
+    container_name: pocketrealm-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: adventure
+      POSTGRES_DB: pocketrealm
     ports:
       - "5433:5432"
     volumes:
@@ -15,7 +15,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: adventure-redis
+    container_name: pocketrealm-redis
     ports:
       - "6379:6379"
     volumes:

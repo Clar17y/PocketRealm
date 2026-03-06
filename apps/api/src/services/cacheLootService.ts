@@ -1,5 +1,5 @@
-import { Prisma } from '@adventure/database';
-import { HIDDEN_CACHE_CONSTANTS, GEM_CONSTANTS, levelToGemTier } from '@adventure/shared';
+import { Prisma } from '@pocketrealm/database';
+import { HIDDEN_CACHE_CONSTANTS, GEM_CONSTANTS, levelToGemTier } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
 import type { PendingLootItem } from './pendingLootService';

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ITEM_RARITY_CONSTANTS } from '@adventure/shared';
-import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@adventure/game-engine';
+import { ITEM_RARITY_CONSTANTS } from '@pocketrealm/shared';
+import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@pocketrealm/game-engine';
 import { Anvil, Sparkles, TrendingUp } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -231,7 +231,7 @@ export function Forge({
 
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Forge</h2>
-        <div className="text-sm text-[var(--rpg-text-secondary)]">Luck: <span className="font-pixel text-[16px]">{equippedLuck}</span></div>
+        <div className="text-sm text-[var(--rpg-text-secondary)]">Luck: <span className="font-pixel text-[12px]">{equippedLuck}</span></div>
       </div>
 
       {noFacility && (

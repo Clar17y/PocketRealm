@@ -1,6 +1,6 @@
-import { prisma } from '@adventure/database';
-import { calculateSellPrice } from '@adventure/game-engine';
-import type { ItemRarity } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import { calculateSellPrice } from '@pocketrealm/game-engine';
+import type { ItemRarity } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
 function itemSellPrice(item: {

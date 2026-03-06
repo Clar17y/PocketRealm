@@ -364,7 +364,7 @@ async function seedRecipes() {
     });
 }
 async function main() {
-    console.log('Seeding Adventure RPG...');
+    console.log('Seeding PocketRealm...');
     await seedZones();
     await seedItemTemplates();
     await seedMobs();

@@ -1,7 +1,7 @@
-import { prisma, Prisma } from '@adventure/database';
-import type { CombatTemplate, CombatTemplateSlot } from '@adventure/database';
-import type { CombatTemplateSlotData, CombatTemplateData, SlotCondition } from '@adventure/shared';
-import { ALWAYS_AVAILABLE_ACTION_IDS, SKILL_POINT_CONSTANTS } from '@adventure/shared';
+import { prisma, Prisma } from '@pocketrealm/database';
+import type { CombatTemplate, CombatTemplateSlot } from '@pocketrealm/database';
+import type { CombatTemplateSlotData, CombatTemplateData, SlotCondition } from '@pocketrealm/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
 export interface CreateSlotInput {

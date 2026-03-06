@@ -70,8 +70,8 @@ import {
   exchangeGold,
   placeRouletteBet,
 } from '@/lib/api';
-import type { CombatTemplateData, ResourceState } from '@adventure/shared';
-import type { RouletteBetType } from '@adventure/shared';
+import type { CombatTemplateData, ResourceState } from '@pocketrealm/shared';
+import type { RouletteBetType } from '@pocketrealm/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
 import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';

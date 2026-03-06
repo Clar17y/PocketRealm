@@ -1,4 +1,4 @@
-import { MANA_CONSTANTS } from '@adventure/shared';
+import { MANA_CONSTANTS } from '@pocketrealm/shared';
 
 export interface ManaCalculationInput {
   magicLevel: number;

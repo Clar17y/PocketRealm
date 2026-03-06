@@ -1,4 +1,4 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { prismaAny } from '../utils/prismaAny.js';
 
 

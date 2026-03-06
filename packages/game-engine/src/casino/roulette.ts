@@ -1,5 +1,5 @@
-import { CASINO_CONSTANTS, getNumberColor, getNumbersForBet } from '@adventure/shared';
-import type { RouletteBetType } from '@adventure/shared';
+import { CASINO_CONSTANTS, getNumberColor, getNumbersForBet } from '@pocketrealm/shared';
+import type { RouletteBetType } from '@pocketrealm/shared';
 
 export { getNumberColor };
 

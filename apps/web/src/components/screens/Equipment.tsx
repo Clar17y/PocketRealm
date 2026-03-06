@@ -7,7 +7,7 @@ import { StatBar } from '@/components/StatBar';
 import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, X, Zap } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
-import { DURABILITY_CONSTANTS } from '@adventure/shared';
+import { DURABILITY_CONSTANTS } from '@pocketrealm/shared';
 import { getStaggerDelay } from '@/lib/animations';
 import { numStat, formatSignedStatValue, signedClass, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
@@ -306,7 +306,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Sword size={16} className="text-[var(--rpg-red)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Attack</span>
-                          <span className={`ml-auto font-pixel text-[16px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack'), 'text-[var(--rpg-red)]')}`}>
+                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack'), 'text-[var(--rpg-red)]')}`}>
                             {formatSignedStatValue('attack', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack'))}
                           </span>
                         </div>
@@ -315,7 +315,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Shield size={16} className="text-[var(--rpg-blue-light)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Armor</span>
-                          <span className={`ml-auto font-pixel text-[16px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor'), 'text-[var(--rpg-blue-light)]')}`}>
+                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor'), 'text-[var(--rpg-blue-light)]')}`}>
                             {formatSignedStatValue('armor', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor'))}
                           </span>
                         </div>
@@ -324,7 +324,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Sparkles size={16} className="text-[var(--rpg-purple)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Magic Def</span>
-                          <span className={`ml-auto font-pixel text-[16px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence'), 'text-[var(--rpg-purple)]')}`}>
+                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence'), 'text-[var(--rpg-purple)]')}`}>
                             {formatSignedStatValue('magicDefence', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence'))}
                           </span>
                         </div>
@@ -333,7 +333,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Heart size={16} className="text-[var(--rpg-green-light)]" />
                           <span className="text-[var(--rpg-text-secondary)]">HP</span>
-                          <span className={`ml-auto font-pixel text-[16px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health'), 'text-[var(--rpg-green-light)]')}`}>
+                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health'), 'text-[var(--rpg-green-light)]')}`}>
                             {formatSignedStatValue('health', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health'))}
                           </span>
                         </div>
@@ -342,7 +342,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Zap size={16} className="text-[var(--rpg-gold)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Dodge</span>
-                          <span className={`ml-auto font-pixel text-[16px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge'), 'text-[var(--rpg-gold)]')}`}>
+                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge'), 'text-[var(--rpg-gold)]')}`}>
                             {formatSignedStatValue('dodge', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge'))}
                           </span>
                         </div>
@@ -351,7 +351,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Crosshair size={16} className="text-[var(--rpg-blue-light)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Accuracy</span>
-                          <span className={`ml-auto font-pixel text-[16px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy'), 'text-[var(--rpg-blue-light)]')}`}>
+                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy'), 'text-[var(--rpg-blue-light)]')}`}>
                             {formatSignedStatValue('accuracy', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy'))}
                           </span>
                         </div>
@@ -360,7 +360,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <div className="flex items-center gap-2">
                           <Backpack size={16} className="text-[var(--rpg-gold)]" />
                           <span className="text-[var(--rpg-text-secondary)]">Inventory Slots</span>
-                          <span className="ml-auto font-pixel text-[16px] text-[var(--rpg-gold)]">
+                          <span className="ml-auto font-pixel text-[12px] text-[var(--rpg-gold)]">
                             +{totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'inventorySlots')}
                           </span>
                         </div>
@@ -575,7 +575,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                       <span className="text-[8px] font-bold text-[var(--rpg-red)] bg-[var(--rpg-red)]/10 px-1 rounded">BROKEN</span>
                     )}
                   </div>
-                  <span className="font-pixel text-[16px] text-[var(--rpg-text-secondary)]">{r.turnCost}</span>
+                  <span className="font-pixel text-[12px] text-[var(--rpg-text-secondary)]">{r.turnCost}</span>
                 </div>
               ))}
             </div>
@@ -583,7 +583,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             <div className="border-t border-[var(--rpg-border)] pt-3 mb-3">
               <div className="flex justify-between text-sm font-bold">
                 <span className="text-[var(--rpg-text-primary)]">Total Cost</span>
-                <span className="font-pixel font-normal text-[16px] text-[var(--rpg-gold)]">{totalRepairCost} turns</span>
+                <span className="font-pixel font-normal text-[12px] text-[var(--rpg-gold)]">{totalRepairCost} turns</span>
               </div>
             </div>
 

@@ -11,8 +11,8 @@ import {
   activateTemplate,
 } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
-import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@adventure/shared';
-import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@adventure/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@pocketrealm/shared';
+import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
 import { ScreenContainer } from '../common/ScreenContainer';
 
@@ -147,8 +147,8 @@ function groupBadge(group: string) {
 function ActionCostLabel({ cost }: { cost: { stamina: number; mana: number } }) {
   return (
     <div className="flex gap-2 text-[10px] text-[var(--rpg-text-secondary)]">
-      {cost.stamina > 0 && <span>Stam: <span className="font-pixel text-[16px]">{cost.stamina}</span></span>}
-      {cost.mana > 0 && <span>Mana: <span className="font-pixel text-[16px]">{cost.mana}</span></span>}
+      {cost.stamina > 0 && <span>Stam: <span className="font-pixel text-[12px]">{cost.stamina}</span></span>}
+      {cost.mana > 0 && <span>Mana: <span className="font-pixel text-[12px]">{cost.mana}</span></span>}
       {cost.stamina === 0 && cost.mana === 0 && <span>Free</span>}
     </div>
   );
@@ -685,19 +685,19 @@ export function Templates({
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Stamina cost:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{cycleCost.stamina}</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{cycleCost.stamina}</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Mana cost:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{cycleCost.mana}</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{cycleCost.mana}</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Stamina regen:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{staminaPerCycle}/cycle</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{staminaPerCycle}/cycle</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Mana regen:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{manaPerCycle}/cycle</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[12px]">{manaPerCycle}/cycle</span>
               </div>
             </div>
             <div className="mt-2 space-y-1 text-xs">

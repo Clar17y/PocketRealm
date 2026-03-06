@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler';
-import { Prisma, prisma } from '@adventure/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { createActivityLog } from '../../services/activityLogService';
 import {
   applyMobEventModifiers,
@@ -13,7 +13,7 @@ import {
   mobToCombatantStats,
   filterAndWeightMobsByTier,
   selectTierWithBleedthrough,
-} from '@adventure/game-engine';
+} from '@pocketrealm/game-engine';
 import {
   COMBAT_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
@@ -21,7 +21,7 @@ import {
   type LootDrop,
   type MobTemplate,
   type PotionConsumed,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { enrichLootWithNames } from '../../services/lootService';
 import type { LootDropWithName } from '../../services/lootService';

@@ -1,4 +1,4 @@
-import { TIER_BLEED_CONSTANTS, ZONE_EXPLORATION_CONSTANTS, resolveZoneTiers, getHighestUnlockedTier } from '@adventure/shared';
+import { TIER_BLEED_CONSTANTS, ZONE_EXPLORATION_CONSTANTS, resolveZoneTiers, getHighestUnlockedTier } from '@pocketrealm/shared';
 
 interface MobWithTier {
   id: string;

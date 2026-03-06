@@ -1,8 +1,8 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { redis } from '../redis';
-import { buildPlayerCombatStats, runTemplateCombat, mobToTemplateCombatant, applyMobPrefix } from '@adventure/game-engine';
-import type { TemplateCombatResult } from '@adventure/game-engine';
-import { TRAINING_CONSTANTS } from '@adventure/shared';
+import { buildPlayerCombatStats, runTemplateCombat, mobToTemplateCombatant, applyMobPrefix } from '@pocketrealm/game-engine';
+import type { TemplateCombatResult } from '@pocketrealm/game-engine';
+import { TRAINING_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getEquipmentStats } from './equipmentService';
 import { getPlayerProgressionState } from './attributesService';

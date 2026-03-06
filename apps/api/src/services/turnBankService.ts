@@ -1,6 +1,6 @@
-import { Prisma, prisma } from '@adventure/database';
-import { calculateCurrentTurns, calculateTimeToCapMs, spendTurns } from '@adventure/game-engine';
-import { TURN_CONSTANTS } from '@adventure/shared';
+import { Prisma, prisma } from '@pocketrealm/database';
+import { calculateCurrentTurns, calculateTimeToCapMs, spendTurns } from '@pocketrealm/game-engine';
+import { TURN_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
 export interface TurnState {

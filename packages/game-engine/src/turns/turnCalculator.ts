@@ -1,4 +1,4 @@
-import { TURN_CONSTANTS } from '@adventure/shared';
+import { TURN_CONSTANTS } from '@pocketrealm/shared';
 
 /**
  * Calculate turns accumulated since last regeneration.

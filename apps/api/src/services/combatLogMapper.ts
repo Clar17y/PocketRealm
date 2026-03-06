@@ -1,4 +1,4 @@
-import { getActionDefinition } from '@adventure/shared';
+import { getActionDefinition } from '@pocketrealm/shared';
 
 /**
  * Maps template combat engine log entries (combatant-indexed fields) to

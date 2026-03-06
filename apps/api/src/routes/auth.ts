@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
-import { prisma } from '@adventure/database';
-import { TURN_CONSTANTS, ALL_SKILLS } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import { TURN_CONSTANTS, ALL_SKILLS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import {
   generateAccessToken,

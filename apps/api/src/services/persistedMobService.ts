@@ -1,7 +1,7 @@
-import { prisma } from '@adventure/database';
-import { WORLD_EVENT_CONSTANTS } from '@adventure/shared';
-import type { PersistedMobData } from '@adventure/shared';
-import { calculatePersistedMobHp } from '@adventure/game-engine';
+import { prisma } from '@pocketrealm/database';
+import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
+import type { PersistedMobData } from '@pocketrealm/shared';
+import { calculatePersistedMobHp } from '@pocketrealm/game-engine';
 
 function toPersistedMobData(row: {
   id: string;

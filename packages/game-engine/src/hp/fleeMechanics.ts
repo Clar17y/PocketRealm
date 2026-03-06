@@ -1,5 +1,5 @@
-import { FLEE_CONSTANTS } from '@adventure/shared';
-import type { FleeOutcome } from '@adventure/shared';
+import { FLEE_CONSTANTS } from '@pocketrealm/shared';
+import type { FleeOutcome } from '@pocketrealm/shared';
 
 export interface FleeInput {
   evasionLevel: number;

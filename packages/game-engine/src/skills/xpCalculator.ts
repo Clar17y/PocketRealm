@@ -7,7 +7,7 @@ import {
   PROCESSING_SKILLS,
   CRAFTING_SKILLS,
   SkillXpResult,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 

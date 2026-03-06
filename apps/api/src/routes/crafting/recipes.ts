@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { prisma } from '@adventure/database';
-import type { CraftingMaterial } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import type { CraftingMaterial } from '@pocketrealm/shared';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { prismaAny, parseMaterials, buildRecipeDiscoveryHint } from './helpers';
 

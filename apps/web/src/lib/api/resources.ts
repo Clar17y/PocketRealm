@@ -1,5 +1,5 @@
 import { fetchApi } from './core';
-import type { ResourceState } from '@adventure/shared';
+import type { ResourceState } from '@pocketrealm/shared';
 
 export interface CombatResourceResponse {
   stamina: ResourceState;

@@ -79,7 +79,7 @@ describe('formatCombatShareText', () => {
     };
 
     const text = formatCombatShareText(input);
-    expect(text).toContain('Adventure Combat Log');
+    expect(text).toContain('PocketRealm Combat Log');
     expect(text).toContain('Outcome: victory');
     expect(text).toContain('Mob: Goblin');
     expect(text).toContain('Zone: Dark Forest');

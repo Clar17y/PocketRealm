@@ -5,7 +5,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { Pagination } from '@/components/common/Pagination';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import { getGuildLog, type GuildLogResponse } from '@/lib/api';
-import { GUILD_CONSTANTS } from '@adventure/shared';
+import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 
 interface GuildActivityLogProps {
   guildId: string;

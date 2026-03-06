@@ -1,6 +1,6 @@
-import { prisma } from '@adventure/database';
-import type { EquipmentSlot, SkillType } from '@adventure/shared';
-import { ALL_EQUIPMENT_SLOTS, ALL_SKILLS } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import type { EquipmentSlot, SkillType } from '@pocketrealm/shared';
+import { ALL_EQUIPMENT_SLOTS, ALL_SKILLS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
 export interface EquipmentStats {

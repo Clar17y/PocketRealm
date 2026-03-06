@@ -7,7 +7,7 @@ const crimsonText = Crimson_Text({ weight: ['400', '600', '700'], style: ['norma
 const silkscreen = Silkscreen({ weight: ['400', '700'], subsets: ['latin'], variable: '--font-pixel', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'Adventure RPG — Turn-Based Async RPG',
+  title: 'PocketRealm — Turn-Based Async RPG',
   description: 'A turn-based RPG that respects your time. Explore 11 zones, battle 80+ monsters, master 14 crafting skills, and raid world bosses. Play free or go Champion.',
   manifest: '/manifest.json',
 };

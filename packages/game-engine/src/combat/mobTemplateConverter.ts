@@ -1,5 +1,5 @@
-import type { MobTemplate, SpellAction, CombatTemplateSlotData, ActionDefinition } from '@adventure/shared';
-import { BASE_ACTION_DEFINITIONS } from '@adventure/shared';
+import type { MobTemplate, SpellAction, CombatTemplateSlotData, ActionDefinition } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 import { mobToCombatantStats } from './damageCalculator';
 import type { TemplateCombatant } from './templateCombatEngine';
 

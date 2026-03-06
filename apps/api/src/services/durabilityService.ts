@@ -1,5 +1,5 @@
-import { Prisma, prisma } from '@adventure/database';
-import { DURABILITY_CONSTANTS, type CombatLogEntry, type CombatActor, type DurabilityLoss } from '@adventure/shared';
+import { Prisma, prisma } from '@pocketrealm/database';
+import { DURABILITY_CONSTANTS, type CombatLogEntry, type CombatActor, type DurabilityLoss } from '@pocketrealm/shared';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;

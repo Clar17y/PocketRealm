@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ActiveEffect, SlotCondition } from '@adventure/shared';
+import type { ActiveEffect, SlotCondition } from '@pocketrealm/shared';
 import { evaluateCondition } from './conditionEvaluator';
 
 describe('evaluateCondition', () => {

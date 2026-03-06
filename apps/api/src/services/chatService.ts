@@ -1,6 +1,6 @@
-import { prisma } from '@adventure/database';
-import { ACHIEVEMENTS_BY_ID, CHAT_CONSTANTS } from '@adventure/shared';
-import type { ChatChannelType, ChatMessageEvent, ChatMessageType } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import { ACHIEVEMENTS_BY_ID, CHAT_CONSTANTS } from '@pocketrealm/shared';
+import type { ChatChannelType, ChatMessageEvent, ChatMessageType } from '@pocketrealm/shared';
 
 // In-memory rate limiter: key = "playerId:channelType" → last send timestamp
 const lastSendTimes = new Map<string, number>();
