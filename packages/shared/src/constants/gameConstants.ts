@@ -67,7 +67,7 @@ export const SLOT_STAT_POOLS: Record<string, { primary: string[]; utility: strin
   belt: { primary: ['armor', 'magicDefence', 'health'], utility: ['luck', 'inventorySlots'] },
   ring: { primary: ['luck', 'accuracy', 'critChance', 'critDamage'], utility: ['dodge'] },
   charm: { primary: ['luck', 'accuracy', 'dodge', 'critChance', 'critDamage'], utility: ['health'] },
-  backpack: { primary: [], utility: [] },
+  backpack: { primary: ['inventorySlots'], utility: ['luck'] },
 };
 
 // =============================================================================
