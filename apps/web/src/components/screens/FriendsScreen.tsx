@@ -18,6 +18,7 @@ import {
 import type { SparResponse } from '@/lib/api';
 import type { FriendListEntry, FriendRequest, BlockedPlayer } from '@pocketrealm/shared';
 import { FRIEND_CONSTANTS } from '@pocketrealm/shared';
+import { relativeTime } from '@/lib/format';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
 import { SubNav } from '@/components/common/SubNav';
 import { LoadingCard } from '@/components/common/LoadingCard';
@@ -39,21 +40,6 @@ interface FriendsScreenProps {
 }
 
 type FriendsView = 'list' | 'incoming' | 'outgoing' | 'blocked';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -596,7 +582,7 @@ export function FriendsScreen({
                       Lv.{r.characterLevel}
                     </span>
                     <span className="ml-2 text-xs text-[var(--rpg-text-secondary)]">
-                      {formatRelativeTime(r.createdAt)}
+                      {relativeTime(r.createdAt)}
                     </span>
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
@@ -645,7 +631,7 @@ export function FriendsScreen({
                       Lv.{r.characterLevel}
                     </span>
                     <span className="ml-2 text-xs text-[var(--rpg-text-secondary)]">
-                      {formatRelativeTime(r.createdAt)}
+                      {relativeTime(r.createdAt)}
                     </span>
                   </div>
                   <PixelButton

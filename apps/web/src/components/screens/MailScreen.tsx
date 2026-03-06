@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { MAIL_CONSTANTS } from '@pocketrealm/shared';
 import type { FriendMailEntry, FriendListEntry } from '@pocketrealm/shared';
+import { relativeTime } from '@/lib/format';
 import { ScreenContainer } from '../common/ScreenContainer';
 import { PixelCard } from '../PixelCard';
 import { PixelButton } from '../PixelButton';
@@ -222,20 +223,6 @@ export function MailScreen({
   // Render helpers
   // -----------------------------------------------------------------------
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return d.toLocaleDateString();
-  };
-
   const tabs: { id: MailView; label: string; count?: number }[] = [
     { id: 'inbox', label: 'Inbox', count: inboxTotal },
     { id: 'sent', label: 'Sent', count: sentTotal },
@@ -344,7 +331,6 @@ export function MailScreen({
           onBack={() => { setSelectedMail(null); setActiveView(returnView); }}
           onReply={() => handleReply(selectedMail)}
           onDelete={() => void handleDelete(selectedMail.id)}
-          formatDate={formatDate}
         />
       )}
     </ScreenContainer>
@@ -423,7 +409,7 @@ export function MailScreen({
                     </span>
                   </div>
                   <span className="text-[10px] text-[var(--rpg-text-secondary)] opacity-60 mt-0.5 block">
-                    {formatDate(mail.createdAt)}
+                    {relativeTime(mail.createdAt)}
                   </span>
                 </button>
 
@@ -576,14 +562,12 @@ export function MailScreen({
     onBack,
     onReply,
     onDelete: onDel,
-    formatDate: fmtDate,
   }: {
     mail: FriendMailEntry;
     playerId: string | null;
     onBack: () => void;
     onReply: () => void;
     onDelete: () => void;
-    formatDate: (iso: string) => string;
   }) {
     const isSentByMe = mail.senderId === pid;
 
@@ -616,7 +600,7 @@ export function MailScreen({
               </div>
               <div className="text-sm font-semibold text-[var(--rpg-text-primary)]">{mail.subject}</div>
               <div className="text-[10px] text-[var(--rpg-text-secondary)] opacity-60">
-                {fmtDate(mail.createdAt)} &middot; {new Date(mail.createdAt).toLocaleString()}
+                {relativeTime(mail.createdAt)} &middot; {new Date(mail.createdAt).toLocaleString()}
               </div>
             </div>
 
