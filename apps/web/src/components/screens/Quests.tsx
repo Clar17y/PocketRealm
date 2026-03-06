@@ -197,12 +197,11 @@ function ShopItemCard({
             </span>
           </div>
           <PixelButton
-            variant="gold"
+            variant="secondary"
             size="sm"
-            onClick={() => onBuy(item.key)}
-            disabled={!canAfford || isBuying}
+            disabled
           >
-            {isBuying ? '...' : 'Buy'}
+            Coming Soon
           </PixelButton>
         </div>
       </div>
