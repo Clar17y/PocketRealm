@@ -246,7 +246,7 @@ export function TalentTree({
                             {node.name}
                           </span>
                           <span
-                            className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                            className="text-[10px] font-medium px-1.5 py-0.5 rounded"
                             style={{
                               color: activeTabMeta.color,
                               borderColor: activeTabMeta.color,
