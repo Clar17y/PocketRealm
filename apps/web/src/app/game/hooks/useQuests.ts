@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getQuests, claimQuestReward, claimDailyBonus, rerollQuest } from '@/lib/api';
 import type { PlayerQuestData, PlayerQuestStateData } from '@pocketrealm/shared';
 
@@ -25,6 +25,11 @@ export function useQuests() {
       setQuestsLoading(false);
     }
   }, []);
+
+  // Load quests on mount so badge count is available on the home screen
+  useEffect(() => {
+    void loadQuests();
+  }, [loadQuests]);
 
   const handleClaimQuestReward = useCallback(async (questId: string) => {
     const res = await claimQuestReward(questId);

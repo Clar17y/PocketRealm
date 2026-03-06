@@ -1189,7 +1189,7 @@ export default function GamePage() {
               { id: 'zones', label: 'Map' },
               { id: 'worldEvents', label: 'Events' },
               { id: 'achievements', label: 'Achievements', badge: achievementUnclaimedCount },
-              { id: 'quests', label: 'Quests' },
+              { id: 'quests', label: 'Quests', badge: quests.filter(q => q.status === 'completed').length },
               { id: 'leaderboard', label: 'Rankings' },
               { id: 'bestiary', label: 'Bestiary' },
               { id: 'skills', label: 'Skills' },
@@ -1276,7 +1276,7 @@ export default function GamePage() {
       <BottomNav
         activeTab={getActiveTab()}
         onNavigate={handleNavigate}
-        badgeTabs={achievementUnclaimedCount > 0 ? new Set(['home']) : undefined}
+        badgeTabs={(achievementUnclaimedCount > 0 || quests.some(q => q.status === 'completed')) ? new Set(['home']) : undefined}
         pulseTabs={tutorialPulseTabs}
       />
       <TutorialDialog
