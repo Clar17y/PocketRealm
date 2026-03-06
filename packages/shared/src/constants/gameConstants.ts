@@ -1295,7 +1295,7 @@ export const QUEST_TEMPLATE_DEFINITIONS: readonly QuestTemplateDefinition[] = [
   // Daily — Exploration
   { key: 'explore_turns',   name: 'Explore the Wilds',   description: 'Spend {target} turns exploring',            category: 'exploration', cadence: 'daily',  progressType: 'exploration_turns', targets: { low: 200, mid: 500, high: 1000 },   rewards: { low: [3, 5], mid: [4, 6], high: [6, 8] } },
   { key: 'open_chests',     name: 'Treasure Seeker',     description: 'Open {target} treasure chests',             category: 'exploration', cadence: 'daily',  progressType: 'chest_open',        targets: { low: 2, mid: 4, high: 8 },          rewards: { low: [4, 6], mid: [5, 8], high: [7, 10] } },
-  { key: 'travel_zones',    name: 'Wanderer',            description: 'Travel to {target} different zones',        category: 'exploration', cadence: 'daily',  progressType: 'zone_travel',       targets: { low: 2, mid: 3, high: 5 },          rewards: { low: [3, 4], mid: [4, 5], high: [5, 6] }, unlockCondition: 'multi_zone' },
+  { key: 'travel_zones',    name: 'Wanderer',            description: 'Travel to {target} zones',        category: 'exploration', cadence: 'daily',  progressType: 'zone_travel',       targets: { low: 2, mid: 3, high: 5 },          rewards: { low: [3, 4], mid: [4, 5], high: [5, 6] }, unlockCondition: 'multi_zone' },
   // Daily — Gathering
   { key: 'gather_resources', name: 'Resource Run',       description: 'Gather resources {target} times',           category: 'gathering',   cadence: 'daily',  progressType: 'gather_actions',    targets: { low: 15, mid: 30, high: 60 },       rewards: { low: [3, 5], mid: [4, 6], high: [6, 8] } },
   // Daily — Crafting

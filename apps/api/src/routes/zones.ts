@@ -259,6 +259,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       newDiscoveries = discoveredZones;
     }
 
+    void trackProgress(playerId, 'zone_travel', 1).catch(() => {});
+
     res.json({
       zone: { id: destinationZone.id, name: destinationZone.name, zoneType: destinationZone.zoneType },
       turns: await getTurnSnapshot(),
