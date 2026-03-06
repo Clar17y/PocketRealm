@@ -16,6 +16,7 @@ import { rollGemCritBatch, computeEventTurnCost } from '@pocketrealm/game-engine
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
+import { getBuffValue, consumeBuffIfActive } from '../services/buffService';
 import { trackProgress } from '../services/progressService';
 
 export const gatheringRouter = Router();
@@ -310,10 +311,12 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { resourceType: template.resourceType });
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
   const guildMods = await getPlayerGuildModifiers(playerId);
+  const shopGatheringYield = await getBuffValue(playerId, 'gathering_yield');
 
-  // Guild bonus applies per action (permanent infrastructure benefit)
-  const guildYieldPerAction = guildMods.gatheringYield > 0
-    ? Math.max(1, Math.floor(baseYieldPerAction * (1 + guildMods.gatheringYield)))
+  // Guild + shop buff bonus applies per action
+  const combinedYieldBonus = guildMods.gatheringYield + shopGatheringYield;
+  const guildYieldPerAction = combinedYieldBonus > 0
+    ? Math.max(1, Math.floor(baseYieldPerAction * (1 + combinedYieldBonus)))
     : baseYieldPerAction;
 
   // yield_down → increase turn cost (so players still collect the full amount)
@@ -390,6 +393,13 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       stack: minedStack,
     };
   });
+
+  // Consume shop gathering yield buff (one use per gather action)
+  if (shopGatheringYield > 0) {
+    await (prisma as any).$transaction(async (tx: any) => {
+      await consumeBuffIfActive(tx, playerId, 'gathering_yield');
+    });
+  }
 
   // XP: scaled by node level requirement
   const xpPerAction = GATHERING_CONSTANTS.XP_PER_ACTION_BASE

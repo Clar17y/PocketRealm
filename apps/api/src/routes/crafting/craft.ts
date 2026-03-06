@@ -21,6 +21,7 @@ import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
+import { getBuffValue, consumeBuffIfActive } from '../../services/buffService';
 import { trackProgress } from '../../services/progressService';
 import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
 import {
@@ -136,6 +137,9 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       return { turnSpend: spent, taxResult: tax };
     });
 
+    // Fetch shop crafting crit buff (consumed after crafting)
+    const shopCraftingCrit = await getBuffValue(playerId, 'crafting_crit');
+
     // Create result items (stack where possible)
     const craftedItemIds: string[] = [];
     const craftedItemDetails: Array<{
@@ -183,8 +187,9 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         : 'resource';
       const equipStats = await getEquipmentStats(playerId);
       const guildMods = await getPlayerGuildModifiers(playerId);
-      const effectiveLuck = guildMods.craftingCrit > 0
-        ? equipStats.luck + Math.floor(guildMods.craftingCrit / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
+      const combinedCritBonus = guildMods.craftingCrit + shopCraftingCrit;
+      const effectiveLuck = combinedCritBonus > 0
+        ? equipStats.luck + Math.floor(combinedCritBonus / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
         : equipStats.luck;
       const templateBaseStats = recipe.resultTemplate.baseStats as ItemStats | null | undefined;
 
@@ -235,6 +240,13 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
           craftedItemDetails.push({ id: created.id, isCrit: false, rarity });
         }
       }
+    }
+
+    // Consume shop crafting crit buff (one use per craft action)
+    if (shopCraftingCrit > 0) {
+      await (prisma as any).$transaction(async (tx: any) => {
+        await consumeBuffIfActive(tx, playerId, 'crafting_crit');
+      });
     }
 
     const xpGrant = await grantSkillXp(playerId, recipe.skillType, recipe.xpReward * quantity);
