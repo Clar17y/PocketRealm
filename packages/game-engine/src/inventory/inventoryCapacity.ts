@@ -1,5 +1,5 @@
-import { INVENTORY_CONSTANTS, ITEM_RARITY_CONSTANTS } from '@adventure/shared';
-import type { ItemRarity } from '@adventure/shared';
+import { INVENTORY_CONSTANTS, ITEM_RARITY_CONSTANTS } from '@pocketrealm/shared';
+import type { ItemRarity } from '@pocketrealm/shared';
 
 const RARITY_INDEX: Record<string, number> = {};
 ITEM_RARITY_CONSTANTS.ORDER.forEach((r, i) => { RARITY_INDEX[r] = i; });

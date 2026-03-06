@@ -16,7 +16,7 @@ vi.mock('../services/bossEncounterService', () => ({
 vi.mock('../services/attributesService', () => ({
   normalizePlayerAttributes: vi.fn((attrs: any) => attrs ?? { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 }),
 }));
-vi.mock('@adventure/game-engine', () => ({
+vi.mock('@pocketrealm/game-engine', () => ({
   xpForLevel: vi.fn((lvl: number) => lvl * 100),
   characterLevelFromXp: vi.fn((xp: number) => Math.floor(xp / 100)),
   rollMobPrefix: vi.fn(() => null),

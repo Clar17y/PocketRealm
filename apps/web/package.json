@@ -1,5 +1,5 @@
 {
-  "name": "@adventure/web",
+  "name": "@pocketrealm/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,8 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@adventure/game-engine": "*",
-    "@adventure/shared": "*",
+    "@pocketrealm/game-engine": "*",
+    "@pocketrealm/shared": "*",
     "eslint": "9.39.2",
     "next": "^16.1.6",
     "react": "^18.2.0",

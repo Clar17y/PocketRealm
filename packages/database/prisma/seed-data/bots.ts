@@ -1,5 +1,5 @@
 import { randomUUID, randomBytes } from 'crypto';
-import { HP_CONSTANTS } from '@adventure/shared';
+import { HP_CONSTANTS } from '@pocketrealm/shared';
 import { IDS } from './ids';
 
 // ── Types ────────────────────────────────────────────────────────────────────

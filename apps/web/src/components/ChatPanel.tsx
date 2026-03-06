@@ -2,9 +2,9 @@
 
 import { useRef, useEffect, useState, type FormEvent } from 'react';
 import { MessageCircle, Send, X } from 'lucide-react';
-import { CHAT_CONSTANTS } from '@adventure/shared';
+import { CHAT_CONSTANTS } from '@pocketrealm/shared';
 import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
-import type { ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@adventure/shared';
+import type { ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@pocketrealm/shared';
 import type { ChatChannel } from '@/hooks/useChat';
 
 interface ChatPanelProps {

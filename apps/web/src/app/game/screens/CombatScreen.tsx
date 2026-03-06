@@ -18,7 +18,7 @@ import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
-import { getMobPrefixDefinition, HP_CONSTANTS } from '@adventure/shared';
+import { getMobPrefixDefinition, HP_CONSTANTS } from '@pocketrealm/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../gameController.types';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
 
@@ -337,7 +337,7 @@ export function CombatScreen({
           {roomTransition && (
             <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)]/30 rounded-lg p-6 text-center">
               <div className="text-lg font-bold text-[var(--rpg-gold)] mb-1">
-                Entering Room <span className="font-pixel font-normal text-[16px]">{roomTransition.entering}</span>
+                Entering Room <span className="font-pixel font-normal text-[12px]">{roomTransition.entering}</span>
               </div>
               <div className="text-sm text-[var(--rpg-text-secondary)]">
                 Prepare for the next fight...
@@ -351,8 +351,8 @@ export function CombatScreen({
               {fightProgress && fightProgress.total > 1 && (
                 <div className="text-sm text-[var(--rpg-gold)] font-semibold mb-2">
                   {fightProgress.room
-                    ? <>Room <span className="font-pixel font-normal text-[16px]">{fightProgress.room}</span> — Fight <span className="font-pixel font-normal text-[16px]">{fightProgress.current}/{fightProgress.total}</span></>
-                    : <>Fight <span className="font-pixel font-normal text-[16px]">{fightProgress.current}/{fightProgress.total}</span></>
+                    ? <>Room <span className="font-pixel font-normal text-[12px]">{fightProgress.room}</span> — Fight <span className="font-pixel font-normal text-[12px]">{fightProgress.current}/{fightProgress.total}</span></>
+                    : <>Fight <span className="font-pixel font-normal text-[12px]">{fightProgress.current}/{fightProgress.total}</span></>
                   }
                 </div>
               )}

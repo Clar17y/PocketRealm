@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import {

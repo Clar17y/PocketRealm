@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Prisma, prisma } from '@adventure/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { prismaAny } from '../../utils/prismaAny.js';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
@@ -14,7 +14,7 @@ import {
   selectTierWithBleedthrough,
   simulateExploration,
   validateExplorationTurns,
-} from '@adventure/game-engine';
+} from '@pocketrealm/game-engine';
 import {
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
@@ -23,7 +23,7 @@ import {
   type CombatOptions,
   type MobTemplate,
   type PotionConsumed,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankService';
 import { enterRecoveringState, setHp } from '../../services/hpService';

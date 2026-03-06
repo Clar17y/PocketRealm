@@ -1,6 +1,6 @@
-import { Prisma, prisma } from '@adventure/database';
-import type { TaxInfo } from '@adventure/shared';
-import { calculateCurrentTurns, calculateTimeToCapMs } from '@adventure/game-engine';
+import { Prisma, prisma } from '@pocketrealm/database';
+import type { TaxInfo } from '@pocketrealm/shared';
+import { calculateCurrentTurns, calculateTimeToCapMs } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { calculateTreasuryCap } from './guildService';
 import { spendPlayerTurnsTx, type SpendTurnsResult } from './turnBankService';

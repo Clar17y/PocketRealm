@@ -1,5 +1,5 @@
-import { prisma } from '@adventure/database';
-import { GUILD_CONSTANTS, type GuildData } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import { GUILD_CONSTANTS, type GuildData } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import {
   requireRole, addGuildLog, calculateMaxMembers,

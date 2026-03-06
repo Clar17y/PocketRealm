@@ -1,4 +1,4 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import {
   GUILD_CONSTANTS,
   GUILD_UPGRADE_DEFINITIONS,
@@ -6,7 +6,7 @@ import {
   GUILD_SPECIALIZATION_DEFINITIONS,
   type GuildUpgradeData,
   type GuildUpgradeEffectType,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { requireRole } from './guildService';
 import { isActiveWithinWindow } from './guildService';

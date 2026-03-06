@@ -1,5 +1,5 @@
-import { Prisma, prisma } from '@adventure/database';
-import type { CombatPotion, CombatTemplateSlotData, ConsumableEffect, ConsumableEffectType, PotionConsumed } from '@adventure/shared';
+import { Prisma, prisma } from '@pocketrealm/database';
+import type { CombatPotion, CombatTemplateSlotData, ConsumableEffect, ConsumableEffectType, PotionConsumed } from '@pocketrealm/shared';
 
 const POTION_ACTION_IDS = new Set(['use_hp_potion', 'use_stamina_potion', 'use_mana_potion']);
 

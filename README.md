@@ -1,4 +1,4 @@
-# Adventure RPG
+# PocketRealm
 
 Turn-based async RPG monorepo with a Next.js web client, Express API, Prisma/PostgreSQL data layer, and shared TypeScript game logic packages.
 
@@ -21,13 +21,13 @@ Turn-based async RPG monorepo with a Next.js web client, Express API, Prisma/Pos
 | Web | Next.js 16 + React + TypeScript |
 | API | Express 4 + TypeScript |
 | Data | PostgreSQL + Prisma |
-| Shared Logic | Workspace packages (`@adventure/shared`, `@adventure/game-engine`) |
+| Shared Logic | Workspace packages (`@pocketrealm/shared`, `@pocketrealm/game-engine`) |
 | Auth | JWT access + refresh token flow |
 
 ## Monorepo Layout
 
 ```text
-Adventure/
+PocketRealm/
 |-- apps/
 |   |-- api/                # Express API
 |   `-- web/                # Next.js frontend
@@ -74,7 +74,7 @@ Minimum useful values:
 
 ```env
 # apps/api/.env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/adventure
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/pocketrealm
 JWT_SECRET=change-this-to-a-long-random-secret
 PORT=4000
 CORS_ORIGINS=http://localhost:3002,http://127.0.0.1:3002

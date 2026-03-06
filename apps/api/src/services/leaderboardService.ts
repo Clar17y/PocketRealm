@@ -1,5 +1,5 @@
-import { prisma, Prisma } from '@adventure/database';
-import { LEADERBOARD_CONSTANTS, ACHIEVEMENTS_BY_ID } from '@adventure/shared';
+import { prisma, Prisma } from '@pocketrealm/database';
+import { LEADERBOARD_CONSTANTS, ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { AppError } from '../middleware/errorHandler';
 

@@ -1,7 +1,7 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { prismaAny } from '../utils/prismaAny.js';
-import { WORLD_EVENT_CONSTANTS, type BossPlayerReward, type SkillType } from '@adventure/shared';
-import { calculateContributionScore } from '@adventure/game-engine';
+import { WORLD_EVENT_CONSTANTS, type BossPlayerReward, type SkillType } from '@pocketrealm/shared';
+import { calculateContributionScore } from '@pocketrealm/game-engine';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantLoot, enrichLootWithNames } from './lootService';
 import { addStackableItem } from './inventoryService';

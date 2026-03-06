@@ -49,7 +49,7 @@ vi.mock('./skillPointService', () => ({
     unlockedActions: [],
   }),
 }));
-vi.mock('@adventure/game-engine', () => ({
+vi.mock('@pocketrealm/game-engine', () => ({
   buildPlayerCombatStats: vi.fn().mockReturnValue({
     attack: 15, defence: 10, magicPower: 0, magicDefence: 5,
     accuracy: 60, dodge: 10, speed: 5, damageMin: 5, damageMax: 15,
@@ -80,7 +80,7 @@ vi.mock('@adventure/game-engine', () => ({
 import { mockPrisma } from '../__test__/setup';
 import { getHpState } from './hpService';
 import { setAllResources } from './resourceService';
-import { runTemplateCombat } from '@adventure/game-engine';
+import { runTemplateCombat } from '@pocketrealm/game-engine';
 import {
   getOrCreateRating,
   getLadder,

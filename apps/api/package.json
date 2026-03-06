@@ -1,5 +1,5 @@
 {
-  "name": "@adventure/api",
+  "name": "@pocketrealm/api",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,9 +10,9 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@adventure/database": "*",
-    "@adventure/game-engine": "*",
-    "@adventure/shared": "*",
+    "@pocketrealm/database": "*",
+    "@pocketrealm/game-engine": "*",
+    "@pocketrealm/shared": "*",
     "@typescript-eslint/eslint-plugin": "8.54.0",
     "@typescript-eslint/parser": "8.54.0",
     "bcrypt": "^6.0.0",

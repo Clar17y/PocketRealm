@@ -46,7 +46,7 @@ export function CombatLog({ enemy, player, combatLog, status, rewards, onContinu
           <div className="flex-1">
             <div className="flex items-baseline gap-2 mb-1">
               <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">{enemy.name}</h2>
-              <span className="text-[16px] text-[var(--rpg-red)] font-pixel">Lv. {enemy.level}</span>
+              <span className="text-[12px] text-[var(--rpg-red)] font-pixel">Lv. {enemy.level}</span>
             </div>
             <StatBar
               current={enemy.health}

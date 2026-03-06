@@ -15,7 +15,7 @@ import {
 import {
   SKILL_CONSTANTS,
   CHARACTER_CONSTANTS,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 
 describe('xpForLevel', () => {
   it('returns 0 for level 1', () => {

@@ -5,7 +5,7 @@ import {
   type MobTemplate,
   type SpellAction,
   type SpellTemplate,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 
 const MAX_PREFIX_SPELL_ROUND = 100;
 

@@ -316,7 +316,7 @@ async function seedBots() {
 // ============================================================================
 
 async function main() {
-  console.log('Seeding Adventure RPG...');
+  console.log('Seeding PocketRealm...');
 
   await cleanTemplateData();
 

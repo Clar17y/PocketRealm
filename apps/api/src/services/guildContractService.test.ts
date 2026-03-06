@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockPrisma as db } from '../__test__/setup';
 import { generateWeeklyContracts, getActiveContracts, incrementContractProgress, getWeekStart } from './guildContractService';
-import { GUILD_CONTRACT_CONSTANTS } from '@adventure/shared';
+import { GUILD_CONTRACT_CONSTANTS } from '@pocketrealm/shared';
 
 // Also mock guildService since incrementContractProgress calls addGuildXp and checkGuildAchievementsForAllMembers
 vi.mock('./guildService.js', () => ({

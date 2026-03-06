@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { MobTemplate } from '@adventure/shared';
-import { COMBAT_CONSTANTS } from '@adventure/shared';
+import type { MobTemplate } from '@pocketrealm/shared';
+import { COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import {
   buildPlayerCombatStats,
   calculateFinalDamage,
@@ -15,7 +15,7 @@ import {
   rollInitiative,
 } from './damageCalculator';
 
-import type { PerActionScaling } from '@adventure/shared';
+import type { PerActionScaling } from '@pocketrealm/shared';
 
 const baseScaling: PerActionScaling = {
   skillLevels: { melee: 10, ranged: 20, magic: 30 },

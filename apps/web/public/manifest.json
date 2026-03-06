@@ -1,7 +1,7 @@
 {
-  "name": "Adventure RPG",
-  "short_name": "Adventure",
-  "description": "Turn-based async adventure RPG",
+  "name": "PocketRealm",
+  "short_name": "PocketRealm",
+  "description": "Turn-based async RPG",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0c",

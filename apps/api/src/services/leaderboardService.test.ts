@@ -20,7 +20,7 @@ import { mockPrisma } from '../__test__/setup';
 import { redis } from '../redis';
 import { getCategories, getLeaderboard, refreshAllLeaderboards } from './leaderboardService';
 import { AppError } from '../middleware/errorHandler';
-import { LEADERBOARD_CONSTANTS } from '@adventure/shared';
+import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
 const mockRedis = redis as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 describe('leaderboardService', () => {

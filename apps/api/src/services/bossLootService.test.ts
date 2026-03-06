@@ -22,7 +22,7 @@ vi.mock('./achievementService', () => ({
 }));
 
 import { mockPrisma } from '../__test__/setup';
-import { WORLD_EVENT_CONSTANTS } from '@adventure/shared';
+import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 import { distributeBossLoot } from './bossLootService';
 import { rollAndGrantLoot, enrichLootWithNames } from './lootService';
 import { grantSkillXp } from './xpService';

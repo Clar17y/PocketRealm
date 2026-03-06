@@ -4,8 +4,8 @@ import { useState, useMemo, useCallback } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Lock, CheckCircle, Sparkles, Zap } from 'lucide-react';
-import { SKILL_POINT_CONSTANTS } from '@adventure/shared';
-import type { TalentNodeDefinition, TalentTree as TalentTreeName } from '@adventure/shared';
+import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
+import type { TalentNodeDefinition, TalentTree as TalentTreeName } from '@pocketrealm/shared';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import type { SkillPointState } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
@@ -153,7 +153,7 @@ export function TalentTree({
             backgroundColor: 'rgba(201, 169, 101, 0.1)',
           }}
         >
-          <span className="font-pixel text-[16px]">{availablePoints}</span> point{availablePoints !== 1 ? 's' : ''} available
+          <span className="font-pixel text-[12px]">{availablePoints}</span> point{availablePoints !== 1 ? 's' : ''} available
         </span>
       </div>
 
@@ -191,7 +191,7 @@ export function TalentTree({
         return (
           <div key={tier}>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-bold text-[var(--rpg-text-primary)]">Tier <span className="font-pixel font-normal text-[16px]">{tier}</span></span>
+              <span className="text-sm font-bold text-[var(--rpg-text-primary)]">Tier <span className="font-pixel font-normal text-[12px]">{tier}</span></span>
               {gateLabel && (
                 <span className="text-[11px] text-[var(--rpg-text-secondary)]">
                   {gateLabel}
@@ -253,7 +253,7 @@ export function TalentTree({
                               borderWidth: 1,
                             }}
                           >
-                            <span className="font-pixel text-[16px]">{node.pointCost}</span> pt{node.pointCost !== 1 ? 's' : ''}
+                            <span className="font-pixel text-[12px]">{node.pointCost}</span> pt{node.pointCost !== 1 ? 's' : ''}
                           </span>
                           {isAllocated && (
                             <span className="text-[10px] font-bold text-[var(--rpg-green-light)] uppercase">

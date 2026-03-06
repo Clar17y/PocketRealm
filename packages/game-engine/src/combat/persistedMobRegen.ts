@@ -1,4 +1,4 @@
-import { WORLD_EVENT_CONSTANTS } from '@adventure/shared';
+import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 
 /**
  * Calculate current HP for a persisted mob after passive regeneration.

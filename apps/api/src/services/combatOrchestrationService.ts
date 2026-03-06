@@ -1,7 +1,7 @@
 import {
   buildPlayerCombatStats,
   type TemplateCombatant,
-} from '@adventure/game-engine';
+} from '@pocketrealm/game-engine';
 import {
   ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
@@ -11,8 +11,8 @@ import {
   type CombatTemplateSlotData,
   type LootDrop,
   type PerActionScaling,
-} from '@adventure/shared';
-import { Prisma } from '@adventure/database';
+} from '@pocketrealm/shared';
+import { Prisma } from '@pocketrealm/database';
 import { rollAndGrantLootWithCapacity } from './lootService';
 import type { PendingLootItem } from './pendingLootService';
 import { grantSkillXp, type GrantXpResult } from './xpService';

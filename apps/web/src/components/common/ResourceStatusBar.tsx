@@ -1,6 +1,6 @@
 'use client';
 
-import { HP_CONSTANTS } from '@adventure/shared';
+import { HP_CONSTANTS } from '@pocketrealm/shared';
 
 interface ResourceStatusBarProps {
   currentHp: number;

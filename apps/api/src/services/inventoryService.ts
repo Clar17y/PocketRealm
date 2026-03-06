@@ -1,6 +1,6 @@
-import { Prisma, prisma } from '@adventure/database';
-import { getInventoryCapacity } from '@adventure/game-engine';
-import type { ItemRarity } from '@adventure/shared';
+import { Prisma, prisma } from '@pocketrealm/database';
+import { getInventoryCapacity } from '@pocketrealm/game-engine';
+import type { ItemRarity } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
 interface InventoryClient {

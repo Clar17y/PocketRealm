@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@adventure/game-engine', () => ({
+vi.mock('@pocketrealm/game-engine', () => ({
   calculatePersistedMobHp: vi.fn(),
 }));
 
 import { mockPrisma } from '../__test__/setup';
-import { calculatePersistedMobHp } from '@adventure/game-engine';
+import { calculatePersistedMobHp } from '@pocketrealm/game-engine';
 import {
   persistMobHp,
   checkPersistedMobReencounter,

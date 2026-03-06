@@ -4,9 +4,9 @@ import { resolve } from 'node:path';
 export default defineConfig({
   resolve: {
     alias: {
-      '@adventure/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
-      '@adventure/game-engine': resolve(__dirname, '../../packages/game-engine/src/index.ts'),
-      '@adventure/database': resolve(__dirname, '../../packages/database/src/index.ts'),
+      '@pocketrealm/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
+      '@pocketrealm/game-engine': resolve(__dirname, '../../packages/game-engine/src/index.ts'),
+      '@pocketrealm/database': resolve(__dirname, '../../packages/database/src/index.ts'),
     },
   },
   test: {

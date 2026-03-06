@@ -1,11 +1,11 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import {
   SKILL_POINT_CONSTANTS,
   ALWAYS_AVAILABLE_ACTION_IDS,
   getAllTalentNodes,
   getTalentNode,
   type SkillPointAllocationData,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 

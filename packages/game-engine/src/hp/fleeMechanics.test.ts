@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FLEE_CONSTANTS } from '@adventure/shared';
+import { FLEE_CONSTANTS } from '@pocketrealm/shared';
 import {
   calculateFleeChance,
   determineFleeOutcome,

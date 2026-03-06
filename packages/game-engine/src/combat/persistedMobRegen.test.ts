@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculatePersistedMobHp } from './persistedMobRegen';
-import { WORLD_EVENT_CONSTANTS } from '@adventure/shared';
+import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 
 describe('calculatePersistedMobHp', () => {
   const maxHp = 1000;

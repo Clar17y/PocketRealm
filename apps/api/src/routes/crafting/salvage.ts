@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { Prisma, prisma } from '@adventure/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { createActivityLog } from '../../services/activityLogService';
-import { CRAFTING_CONSTANTS } from '@adventure/shared';
+import { CRAFTING_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';

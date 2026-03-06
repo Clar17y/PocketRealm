@@ -1,5 +1,5 @@
-import { Prisma, prisma } from '@adventure/database';
-import { getAllMobPrefixes } from '@adventure/shared';
+import { Prisma, prisma } from '@pocketrealm/database';
+import { getAllMobPrefixes } from '@pocketrealm/shared';
 
 // Counter-only keys that remain in the player_stats table
 type CounterKey =

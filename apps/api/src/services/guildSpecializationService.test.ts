@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GUILD_CONSTANTS } from '@adventure/shared';
+import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 import { mockPrisma as db } from '../__test__/setup';
 
 import {

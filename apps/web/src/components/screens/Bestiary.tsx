@@ -7,7 +7,7 @@ import { BookOpen, X, MapPin, Sword, Shield, Heart, Lock } from 'lucide-react';
 import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
-import { getMobPrefixDefinition, getTierName } from '@adventure/shared';
+import { getMobPrefixDefinition, getTierName } from '@pocketrealm/shared';
 import { StatBar } from '@/components/StatBar';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { ScreenContainer } from '../common/ScreenContainer';
@@ -348,7 +348,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         <div className="flex items-center gap-3">
                           <Heart size={16} color="var(--rpg-green-light)" />
                           <span className="text-sm text-[var(--rpg-text-primary)]">HP:</span>
-                          <span className="text-[16px] font-pixel text-[var(--rpg-green-light)]">{selectedMonster.stats.hp}</span>
+                          <span className="text-[12px] font-pixel text-[var(--rpg-green-light)]">{selectedMonster.stats.hp}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-3 opacity-50">
@@ -361,7 +361,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         <div className="flex items-center gap-3">
                           <Sword size={16} color="var(--rpg-red)" />
                           <span className="text-sm text-[var(--rpg-text-primary)]">Accuracy:</span>
-                          <span className="text-[16px] font-pixel text-[var(--rpg-red)]">{selectedMonster.stats.accuracy}</span>
+                          <span className="text-[12px] font-pixel text-[var(--rpg-red)]">{selectedMonster.stats.accuracy}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-3 opacity-50">
@@ -376,7 +376,7 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
                         <div className="flex items-center gap-3">
                           <Shield size={16} color="var(--rpg-blue-light)" />
                           <span className="text-sm text-[var(--rpg-text-primary)]">Defence:</span>
-                          <span className="text-[16px] font-pixel text-[var(--rpg-blue-light)]">
+                          <span className="text-[12px] font-pixel text-[var(--rpg-blue-light)]">
                             {selectedMonster.stats.defence}
                           </span>
                         </div>

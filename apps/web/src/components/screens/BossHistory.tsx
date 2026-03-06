@@ -71,7 +71,7 @@ export function BossHistory() {
                       className="w-8 h-8 rounded object-cover shrink-0"
                     />
                     <span className="text-[var(--rpg-text-primary)] font-semibold font-almendra">
-                      {entry.mobName} <span className="font-pixel font-normal text-[16px]">(Lv.{entry.mobLevel})</span>
+                      {entry.mobName} <span className="font-pixel font-normal text-[12px]">(Lv.{entry.mobLevel})</span>
                     </span>
                     <span className="text-xs ml-2 text-[var(--rpg-text-secondary)] font-almendra">
                       {entry.zoneName}

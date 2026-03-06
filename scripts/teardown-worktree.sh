@@ -7,12 +7,12 @@ set -euo pipefail
 #   ./scripts/teardown-worktree.sh <branch-name> [--keep-branch] [-y|--yes]
 #
 # Removes:
-#   .worktrees/adventure-<name>/   — git worktree
-#   PostgreSQL database            — adventure_<name>
+#   .worktrees/pocketrealm-<name>/   — git worktree
+#   PostgreSQL database            — pocketrealm_<name>
 #
 # Does NOT remove the git branch unless you omit --keep-branch.
 
-CONTAINER="adventure-postgres"
+CONTAINER="pocketrealm-postgres"
 PG_USER="postgres"
 
 usage() {
@@ -48,8 +48,8 @@ for arg in "$@"; do
 done
 
 SAFE_NAME=$(echo "$BRANCH" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:upper:]' '[:lower:]')
-DB_NAME="adventure_${SAFE_NAME}"
-WORKTREE_DIR=".worktrees/adventure-${BRANCH##*/}"
+DB_NAME="pocketrealm_${SAFE_NAME}"
+WORKTREE_DIR=".worktrees/pocketrealm-${BRANCH##*/}"
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 WORKTREE_PATH="${REPO_ROOT}/${WORKTREE_DIR}"

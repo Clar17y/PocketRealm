@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockPrisma as db } from '../__test__/setup';
 import { activateUpgrade, getActiveUpgrades, getAvailableUpgrades, getPlayerGuildModifiers } from './guildUpgradeService';
-import { GUILD_CONSTANTS } from '@adventure/shared';
+import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 
 const GUILD_ID = 'guild-1';
 const PLAYER_ID = 'player-1';

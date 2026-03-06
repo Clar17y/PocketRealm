@@ -171,7 +171,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
             </div>
             <div className="flex justify-between items-center mt-2">
               <span className="text-[var(--rpg-text-secondary)]">HP After Recovery</span>
-              <span className="text-[16px] text-[var(--rpg-green-light)] font-pixel">
+              <span className="text-[12px] text-[var(--rpg-green-light)] font-pixel">
                 {Math.floor(hpState.maxHp * 0.25)} / {hpState.maxHp}
               </span>
             </div>
@@ -234,7 +234,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
         <div className="mb-4">
           <div className="flex justify-between mb-1">
             <span className="text-sm text-[var(--rpg-text-secondary)]">Current HP</span>
-            <span className="text-[16px] font-pixel text-[var(--rpg-green-light)]">
+            <span className="text-[12px] font-pixel text-[var(--rpg-green-light)]">
               {hpState.currentHp} / {hpState.maxHp}
             </span>
           </div>
@@ -288,19 +288,19 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
               <div className="bg-[var(--rpg-background)] rounded-lg p-4 mb-4">
                 <div className="flex justify-between items-center">
                   <span className="text-[var(--rpg-text-secondary)]">HP Restored</span>
-                  <span className="text-[16px] text-[var(--rpg-green-light)] font-pixel">
+                  <span className="text-[12px] text-[var(--rpg-green-light)] font-pixel">
                     +{Math.floor(estimate.healAmount)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-[var(--rpg-text-secondary)]">Result</span>
-                  <span className="font-pixel text-[16px]">
+                  <span className="font-pixel text-[12px]">
                     {hpState.currentHp} → {Math.floor(estimate.resultingHp)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-[var(--rpg-text-secondary)]">Turns Used</span>
-                  <span className="font-pixel text-[16px] text-[var(--rpg-gold)]">
+                  <span className="font-pixel text-[12px] text-[var(--rpg-gold)]">
                     {estimate.turnsNeeded}
                   </span>
                 </div>

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
-import { prisma } from '@adventure/database';
-import { INVENTORY_CONSTANTS } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import { INVENTORY_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
 import { getInventoryState } from './inventoryService';

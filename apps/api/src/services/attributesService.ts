@@ -1,11 +1,11 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { prismaAny } from '../utils/prismaAny.js';
 import {
   ATTRIBUTE_TYPES,
   DEFAULT_PLAYER_ATTRIBUTES,
   type AttributeType,
   type PlayerAttributes,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
 

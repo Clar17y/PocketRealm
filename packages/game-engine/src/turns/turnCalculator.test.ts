@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TURN_CONSTANTS } from '@adventure/shared';
+import { TURN_CONSTANTS } from '@pocketrealm/shared';
 import {
   calculateAccruedTurns,
   calculateCurrentTurns,

@@ -7,17 +7,17 @@ set -euo pipefail
 #   ./scripts/setup-worktree.sh <branch-name> [--no-seed]
 #
 # Creates:
-#   .worktrees/adventure-<name>/   — git worktree
-#   PostgreSQL database            — adventure_<name>
+#   .worktrees/pocketrealm-<name>/   — git worktree
+#   PostgreSQL database            — pocketrealm_<name>
 #   apps/api/.env                  — copied from canonical, DATABASE_URL patched
 #   packages/database/.env         — DATABASE_URL for Prisma
 #   apps/web/public/assets         — symlink/junction to canonical assets
 
-CANONICAL_ROOT="${USERPROFILE:-$HOME}/.config/Adventure"
-CONTAINER="adventure-postgres"
+CANONICAL_ROOT="${USERPROFILE:-$HOME}/.config/PocketRealm"
+CONTAINER="pocketrealm-postgres"
 PG_USER="postgres"
 PG_PORT="5433"
-DEFAULT_DB="adventure"
+DEFAULT_DB="pocketrealm"
 
 usage() {
   echo "Usage: $0 <branch-name> [--no-seed]"
@@ -40,8 +40,8 @@ NO_SEED=false
 
 # Sanitize branch name for DB and directory (replace non-alphanumeric with _)
 SAFE_NAME=$(echo "$BRANCH" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:upper:]' '[:lower:]')
-DB_NAME="adventure_${SAFE_NAME}"
-WORKTREE_DIR=".worktrees/adventure-${BRANCH##*/}"
+DB_NAME="pocketrealm_${SAFE_NAME}"
+WORKTREE_DIR=".worktrees/pocketrealm-${BRANCH##*/}"
 
 # --- Resolve repo root ---
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)

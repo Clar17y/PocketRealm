@@ -10,8 +10,8 @@ import { titleCaseFromSnake, xpRateColor } from '@/lib/format';
 import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 import { Pickaxe, MapPin } from 'lucide-react';
 import { TurnPresets } from '@/components/common/TurnPresets';
-import { GATHERING_CONSTANTS } from '@adventure/shared';
-import { computeResourceYieldMultiplier, computeEventTurnCost } from '@adventure/game-engine';
+import { GATHERING_CONSTANTS } from '@pocketrealm/shared';
+import { computeResourceYieldMultiplier, computeEventTurnCost } from '@pocketrealm/game-engine';
 import { EventBadges } from '@/components/common/EventBadge';
 import { effectiveTurns as calcEffectiveTurns, inflateCost } from '@/lib/taxCalc';
 import { ActivityLog } from '@/components/ActivityLog';
@@ -225,7 +225,7 @@ export function Gathering({
             XP Rate
             <XpRateTooltip />
           </div>
-          <div className="text-[16px] font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
+          <div className="text-[12px] font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
-import { Prisma, prisma } from '@adventure/database';
-import { rollBonusStatsForRarity, rollDropRarity } from '@adventure/game-engine';
-import type { EquipmentSlot, ItemStats, ItemType, LootDrop } from '@adventure/shared';
+import { Prisma, prisma } from '@pocketrealm/database';
+import { rollBonusStatsForRarity, rollDropRarity } from '@pocketrealm/game-engine';
+import type { EquipmentSlot, ItemStats, ItemType, LootDrop } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import { addStackableItem, getInventoryState } from './inventoryService';
 import { storePendingLoot, type PendingLootItem } from './pendingLootService';

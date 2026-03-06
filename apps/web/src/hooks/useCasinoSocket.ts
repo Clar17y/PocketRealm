@@ -8,8 +8,8 @@ import type {
   CasinoResultEvent,
   RoulettePublicBet,
   RouletteBetType,
-} from '@adventure/shared';
-import { CASINO_CONSTANTS, CHAT_CONSTANTS, getNumberColor } from '@adventure/shared';
+} from '@pocketrealm/shared';
+import { CASINO_CONSTANTS, CHAT_CONSTANTS, getNumberColor } from '@pocketrealm/shared';
 
 export interface SessionBet {
   id: string;

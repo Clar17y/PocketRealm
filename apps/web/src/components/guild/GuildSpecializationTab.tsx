@@ -9,7 +9,7 @@ import {
   GUILD_MODIFIER_LABELS,
   type SpecializationStatusResponse,
 } from '@/lib/api/guild';
-import { GUILD_CONSTANTS, GUILD_SPECIALIZATION_DEFINITIONS } from '@adventure/shared';
+import { GUILD_CONSTANTS, GUILD_SPECIALIZATION_DEFINITIONS } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
 
 const PATH_COLORS: Record<string, { primary: string; bg: string }> = {

@@ -1,5 +1,5 @@
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
-import type { CombatAction } from '@adventure/shared';
+import type { CombatAction } from '@pocketrealm/shared';
 
 // Shared event modifier types
 export interface EventModifierBadge {

@@ -11,8 +11,8 @@ import type {
   ActionEffect,
   CombatAction,
   PerActionScaling,
-} from '@adventure/shared';
-import { COMBAT_ACTION_CONSTANTS, COMBAT_CONSTANTS, POTION_CONSTANTS } from '@adventure/shared';
+} from '@pocketrealm/shared';
+import { COMBAT_ACTION_CONSTANTS, COMBAT_CONSTANTS, POTION_CONSTANTS } from '@pocketrealm/shared';
 import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type RoundInteraction } from './actionResolver';
 import {
   rollD20,
@@ -599,7 +599,7 @@ function executeSupportiveAction(
   combatantBAction: string,
   wasExhausted: boolean,
   interactionResult: string,
-  availablePotions: import('@adventure/shared').CombatPotion[],
+  availablePotions: import('@pocketrealm/shared').CombatPotion[],
   potionsConsumed: PotionConsumed[],
 ): void {
   // Potion use
@@ -742,7 +742,7 @@ function executePotionAction(
   combatantBAction: string,
   wasExhausted: boolean,
   interactionResult: string,
-  availablePotions: import('@adventure/shared').CombatPotion[],
+  availablePotions: import('@pocketrealm/shared').CombatPotion[],
   potionsConsumed: PotionConsumed[],
 ): void {
   const potionType = action.potionType ?? 'hp';
@@ -1129,7 +1129,7 @@ function executeAction(
   combatantBAction: string,
   wasExhausted: boolean,
   interactionResult: string,
-  availablePotions: import('@adventure/shared').CombatPotion[],
+  availablePotions: import('@pocketrealm/shared').CombatPotion[],
   potionsConsumed: PotionConsumed[],
   perActionScaling?: PerActionScaling,
 ): void {

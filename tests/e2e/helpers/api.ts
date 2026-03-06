@@ -2,7 +2,7 @@ import { APIRequestContext, request } from '@playwright/test';
 import pg from 'pg';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:4000';
-const DATABASE_URL = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5433/adventure_fix_e2e_tests';
+const DATABASE_URL = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5433/pocketrealm_fix_e2e_tests';
 
 interface AuthTokens {
   accessToken: string;

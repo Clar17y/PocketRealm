@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import { createActivityLog } from '../services/activityLogService';
 import {
   buildPlayerCombatStats,
@@ -10,8 +10,8 @@ import {
   mobToTemplateCombatant,
   filterAndWeightMobsByTier,
   runTemplateCombat,
-} from '@adventure/game-engine';
-import type { CombatOptions, PotionConsumed } from '@adventure/shared';
+} from '@pocketrealm/game-engine';
+import type { CombatOptions, PotionConsumed } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';

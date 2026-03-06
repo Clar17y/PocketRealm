@@ -1,5 +1,5 @@
-import { Prisma } from '@adventure/database';
-import type { LootDrop, ItemRarity } from '@adventure/shared';
+import { Prisma } from '@pocketrealm/database';
+import type { LootDrop, ItemRarity } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
 import { pickWeighted } from '../utils/pickWeighted.js';

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { ActionDefinition, CombatTemplateSlotData } from '@adventure/shared';
+import type { ActionDefinition, CombatTemplateSlotData } from '@pocketrealm/shared';
 import {
   BASE_ACTION_DEFINITIONS,
   COMBAT_ACTION_CONSTANTS,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import {
   resolveAction,
   resolveInteraction,

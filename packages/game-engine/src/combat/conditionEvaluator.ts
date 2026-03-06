@@ -1,4 +1,4 @@
-import type { ActiveEffect, CombatActor, SlotCondition, ConditionResourceType } from '@adventure/shared';
+import type { ActiveEffect, CombatActor, SlotCondition, ConditionResourceType } from '@pocketrealm/shared';
 
 function getResourcePercent(
   resource: ConditionResourceType,

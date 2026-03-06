@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SKILL_POINT_CONSTANTS } from '@adventure/shared';
+import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 import { mockPrisma } from '../__test__/setup';
 import { grantSkillXp } from './xpService';
 const now = new Date('2025-06-01T12:00:00Z');

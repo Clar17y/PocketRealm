@@ -54,7 +54,7 @@ export function formatCombatShareText(input: CombatShareInput): string {
   const mobMaxHp = resolveMobMaxHp(input.log, input.mobMaxHp);
 
   const lines: string[] = [];
-  lines.push('Adventure Combat Log');
+  lines.push('PocketRealm Combat Log');
   lines.push(`Outcome: ${input.outcome}`);
   if (input.mobName) lines.push(`Mob: ${input.mobName}`);
   if (input.zoneName) lines.push(`Zone: ${input.zoneName}`);

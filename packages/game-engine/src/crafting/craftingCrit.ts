@@ -6,7 +6,7 @@ import {
   type ItemRarity,
   type ItemStats,
   type ItemType,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import { clamp, randomUnit } from '../utils/math';
 
 export type CraftingCritStat = keyof ItemStats;

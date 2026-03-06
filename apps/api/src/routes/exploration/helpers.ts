@@ -7,12 +7,12 @@ import {
   type EncounterMobRole,
   type EncounterMobStatus,
   type EncounterMobSlot,
-} from '@adventure/shared';
+} from '@pocketrealm/shared';
 import {
   generateRoomAssignments,
   rollMobPrefix,
   selectTierWithBleedthrough,
-} from '@adventure/game-engine';
+} from '@pocketrealm/game-engine';
 import { pickWeighted as pickWeightedGeneric } from '../../utils/pickWeighted.js';
 
 // --- Zod schemas ---
@@ -30,7 +30,7 @@ export const startSchema = z.object({
 
 // --- Types ---
 
-export type { EncounterSiteSize, EncounterMobRole, EncounterMobStatus } from '@adventure/shared';
+export type { EncounterSiteSize, EncounterMobRole, EncounterMobStatus } from '@pocketrealm/shared';
 
 export type NarrativeEventType =
   | 'ambush_victory'

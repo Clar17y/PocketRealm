@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { CombatantStats, ActionDefinition, CombatTemplateSlotData, BossTemplateAction } from '@adventure/shared';
-import { BASE_ACTION_DEFINITIONS, BOSS_ACTION_DEFINITIONS } from '@adventure/shared';
+import type { CombatantStats, ActionDefinition, CombatTemplateSlotData, BossTemplateAction } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS, BOSS_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 import { resolveBossRound } from './bossRoundResolver';
 import type { BossRoundParticipant, BossState, BossRoundInput } from './bossRoundResolver';
 import { initThreatTable } from './threatSystem';

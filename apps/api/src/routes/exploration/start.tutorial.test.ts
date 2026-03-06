@@ -160,7 +160,7 @@ vi.mock('../../utils/routeHelpers.js', () => ({
   trackAchievements: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@adventure/game-engine', () => ({
+vi.mock('@pocketrealm/game-engine', () => ({
   applyMobEventModifiers: vi.fn((mob: any) => mob),
   applyMobPrefix: vi.fn((mob: any, prefix: any) => ({ ...mob, mobPrefix: prefix, mobDisplayName: prefix ? `${prefix} ${mob.name}` : mob.name })),
   buildPlayerCombatStats: vi.fn(() => ({ attack: 10, accuracy: 10, defence: 5, magicDefence: 0, speed: 5, hp: 100, critChance: 0.05, critDamage: 1.5 })),
@@ -191,7 +191,7 @@ vi.mock('@adventure/game-engine', () => ({
 
 import { mockPrisma } from '../../__test__/setup';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
-import { applyMobPrefix, simulateExploration, runTemplateCombat } from '@adventure/game-engine';
+import { applyMobPrefix, simulateExploration, runTemplateCombat } from '@pocketrealm/game-engine';
 import { startRouter } from './start';
 
 const mockSpendPlayerTurnsTx = spendPlayerTurnsTx as ReturnType<typeof vi.fn>;

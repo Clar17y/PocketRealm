@@ -146,7 +146,7 @@ export function Settings({
                 onValueChange={(val) => onDefaultExploreTurnsChange(val[0])}
                 onValueCommit={(val) => onDefaultExploreTurnsCommit(val[0])}
               />
-              <span className="text-[16px] font-pixel text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
+              <span className="text-[12px] font-pixel text-[var(--rpg-text-primary)] w-16 text-right shrink-0">
                 {defaultExploreTurns.toLocaleString()}
               </span>
             </div>

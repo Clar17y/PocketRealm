@@ -1,4 +1,4 @@
-import { prisma } from '@adventure/database';
+import { prisma } from '@pocketrealm/database';
 import {
   calculateMaxStamina,
   calculateStaminaRegenPerSecond,
@@ -10,8 +10,8 @@ import {
   calculateManaRegenPerRound,
   calculateCurrentMana,
   calculateManaRestHealing,
-} from '@adventure/game-engine';
-import type { ResourceState } from '@adventure/shared';
+} from '@pocketrealm/game-engine';
+import type { ResourceState } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 import {

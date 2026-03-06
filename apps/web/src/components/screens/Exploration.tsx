@@ -8,7 +8,7 @@ import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ResourceStatusBar } from '../common/ResourceStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Loader2, Mountain, Play } from 'lucide-react';
-import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@adventure/shared';
+import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@pocketrealm/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import Image from 'next/image';
@@ -212,8 +212,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           {explorationProgress && explorationProgress.turnsToExplore && (
             <PixelCard>
               <div className="flex justify-between text-sm text-[var(--rpg-text-secondary)] mb-1">
-                <span>Zone Exploration: <span className="font-pixel text-[16px]">{Math.floor(explorationProgress.percent)}%</span></span>
-                <span className="font-pixel text-[16px]">{explorationProgress.turnsExplored.toLocaleString()} / {explorationProgress.turnsToExplore.toLocaleString()} turns</span>
+                <span>Zone Exploration: <span className="font-pixel text-[12px]">{Math.floor(explorationProgress.percent)}%</span></span>
+                <span className="font-pixel text-[12px]">{explorationProgress.turnsExplored.toLocaleString()} / {explorationProgress.turnsToExplore.toLocaleString()} turns</span>
               </div>
               <div className="h-2 rounded-full bg-[var(--rpg-background)] overflow-hidden">
                 <div

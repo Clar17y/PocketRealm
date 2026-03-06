@@ -1,5 +1,5 @@
-import { prisma } from '@adventure/database';
-import type { ConsumableEffect } from '@adventure/shared';
+import { prisma } from '@pocketrealm/database';
+import type { ConsumableEffect } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getHpState } from './hpService';
 

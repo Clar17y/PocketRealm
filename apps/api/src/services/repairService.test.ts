@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DURABILITY_CONSTANTS } from '@adventure/shared';
+import { DURABILITY_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('./turnBankService', () => ({
   spendPlayerTurnsTx: vi.fn().mockResolvedValue({

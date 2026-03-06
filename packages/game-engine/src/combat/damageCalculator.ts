@@ -1,4 +1,4 @@
-import { CHARACTER_CONSTANTS, COMBAT_CONSTANTS, CombatantStats, MobTemplate, type PlayerAttributes, type ScalingStat, type PerActionScaling } from '@adventure/shared';
+import { CHARACTER_CONSTANTS, COMBAT_CONSTANTS, CombatantStats, MobTemplate, type PlayerAttributes, type ScalingStat, type PerActionScaling } from '@pocketrealm/shared';
 import { clamp } from '../utils/math';
 
 function finiteOrFallback(value: number, fallback: number): number {
