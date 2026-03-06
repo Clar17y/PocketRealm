@@ -30,7 +30,7 @@ export function CombatRewardsSummary({ rewards, outcome }: CombatRewardsSummaryP
         <div key={grant.skillType} className="flex items-center gap-2 text-sm">
           <span>ATK</span>
           <span className="text-[var(--rpg-text-primary)]">{capitalize(grant.skillType)}</span>
-          <span className="text-[var(--rpg-gold)] font-mono">
+          <span className="text-[var(--rpg-gold)] font-pixel text-[16px]">
             +{grant.xpAfterEfficiency} XP
           </span>
           {grant.efficiency < 1 && (

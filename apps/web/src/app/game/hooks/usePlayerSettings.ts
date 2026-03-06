@@ -12,6 +12,7 @@ export interface ServerSettingsPayload {
   defaultRefiningMax?: boolean | null;
   lowHpWarning?: boolean | null;
   confirmRarity?: ConfirmRarity | null;
+  lootRevealRarity?: ConfirmRarity | null;
 }
 
 export function usePlayerSettings() {
@@ -23,6 +24,7 @@ export function usePlayerSettings() {
   const [defaultRefiningMax, setDefaultRefiningMax] = useState(false);
   const [lowHpWarning, setLowHpWarning] = useState(true);
   const [confirmRarity, setConfirmRarity] = useState<ConfirmRarity>('uncommon');
+  const [lootRevealRarity, setLootRevealRarity] = useState<ConfirmRarity>('uncommon');
   const [guildTaxRate, setGuildTaxRate] = useState(0);
 
   // --- generic persist helper ---------------------------------------------------
@@ -51,6 +53,8 @@ export function usePlayerSettings() {
     handleSetSetting('lowHpWarning', value, setLowHpWarning, lowHpWarning);
   const handleSetConfirmRarity = (value: ConfirmRarity) =>
     handleSetSetting('confirmRarity', value, setConfirmRarity, confirmRarity);
+  const handleSetLootRevealRarity = (value: ConfirmRarity) =>
+    handleSetSetting('lootRevealRarity', value, setLootRevealRarity, lootRevealRarity);
 
   // --- server hydration ---------------------------------------------------------
 
@@ -63,6 +67,7 @@ export function usePlayerSettings() {
     setDefaultRefiningMax(s.defaultRefiningMax ?? false);
     setLowHpWarning(s.lowHpWarning ?? true);
     setConfirmRarity(s.confirmRarity ?? 'uncommon');
+    setLootRevealRarity(s.lootRevealRarity ?? 'uncommon');
   };
 
   return {
@@ -75,6 +80,7 @@ export function usePlayerSettings() {
     defaultRefiningMax,
     lowHpWarning,
     confirmRarity,
+    lootRevealRarity,
     guildTaxRate,
 
     // Raw setters for optimistic / external updates
@@ -93,6 +99,7 @@ export function usePlayerSettings() {
     handleSetDefaultRefiningMax,
     handleSetLowHpWarning,
     handleSetConfirmRarity,
+    handleSetLootRevealRarity,
 
     // Initialization
     initSettingsFromServer,

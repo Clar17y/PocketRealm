@@ -6,6 +6,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { groupAchievementChains } from '@adventure/shared';
 import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
+import { ScreenContainer } from '../common/ScreenContainer';
 import type { PlayerAchievementProgress as SharedProgress } from '@adventure/shared';
 import type { PlayerAchievementProgress, AchievementRewardResponse } from '@/lib/api';
 
@@ -101,14 +102,14 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
   const unlockedTitles = achievements.filter((a) => a.unlocked && a.titleReward);
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       {/* Completion counter */}
       <PixelCard padding="sm">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm font-medium text-[var(--rpg-text-primary)]">
-            {totalCompleted} / {totalAchievements} Achievements
+            <span className="font-pixel text-[16px]">{totalCompleted} / {totalAchievements}</span> Achievements
           </span>
-          <span className="text-xs text-[var(--rpg-text-secondary)]">
+          <span className="text-[8px] text-[var(--rpg-text-secondary)] font-pixel">
             {totalAchievements > 0 ? Math.round((totalCompleted / totalAchievements) * 100) : 0}%
           </span>
         </div>
@@ -247,6 +248,6 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
           </p>
         )}
       </div>
-    </div>
+    </ScreenContainer>
   );
 }

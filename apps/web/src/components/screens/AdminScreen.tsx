@@ -33,6 +33,7 @@ import {
   type AdminResourceNode,
 } from '@/lib/api';
 import { Shield } from 'lucide-react';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 type AdminTab = 'player' | 'items' | 'world' | 'zones' | 'resources';
 
@@ -216,9 +217,9 @@ function ItemsTab({ onAction }: { onAction?: () => void }) {
                   ? 'bg-[var(--rpg-gold)]/20 border border-[var(--rpg-gold)]/40'
                   : 'bg-[var(--rpg-surface)] hover:bg-[var(--rpg-surface-hover)]'
               }`}>
-              <span className="text-[var(--rpg-text-primary)]">{t.name}</span>
+              <span className="text-[var(--rpg-text-primary)] font-almendra">{t.name}</span>
               <span className="text-xs text-[var(--rpg-text-secondary)] ml-2">
-                {t.itemType} {t.slot ? `(${t.slot})` : ''} T{t.tier}
+                {t.itemType} {t.slot ? `(${t.slot})` : ''} T<span className="font-pixel text-[8px]">{t.tier}</span>
               </span>
             </div>
           ))}
@@ -455,9 +456,9 @@ function ZonesTab({ onAction }: { onAction?: () => void }) {
           {zones.map((z) => (
             <div key={z.id} className="flex items-center justify-between bg-[var(--rpg-surface)] rounded px-2 py-1.5 text-sm">
               <div>
-                <span className="text-[var(--rpg-text-primary)]">{z.name}</span>
+                <span className="text-[var(--rpg-text-primary)] font-almendra">{z.name}</span>
                 <span className="text-xs text-[var(--rpg-text-secondary)] ml-2">
-                  Lv.{z.difficulty} | {z.zoneType}
+                  Lv.<span className="font-pixel text-[8px]">{z.difficulty}</span> | {z.zoneType}
                 </span>
               </div>
               <PixelButton size="sm" disabled={busy}
@@ -596,10 +597,10 @@ export default function AdminScreen({ onAction }: { onAction?: () => void }) {
   const [tab, setTab] = useState<AdminTab>('player');
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       <div className="flex items-center gap-2 mb-2">
         <Shield className="w-5 h-5 text-[var(--rpg-gold)]" />
-        <h2 className="text-lg font-bold text-[var(--rpg-gold)]">Admin Panel</h2>
+        <h2 className="text-lg font-bold font-almendra text-[var(--rpg-gold)]">Admin Panel</h2>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -620,6 +621,6 @@ export default function AdminScreen({ onAction }: { onAction?: () => void }) {
       {tab === 'world' && <WorldTab onAction={onAction} />}
       {tab === 'zones' && <ZonesTab onAction={onAction} />}
       {tab === 'resources' && <ResourcesTab onAction={onAction} />}
-    </div>
+    </ScreenContainer>
   );
 }

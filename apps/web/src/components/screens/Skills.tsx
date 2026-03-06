@@ -2,6 +2,9 @@
 
 import type { LucideIcon } from 'lucide-react';
 import { SkillCard } from '@/components/SkillCard';
+import { Divider } from '@/components/common/Divider';
+import { getStaggerDelay } from '@/lib/animations';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface Skill {
   id: string;
@@ -21,29 +24,32 @@ interface SkillsProps {
 
 export function Skills({ skills }: SkillsProps) {
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Skills</h2>
+        <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Skills</h2>
         <div className="text-sm text-[var(--rpg-text-secondary)]">
-          Total Level: {skills.reduce((sum, skill) => sum + skill.level, 0)}
+          Total Level: <span className="font-pixel text-[16px]">{skills.reduce((sum, skill) => sum + skill.level, 0)}</span>
         </div>
       </div>
 
+      <Divider className="my-1" />
+
       <div className="space-y-3">
-        {skills.map((skill) => (
-          <SkillCard
-            key={skill.id}
-            name={skill.name}
-            icon={skill.icon}
-            imageSrc={skill.imageSrc}
-            level={skill.level}
-            currentXP={skill.currentXP}
-            nextLevelXP={skill.nextLevelXP}
-            xpRate={skill.xpRate}
-            iconColor={skill.color}
-          />
+        {skills.map((skill, index) => (
+          <div key={skill.id} className="rpg-stagger-item" style={{ animationDelay: getStaggerDelay(index) }}>
+            <SkillCard
+              name={skill.name}
+              icon={skill.icon}
+              imageSrc={skill.imageSrc}
+              level={skill.level}
+              currentXP={skill.currentXP}
+              nextLevelXP={skill.nextLevelXP}
+              xpRate={skill.xpRate}
+              iconColor={skill.color}
+            />
+          </div>
         ))}
       </div>
-    </div>
+    </ScreenContainer>
   );
 }

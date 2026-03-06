@@ -14,6 +14,7 @@ import type { Screen } from '@/app/game/gameController.types';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@adventure/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@adventure/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 // --- Constants ---
 
@@ -146,8 +147,8 @@ function groupBadge(group: string) {
 function ActionCostLabel({ cost }: { cost: { stamina: number; mana: number } }) {
   return (
     <div className="flex gap-2 text-[10px] text-[var(--rpg-text-secondary)]">
-      {cost.stamina > 0 && <span>Stam: {cost.stamina}</span>}
-      {cost.mana > 0 && <span>Mana: {cost.mana}</span>}
+      {cost.stamina > 0 && <span>Stam: <span className="font-pixel text-[16px]">{cost.stamina}</span></span>}
+      {cost.mana > 0 && <span>Mana: <span className="font-pixel text-[16px]">{cost.mana}</span></span>}
       {cost.stamina === 0 && cost.mana === 0 && <span>Free</span>}
     </div>
   );
@@ -480,7 +481,7 @@ export function Templates({
                       className="flex items-center gap-2 p-2 cursor-pointer active:bg-[var(--rpg-surface)]"
                       onClick={() => setExpandedSlot(isExpanded ? null : i)}
                     >
-                      <span className="text-xs font-mono text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">
+                      <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">
                         {i + 1}
                       </span>
                       <div className="flex-1 min-w-0">
@@ -680,23 +681,23 @@ export function Templates({
         {/* Resource preview */}
         {editorSlots.length > 0 && (
           <PixelCard padding="sm">
-            <span className="text-xs text-[var(--rpg-text-secondary)] block mb-2">Resource Preview (worst-case per cycle of {editorSlots.length} slots)</span>
+            <span className="text-xs text-[var(--rpg-text-secondary)] block mb-2">Resource Preview (worst-case per cycle of <span className="font-pixel text-[8px]">{editorSlots.length}</span> slots)</span>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Stamina cost:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)]">{cycleCost.stamina}</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{cycleCost.stamina}</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Mana cost:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)]">{cycleCost.mana}</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{cycleCost.mana}</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Stamina regen:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)]">{staminaPerCycle}/cycle</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{staminaPerCycle}/cycle</span>
               </div>
               <div>
                 <span className="text-[var(--rpg-text-secondary)] text-xs">Mana regen:</span>
-                <span className="ml-1 text-[var(--rpg-text-primary)]">{manaPerCycle}/cycle</span>
+                <span className="ml-1 text-[var(--rpg-text-primary)] font-pixel text-[16px]">{manaPerCycle}/cycle</span>
               </div>
             </div>
             <div className="mt-2 space-y-1 text-xs">
@@ -722,10 +723,10 @@ export function Templates({
 
   // -- List view --
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       <TemplateTutorial />
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">Combat Templates</h2>
+        <h2 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">Combat Templates</h2>
         <PixelButton size="sm" variant="primary" onClick={handleNewTemplate}>
           <Plus size={14} className="mr-1 inline" /> New Template
         </PixelButton>
@@ -751,7 +752,7 @@ export function Templates({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{t.name}</span>
+                    <span className="text-sm font-semibold font-almendra text-[var(--rpg-text-primary)]">{t.name}</span>
                     {t.isActive && (
                       <span className="text-[10px] font-bold text-[var(--rpg-gold)] uppercase">Active</span>
                     )}
@@ -760,7 +761,7 @@ export function Templates({
                     {templatePreview(t.slots)}
                   </span>
                   <span className="text-xs text-[var(--rpg-text-secondary)]">
-                    {t.slots.length} slot{t.slots.length !== 1 ? 's' : ''}
+                    <span className="font-pixel text-[8px]">{t.slots.length}</span> slot{t.slots.length !== 1 ? 's' : ''}
                   </span>
                 </div>
                 <div className="flex gap-1 shrink-0">
@@ -781,6 +782,6 @@ export function Templates({
           ))}
         </div>
       )}
-    </div>
+    </ScreenContainer>
   );
 }

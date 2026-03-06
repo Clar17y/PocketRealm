@@ -142,7 +142,7 @@ export function ExplorationPlayback({
       {/* Header */}
       <div className="text-center">
         <div className="text-sm text-[var(--rpg-text-secondary)]">{label}</div>
-        <div className="text-xs text-[var(--rpg-text-secondary)] font-mono mt-1">
+        <div className="text-[8px] text-[var(--rpg-text-secondary)] font-pixel mt-1">
           Turn {currentTurn.toLocaleString()} / {totalTurns.toLocaleString()}
         </div>
       </div>

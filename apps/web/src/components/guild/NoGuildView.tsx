@@ -75,7 +75,7 @@ export function NoGuildView({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Guild</h2>
+      <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Guild</h2>
 
       {(error || actionError || searchError) && <ErrorBanner message={(error || actionError || searchError)!} />}
 
@@ -98,7 +98,7 @@ export function NoGuildView({
 
       {showCreate && (
         <PixelCard>
-          <h3 className="text-lg font-bold text-[var(--rpg-text-primary)] mb-3">Create Guild</h3>
+          <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)] mb-3">Create Guild</h3>
           <div className="space-y-3">
             <div>
               <label className="text-sm text-[var(--rpg-text-secondary)]">Name ({GUILD_CONSTANTS.MIN_NAME_LENGTH}-{GUILD_CONSTANTS.MAX_NAME_LENGTH} chars)</label>
@@ -145,7 +145,7 @@ export function NoGuildView({
       )}
 
       <PixelCard>
-        <h3 className="text-lg font-bold text-[var(--rpg-text-primary)] mb-3">Find Guilds</h3>
+        <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)] mb-3">Find Guilds</h3>
         <DebouncedInput
           value={searchQuery}
           onChange={setSearchQuery}

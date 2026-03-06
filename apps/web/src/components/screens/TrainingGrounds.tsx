@@ -10,6 +10,7 @@ import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
 import { getMobPrefixDefinition } from '@adventure/shared';
 import type { TrainingCombatResult } from '@/lib/api/training';
 import { monsterImageSrc } from '@/lib/assets';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface BestiaryMob {
   id: string;
@@ -220,7 +221,7 @@ export function TrainingGrounds({
               {outcomeLabel}!
             </div>
             <div className="text-sm text-[var(--rpg-text-secondary)]">
-              vs {mobDisplayName} — {combatResult.log.length} rounds
+              vs <span className="font-almendra">{mobDisplayName}</span> — <span className="font-pixel text-[16px]">{combatResult.log.length}</span> rounds
             </div>
             <div className="bg-[var(--rpg-background)] rounded-lg px-4 py-2 inline-block">
               <span className="text-sm text-[var(--rpg-text-secondary)]">
@@ -244,7 +245,7 @@ export function TrainingGrounds({
 
   // Idle / selection phase
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       <FirstVisitHowTo
         storageKey="howto_training"
         title="Training Grounds"
@@ -260,7 +261,7 @@ export function TrainingGrounds({
         <div className="flex items-center gap-3 mb-1">
           <Swords size={28} className="text-[var(--rpg-gold)]" />
           <div>
-            <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">
+            <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">
               Training Grounds
             </h2>
             <p className="text-sm text-[var(--rpg-text-secondary)]">
@@ -304,16 +305,16 @@ export function TrainingGrounds({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">
+                        <span className="text-sm font-semibold font-almendra text-[var(--rpg-text-primary)]">
                           {mob.name}
                         </span>
                         <span className="text-xs text-[var(--rpg-text-secondary)]">
-                          Lv. {mob.level}
+                          Lv. <span className="font-pixel text-[8px]">{mob.level}</span>
                         </span>
                       </div>
                       {mob.prefixesEncountered.length > 0 && (
                         <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">
-                          {mob.prefixesEncountered.length} variant{mob.prefixesEncountered.length !== 1 ? 's' : ''} discovered
+                          <span className="font-pixel text-[8px]">{mob.prefixesEncountered.length}</span> variant{mob.prefixesEncountered.length !== 1 ? 's' : ''} discovered
                         </div>
                       )}
                     </div>
@@ -390,7 +391,7 @@ export function TrainingGrounds({
       <div className="text-center text-xs text-[var(--rpg-text-secondary)]">
         Training fights grant no XP, loot, or gold
       </div>
-    </div>
+    </ScreenContainer>
   );
 }
 
@@ -398,7 +399,7 @@ function CooldownDisplay({ seconds }: { seconds: number }) {
   return (
     <div className="bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg p-3 text-center">
       <div className="text-xs text-[var(--rpg-text-secondary)] mb-1">Cooldown</div>
-      <div className="text-lg font-bold font-mono text-[var(--rpg-gold)]">
+      <div className="text-[16px] font-pixel text-[var(--rpg-gold)]">
         {formatTime(seconds)}
       </div>
     </div>

@@ -51,7 +51,7 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
       <PixelCard className="max-w-sm w-full">
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">Loot Overflow</h3>
+            <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">Loot Overflow</h3>
             <div className="text-xs text-[var(--rpg-text-secondary)]">
               {noSpace
                 ? 'Your backpack is full! Free up space to claim these items.'
@@ -77,8 +77,8 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
 
         <div className="text-sm text-[var(--rpg-text-secondary)] mb-3">
           {noSpace
-            ? <span className="text-[var(--rpg-red)] font-mono">0</span>
-            : <>Selected: <span className="font-mono text-[var(--rpg-gold)]">{selected.size}</span></>
+            ? <span className="text-[var(--rpg-red)] font-pixel text-[16px]">0</span>
+            : <>Selected: <span className="font-pixel text-[16px] text-[var(--rpg-gold)]">{selected.size}</span></>
           }
           {' '}/ {availableSlots} slots available
         </div>

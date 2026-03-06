@@ -98,7 +98,7 @@ export function CombatLogEntry({
       <div className="flex items-center gap-2 text-sm py-0.5">
         {entry.round === 0 ? (
           <>
-            <span className="text-[var(--rpg-gold)] font-mono w-7 shrink-0">Init</span>
+            <span className="text-[var(--rpg-gold)] font-pixel text-[16px] w-7 shrink-0">Init</span>
             <span className="text-[var(--rpg-text-primary)] text-xs">
               {isPlayerAction ? `${playerLabel} go${playerLabel === 'You' ? '' : 'es'} first` : `${opponentLabel} goes first`}
             </span>
@@ -106,7 +106,7 @@ export function CombatLogEntry({
         ) : (
           <>{entry.effectsExpired && entry.effectsExpired.length > 0 ? (
             <>
-              <span className="text-[var(--rpg-gold)] font-mono w-7 shrink-0">R{entry.round}</span>
+              <span className="text-[var(--rpg-gold)] font-pixel text-[16px] w-7 shrink-0">R{entry.round}</span>
               <span className="shrink-0 text-xs">✨</span>
               <span className="text-[var(--rpg-text-secondary)] text-xs italic">
                 {entry.effectsExpired.map(e => `${e.name} wore off`).join(', ')}
@@ -114,19 +114,19 @@ export function CombatLogEntry({
             </>
           ) : (
             <>
-              <span className="text-[var(--rpg-gold)] font-mono w-7 shrink-0">R{entry.round}</span>
-              <span className={`shrink-0 ${actorColor}`}>{isPlayerAction ? playerLabel : opponentLabel}</span>
+              <span className="text-[var(--rpg-gold)] font-pixel text-[16px] w-7 shrink-0">R{entry.round}</span>
+              <span className={`shrink-0 font-almendra ${actorColor}`}>{isPlayerAction ? playerLabel : opponentLabel}</span>
               {icon && <span className="shrink-0 text-xs">{icon}</span>}
               {entry.actionName ? (
-                <span className={`text-xs font-semibold ${getActionCategoryColor(entry)}`}>{entry.actionName}</span>
+                <span className={`text-xs font-semibold font-almendra ${getActionCategoryColor(entry)}`}>{entry.actionName}</span>
               ) : entry.spellName ? (
-                <span className="text-[var(--rpg-blue-light)] text-xs font-semibold">{entry.spellName}</span>
+                <span className="text-[var(--rpg-blue-light)] text-xs font-semibold font-almendra">{entry.spellName}</span>
               ) : null}
               {entry.damage !== undefined && entry.damage > 0 && (
-                <span className="text-[var(--rpg-text-primary)] font-mono font-semibold">{entry.damage} dmg</span>
+                <span className={`font-pixel text-[16px] ${entry.isCritical ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-red)]'}`}>{entry.damage} dmg</span>
               )}
               {entry.healAmount !== undefined && entry.healAmount > 0 && (
-                <span className={`font-mono font-semibold ${entry.healResourceType === 'stamina' ? 'text-teal-400' : entry.healResourceType === 'mana' ? 'text-[var(--rpg-blue-light)]' : 'text-[var(--rpg-green-light)]'}`}>
+                <span className={`font-pixel text-[16px] ${entry.healResourceType === 'stamina' ? 'text-teal-400' : entry.healResourceType === 'mana' ? 'text-[var(--rpg-blue-light)]' : 'text-[var(--rpg-green-light)]'}`}>
                   +{entry.healAmount} {entry.healResourceType === 'stamina' ? 'STA' : entry.healResourceType === 'mana' ? 'MP' : 'HP'}
                 </span>
               )}
@@ -154,7 +154,7 @@ export function CombatLogEntry({
             </>
           )}</>
         )}
-        <span className="ml-auto flex gap-2 text-xs font-mono text-[var(--rpg-text-secondary)]">
+        <span className="ml-auto flex gap-2 text-[8px] font-pixel text-[var(--rpg-text-secondary)]">
           {entry.combatantAHpAfter !== undefined && (
             <span className="text-[var(--rpg-green-light)]">{formatHp(entry.combatantAHpAfter, playerMaxHp)}</span>
           )}

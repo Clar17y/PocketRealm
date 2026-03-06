@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@config "../../tailwind.config.ts";
 
 /*
  * Custom theme colors - define CSS variables first,
@@ -6,11 +7,15 @@
  */
 :root {
   /* RPG Color Palette */
-  --rpg-background: #0a0a0c;
-  --rpg-surface: #2a2a3a;
-  --rpg-border: #5a5a6a;
+  --rpg-background: #0c0a08;
+  --rpg-surface: #1e1c18;
+  --rpg-surface-light: #2a2820;
+  --rpg-border: #3a3830;
   --rpg-text-primary: #e8e8e0;
-  --rpg-text-secondary: #9a9aaa;
+  --rpg-text-secondary: #8a8878;
+  --rpg-gold-dim: rgba(212, 168, 75, 0.08);
+  --rpg-gold-glow: rgba(212, 168, 75, 0.3);
+  --rpg-hp-warning: #d4943a;
   --rpg-gold: #d4a84b;
   --rpg-green-dark: #3d6b4a;
   --rpg-green-light: #6aaa5a;
@@ -25,9 +30,13 @@
 @theme inline {
   --color-rpg-background: var(--rpg-background);
   --color-rpg-surface: var(--rpg-surface);
+  --color-rpg-surface-light: var(--rpg-surface-light);
   --color-rpg-border: var(--rpg-border);
   --color-rpg-text-primary: var(--rpg-text-primary);
   --color-rpg-text-secondary: var(--rpg-text-secondary);
+  --color-rpg-gold-dim: var(--rpg-gold-dim);
+  --color-rpg-gold-glow: var(--rpg-gold-glow);
+  --color-rpg-hp-warning: var(--rpg-hp-warning);
   --color-rpg-gold: var(--rpg-gold);
   --color-rpg-green-dark: var(--rpg-green-dark);
   --color-rpg-green-light: var(--rpg-green-light);
@@ -51,6 +60,10 @@ body {
   height: 100%;
   background: var(--rpg-background);
   color: var(--rpg-text-primary);
+}
+
+body {
+  font-family: var(--font-crimson), Georgia, serif;
 }
 
 /* PWA safe area utilities */
@@ -131,6 +144,129 @@ body {
   100% { opacity: 0; }
 }
 
+/* Background noise texture overlay */
+.rpg-noise {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.04;
+  background: url('/textures/noise.svg');
+  mix-blend-mode: overlay;
+}
+
+/* Vignette edge-darkening effect */
+.rpg-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.4) 100%);
+}
+
+/* Card parchment texture */
+.rpg-card-texture {
+  position: relative;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 4px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.rpg-card-texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0.05;
+  background-image: url('/textures/noise.svg');
+  background-repeat: repeat;
+  background-size: 64px 64px;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Gold frame for important cards */
+.rpg-gold-frame {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 4px 8px rgba(0, 0, 0, 0.15),
+    inset 0 0 0 1px rgba(212, 168, 75, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Stat bar shimmer sweep */
+@keyframes bar-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.rpg-bar-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.rpg-bar-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 100%
+  );
+  width: 50%;
+  animation: bar-shimmer 3s ease-in-out infinite;
+}
+
+/* Screen enter transition */
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rpg-screen-enter {
+  animation: screen-enter 0.25s ease-out both;
+}
+
+.rpg-gold-text-glow {
+  text-shadow: 0 0 12px var(--rpg-gold-glow);
+}
+
+/* Silkscreen is an 8px-grid bitmap font — only renders cleanly at multiples of 8.
+   Disable anti-aliasing so 1px strokes (4, %) stay crisp.
+   Use text-[8px], text-[16px], or text-[24px] instead of text-xs/sm/lg. */
+.font-pixel,
+[class*="font-pixel"] {
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+  font-smooth: never;
+}
+
+/* Staggered list item reveal */
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rpg-stagger-item {
+  animation: stagger-in 0.2s ease-out both;
+}
+
 /* Hide scrollbar for horizontal scroll strips */
 .scrollbar-hide {
   -ms-overflow-style: none;
@@ -138,4 +274,95 @@ body {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Ornamental header bottom border */
+.rpg-header-border {
+  position: relative;
+}
+
+.rpg-header-border::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--rpg-gold) 20%,
+    var(--rpg-gold) 80%,
+    transparent 100%
+  );
+  opacity: 0.3;
+}
+
+/* Gold nav underline glow for active tab */
+.rpg-nav-active {
+  position: relative;
+}
+
+.rpg-nav-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: var(--rpg-gold);
+  box-shadow: 0 0 6px var(--rpg-gold-glow);
+  border-radius: 1px;
+}
+
+/* Loot reveal animation */
+@keyframes loot-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.8) rotateY(10deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotateY(0deg);
+  }
+}
+
+.rpg-loot-reveal {
+  animation: loot-reveal 0.3s ease-out both;
+}
+
+/* Legendary item flash */
+@keyframes legendary-flash {
+  0% { box-shadow: 0 0 0 0 rgba(212, 168, 75, 0); }
+  30% { box-shadow: 0 0 20px 4px rgba(212, 168, 75, 0.6); }
+  100% { box-shadow: 0 0 12px 2px rgba(212, 168, 75, 0.4); }
+}
+
+.rpg-legendary-flash {
+  animation: legendary-flash 0.6s ease-out both;
+}
+
+/* Victory pulse on combat results */
+@keyframes victory-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 168, 75, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(212, 168, 75, 0.3); }
+}
+
+.rpg-victory-pulse {
+  animation: victory-pulse 1.5s ease-in-out 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rpg-screen-enter,
+  .rpg-stagger-item,
+  .rpg-loot-reveal,
+  .rpg-legendary-flash,
+  .rpg-victory-pulse,
+  .tutorial-pulse,
+  .rainbow-title {
+    animation: none !important;
+  }
+  .rpg-bar-shimmer::after {
+    animation: none !important;
+  }
 }

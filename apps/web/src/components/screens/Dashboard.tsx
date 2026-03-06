@@ -8,9 +8,12 @@ import { StatBar } from '@/components/StatBar';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { Coins, TrendingUp, MapPin, Sword, Pickaxe, Hammer, Heart, Crosshair, Sparkles, Dice5, Wind } from 'lucide-react';
 import Image from 'next/image';
+import { getStaggerDelay } from '@/lib/animations';
 import { uiIconSrc } from '@/lib/assets';
 import { ActivityLog } from '@/components/ActivityLog';
+import { Divider } from '@/components/common/Divider';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface DashboardProps {
   playerData: {
@@ -73,7 +76,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
   };
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       {/* Knockout Banner */}
       {playerData.isRecovering && (
         <KnockoutBanner action="taking any actions" recoveryCost={playerData.recoveryCost} />
@@ -89,7 +92,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
       )}
 
       {/* Turn Counter */}
-      <PixelCard>
+      <PixelCard variant="ornate">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-14 h-14 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
@@ -103,14 +106,14 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
             </div>
             <div>
               <div className="text-sm text-[var(--rpg-text-secondary)]">Available Turns</div>
-              <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">
+              <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">
                 {playerData.turns.toLocaleString()}
               </div>
             </div>
           </div>
           <div className="text-right">
             <div className="text-xs text-[var(--rpg-text-secondary)]">Regen Rate</div>
-            <div className="text-sm text-[var(--rpg-green-light)]">
+            <div className="text-[16px] text-[var(--rpg-green-light)] font-pixel">
               +{playerData.turnsRegenRate}/min
             </div>
           </div>
@@ -128,7 +131,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
 
       {/* Action Buttons */}
       <div>
-        <h2 className="text-lg font-semibold mb-3 text-[var(--rpg-text-primary)]">Actions</h2>
+        <h2 className="text-lg font-semibold font-almendra mb-3 text-[var(--rpg-text-primary)]">Actions</h2>
         <div className="grid grid-cols-2 gap-3">
           <div className="relative group">
             <PixelButton
@@ -205,13 +208,15 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
         </div>
       </div>
 
+      <Divider className="my-1" />
+
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3">
         <PixelCard padding="sm">
           <div className="flex flex-col items-center text-center">
             <Coins size={20} color="var(--rpg-gold)" className="mb-1" />
             <div className="text-xs text-[var(--rpg-text-secondary)]">Gold</div>
-            <div className="text-lg font-bold text-[var(--rpg-gold)] font-mono">
+            <div className="text-[16px] text-[var(--rpg-gold)] font-pixel">
               {playerData.gold.toLocaleString()}
             </div>
           </div>
@@ -221,7 +226,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
           <div className="flex flex-col items-center text-center">
             <TrendingUp size={20} color="var(--rpg-blue-light)" className="mb-1" />
             <div className="text-xs text-[var(--rpg-text-secondary)]">Total XP</div>
-            <div className="text-lg font-bold text-[var(--rpg-blue-light)] font-mono">
+            <div className="text-[16px] text-[var(--rpg-blue-light)] font-pixel">
               {playerData.currentXP.toLocaleString()}
             </div>
           </div>
@@ -231,7 +236,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
           <div className="flex flex-col items-center text-center">
             <MapPin size={20} color="var(--rpg-purple)" className="mb-1" />
             <div className="text-xs text-[var(--rpg-text-secondary)]">Zone</div>
-            <div className="text-xs font-semibold text-[var(--rpg-text-primary)] mt-1">
+            <div className="text-xs font-semibold font-almendra text-[var(--rpg-text-primary)] mt-1">
               {playerData.currentZone}
             </div>
           </div>
@@ -239,21 +244,21 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
       </div>
 
       {/* Attributes */}
-      <PixelCard>
+      <PixelCard variant="framed">
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-sm text-[var(--rpg-text-secondary)]">Character Level</div>
-            <div className="text-2xl font-bold text-[var(--rpg-gold)]">{characterProgression.characterLevel}</div>
+            <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{characterProgression.characterLevel}</div>
           </div>
           <div className="text-right">
             <div className="text-sm text-[var(--rpg-text-secondary)]">Unspent Points</div>
-            <div className="text-2xl font-bold text-[var(--rpg-blue-light)]">{characterProgression.attributePoints}</div>
+            <div className="text-[24px] text-[var(--rpg-blue-light)] font-pixel">{characterProgression.attributePoints}</div>
           </div>
         </div>
         <div className="mb-3">
           <div className="flex items-center justify-between text-xs text-[var(--rpg-text-secondary)] mb-1">
             <span>Level Progress</span>
-            <span className="font-mono">
+            <span className="font-pixel text-[8px]">
               {playerData.currentLevelXp.toLocaleString()} / {playerData.requiredLevelXp.toLocaleString()} XP
             </span>
           </div>
@@ -266,20 +271,21 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
           />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {Object.entries(ATTRIBUTE_META).map(([key, meta]) => {
+          {Object.entries(ATTRIBUTE_META).map(([key, meta], index) => {
             const attribute = key as AttributeType;
             const Icon = meta.icon;
             const disabled = characterProgression.attributePoints <= 0 || allocating !== null;
             return (
               <div
                 key={attribute}
-                className="rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2 flex items-center justify-between gap-2"
+                className="rpg-stagger-item rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-2 flex items-center justify-between gap-2"
+                style={{ animationDelay: getStaggerDelay(index) }}
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <Icon size={16} color={meta.color} />
                     <span className="font-semibold text-[var(--rpg-text-primary)]">{meta.label}</span>
-                    <span className="text-sm font-bold text-[var(--rpg-gold)]">
+                    <span className="text-[16px] text-[var(--rpg-gold)] font-pixel">
                       {characterProgression.attributes[attribute]}
                     </span>
                   </div>
@@ -299,9 +305,11 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
         </div>
       </PixelCard>
 
+      <Divider className="my-1" />
+
       {/* Skills Grid */}
       <div>
-        <h2 className="text-lg font-semibold mb-3 text-[var(--rpg-text-primary)]">Skills</h2>
+        <h2 className="text-lg font-semibold font-almendra mb-3 text-[var(--rpg-text-primary)]">Skills</h2>
         <div className="grid grid-cols-4 gap-3">
           {skills.map((skill, index) => {
             const Icon = skill.icon;
@@ -309,7 +317,8 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
               <button
                 key={index}
                 onClick={() => onNavigate('skills')}
-                className="aspect-square bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg flex flex-col items-center justify-center gap-1 hover:border-[var(--rpg-gold)] transition-all active:scale-95"
+                className="rpg-stagger-item aspect-square bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg flex flex-col items-center justify-center gap-1 hover:border-[var(--rpg-gold)] transition-all active:scale-95"
+                style={{ animationDelay: getStaggerDelay(index) }}
               >
                 {skill.imageSrc ? (
                   <div className="relative w-14 h-14 flex-shrink-0">
@@ -325,7 +334,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
                   <Icon size={56} color="var(--rpg-gold)" />
                 ) : null}
                 <span className="text-xs text-[var(--rpg-text-secondary)]">{skill.name}</span>
-                <span className="text-sm font-bold text-[var(--rpg-gold)]">{skill.level}</span>
+                <span className="text-[16px] text-[var(--rpg-gold)] font-pixel">{skill.level}</span>
               </button>
             );
           })}
@@ -335,6 +344,6 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
       {/* Activity Log */}
       <ActivityLog entries={activityLog} />
 
-    </div>
+    </ScreenContainer>
   );
 }

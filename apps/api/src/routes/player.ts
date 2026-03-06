@@ -49,6 +49,7 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       defaultRefiningMax: true,
       lowHpWarning: true,
       confirmRarity: true,
+      lootRevealRarity: true,
       activeTitle: true,
       gold: true,
     },
@@ -134,7 +135,7 @@ playerRouter.post('/attributes', asyncHandler(async (req, res) => {
 const SETTINGS_FIELDS = [
   'combatLogSpeedMs', 'explorationSpeedMs',
   'autoSkipKnownCombat', 'defaultExploreTurns', 'quickRestHealPercent', 'defaultRefiningMax',
-  'lowHpWarning', 'confirmRarity',
+  'lowHpWarning', 'confirmRarity', 'lootRevealRarity',
 ] as const;
 
 const settingsSchema = z.object({
@@ -146,6 +147,7 @@ const settingsSchema = z.object({
   defaultRefiningMax: z.boolean().optional(),
   lowHpWarning: z.boolean().optional(),
   confirmRarity: z.enum(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
+  lootRevealRarity: z.enum(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
 }).refine(data => Object.values(data).some(v => v !== undefined), { message: 'At least one setting required' });
 
 /**

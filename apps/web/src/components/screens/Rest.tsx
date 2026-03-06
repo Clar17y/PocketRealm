@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/Slider';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { Heart, AlertTriangle } from 'lucide-react';
 import * as api from '@/lib/api';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface RestProps {
   onComplete: () => void;
@@ -149,12 +150,12 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
   // Recovering mode
   if (hpState.isRecovering) {
     return (
-      <div className="space-y-4">
+      <ScreenContainer>
         <PixelCard>
           <div className="flex items-center gap-3 mb-4">
             <AlertTriangle size={32} color="var(--rpg-red)" />
             <div>
-              <h2 className="text-xl font-bold text-[var(--rpg-red)]">Knocked Out</h2>
+              <h2 className="text-xl font-bold font-almendra text-[var(--rpg-red)]">Knocked Out</h2>
               <p className="text-sm text-[var(--rpg-text-secondary)]">
                 You must recover before taking any actions
               </p>
@@ -164,13 +165,13 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
           <div className="bg-[var(--rpg-background)] rounded-lg p-4 mb-4">
             <div className="flex justify-between items-center">
               <span className="text-[var(--rpg-text-secondary)]">Recovery Cost</span>
-              <span className="text-xl font-bold text-[var(--rpg-gold)] font-mono">
+              <span className="text-[24px] text-[var(--rpg-gold)] font-pixel">
                 {hpState.recoveryCost?.toLocaleString()} turns
               </span>
             </div>
             <div className="flex justify-between items-center mt-2">
               <span className="text-[var(--rpg-text-secondary)]">HP After Recovery</span>
-              <span className="text-lg font-bold text-[var(--rpg-green-light)] font-mono">
+              <span className="text-[16px] text-[var(--rpg-green-light)] font-pixel">
                 {Math.floor(hpState.maxHp * 0.25)} / {hpState.maxHp}
               </span>
             </div>
@@ -189,7 +190,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
             {isLoading ? 'Recovering...' : 'Recover'}
           </PixelButton>
         </PixelCard>
-      </div>
+      </ScreenContainer>
     );
   }
 
@@ -217,12 +218,12 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
   }) : null;
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       <PixelCard>
         <div className="flex items-center gap-3 mb-4">
           <Heart size={32} color="var(--rpg-green-light)" />
           <div>
-            <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">Rest</h2>
+            <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Rest</h2>
             <p className="text-sm text-[var(--rpg-text-secondary)]">
               Spend turns to restore health
             </p>
@@ -233,7 +234,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
         <div className="mb-4">
           <div className="flex justify-between mb-1">
             <span className="text-sm text-[var(--rpg-text-secondary)]">Current HP</span>
-            <span className="text-sm font-mono text-[var(--rpg-green-light)]">
+            <span className="text-[16px] font-pixel text-[var(--rpg-green-light)]">
               {hpState.currentHp} / {hpState.maxHp}
             </span>
           </div>
@@ -245,7 +246,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
             showNumbers={false}
           />
           <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">
-            Passive regen: +{hpState.regenPerSecond.toFixed(1)} HP/sec
+            Passive regen: <span className="font-pixel text-[8px]">+{hpState.regenPerSecond.toFixed(1)}</span> HP/sec
           </div>
         </div>
 
@@ -256,7 +257,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-[var(--rpg-text-secondary)]">Turns to spend</span>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-[var(--rpg-gold)] font-mono">{turns}</div>
+                  <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{turns}</div>
                   {estimate?.taxRate != null && estimate.taxRate > 0 && estimate.effectiveTurns != null && (
                     <div className="text-xs text-[var(--rpg-text-secondary)]">
                       {estimate.effectiveTurns} effective ({estimate.taxRate}% tax)
@@ -287,19 +288,19 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
               <div className="bg-[var(--rpg-background)] rounded-lg p-4 mb-4">
                 <div className="flex justify-between items-center">
                   <span className="text-[var(--rpg-text-secondary)]">HP Restored</span>
-                  <span className="text-lg font-bold text-[var(--rpg-green-light)] font-mono">
+                  <span className="text-[16px] text-[var(--rpg-green-light)] font-pixel">
                     +{Math.floor(estimate.healAmount)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-[var(--rpg-text-secondary)]">Result</span>
-                  <span className="font-mono">
+                  <span className="font-pixel text-[16px]">
                     {hpState.currentHp} → {Math.floor(estimate.resultingHp)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-[var(--rpg-text-secondary)]">Turns Used</span>
-                  <span className="font-mono text-[var(--rpg-gold)]">
+                  <span className="font-pixel text-[16px] text-[var(--rpg-gold)]">
                     {estimate.turnsNeeded}
                   </span>
                 </div>
@@ -327,6 +328,6 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
           </div>
         )}
       </PixelCard>
-    </div>
+    </ScreenContainer>
   );
 }

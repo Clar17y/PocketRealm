@@ -12,6 +12,7 @@ import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { xpRateColor } from '@/lib/format';
 import { XpRateTooltip } from '@/components/common/XpRateTooltip';
+import { ScreenContainer } from '../common/ScreenContainer';
 
 interface Material {
   name: string;
@@ -110,7 +111,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
   };
 
   return (
-    <div className="space-y-4">
+    <ScreenContainer>
       {/* Knockout Banner */}
       {isRecovering && (
         <KnockoutBanner action="crafting" recoveryCost={recoveryCost} />
@@ -119,8 +120,8 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-[var(--rpg-text-primary)]">{skillName}</h2>
-          <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-sm font-bold">
+          <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">{skillName}</h2>
+          <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-[12px] font-pixel">
             Lv. {skillLevel}
           </div>
         </div>
@@ -129,7 +130,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
             XP Rate
             <XpRateTooltip />
           </div>
-          <div className="text-sm font-bold" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
+          <div className="text-[16px] font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>
 
@@ -189,7 +190,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                             </span>
                           )}
                         </h4>
-                        <span className="text-xs text-[var(--rpg-text-secondary)]">Lv. {recipe.requiredLevel}</span>
+                        <span className="text-[8px] text-[var(--rpg-text-secondary)] font-pixel">Lv. {recipe.requiredLevel}</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         {levelLocked ? (
@@ -241,7 +242,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
               )}
             </div>
             <div>
-              <h3 className="font-bold text-[var(--rpg-text-primary)] text-lg">{selectedRecipe.name}</h3>
+              <h3 className="font-bold font-almendra text-[var(--rpg-text-primary)] text-lg">{selectedRecipe.name}</h3>
               <p className="text-xs text-[var(--rpg-text-secondary)] capitalize">
                 {selectedRecipe.rarity} - Lv. {selectedRecipe.requiredLevel} Required
                 {selectedLevelLocked && (
@@ -270,7 +271,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
               selectedBaseStats.map(([stat, value]) => (
                 <div key={stat} className="flex items-center justify-between text-sm">
                   <span className="text-[var(--rpg-text-primary)]">{prettyStatName(stat)}</span>
-                  <span className="text-[var(--rpg-green-light)] font-mono font-semibold">+{formatStatValue(stat, value)}</span>
+                  <span className="text-[var(--rpg-green-light)] font-pixel text-[16px]">+{formatStatValue(stat, value)}</span>
                 </div>
               ))
             )}
@@ -297,7 +298,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                     <div className="flex justify-between items-baseline">
                       <span className="text-sm text-[var(--rpg-text-primary)]">{material.name}</span>
                       <span
-                        className={`text-sm font-mono font-semibold ${
+                        className={`text-[16px] font-pixel ${
                           hasEnough ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'
                         }`}
                       >
@@ -328,7 +329,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                 const taxAmount = inflated - baseCost;
                 return (
                   <>
-                    <div className="text-xl font-bold text-[var(--rpg-gold)] font-mono">
+                    <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">
                       {inflated}
                       {quantity > 1 && (
                         <span className="text-xs font-normal text-[var(--rpg-text-secondary)] ml-1">
@@ -351,7 +352,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                 <Sparkles size={16} color="var(--rpg-blue-light)" />
                 <span className="text-xs text-[var(--rpg-text-secondary)]">XP Reward</span>
               </div>
-              <div className="text-xl font-bold text-[var(--rpg-blue-light)] font-mono">
+              <div className="text-[24px] text-[var(--rpg-blue-light)] font-pixel">
                 {selectedRecipe.xpReward * quantity}
                 {quantity > 1 && (
                   <span className="text-xs font-normal text-[var(--rpg-text-secondary)] ml-1">
@@ -374,7 +375,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                 >
                   <Minus size={14} />
                 </button>
-                <span className="text-lg font-bold font-mono text-[var(--rpg-gold)] w-10 text-center">{quantity}</span>
+                <span className="text-[16px] font-pixel text-[var(--rpg-gold)] w-10 text-center">{quantity}</span>
                 <button
                   onClick={() => setQuantity((q) => Math.min(selectedMax, q + 1))}
                   disabled={quantity >= selectedMax}
@@ -422,7 +423,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
       )}
 
       <ActivityLog entries={activityLog} maxHeight="max-h-48" />
-    </div>
+    </ScreenContainer>
   );
 }
 

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
+import { RARITY_RANK } from '@/lib/rarity';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { updateTutorialStep } from '@/lib/api';
 import {
@@ -214,6 +216,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     defaultRefiningMax,
     lowHpWarning,
     confirmRarity,
+    lootRevealRarity,
     guildTaxRate, setGuildTaxRate,
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
@@ -223,6 +226,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetDefaultRefiningMax,
     handleSetLowHpWarning,
     handleSetConfirmRarity,
+    handleSetLootRevealRarity,
     initSettingsFromServer,
   } = playerSettings;
   const [tutorialStep, setTutorialStep] = useState<number>(TUTORIAL_COMPLETED);
@@ -233,6 +237,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const pendingLootQueueRef = useRef<string[]>([]);
   const arrivedInTownRef = useRef(false);
   const lastEventLogTimeRef = useRef(0);
+  const prevInventoryIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedOnceRef = useRef(false);
+  const lootRevealRarityRef = useRef(lootRevealRarity);
+  lootRevealRarityRef.current = lootRevealRarity;
+  const [lootRevealItems, setLootRevealItems] = useState<Array<{
+    name: string;
+    rarity: 'uncommon' | 'rare' | 'epic' | 'legendary';
+    quantity: number;
+    imageSrc?: string;
+  }> | null>(null);
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<{
     totalTurns: number;
     zoneName: string;
@@ -343,6 +357,23 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setInventoryCapacity(invRes.data.capacity ?? 24);
       setInventoryUsedSlots(invRes.data.usedSlots ?? 0);
       if (invRes.data.materialTotals) setMaterialTotals(invRes.data.materialTotals);
+      // Detect new notable items for loot reveal
+      if (hasLoadedOnceRef.current && lootRevealRarityRef.current !== 'none') {
+        const minRank = RARITY_RANK[lootRevealRarityRef.current] ?? 1;
+        const newNotableItems = invRes.data.items.filter(
+          item => !prevInventoryIdsRef.current.has(item.id) && RARITY_RANK[item.rarity] >= minRank
+        );
+        if (newNotableItems.length > 0) {
+          setLootRevealItems(newNotableItems.map(i => ({
+            name: i.template.name,
+            rarity: i.rarity as 'uncommon' | 'rare' | 'epic' | 'legendary',
+            quantity: i.quantity,
+            imageSrc: itemImageSrc(i.template.name, i.template.itemType),
+          })));
+        }
+      }
+      prevInventoryIdsRef.current = new Set(invRes.data.items.map(i => i.id));
+      hasLoadedOnceRef.current = true;
     }
     if (equipRes.data) {
       setEquipment(
@@ -1519,6 +1550,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   }, []);
 
+  const handleDismissLootReveal = useCallback(() => {
+    setLootRevealItems(null);
+  }, []);
+
   return {
     // Navigation
     activeScreen,
@@ -1586,6 +1621,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetLowHpWarning,
     confirmRarity,
     handleSetConfirmRarity,
+    lootRevealRarity,
+    handleSetLootRevealRarity,
     playbackActive,
     combatPlaybackData,
     combatPlaybackQueue,
@@ -1675,6 +1712,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Casino & Training
     handleExchangeGold,
     handlePlaceBet,
+
+    // Loot reveal
+    lootRevealItems,
+    handleDismissLootReveal,
   };
 }
 
