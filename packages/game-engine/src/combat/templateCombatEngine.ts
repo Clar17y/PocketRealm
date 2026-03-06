@@ -271,7 +271,7 @@ function applyEffectTicks(
 
       // Track DOT damage by scaling stat (combatantA dealing to combatantB)
       if (targetKey === 'combatantB' && tickDamage > 0) {
-        const dotStat = effect.dotDamageType === 'physical' ? 'melee' : 'magic';
+        const dotStat = effect.sourceScalingStat ?? (effect.dotDamageType === 'physical' ? 'melee' : 'magic');
         state.combatantADamageByScalingStat[dotStat] += tickDamage;
       }
 
@@ -487,9 +487,11 @@ function executeOffensiveAction(
 
   applyDamage(state, opponent(actorKey), finalDamage);
 
+  // Resolved scaling stat for XP attribution (damage tracking + DOT source)
+  const xpStat = resolvedScaling ?? (actorStats.damageType === 'magic' ? 'magic' as const : 'melee' as const);
+
   // Track damage by scaling stat for XP splitting (combatantA only)
   if (actorKey === 'combatantA' && finalDamage > 0) {
-    const xpStat = resolvedScaling ?? (actorStats.damageType === 'magic' ? 'magic' : 'melee');
     state.combatantADamageByScalingStat[xpStat] += finalDamage;
   }
 
@@ -544,6 +546,7 @@ function executeOffensiveAction(
       stat: effect.stat,
       modifier: effect.modifier,
       remainingRounds: effect.duration,
+      sourceScalingStat: xpStat,
     };
 
     Object.assign(newEffect, snapshotEffectValues(action.effect, finalDamage));

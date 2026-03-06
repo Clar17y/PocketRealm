@@ -48,6 +48,8 @@ export interface ActiveEffect {
   dotDamageType?: 'physical' | 'magic';
   /** Snapshotted HOT healing per round */
   resolvedHealPerRound?: number;
+  /** Which combat skill applied this effect (for XP attribution of DOT ticks) */
+  sourceScalingStat?: 'melee' | 'ranged' | 'magic';
 }
 
 export interface CombatLogEntry {
