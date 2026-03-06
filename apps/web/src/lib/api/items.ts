@@ -1,4 +1,4 @@
-import type { QuestProgressUpdate } from '@adventure/shared';
+import type { QuestProgressUpdate } from '@pocketrealm/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 import type { EventModifierBadge } from './combat';
 
