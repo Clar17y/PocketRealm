@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
+import { RARITY_RANK } from '@/lib/rarity';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { updateTutorialStep } from '@/lib/api';
 import {
@@ -357,7 +358,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setInventoryUsedSlots(invRes.data.usedSlots ?? 0);
       if (invRes.data.materialTotals) setMaterialTotals(invRes.data.materialTotals);
       // Detect new notable items for loot reveal
-      const RARITY_RANK: Record<string, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
       if (hasLoadedOnceRef.current && lootRevealRarityRef.current !== 'none') {
         const minRank = RARITY_RANK[lootRevealRarityRef.current] ?? 1;
         const newNotableItems = invRes.data.items.filter(

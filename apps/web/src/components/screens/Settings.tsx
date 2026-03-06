@@ -4,6 +4,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { Slider } from '@/components/ui/Slider';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { ConfirmRarity } from '@/lib/rarity';
+import { RaritySelector } from '../common/RaritySelector';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface SettingsProps {
@@ -192,48 +193,20 @@ export function Settings({
       {/* Inventory */}
       <PixelCard>
         <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Inventory</h3>
-        <div>
-          <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Confirm Before Drop / Salvage / Sell</p>
-          <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
-            Show a confirmation dialog when destroying items at or above this rarity.
-          </p>
-          <div className="flex gap-2">
-            {(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary'] as const).map((r) => (
-              <button
-                key={r}
-                onClick={() => onConfirmRarityChange(r)}
-                className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors capitalize ${
-                  confirmRarity === r
-                    ? 'bg-[var(--rpg-gold)] text-black'
-                    : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-border)]'
-                }`}
-              >
-                {r === 'none' ? 'Off' : r}
-              </button>
-            ))}
-          </div>
-        </div>
+        <RaritySelector
+          label="Confirm Before Drop / Salvage / Sell"
+          description="Show a confirmation dialog when destroying items at or above this rarity."
+          value={confirmRarity}
+          onChange={onConfirmRarityChange}
+        />
 
         <div className="mt-4">
-          <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Loot Reveal Popup</p>
-          <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60 mb-2">
-            Show an animated popup when items at or above this rarity are added to your backpack.
-          </p>
-          <div className="flex gap-2">
-            {(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary'] as const).map((r) => (
-              <button
-                key={r}
-                onClick={() => onLootRevealRarityChange(r)}
-                className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors capitalize ${
-                  lootRevealRarity === r
-                    ? 'bg-[var(--rpg-gold)] text-black'
-                    : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-border)]'
-                }`}
-              >
-                {r === 'none' ? 'Off' : r}
-              </button>
-            ))}
-          </div>
+          <RaritySelector
+            label="Loot Reveal Popup"
+            description="Show an animated popup when items at or above this rarity are added to your backpack."
+            value={lootRevealRarity}
+            onChange={onLootRevealRarityChange}
+          />
         </div>
       </PixelCard>
 
