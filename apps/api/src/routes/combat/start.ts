@@ -294,7 +294,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
           damageByScalingStat: combatResult.damageByScalingStat,
           resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           guildXpBoost: guildMods.xpBoost,
-          includeGuildCredit: true,
+
         });
         mobLoot = await enrichLootWithNames(rewards.loot);
         allSiteOverflow.push(...rewards.overflow);
@@ -892,7 +892,7 @@ export function registerStartRoutes(router: Router): void {
           damageByScalingStat: combatResult.damageByScalingStat,
           resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           guildXpBoost: guildMods.xpBoost,
-          includeGuildCredit: true,
+
           includeBestiary: false, // zone combat has its own bestiary logic (upserts on all outcomes)
         });
         loot = rewards.loot;

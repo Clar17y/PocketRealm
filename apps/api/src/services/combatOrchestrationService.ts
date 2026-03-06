@@ -96,7 +96,6 @@ export interface VictoryRewardParams {
   damageByScalingStat?: { melee: number; ranged: number; magic: number };
   resourceCostByScalingStat?: { melee: number; ranged: number; magic: number };
   guildXpBoost?: number;
-  includeGuildCredit?: boolean;
   includeBestiary?: boolean;
 }
 
@@ -126,14 +125,11 @@ export async function processCombatVictoryRewards(
     await recordBestiaryKill(playerId, mob.id, mob.mobPrefix);
   }
 
-  if (params.includeGuildCredit) {
-    const guildId = await getPlayerGuildId(playerId);
-    if (guildId) {
-      await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
-    }
+  // Guild XP + quest/contract progress for all combat victories
+  const guildId = await getPlayerGuildId(playerId);
+  if (guildId) {
+    await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
   }
-
-  // Quest + guild contract progress — always track, regardless of guild credit flag
   const questProgress: QuestProgressUpdate[] = [];
   const killProgress = await trackProgress(playerId, 'kill_count', 1);
   questProgress.push(...killProgress);
