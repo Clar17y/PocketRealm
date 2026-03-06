@@ -9,6 +9,7 @@ import {
   claimQuestReward,
   claimDailyBonus,
   getQuestState,
+  rerollQuest,
 } from './questService';
 import { QUEST_CONSTANTS } from '@pocketrealm/shared';
 
@@ -342,6 +343,11 @@ describe('claimDailyBonus', () => {
 // generateDailyQuests
 // ---------------------------------------------------------------------------
 describe('generateDailyQuests', () => {
+  beforeEach(() => {
+    db.playerZoneDiscovery.count.mockResolvedValue(5);
+    db.playerBestiaryPrefix.findFirst.mockResolvedValue({ playerId: PLAYER_ID });
+  });
+
   it('creates DAILY_COUNT quests with diverse categories', async () => {
     let createCount = 0;
     db.playerQuest.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => {
@@ -394,6 +400,11 @@ describe('generateDailyQuests', () => {
 // generateWeeklyQuest
 // ---------------------------------------------------------------------------
 describe('generateWeeklyQuest', () => {
+  beforeEach(() => {
+    db.playerZoneDiscovery.count.mockResolvedValue(5);
+    db.playerBestiaryPrefix.findFirst.mockResolvedValue({ playerId: PLAYER_ID });
+  });
+
   it('creates 1 weekly quest', async () => {
     db.playerQuest.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => ({
       id: 'wq-1',
@@ -452,6 +463,10 @@ describe('getActiveQuests', () => {
   });
 
   it('triggers daily reset and generates new dailies when needed', async () => {
+    // Unlock mocks for getEligibleTemplates
+    db.playerZoneDiscovery.count.mockResolvedValue(5);
+    db.playerBestiaryPrefix.findFirst.mockResolvedValue({ playerId: PLAYER_ID });
+
     // lastDailyReset is yesterday (needs reset)
     const yesterday = new Date('2026-02-24T00:00:00Z');
     db.playerQuestState.upsert.mockResolvedValue({
@@ -510,6 +525,158 @@ describe('getActiveQuests', () => {
 // ---------------------------------------------------------------------------
 // getQuestState
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// rerollQuest
+// ---------------------------------------------------------------------------
+describe('rerollQuest', () => {
+  it('replaces an active quest and increments rerollsUsed', async () => {
+    // Active quest to reroll
+    db.playerQuest.findFirst.mockResolvedValue({
+      id: 'q-old',
+      playerId: PLAYER_ID,
+      questKey: 'kill_mobs',
+      cadence: 'daily',
+      targetValue: 15,
+      currentValue: 3,
+      rewardAmount: 4,
+      status: 'active',
+      filterValue: null,
+      assignedAt: NOW,
+      expiresAt: TOMORROW,
+      completedAt: null,
+      claimedAt: null,
+    });
+
+    // Player level
+    db.player.findUnique.mockResolvedValue({ characterLevel: 5 });
+
+    // Current quests for dedup
+    db.playerQuest.findMany.mockResolvedValue([
+      { questKey: 'kill_mobs' },
+    ]);
+
+    // Eligible template unlock checks
+    db.playerZoneDiscovery.count.mockResolvedValue(5);
+    db.playerBestiaryPrefix.findFirst.mockResolvedValue({ playerId: PLAYER_ID });
+
+    // Inside transaction: reroll guard
+    db.playerQuestState.findUnique.mockResolvedValue({
+      playerId: PLAYER_ID,
+      rerollsUsed: 0,
+    });
+
+    // Transaction: delete old, create new, update state
+    db.playerQuest.delete.mockResolvedValue({});
+    db.playerQuest.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => ({
+      id: 'q-new',
+      ...data,
+      currentValue: 0,
+      status: 'active',
+      completedAt: null,
+      claimedAt: null,
+      assignedAt: NOW,
+    }));
+    db.playerQuestState.update.mockResolvedValue({ rerollsUsed: 1 });
+
+    const result = await rerollQuest(PLAYER_ID, 'q-old', NOW);
+
+    expect(result.id).toBe('q-new');
+    expect(result.questKey).not.toBe('kill_mobs');
+    expect(db.playerQuest.delete).toHaveBeenCalledWith({ where: { id: 'q-old' } });
+    expect(db.playerQuestState.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { playerId: PLAYER_ID },
+        data: { rerollsUsed: { increment: 1 } },
+      }),
+    );
+  });
+
+  it('throws NO_REROLLS when rerollsUsed >= REROLLS_PER_DAY', async () => {
+    // Active quest exists
+    db.playerQuest.findFirst.mockResolvedValue({
+      id: 'q1',
+      playerId: PLAYER_ID,
+      questKey: 'kill_mobs',
+      cadence: 'daily',
+      targetValue: 15,
+      currentValue: 0,
+      rewardAmount: 4,
+      status: 'active',
+      filterValue: null,
+      assignedAt: NOW,
+      expiresAt: TOMORROW,
+      completedAt: null,
+      claimedAt: null,
+    });
+
+    db.player.findUnique.mockResolvedValue({ characterLevel: 5 });
+    db.playerQuest.findMany.mockResolvedValue([{ questKey: 'kill_mobs' }]);
+    db.playerZoneDiscovery.count.mockResolvedValue(5);
+    db.playerBestiaryPrefix.findFirst.mockResolvedValue({ playerId: PLAYER_ID });
+
+    // Reroll limit reached — inside transaction
+    db.playerQuestState.findUnique.mockResolvedValue({
+      playerId: PLAYER_ID,
+      rerollsUsed: 1,
+    });
+
+    await expect(rerollQuest(PLAYER_ID, 'q1', NOW)).rejects.toThrow(/no rerolls/i);
+  });
+
+  it('throws QUEST_NOT_ACTIVE for non-existent quest', async () => {
+    db.playerQuest.findFirst.mockResolvedValue(null);
+
+    await expect(rerollQuest(PLAYER_ID, 'nonexistent', NOW)).rejects.toThrow(
+      /not found|not active/i,
+    );
+  });
+
+  it('throws NO_ALTERNATIVES when no eligible templates remain', async () => {
+    // Active quest
+    db.playerQuest.findFirst.mockResolvedValue({
+      id: 'q1',
+      playerId: PLAYER_ID,
+      questKey: 'kill_mobs',
+      cadence: 'daily',
+      targetValue: 15,
+      currentValue: 0,
+      rewardAmount: 4,
+      status: 'active',
+      filterValue: null,
+      assignedAt: NOW,
+      expiresAt: TOMORROW,
+      completedAt: null,
+      claimedAt: null,
+    });
+
+    db.player.findUnique.mockResolvedValue({ characterLevel: 5 });
+
+    // All eligible daily templates are already assigned
+    db.playerZoneDiscovery.count.mockResolvedValue(5);
+    db.playerBestiaryPrefix.findFirst.mockResolvedValue({ playerId: PLAYER_ID });
+
+    // Return all daily template keys as current quests — blocks all alternatives
+    db.playerQuest.findMany.mockResolvedValue([
+      { questKey: 'kill_mobs' },
+      { questKey: 'kill_prefix' },
+      { questKey: 'explore_turns' },
+      { questKey: 'open_chests' },
+      { questKey: 'travel_zones' },
+      { questKey: 'gather_resources' },
+      { questKey: 'craft_items' },
+      { questKey: 'pvp_wins' },
+      { questKey: 'pvp_damage' },
+      { questKey: 'casino_wager' },
+      { questKey: 'casino_bets' },
+    ]);
+
+    await expect(rerollQuest(PLAYER_ID, 'q1', NOW)).rejects.toThrow(/no alternative/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getQuestState
+// ---------------------------------------------------------------------------
 describe('getQuestState', () => {
   it('returns PlayerQuestStateData for the player', async () => {
     db.playerQuestState.upsert.mockResolvedValue({
@@ -517,6 +684,7 @@ describe('getQuestState', () => {
       playerId: PLAYER_ID,
       questTokens: 42,
       dailyBonusClaimed: false,
+      rerollsUsed: 0,
       lastDailyReset: DAY_START,
       lastWeeklyReset: WEEK_START,
     });
@@ -525,6 +693,7 @@ describe('getQuestState', () => {
     expect(result).toEqual({
       questTokens: 42,
       dailyBonusClaimed: false,
+      rerollsUsed: 0,
       lastDailyReset: DAY_START.toISOString(),
       lastWeeklyReset: WEEK_START.toISOString(),
     });

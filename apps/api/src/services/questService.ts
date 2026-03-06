@@ -43,8 +43,11 @@ async function getEligibleTemplates(
   }
 
   // Prefix kills: requires at least 1 prefix encounter
-  const prefixCount = await prisma.playerBestiaryPrefix.count({ where: { playerId }, take: 1 });
-  if (prefixCount > 0) {
+  const hasPrefix = await prisma.playerBestiaryPrefix.findFirst({
+    where: { playerId },
+    select: { playerId: true },
+  });
+  if (hasPrefix) {
     hasUnlock.add('has_prefix_kills');
   }
 
@@ -242,6 +245,7 @@ export async function generateWeeklyQuest(
   const expiresAt = getWeekEnd(getWeekStart(now));
 
   const eligible = await getEligibleTemplates(playerId, playerLevel, 'weekly');
+  if (eligible.length === 0) return [];
   const def = eligible[Math.floor(Math.random() * eligible.length)]!;
 
   const targetValue = def.targets[bracket];
@@ -424,13 +428,7 @@ export async function rerollQuest(
   questId: string,
   now: Date = new Date(),
 ): Promise<PlayerQuestData> {
-  const state = await getOrCreateQuestState(playerId);
-
-  if (state.rerollsUsed >= QUEST_CONSTANTS.REROLLS_PER_DAY) {
-    throw new AppError(400, 'No rerolls remaining today', 'NO_REROLLS');
-  }
-
-  // Find the quest to reroll — must be active (not completed/claimed)
+  // Find the quest to reroll — must be active
   const quest = await prisma.playerQuest.findFirst({
     where: { id: questId, playerId, status: 'active' },
   });
@@ -444,7 +442,7 @@ export async function rerollQuest(
   const playerLevel = player?.characterLevel ?? 1;
   const bracket = getLevelBracket(playerLevel);
 
-  // Get eligible templates for this cadence, excluding already-assigned quest keys
+  // Get eligible templates excluding already-assigned quest keys
   const currentQuests = await prisma.playerQuest.findMany({
     where: { playerId, cadence: quest.cadence, status: { not: 'expired' }, assignedAt: { gte: getDayStart(now) } },
     select: { questKey: true },
@@ -470,8 +468,14 @@ export async function rerollQuest(
     filterValue = prefixes[Math.floor(Math.random() * prefixes.length)]!.key;
   }
 
-  // Delete old quest, create new one, increment rerollsUsed — in transaction
+  // All DB writes in one transaction with reroll guard inside
   const newQuest = await prisma.$transaction(async (tx) => {
+    // Check reroll limit inside transaction to prevent TOCTOU race
+    const state = await tx.playerQuestState.findUnique({ where: { playerId } });
+    if (!state || state.rerollsUsed >= QUEST_CONSTANTS.REROLLS_PER_DAY) {
+      throw new AppError(400, 'No rerolls remaining today', 'NO_REROLLS');
+    }
+
     await tx.playerQuest.delete({ where: { id: questId } });
 
     const created = await tx.playerQuest.create({
@@ -484,7 +488,7 @@ export async function rerollQuest(
         rewardAmount,
         status: 'active',
         filterValue,
-        expiresAt: quest.expiresAt, // keep same expiry as original
+        expiresAt: quest.expiresAt,
       },
     });
 

@@ -55,7 +55,7 @@ function QuestProgressBar({ current, max, completed }: { current: number; max: n
       </div>
       <div className="relative w-full h-2 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded overflow-hidden">
         <div
-          className={`h-full transition-all duration-300 rpg-bar-shimmer ${completed ? 'bg-[var(--rpg-gold)]' : 'bg-[var(--rpg-gold)]'}`}
+          className={`h-full transition-all duration-300 rpg-bar-shimmer ${completed ? 'bg-[var(--rpg-green-light)]' : 'bg-[var(--rpg-gold)]'}`}
           style={{ width: `${pct}%` }}
         />
       </div>
