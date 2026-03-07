@@ -11,11 +11,12 @@ import { GuildContractsTab } from '@/components/guild/GuildContractsTab';
 import { GuildProjectsTab } from '@/components/guild/GuildProjectsTab';
 import { GuildSpecializationTab } from '@/components/guild/GuildSpecializationTab';
 import { GuildSettings } from '@/components/guild/GuildSettings';
+import { GuildExpeditionsTab } from '@/components/guild/GuildExpeditionsTab';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { ScreenContainer } from '../common/ScreenContainer';
 
-type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'projects' | 'specialization' | 'log' | 'settings';
+type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'projects' | 'expeditions' | 'specialization' | 'log' | 'settings';
 
 interface GuildScreenProps {
   playerId: string | null;
@@ -76,7 +77,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
       {error && <ErrorBanner message={error} />}
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {(['overview', 'members', 'upgrades', 'contracts', 'projects', 'specialization', 'log', ...(guildData.role === 'leader' || guildData.role === 'officer' ? ['settings'] : [])] as GuildTab[]).map((tab) => (
+        {(['overview', 'members', 'upgrades', 'contracts', 'projects', 'expeditions', 'specialization', 'log', ...(guildData.role === 'leader' || guildData.role === 'officer' ? ['settings'] : [])] as GuildTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -110,6 +111,16 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
       )}
       {activeTab === 'projects' && (
         <GuildProjectsTab guildId={guildData.guild.id} myRole={guildData.role} setError={setError} onTurnsChanged={onTurnsChanged} />
+      )}
+      {activeTab === 'expeditions' && (
+        <GuildExpeditionsTab
+          guildId={guildData.guild.id}
+          myRole={guildData.role as 'leader' | 'officer' | 'member'}
+          characterLevel={characterLevel}
+          setError={setError}
+          onTurnsChanged={onTurnsChanged}
+          onRefresh={loadGuild}
+        />
       )}
       {activeTab === 'specialization' && (
         <GuildSpecializationTab guildId={guildData.guild.id} guildLevel={guildData.guild.level} myRole={guildData.role} setError={setError} />
