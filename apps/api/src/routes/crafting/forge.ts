@@ -12,7 +12,7 @@ import {
   rollBonusStatsForRarity,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
-import { getBuffValue, hasActiveBuff, consumeBuff } from '../../services/buffService';
+import { getBuffValue, hasActiveBuff, consumeBuff, consumeBuffStandalone } from '../../services/buffService';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
@@ -168,11 +168,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       });
 
       // Consume forge_luck on success (it modified the chance); forge_protection not consumed (wasn't needed)
-      if (forgeLuckBonus > 0) {
-        await prisma.$transaction(async (tx) => {
-          await consumeBuff(tx, playerId, 'forge_luck');
-        });
-      }
+      if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
 
       res.json({
         logId: log.id,
@@ -239,12 +235,8 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
     });
 
     // Consume buffs after failed forge
-    if (forgeLuckBonus > 0 || hasForgeProtection) {
-      await prisma.$transaction(async (tx) => {
-        if (forgeLuckBonus > 0) await consumeBuff(tx, playerId, 'forge_luck');
-        if (hasForgeProtection) await consumeBuff(tx, playerId, 'forge_protection');
-      });
-    }
+    if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
+    if (hasForgeProtection) await consumeBuffStandalone(playerId, 'forge_protection');
 
     res.json({
       logId: log.id,

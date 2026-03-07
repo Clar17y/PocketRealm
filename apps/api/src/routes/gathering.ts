@@ -16,7 +16,7 @@ import { rollGemCritBatch, computeEventTurnCost } from '@pocketrealm/game-engine
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
-import { getBuffValue, consumeBuffIfActive } from '../services/buffService';
+import { getBuffValue, consumeBuffStandalone } from '../services/buffService';
 import { trackProgress } from '../services/progressService';
 
 export const gatheringRouter = Router();
@@ -395,11 +395,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   });
 
   // Consume shop gathering yield buff (one use per gather action)
-  if (shopGatheringYield > 0) {
-    await (prisma as any).$transaction(async (tx: any) => {
-      await consumeBuffIfActive(tx, playerId, 'gathering_yield');
-    });
-  }
+  if (shopGatheringYield > 0) await consumeBuffStandalone(playerId, 'gathering_yield');
 
   // XP: scaled by node level requirement
   const xpPerAction = GATHERING_CONSTANTS.XP_PER_ACTION_BASE

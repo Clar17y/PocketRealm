@@ -1,6 +1,12 @@
 import { prisma } from '@pocketrealm/database';
 import type { PlayerBuffData } from '@pocketrealm/shared';
 
+export interface CombatBuffs {
+  damageBoost: number;
+  defenceBoost: number;
+  durabilityShield: number;
+}
+
 export async function getActiveBuffs(playerId: string): Promise<PlayerBuffData[]> {
   const buffs = await (prisma as any).playerBuff.findMany({
     where: { playerId },
@@ -70,4 +76,46 @@ export async function consumeBuffIfActive(tx: any, playerId: string, buffType: s
     });
   }
   return buff.bonusValue;
+}
+
+/** Fetch all combat-related buff values for a player. */
+export async function getCombatBuffs(playerId: string): Promise<CombatBuffs> {
+  const [damageBoost, defenceBoost, durabilityShield] = await Promise.all([
+    getBuffValue(playerId, 'combat_damage'),
+    getBuffValue(playerId, 'combat_defence'),
+    getBuffValue(playerId, 'durability_shield'),
+  ]);
+  return { damageBoost, defenceBoost, durabilityShield };
+}
+
+/** Apply combat buffs to player stats before combat resolution. Mutates in place. */
+export function applyCombatBuffs(
+  playerStats: { damageMin: number; damageMax: number; defence: number },
+  buffs: { damageBoost: number; defenceBoost: number },
+): void {
+  if (buffs.damageBoost > 0) {
+    playerStats.damageMin = Math.floor(playerStats.damageMin * (1 + buffs.damageBoost));
+    playerStats.damageMax = Math.floor(playerStats.damageMax * (1 + buffs.damageBoost));
+  }
+  if (buffs.defenceBoost > 0) {
+    playerStats.defence = Math.floor(playerStats.defence * (1 + buffs.defenceBoost));
+  }
+}
+
+/** Consume all active combat buffs in a transaction. */
+export async function consumeCombatBuffs(
+  tx: any,
+  playerId: string,
+  buffs: CombatBuffs,
+): Promise<void> {
+  if (buffs.damageBoost > 0) await consumeBuffIfActive(tx, playerId, 'combat_damage');
+  if (buffs.defenceBoost > 0) await consumeBuffIfActive(tx, playerId, 'combat_defence');
+  if (buffs.durabilityShield > 0) await consumeBuffIfActive(tx, playerId, 'durability_shield');
+}
+
+/** Consume a buff in its own transaction when the caller has no transaction context. */
+export async function consumeBuffStandalone(playerId: string, buffType: string): Promise<void> {
+  await (prisma as any).$transaction(async (tx: any) => {
+    await consumeBuffIfActive(tx, playerId, buffType);
+  });
 }

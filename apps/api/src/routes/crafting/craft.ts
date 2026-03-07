@@ -21,7 +21,7 @@ import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
-import { getBuffValue, consumeBuffIfActive } from '../../services/buffService';
+import { getBuffValue, consumeBuffStandalone } from '../../services/buffService';
 import { trackProgress } from '../../services/progressService';
 import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
 import {
@@ -243,11 +243,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     }
 
     // Consume shop crafting crit buff (one use per craft action)
-    if (shopCraftingCrit > 0) {
-      await (prisma as any).$transaction(async (tx: any) => {
-        await consumeBuffIfActive(tx, playerId, 'crafting_crit');
-      });
-    }
+    if (shopCraftingCrit > 0) await consumeBuffStandalone(playerId, 'crafting_crit');
 
     const xpGrant = await grantSkillXp(playerId, recipe.skillType, recipe.xpReward * quantity);
 

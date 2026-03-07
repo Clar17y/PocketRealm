@@ -61,7 +61,7 @@ import { incrementStats } from '../../services/statsService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
-import { getBuffValue, consumeBuffIfActive } from '../../services/buffService';
+import { getCombatBuffs, applyCombatBuffs, consumeCombatBuffs } from '../../services/buffService';
 import { buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import {
   prismaAny,
@@ -177,11 +177,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const guildMods = await getPlayerGuildModifiers(playerId);
 
   // Quest shop combat buffs
-  const [combatDamageBuff, combatDefenceBuff, durabilityShieldActive] = await Promise.all([
-    getBuffValue(playerId, 'combat_damage'),
-    getBuffValue(playerId, 'combat_defence'),
-    getBuffValue(playerId, 'durability_shield'),
-  ]);
+  const combatBuffs = await getCombatBuffs(playerId);
 
   // Per-action scaling for template combat engine
   const perActionScaling = await buildPerActionScaling(playerId, {
@@ -259,13 +255,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       applyGuildCombatModifiers(playerStats, guildMods);
 
       // Apply quest shop combat buffs
-      if (combatDamageBuff > 0) {
-        playerStats.damageMin = Math.floor(playerStats.damageMin * (1 + combatDamageBuff));
-        playerStats.damageMax = Math.floor(playerStats.damageMax * (1 + combatDamageBuff));
-      }
-      if (combatDefenceBuff > 0) {
-        playerStats.defence = Math.floor(playerStats.defence * (1 + combatDefenceBuff));
-      }
+      applyCombatBuffs(playerStats, combatBuffs);
 
       const combatOptions: CombatOptions | undefined = potionPool.length > 0
         ? { potions: [...potionPool] }
@@ -300,7 +290,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       let mobLoot: LootDropWithName[] = [];
       let mobXpGrants: GrantXpResult[] = [];
       const mobXpAwarded = combatResult.outcome === 'victory' ? Math.max(0, prefixedMob.xpReward) : 0;
-      const mobDurabilityLost = durabilityShieldActive > 0
+      const mobDurabilityLost = combatBuffs.durabilityShield > 0
         ? []
         : await degradeEquippedDurability(playerId, combatResult.log);
 
@@ -453,11 +443,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   }
 
   // Consume quest shop combat buffs (regardless of outcome)
-  if (combatDamageBuff > 0 || combatDefenceBuff > 0 || durabilityShieldActive > 0) {
+  if (combatBuffs.damageBoost > 0 || combatBuffs.defenceBoost > 0 || combatBuffs.durabilityShield > 0) {
     await prisma.$transaction(async (tx) => {
-      if (combatDamageBuff > 0) await consumeBuffIfActive(tx, playerId, 'combat_damage');
-      if (combatDefenceBuff > 0) await consumeBuffIfActive(tx, playerId, 'combat_defence');
-      if (durabilityShieldActive > 0) await consumeBuffIfActive(tx, playerId, 'durability_shield');
+      await consumeCombatBuffs(tx, playerId, combatBuffs);
     });
   }
 
@@ -819,11 +807,7 @@ export function registerStartRoutes(router: Router): void {
       const guildMods = await getPlayerGuildModifiers(playerId);
 
       // Quest shop combat buffs
-      const [zoneCombatDamageBuff, zoneCombatDefenceBuff, zoneDurabilityShieldActive] = await Promise.all([
-        getBuffValue(playerId, 'combat_damage'),
-        getBuffValue(playerId, 'combat_defence'),
-        getBuffValue(playerId, 'durability_shield'),
-      ]);
+      const zoneCombatBuffs = await getCombatBuffs(playerId);
 
       // Per-action scaling for template combat engine
       const perActionScaling = await buildPerActionScaling(playerId, {
@@ -847,13 +831,7 @@ export function registerStartRoutes(router: Router): void {
       applyGuildCombatModifiers(playerStats, guildMods);
 
       // Apply quest shop combat buffs
-      if (zoneCombatDamageBuff > 0) {
-        playerStats.damageMin = Math.floor(playerStats.damageMin * (1 + zoneCombatDamageBuff));
-        playerStats.damageMax = Math.floor(playerStats.damageMax * (1 + zoneCombatDamageBuff));
-      }
-      if (zoneCombatDefenceBuff > 0) {
-        playerStats.defence = Math.floor(playerStats.defence * (1 + zoneCombatDefenceBuff));
-      }
+      applyCombatBuffs(playerStats, zoneCombatBuffs);
 
       const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
       const [zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyRow] = await Promise.all([
@@ -915,7 +893,7 @@ export function registerStartRoutes(router: Router): void {
       let pendingLootSessionId: string | null = null;
       let xpGrants: GrantXpResult[] = [];
       let zoneQuestProgress: QuestProgressUpdate[] = [];
-      const durabilityLost = zoneDurabilityShieldActive > 0
+      const durabilityLost = zoneCombatBuffs.durabilityShield > 0
         ? []
         : await degradeEquippedDurability(playerId, combatResult.log);
       let fleeResult = null as null | ReturnType<typeof calculateFleeResult>;
@@ -969,11 +947,9 @@ export function registerStartRoutes(router: Router): void {
       }
 
       // Consume quest shop combat buffs (regardless of outcome)
-      if (zoneCombatDamageBuff > 0 || zoneCombatDefenceBuff > 0 || zoneDurabilityShieldActive > 0) {
+      if (zoneCombatBuffs.damageBoost > 0 || zoneCombatBuffs.defenceBoost > 0 || zoneCombatBuffs.durabilityShield > 0) {
         await prisma.$transaction(async (tx) => {
-          if (zoneCombatDamageBuff > 0) await consumeBuffIfActive(tx, playerId, 'combat_damage');
-          if (zoneCombatDefenceBuff > 0) await consumeBuffIfActive(tx, playerId, 'combat_defence');
-          if (zoneDurabilityShieldActive > 0) await consumeBuffIfActive(tx, playerId, 'durability_shield');
+          await consumeCombatBuffs(tx, playerId, zoneCombatBuffs);
         });
       }
 
