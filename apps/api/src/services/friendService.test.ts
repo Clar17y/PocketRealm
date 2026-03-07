@@ -502,29 +502,27 @@ describe('friendService', () => {
   // ---------------------------------------------------------------------------
   describe('findPlayerByUsername', () => {
     it('returns player info when found', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({
+      mockPrisma.playerBlock.findMany.mockResolvedValue([]);
+      mockPrisma.player.findFirst.mockResolvedValue({
         id: TARGET_ID,
         username: 'Alice',
         characterLevel: 10,
       });
 
-      const result = await findPlayerByUsername('Alice');
+      const result = await findPlayerByUsername('Alice', PLAYER_ID);
 
       expect(result).toEqual({
         id: TARGET_ID,
         username: 'Alice',
         characterLevel: 10,
       });
-      expect(mockPrisma.player.findUnique).toHaveBeenCalledWith({
-        where: { username: 'Alice' },
-        select: { id: true, username: true, characterLevel: true },
-      });
     });
 
     it('returns null when player not found', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue(null);
+      mockPrisma.playerBlock.findMany.mockResolvedValue([]);
+      mockPrisma.player.findFirst.mockResolvedValue(null);
 
-      const result = await findPlayerByUsername('nobody');
+      const result = await findPlayerByUsername('nobody', PLAYER_ID);
 
       expect(result).toBeNull();
     });

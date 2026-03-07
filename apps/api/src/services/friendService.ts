@@ -278,9 +278,20 @@ export async function getFriendProfile(
 
 export async function findPlayerByUsername(
   username: string,
+  searcherId: string,
 ): Promise<{ id: string; username: string; characterLevel: number } | null> {
+  // Exclude players who have blocked the searcher (so blocking isn't obvious)
+  const blockedByIds = await prisma.playerBlock.findMany({
+    where: { blockedId: searcherId },
+    select: { blockerId: true },
+  });
+  const excludeIds = [searcherId, ...blockedByIds.map((b) => b.blockerId)];
+
   return prisma.player.findFirst({
-    where: { username: { contains: username, mode: 'insensitive' } },
+    where: {
+      username: { contains: username, mode: 'insensitive' },
+      id: { notIn: excludeIds },
+    },
     select: { id: true, username: true, characterLevel: true },
   });
 }

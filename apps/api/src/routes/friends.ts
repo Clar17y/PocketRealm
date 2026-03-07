@@ -57,8 +57,9 @@ friendsRouter.post('/request', asyncHandler(async (req, res) => {
 }));
 
 friendsRouter.post('/request/search', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
   const body = usernameSchema.parse(req.body);
-  const player = await findPlayerByUsername(body.username);
+  const player = await findPlayerByUsername(body.username, playerId);
   res.json({ player });
 }));
 
