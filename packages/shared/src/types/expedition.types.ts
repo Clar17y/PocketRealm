@@ -35,6 +35,7 @@ export interface RaidRoundInput {
   participants: RaidParticipant[];
   threatTable: RaidThreatEntry[];
   roundNumber: number;
+  environmentalDotPercent?: number;
 }
 
 export interface RaidParticipant {

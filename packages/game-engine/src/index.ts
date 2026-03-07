@@ -9,6 +9,8 @@ export * from './combat/mobTemplateConverter';
 export * from './combat/threatSystem';
 export * from './combat/bossContribution';
 export * from './combat/conditionEvaluator';
+export { resolveRaidRound } from './combat/raidRoundResolver';
+export type { RaidRoundRng } from './combat/raidRoundResolver';
 
 // Turns
 export * from './turns/turnCalculator';
