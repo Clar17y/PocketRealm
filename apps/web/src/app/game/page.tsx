@@ -1184,6 +1184,8 @@ export default function GamePage() {
       <AppShell
   turns={turns}
   username={player?.username}
+  mailUnreadCount={mailUnreadCount}
+  onMailClick={() => setActiveScreen('mail')}
   onSettings={() => handleNavigate('settings')}
   onLogout={() => { logout(); router.push('/'); }}
   onWhatsNew={openChangelog}
