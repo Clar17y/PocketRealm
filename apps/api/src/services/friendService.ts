@@ -279,8 +279,8 @@ export async function getFriendProfile(
 export async function findPlayerByUsername(
   username: string,
 ): Promise<{ id: string; username: string; characterLevel: number } | null> {
-  return prisma.player.findUnique({
-    where: { username },
+  return prisma.player.findFirst({
+    where: { username: { equals: username, mode: 'insensitive' } },
     select: { id: true, username: true, characterLevel: true },
   });
 }
