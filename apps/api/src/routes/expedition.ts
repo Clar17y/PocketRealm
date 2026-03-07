@@ -10,6 +10,11 @@ import {
   signUpForExpedition,
   recoverFromKO,
 } from '../services/expeditionService';
+import {
+  getShopItems,
+  getPlayerTokens,
+  purchaseShopItem,
+} from '../services/expeditionShopService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { paginationSchema, buildPagination } from '../utils/routeHelpers';
 
@@ -90,14 +95,20 @@ expeditionRouter.get('/history', asyncHandler(async (req, res) => {
   });
 }));
 
-// GET /shop — placeholder for Task 11
-expeditionRouter.get('/shop', asyncHandler(async (_req, res) => {
-  res.status(501).json({ error: 'Not implemented' });
+// GET /shop
+expeditionRouter.get('/shop', asyncHandler(async (req, res) => {
+  const items = getShopItems();
+  const tokens = await getPlayerTokens(req.player!.playerId);
+  res.json({ items, tokens });
 }));
 
-// POST /shop/purchase — placeholder for Task 11
-expeditionRouter.post('/shop/purchase', asyncHandler(async (_req, res) => {
-  res.status(501).json({ error: 'Not implemented' });
+// POST /shop/purchase
+const purchaseSchema = z.object({ itemId: z.string() });
+
+expeditionRouter.post('/shop/purchase', asyncHandler(async (req, res) => {
+  const { itemId } = purchaseSchema.parse(req.body);
+  const result = await purchaseShopItem(req.player!.playerId, itemId);
+  res.json(result);
 }));
 
 const expeditionIdSchema = z.object({ id: z.string().uuid() });
