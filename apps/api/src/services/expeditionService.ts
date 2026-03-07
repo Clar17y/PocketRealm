@@ -907,6 +907,63 @@ export async function handleWipe(expeditionId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Recover From KO
+// ---------------------------------------------------------------------------
+
+export async function recoverFromKO(
+  expeditionId: string,
+  playerId: string,
+): Promise<ExpeditionMemberData> {
+  const expedition = await prisma.guildExpedition.findUnique({
+    where: { id: expeditionId },
+  });
+  if (!expedition) {
+    throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
+  }
+  if (expedition.status !== 'in_progress') {
+    throw new AppError(400, 'Expedition is not in progress', 'NOT_IN_PROGRESS');
+  }
+
+  const member = await prisma.guildExpeditionMember.findUnique({
+    where: { expeditionId_playerId: { expeditionId, playerId } },
+    include: { player: { select: { username: true } } },
+  });
+  if (!member) {
+    throw new AppError(400, 'Not a member of this expedition', 'NOT_A_MEMBER');
+  }
+  if (!member.isKnockedOut) {
+    throw new AppError(400, 'Not knocked out', 'NOT_KNOCKED_OUT');
+  }
+
+  // Calculate maxHp to restore to 30%
+  const [equipStats, progression] = await Promise.all([
+    getEquipmentStats(playerId),
+    getPlayerProgressionState(playerId),
+  ]);
+  const maxHp = calculateMaxHp({
+    vitalityLevel: progression.attributes.vitality,
+    equipmentHealthBonus: equipStats.health,
+  });
+  const restoredHp = Math.floor(maxHp * 0.3);
+
+  // Spend turns and update member in a transaction
+  const updated = await prisma.$transaction(async (tx) => {
+    await spendPlayerTurnsTx(tx, playerId, EXPEDITION_CONSTANTS.KO_RECOVERY_TURN_COST);
+
+    return tx.guildExpeditionMember.update({
+      where: { expeditionId_playerId: { expeditionId, playerId } },
+      data: {
+        isKnockedOut: false,
+        currentHp: restoredHp,
+      },
+      include: { player: { select: { username: true } } },
+    });
+  });
+
+  return toExpeditionMemberData(updated);
+}
+
+// ---------------------------------------------------------------------------
 // Complete Expedition
 // ---------------------------------------------------------------------------
 

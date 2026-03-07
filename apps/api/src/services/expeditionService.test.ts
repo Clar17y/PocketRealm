@@ -82,7 +82,9 @@ import {
   handleRoomCleared,
   handleWipe,
   completeExpedition,
+  recoverFromKO,
 } from './expeditionService';
+import { spendPlayerTurnsTx } from './turnBankService';
 import { getHpState } from './hpService';
 import { resolveRaidRound } from '@pocketrealm/game-engine';
 
@@ -678,6 +680,77 @@ describe('expeditionService', () => {
           where: { id: GUILD_ID },
           data: { xp: { increment: 100 } },
         }),
+      );
+    });
+  });
+
+  // =========================================================================
+  // recoverFromKO
+  // =========================================================================
+
+  describe('recoverFromKO', () => {
+    it('recovers KO\'d player: deducts turns, restores HP to 30%, clears KO flag', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({ status: 'in_progress' }),
+      );
+      mockPrisma.guildExpeditionMember.findUnique.mockResolvedValue(
+        makeMemberRow({ isKnockedOut: true, currentHp: 0 }),
+      );
+      const updatedMember = makeMemberRow({ isKnockedOut: false, currentHp: 37 });
+      mockPrisma.guildExpeditionMember.update.mockResolvedValue(updatedMember);
+
+      const result = await recoverFromKO(EXPEDITION_ID, PLAYER_ID);
+
+      expect(result.isKnockedOut).toBe(false);
+      // Turns deducted
+      expect(spendPlayerTurnsTx).toHaveBeenCalledWith(
+        expect.anything(), // tx
+        PLAYER_ID,
+        500, // KO_RECOVERY_TURN_COST
+      );
+      // HP restored to 30% of maxHp and KO flag cleared
+      expect(mockPrisma.guildExpeditionMember.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { expeditionId_playerId: { expeditionId: EXPEDITION_ID, playerId: PLAYER_ID } },
+          data: expect.objectContaining({
+            isKnockedOut: false,
+            currentHp: expect.any(Number),
+          }),
+        }),
+      );
+    });
+
+    it('rejects recovery if not knocked out', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({ status: 'in_progress' }),
+      );
+      mockPrisma.guildExpeditionMember.findUnique.mockResolvedValue(
+        makeMemberRow({ isKnockedOut: false }),
+      );
+
+      await expect(recoverFromKO(EXPEDITION_ID, PLAYER_ID)).rejects.toThrow(
+        'Not knocked out',
+      );
+    });
+
+    it('rejects recovery if not a member', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({ status: 'in_progress' }),
+      );
+      mockPrisma.guildExpeditionMember.findUnique.mockResolvedValue(null);
+
+      await expect(recoverFromKO(EXPEDITION_ID, 'stranger')).rejects.toThrow(
+        'Not a member of this expedition',
+      );
+    });
+
+    it('rejects recovery if expedition not in progress', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({ status: 'recruiting' }),
+      );
+
+      await expect(recoverFromKO(EXPEDITION_ID, PLAYER_ID)).rejects.toThrow(
+        'Expedition is not in progress',
       );
     });
   });
