@@ -71,6 +71,7 @@ interface GatheringProps {
   isOverEncumbered?: boolean;
   backpackFull?: boolean;
   ownedResourceNames?: Set<string>;
+  gatheringYieldUses?: number;
 }
 
 export function Gathering({
@@ -98,6 +99,7 @@ export function Gathering({
   isOverEncumbered = false,
   backpackFull = false,
   ownedResourceNames,
+  gatheringYieldUses = 0,
 }: GatheringProps) {
   const getEventYieldMultiplier = (node: ResourceNode) =>
     computeResourceYieldMultiplier(node.eventModifiers ?? []);
@@ -230,6 +232,11 @@ export function Gathering({
           <div className="text-[12px] font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>
+
+      {/* Gathering Yield Buff */}
+      {gatheringYieldUses > 0 && (
+        <div className="text-xs text-[var(--rpg-gold)]">+15% Gathering Yield — {gatheringYieldUses} use{gatheringYieldUses !== 1 ? 's' : ''} left</div>
+      )}
 
       {/* Resource Nodes */}
       <div className="space-y-2">
