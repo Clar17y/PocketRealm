@@ -10,7 +10,7 @@ import {
   Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, RefreshCw,
   Wrench, Zap, Package, Crown, Shield,
 } from 'lucide-react';
-import { getShopItems, purchaseShopItem, getPlayerBuffs } from '@/lib/api';
+import { getShopItems, purchaseShopItem, getPlayerBuffs, getBestiary, getPlayerGuild, getGuildContracts } from '@/lib/api';
 import type { PlayerQuestData, PlayerQuestStateData, QuestCategory, ShopItemData, PlayerBuffData } from '@pocketrealm/shared';
 import { QUEST_CONSTANTS } from '@pocketrealm/shared';
 
@@ -23,6 +23,8 @@ interface QuestsProps {
   onClaimBonus: () => Promise<void>;
   onReroll: (questId: string) => Promise<void>;
   onShopPurchase?: () => void;
+  zones?: Array<{ id: string; name: string; zoneType: string }>;
+  homeTownId?: string | null;
 }
 
 const CATEGORY_ICONS: Record<QuestCategory, typeof Sword> = {
@@ -206,14 +208,25 @@ function ShopItemCard({
   tokens,
   onBuy,
   buyingId,
+  targetOptions,
+  targetValue,
+  onTargetChange,
+  targetPlaceholder,
+  disabledReason,
 }: {
   item: ShopItemData;
   tokens: number;
   onBuy: (item: ShopItemData) => void;
   buyingId: string | null;
+  targetOptions?: Array<{ value: string; label: string }>;
+  targetValue?: string;
+  onTargetChange?: (value: string) => void;
+  targetPlaceholder?: string;
+  disabledReason?: string | null;
 }) {
   const canAfford = tokens >= item.cost;
   const isBuying = buyingId === item.id;
+  const needsTarget = targetOptions != null && targetOptions.length > 0;
   const config = SHOP_CATEGORY_CONFIG[item.category];
   const Icon = config.icon;
 
@@ -264,21 +277,46 @@ function ShopItemCard({
               {item.cost}
             </span>
           </div>
+          {needsTarget && (
+            <select
+              value={targetValue ?? ''}
+              onChange={(e) => onTargetChange?.(e.target.value)}
+              className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-xs text-[var(--rpg-text-primary)] w-full"
+            >
+              <option value="">{targetPlaceholder ?? 'Select...'}</option>
+              {targetOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          )}
           <PixelButton
             variant="secondary"
             size="sm"
             onClick={() => onBuy(item)}
-            disabled={!item.canPurchase || !canAfford || isBuying}
+            disabled={!item.canPurchase || !canAfford || isBuying || (needsTarget && !targetValue) || !!disabledReason}
           >
             {isBuying ? '...' : 'Buy'}
           </PixelButton>
+          {disabledReason && (
+            <p className="text-[10px] text-[var(--rpg-red)] text-right">{disabledReason}</p>
+          )}
         </div>
       </div>
     </PixelCard>
   );
 }
 
-function ShopTab({ questTokens, onPurchase }: { questTokens: number; onPurchase?: () => void }) {
+function ShopTab({
+  questTokens,
+  onPurchase,
+  zones,
+  homeTownId,
+}: {
+  questTokens: number;
+  onPurchase?: () => void;
+  zones?: Array<{ id: string; name: string; zoneType: string }>;
+  homeTownId?: string | null;
+}) {
   const [shopItems, setShopItems] = useState<ShopItemData[]>([]);
   const [tokens, setTokens] = useState(questTokens);
   const [shopLoading, setShopLoading] = useState(true);
@@ -286,6 +324,9 @@ function ShopTab({ questTokens, onPurchase }: { questTokens: number; onPurchase?
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [buffs, setBuffs] = useState<PlayerBuffData[]>([]);
   const [purchaseMessage, setPurchaseMessage] = useState<string | null>(null);
+  const [targetSelections, setTargetSelections] = useState<Record<string, string>>({});
+  const [mobTemplates, setMobTemplates] = useState<Array<{ id: string; name: string }>>([]);
+  const [guildContracts, setGuildContracts] = useState<Array<{ id: string; name: string }>>([]);
 
   const loadShop = useCallback(async () => {
     setShopLoading(true);
@@ -301,6 +342,29 @@ function ShopTab({ questTokens, onPurchase }: { questTokens: number; onPurchase?
       if (buffsRes.data) {
         setBuffs(buffsRes.data.buffs);
       }
+
+      // Fetch bestiary for mob template names (teleport_scroll target)
+      try {
+        const bestiaryRes = await getBestiary();
+        if (bestiaryRes.data) {
+          setMobTemplates(bestiaryRes.data.mobs
+            .filter(m => m.isDiscovered)
+            .map(m => ({ id: m.id, name: m.name })));
+        }
+      } catch { /* bestiary not critical */ }
+
+      // Fetch guild contracts if player is in a guild
+      try {
+        const guildRes = await getPlayerGuild();
+        if (guildRes.data?.guild) {
+          const contractsRes = await getGuildContracts(guildRes.data.guild.id);
+          if (contractsRes.data) {
+            setGuildContracts(contractsRes.data.contracts
+              .filter(c => c.status === 'active')
+              .map(c => ({ id: c.id, name: c.name })));
+          }
+        }
+      } catch { /* not in guild */ }
     } catch {
       setShopError('Failed to load shop');
     } finally {
@@ -316,10 +380,18 @@ function ShopTab({ questTokens, onPurchase }: { questTokens: number; onPurchase?
     setBuyingId(item.id);
     setPurchaseMessage(null);
     try {
-      const res = await purchaseShopItem(item.id);
+      const params: Record<string, string> = {};
+      const target = targetSelections[item.id];
+      if (item.key === 'teleport_scroll' && target) params.targetZoneId = target;
+      if (item.key === 'bestiary_tome' && target) params.targetMobTemplateId = target;
+      if (item.key === 'guild_contract_reroll' && target) params.targetContractId = target;
+
+      const res = await purchaseShopItem(item.id, Object.keys(params).length > 0 ? params : undefined);
       if (res.data) {
         setTokens(res.data.newBalance);
         setPurchaseMessage(`Purchased ${item.name}!`);
+        // Clear target selection for purchased item
+        setTargetSelections(prev => { const next = { ...prev }; delete next[item.id]; return next; });
         // Refresh shop state and buffs
         void loadShop();
         // Refresh player state (attributes, skills, etc. may have changed)
@@ -333,6 +405,39 @@ function ShopTab({ questTokens, onPurchase }: { questTokens: number; onPurchase?
       setBuyingId(null);
     }
   };
+
+  function getItemTargetConfig(item: ShopItemData): {
+    options: Array<{ value: string; label: string }>;
+    placeholder: string;
+  } | null {
+    switch (item.key) {
+      case 'teleport_scroll':
+        return {
+          options: (zones ?? [])
+            .filter(z => z.name !== '???')
+            .map(z => ({ value: z.id, label: `${z.name} (${z.zoneType})` })),
+          placeholder: 'Select zone...',
+        };
+      case 'bestiary_tome':
+        return {
+          options: mobTemplates.map(m => ({ value: m.id, label: m.name })),
+          placeholder: 'Select monster...',
+        };
+      case 'guild_contract_reroll':
+        return {
+          options: guildContracts.map(c => ({ value: c.id, label: c.name })),
+          placeholder: 'Select contract...',
+        };
+      default:
+        return null;
+    }
+  }
+
+  function getItemDisabledReason(item: ShopItemData): string | null {
+    if (item.key === 'hearthstone' && !homeTownId) return 'Set a home town first (visit a town zone)';
+    if (item.key === 'guild_contract_reroll' && guildContracts.length === 0) return 'Requires active guild contract';
+    return null;
+  }
 
   if (shopLoading) {
     return <LoadingCard message="Loading shop..." />;
@@ -393,15 +498,23 @@ function ShopTab({ questTokens, onPurchase }: { questTokens: number; onPurchase?
               {config.label}
             </h2>
             <div className="space-y-2">
-              {items.map((item) => (
-                <ShopItemCard
-                  key={item.id}
-                  item={item}
-                  tokens={tokens}
-                  onBuy={(i) => void handleBuy(i)}
-                  buyingId={buyingId}
-                />
-              ))}
+              {items.map((item) => {
+                const targetConfig = getItemTargetConfig(item);
+                return (
+                  <ShopItemCard
+                    key={item.id}
+                    item={item}
+                    tokens={tokens}
+                    onBuy={(i) => void handleBuy(i)}
+                    buyingId={buyingId}
+                    targetOptions={targetConfig?.options}
+                    targetValue={targetSelections[item.id]}
+                    onTargetChange={(v) => setTargetSelections(prev => ({ ...prev, [item.id]: v }))}
+                    targetPlaceholder={targetConfig?.placeholder}
+                    disabledReason={getItemDisabledReason(item)}
+                  />
+                );
+              })}
             </div>
           </div>
         );
@@ -416,7 +529,7 @@ function ShopTab({ questTokens, onPurchase }: { questTokens: number; onPurchase?
   );
 }
 
-export function Quests({ quests, questState, loading, error, onClaimReward, onClaimBonus, onReroll, onShopPurchase }: QuestsProps) {
+export function Quests({ quests, questState, loading, error, onClaimReward, onClaimBonus, onReroll, onShopPurchase, zones, homeTownId }: QuestsProps) {
   const [activeTab, setActiveTab] = useState('quests');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [rerollingId, setRerollingId] = useState<string | null>(null);
@@ -471,7 +584,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
       <SubNav tabs={[...SHOP_TABS]} activeId={activeTab} onSelect={setActiveTab} />
 
       {activeTab === 'shop' ? (
-        <ShopTab questTokens={questState?.questTokens ?? 0} onPurchase={onShopPurchase} />
+        <ShopTab questTokens={questState?.questTokens ?? 0} onPurchase={onShopPurchase} zones={zones} homeTownId={homeTownId} />
       ) : (
         <>
           {/* Quest Token Balance + Daily Bonus */}

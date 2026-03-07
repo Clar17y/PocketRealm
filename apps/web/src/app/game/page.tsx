@@ -1069,6 +1069,8 @@ export default function GamePage() {
             onClaimBonus={handleClaimDailyBonus}
             onReroll={handleRerollQuest}
             onShopPurchase={loadAll}
+            zones={zones.filter(z => z.discovered).map(z => ({ id: z.id, name: z.name, zoneType: z.zoneType }))}
+            homeTownId={homeTownId}
           />
         );
       case 'leaderboard':
