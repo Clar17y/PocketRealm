@@ -374,6 +374,13 @@ export default function GamePage() {
     return lowest;
   }, [skills]);
 
+  const badgeTabs = useMemo(() => {
+    const tabs = new Set<string>();
+    if (achievementUnclaimedCount > 0 || quests.some(q => q.status === 'completed')) tabs.add('home');
+    if (incomingFriendRequestCount > 0 || mailUnreadCount > 0) tabs.add('social');
+    return tabs.size > 0 ? tabs : undefined;
+  }, [achievementUnclaimedCount, quests, incomingFriendRequestCount, mailUnreadCount]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[var(--rpg-background)] flex items-center justify-center">
@@ -1308,12 +1315,7 @@ export default function GamePage() {
       <BottomNav
         activeTab={getActiveTab()}
         onNavigate={handleNavigate}
-        badgeTabs={useMemo(() => {
-          const tabs = new Set<string>();
-          if (achievementUnclaimedCount > 0 || quests.some(q => q.status === 'completed')) tabs.add('home');
-          if (incomingFriendRequestCount > 0 || mailUnreadCount > 0) tabs.add('social');
-          return tabs.size > 0 ? tabs : undefined;
-        }, [achievementUnclaimedCount, quests, incomingFriendRequestCount, mailUnreadCount])}
+        badgeTabs={badgeTabs}
         pulseTabs={tutorialPulseTabs}
       />
       <TutorialDialog
