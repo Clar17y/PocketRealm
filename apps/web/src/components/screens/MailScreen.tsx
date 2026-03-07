@@ -335,12 +335,13 @@ export function MailScreen({
       )}
     </ScreenContainer>
   );
+}
 
-  // -----------------------------------------------------------------------
-  // Inline sub-components (private to this file)
-  // -----------------------------------------------------------------------
+// -----------------------------------------------------------------------
+// Sub-components (defined outside MailScreen to avoid re-mount on state change)
+// -----------------------------------------------------------------------
 
-  function MailList({
+function MailList({
     mails,
     nameKey,
     playerId: _pid,
@@ -628,4 +629,3 @@ export function MailScreen({
       </div>
     );
   }
-}

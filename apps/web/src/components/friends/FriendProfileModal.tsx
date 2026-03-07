@@ -128,7 +128,7 @@ export function FriendProfileModal({
 
   return (
     <ModalOverlay onClose={onClose}>
-      <div className="bg-[var(--rpg-bg-dark,#1a1a2e)] border border-[var(--rpg-border)] rounded-lg p-5 max-w-md w-full mx-4 max-h-[85vh] flex flex-col relative">
+      <div className="bg-[var(--rpg-bg-dark,#1a1a2e)] border border-[var(--rpg-gold,#c8a84e)] rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] flex flex-col relative">
         {/* Close button */}
         <button
           className="absolute top-3 right-3 text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors text-xl leading-none"

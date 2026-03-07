@@ -37,6 +37,7 @@ interface FriendsScreenProps {
   onTurnsChanged: () => void;
   onFriendCountsChanged?: () => void;
   combatSpeedMs?: number;
+  onNavigateToMail?: (recipientId: string, recipientName: string) => void;
 }
 
 type FriendsView = 'list' | 'incoming' | 'outgoing' | 'blocked';
@@ -50,6 +51,7 @@ export function FriendsScreen({
   onTurnsChanged,
   onFriendCountsChanged,
   combatSpeedMs,
+  onNavigateToMail,
 }: FriendsScreenProps) {
   // --- data state ---
   const [friends, setFriends] = useState<FriendListEntry[]>([]);
@@ -313,9 +315,9 @@ export function FriendsScreen({
     }
   }
 
-  // --- Send mail handler (placeholder -- closes modal for now) ---
-  function handleSendMail(_recipientId: string, _recipientName: string) {
+  function handleSendMail(recipientId: string, recipientName: string) {
     setSelectedFriendshipId(null);
+    onNavigateToMail?.(recipientId, recipientName);
   }
 
   // --- Dismiss spar playback ---

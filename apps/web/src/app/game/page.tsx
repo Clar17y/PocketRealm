@@ -381,6 +381,9 @@ export default function GamePage() {
     return tabs.size > 0 ? tabs : undefined;
   }, [achievementUnclaimedCount, quests, incomingFriendRequestCount, mailUnreadCount]);
 
+  // Mail compose recipient (set when clicking "Send Mail" from friend profile)
+  const [mailRecipient, setMailRecipient] = useState<{ id: string; name: string } | null>(null);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[var(--rpg-background)] flex items-center justify-center">
@@ -1074,10 +1077,21 @@ export default function GamePage() {
             onTurnsChanged={() => void loadTurnsAndHp()}
             onFriendCountsChanged={() => void loadFriendCounts()}
             combatSpeedMs={combatLogSpeedMs}
+            onNavigateToMail={(recipientId, recipientName) => {
+              setMailRecipient({ id: recipientId, name: recipientName });
+              setActiveScreen('mail');
+            }}
           />
         );
       case 'mail':
-        return <MailScreen playerId={player?.id ?? null} onMailCountChanged={() => void loadFriendCounts()} />;
+        return (
+          <MailScreen
+            playerId={player?.id ?? null}
+            onMailCountChanged={() => void loadFriendCounts()}
+            initialRecipientId={mailRecipient?.id}
+            initialRecipientName={mailRecipient?.name}
+          />
+        );
       case 'templates':
         return (
           <Templates
@@ -1276,7 +1290,10 @@ export default function GamePage() {
               { id: 'mail', label: 'Mail', badge: mailUnreadCount },
             ]}
             activeId={activeScreen}
-            onSelect={(id) => setActiveScreen(id as Screen)}
+            onSelect={(id) => {
+              if (id !== 'mail') setMailRecipient(null);
+              setActiveScreen(id as Screen);
+            }}
           />
         )}
 
