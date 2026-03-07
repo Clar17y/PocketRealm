@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { RARITY_RANK } from '@/lib/rarity';
@@ -64,6 +64,7 @@ import {
   allocateSkillPoint,
   respecSkillPoints,
   getTemplates,
+  type ApiResponse,
   type PendingLootItem,
   type WorldEventResponse,
   type SkillPointState,
@@ -533,20 +534,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (entries.length > 0) pushLog(...entries);
   };
 
-  const currentZone =
+  const currentZone = useMemo(() =>
     zones.find((z) => z.id === activeZoneId) ??
     zones.find((z) => z.discovered) ??
     zones.find((z) => z.isStarter) ??
-    null;
+    null, [zones, activeZoneId]);
 
-  const ownedByTemplateId = (() => {
+  const ownedByTemplateId = useMemo(() => {
     const map = new Map<string, number>();
-    // Use materialTotals (backpack + stash combined) so crafting sees all owned materials
     for (const [templateId, qty] of Object.entries(materialTotals)) {
       map.set(templateId, qty);
     }
     return map;
-  })();
+  }, [materialTotals]);
 
   const runAction = async (actionName: string, fn: () => Promise<void>) => {
     if (busyAction) return;
@@ -557,6 +557,23 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     } finally {
       setBusyAction(null);
     }
+  };
+
+  // Helper for simple API-call-then-reload actions
+  const simpleAction = async <T>(
+    actionName: string,
+    apiFn: () => Promise<ApiResponse<T>>,
+    onSuccess?: (data: T) => void,
+  ) => {
+    await runAction(actionName, async () => {
+      const res = await apiFn();
+      if (!res.data) {
+        setActionError(res.error?.message ?? `${actionName.replace(/_/g, ' ')} failed`);
+        return;
+      }
+      onSuccess?.(res.data);
+      await loadAll();
+    });
   };
 
   const handleStartExploration = async (turnSpend: number, tier?: number) => {
@@ -809,7 +826,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       // Store pending loot session ID for activation after playback
       combatPendingLootRef.current = data.pendingLootSessionId ?? null;
 
-      await Promise.all([loadAll(), loadTurnsAndHp(), loadBestiary()]);
+      await Promise.all([loadAll(), loadBestiary()]);
     });
   };
 
@@ -1020,271 +1037,95 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
-  const handleSalvageItem = async (itemId: string) => {
-    await runAction('salvage', async () => {
-      const res = await salvage(itemId);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Salvage failed');
-        return;
-      }
-
+  const handleSalvageItem = (itemId: string) =>
+    simpleAction('salvage', () => salvage(itemId), (data) => {
       setTurns(data.turns.currentTurns);
-      const materialSummary = data.salvage.returnedMaterials
-        .map((entry) => `${entry.name} x${entry.quantity}`)
-        .join(', ');
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Salvaged item for: ${materialSummary}.`,
-      });
-      await loadAll();
+      const materialSummary = data.salvage.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged item for: ${materialSummary}.` });
     });
-  };
 
-  const handleSalvageBatch = async (itemIds: string[]) => {
-    await runAction('salvage_batch', async () => {
-      const res = await salvageBatch(itemIds);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Batch salvage failed');
-        return;
-      }
-
+  const handleSalvageBatch = (itemIds: string[]) =>
+    simpleAction('salvage_batch', () => salvageBatch(itemIds), (data) => {
       setTurns(data.turns.currentTurns);
-      const materialSummary = data.returnedMaterials
-        .map((entry) => `${entry.name} x${entry.quantity}`)
-        .join(', ');
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Salvaged ${data.salvaged.length} items (${data.totalTurnCost} turns). Recovered: ${materialSummary}`,
-      });
-      await loadAll();
+      const materialSummary = data.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged ${data.salvaged.length} items (${data.totalTurnCost} turns). Recovered: ${materialSummary}` });
     });
-  };
 
-  const handleForgeUpgrade = async (itemId: string, sacrificialItemId: string) => {
-    await runAction('forge_upgrade', async () => {
-      const res = await forgeUpgrade(itemId, sacrificialItemId);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Forge upgrade failed');
-        return;
-      }
-
+  const handleForgeUpgrade = (itemId: string, sacrificialItemId: string) =>
+    simpleAction('forge_upgrade', () => forgeUpgrade(itemId, sacrificialItemId), (data) => {
       setTurns(data.turns.currentTurns);
       const fromLabel = data.forge.fromRarity.charAt(0).toUpperCase() + data.forge.fromRarity.slice(1);
       const toLabel = data.forge.toRarity.charAt(0).toUpperCase() + data.forge.toRarity.slice(1);
       const chancePct = (data.forge.successChance * 100).toFixed(1);
-
       if (data.forge.success) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `Forge success: ${fromLabel} -> ${toLabel} (${chancePct}% chance). Sacrificial item consumed.`,
-        });
+        pushLog({ timestamp: nowStamp(), type: 'success', message: `Forge success: ${fromLabel} -> ${toLabel} (${chancePct}% chance). Sacrificial item consumed.` });
       } else {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'info',
-          message: `Forge failed at ${fromLabel} (${chancePct}% chance). Target and sacrifice consumed.`,
-        });
+        pushLog({ timestamp: nowStamp(), type: 'info', message: `Forge failed at ${fromLabel} (${chancePct}% chance). Target and sacrifice consumed.` });
       }
-
-      await loadAll();
     });
-  };
 
-  const handleForgeReroll = async (itemId: string, sacrificialItemId: string) => {
-    await runAction('forge_reroll', async () => {
-      const res = await forgeReroll(itemId, sacrificialItemId);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Forge reroll failed');
-        return;
-      }
-
+  const handleForgeReroll = (itemId: string, sacrificialItemId: string) =>
+    simpleAction('forge_reroll', () => forgeReroll(itemId, sacrificialItemId), (data) => {
       setTurns(data.turns.currentTurns);
       const rarityLabel = data.forge.rarity.charAt(0).toUpperCase() + data.forge.rarity.slice(1);
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Re-rolled ${rarityLabel} item bonus stats. Sacrificial duplicate consumed.`,
-      });
-
-      await loadAll();
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Re-rolled ${rarityLabel} item bonus stats. Sacrificial duplicate consumed.` });
     });
-  };
 
-  const handleDestroyItem = async (itemId: string) => {
-    await runAction('destroy', async () => {
-      const res = await destroyInventoryItem(itemId);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Destroy failed');
-        return;
-      }
-      await loadAll();
-    });
-  };
+  const handleDestroyItem = (itemId: string) =>
+    simpleAction('destroy', () => destroyInventoryItem(itemId));
 
-  const handleRepairItem = async (itemId: string) => {
-    await runAction('repair', async () => {
-      const res = await repairItem(itemId);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Repair failed');
-        return;
-      }
+  const handleRepairItem = (itemId: string) =>
+    simpleAction('repair', () => repairItem(itemId), (data) => {
       if (data.turns) setTurns(data.turns.currentTurns);
-      await loadAll();
     });
-  };
 
-  const handleRepairAllEquipped = async () => {
-    await runAction('repair_all', async () => {
-      const res = await repairAllEquipped();
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Repair all failed');
-        return;
-      }
+  const handleRepairAllEquipped = () =>
+    simpleAction('repair_all', () => repairAllEquipped(), (data) => {
       if (data.turns) setTurns(data.turns.currentTurns);
-      await loadAll();
     });
-  };
 
-  const handleUseItem = async (itemId: string) => {
-    await runAction('use_item', async () => {
-      const res = await useItem(itemId);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Use item failed');
-        return;
-      }
-      await loadAll();
-    });
-  };
+  const handleUseItem = (itemId: string) =>
+    simpleAction('use_item', () => useItem(itemId));
 
-  const handleEquipItem = async (itemId: string, slot: string) => {
-    await runAction('equip', async () => {
-      const res = await equip(itemId, slot);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Equip failed');
-        return;
-      }
-      await loadAll();
+  const handleEquipItem = (itemId: string, slot: string) =>
+    simpleAction('equip', () => equip(itemId, slot), () => {
       advanceTutorial(TUTORIAL_STEP_EQUIP);
     });
-  };
 
-  const handleUnequipSlot = async (slot: string) => {
-    await runAction('unequip', async () => {
-      const res = await unequip(slot);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Unequip failed');
-        return;
-      }
-      await loadAll();
-    });
-  };
+  const handleUnequipSlot = (slot: string) =>
+    simpleAction('unequip', () => unequip(slot));
 
-  const handleSellItem = async (itemId: string) => {
-    await runAction('sell', async () => {
-      const res = await sellItem(itemId);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Sell failed');
-        return;
-      }
-      setGold(res.data.newGold);
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Sold item for ${res.data.goldEarned} gold`,
-      });
-      await loadAll();
+  const handleSellItem = (itemId: string) =>
+    simpleAction('sell', () => sellItem(itemId), (data) => {
+      setGold(data.newGold);
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Sold item for ${data.goldEarned} gold` });
     });
-  };
 
-  const handleSellBatch = async (itemIds: string[]) => {
-    await runAction('sell_batch', async () => {
-      const res = await sellBulk(itemIds);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Batch sell failed');
-        return;
-      }
-      setGold(res.data.newGold);
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Sold ${res.data.soldCount} item(s) for ${res.data.totalGoldEarned} gold`,
-      });
-      await loadAll();
+  const handleSellBatch = (itemIds: string[]) =>
+    simpleAction('sell_batch', () => sellBulk(itemIds), (data) => {
+      setGold(data.newGold);
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Sold ${data.soldCount} item(s) for ${data.totalGoldEarned} gold` });
     });
-  };
 
-  const handleDepositItem = async (itemId: string) => {
-    await runAction('deposit', async () => {
-      const res = await depositToStash(itemId);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Deposit failed');
-        return;
-      }
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: 'Item deposited to stash',
-      });
-      await loadAll();
+  const handleDepositItem = (itemId: string) =>
+    simpleAction('deposit', () => depositToStash(itemId), () => {
+      pushLog({ timestamp: nowStamp(), type: 'success', message: 'Item deposited to stash' });
     });
-  };
 
-  const handleDepositBatch = async (itemIds: string[]) => {
-    await runAction('deposit_batch', async () => {
-      const res = await depositBatchToStash(itemIds);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Batch deposit failed');
-        return;
-      }
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `${res.data.depositedCount} item(s) deposited to stash`,
-      });
-      await loadAll();
+  const handleDepositBatch = (itemIds: string[]) =>
+    simpleAction('deposit_batch', () => depositBatchToStash(itemIds), (data) => {
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `${data.depositedCount} item(s) deposited to stash` });
     });
-  };
 
-  const handleWithdrawItem = async (itemId: string) => {
-    await runAction('withdraw', async () => {
-      const res = await withdrawFromStash(itemId);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Withdraw failed');
-        return;
-      }
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: 'Item withdrawn from stash',
-      });
-      await loadAll();
+  const handleWithdrawItem = (itemId: string) =>
+    simpleAction('withdraw', () => withdrawFromStash(itemId), () => {
+      pushLog({ timestamp: nowStamp(), type: 'success', message: 'Item withdrawn from stash' });
     });
-  };
 
-  const handleWithdrawBatch = async (itemIds: string[]) => {
-    await runAction('withdraw_batch', async () => {
-      const res = await withdrawBatchFromStash(itemIds);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Batch withdraw failed');
-        return;
-      }
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `${res.data.withdrawnCount} item(s) withdrawn from stash`,
-      });
-      await loadAll();
+  const handleWithdrawBatch = (itemIds: string[]) =>
+    simpleAction('withdraw_batch', () => withdrawBatchFromStash(itemIds), (data) => {
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `${data.withdrawnCount} item(s) withdrawn from stash` });
     });
-  };
 
   const activateNextQueuedLoot = async () => {
     const next = pendingLootQueueRef.current.shift();
