@@ -50,8 +50,7 @@ describe('friendMailService', () => {
   describe('sendMail', () => {
     it('deducts gold and creates mail for accepted friends', async () => {
       mockPrisma.friendship.findFirst.mockResolvedValue({ id: 'friend-1' });
-      mockPrisma.player.findUnique.mockResolvedValue({ gold: 100 });
-      mockPrisma.player.update.mockResolvedValue({});
+      mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.friendMail.create.mockResolvedValue(makeMail());
       mockPrisma.friendMail.count.mockResolvedValue(5);
 
@@ -61,8 +60,8 @@ describe('friendMailService', () => {
       expect(result.senderName).toBe('Alice');
       expect(result.recipientName).toBe('Bob');
       expect(result.goldCost).toBe(25);
-      expect(mockPrisma.player.update).toHaveBeenCalledWith({
-        where: { id: SENDER_ID },
+      expect(mockPrisma.player.updateMany).toHaveBeenCalledWith({
+        where: { id: SENDER_ID, gold: { gte: 25 } },
         data: { gold: { decrement: 25 } },
       });
       expect(mockPrisma.friendMail.create).toHaveBeenCalledWith({
@@ -112,7 +111,7 @@ describe('friendMailService', () => {
 
     it('throws INSUFFICIENT_GOLD when sender cannot afford the cost', async () => {
       mockPrisma.friendship.findFirst.mockResolvedValue({ id: 'friend-1' });
-      mockPrisma.player.findUnique.mockResolvedValue({ gold: 10 });
+      mockPrisma.player.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(sendMail(SENDER_ID, RECIPIENT_ID, 'Hi', 'Body')).rejects.toThrow(AppError);
       await expect(sendMail(SENDER_ID, RECIPIENT_ID, 'Hi', 'Body')).rejects.toMatchObject({

@@ -74,20 +74,14 @@ export async function sendMail(
   const truncatedBody = body.slice(0, MAIL_CONSTANTS.MAX_BODY_LENGTH);
 
   const mail = await prisma.$transaction(async (tx) => {
-    // Check gold
-    const sender = await tx.player.findUnique({
-      where: { id: senderId },
-      select: { gold: true },
-    });
-    if (!sender || sender.gold < MAIL_CONSTANTS.GOLD_COST) {
-      throw new AppError(400, 'Insufficient gold', 'INSUFFICIENT_GOLD');
-    }
-
-    // Deduct gold
-    await tx.player.update({
-      where: { id: senderId },
+    // Atomic gold deduction — only decrements if balance is sufficient
+    const { count } = await tx.player.updateMany({
+      where: { id: senderId, gold: { gte: MAIL_CONSTANTS.GOLD_COST } },
       data: { gold: { decrement: MAIL_CONSTANTS.GOLD_COST } },
     });
+    if (count === 0) {
+      throw new AppError(400, 'Insufficient gold', 'INSUFFICIENT_GOLD');
+    }
 
     // Create mail
     const created = await tx.friendMail.create({
