@@ -52,6 +52,8 @@ import {
 import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
 import { GuildScreen } from '@/components/screens/GuildScreen';
+import { FriendsScreen } from '@/components/screens/FriendsScreen';
+import { MailScreen } from '@/components/screens/MailScreen';
 import { Templates } from '@/components/screens/Templates';
 import { TalentTree } from '@/components/screens/TalentTree';
 import { Quests } from '@/components/screens/Quests';
@@ -167,6 +169,9 @@ export default function GamePage() {
     templates,
     handleLoadTemplates,
     pvpNotificationCount,
+    incomingFriendRequestCount,
+    mailUnreadCount,
+    loadFriendCounts,
     playbackActive,
     combatPlaybackData,
     combatPlaybackQueue,
@@ -368,6 +373,16 @@ export default function GamePage() {
     }
     return lowest;
   }, [skills]);
+
+  const badgeTabs = useMemo(() => {
+    const tabs = new Set<string>();
+    if (achievementUnclaimedCount > 0 || quests.some(q => q.status === 'completed')) tabs.add('home');
+    if (incomingFriendRequestCount > 0 || mailUnreadCount > 0) tabs.add('social');
+    return tabs.size > 0 ? tabs : undefined;
+  }, [achievementUnclaimedCount, quests, incomingFriendRequestCount, mailUnreadCount]);
+
+  // Mail compose recipient (set when clicking "Send Mail" from friend profile)
+  const [mailRecipient, setMailRecipient] = useState<{ id: string; name: string } | null>(null);
 
   if (isLoading) {
     return (
@@ -1055,6 +1070,28 @@ export default function GamePage() {
             onTurnsChanged={() => void loadTurnsAndHp()}
           />
         );
+      case 'friends':
+        return (
+          <FriendsScreen
+            playerId={player?.id ?? null}
+            onTurnsChanged={() => void loadTurnsAndHp()}
+            onFriendCountsChanged={() => void loadFriendCounts()}
+            combatSpeedMs={combatLogSpeedMs}
+            onNavigateToMail={(recipientId, recipientName) => {
+              setMailRecipient({ id: recipientId, name: recipientName });
+              setActiveScreen('mail');
+            }}
+          />
+        );
+      case 'mail':
+        return (
+          <MailScreen
+            playerId={player?.id ?? null}
+            onMailCountChanged={() => void loadFriendCounts()}
+            initialRecipientId={mailRecipient?.id}
+            initialRecipientName={mailRecipient?.name}
+          />
+        );
       case 'templates':
         return (
           <Templates
@@ -1147,6 +1184,8 @@ export default function GamePage() {
       <AppShell
   turns={turns}
   username={player?.username}
+  mailUnreadCount={mailUnreadCount}
+  onMailClick={() => setActiveScreen('mail')}
   onSettings={() => handleNavigate('settings')}
   onLogout={() => { logout(); router.push('/'); }}
   onWhatsNew={openChangelog}
@@ -1245,6 +1284,21 @@ export default function GamePage() {
           />
         )}
 
+        {getActiveTab() === 'social' && (
+          <SubNav
+            tabs={[
+              { id: 'guild', label: 'Guild' },
+              { id: 'friends', label: 'Friends', badge: incomingFriendRequestCount },
+              { id: 'mail', label: 'Mail', badge: mailUnreadCount },
+            ]}
+            activeId={activeScreen}
+            onSelect={(id) => {
+              if (id !== 'mail') setMailRecipient(null);
+              setActiveScreen(id as Screen);
+            }}
+          />
+        )}
+
         {actionError && (
           <div
             ref={errorRef}
@@ -1280,7 +1334,7 @@ export default function GamePage() {
       <BottomNav
         activeTab={getActiveTab()}
         onNavigate={handleNavigate}
-        badgeTabs={(achievementUnclaimedCount > 0 || quests.some(q => q.status === 'completed')) ? new Set(['home']) : undefined}
+        badgeTabs={badgeTabs}
         pulseTabs={tutorialPulseTabs}
       />
       <TutorialDialog

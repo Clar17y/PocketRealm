@@ -1328,3 +1328,33 @@ export const QUEST_SHOP_ITEMS: readonly QuestShopItem[] = [
   { key: 'rare_material_bundle', name: 'Rare Material Bundle',   description: 'A bundle of assorted rare crafting materials', cost: 25,  category: 'material',   permanent: false },
   { key: 'stat_reset_scroll',    name: 'Stat Reset Scroll',      description: 'Reset your attribute points',                 cost: 40,  category: 'utility',    permanent: false },
 ] as const;
+
+// =============================================================================
+// FRIENDS
+// =============================================================================
+
+export const FRIEND_CONSTANTS = {
+  MAX_FRIENDS: 50,
+  MAX_PENDING_REQUESTS: 20,
+  REQUEST_COOLDOWN_SECONDS: 60,
+} as const;
+
+// =============================================================================
+// SPARRING
+// =============================================================================
+
+export const SPAR_CONSTANTS = {
+  TURN_COST: 200,
+} as const;
+
+// =============================================================================
+// MAIL
+// =============================================================================
+
+export const MAIL_CONSTANTS = {
+  GOLD_COST: 25,
+  MAX_SUBJECT_LENGTH: 100,
+  MAX_BODY_LENGTH: 1000,
+  MAX_INBOX_SIZE: 100,
+  MAX_SENT_SIZE: 50,
+} as const;
