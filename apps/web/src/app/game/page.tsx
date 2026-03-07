@@ -440,7 +440,6 @@ export default function GamePage() {
               onNavigate={handleNavigate}
               activityLog={activityLog}
               onAllocateAttribute={handleAllocateAttribute}
-              activeBuffs={activeBuffs}
             />
           </>
         );
@@ -824,7 +823,6 @@ export default function GamePage() {
               defaultMaxQuantity={activeCraftingSkill === 'refining' && defaultRefiningMax}
               guildTaxRate={guildTaxRate}
               backpackFull={backpackFull}
-              craftingCritUses={activeBuffs.find(b => b.buffType === 'crafting_crit')?.remainingUses ?? 0}
             />
           </div>
         );
@@ -930,7 +928,6 @@ export default function GamePage() {
               ownedResourceNames={ownedResourceNames}
               recoveryCost={hpState.recoveryCost}
               guildTaxRate={guildTaxRate}
-              gatheringYieldUses={activeBuffs.find(b => b.buffType === 'gathering_yield')?.remainingUses ?? 0}
             />
           </div>
         );

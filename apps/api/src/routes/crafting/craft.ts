@@ -302,6 +302,9 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       },
     });
 
+    const craftingBuffBadges: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }> = [];
+    if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });
+
     res.json({
       logId: log.id,
       turns: turnSpend,
@@ -315,5 +318,6 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       xp: serializeXpGrant(xpGrant),
       tax: taxInfoFromResult(taxResult),
       ...(craftQuestProgress.length > 0 ? { questProgress: craftQuestProgress } : {}),
+      ...(craftingBuffBadges.length > 0 ? { activeEvents: craftingBuffBadges } : {}),
     });
 }));

@@ -165,9 +165,15 @@ gatheringRouter.get('/nodes', asyncHandler(async (req, res) => {
     }
   }
 
+  const shopGatheringYieldForList = await getBuffValue(playerId, 'gathering_yield');
+  const gatheringBuffBadge: EventModifierBadge | null = shopGatheringYieldForList > 0
+    ? { title: 'Gathering Yield Scroll', effectType: 'yield_up', effectValue: shopGatheringYieldForList, isGlobal: false }
+    : null;
+
   res.json({
     nodes: pageNodes.map((pn) => {
       const template = pn.resourceNode;
+      const eventMods = nodeBadgeCache.get(`${template.zoneId}:${template.resourceType}`) ?? [];
       return {
         id: pn.id, // PlayerResourceNode ID (what frontend uses to mine)
         templateId: template.id,
@@ -183,7 +189,7 @@ gatheringRouter.get('/nodes', asyncHandler(async (req, res) => {
         sizeName: getNodeSizeName(pn.effectiveCapacity, template.maxCapacity),
         discoveredAt: pn.discoveredAt.toISOString(),
         weathered: pn.decayedCapacity > 0,
-        eventModifiers: nodeBadgeCache.get(`${template.zoneId}:${template.resourceType}`) ?? [],
+        eventModifiers: [...eventMods, ...(gatheringBuffBadge ? [gatheringBuffBadge] : [])],
       };
     }),
     pagination: { ...pagination, page },
@@ -488,7 +494,13 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     },
     xp: serializeXpGrant(xpGrant),
     gemCrit: gemCrit ?? undefined,
-    activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
+    activeEvents: (() => {
+      const badges = [
+        ...activeEventEffects,
+        ...(shopGatheringYield > 0 ? [{ title: 'Gathering Yield Scroll', effectType: 'yield_up', effectValue: shopGatheringYield, isGlobal: false }] : []),
+      ];
+      return badges.length > 0 ? badges : undefined;
+    })(),
     yieldBreakdown: zoneModifiers.resourceYieldMultiplier !== 1
       ? {
           baseYieldPerAction,

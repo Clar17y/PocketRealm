@@ -55,11 +55,10 @@ interface CraftingProps {
   guildTaxRate?: number;
   backpackFull?: boolean;
   isOverEncumbered?: boolean;
-  craftingCritUses?: number;
 }
 
 
-export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, craftingCritUses = 0 }: CraftingProps) {
+export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
@@ -134,11 +133,6 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
           <div className="text-[12px] font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
         </div>
       </div>
-
-      {/* Crafting Crit Buff */}
-      {craftingCritUses > 0 && (
-        <div className="text-xs text-[var(--rpg-gold)]">+10% Crafting Crit — {craftingCritUses} use{craftingCritUses !== 1 ? 's' : ''} left</div>
-      )}
 
       {/* Recipe List */}
       <div className="space-y-2">

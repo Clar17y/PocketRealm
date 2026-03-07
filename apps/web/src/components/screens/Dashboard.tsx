@@ -13,7 +13,6 @@ import { uiIconSrc } from '@/lib/assets';
 import { ActivityLog } from '@/components/ActivityLog';
 import { Divider } from '@/components/common/Divider';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
-import type { PlayerBuffData } from '@pocketrealm/shared';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface DashboardProps {
@@ -50,7 +49,6 @@ interface DashboardProps {
     attribute: 'vitality' | 'strength' | 'dexterity' | 'intelligence' | 'luck' | 'evasion',
     points?: number
   ) => Promise<void>;
-  activeBuffs?: PlayerBuffData[];
 }
 
 const ATTRIBUTE_META = {
@@ -64,7 +62,7 @@ const ATTRIBUTE_META = {
 
 type AttributeType = keyof typeof ATTRIBUTE_META;
 
-export function Dashboard({ playerData, skills, onNavigate, characterProgression, activityLog, onAllocateAttribute, activeBuffs = [] }: DashboardProps) {
+export function Dashboard({ playerData, skills, onNavigate, characterProgression, activityLog, onAllocateAttribute }: DashboardProps) {
   const [allocating, setAllocating] = useState<AttributeType | null>(null);
 
   const handleAllocate = async (attribute: AttributeType) => {
@@ -89,20 +87,6 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
         <PixelCard className="border-[var(--rpg-gold)]">
           <div className="text-center text-sm text-[var(--rpg-gold)]">
             You are <span className="font-bold">over-encumbered</span> and cannot explore, mine, or craft until you free up inventory space.
-          </div>
-        </PixelCard>
-      )}
-
-      {/* Active Buffs */}
-      {activeBuffs.length > 0 && (
-        <PixelCard padding="sm">
-          <div className="text-xs font-semibold text-[var(--rpg-gold)] mb-1">Active Buffs</div>
-          <div className="flex flex-wrap gap-1">
-            {activeBuffs.map(buff => (
-              <span key={buff.id} className="px-1.5 py-0.5 rounded bg-[var(--rpg-surface)] text-xs text-[var(--rpg-text-secondary)]">
-                {buff.shopItemName}: {buff.remainingUses} left
-              </span>
-            ))}
           </div>
         </PixelCard>
       )}

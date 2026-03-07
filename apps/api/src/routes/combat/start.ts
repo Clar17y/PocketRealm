@@ -720,9 +720,17 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       percent: explorationProgress.percent,
       turnsToExplore: explorationProgress.turnsToExplore,
     },
-    activeEvents: activeEventEffects.length > 0
-      ? tagEventsWithApplicability(activeEventEffects, siteMobBadges)
-      : undefined,
+    activeEvents: (() => {
+      const siteBuffBadges: EventModifierBadge[] = [];
+      if (combatBuffs.damageBoost > 0) siteBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: combatBuffs.damageBoost, isGlobal: false });
+      if (combatBuffs.defenceBoost > 0) siteBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: combatBuffs.defenceBoost, isGlobal: false });
+      if (combatBuffs.durabilityShield > 0) siteBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: combatBuffs.durabilityShield, isGlobal: false });
+      const all = [
+        ...tagEventsWithApplicability(activeEventEffects, siteMobBadges),
+        ...siteBuffBadges,
+      ];
+      return all.length > 0 ? all : undefined;
+    })(),
     ...(allQuestProgress.length > 0 ? { questProgress: allQuestProgress } : {}),
   });
 }
@@ -1086,9 +1094,17 @@ export function registerStartRoutes(router: Router): void {
           percent: explorationProgress.percent,
           turnsToExplore: explorationProgress.turnsToExplore,
         },
-        activeEvents: activeEventEffects.length > 0
-          ? tagEventsWithApplicability(activeEventEffects, zoneMobBadges)
-          : undefined,
+        activeEvents: (() => {
+          const combatBuffBadges: EventModifierBadge[] = [];
+          if (zoneCombatBuffs.damageBoost > 0) combatBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: zoneCombatBuffs.damageBoost, isGlobal: false });
+          if (zoneCombatBuffs.defenceBoost > 0) combatBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: zoneCombatBuffs.defenceBoost, isGlobal: false });
+          if (zoneCombatBuffs.durabilityShield > 0) combatBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: zoneCombatBuffs.durabilityShield, isGlobal: false });
+          const all = [
+            ...tagEventsWithApplicability(activeEventEffects, zoneMobBadges),
+            ...combatBuffBadges,
+          ];
+          return all.length > 0 ? all : undefined;
+        })(),
         ...(zoneQuestProgress.length > 0 ? { questProgress: zoneQuestProgress } : {}),
       });
   }));
