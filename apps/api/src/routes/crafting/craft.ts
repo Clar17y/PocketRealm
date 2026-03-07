@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Prisma, prisma } from '@pocketrealm/database';
 import { createActivityLog } from '../../services/activityLogService';
+import type { EventModifierBadge } from '../../services/worldEventService';
 import {
   CRAFTING_CONSTANTS,
   GUILD_CONSTANTS,
@@ -302,7 +303,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       },
     });
 
-    const craftingBuffBadges: Array<{ title: string; effectType: string; effectValue: number; isGlobal: boolean }> = [];
+    const craftingBuffBadges: EventModifierBadge[] = [];
     if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });
 
     res.json({
