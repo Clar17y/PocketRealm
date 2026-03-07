@@ -61,7 +61,7 @@ import { incrementStats } from '../../services/statsService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
-import { getCombatBuffs, applyCombatBuffs, consumeCombatBuffs } from '../../services/buffService';
+import { getCombatBuffs, applyCombatBuffs, consumeCombatBuffs, consumeBuffIfActive } from '../../services/buffService';
 import { buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import {
   prismaAny,
@@ -176,8 +176,18 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   // Guild combat modifiers
   const guildMods = await getPlayerGuildModifiers(playerId);
 
-  // Quest shop combat buffs
+  // Quest shop combat buffs — track remaining uses locally for per-mob consumption
   const combatBuffs = await getCombatBuffs(playerId);
+  const buffUsesLeft = { damage: combatBuffs.damageBoost > 0 ? 1 : 0, defence: combatBuffs.defenceBoost > 0 ? 1 : 0, durability: combatBuffs.durabilityShield > 0 ? 1 : 0 };
+  // Resolve actual remaining uses from DB for encounter site multi-mob fights
+  if (combatBuffs.damageBoost > 0 || combatBuffs.defenceBoost > 0 || combatBuffs.durabilityShield > 0) {
+    const allBuffs = await (prisma as any).playerBuff.findMany({ where: { playerId, buffType: { in: ['combat_damage', 'combat_defence', 'durability_shield'] } }, select: { buffType: true, remainingUses: true } });
+    for (const b of allBuffs) {
+      if (b.buffType === 'combat_damage') buffUsesLeft.damage = b.remainingUses;
+      if (b.buffType === 'combat_defence') buffUsesLeft.defence = b.remainingUses;
+      if (b.buffType === 'durability_shield') buffUsesLeft.durability = b.remainingUses;
+    }
+  }
 
   // Per-action scaling for template combat engine
   const perActionScaling = await buildPerActionScaling(playerId, {
@@ -254,8 +264,12 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
       applyGuildCombatModifiers(playerStats, guildMods);
 
-      // Apply quest shop combat buffs
-      applyCombatBuffs(playerStats, combatBuffs);
+      // Apply quest shop combat buffs only if uses remain
+      const mobBuffs = {
+        damageBoost: buffUsesLeft.damage > 0 ? combatBuffs.damageBoost : 0,
+        defenceBoost: buffUsesLeft.defence > 0 ? combatBuffs.defenceBoost : 0,
+      };
+      applyCombatBuffs(playerStats, mobBuffs);
 
       const combatOptions: CombatOptions | undefined = potionPool.length > 0
         ? { potions: [...potionPool] }
@@ -290,9 +304,16 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       let mobLoot: LootDropWithName[] = [];
       let mobXpGrants: GrantXpResult[] = [];
       const mobXpAwarded = combatResult.outcome === 'victory' ? Math.max(0, prefixedMob.xpReward) : 0;
-      const mobDurabilityLost = combatBuffs.durabilityShield > 0
+      const mobDurabilityLost = buffUsesLeft.durability > 0
         ? []
         : await degradeEquippedDurability(playerId, combatResult.log);
+
+      // Consume combat buff charges per mob
+      await prisma.$transaction(async (tx) => {
+        if (buffUsesLeft.damage > 0) { await consumeBuffIfActive(tx, playerId, 'combat_damage'); buffUsesLeft.damage--; }
+        if (buffUsesLeft.defence > 0) { await consumeBuffIfActive(tx, playerId, 'combat_defence'); buffUsesLeft.defence--; }
+        if (buffUsesLeft.durability > 0) { await consumeBuffIfActive(tx, playerId, 'durability_shield'); buffUsesLeft.durability--; }
+      });
 
       if (combatResult.outcome === 'victory') {
         await setAllResources(playerId, combatResult.combatantAHpRemaining, currentStamina, currentMana);
@@ -442,12 +463,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     sitePendingLootSessionId = await storePendingLoot(playerId, allSiteOverflow);
   }
 
-  // Consume quest shop combat buffs (regardless of outcome)
-  if (combatBuffs.damageBoost > 0 || combatBuffs.defenceBoost > 0 || combatBuffs.durabilityShield > 0) {
-    await prisma.$transaction(async (tx) => {
-      await consumeCombatBuffs(tx, playerId, combatBuffs);
-    });
-  }
+  // Combat buffs already consumed per-mob inside the fight loop above
 
   // --- Defeat handling (last fight only) ---
   const lastFight = fightResults[fightResults.length - 1];
