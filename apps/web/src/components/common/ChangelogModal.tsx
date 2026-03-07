@@ -23,8 +23,8 @@ export function ChangelogModal({ onDismiss }: ChangelogModalProps) {
 
   return (
     <ModalOverlay>
-      <div className="bg-[var(--rpg-bg-dark,#1a1a2e)] border border-[var(--rpg-gold,#c8a84e)] rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] flex flex-col">
-        <h2 className="text-[var(--rpg-gold,#c8a84e)] font-bold text-lg mb-4">
+      <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)] rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] flex flex-col">
+        <h2 className="text-[var(--rpg-gold)] font-bold text-lg mb-4">
           What&apos;s New
         </h2>
 

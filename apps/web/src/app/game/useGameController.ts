@@ -70,6 +70,8 @@ import {
   type SkillPointState,
   exchangeGold,
   placeRouletteBet,
+  getIncomingFriendRequests,
+  getFriendMailUnreadCount,
 } from '@/lib/api';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
@@ -230,6 +232,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [skillPointState, setSkillPointState] = useState<SkillPointState | null>(null);
   const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
+  const [incomingFriendRequestCount, setIncomingFriendRequestCount] = useState(0);
+  const [mailUnreadCount, setMailUnreadCount] = useState(0);
   const [activeEvents, setActiveEvents] = useState<WorldEventResponse[]>([]);
   const playerSettings = usePlayerSettings();
   const {
@@ -309,6 +313,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (result.data) {
       setPvpNotificationCount(result.data.count);
     }
+  }, []);
+
+  const loadFriendCounts = useCallback(async () => {
+    const [reqRes, mailRes] = await Promise.all([
+      getIncomingFriendRequests(),
+      getFriendMailUnreadCount(),
+    ]);
+    if (reqRes.data) setIncomingFriendRequestCount(reqRes.data.requests.length);
+    if (mailRes.data) setMailUnreadCount(mailRes.data.count);
   }, []);
 
   const handleLoadSkillPoints = useCallback(async () => {
@@ -487,6 +500,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (isAuthenticated) {
       void loadAll();
       void loadPvpNotificationCount();
+      void loadFriendCounts();
       // Auto-show changelog if unseen
       const latestVer = getLatestVersion();
       if (latestVer && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVer) {
@@ -495,16 +509,18 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       const interval = setInterval(() => void loadTurnsAndHp(), 10000);
       // Poll PvP notifications less frequently (60s)
       const pvpInterval = setInterval(() => void loadPvpNotificationCount(), 60000);
-      return () => { clearInterval(interval); clearInterval(pvpInterval); };
+      // Poll friend counts at same cadence as PvP
+      const friendInterval = setInterval(() => void loadFriendCounts(), 60000);
+      return () => { clearInterval(interval); clearInterval(pvpInterval); clearInterval(friendInterval); };
     }
-  }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount]);
+  }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount, loadFriendCounts]);
 
   const getActiveTab = () => {
     if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'quests', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
     if (['explore', 'gathering', 'crafting', 'forge'].includes(activeScreen)) return 'explore';
     if (['inventory', 'equipment'].includes(activeScreen)) return 'inventory';
     if (['combat', 'arena', 'templates', 'talentTree'].includes(activeScreen)) return 'combat';
-    if (activeScreen === 'guild') return 'guild';
+    if (['guild', 'friends', 'mail'].includes(activeScreen)) return 'social';
     return 'home';
   };
 
@@ -874,7 +890,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (activeScreen === 'combat' && screen !== 'combat') {
       setLastCombat(null);
     }
-    setActiveScreen(screen as Screen);
+    // Map bottom nav tab ids to default sub-screens
+    const resolved = screen === 'social' ? 'guild' : screen;
+    setActiveScreen(resolved as Screen);
   };
 
   const handleMine = async (playerNodeId: string, turnSpend: number) => {
@@ -1461,6 +1479,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     templates,
     handleLoadTemplates,
     pvpNotificationCount,
+    incomingFriendRequestCount,
+    mailUnreadCount,
+    loadFriendCounts,
     combatLogSpeedMs,
     setCombatLogSpeedMs,
     explorationSpeedMs,

@@ -30,6 +30,7 @@ import { skillPointsRouter } from './routes/skillpoints';
 import { casinoRouter } from './routes/casino';
 import { trainingRouter } from './routes/training';
 import { questsRouter } from './routes/quests';
+import { friendsRouter } from './routes/friends';
 import { errorHandler } from './middleware/errorHandler';
 import { createSocketServer, getIo } from './socket';
 import { checkAndResolveDueBossRounds } from './services/bossEncounterService';
@@ -118,6 +119,7 @@ app.use('/api/v1/skillpoints', skillPointsRouter);
 app.use('/api/v1/casino', casinoRouter);
 app.use('/api/v1/training', trainingRouter);
 app.use('/api/v1/quests', questsRouter);
+app.use('/api/v1/friends', friendsRouter);
 
 // Error handler
 app.use(errorHandler);

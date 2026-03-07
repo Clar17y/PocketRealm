@@ -22,6 +22,8 @@ export type Screen =
   | 'achievements'
   | 'leaderboard'
   | 'guild'
+  | 'friends'
+  | 'mail'
   | 'templates'
   | 'talentTree'
   | 'casino'

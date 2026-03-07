@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.29',
+    date: '2026-03-07',
+    title: 'Friends & Social',
+    summary:
+      'Add friends, send mail, and spar. Search for players by name (partial, case-insensitive) and send friend requests. View their profile — level, equipment, and online status. Challenge friends to a friendly spar for 200 turns — full combat with playback, no ELO or consequences. Losers get a cheeky system mail. Send text mail to friends for 25 gold (the game\'s first gold sink). Inbox, sent, compose with reply support. Block players to remove them from your friends list and hide yourself from their search results. The Guild tab is now a Social hub with Guild, Friends, and Mail sub-screens. An envelope icon in the header shows your unread mail count at a glance.',
+  },
+  {
     version: '0.28',
     date: '2026-03-06',
     title: 'Daily & Weekly Quests',
