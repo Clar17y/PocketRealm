@@ -240,3 +240,21 @@ export { exchangeGold, getRouletteRound, placeRouletteBet, getRouletteHistory, g
 export type { GoldExchangeResponse, PlaceBetResponse, RouletteNumberStat } from './casino';
 export { startTrainingFight, getTrainingCooldown } from './training';
 export type { TrainingFightResponse, TrainingCooldownResponse } from './training';
+
+export {
+  getActiveExpedition,
+  getExpeditionStatus,
+  getExpeditionHistory,
+  launchExpedition,
+  signUpForExpedition,
+  recoverFromExpeditionKO,
+  getExpeditionShop,
+  purchaseExpeditionItem,
+} from './expedition';
+export type {
+  ExpeditionStatusResponse,
+  ExpeditionDetailResponse,
+  ExpeditionHistoryResponse,
+  ExpeditionShopResponse,
+  ExpeditionPurchaseResponse,
+} from './expedition';
