@@ -49,12 +49,28 @@ vi.mock('./skillPointService', () => ({
     unlockedActions: [],
   }),
 }));
-vi.mock('@pocketrealm/game-engine', () => ({
-  buildPlayerCombatStats: vi.fn().mockReturnValue({
-    attack: 15, defence: 10, magicPower: 0, magicDefence: 5,
-    accuracy: 60, dodge: 10, speed: 5, damageMin: 5, damageMax: 15,
-    critChance: 0.05, critDamage: 1.5, maxHp: 100, currentHp: 100,
+vi.mock('./pvpCombatantBuilder', () => ({
+  getAttackStyle: vi.fn().mockResolvedValue('melee'),
+  buildPvpCombatant: vi.fn().mockResolvedValue({
+    id: 'mock-player',
+    name: 'MockPlayer',
+    stats: {
+      hp: 100, maxHp: 100,
+      attack: 15, defence: 10, magicPower: 0, magicDefence: 5,
+      accuracy: 60, dodge: 10, speed: 5, damageMin: 5, damageMax: 15,
+      critChance: 0.05, critDamage: 1.5, evasion: 5, damageType: 'physical',
+    },
+    template: [{ actionId: 'light_attack' }],
+    stamina: 100,
+    maxStamina: 100,
+    staminaRegenPerRound: 10,
+    mana: 50,
+    maxMana: 50,
+    manaRegenPerRound: 5,
+    actionDefinitions: {},
   }),
+}));
+vi.mock('@pocketrealm/game-engine', () => ({
   calculateFleeResult: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1 }),
   runTemplateCombat: vi.fn().mockReturnValue({
     outcome: 'victory',
@@ -70,11 +86,8 @@ vi.mock('@pocketrealm/game-engine', () => ({
     potionsConsumed: [],
     totalRounds: 5,
   }),
-  calculateMaxHp: vi.fn().mockReturnValue(100),
   calculateMaxStamina: vi.fn().mockReturnValue(100),
-  calculateStaminaRegenPerRound: vi.fn().mockReturnValue(10),
   calculateMaxMana: vi.fn().mockReturnValue(50),
-  calculateManaRegenPerRound: vi.fn().mockReturnValue(5),
 }));
 
 import { mockPrisma } from '../__test__/setup';

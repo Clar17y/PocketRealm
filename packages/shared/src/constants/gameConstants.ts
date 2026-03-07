@@ -1313,3 +1313,32 @@ export const QUEST_TEMPLATE_DEFINITIONS: readonly QuestTemplateDefinition[] = [
   { key: 'weekly_craft',    name: 'Quality Crafter',     description: 'Craft {target} rare+ items this week',      category: 'crafting',    cadence: 'weekly', progressType: 'craft_rare',        targets: { low: 2, mid: 5, high: 10 },         rewards: { low: [15, 20], mid: [18, 25], high: [22, 30] } },
 ] as const;
 
+// =============================================================================
+// FRIENDS
+// =============================================================================
+
+export const FRIEND_CONSTANTS = {
+  MAX_FRIENDS: 50,
+  MAX_PENDING_REQUESTS: 20,
+  REQUEST_COOLDOWN_SECONDS: 60,
+} as const;
+
+// =============================================================================
+// SPARRING
+// =============================================================================
+
+export const SPAR_CONSTANTS = {
+  TURN_COST: 200,
+} as const;
+
+// =============================================================================
+// MAIL
+// =============================================================================
+
+export const MAIL_CONSTANTS = {
+  GOLD_COST: 25,
+  MAX_SUBJECT_LENGTH: 100,
+  MAX_BODY_LENGTH: 1000,
+  MAX_INBOX_SIZE: 100,
+  MAX_SENT_SIZE: 50,
+} as const;
