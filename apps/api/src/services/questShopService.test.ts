@@ -40,6 +40,7 @@ function makeTx() {
     guild: mockModel(),
     guildLog: mockModel(),
     shopItem: mockModel(),
+    playerAchievement: mockModel(),
   };
 }
 
@@ -288,22 +289,28 @@ describe('purchaseItem', () => {
     await expect(purchaseItem(PLAYER_ID, SHOP_ITEM_ID, { targetZoneId: 'zone-42' })).rejects.toThrow('Zone not discovered');
   });
 
-  it('prestige item records purchase and returns title', async () => {
+  it('prestige item records purchase and unlocks achievement', async () => {
     const item = {
-      id: SHOP_ITEM_ID, key: 'title_champion', cost: 20, enabled: true,
+      id: SHOP_ITEM_ID, key: 'title_questmaster', cost: 500, enabled: true,
       category: 'prestige', weeklyLimit: null, lifetimeLimit: 1,
       buffType: null, buffValue: null, buffUses: null,
     };
-    db.shopItem.findUnique.mockResolvedValue({ ...item, name: 'Champion' });
+    db.shopItem.findUnique.mockResolvedValue({ ...item, name: 'Title: Questmaster' });
 
     const tx = makeTx();
-    tx.playerQuestState.findUnique.mockResolvedValue({ questTokens: 30 });
+    tx.playerQuestState.findUnique.mockResolvedValue({ questTokens: 600 });
     tx.playerShopPurchase.count.mockResolvedValue(0);
-    tx.playerQuestState.update.mockResolvedValue({ questTokens: 10 });
+    tx.playerQuestState.update.mockResolvedValue({ questTokens: 100 });
     tx.playerShopPurchase.create.mockResolvedValue({});
+    tx.playerAchievement.upsert.mockResolvedValue({});
     db.$transaction.mockImplementation(async (cb: any) => cb(tx));
 
     const result = await purchaseItem(PLAYER_ID, SHOP_ITEM_ID);
-    expect(result.effect).toEqual({ type: 'prestige', title: 'Champion' });
+    expect(result.effect).toEqual({ type: 'prestige', achievementId: 'shop_title_questmaster' });
+    expect(tx.playerAchievement.upsert).toHaveBeenCalledWith({
+      where: { playerId_achievementId: { playerId: PLAYER_ID, achievementId: 'shop_title_questmaster' } },
+      create: { playerId: PLAYER_ID, achievementId: 'shop_title_questmaster' },
+      update: {},
+    });
   });
 });

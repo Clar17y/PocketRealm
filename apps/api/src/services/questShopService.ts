@@ -171,14 +171,29 @@ async function applyEffect(tx: any, playerId: string, item: any, params?: Purcha
     case 'guild_contract_reroll':
       return applyContractReroll(tx, playerId, params?.targetContractId);
 
+    // === Prestige / title items ===
+    case 'title_questmaster':
+      return applyPrestigeTitle(tx, playerId, 'shop_title_questmaster');
+    case 'title_token_hoarder':
+      return applyPrestigeTitle(tx, playerId, 'shop_title_token_hoarder');
+
     default:
       // Buff/upgrade items
       if (item.buffType && item.buffValue != null && item.buffUses != null) {
         return applyBuff(tx, playerId, item);
       }
-      // Prestige / title items — just the purchase record is enough
-      return { type: 'prestige', title: item.name };
+      return { type: 'unknown' };
   }
+}
+
+async function applyPrestigeTitle(tx: any, playerId: string, achievementId: string) {
+  // Create the achievement record so the title becomes available via the title system
+  await tx.playerAchievement.upsert({
+    where: { playerId_achievementId: { playerId, achievementId } },
+    create: { playerId, achievementId },
+    update: {},
+  });
+  return { type: 'prestige', achievementId };
 }
 
 async function applyBuff(tx: any, playerId: string, item: any) {
