@@ -484,22 +484,18 @@ function MailList({
           {/* Recipient */}
           <div>
             <label className="block text-xs text-[var(--rpg-text-secondary)] mb-1">To</label>
-            {recipientName && recipientId ? (
-              <div className="text-sm text-[var(--rpg-text-primary)]">{recipientName}</div>
-            ) : (
-              <select
-                value={recipientId}
-                onChange={(e) => onRecipientChange(e.target.value)}
-                className="w-full bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-2 py-1.5 text-sm text-[var(--rpg-text-primary)]"
-              >
-                <option value="">Select a friend...</option>
-                {friendList.map((f) => (
-                  <option key={f.playerId} value={f.playerId}>
-                    {f.username} (Lv.{f.characterLevel})
-                  </option>
-                ))}
-              </select>
-            )}
+            <select
+              value={recipientId}
+              onChange={(e) => onRecipientChange(e.target.value)}
+              className="w-full bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded px-2 py-1.5 text-sm text-[var(--rpg-text-primary)]"
+            >
+              <option value="">Select a friend...</option>
+              {friendList.map((f) => (
+                <option key={f.playerId} value={f.playerId}>
+                  {f.username} (Lv.{f.characterLevel})
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Subject */}

@@ -38,7 +38,7 @@ export function ConfirmModal({
 
   return (
     <ModalOverlay>
-      <div className={`bg-[var(--rpg-bg-dark,#1a1a2e)] border ${styles.border} rounded-lg p-6 max-w-sm w-full mx-4`}>
+      <div className={`bg-[var(--rpg-surface)] border ${styles.border} rounded-lg p-6 max-w-sm w-full mx-4`}>
         <h2 className={`${styles.title} font-bold text-lg mb-3`}>{title}</h2>
         <p className="text-sm text-[var(--rpg-text-primary)] mb-5 leading-relaxed">{message}</p>
 
