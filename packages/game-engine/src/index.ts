@@ -53,5 +53,9 @@ export * from './events/applyEventModifiers';
 export { isWinningBet, calculatePayout, validateBet, getNumberColor, generateSpinResult } from './casino/roulette';
 export type { BetValidation } from './casino/roulette';
 
+// Expedition
+export { generateExpeditionRooms } from './expedition/roomGenerator';
+export type { MobPoolEntry } from './expedition/roomGenerator';
+
 // Utils
 export { clamp, randomUnit } from './utils/math';
