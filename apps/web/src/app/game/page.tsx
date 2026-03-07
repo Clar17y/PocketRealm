@@ -257,6 +257,7 @@ export default function GamePage() {
     handleRerollQuest,
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
+    activeBuffs,
     combatLogPrefetch,
     inventoryCapacity,
     inventoryUsedSlots,
@@ -862,6 +863,8 @@ export default function GamePage() {
             recoveryCost={hpState.recoveryCost}
             zoneCraftingLevel={zoneCraftingLevel}
             guildTaxRate={guildTaxRate}
+            forgeLuckUses={activeBuffs.find(b => b.buffType === 'forge_luck')?.remainingUses ?? 0}
+            forgeProtectionUses={activeBuffs.find(b => b.buffType === 'forge_protection')?.remainingUses ?? 0}
           />
         );
       }

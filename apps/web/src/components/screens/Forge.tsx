@@ -115,6 +115,8 @@ interface ForgeProps {
   recoveryCost?: number | null;
   zoneCraftingLevel: number | null;
   guildTaxRate?: number;
+  forgeLuckUses?: number;
+  forgeProtectionUses?: number;
 }
 
 function titleCaseRarity(rarity: Rarity): string {
@@ -137,6 +139,8 @@ export function Forge({
   recoveryCost,
   zoneCraftingLevel,
   guildTaxRate = 0,
+  forgeLuckUses = 0,
+  forgeProtectionUses = 0,
 }: ForgeProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(items[0]?.id ?? null);
   const [selectedUpgradeSacrificeId, setSelectedUpgradeSacrificeId] = useState<string | null>(null);
@@ -220,7 +224,10 @@ export function Forge({
   const inflatedUpgradeCost = upgradeCost !== null ? inflateCost(upgradeCost, guildTaxRate) : null;
   const inflatedRerollCost = rerollCost !== null ? inflateCost(rerollCost, guildTaxRate) : null;
   const nextRarity = selected ? getNextRarity(selected.rarity) : null;
-  const upgradeChance = selected ? calculateForgeUpgradeSuccessChance(selected.rarity, equippedLuck) : null;
+  const baseUpgradeChance = selected ? calculateForgeUpgradeSuccessChance(selected.rarity, equippedLuck) : null;
+  const upgradeChance = baseUpgradeChance !== null && forgeLuckUses > 0
+    ? Math.min(1, baseUpgradeChance * 2)
+    : baseUpgradeChance;
   const bonusEntries = statEntries(selected?.bonusStats);
   const baseEntries = statEntries(selected?.baseStats);
 
@@ -348,6 +355,8 @@ export function Forge({
               </div>
               <div className="text-xs text-[var(--rpg-text-secondary)]">
                 Success: {typeof upgradeChance === 'number' ? `${(upgradeChance * 100).toFixed(1)}%` : '-'}
+                {forgeLuckUses > 0 && <span className="text-[var(--rpg-gold)] ml-1">(2x Forge Luck — {forgeLuckUses} use{forgeLuckUses !== 1 ? 's' : ''} left)</span>}
+                {forgeProtectionUses > 0 && <span className="text-[var(--rpg-green-light)] ml-1">(Protected — item saved on failure)</span>}
               </div>
 
               <div className="space-y-1">
