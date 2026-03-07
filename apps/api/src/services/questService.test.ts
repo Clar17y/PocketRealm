@@ -481,13 +481,10 @@ describe('getActiveQuests', () => {
     });
     db.player.findUnique.mockResolvedValue({ characterLevel: 5 });
 
+    // Optimistic lock: claim daily reset
+    db.playerQuestState.updateMany.mockResolvedValue({ count: 1 });
     // Expire old dailies
     db.playerQuest.updateMany.mockResolvedValue({ count: 3 });
-    // Update state
-    db.playerQuestState.update.mockResolvedValue({
-      lastDailyReset: DAY_START,
-      dailyBonusClaimed: false,
-    });
 
     // Generate new dailies
     let createCount = 0;
@@ -509,18 +506,18 @@ describe('getActiveQuests', () => {
 
     await getActiveQuests(PLAYER_ID, NOW);
 
-    // Should have expired old dailies
-    expect(db.playerQuest.updateMany).toHaveBeenCalled();
-    // Should have updated the state
-    expect(db.playerQuestState.update).toHaveBeenCalledWith(
+    // Should have claimed the daily reset via optimistic lock
+    expect(db.playerQuestState.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { playerId: PLAYER_ID },
+        where: { playerId: PLAYER_ID, lastDailyReset: { lt: DAY_START } },
         data: expect.objectContaining({
           lastDailyReset: DAY_START,
           dailyBonusClaimed: false,
         }),
       }),
     );
+    // Should have expired old dailies
+    expect(db.playerQuest.updateMany).toHaveBeenCalled();
   });
 });
 
