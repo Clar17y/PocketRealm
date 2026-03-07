@@ -30,15 +30,12 @@ import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankSe
 import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { trackProgress } from '../../services/progressService';
-import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
-import { buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../../services/combatOrchestrationService';
+import { preparePlayerForCombat, buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../../services/combatOrchestrationService';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { getActiveTemplate } from '../../services/combatTemplateService';
-import { getSkillPoints } from '../../services/skillPointService';
-import { getResourceState, setAllResources } from '../../services/resourceService';
+import { setAllResources } from '../../services/resourceService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
@@ -49,11 +46,11 @@ import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { getIo } from '../../socket';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
-import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
+import { deductConsumedPotions } from '../../services/potionService';
 import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
-import { getMainHandAttackSkill, getSkillLevel, buildPerActionScaling, type AttackSkill } from '../../services/combatStatsService';
+import { getMainHandAttackSkill } from '../../services/combatStatsService';
 import {
   startSchema,
   pickWeighted,
@@ -125,16 +122,12 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       getMainHandAttackSkill(playerId),
     ]);
 
-    const attackSkill: AttackSkill = mainHandAttackSkill ?? 'melee';
-    const attackLevel = await getSkillLevel(playerId, attackSkill);
-
-    const guildMods = await getPlayerGuildModifiers(playerId);
-    const perActionScaling = await buildPerActionScaling(playerId, {
-      equipmentStats,
-      attributes: progression.attributes,
-      weaponRequiredSkill: mainHandAttackSkill,
-      guildDamageMultiplier: guildMods.combatDamage,
+    // Prepare player combat data (using pre-fetched equipment/progression/weapon)
+    const combatPrep = await preparePlayerForCombat(playerId, {
+      maxHp: hpState.maxHp,
+      preloaded: { mainHandAttackSkill, equipmentStats, progression },
     });
+    const { attackSkill, attackLevel, guildMods, perActionScaling, playerTemplate, potionPool, resources, unlockedActions: explorationUnlockedActions } = combatPrep;
 
     const explorationProgress = await getExplorationPercent(playerId, body.zoneId);
     const zoneTiers = zone.explorationTiers as Record<string, number> | null;
@@ -240,23 +233,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     let wasKnockedOut = false;
 
     let currentHp = hpState.currentHp;
-
-    // Fetch combat template, resource state, and unlocked actions for template combat
-    const [playerTemplate, resourceState, explorationSkillPoints] = await Promise.all([
-      getActiveTemplate(playerId),
-      getResourceState(playerId),
-      getSkillPoints(playerId),
-    ]);
-    const explorationUnlockedActions = explorationSkillPoints.unlockedActions;
-    const potionPool = templateHasPotionActions(playerTemplate)
-      ? await buildPotionPool(playerId, hpState.maxHp)
-      : [];
-    let currentStamina = resourceState.stamina.current;
-    let currentMana = resourceState.mana.current;
-    const maxStamina = resourceState.stamina.max;
-    const maxMana = resourceState.mana.max;
-    const staminaRegenPerRound = resourceState.stamina.regenPerRound;
-    const manaRegenPerRound = resourceState.mana.regenPerRound;
+    let currentStamina = resources.stamina;
+    let currentMana = resources.mana;
 
     let aborted = false;
     let abortedAtTurn: number | null = null;
@@ -340,11 +318,11 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           playerStats,
           template: playerTemplate,
           stamina: currentStamina,
-          maxStamina,
-          staminaRegenPerRound,
+          maxStamina: resources.maxStamina,
+          staminaRegenPerRound: resources.staminaRegenPerRound,
           mana: currentMana,
-          maxMana,
-          manaRegenPerRound,
+          maxMana: resources.maxMana,
+          manaRegenPerRound: resources.manaRegenPerRound,
           unlockedActions: explorationUnlockedActions,
           perActionScaling,
         });
