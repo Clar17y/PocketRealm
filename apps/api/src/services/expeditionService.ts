@@ -53,7 +53,7 @@ interface GuildExpeditionRow {
 }
 
 function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
-  const rooms = exp.roomDefinitions as ExpeditionRoomDefinition[];
+  const rooms = exp.roomDefinitions as unknown as ExpeditionRoomDefinition[];
   const currentRoomDef = rooms[exp.currentRoom];
   const mobsRemaining = currentRoomDef
     ? currentRoomDef.mobs.filter((m) => m.hp > 0).length
@@ -501,7 +501,7 @@ export async function checkAndResolveExpeditionRounds(io: unknown): Promise<void
 
       if (memberCount >= minParticipants) {
         // Transition to in_progress: take room start snapshot, schedule first round
-        const rooms = exp.roomDefinitions as ExpeditionRoomDefinition[];
+        const rooms = exp.roomDefinitions as unknown as ExpeditionRoomDefinition[];
         const snapshot = {
           mobs: rooms[0]?.mobs ?? [],
           members: await getMembers(exp.id),
@@ -572,7 +572,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
   });
   if (!expedition || expedition.status !== 'in_progress') return;
 
-  const rooms = expedition.roomDefinitions as ExpeditionRoomDefinition[];
+  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
   const currentRoomDef = rooms[expedition.currentRoom];
   if (!currentRoomDef) return;
 
@@ -721,7 +721,7 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
   });
   if (!expedition) return;
 
-  const rooms = expedition.roomDefinitions as ExpeditionRoomDefinition[];
+  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
   const currentRoomDef = rooms[expedition.currentRoom];
   const roomType = currentRoomDef?.roomType ?? 'trash';
 
@@ -836,7 +836,7 @@ export async function handleWipe(expeditionId: string): Promise<void> {
   });
   if (!expedition) return;
 
-  const rooms = expedition.roomDefinitions as ExpeditionRoomDefinition[];
+  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
   const snapshot = expedition.roomStartSnapshot as {
     mobs: ExpeditionRoomDefinition['mobs'];
     members: { playerId: string; currentHp: number; currentStamina: number; currentMana: number }[];
@@ -986,7 +986,7 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
 
   // Award completion bonus tokens
   // Calculate total room tokens earned across all rooms, multiply by bonus multiplier
-  const rooms = expedition.roomDefinitions as ExpeditionRoomDefinition[];
+  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
   let totalRoomTokens = 0;
   for (const room of rooms) {
     const baseTokens = EXPEDITION_CONSTANTS.TOKENS_PER_ROOM[room.roomType];

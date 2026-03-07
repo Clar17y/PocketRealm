@@ -30,9 +30,11 @@ import { skillPointsRouter } from './routes/skillpoints';
 import { casinoRouter } from './routes/casino';
 import { trainingRouter } from './routes/training';
 import { questsRouter } from './routes/quests';
+import { expeditionRouter } from './routes/expedition';
 import { errorHandler } from './middleware/errorHandler';
 import { createSocketServer, getIo } from './socket';
 import { checkAndResolveDueBossRounds } from './services/bossEncounterService';
+import { checkAndResolveExpeditionRounds } from './services/expeditionService';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
 import { refreshAllLeaderboards } from './services/leaderboardService';
 import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
@@ -118,6 +120,7 @@ app.use('/api/v1/skillpoints', skillPointsRouter);
 app.use('/api/v1/casino', casinoRouter);
 app.use('/api/v1/training', trainingRouter);
 app.use('/api/v1/quests', questsRouter);
+app.use('/api/v1/expedition', expeditionRouter);
 
 // Error handler
 app.use(errorHandler);
@@ -132,6 +135,13 @@ server.listen(PORT, () => {
   setInterval(() => {
     checkAndResolveDueBossRounds(getIo()).catch((err) => {
       console.error('Boss round resolution error:', err);
+    });
+  }, 60_000);
+
+  // Expedition round resolution timer (every 60 seconds)
+  setInterval(() => {
+    checkAndResolveExpeditionRounds(getIo()).catch((err) => {
+      console.error('Expedition round resolution error:', err);
     });
   }, 60_000);
 
