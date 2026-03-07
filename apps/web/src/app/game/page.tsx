@@ -1268,7 +1268,7 @@ export default function GamePage() {
           />
         )}
 
-        {getActiveTab() === 'social' && (
+        {activeTab === 'social' && (
           <SubNav
             tabs={[
               { id: 'guild', label: 'Guild' },
