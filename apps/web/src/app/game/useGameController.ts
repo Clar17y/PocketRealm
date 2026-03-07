@@ -91,6 +91,20 @@ import { useCombatPlayback } from './hooks/useCombatPlayback';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
+function mapPlaybackEventsToLogs(
+  events: Array<{ turn: number; type: string; description: string }>,
+): Array<{ timestamp: string; type: 'info' | 'success' | 'danger'; message: string }> {
+  return events.slice().reverse().map((event) => ({
+    timestamp: nowStamp(),
+    type: (event.type === 'ambush_defeat'
+      ? 'danger'
+      : event.type === 'ambush_victory' || event.type === 'encounter_site' || event.type === 'resource_node'
+        ? 'success'
+        : 'info') as 'info' | 'success' | 'danger',
+    message: `Turn ${event.turn}: ${event.description}`,
+  }));
+}
+
 function showQuestToasts(updates?: QuestProgressUpdate[]) {
   if (!updates?.length) return;
   const show = (window as unknown as Record<string, unknown>).__showQuestToast as
@@ -653,27 +667,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   };
 
   const handlePlaybackSkip = async () => {
-    // Dump all remaining events to activity log at once
     if (explorationPlaybackData) {
-      const entries = explorationPlaybackData.events
-        .slice()
-        .reverse()
-        .map((event) => ({
-          timestamp: nowStamp(),
-          type: (event.type === 'ambush_defeat'
-            ? 'danger'
-            : event.type === 'ambush_victory' || event.type === 'encounter_site' || event.type === 'resource_node'
-              ? 'success'
-              : 'info') as 'info' | 'success' | 'danger',
-          message: `Turn ${event.turn}: ${event.description}`,
-        }));
       pushLog(
         {
           timestamp: nowStamp(),
           type: 'info',
           message: `Explored ${explorationPlaybackData.totalTurns.toLocaleString()} turns in ${explorationPlaybackData.zoneName}.`,
         },
-        ...entries,
+        ...mapPlaybackEventsToLogs(explorationPlaybackData.events),
       );
       if (explorationPlaybackData.aborted && explorationPlaybackData.refundedTurns > 0) {
         pushLog({
@@ -1319,15 +1320,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const handleTravelPlaybackSkip = async () => {
     if (travelPlaybackData) {
-      const entries = travelPlaybackData.events
-        .slice()
-        .reverse()
-        .map((event) => ({
-          timestamp: nowStamp(),
-          type: (event.type === 'ambush_defeat' ? 'danger' : event.type === 'ambush_victory' ? 'success' : 'info') as 'info' | 'success' | 'danger',
-          message: `Turn ${event.turn}: ${event.description}`,
-        }));
-      pushLog(...entries);
+      pushLog(...mapPlaybackEventsToLogs(travelPlaybackData.events));
 
       if (travelPlaybackData.aborted && travelPlaybackData.respawnedToName) {
         pushLog({
