@@ -30,6 +30,9 @@ const CATEGORIES = [
   { id: 'bestiary', label: 'Bestiary' },
   { id: 'general', label: 'General' },
   { id: 'family', label: 'Families' },
+  { id: 'guild', label: 'Guild' },
+  { id: 'casino', label: 'Casino' },
+  { id: 'shop', label: 'Shop' },
 ];
 
 function RewardBadge({ reward }: { reward: AchievementRewardResponse }) {

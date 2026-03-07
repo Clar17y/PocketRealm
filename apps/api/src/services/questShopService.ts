@@ -4,7 +4,9 @@ import {
   GUILD_CONTRACT_CONSTANTS,
   getAllMobPrefixes,
 } from '@pocketrealm/shared';
+import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { emitAchievementNotifications } from './achievementService';
 import { getWeekStart, getLevelBracket } from '../utils/dateHelpers';
 import { randomIntInclusive } from '../utils/random';
 
@@ -145,6 +147,14 @@ export async function purchaseItem(playerId: string, shopItemId: string, params?
 
     return { newBalance: updatedState.questTokens, itemKey: item.key, effect };
   });
+
+  // Emit achievement notification after transaction commits (for prestige titles)
+  if (result.effect?.type === 'prestige' && result.effect?.achievementId) {
+    const def = ACHIEVEMENTS_BY_ID.get(result.effect.achievementId as string);
+    if (def) {
+      void emitAchievementNotifications(playerId, [def]);
+    }
+  }
 
   return { success: true, ...result };
 }
