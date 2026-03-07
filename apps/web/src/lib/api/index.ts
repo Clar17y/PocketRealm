@@ -161,6 +161,7 @@ export {
   adminSpawnEncounter,
   adminGetResourceNodes,
   adminSpawnResourceNode,
+  adminGrantTokens,
 } from './admin';
 export type {
   AdminItemTemplate,
