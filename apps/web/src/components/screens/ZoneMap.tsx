@@ -509,8 +509,8 @@ export function ZoneMap({
             );
           })()}
 
-          {/* Home town button — only for town zones */}
-          {selectedZone.zoneType === 'town' && onSetHomeTown && (
+          {/* Home town button — only when physically in a town zone */}
+          {selectedZone.zoneType === 'town' && onSetHomeTown && selectedZone.id === currentZoneId && (
             <div className="mb-2">
               {homeTownId === selectedZone.id ? (
                 <div className="flex items-center gap-1.5 text-xs text-[var(--rpg-gold)]">
