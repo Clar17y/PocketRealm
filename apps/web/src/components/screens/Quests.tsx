@@ -22,6 +22,7 @@ interface QuestsProps {
   onClaimReward: (questId: string) => Promise<void>;
   onClaimBonus: () => Promise<void>;
   onReroll: (questId: string) => Promise<void>;
+  onShopPurchase?: () => void;
 }
 
 const CATEGORY_ICONS: Record<QuestCategory, typeof Sword> = {
@@ -277,7 +278,7 @@ function ShopItemCard({
   );
 }
 
-function ShopTab({ questTokens }: { questTokens: number }) {
+function ShopTab({ questTokens, onPurchase }: { questTokens: number; onPurchase?: () => void }) {
   const [shopItems, setShopItems] = useState<ShopItemData[]>([]);
   const [tokens, setTokens] = useState(questTokens);
   const [shopLoading, setShopLoading] = useState(true);
@@ -321,6 +322,8 @@ function ShopTab({ questTokens }: { questTokens: number }) {
         setPurchaseMessage(`Purchased ${item.name}!`);
         // Refresh shop state and buffs
         void loadShop();
+        // Refresh player state (attributes, skills, etc. may have changed)
+        onPurchase?.();
       } else if (res.error) {
         setPurchaseMessage(res.error.message);
       }
@@ -413,7 +416,7 @@ function ShopTab({ questTokens }: { questTokens: number }) {
   );
 }
 
-export function Quests({ quests, questState, loading, error, onClaimReward, onClaimBonus, onReroll }: QuestsProps) {
+export function Quests({ quests, questState, loading, error, onClaimReward, onClaimBonus, onReroll, onShopPurchase }: QuestsProps) {
   const [activeTab, setActiveTab] = useState('quests');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [rerollingId, setRerollingId] = useState<string | null>(null);
@@ -468,7 +471,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
       <SubNav tabs={[...SHOP_TABS]} activeId={activeTab} onSelect={setActiveTab} />
 
       {activeTab === 'shop' ? (
-        <ShopTab questTokens={questState?.questTokens ?? 0} />
+        <ShopTab questTokens={questState?.questTokens ?? 0} onPurchase={onShopPurchase} />
       ) : (
         <>
           {/* Quest Token Balance + Daily Bonus */}

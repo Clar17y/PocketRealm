@@ -1062,6 +1062,7 @@ export default function GamePage() {
             onClaimReward={handleClaimQuestReward}
             onClaimBonus={handleClaimDailyBonus}
             onReroll={handleRerollQuest}
+            onShopPurchase={loadAll}
           />
         );
       case 'leaderboard':
