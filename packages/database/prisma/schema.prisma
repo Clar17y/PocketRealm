@@ -97,6 +97,11 @@ model Player {
   quests               PlayerQuest[]
   questState           PlayerQuestState?
 
+  // Expeditions
+  expeditionTokens      Int                    @default(0) @map("expedition_tokens")
+  expeditionsLaunched   GuildExpedition[]       @relation("ExpeditionLauncher")
+  expeditionMemberships GuildExpeditionMember[]
+
   @@map("players")
 }
 
@@ -200,6 +205,7 @@ model Item {
   bonusStats        Json?    @map("bonus_stats")
   createdAt         DateTime @default(now()) @map("created_at")
   inStash           Boolean  @default(false) @map("in_stash")
+  isSoulbound       Boolean  @default(false) @map("is_soulbound")
 
   template  ItemTemplate      @relation(fields: [templateId], references: [id])
   owner     Player            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -795,6 +801,7 @@ model Guild {
   contracts    GuildContract[]
   logs         GuildLog[]
   joinRequests GuildJoinRequest[]
+  expeditions  GuildExpedition[]
 
   @@map("guilds")
 }
@@ -905,6 +912,60 @@ model GuildJoinRequest {
   @@unique([guildId, playerId])
   @@index([guildId, status])
   @@map("guild_join_requests")
+}
+
+// =============================================================================
+// GUILD EXPEDITIONS
+// =============================================================================
+
+model GuildExpedition {
+  id                String    @id @default(uuid())
+  guildId           String    @map("guild_id")
+  tier              Int
+  status            String    @default("recruiting") @db.VarChar(16)
+  currentRoom       Int       @default(0) @map("current_room")
+  totalRooms        Int       @map("total_rooms")
+  roomDefinitions   Json      @map("room_definitions")
+  roomStartSnapshot Json?     @map("room_start_snapshot")
+  roundNumber       Int       @default(0) @map("round_number")
+  roundSummaries    Json?     @map("round_summaries")
+  nextRoundAt       DateTime? @map("next_round_at")
+  startedAt         DateTime  @default(now()) @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  launchedBy        String    @map("launched_by")
+
+  guild    Guild                   @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  launcher Player                  @relation("ExpeditionLauncher", fields: [launchedBy], references: [id])
+  members  GuildExpeditionMember[]
+
+  @@index([guildId, status])
+  @@index([guildId, tier, startedAt])
+  @@index([status, nextRoundAt])
+  @@map("guild_expeditions")
+}
+
+model GuildExpeditionMember {
+  id             String   @id @default(uuid())
+  expeditionId   String   @map("expedition_id")
+  playerId       String   @map("player_id")
+  currentHp      Int      @map("current_hp")
+  currentStamina Int      @map("current_stamina")
+  currentMana    Int      @map("current_mana")
+  templateRound  Int      @default(1) @map("template_round")
+  activeEffects  Json     @default("[]") @map("active_effects")
+  threatValue    Float    @default(0) @map("threat_value")
+  isKnockedOut   Boolean  @default(false) @map("is_knocked_out")
+  totalDamage    BigInt   @default(0) @map("total_damage")
+  totalHealing   BigInt   @default(0) @map("total_healing")
+  roomDamage     BigInt   @default(0) @map("room_damage")
+  roomHealing    BigInt   @default(0) @map("room_healing")
+  signedUpAt     DateTime @default(now()) @map("signed_up_at")
+
+  expedition GuildExpedition @relation(fields: [expeditionId], references: [id], onDelete: Cascade)
+  player     Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([expeditionId, playerId])
+  @@map("guild_expedition_members")
 }
 
 // =============================================================================
