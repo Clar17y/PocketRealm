@@ -1328,3 +1328,60 @@ export const QUEST_SHOP_ITEMS: readonly QuestShopItem[] = [
   { key: 'rare_material_bundle', name: 'Rare Material Bundle',   description: 'A bundle of assorted rare crafting materials', cost: 25,  category: 'material',   permanent: false },
   { key: 'stat_reset_scroll',    name: 'Stat Reset Scroll',      description: 'Reset your attribute points',                 cost: 40,  category: 'utility',    permanent: false },
 ] as const;
+
+// =============================================================================
+// EXPEDITIONS
+// =============================================================================
+
+export const EXPEDITION_CONSTANTS = {
+  TREASURY_COST_BY_TIER: [200_000, 500_000, 1_000_000] as const,
+  LEVEL_REQUIREMENT_BY_TIER: [10, 16, 23] as const,
+  MIN_PARTICIPANTS_BY_TIER: [5, 8, 12] as const,
+  ROOMS_BY_TIER: [5, 6, 8] as const,
+  MOB_COUNTS: {
+    trash: [4, 5] as const,
+    elite: [3, 4] as const,
+    mini_boss_adds: [2, 3] as const,
+    event: [3, 4] as const,
+  } as const,
+  SIGNUP_WINDOW_MS: 10 * 60 * 1000,
+  ROUND_INTERVAL_MS: 5 * 60 * 1000,
+  REST_DURATION_MS: 5 * 60 * 1000,
+  REST_HP_REGEN: 0.20,
+  REST_STAMINA_REGEN: 0.30,
+  REST_MANA_REGEN: 0.30,
+  EVENT_DOT_PERCENT: 0.03,
+  WEEKLY_COOLDOWN_MS: 7 * 24 * 60 * 60 * 1000,
+  BETWEEN_EXPEDITION_COOLDOWN_MS: 24 * 60 * 60 * 1000,
+  SIGNUP_TURN_COST: 300,
+  TOKENS_PER_ROOM: {
+    trash: 5,
+    elite: 8,
+    mini_boss: 12,
+    event: 8,
+    final_boss: 20,
+  } as const,
+  TOKEN_TIER_MULTIPLIER: [1, 2, 4] as const,
+  COMPLETION_BONUS_MULTIPLIER: 1.0,
+  LOOT_MULTIPLIER: {
+    trash: 1.0,
+    elite: 1.5,
+    mini_boss: 2.0,
+    event: 1.5,
+    final_boss: 3.0,
+  } as const,
+  GUILD_XP_PER_ROOM: 25,
+  GUILD_XP_COMPLETION_BONUS: 100,
+  KO_RECOVERY_TURN_COST: 500,
+  BOSS_PHASE_THRESHOLDS: [0.50, 0.25] as const,
+  SOULBOUND_DURABILITY_MULTIPLIER: 2,
+} as const;
+
+export const EXPEDITION_TOKEN_CONSTANTS = {
+  TOKEN_COST_HEAD: 80,
+  TOKEN_COST_CHEST: 120,
+  TOKEN_COST_GLOVES: 60,
+  TOKEN_COST_LEGS: 100,
+  TOKEN_COST_BOOTS: 60,
+  SET_BONUS_GROUP_CONTENT_ONLY: true,
+} as const;

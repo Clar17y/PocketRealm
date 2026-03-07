@@ -25,6 +25,7 @@ export * from './constants/combatActionDefinitions';
 export * from './constants/combatEffectNames';
 export * from './constants/talentTreeDefinitions';
 export * from './constants/bossTemplateDefinitions';
+export * from './constants/expeditionDefinitions';
 
 // Utils
 export * from './utils/achievementChains';
