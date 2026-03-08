@@ -508,7 +508,7 @@ router.post('/resource-nodes/spawn', asyncHandler(async (req, res) => {
 // Quest Tokens
 // ---------------------------------------------------------------------------
 
-const grantTokensSchema = z.object({ amount: z.number().int().min(1) });
+const grantTokensSchema = z.object({ amount: z.number().int().min(1).max(100000) });
 
 router.post('/tokens/grant', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;

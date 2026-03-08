@@ -23,12 +23,12 @@ const purchaseBodySchema = z.object({
   targetZoneId: z.string().uuid().optional(),
   targetMobTemplateId: z.string().uuid().optional(),
   targetContractId: z.string().uuid().optional(),
-}).optional();
+}).default({});
 
 shopRouter.post('/purchase/:itemId', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { itemId } = purchaseParamsSchema.parse(req.params);
   const body = purchaseBodySchema.parse(req.body);
-  const result = await purchaseItem(playerId, itemId, body ?? {});
+  const result = await purchaseItem(playerId, itemId, body);
   res.json(result);
 }));
