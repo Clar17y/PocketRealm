@@ -40,6 +40,10 @@ vi.mock('./potionService', () => ({
 vi.mock('./hpService', () => ({
   getHpState: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
 }));
+vi.mock('./lootService', () => ({
+  rollAndGrantLoot: vi.fn().mockResolvedValue([]),
+  enrichLootWithNames: vi.fn().mockResolvedValue([]),
+}));
 vi.mock('./equipmentService', () => ({
   getEquipmentStats: vi.fn().mockResolvedValue({
     attack: 10, rangedPower: 0, magicPower: 0, armor: 10,
@@ -65,9 +69,9 @@ vi.mock('@pocketrealm/game-engine', async () => {
   return {
     ...actual,
     generateExpeditionRooms: vi.fn().mockReturnValue([
-      { roomIndex: 0, roomType: 'trash', mobs: [{ id: 'mob-0-0', hp: 100, maxHp: 100 }] },
-      { roomIndex: 1, roomType: 'elite', mobs: [{ id: 'mob-1-0', hp: 200, maxHp: 200 }] },
-      { roomIndex: 2, roomType: 'final_boss', mobs: [{ id: 'mob-2-0', hp: 500, maxHp: 500 }] },
+      { roomIndex: 0, roomType: 'trash', mobs: [{ id: 'mob-0-0', mobTemplateId: 'tmpl-1', hp: 100, maxHp: 100 }] },
+      { roomIndex: 1, roomType: 'elite', mobs: [{ id: 'mob-1-0', mobTemplateId: 'tmpl-1', hp: 200, maxHp: 200 }] },
+      { roomIndex: 2, roomType: 'final_boss', mobs: [{ id: 'mob-2-0', mobTemplateId: 'tmpl-1', hp: 500, maxHp: 500 }] },
     ]),
     resolveRaidRound: vi.fn().mockReturnValue({
       mobsAfter: [{ id: 'mob-0-0', hp: 50, maxHp: 100, activeEffects: [] }],
@@ -165,9 +169,9 @@ const makeExpeditionRow = (overrides: Record<string, unknown> = {}) => ({
   currentRoom: 0,
   totalRooms: 3,
   roomDefinitions: [
-    { roomIndex: 0, roomType: 'trash', mobs: [{ id: 'mob-0-0', hp: 100, maxHp: 100 }] },
-    { roomIndex: 1, roomType: 'elite', mobs: [{ id: 'mob-1-0', hp: 200, maxHp: 200 }] },
-    { roomIndex: 2, roomType: 'final_boss', mobs: [{ id: 'mob-2-0', hp: 500, maxHp: 500 }] },
+    { roomIndex: 0, roomType: 'trash', mobs: [{ id: 'mob-0-0', mobTemplateId: 'tmpl-1', hp: 100, maxHp: 100 }] },
+    { roomIndex: 1, roomType: 'elite', mobs: [{ id: 'mob-1-0', mobTemplateId: 'tmpl-1', hp: 200, maxHp: 200 }] },
+    { roomIndex: 2, roomType: 'final_boss', mobs: [{ id: 'mob-2-0', mobTemplateId: 'tmpl-1', hp: 500, maxHp: 500 }] },
   ],
   roomStartSnapshot: null,
   roundNumber: 0,
@@ -202,6 +206,9 @@ const makeMemberRow = (overrides: Record<string, unknown> = {}) => ({
   currentHp: 100,
   currentStamina: 80,
   currentMana: 50,
+  maxHp: 125,
+  maxStamina: 100,
+  maxMana: 60,
   templateRound: 1,
   activeEffects: [],
   threatValue: 0,
@@ -602,6 +609,7 @@ describe('expeditionService', () => {
       mockPrisma.guild.update.mockResolvedValue({});
       mockPrisma.guildExpeditionMember.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.guildExpeditionMember.findMany.mockResolvedValue([makeMemberRow()]);
+      mockPrisma.guildExpeditionMember.update.mockResolvedValue(makeMemberRow());
       mockPrisma.guildExpedition.update.mockResolvedValue({});
       mockPrisma.guildLog.create.mockResolvedValue({});
 

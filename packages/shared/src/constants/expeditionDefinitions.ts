@@ -5,10 +5,25 @@ import type { ExpeditionRoomType, ExpeditionShopItem, ExpeditionSetId } from '..
 // ROOM COMPOSITIONS PER TIER
 // =============================================================================
 
-export const EXPEDITION_ROOM_COMPOSITIONS: Record<number, readonly ExpeditionRoomType[]> = {
-  0: ['trash', 'elite', 'mini_boss', 'event', 'final_boss'],
-  1: ['trash', 'elite', 'trash', 'mini_boss', 'event', 'final_boss'],
-  2: ['trash', 'elite', 'trash', 'elite', 'mini_boss', 'event', 'trash', 'final_boss'],
+export const EXPEDITION_ROOM_COMPOSITIONS: Record<number, { type: ExpeditionRoomType; count: number }[]> = {
+  0: [
+    { type: 'trash', count: 3 },
+    { type: 'elite', count: 1 },
+    { type: 'final_boss', count: 1 },
+  ],
+  1: [
+    { type: 'trash', count: 3 },
+    { type: 'elite', count: 1 },
+    { type: 'mini_boss', count: 1 },
+    { type: 'final_boss', count: 1 },
+  ],
+  2: [
+    { type: 'trash', count: 3 },
+    { type: 'elite', count: 2 },
+    { type: 'mini_boss', count: 1 },
+    { type: 'event', count: 1 },
+    { type: 'final_boss', count: 1 },
+  ],
 };
 
 // =============================================================================

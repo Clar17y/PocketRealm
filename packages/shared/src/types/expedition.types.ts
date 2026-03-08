@@ -19,6 +19,7 @@ export interface ExpeditionMobState {
   stats: CombatantStats;
   actionTemplate: BossTemplateAction[];
   activeEffects: BossActiveEffect[];
+  phaseTemplates?: { hpThreshold: number; template: BossTemplateAction[] }[];
 }
 
 export interface ExpeditionRoomDefinition {

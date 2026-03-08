@@ -25,7 +25,8 @@ import {
   initThreatTable,
   type MobPoolEntry,
 } from '@pocketrealm/game-engine';
-import { awardRoomTokens, awardCompletionBonus } from './expeditionLootService';
+import { awardRoomTokens, awardCompletionBonus, distributeRoomLoot } from './expeditionLootService';
+import type { ExpeditionContributor } from './expeditionLootService';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { addGuildLog } from './guildService';
@@ -711,6 +712,17 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
   // Award per-room tokens to all members (flat, not contribution-weighted)
   await awardRoomTokens(expedition.members, roomType, expedition.tier);
 
+  // Distribute item loot weighted by contribution
+  const contributors: ExpeditionContributor[] = expedition.members.map(m => ({
+    playerId: m.playerId,
+    roomDamage: Number(m.roomDamage),
+    roomHealing: Number(m.roomHealing),
+  }));
+  const mobTemplateIds = currentRoomDef
+    ? currentRoomDef.mobs.map(m => m.mobTemplateId)
+    : [];
+  await distributeRoomLoot(contributors, roomType, expedition.tier, mobTemplateIds);
+
   // Award guild XP
   await prisma.guild.update({
     where: { id: expedition.guildId },
@@ -732,40 +744,24 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
     data: { roomDamage: 0, roomHealing: 0, isKnockedOut: false, threatValue: 0 },
   });
 
-  // Apply rest regen to all members
+  // Apply rest regen to all members using stored max stats (no N+1 queries)
   const members = await prisma.guildExpeditionMember.findMany({
     where: { expeditionId },
   });
 
   await Promise.all(
-    members.map(async m => {
-      const [equipStats, progression, meleeLevel, rangedLevel, magicLevel] = await Promise.all([
-        getEquipmentStats(m.playerId),
-        getPlayerProgressionState(m.playerId),
-        getSkillLevel(m.playerId, 'melee'),
-        getSkillLevel(m.playerId, 'ranged'),
-        getSkillLevel(m.playerId, 'magic'),
-      ]);
-      const maxHp = calculateMaxHp({
-        vitalityLevel: progression.attributes.vitality,
-        equipmentHealthBonus: equipStats.health,
-      });
-      const maxStamina = calculateMaxStamina({
-        meleeLevel, rangedLevel, evasionLevel: progression.attributes.evasion, equipmentStaminaBonus: 0,
-      });
-      const maxMana = calculateMaxMana({ magicLevel, equipmentManaBonus: 0 });
+    members.map(m => {
+      const regenHp = Math.floor(m.maxHp * EXPEDITION_CONSTANTS.REST_HP_REGEN);
+      const regenStamina = Math.floor(m.maxStamina * EXPEDITION_CONSTANTS.REST_STAMINA_REGEN);
+      const regenMana = Math.floor(m.maxMana * EXPEDITION_CONSTANTS.REST_MANA_REGEN);
 
-      const regenHp = Math.min(maxHp, m.currentHp + Math.floor(maxHp * EXPEDITION_CONSTANTS.REST_HP_REGEN));
-      const regenStamina = Math.min(maxStamina, m.currentStamina + Math.floor(maxStamina * EXPEDITION_CONSTANTS.REST_STAMINA_REGEN));
-      const regenMana = Math.min(maxMana, m.currentMana + Math.floor(maxMana * EXPEDITION_CONSTANTS.REST_MANA_REGEN));
+      const newHp = Math.min(m.currentHp + regenHp, m.maxHp);
+      const newStamina = Math.min(m.currentStamina + regenStamina, m.maxStamina);
+      const newMana = Math.min(m.currentMana + regenMana, m.maxMana);
 
-      return prisma.guildExpeditionMember.updateMany({
-        where: { expeditionId, playerId: m.playerId },
-        data: {
-          currentHp: regenHp,
-          currentStamina: regenStamina,
-          currentMana: regenMana,
-        },
+      return prisma.guildExpeditionMember.update({
+        where: { id: m.id },
+        data: { currentHp: newHp, currentStamina: newStamina, currentMana: newMana },
       });
     }),
   );
@@ -797,6 +793,27 @@ export async function handleWipe(expeditionId: string): Promise<void> {
     where: { id: expeditionId },
   });
   if (!expedition) return;
+
+  // Count total wipes from round summaries (allPlayersDead entries)
+  const summaries = (Array.isArray(expedition.roundSummaries)
+    ? expedition.roundSummaries
+    : []) as unknown as ExpeditionRoundSummary[];
+  // +1 for the current wipe that triggered this call
+  const wipeCount = summaries.filter(s => s.allPlayersDead).length + 1;
+
+  if (wipeCount >= EXPEDITION_CONSTANTS.MAX_WIPES_PER_EXPEDITION) {
+    await prisma.guildExpedition.update({
+      where: { id: expeditionId },
+      data: { status: 'failed', completedAt: new Date(), nextRoundAt: null },
+    });
+    await addGuildLog(
+      expedition.guildId,
+      'expedition_failed',
+      `Expedition failed after ${wipeCount} wipes`,
+      { expeditionId, wipeCount },
+    );
+    return;
+  }
 
   const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
   const snapshot = expedition.roomStartSnapshot as {

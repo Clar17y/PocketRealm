@@ -40,6 +40,23 @@ const AOE_ACTION_IDS = new Set([
   'cleave', 'volley', 'chain_lightning', 'meteor_strike',
 ]);
 
+// --- Phase Transition ---
+
+/**
+ * Check if a mob's HP has dropped below a phase threshold and swap its action
+ * template to the more aggressive phase. phaseTemplates must be sorted by
+ * threshold ascending (lowest/most aggressive first) so the first match wins.
+ */
+function checkPhaseTransition(mob: ExpeditionMobState): void {
+  if (!mob.phaseTemplates || mob.phaseTemplates.length === 0) return;
+  for (const phase of mob.phaseTemplates) {
+    if (mob.hp <= mob.maxHp * phase.hpThreshold && mob.actionTemplate !== phase.template) {
+      mob.actionTemplate = phase.template;
+      break;
+    }
+  }
+}
+
 // --- Resolver ---
 
 export function resolveRaidRound(
@@ -158,6 +175,11 @@ export function resolveRaidRound(
     if (totalDamageDealt > 0) {
       addDamageThreat(input.threatTable, s.playerId, totalDamageDealt);
     }
+  }
+
+  // --- Step 4b: Phase transitions ---
+  for (const mob of mobState) {
+    if (mob.hp > 0) checkPhaseTransition(mob);
   }
 
   // --- Step 5: Player supportive phase ---
@@ -320,6 +342,7 @@ export function resolveRaidRound(
       stats: m.stats,
       actionTemplate: m.actionTemplate,
       activeEffects: m.activeEffects,
+      ...(m.phaseTemplates ? { phaseTemplates: m.phaseTemplates } : {}),
     }));
 
   const roomCleared = mobsAfter.length === 0;

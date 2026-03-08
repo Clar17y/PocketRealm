@@ -13,6 +13,8 @@ import {
   MINI_BOSS_TEMPLATE,
   MINI_BOSS_ADD_TEMPLATE,
   FINAL_BOSS_PHASE1_TEMPLATE,
+  FINAL_BOSS_PHASE2_TEMPLATE,
+  FINAL_BOSS_PHASE3_TEMPLATE,
 } from '@pocketrealm/shared';
 
 export interface MobPoolEntry {
@@ -125,7 +127,13 @@ function generateMobsForRoom(
     }
     case 'final_boss': {
       const boss = pickRandom(mobPool, rng);
-      mobs.push(buildMob(boss, roomIndex, 0, tier, FINAL_BOSS_PHASE1_TEMPLATE));
+      const bossMob = buildMob(boss, roomIndex, 0, tier, FINAL_BOSS_PHASE1_TEMPLATE);
+      // Sorted by threshold ascending: lowest (most aggressive) first
+      bossMob.phaseTemplates = [
+        { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[1], template: [...FINAL_BOSS_PHASE3_TEMPLATE] },
+        { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[0], template: [...FINAL_BOSS_PHASE2_TEMPLATE] },
+      ];
+      mobs.push(bossMob);
       break;
     }
   }
@@ -147,10 +155,18 @@ export function generateExpeditionRooms(
     throw new Error(`No room composition defined for tier ${tier}`);
   }
 
+  // Expand { type, count } entries into a flat room type list
+  const expanded: ExpeditionRoomType[] = [];
+  for (const entry of composition) {
+    for (let c = 0; c < entry.count; c++) {
+      expanded.push(entry.type);
+    }
+  }
+
   // Separate final_boss from the rest so it always goes last
   const nonBoss: ExpeditionRoomType[] = [];
   let hasFinalBoss = false;
-  for (const roomType of composition) {
+  for (const roomType of expanded) {
     if (roomType === 'final_boss') {
       hasFinalBoss = true;
     } else {

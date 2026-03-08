@@ -58,19 +58,17 @@ function countRoomTypes(rooms: { roomType: ExpeditionRoomType }[]): Record<strin
 }
 
 describe('generateExpeditionRooms', () => {
-  // Composition from constants:
-  // Tier 0: ['trash', 'elite', 'mini_boss', 'event', 'final_boss'] = 5 rooms
-  // Tier 1: ['trash', 'elite', 'trash', 'mini_boss', 'event', 'final_boss'] = 6 rooms
-  // Tier 2: ['trash', 'elite', 'trash', 'elite', 'mini_boss', 'event', 'trash', 'final_boss'] = 8 rooms
+  // Composition from constants (design doc):
+  // Tier 0: 3 trash + 1 elite + 1 final_boss = 5 rooms
+  // Tier 1: 3 trash + 1 elite + 1 mini_boss + 1 final_boss = 6 rooms
+  // Tier 2: 3 trash + 2 elite + 1 mini_boss + 1 event + 1 final_boss = 8 rooms
 
   it('tier 0 generates 5 rooms with correct composition', () => {
     const rooms = generateExpeditionRooms(0, TEST_MOB_POOL, seededRng(1));
     expect(rooms).toHaveLength(5);
     const counts = countRoomTypes(rooms);
-    expect(counts['trash']).toBe(1);
+    expect(counts['trash']).toBe(3);
     expect(counts['elite']).toBe(1);
-    expect(counts['mini_boss']).toBe(1);
-    expect(counts['event']).toBe(1);
     expect(counts['final_boss']).toBe(1);
   });
 
@@ -78,10 +76,9 @@ describe('generateExpeditionRooms', () => {
     const rooms = generateExpeditionRooms(1, TEST_MOB_POOL, seededRng(42));
     expect(rooms).toHaveLength(6);
     const counts = countRoomTypes(rooms);
-    expect(counts['trash']).toBe(2);
+    expect(counts['trash']).toBe(3);
     expect(counts['elite']).toBe(1);
     expect(counts['mini_boss']).toBe(1);
-    expect(counts['event']).toBe(1);
     expect(counts['final_boss']).toBe(1);
   });
 
@@ -157,23 +154,23 @@ describe('generateExpeditionRooms', () => {
   });
 
   it('event rooms have environmentalDotPercent set', () => {
-    for (let tier = 0; tier <= 2; tier++) {
-      const rooms = generateExpeditionRooms(tier, TEST_MOB_POOL, seededRng(tier + 200));
-      const eventRooms = rooms.filter((r) => r.roomType === 'event');
-      expect(eventRooms.length).toBeGreaterThan(0);
-      for (const room of eventRooms) {
-        expect(room.environmentalDotPercent).toBe(EXPEDITION_CONSTANTS.EVENT_DOT_PERCENT);
-      }
-      // Non-event rooms should not have it
-      const nonEventRooms = rooms.filter((r) => r.roomType !== 'event');
-      for (const room of nonEventRooms) {
-        expect(room.environmentalDotPercent).toBeUndefined();
-      }
+    // Only tier 2 has event rooms in the new composition
+    const rooms = generateExpeditionRooms(2, TEST_MOB_POOL, seededRng(200));
+    const eventRooms = rooms.filter((r) => r.roomType === 'event');
+    expect(eventRooms.length).toBeGreaterThan(0);
+    for (const room of eventRooms) {
+      expect(room.environmentalDotPercent).toBe(EXPEDITION_CONSTANTS.EVENT_DOT_PERCENT);
+    }
+    // Non-event rooms should not have it
+    const nonEventRooms = rooms.filter((r) => r.roomType !== 'event');
+    for (const room of nonEventRooms) {
+      expect(room.environmentalDotPercent).toBeUndefined();
     }
   });
 
   it('mini-boss rooms have 1 main mob with MINI_BOSS_TEMPLATE', () => {
-    for (let tier = 0; tier <= 2; tier++) {
+    // Only tiers 1 and 2 have mini_boss rooms in the new composition
+    for (let tier = 1; tier <= 2; tier++) {
       const rooms = generateExpeditionRooms(tier, TEST_MOB_POOL, seededRng(tier + 300));
       const miniBossRooms = rooms.filter((r) => r.roomType === 'mini_boss');
       expect(miniBossRooms.length).toBe(1);
@@ -190,7 +187,8 @@ describe('generateExpeditionRooms', () => {
   });
 
   it('assigns correct action templates per room type', () => {
-    const rooms = generateExpeditionRooms(1, TEST_MOB_POOL, seededRng(500));
+    // Use tier 2 to cover all room types including event
+    const rooms = generateExpeditionRooms(2, TEST_MOB_POOL, seededRng(500));
     for (const room of rooms) {
       for (const mob of room.mobs) {
         switch (room.roomType) {
