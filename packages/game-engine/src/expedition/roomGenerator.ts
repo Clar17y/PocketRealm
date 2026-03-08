@@ -55,17 +55,6 @@ function pickRandomMobs(pool: readonly MobPoolEntry[], count: number, rng: () =>
   return result;
 }
 
-function getActionTemplate(roomType: ExpeditionRoomType, isBossAdd: boolean): readonly BossTemplateAction[] {
-  if (isBossAdd) return MINI_BOSS_ADD_TEMPLATE;
-  switch (roomType) {
-    case 'trash': return TRASH_MOB_TEMPLATE;
-    case 'elite': return ELITE_MOB_TEMPLATE;
-    case 'mini_boss': return MINI_BOSS_TEMPLATE;
-    case 'event': return TRASH_MOB_TEMPLATE;
-    case 'final_boss': return FINAL_BOSS_PHASE1_TEMPLATE;
-  }
-}
-
 function buildMob(
   entry: MobPoolEntry,
   roomIndex: number,

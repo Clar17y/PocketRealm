@@ -1,7 +1,9 @@
 import { prisma } from '@pocketrealm/database';
 import {
   EXPEDITION_CONSTANTS,
+  ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
+  type ActionDefinition,
   type ExpeditionData,
   type ExpeditionMemberData,
   type ExpeditionStatus,
@@ -31,6 +33,7 @@ import { getEquipmentStats } from './equipmentService';
 import { getSkillLevel, getMainHandAttackSkill } from './combatStatsService';
 import { getPlayerProgressionState } from './attributesService';
 import { getActiveTemplate } from './combatTemplateService';
+import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
 
 // ---------------------------------------------------------------------------
 // Data Transformation
@@ -135,40 +138,28 @@ export async function launchExpedition(
   const guild = membership.guild;
   const guildId = guild.id;
 
-  // Check no active expedition
-  const activeExpedition = await prisma.guildExpedition.findFirst({
-    where: {
-      guildId,
-      status: { in: ['recruiting', 'in_progress'] },
-    },
-  });
+  // Check cooldowns in parallel (all independent queries)
+  const weeklyAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.WEEKLY_COOLDOWN_MS);
+  const dayAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
+
+  const [activeExpedition, recentTierExpedition, recentAnyExpedition] = await Promise.all([
+    prisma.guildExpedition.findFirst({
+      where: { guildId, status: { in: ['recruiting', 'in_progress'] } },
+    }),
+    prisma.guildExpedition.findFirst({
+      where: { guildId, tier, status: { in: ['completed', 'failed'] }, completedAt: { gt: weeklyAgo } },
+    }),
+    prisma.guildExpedition.findFirst({
+      where: { guildId, status: { in: ['completed', 'failed'] }, completedAt: { gt: dayAgo } },
+    }),
+  ]);
+
   if (activeExpedition) {
     throw new AppError(400, 'Guild already has an active expedition', 'ACTIVE_EXPEDITION_EXISTS');
   }
-
-  // Check weekly cooldown per tier
-  const weeklyAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.WEEKLY_COOLDOWN_MS);
-  const recentTierExpedition = await prisma.guildExpedition.findFirst({
-    where: {
-      guildId,
-      tier,
-      status: { in: ['completed', 'failed'] },
-      completedAt: { gt: weeklyAgo },
-    },
-  });
   if (recentTierExpedition) {
     throw new AppError(400, 'Weekly cooldown for this tier has not expired', 'WEEKLY_COOLDOWN');
   }
-
-  // Check 24h between-expedition cooldown
-  const dayAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
-  const recentAnyExpedition = await prisma.guildExpedition.findFirst({
-    where: {
-      guildId,
-      status: { in: ['completed', 'failed'] },
-      completedAt: { gt: dayAgo },
-    },
-  });
   if (recentAnyExpedition) {
     throw new AppError(400, '24-hour cooldown between expeditions has not expired', 'BETWEEN_COOLDOWN');
   }
@@ -271,30 +262,25 @@ export async function signUpForExpedition(
   expeditionId: string,
   playerId: string,
 ): Promise<ExpeditionMemberData> {
-  // Fetch expedition
-  const expedition = await prisma.guildExpedition.findUnique({
-    where: { id: expeditionId },
-  });
+  // Fetch all validation data in parallel (all independent queries)
+  const [expedition, membership, player, existing] = await Promise.all([
+    prisma.guildExpedition.findUnique({ where: { id: expeditionId } }),
+    prisma.guildMember.findUnique({ where: { playerId } }),
+    prisma.player.findUnique({ where: { id: playerId }, select: { characterLevel: true, username: true } }),
+    prisma.guildExpeditionMember.findUnique({
+      where: { expeditionId_playerId: { expeditionId, playerId } },
+    }),
+  ]);
+
   if (!expedition) {
     throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
   }
   if (expedition.status !== 'recruiting') {
     throw new AppError(400, 'Expedition is not recruiting', 'NOT_RECRUITING');
   }
-
-  // Validate player is in same guild
-  const membership = await prisma.guildMember.findUnique({
-    where: { playerId },
-  });
   if (!membership || membership.guildId !== expedition.guildId) {
     throw new AppError(400, 'You are not in this guild', 'WRONG_GUILD');
   }
-
-  // Validate player level meets tier requirement
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { characterLevel: true, username: true },
-  });
   if (!player) {
     throw new AppError(404, 'Player not found', 'NOT_FOUND');
   }
@@ -302,13 +288,6 @@ export async function signUpForExpedition(
   if (player.characterLevel < requiredLevel) {
     throw new AppError(400, `Character level ${requiredLevel} required for tier ${expedition.tier}`, 'LEVEL_TOO_LOW');
   }
-
-  // Check not already signed up
-  const existing = await prisma.guildExpeditionMember.findUnique({
-    where: {
-      expeditionId_playerId: { expeditionId, playerId },
-    },
-  });
   if (existing) {
     throw new AppError(400, 'Already signed up for this expedition', 'ALREADY_SIGNED_UP');
   }
@@ -418,63 +397,57 @@ export async function getExpeditionStatus(
 async function buildRaidParticipant(
   member: { playerId: string; currentHp: number; currentStamina: number; currentMana: number; templateRound: number; activeEffects: unknown },
 ): Promise<RaidParticipant> {
-  const [equipStats, template, progression] = await Promise.all([
+  // Fetch equipment + progression first to compute maxHp (needed by preparePlayerForCombat)
+  const [equipStats, progression] = await Promise.all([
     getEquipmentStats(member.playerId),
-    getActiveTemplate(member.playerId),
     getPlayerProgressionState(member.playerId),
   ]);
-
-  const mainHandSkill = await getMainHandAttackSkill(member.playerId);
-  const attackSkill = mainHandSkill ?? 'melee';
-  const [attackSkillLevel, meleeLevel, rangedLevel, magicLevel] = await Promise.all([
-    getSkillLevel(member.playerId, attackSkill),
-    getSkillLevel(member.playerId, 'melee'),
-    getSkillLevel(member.playerId, 'ranged'),
-    getSkillLevel(member.playerId, 'magic'),
-  ]);
-
-  const evasionLevel = progression.attributes.evasion;
   const maxHp = calculateMaxHp({
     vitalityLevel: progression.attributes.vitality,
     equipmentHealthBonus: equipStats.health,
   });
-  const maxStamina = calculateMaxStamina({
-    meleeLevel,
-    rangedLevel,
-    evasionLevel,
-    equipmentStaminaBonus: 0,
-  });
-  const maxMana = calculateMaxMana({
-    magicLevel,
-    equipmentManaBonus: 0,
+
+  const prep = await preparePlayerForCombat(member.playerId, {
+    maxHp,
+    preloaded: { equipmentStats: equipStats, progression },
   });
 
   const stats = buildPlayerCombatStats(
     maxHp, maxHp,
-    { attackStyle: attackSkill, skillLevel: attackSkillLevel, attributes: progression.attributes },
-    equipStats,
+    { attackStyle: prep.attackSkill, skillLevel: prep.attackLevel, attributes: prep.progression.attributes },
+    prep.equipmentStats,
   );
+  applyGuildCombatModifiers(stats, prep.guildMods);
+
+  // Filter actions to only those the player has unlocked
+  const unlockedSet = new Set(prep.unlockedActions);
+  const filteredActions: Record<string, ActionDefinition> = {};
+  for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
+    if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
+      filteredActions[id] = def;
+    }
+  }
 
   const effects = Array.isArray(member.activeEffects) ? member.activeEffects : [];
 
   return {
     playerId: member.playerId,
     stats,
-    template: template.map(s => ({
+    template: prep.playerTemplate.map(s => ({
       actionId: s.actionId,
       condition: s.condition,
       thenActionId: s.thenActionId ?? undefined,
       sortOrder: s.sortOrder,
     })),
-    actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
+    actionDefinitions: filteredActions,
     hp: member.currentHp,
     maxHp,
     stamina: member.currentStamina,
-    maxStamina,
-    staminaRegenPerRound: calculateStaminaRegenPerRound(meleeLevel, rangedLevel, evasionLevel),
+    maxStamina: prep.resources.maxStamina,
+    staminaRegenPerRound: prep.resources.staminaRegenPerRound,
     mana: member.currentMana,
-    maxMana,
-    manaRegenPerRound: calculateManaRegenPerRound(magicLevel),
+    maxMana: prep.resources.maxMana,
+    manaRegenPerRound: prep.resources.manaRegenPerRound,
     templateRound: member.templateRound,
     activeEffects: effects as RaidParticipant['activeEffects'],
   };
@@ -745,29 +718,19 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
     data: { xp: { increment: EXPEDITION_CONSTANTS.GUILD_XP_PER_ROOM } },
   });
 
-  // Reset room-level tracking
-  await prisma.guildExpeditionMember.updateMany({
-    where: { expeditionId },
-    data: { roomDamage: 0, roomHealing: 0 },
-  });
-
   // Check if last room
   if (expedition.currentRoom >= expedition.totalRooms - 1) {
     await completeExpedition(expeditionId);
     return;
   }
 
-  // Enter rest phase: advance room, reset for next room
+  // Enter rest phase: advance room, reset room-level tracking + KO flags + threat
   const nextRoom = expedition.currentRoom + 1;
   const nextRoomDef = rooms[nextRoom];
 
-  // Reset KO flags and threat values
   await prisma.guildExpeditionMember.updateMany({
     where: { expeditionId },
-    data: {
-      isKnockedOut: false,
-      threatValue: 0,
-    },
+    data: { roomDamage: 0, roomHealing: 0, isKnockedOut: false, threatValue: 0 },
   });
 
   // Apply rest regen to all members

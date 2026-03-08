@@ -15,26 +15,23 @@ import type {
   ExpeditionDetailResponse,
 } from '@/lib/api/expedition';
 import type { ExpeditionData, ExpeditionMemberData, ExpeditionRoomType } from '@pocketrealm/shared';
+import { EXPEDITION_CONSTANTS } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
 
 // ---------------------------------------------------------------------------
-// Tier definitions (from design doc; not yet in shared constants)
+// Tier definitions — derived from shared constants
 // ---------------------------------------------------------------------------
 
-interface TierConfig {
-  tier: number;
-  name: string;
-  levelReq: number;
-  treasuryCost: number;
-  minParticipants: number;
-  totalRooms: number;
-}
+const TIER_NAMES = ['Forest Depths', 'Cavern Descent', 'Ruined Citadel'];
 
-const TIER_CONFIGS: TierConfig[] = [
-  { tier: 1, name: 'Forest Depths',    levelReq: 10, treasuryCost: 200_000,   minParticipants: 5,  totalRooms: 5 },
-  { tier: 2, name: 'Cavern Descent',   levelReq: 16, treasuryCost: 500_000,   minParticipants: 8,  totalRooms: 6 },
-  { tier: 3, name: 'Ruined Citadel',   levelReq: 23, treasuryCost: 1_000_000, minParticipants: 12, totalRooms: 8 },
-];
+const TIER_CONFIGS = EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER.map((levelReq, i) => ({
+  tier: i + 1,
+  name: TIER_NAMES[i],
+  levelReq,
+  treasuryCost: EXPEDITION_CONSTANTS.TREASURY_COST_BY_TIER[i],
+  minParticipants: EXPEDITION_CONSTANTS.MIN_PARTICIPANTS_BY_TIER[i],
+  totalRooms: EXPEDITION_CONSTANTS.ROOMS_BY_TIER[i],
+}));
 
 // ---------------------------------------------------------------------------
 // Props
@@ -318,7 +315,6 @@ function RecruitingView({
   onSignup: () => void;
 }) {
   const tierCfg = TIER_CONFIGS.find((c) => c.tier === expedition.tier);
-  const alreadySignedUp = members.length > 0; // API would filter; for now show signup
   const meetsLevel = tierCfg ? characterLevel >= tierCfg.levelReq : true;
 
   return (
@@ -443,10 +439,6 @@ function InProgressView({
 // ---------------------------------------------------------------------------
 
 function CompletedView({ expedition }: { expedition: ExpeditionData }) {
-  const duration = expedition.completedAt && expedition.startedAt
-    ? formatTimeRemaining(expedition.completedAt) // already handles formatting
-    : null;
-
   return (
     <PixelCard>
       <div className="text-center space-y-2 py-2">

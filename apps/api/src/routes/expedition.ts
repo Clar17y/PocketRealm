@@ -115,9 +115,19 @@ const expeditionIdSchema = z.object({ id: z.string().uuid() });
 
 // GET /:id
 expeditionRouter.get('/:id', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
   const { id } = expeditionIdSchema.parse(req.params);
   const data = await getExpeditionStatus(id);
   if (!data) {
+    throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
+  }
+
+  // Verify the requesting player belongs to the same guild
+  const membership = await prisma.guildMember.findUnique({
+    where: { playerId },
+    select: { guildId: true },
+  });
+  if (!membership || membership.guildId !== data.expedition.guildId) {
     throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
   }
 

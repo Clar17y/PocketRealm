@@ -5,6 +5,37 @@ vi.mock('./turnBankService', () => ({
 }));
 vi.mock('./guildService', () => ({
   addGuildLog: vi.fn().mockResolvedValue(undefined),
+  getPlayerGuildId: vi.fn().mockResolvedValue(null),
+  isActiveWithinWindow: vi.fn().mockReturnValue(true),
+}));
+vi.mock('./guildUpgradeService', () => ({
+  getPlayerGuildModifiers: vi.fn().mockResolvedValue({
+    combatDamage: 0,
+    defenseBoost: 0,
+    xpBoost: 0,
+    gatheringYield: 0,
+    craftingCrit: 0,
+    treasuryTax: 0,
+  }),
+}));
+vi.mock('./resourceService', () => ({
+  getResourceState: vi.fn().mockResolvedValue({
+    stamina: { current: 80, max: 100, regenPerSecond: 0.1, regenPerRound: 5 },
+    mana: { current: 50, max: 60, regenPerSecond: 0.1, regenPerRound: 3 },
+  }),
+}));
+vi.mock('./skillPointService', () => ({
+  getSkillPoints: vi.fn().mockResolvedValue({
+    totalPoints: 0,
+    allocatedPoints: 0,
+    availablePoints: 0,
+    allocations: [],
+    unlockedActions: [],
+  }),
+}));
+vi.mock('./potionService', () => ({
+  templateHasPotionActions: vi.fn().mockReturnValue(false),
+  buildPotionPool: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('./hpService', () => ({
   getHpState: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
@@ -24,6 +55,7 @@ vi.mock('./attributesService', () => ({
 vi.mock('./combatStatsService', () => ({
   getSkillLevel: vi.fn().mockResolvedValue(10),
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
+  buildPerActionScaling: vi.fn().mockResolvedValue({}),
 }));
 vi.mock('./combatTemplateService', () => ({
   getActiveTemplate: vi.fn().mockResolvedValue([{ id: 'slot-0', sortOrder: 0, actionId: 'normal_attack' }]),

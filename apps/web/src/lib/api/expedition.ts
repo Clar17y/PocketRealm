@@ -3,7 +3,6 @@ import type {
   ExpeditionData,
   ExpeditionMemberData,
   ExpeditionShopItem,
-  ExpeditionRoundSummary,
 } from '@pocketrealm/shared';
 
 // ---------------------------------------------------------------------------
