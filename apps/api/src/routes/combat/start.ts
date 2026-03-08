@@ -721,10 +721,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       turnsToExplore: explorationProgress.turnsToExplore,
     },
     activeEvents: (() => {
-      const siteBuffBadges: EventModifierBadge[] = [];
-      if (combatBuffs.damageBoost > 0) siteBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: combatBuffs.damageBoost, isGlobal: false });
-      if (combatBuffs.defenceBoost > 0) siteBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: combatBuffs.defenceBoost, isGlobal: false });
-      if (combatBuffs.durabilityShield > 0) siteBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: combatBuffs.durabilityShield, isGlobal: false });
+      const siteBuffBadges = [];
+      if (combatBuffs.damageBoost > 0) siteBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: combatBuffs.damageBoost, isGlobal: false, appliedToThisMob: true });
+      if (combatBuffs.defenceBoost > 0) siteBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: combatBuffs.defenceBoost, isGlobal: false, appliedToThisMob: true });
+      if (combatBuffs.durabilityShield > 0) siteBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: combatBuffs.durabilityShield, isGlobal: false, appliedToThisMob: true });
       const all = [
         ...tagEventsWithApplicability(activeEventEffects, siteMobBadges),
         ...siteBuffBadges,
@@ -1095,10 +1095,10 @@ export function registerStartRoutes(router: Router): void {
           turnsToExplore: explorationProgress.turnsToExplore,
         },
         activeEvents: (() => {
-          const combatBuffBadges: EventModifierBadge[] = [];
-          if (zoneCombatBuffs.damageBoost > 0) combatBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: zoneCombatBuffs.damageBoost, isGlobal: false });
-          if (zoneCombatBuffs.defenceBoost > 0) combatBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: zoneCombatBuffs.defenceBoost, isGlobal: false });
-          if (zoneCombatBuffs.durabilityShield > 0) combatBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: zoneCombatBuffs.durabilityShield, isGlobal: false });
+          const combatBuffBadges = [];
+          if (zoneCombatBuffs.damageBoost > 0) combatBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: zoneCombatBuffs.damageBoost, isGlobal: false, appliedToThisMob: true });
+          if (zoneCombatBuffs.defenceBoost > 0) combatBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: zoneCombatBuffs.defenceBoost, isGlobal: false, appliedToThisMob: true });
+          if (zoneCombatBuffs.durabilityShield > 0) combatBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: zoneCombatBuffs.durabilityShield, isGlobal: false, appliedToThisMob: true });
           const all = [
             ...tagEventsWithApplicability(activeEventEffects, zoneMobBadges),
             ...combatBuffBadges,
