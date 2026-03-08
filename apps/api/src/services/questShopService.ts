@@ -308,32 +308,41 @@ async function applyBestiaryTome(tx: any, playerId: string, targetMobTemplateId?
   const mob = await tx.mobTemplate.findUnique({ where: { id: targetMobTemplateId } });
   if (!mob) throw new AppError(404, 'Mob template not found', 'MOB_NOT_FOUND');
 
-  // Upsert base bestiary entry
-  await tx.playerBestiary.upsert({
+  // Ensure base bestiary entry exists (discover the mob without inflating kills)
+  const BESTIARY_DISCOVER_THRESHOLD = 1;
+  const existing = await tx.playerBestiary.findUnique({
     where: { playerId_mobTemplateId: { playerId, mobTemplateId: targetMobTemplateId } },
-    update: { kills: 999 },
-    create: { playerId, mobTemplateId: targetMobTemplateId, kills: 999 },
   });
+  if (!existing) {
+    await tx.playerBestiary.create({
+      data: { playerId, mobTemplateId: targetMobTemplateId, kills: BESTIARY_DISCOVER_THRESHOLD },
+    });
+  } else if (existing.kills < BESTIARY_DISCOVER_THRESHOLD) {
+    await tx.playerBestiary.update({
+      where: { playerId_mobTemplateId: { playerId, mobTemplateId: targetMobTemplateId } },
+      data: { kills: BESTIARY_DISCOVER_THRESHOLD },
+    });
+  }
 
-  // Upsert all prefix variants
+  // Ensure all prefix entries exist at full reveal threshold (10 kills reveals spell info)
+  // Only raise kills to threshold, never lower actual kills
+  const PREFIX_REVEAL_THRESHOLD = 10;
   const allPrefixes = getAllMobPrefixes();
   for (const prefix of allPrefixes) {
-    await tx.playerBestiaryPrefix.upsert({
-      where: {
-        playerId_mobTemplateId_prefix: {
-          playerId,
-          mobTemplateId: targetMobTemplateId,
-          prefix: prefix.key,
-        },
-      },
-      update: { kills: 999 },
-      create: {
-        playerId,
-        mobTemplateId: targetMobTemplateId,
-        prefix: prefix.key,
-        kills: 999,
-      },
+    const key = { playerId, mobTemplateId: targetMobTemplateId, prefix: prefix.key };
+    const existingPrefix = await tx.playerBestiaryPrefix.findUnique({
+      where: { playerId_mobTemplateId_prefix: key },
     });
+    if (!existingPrefix) {
+      await tx.playerBestiaryPrefix.create({
+        data: { ...key, kills: PREFIX_REVEAL_THRESHOLD },
+      });
+    } else if (existingPrefix.kills < PREFIX_REVEAL_THRESHOLD) {
+      await tx.playerBestiaryPrefix.update({
+        where: { playerId_mobTemplateId_prefix: key },
+        data: { kills: PREFIX_REVEAL_THRESHOLD },
+      });
+    }
   }
 
   return { type: 'bestiary_tome', mobName: mob.name, prefixCount: allPrefixes.length };
