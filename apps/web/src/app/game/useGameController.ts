@@ -394,6 +394,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setGold(playerRes.data.player.gold ?? 0);
       initSettingsFromServer(playerRes.data.player);
       setTutorialStep(playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED);
+      // Don't show changelog to brand new players (step 0)
+      const serverTutorialStep = playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED;
+      const latestVer = getLatestVersion();
+      if (latestVer && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVer) {
+        if (serverTutorialStep === 0) {
+          localStorage.setItem(CHANGELOG_STORAGE_KEY, latestVer);
+        } else {
+          setShowChangelog(true);
+        }
+      }
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
     if (hpRes.data) {
@@ -528,11 +538,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       void loadAll();
       void loadPvpNotificationCount();
       void loadFriendCounts();
-      // Auto-show changelog if unseen
-      const latestVer = getLatestVersion();
-      if (latestVer && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVer) {
-        setShowChangelog(true);
-      }
       const interval = setInterval(() => void loadTurnsAndHp(), 10000);
       // Poll PvP notifications less frequently (60s)
       const pvpInterval = setInterval(() => void loadPvpNotificationCount(), 60000);
