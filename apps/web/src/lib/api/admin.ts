@@ -192,6 +192,13 @@ export async function adminGrantTokens(amount: number) {
   });
 }
 
+export async function adminGrantGuildTreasury(amount: number) {
+  return fetchApi<{ success: boolean; treasuryTurns: number }>('/api/v1/admin/guild/treasury', {
+    method: 'POST',
+    body: JSON.stringify({ amount }),
+  });
+}
+
 export async function adminFillExpedition() {
   return fetchApi<{ message: string; botsCreated: number; totalParticipants: number; minRequired: number }>(
     '/api/v1/admin/expedition/fill',

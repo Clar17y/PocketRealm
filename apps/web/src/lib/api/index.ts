@@ -162,6 +162,7 @@ export {
   adminGetResourceNodes,
   adminSpawnResourceNode,
   adminGrantTokens,
+  adminGrantGuildTreasury,
   adminFillExpedition,
 } from './admin';
 export type {

@@ -25,6 +25,7 @@ import {
   adminGetResourceNodes,
   adminSpawnResourceNode,
   adminGrantTokens,
+  adminGrantGuildTreasury,
   adminFillExpedition,
   type AdminItemTemplate,
   type AdminZone,
@@ -37,7 +38,7 @@ import {
 import { Shield } from 'lucide-react';
 import { ScreenContainer } from '../common/ScreenContainer';
 
-type AdminTab = 'player' | 'items' | 'world' | 'zones' | 'resources';
+type AdminTab = 'player' | 'items' | 'world' | 'zones' | 'resources' | 'guild';
 
 function StatusMsg({ msg }: { msg: { text: string; ok: boolean } | null }) {
   if (!msg) return null;
@@ -424,22 +425,6 @@ function WorldTab({ onAction }: { onAction?: () => void }) {
         </div>
       </PixelCard>
 
-      <PixelCard>
-        <div style={{ fontWeight: 'bold', marginBottom: 8, color: 'var(--rpg-gold)' }}>
-          Expedition Testing
-        </div>
-        <p style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: 8 }}>
-          Fill active recruiting expedition with bot players
-        </p>
-        <PixelButton
-          size="sm"
-          disabled={busy}
-          onClick={() => act('Fill expedition', () => adminFillExpedition())}
-        >
-          Fill Expedition with Bots
-        </PixelButton>
-      </PixelCard>
-
       <StatusMsg msg={msg} />
     </div>
   );
@@ -611,6 +596,40 @@ function ResourcesTab({ onAction }: { onAction?: () => void }) {
   );
 }
 
+// ── Guild Tab ────────────────────────────────────────────────────────────────
+
+function GuildTab({ onAction }: { onAction?: () => void }) {
+  const [treasuryAmount, setTreasuryAmount] = useState(500000);
+  const { busy, msg, act } = useAdminAction(onAction);
+
+  return (
+    <div className="space-y-4">
+      <PixelCard>
+        <h3 className="text-sm font-semibold text-[var(--rpg-gold)] mb-3">Guild Treasury</h3>
+        <div className="flex items-center gap-2">
+          <input type="number" value={treasuryAmount} onChange={(e) => setTreasuryAmount(Number(e.target.value))} min={1}
+            className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-32 text-[var(--rpg-text-primary)]" />
+          <PixelButton size="sm" disabled={busy} onClick={() => act('Grant treasury', () => adminGrantGuildTreasury(treasuryAmount))}>
+            Grant Treasury
+          </PixelButton>
+        </div>
+      </PixelCard>
+
+      <PixelCard>
+        <h3 className="text-sm font-semibold text-[var(--rpg-gold)] mb-3">Expedition Testing</h3>
+        <p className="text-xs text-[var(--rpg-text-secondary)] mb-2">
+          Fill active recruiting expedition with bot players
+        </p>
+        <PixelButton size="sm" disabled={busy} onClick={() => act('Fill expedition', () => adminFillExpedition())}>
+          Fill Expedition with Bots
+        </PixelButton>
+      </PixelCard>
+
+      <StatusMsg msg={msg} />
+    </div>
+  );
+}
+
 // ── Main Admin Screen ───────────────────────────────────────────────────────
 
 const TABS: { id: AdminTab; label: string }[] = [
@@ -619,6 +638,7 @@ const TABS: { id: AdminTab; label: string }[] = [
   { id: 'world', label: 'World' },
   { id: 'zones', label: 'Zones' },
   { id: 'resources', label: 'Resources' },
+  { id: 'guild', label: 'Guild' },
 ];
 
 export default function AdminScreen({ onAction }: { onAction?: () => void }) {
@@ -649,6 +669,7 @@ export default function AdminScreen({ onAction }: { onAction?: () => void }) {
       {tab === 'world' && <WorldTab onAction={onAction} />}
       {tab === 'zones' && <ZonesTab onAction={onAction} />}
       {tab === 'resources' && <ResourcesTab onAction={onAction} />}
+      {tab === 'guild' && <GuildTab onAction={onAction} />}
     </ScreenContainer>
   );
 }

@@ -531,6 +531,30 @@ router.post('/tokens/grant', asyncHandler(async (req, res) => {
 }));
 
 // ---------------------------------------------------------------------------
+// Guild
+// ---------------------------------------------------------------------------
+
+const grantTreasurySchema = z.object({ amount: z.number().int().min(1).max(10_000_000) });
+
+router.post('/guild/treasury', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { amount } = grantTreasurySchema.parse(req.body);
+
+  const membership = await prisma.guildMember.findUnique({ where: { playerId } });
+  if (!membership) {
+    throw new AppError(400, 'You must be in a guild', 'NOT_IN_GUILD');
+  }
+
+  const guild = await prisma.guild.update({
+    where: { id: membership.guildId },
+    data: { treasuryTurns: { increment: amount } },
+    select: { treasuryTurns: true },
+  });
+
+  res.json({ success: true, treasuryTurns: guild.treasuryTurns });
+}));
+
+// ---------------------------------------------------------------------------
 // Expeditions
 // ---------------------------------------------------------------------------
 
