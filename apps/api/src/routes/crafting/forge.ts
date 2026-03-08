@@ -93,6 +93,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
     const forgeLuckBonus = await getBuffValue(playerId, 'forge_luck');
     const hasForgeProtection = await hasActiveBuff(playerId, 'forge_protection');
 
+    // forge_luck uses multiplicative bonus (2.0 = double chance), unlike other buffs which are additive
     let adjustedChance = successChance;
     if (forgeLuckBonus > 0) {
       adjustedChance = Math.min(1, adjustedChance * forgeLuckBonus);
