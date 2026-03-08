@@ -31,6 +31,8 @@ import { casinoRouter } from './routes/casino';
 import { trainingRouter } from './routes/training';
 import { questsRouter } from './routes/quests';
 import { expeditionRouter } from './routes/expedition';
+import { shopRouter } from './routes/shop';
+import { friendsRouter } from './routes/friends';
 import { errorHandler } from './middleware/errorHandler';
 import { createSocketServer, getIo } from './socket';
 import { checkAndResolveDueBossRounds } from './services/bossEncounterService';
@@ -121,6 +123,8 @@ app.use('/api/v1/casino', casinoRouter);
 app.use('/api/v1/training', trainingRouter);
 app.use('/api/v1/quests', questsRouter);
 app.use('/api/v1/expedition', expeditionRouter);
+app.use('/api/v1/shop', shopRouter);
+app.use('/api/v1/friends', friendsRouter);
 
 // Error handler
 app.use(errorHandler);

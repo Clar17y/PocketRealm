@@ -1,18 +1,15 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import {
-  buildPlayerCombatStats, calculateMaxHp,
-  runTemplateCombat, calculateMaxStamina, calculateStaminaRegenPerRound,
-  calculateMaxMana, calculateManaRegenPerRound,
+  calculateMaxStamina, calculateMaxMana,
+  runTemplateCombat,
 } from '@pocketrealm/game-engine';
-import type { TemplateCombatant } from '@pocketrealm/game-engine';
 import {
   PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, BASE_ACTION_DEFINITIONS,
   TALENT_TREE_DEFINITIONS,
-  type SkillType, type ActionDefinition,
+  type ActionDefinition,
 } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { buildPagination, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
-import { getSkillLevel } from './combatStatsService.js';
 import { calculateEloChange } from './eloService';
 import { getEquipmentStats } from './equipmentService';
 import { spendPlayerTurnsTx } from './turnBankService';
@@ -20,11 +17,10 @@ import { degradeEquippedDurability } from './durabilityService';
 import { normalizePlayerAttributes } from './attributesService';
 import { getHpState, setHp, enterRecoveringState } from './hpService';
 import { getActiveTemplate } from './combatTemplateService';
-import { getResourceState, setAllResources } from './resourceService';
+import { setAllResources } from './resourceService';
 import { getSkillPoints } from './skillPointService';
 import { mapTemplateCombatLog } from './combatLogMapper';
-
-type AttackStyle = 'melee' | 'ranged' | 'magic';
+import { getAttackStyle, buildPvpCombatant } from './pvpCombatantBuilder';
 
 const REVENGE_WINDOW_DAYS = 7;
 
@@ -140,10 +136,19 @@ export async function scoutOpponent(attackerId: string, targetId: string) {
     await spendPlayerTurnsTx(tx, attackerId, PVP_CONSTANTS.SCOUT_TURN_COST);
   });
 
-  const targetEquipment = await prisma.playerEquipment.findMany({
-    where: { playerId: targetId, itemId: { not: null } },
-    include: { item: { include: { template: true } } },
-  });
+  const [targetEquipment, [targetPower, myPower], targetTemplate, targetSkills, skillPoints] = await Promise.all([
+    prisma.playerEquipment.findMany({
+      where: { playerId: targetId, itemId: { not: null } },
+      include: { item: { include: { template: true } } },
+    }),
+    Promise.all([calculatePowerRating(targetId), calculatePowerRating(attackerId)]),
+    getActiveTemplate(targetId),
+    prisma.playerSkill.findMany({
+      where: { playerId: targetId },
+      select: { skillType: true, level: true },
+    }),
+    getSkillPoints(targetId),
+  ]);
 
   // Determine attack style from main hand weapon
   const mainHand = targetEquipment.find((e) => e.slot === 'main_hand');
@@ -157,24 +162,11 @@ export async function scoutOpponent(attackerId: string, targetId: string) {
   const weightClass = chest?.item?.template?.weightClass as string | null;
   const armorClass = weightClass ?? 'none';
 
-  // Calculate power ratings for both players
-  const [targetPower, myPower] = await Promise.all([
-    calculatePowerRating(targetId),
-    calculatePowerRating(attackerId),
-  ]);
-
-  // Template info
-  const targetTemplate = await getActiveTemplate(targetId);
   const categoryBreakdown = computeTemplateCategoryBreakdown(
     targetTemplate,
     BASE_ACTION_DEFINITIONS,
   );
 
-  // Resource profile
-  const targetSkills = await prisma.playerSkill.findMany({
-    where: { playerId: targetId },
-    select: { skillType: true, level: true },
-  });
   const skillMap: Record<string, number> = {};
   for (const s of targetSkills) skillMap[s.skillType] = s.level;
 
@@ -188,9 +180,6 @@ export async function scoutOpponent(attackerId: string, targetId: string) {
     magicLevel: skillMap['magic'] ?? 1,
     equipmentManaBonus: 0,
   });
-
-  // Talent investment
-  const skillPoints = await getSkillPoints(targetId);
   const talentInvestment = computeTalentInvestment(skillPoints.allocations);
 
   // Create scout notification
@@ -217,17 +206,6 @@ export async function scoutOpponent(attackerId: string, targetId: string) {
 // ---------------------------------------------------------------------------
 // challenge
 // ---------------------------------------------------------------------------
-
-async function getAttackStyleFromEquipment(playerId: string): Promise<AttackStyle> {
-  const mainHand = await prisma.playerEquipment.findUnique({
-    where: { playerId_slot: { playerId, slot: 'main_hand' } },
-    include: { item: { include: { template: true } } },
-  });
-  const reqSkill = mainHand?.item?.template?.requiredSkill as string | null;
-  if (reqSkill === 'ranged') return 'ranged';
-  if (reqSkill === 'magic') return 'magic';
-  return 'melee';
-}
 
 async function calculatePowerRating(playerId: string): Promise<number> {
   const [equipStats, player, combatSkills] = await Promise.all([
@@ -346,6 +324,7 @@ export async function challenge(
       attributes: true,
       username: true,
       isBot: true,
+      role: true,
     },
   });
   if (!target) throw new AppError(404, 'Target not found', 'NOT_FOUND');
@@ -375,103 +354,17 @@ export async function challenge(
   const isRevenge = !!revengeMatch;
   const turnCost = isRevenge ? PVP_CONSTANTS.REVENGE_TURN_COST : PVP_CONSTANTS.CHALLENGE_TURN_COST;
 
-  // Build attacker combatant
-  const attackStyle = await getAttackStyleFromEquipment(attackerId);
+  // Build combatants: attacker uses current resources, defender uses max (ghost)
+  const [attackerCombatant, defenderCombatant, attackStyle, defenderStyle] = await Promise.all([
+    buildPvpCombatant(attackerId, attackerUsername, true),
+    buildPvpCombatant(targetId, target.username, false),
+    getAttackStyle(attackerId),
+    getAttackStyle(targetId),
+  ]);
+
+  // Capture attacker start resources for post-combat processing and response
+  const attackerMaxHp = attackerCombatant.stats.maxHp;
   const attackerAttributes = normalizePlayerAttributes(attacker.attributes);
-  const attackerEquipStats = await getEquipmentStats(attackerId);
-
-  const [attackerMeleeLevel, attackerRangedLevel, attackerEvasionLevel, attackerMagicLevel] = await Promise.all([
-    getSkillLevel(attackerId, 'melee'),
-    getSkillLevel(attackerId, 'ranged'),
-    getSkillLevel(attackerId, 'evasion' as SkillType),
-    getSkillLevel(attackerId, 'magic'),
-  ]);
-  const attackerSkillLevel = attackStyle === 'ranged' ? attackerRangedLevel
-    : attackStyle === 'magic' ? attackerMagicLevel
-    : attackerMeleeLevel;
-
-  const attackerMaxHp = calculateMaxHp({
-    vitalityLevel: attackerAttributes.vitality,
-    equipmentHealthBonus: attackerEquipStats.health,
-  });
-  const attackerStats = buildPlayerCombatStats(
-    hpState.currentHp,
-    attackerMaxHp,
-    { attackStyle, skillLevel: attackerSkillLevel, attributes: attackerAttributes },
-    attackerEquipStats,
-  );
-
-  // Attacker template + resources
-  const attackerTemplate = await getActiveTemplate(attackerId);
-  const attackerResources = await getResourceState(attackerId);
-
-  const attackerCombatant: TemplateCombatant = {
-    id: attackerId,
-    name: attackerUsername,
-    stats: attackerStats,
-    template: attackerTemplate,
-    stamina: attackerResources.stamina.current,
-    maxStamina: attackerResources.stamina.max,
-    staminaRegenPerRound: calculateStaminaRegenPerRound(attackerMeleeLevel, attackerRangedLevel, attackerEvasionLevel),
-    mana: attackerResources.mana.current,
-    maxMana: attackerResources.mana.max,
-    manaRegenPerRound: calculateManaRegenPerRound(attackerMagicLevel),
-    actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
-  };
-
-  // Build defender combatant (ghost — max everything)
-  const defenderAttributes = normalizePlayerAttributes(target.attributes);
-  const defenderEquipStats = await getEquipmentStats(targetId);
-  const defenderStyle = await getAttackStyleFromEquipment(targetId);
-
-  const [defenderMeleeLevel, defenderRangedLevel, defenderEvasionLevel, defenderMagicLevel] = await Promise.all([
-    getSkillLevel(targetId, 'melee'),
-    getSkillLevel(targetId, 'ranged'),
-    getSkillLevel(targetId, 'evasion' as SkillType),
-    getSkillLevel(targetId, 'magic'),
-  ]);
-  const defenderSkillLevel = defenderStyle === 'ranged' ? defenderRangedLevel
-    : defenderStyle === 'magic' ? defenderMagicLevel
-    : defenderMeleeLevel;
-
-  const defenderMaxHp = calculateMaxHp({
-    vitalityLevel: defenderAttributes.vitality,
-    equipmentHealthBonus: defenderEquipStats.health,
-  });
-  const defenderStats = buildPlayerCombatStats(
-    defenderMaxHp,
-    defenderMaxHp,
-    { attackStyle: defenderStyle, skillLevel: defenderSkillLevel, attributes: defenderAttributes },
-    defenderEquipStats,
-  );
-
-  // Defender template + max resources
-  const defenderTemplate = await getActiveTemplate(targetId);
-
-  const defenderMaxStamina = calculateMaxStamina({
-    meleeLevel: defenderMeleeLevel,
-    rangedLevel: defenderRangedLevel,
-    evasionLevel: defenderEvasionLevel,
-    equipmentStaminaBonus: 0,
-  });
-  const defenderMaxMana = calculateMaxMana({
-    magicLevel: defenderMagicLevel,
-    equipmentManaBonus: 0,
-  });
-
-  const defenderCombatant: TemplateCombatant = {
-    id: targetId,
-    name: target.username,
-    stats: defenderStats,
-    template: defenderTemplate,
-    stamina: defenderMaxStamina,
-    maxStamina: defenderMaxStamina,
-    staminaRegenPerRound: calculateStaminaRegenPerRound(defenderMeleeLevel, defenderRangedLevel, defenderEvasionLevel),
-    mana: defenderMaxMana,
-    maxMana: defenderMaxMana,
-    manaRegenPerRound: calculateManaRegenPerRound(defenderMagicLevel),
-    actionDefinitions: { ...BASE_ACTION_DEFINITIONS },
-  };
 
   const combatResult = runTemplateCombat(attackerCombatant, defenderCombatant);
 
@@ -486,15 +379,9 @@ export async function challenge(
   let defenderRatingChange = elo.deltaB;
 
   // Zero ELO changes when an admin is involved (friendly match)
-  if (attacker.role === 'admin') {
+  if (attacker.role === 'admin' || target.role === 'admin') {
     attackerRatingChange = 0;
     defenderRatingChange = 0;
-  } else {
-    const defenderPlayer = await prisma.player.findUnique({ where: { id: targetId }, select: { role: true } });
-    if (defenderPlayer?.role === 'admin') {
-      attackerRatingChange = 0;
-      defenderRatingChange = 0;
-    }
   }
   const now = new Date();
 
@@ -637,9 +524,9 @@ export async function challenge(
     attackerStyle: attackStyle,
     defenderStyle,
     combat: { ...combatResult, log: mapTemplateCombatLog(combatResult.log) },
-    attackerStartHp: hpState.currentHp,
-    attackerStartStamina: attackerResources.stamina.current,
-    attackerStartMana: attackerResources.mana.current,
+    attackerStartHp: attackerCombatant.stats.hp,
+    attackerStartStamina: attackerCombatant.stamina,
+    attackerStartMana: attackerCombatant.mana,
     attackerKnockedOut,
     fleeOutcome,
     durability: {

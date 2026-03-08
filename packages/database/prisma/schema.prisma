@@ -96,6 +96,16 @@ model Player {
   bossRotations        PlayerBossRotation[]
   quests               PlayerQuest[]
   questState           PlayerQuestState?
+  shopPurchases        PlayerShopPurchase[]
+  buffs                PlayerBuff[]
+
+  // Friends & Social
+  friendshipsSent     Friendship[]  @relation("FriendshipSender")
+  friendshipsReceived Friendship[]  @relation("FriendshipReceiver")
+  blocksInitiated     PlayerBlock[] @relation("PlayerBlockBlocker")
+  blocksReceived      PlayerBlock[] @relation("PlayerBlockBlocked")
+  friendMailsSent     FriendMail[]  @relation("FriendMailSender")
+  friendMailsReceived FriendMail[]  @relation("FriendMailRecipient")
 
   // Expeditions
   expeditionTokens      Int                    @default(0) @map("expedition_tokens")
@@ -969,6 +979,62 @@ model GuildExpeditionMember {
 }
 
 // =============================================================================
+// FRIENDS & SOCIAL
+// =============================================================================
+
+model Friendship {
+  id         String    @id @default(uuid())
+  senderId   String    @map("sender_id")
+  receiverId String    @map("receiver_id")
+  status     String    @default("pending") @db.VarChar(16)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  acceptedAt DateTime? @map("accepted_at")
+
+  sender   Player @relation("FriendshipSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver Player @relation("FriendshipReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status])
+  @@index([senderId, status])
+  @@map("friendships")
+}
+
+model PlayerBlock {
+  id        String   @id @default(uuid())
+  blockerId String   @map("blocker_id")
+  blockedId String   @map("blocked_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker Player @relation("PlayerBlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked Player @relation("PlayerBlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@map("player_blocks")
+}
+
+model FriendMail {
+  id                   String   @id @default(uuid())
+  senderId             String   @map("sender_id")
+  recipientId          String   @map("recipient_id")
+  subject              String   @db.VarChar(100)
+  body                 String   @db.VarChar(1000)
+  goldCost             Int      @default(0) @map("gold_cost")
+  isSystem             Boolean  @default(false) @map("is_system")
+  isRead               Boolean  @default(false) @map("is_read")
+  isDeletedBySender    Boolean  @default(false) @map("is_deleted_by_sender")
+  isDeletedByRecipient Boolean  @default(false) @map("is_deleted_by_recipient")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  sender    Player @relation("FriendMailSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient Player @relation("FriendMailRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isDeletedByRecipient, isRead])
+  @@index([senderId, isDeletedBySender])
+  @@map("friend_mails")
+}
+
+// =============================================================================
 // COMBAT TEMPLATES
 // =============================================================================
 
@@ -1123,4 +1189,58 @@ model PlayerQuestState {
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@map("player_quest_state")
+}
+
+// =============================================================================
+// QUEST SHOP
+// =============================================================================
+
+model ShopItem {
+  id            String  @id @default(uuid())
+  key           String  @unique @db.VarChar(64)
+  name          String  @db.VarChar(128)
+  description   String  @db.VarChar(512)
+  cost          Int
+  category      String  @db.VarChar(16)
+  weeklyLimit   Int?    @map("weekly_limit")
+  lifetimeLimit Int?    @map("lifetime_limit")
+  buffType      String? @map("buff_type") @db.VarChar(32)
+  buffValue     Float?  @map("buff_value")
+  buffUses      Int?    @map("buff_uses")
+  enabled       Boolean @default(true)
+  sortOrder     Int     @default(0) @map("sort_order")
+
+  purchases PlayerShopPurchase[]
+  buffs     PlayerBuff[]
+
+  @@map("shop_items")
+}
+
+model PlayerShopPurchase {
+  id          String   @id @default(uuid())
+  playerId    String   @map("player_id")
+  shopItemId  String   @map("shop_item_id")
+  purchasedAt DateTime @default(now()) @map("purchased_at")
+
+  player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, shopItemId, purchasedAt])
+  @@map("player_shop_purchases")
+}
+
+model PlayerBuff {
+  id            String   @id @default(uuid())
+  playerId      String   @map("player_id")
+  buffType      String   @map("buff_type") @db.VarChar(32)
+  remainingUses Int      @map("remaining_uses")
+  bonusValue    Float    @map("bonus_value")
+  shopItemId    String   @map("shop_item_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  player   Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, buffType])
+  @@map("player_buffs")
 }

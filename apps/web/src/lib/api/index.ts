@@ -161,6 +161,7 @@ export {
   adminSpawnEncounter,
   adminGetResourceNodes,
   adminSpawnResourceNode,
+  adminGrantTokens,
 } from './admin';
 export type {
   AdminItemTemplate,
@@ -231,8 +232,11 @@ export type {
   GuildJoinRequestsResponse,
 } from './guild';
 
-export { getQuests, claimQuestReward, claimDailyBonus, getQuestShop, purchaseQuestItem, rerollQuest } from './quests';
-export type { QuestsResponse, ClaimRewardResponse, ClaimBonusResponse, ShopResponse, PurchaseResponse, RerollQuestResponse } from './quests';
+export { getQuests, claimQuestReward, claimDailyBonus, rerollQuest } from './quests';
+export type { QuestsResponse, ClaimRewardResponse, ClaimBonusResponse, RerollQuestResponse } from './quests';
+
+export { getShopItems, purchaseShopItem, getPlayerBuffs } from './shop';
+export type { ShopListResponse, BuffsResponse } from './shop';
 
 export { getSkillPointState, allocateSkillPoint, respecSkillPoints } from './skillPoints';
 export type { SkillPointState } from './skillPoints';
@@ -258,3 +262,26 @@ export type {
   ExpeditionShopResponse,
   ExpeditionPurchaseResponse,
 } from './expedition';
+
+export {
+  getFriendsList,
+  sendFriendRequest,
+  searchPlayerByUsername,
+  getIncomingFriendRequests,
+  getOutgoingFriendRequests,
+  acceptFriendRequest,
+  declineFriendRequest,
+  unfriend,
+  getFriendProfile,
+  sparFriend,
+  blockPlayer,
+  unblockPlayer,
+  getBlockList,
+  sendFriendMail,
+  getFriendMailInbox,
+  getFriendMailSent,
+  getFriendMailUnreadCount,
+  readFriendMail,
+  deleteFriendMail,
+} from './friends';
+export type { SparResponse } from './friends';

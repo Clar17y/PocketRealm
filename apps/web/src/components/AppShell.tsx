@@ -10,6 +10,8 @@ interface AppShellProps {
   children: ReactNode;
   turns?: number;
   username?: string;
+  mailUnreadCount?: number;
+  onMailClick?: () => void;
   onSettings?: () => void;
   onLogout?: () => void;
   onWhatsNew?: () => void;
@@ -17,7 +19,7 @@ interface AppShellProps {
   backgroundSrc?: string;
 }
 
-export function AppShell({ children, turns = 0, username, onSettings, onLogout, onWhatsNew, hasUnseenChangelog, backgroundSrc }: AppShellProps) {
+export function AppShell({ children, turns = 0, username, mailUnreadCount = 0, onMailClick, onSettings, onLogout, onWhatsNew, hasUnseenChangelog, backgroundSrc }: AppShellProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const hasMenu = Boolean(onSettings || onLogout || onWhatsNew);
 
@@ -41,6 +43,23 @@ export function AppShell({ children, turns = 0, username, onSettings, onLogout, 
               />
               <span className="font-pixel text-[12px] text-[var(--rpg-gold)]">{turns.toLocaleString()}</span>
             </div>
+            {onMailClick && (
+              <button
+                onClick={onMailClick}
+                className="relative text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)] transition-colors"
+                aria-label={`Mail${mailUnreadCount > 0 ? ` (${mailUnreadCount} unread)` : ''}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="20" height="16" x="2" y="4" rx="2" />
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
+                {mailUnreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 flex items-center justify-center text-[10px] font-bold rounded-full bg-[var(--rpg-red)] text-white">
+                    {mailUnreadCount > 99 ? '99+' : mailUnreadCount}
+                  </span>
+                )}
+              </button>
+            )}
             {username && (
               <div
                 className="relative"

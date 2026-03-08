@@ -3,7 +3,8 @@
 import type { EventModifierBadge } from '@/lib/api';
 
 function isPlayerBuff(effectType: string): boolean {
-  return ['damage_down', 'hp_down', 'spawn_rate_down', 'yield_up', 'drop_rate_up'].includes(effectType);
+  return ['damage_down', 'hp_down', 'spawn_rate_down', 'yield_up', 'drop_rate_up',
+    'player_damage_up', 'player_defence_up', 'durability_shield', 'crafting_crit_up', 'xp_up'].includes(effectType);
 }
 
 function effectLabel(effectType: string): string {
@@ -13,6 +14,11 @@ function effectLabel(effectType: string): string {
     spawn_rate_up: 'Spawns', spawn_rate_down: 'Spawns',
     drop_rate_up: 'Drops', drop_rate_down: 'Drops',
     yield_up: 'Yield', yield_down: 'Yield',
+    player_damage_up: 'ATK',
+    player_defence_up: 'DEF',
+    durability_shield: 'Durability',
+    crafting_crit_up: 'Crit',
+    xp_up: 'XP',
   };
   return labels[effectType] ?? effectType;
 }

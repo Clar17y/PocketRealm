@@ -15,6 +15,8 @@ export * from './types/bossTemplate.types';
 export * from './types/casino.types';
 export * from './types/quest.types';
 export * from './types/expedition.types';
+export type { ShopItemData, PlayerBuffData, ShopPurchaseResult } from './types/shop.types';
+export * from './types/friend.types';
 
 // Constants
 export * from './constants/gameConstants';

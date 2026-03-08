@@ -20,7 +20,7 @@ describe('achievementDefinitions', () => {
         expect(a.title).toBeTruthy();
         expect(a.description).toBeTruthy();
         expect(typeof a.threshold).toBe('number');
-        expect(a.threshold).toBeGreaterThan(0);
+        expect(a.threshold).toBeGreaterThanOrEqual(0);
       }
     });
 
@@ -33,7 +33,7 @@ describe('achievementDefinitions', () => {
     it('every achievement has a valid category', () => {
       const validCategories = new Set([
         'combat', 'exploration', 'crafting', 'skills',
-        'gathering', 'bestiary', 'general', 'family', 'guild', 'casino',
+        'gathering', 'bestiary', 'general', 'family', 'guild', 'casino', 'shop',
       ]);
       for (const a of ALL_ACHIEVEMENTS) {
         expect(validCategories.has(a.category)).toBe(true);

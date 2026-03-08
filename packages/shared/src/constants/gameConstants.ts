@@ -7,7 +7,7 @@ import type {
   GuildProjectDefinition,
   GuildSpecializationDefinition,
 } from '../types/guild.types';
-import type { QuestTemplateDefinition, QuestShopItem } from '../types/quest.types';
+import type { QuestTemplateDefinition } from '../types/quest.types';
 
 // =============================================================================
 // TURN ECONOMY
@@ -1314,20 +1314,34 @@ export const QUEST_TEMPLATE_DEFINITIONS: readonly QuestTemplateDefinition[] = [
 ] as const;
 
 // =============================================================================
-// QUEST SHOP
+// FRIENDS
 // =============================================================================
 
-export const QUEST_SHOP_ITEMS: readonly QuestShopItem[] = [
-  // Permanent items
-  { key: 'minor_health_potion',  name: 'Minor Health Potion',    description: 'Restores a small amount of HP',               cost: 5,   category: 'consumable', permanent: true },
-  { key: 'health_potion',        name: 'Health Potion',          description: 'Restores a moderate amount of HP',            cost: 10,  category: 'consumable', permanent: true },
-  { key: 'repair_kit',           name: 'Repair Kit',             description: 'Repairs equipped gear without gold cost',     cost: 12,  category: 'utility',    permanent: true },
-  { key: 'xp_scroll_small',      name: 'Minor XP Scroll',       description: 'Grants a small amount of character XP',       cost: 15,  category: 'utility',    permanent: true },
-  { key: 'xp_scroll_large',      name: 'Major XP Scroll',       description: 'Grants a large amount of character XP',       cost: 30,  category: 'utility',    permanent: true },
-  // Rotating items (shown only some weeks -- for now, show all)
-  { key: 'rare_material_bundle', name: 'Rare Material Bundle',   description: 'A bundle of assorted rare crafting materials', cost: 25,  category: 'material',   permanent: false },
-  { key: 'stat_reset_scroll',    name: 'Stat Reset Scroll',      description: 'Reset your attribute points',                 cost: 40,  category: 'utility',    permanent: false },
-] as const;
+export const FRIEND_CONSTANTS = {
+  MAX_FRIENDS: 50,
+  MAX_PENDING_REQUESTS: 20,
+  REQUEST_COOLDOWN_SECONDS: 60,
+} as const;
+
+// =============================================================================
+// SPARRING
+// =============================================================================
+
+export const SPAR_CONSTANTS = {
+  TURN_COST: 200,
+} as const;
+
+// =============================================================================
+// MAIL
+// =============================================================================
+
+export const MAIL_CONSTANTS = {
+  GOLD_COST: 25,
+  MAX_SUBJECT_LENGTH: 100,
+  MAX_BODY_LENGTH: 1000,
+  MAX_INBOX_SIZE: 100,
+  MAX_SENT_SIZE: 50,
+} as const;
 
 // =============================================================================
 // EXPEDITIONS

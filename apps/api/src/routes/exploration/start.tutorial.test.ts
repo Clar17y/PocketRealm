@@ -157,6 +157,37 @@ vi.mock('../../utils/routeHelpers.js', () => ({
   trackAchievements: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../services/combatOrchestrationService', () => ({
+  preparePlayerForCombat: vi.fn().mockResolvedValue({
+    attackSkill: 'melee', attackLevel: 1,
+    progression: { characterXp: 0, characterLevel: 1, attributePoints: 0, attributes: { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 } },
+    equipmentStats: { attack: 5, accuracy: 5, defence: 5, magicDefence: 0, speed: 0, critChance: 0, critDamage: 1 },
+    guildMods: { combatDamage: 0, defenseBoost: 0, xpBoost: 0, travelCostReduction: 0 },
+    perActionScaling: { skillLevels: { melee: 1, ranged: 1, magic: 1 }, attributes: { strength: 0, dexterity: 0, intelligence: 0 }, weaponPower: { attack: 5, rangedPower: 0, magicPower: 0 }, equipmentAccuracy: 0, weaponRequiredSkill: 'melee' },
+    playerTemplate: [{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }],
+    potionPool: [],
+    resources: { stamina: 100, maxStamina: 100, staminaRegenPerRound: 5, mana: 50, maxMana: 50, manaRegenPerRound: 3 },
+    unlockedActions: [],
+  }),
+  buildPlayerTemplateCombatant: vi.fn((params: any) => ({
+    id: params.playerId, name: params.username, stats: params.playerStats, template: params.template,
+    stamina: params.stamina, maxStamina: params.maxStamina, staminaRegenPerRound: params.staminaRegenPerRound,
+    mana: params.mana, maxMana: params.maxMana, manaRegenPerRound: params.manaRegenPerRound,
+    actionDefinitions: {},
+  })),
+  processCombatVictoryRewards: vi.fn().mockResolvedValue({
+    loot: [], overflow: [], pendingLootSessionId: null, xpGrants: [{ skillType: 'melee', xpResult: { xpGained: 10, xpAfterEfficiency: 10, efficiency: 1, leveledUp: false, newLevel: 1, atDailyCap: false }, newTotalXp: 10, newDailyXpGained: 10, characterXpGain: 5, characterXpAfter: 5, characterLevelBefore: 1, characterLevelAfter: 1, attributePointsAfter: 0, characterLeveledUp: false }],
+    questProgress: [],
+  }),
+  buildCombatLogResult: vi.fn(() => ({})),
+}));
+vi.mock('../../services/buffService', () => ({
+  getCombatBuffsWithUses: vi.fn().mockResolvedValue({ buffs: { damageBoost: 0, defenceBoost: 0, durabilityShield: 0 }, uses: { damage: 0, defence: 0, durability: 0 } }),
+  applyCombatBuffs: vi.fn(),
+  consumeBuffChargesPerMob: vi.fn(),
+  buildCombatBuffBadges: vi.fn().mockReturnValue([]),
+}));
+
 vi.mock('@pocketrealm/game-engine', () => ({
   applyMobEventModifiers: vi.fn((mob: any) => mob),
   applyMobPrefix: vi.fn((mob: any, prefix: any) => ({ ...mob, mobPrefix: prefix, mobDisplayName: prefix ? `${prefix} ${mob.name}` : mob.name })),

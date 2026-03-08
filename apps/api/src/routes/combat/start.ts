@@ -10,7 +10,6 @@ import {
   mobToTemplateCombatant,
   calculateFleeResult,
   rollMobPrefix,
-  mobToCombatantStats,
   filterAndWeightMobsByTier,
   selectTierWithBleedthrough,
 } from '@pocketrealm/game-engine';
@@ -30,13 +29,9 @@ import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import type { GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { setHp } from '../../services/hpService';
-import { getActiveTemplate } from '../../services/combatTemplateService';
-import { getResourceState, setAllResources } from '../../services/resourceService';
-import { getEquipmentStats } from '../../services/equipmentService';
+import { setAllResources } from '../../services/resourceService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot } from '../../services/pendingLootService';
-import { getPlayerProgressionState } from '../../services/attributesService';
-import { getSkillPoints } from '../../services/skillPointService';
 import { grantEncounterSiteChestRewardsTx } from '../../services/chestService';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, type EventModifierBadge } from '../../services/worldEventService';
 
@@ -54,14 +49,14 @@ import {
   checkPersistedMobReencounter,
   removePersistedMob,
 } from '../../services/persistedMobService';
-import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
-import { buildPerActionScaling, getMainHandAttackSkill, getSkillLevel, type AttackSkill } from '../../services/combatStatsService';
+import { deductConsumedPotions } from '../../services/potionService';
+import type { AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
-import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
-import { buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
+import { getCombatBuffs, getCombatBuffsWithUses, applyCombatBuffs, consumeCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges } from '../../services/buffService';
+import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import {
   prismaAny,
   startSchema,
@@ -162,26 +157,20 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const mobTemplateRows = await prisma.mobTemplate.findMany({ where: { id: { in: allMobTemplateIds } } });
   const mobTemplateById = new Map(mobTemplateRows.map(t => [t.id, t]));
 
-  // Build player stats once
+  // Build player combat data (parallelized) + zone events
   const requestedAttackSkill: AttackSkill | null = body.attackSkill ?? null;
-  const mainHandAttackSkill = await getMainHandAttackSkill(playerId);
-  const attackSkill: AttackSkill = mainHandAttackSkill ?? requestedAttackSkill ?? 'melee';
-  const [attackLevel, progression] = await Promise.all([
-    getSkillLevel(playerId, attackSkill),
-    getPlayerProgressionState(playerId),
+  const [combatPrep, cachedZoneEvents, cachedWorldEvents] = await Promise.all([
+    preparePlayerForCombat(playerId, { requestedAttackSkill, maxHp: hpState.maxHp }),
+    getActiveEventsForZone(zoneId),
+    getActiveWorldWideEvents(),
   ]);
-  const equipmentStats = await getEquipmentStats(playerId);
+  const { attackSkill, attackLevel, progression, equipmentStats, guildMods, perActionScaling, playerTemplate, potionPool, resources, unlockedActions: playerUnlockedActions } = combatPrep;
+  const allPotionsConsumed: PotionConsumed[] = [];
+  let currentStamina = resources.stamina;
+  let currentMana = resources.mana;
 
-  // Guild combat modifiers
-  const guildMods = await getPlayerGuildModifiers(playerId);
-
-  // Per-action scaling for template combat engine
-  const perActionScaling = await buildPerActionScaling(playerId, {
-    equipmentStats,
-    attributes: progression.attributes,
-    weaponRequiredSkill: mainHandAttackSkill,
-    guildDamageMultiplier: guildMods.combatDamage,
-  });
+  // Quest shop combat buffs — track remaining uses locally for per-mob consumption
+  const { buffs: combatBuffs, uses: buffUsesLeft } = await getCombatBuffsWithUses(playerId);
 
   // Apply room carry HP
   let currentPlayerHp = hpState.currentHp;
@@ -189,30 +178,6 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     currentPlayerHp = site.roomCarryHp;
     await setHp(playerId, currentPlayerHp);
   }
-
-  // Fetch player's active template, resource state, and unlocked actions
-  const [playerTemplate, resourceState, skillPointState] = await Promise.all([
-    getActiveTemplate(playerId),
-    getResourceState(playerId),
-    getSkillPoints(playerId),
-  ]);
-
-  // Build shared potion pool when the template includes potion actions
-  const potionPool = templateHasPotionActions(playerTemplate) ? await buildPotionPool(playerId, hpState.maxHp) : [];
-  const allPotionsConsumed: PotionConsumed[] = [];
-  const playerUnlockedActions = skillPointState.unlockedActions;
-  let currentStamina = resourceState.stamina.current;
-  let currentMana = resourceState.mana.current;
-  const maxStamina = resourceState.stamina.max;
-  const maxMana = resourceState.mana.max;
-  const staminaRegenPerRound = resourceState.stamina.regenPerRound;
-  const manaRegenPerRound = resourceState.mana.regenPerRound;
-
-  // Zone modifiers — fetch events once, derive modifiers synchronously
-  const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
-    getActiveEventsForZone(zoneId),
-    getActiveWorldWideEvents(),
-  ]);
   const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
 
@@ -250,14 +215,21 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
       applyGuildCombatModifiers(playerStats, guildMods);
 
+      // Apply quest shop combat buffs only if uses remain
+      const mobBuffs = {
+        damageBoost: buffUsesLeft.damage > 0 ? combatBuffs.damageBoost : 0,
+        defenceBoost: buffUsesLeft.defence > 0 ? combatBuffs.defenceBoost : 0,
+      };
+      applyCombatBuffs(playerStats, mobBuffs);
+
       const combatOptions: CombatOptions | undefined = potionPool.length > 0
         ? { potions: [...potionPool] }
         : undefined;
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,
-        stamina: currentStamina, maxStamina, staminaRegenPerRound,
-        mana: currentMana, maxMana, manaRegenPerRound,
+        stamina: currentStamina, maxStamina: resources.maxStamina, staminaRegenPerRound: resources.staminaRegenPerRound,
+        mana: currentMana, maxMana: resources.maxMana, manaRegenPerRound: resources.manaRegenPerRound,
         unlockedActions: playerUnlockedActions,
         perActionScaling,
       });
@@ -283,7 +255,14 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       let mobLoot: LootDropWithName[] = [];
       let mobXpGrants: GrantXpResult[] = [];
       const mobXpAwarded = combatResult.outcome === 'victory' ? Math.max(0, prefixedMob.xpReward) : 0;
-      const mobDurabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
+      const mobDurabilityLost = buffUsesLeft.durability > 0
+        ? []
+        : await degradeEquippedDurability(playerId, combatResult.log);
+
+      // Consume combat buff charges per mob
+      await prisma.$transaction(async (tx) => {
+        await consumeBuffChargesPerMob(tx, playerId, buffUsesLeft);
+      });
 
       if (combatResult.outcome === 'victory') {
         await setAllResources(playerId, combatResult.combatantAHpRemaining, currentStamina, currentMana);
@@ -433,6 +412,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     sitePendingLootSessionId = await storePendingLoot(playerId, allSiteOverflow);
   }
 
+  // Combat buffs already consumed per-mob inside the fight loop above
+
   // --- Defeat handling (last fight only) ---
   const lastFight = fightResults[fightResults.length - 1];
   let fleeResult: ReturnType<typeof calculateFleeResult> | null = null;
@@ -486,16 +467,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     if (lastXpGrants.some(g => g.newLevel > (g.characterLevelBefore ?? 0))) achievementKeys.push('highestSkillLevel');
     if (lastXpGrants.some(g => g.characterLeveledUp)) achievementKeys.push('highestCharacterLevel');
 
-    // Resolve mob family
-    const firstMobTemplateId = fightResults[0]?.mobTemplateId;
+    // Use encounter site's mob family directly (avoids N+1 query)
     const familyIds: string[] = [];
-    if (firstMobTemplateId) {
-      const familyMember = await prismaAny.mobFamilyMember.findFirst({
-        where: { mobTemplateId: firstMobTemplateId },
-        select: { mobFamilyId: true },
-      });
-      if (familyMember?.mobFamilyId) familyIds.push(familyMember.mobFamilyId);
-    }
+    if (site.mobFamilyId) familyIds.push(site.mobFamilyId as string);
 
     await trackAchievements(playerId, {}, { statKeys: achievementKeys, familyIds });
   } else {
@@ -688,9 +662,14 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       percent: explorationProgress.percent,
       turnsToExplore: explorationProgress.turnsToExplore,
     },
-    activeEvents: activeEventEffects.length > 0
-      ? tagEventsWithApplicability(activeEventEffects, siteMobBadges)
-      : undefined,
+    activeEvents: (() => {
+      const siteBuffBadges = buildCombatBuffBadges(combatBuffs);
+      const all = [
+        ...tagEventsWithApplicability(activeEventEffects, siteMobBadges),
+        ...siteBuffBadges,
+      ];
+      return all.length > 0 ? all : undefined;
+    })(),
     ...(allQuestProgress.length > 0 ? { questProgress: allQuestProgress } : {}),
   });
 }
@@ -778,25 +757,29 @@ export function registerStartRoutes(router: Router): void {
       let mobPrefix = rollMobPrefix();
 
       const requestedAttackSkill: AttackSkill | null = body.attackSkill ?? null;
-      const mainHandAttackSkill = await getMainHandAttackSkill(playerId);
-      const attackSkill: AttackSkill = mainHandAttackSkill ?? requestedAttackSkill ?? 'melee';
-      const [attackLevel, progression] = await Promise.all([
-        getSkillLevel(playerId, attackSkill),
-        getPlayerProgressionState(playerId),
+
+      // Prepare player combat data + zone events + mob family lookup in parallel
+      const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
+      const [combatPrep, zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyRow] = await Promise.all([
+        preparePlayerForCombat(playerId, { requestedAttackSkill, maxHp: hpState.maxHp }),
+        getActiveEventsForZone(zoneId),
+        getActiveWorldWideEvents(),
+        prismaAny.mobFamilyMember.findFirst({
+          where: { mobTemplateId: baseMob.id },
+          select: { mobFamilyId: true },
+        }),
       ]);
+      const { attackSkill, attackLevel, progression, equipmentStats, guildMods, perActionScaling, playerTemplate, potionPool, resources, unlockedActions } = combatPrep;
 
-      const equipmentStats = await getEquipmentStats(playerId);
+      const zoneMobFamilyId: string | undefined = zoneMobFamilyRow?.mobFamilyId ?? undefined;
+      const zoneModifiers = computeZoneModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyId ? { mobFamilyId: zoneMobFamilyId } : undefined);
+      const activeEventEffects = computeEventSummaries(zoneCombatZoneEvents, zoneCombatWorldEvents);
+      const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
+      const prefixedMob = applyMobPrefix(modifiedMob, mobPrefix);
+      mobPrefix = prefixedMob.mobPrefix;
 
-      // Guild combat modifiers
-      const guildMods = await getPlayerGuildModifiers(playerId);
-
-      // Per-action scaling for template combat engine
-      const perActionScaling = await buildPerActionScaling(playerId, {
-        equipmentStats,
-        attributes: progression.attributes,
-        weaponRequiredSkill: mainHandAttackSkill,
-        guildDamageMultiplier: guildMods.combatDamage,
-      });
+      // Quest shop combat buffs
+      const zoneCombatBuffs = await getCombatBuffs(playerId);
 
       const playerStats = buildPlayerCombatStats(
         hpState.currentHp,
@@ -811,21 +794,8 @@ export function registerStartRoutes(router: Router): void {
 
       applyGuildCombatModifiers(playerStats, guildMods);
 
-      const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
-      const [zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyRow] = await Promise.all([
-        getActiveEventsForZone(zoneId),
-        getActiveWorldWideEvents(),
-        prismaAny.mobFamilyMember.findFirst({
-          where: { mobTemplateId: baseMob.id },
-          select: { mobFamilyId: true },
-        }),
-      ]);
-      const zoneMobFamilyId: string | undefined = zoneMobFamilyRow?.mobFamilyId ?? undefined;
-      const zoneModifiers = computeZoneModifiers(zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyId ? { mobFamilyId: zoneMobFamilyId } : undefined);
-      const activeEventEffects = computeEventSummaries(zoneCombatZoneEvents, zoneCombatWorldEvents);
-      const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
-      const prefixedMob = applyMobPrefix(modifiedMob, mobPrefix);
-      mobPrefix = prefixedMob.mobPrefix;
+      // Apply quest shop combat buffs
+      applyCombatBuffs(playerStats, zoneCombatBuffs);
 
       // Persisted mob reencounter
       let persistedMobId: string | null = null;
@@ -838,23 +808,16 @@ export function registerStartRoutes(router: Router): void {
 
       const finalMob = mobHpOverride ? { ...prefixedMob, ...mobHpOverride } : prefixedMob;
 
-      // Fetch player's active template, resource state, and unlocked actions
-      const [playerTemplate, resourceState, zoneCombatSkillPoints] = await Promise.all([
-        getActiveTemplate(playerId),
-        getResourceState(playerId),
-        getSkillPoints(playerId),
-      ]);
-
-      // Build potion pool when the template includes potion actions
-      const combatOptions: CombatOptions | undefined = templateHasPotionActions(playerTemplate)
-        ? { potions: await buildPotionPool(playerId, hpState.maxHp) }
+      // Build potion pool into combat options
+      const combatOptions: CombatOptions | undefined = potionPool.length > 0
+        ? { potions: [...potionPool] }
         : undefined;
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,
-        stamina: resourceState.stamina.current, maxStamina: resourceState.stamina.max, staminaRegenPerRound: resourceState.stamina.regenPerRound,
-        mana: resourceState.mana.current, maxMana: resourceState.mana.max, manaRegenPerRound: resourceState.mana.regenPerRound,
-        unlockedActions: zoneCombatSkillPoints.unlockedActions,
+        stamina: resources.stamina, maxStamina: resources.maxStamina, staminaRegenPerRound: resources.staminaRegenPerRound,
+        mana: resources.mana, maxMana: resources.maxMana, manaRegenPerRound: resources.manaRegenPerRound,
+        unlockedActions,
         perActionScaling,
       });
       const mobCombatant = mobToTemplateCombatant(finalMob);
@@ -871,7 +834,9 @@ export function registerStartRoutes(router: Router): void {
       let pendingLootSessionId: string | null = null;
       let xpGrants: GrantXpResult[] = [];
       let zoneQuestProgress: QuestProgressUpdate[] = [];
-      const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
+      const durabilityLost = zoneCombatBuffs.durabilityShield > 0
+        ? []
+        : await degradeEquippedDurability(playerId, combatResult.log);
       let fleeResult = null as null | ReturnType<typeof calculateFleeResult>;
       let respawnedTo: { townId: string; townName: string } | null = null;
 
@@ -920,6 +885,13 @@ export function registerStartRoutes(router: Router): void {
         await removePersistedMob(persistedMobId);
       } else if (combatResult.outcome === 'defeat' && combatResult.combatantBHpRemaining > 0) {
         await persistMobHp(playerId, prefixedMob.id, zoneId, combatResult.combatantBHpRemaining, prefixedMob.hp);
+      }
+
+      // Consume quest shop combat buffs (regardless of outcome)
+      if (zoneCombatBuffs.damageBoost > 0 || zoneCombatBuffs.defenceBoost > 0 || zoneCombatBuffs.durabilityShield > 0) {
+        await prisma.$transaction(async (tx) => {
+          await consumeCombatBuffs(tx, playerId, zoneCombatBuffs);
+        });
       }
 
       const lootWithNames = await enrichLootWithNames(loot);
@@ -1009,8 +981,8 @@ export function registerStartRoutes(router: Router): void {
           attackSkill,
           outcome: combatResult.outcome,
           playerMaxHp: combatResult.combatantAMaxHp,
-          playerStartStamina: resourceState.stamina.current,
-          playerStartMana: resourceState.mana.current,
+          playerStartStamina: resources.stamina,
+          playerStartMana: resources.mana,
           mobMaxHp: combatResult.combatantBMaxHp,
           log: mapTemplateCombatLog(combatResult.log),
           playerHpRemaining: combatResult.combatantAHpRemaining,
@@ -1039,9 +1011,14 @@ export function registerStartRoutes(router: Router): void {
           percent: explorationProgress.percent,
           turnsToExplore: explorationProgress.turnsToExplore,
         },
-        activeEvents: activeEventEffects.length > 0
-          ? tagEventsWithApplicability(activeEventEffects, zoneMobBadges)
-          : undefined,
+        activeEvents: (() => {
+          const combatBuffBadges = buildCombatBuffBadges(zoneCombatBuffs);
+          const all = [
+            ...tagEventsWithApplicability(activeEventEffects, zoneMobBadges),
+            ...combatBuffBadges,
+          ];
+          return all.length > 0 ? all : undefined;
+        })(),
         ...(zoneQuestProgress.length > 0 ? { questProgress: zoneQuestProgress } : {}),
       });
   }));

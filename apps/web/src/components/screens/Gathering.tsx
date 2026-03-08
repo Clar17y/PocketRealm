@@ -17,6 +17,7 @@ import { effectiveTurns as calcEffectiveTurns, inflateCost } from '@/lib/taxCalc
 import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import type { EventModifierBadge } from '@/lib/api';
+import { ItemIcon } from '@/components/common/ItemIcon';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface ResourceNode {
@@ -295,15 +296,7 @@ export function Gathering({
               <PixelCard padding="sm" className={isSelected ? 'border-[var(--rpg-gold)]' : ''}>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center text-2xl flex-shrink-0">
-                    {node.imageSrc ? (
-                      <img
-                        src={node.imageSrc}
-                        alt={node.name}
-                        className="w-10 h-10 object-contain image-rendering-pixelated"
-                      />
-                    ) : (
-                      node.icon
-                    )}
+                    <ItemIcon imageSrc={node.imageSrc} name={node.name} size="lg" fallback={node.icon} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between gap-1 flex-wrap">
@@ -403,15 +396,7 @@ export function Gathering({
           <h3 className="font-semibold text-[var(--rpg-text-primary)] mb-3">Estimated Yield</h3>
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-lg bg-[var(--rpg-surface)] flex items-center justify-center text-3xl">
-              {selectedNode.imageSrc ? (
-                <img
-                  src={selectedNode.imageSrc}
-                  alt={selectedNode.name}
-                  className="w-14 h-14 object-contain image-rendering-pixelated"
-                />
-              ) : (
-                selectedNode.icon
-              )}
+              <ItemIcon imageSrc={selectedNode.imageSrc} name={selectedNode.name} size="2xl" fallback={selectedNode.icon} />
             </div>
             <div className="flex-1">
               <div className="text-sm text-[var(--rpg-text-secondary)]">{selectedNode.name}</div>

@@ -13,6 +13,7 @@ export interface ServerSettingsPayload {
   lowHpWarning?: boolean | null;
   confirmRarity?: ConfirmRarity | null;
   lootRevealRarity?: ConfirmRarity | null;
+  homeTownId?: string | null;
 }
 
 export function usePlayerSettings() {
@@ -26,6 +27,7 @@ export function usePlayerSettings() {
   const [confirmRarity, setConfirmRarity] = useState<ConfirmRarity>('uncommon');
   const [lootRevealRarity, setLootRevealRarity] = useState<ConfirmRarity>('uncommon');
   const [guildTaxRate, setGuildTaxRate] = useState(0);
+  const [homeTownId, setHomeTownId] = useState<string | null>(null);
 
   // --- generic persist helper ---------------------------------------------------
 
@@ -55,6 +57,8 @@ export function usePlayerSettings() {
     handleSetSetting('confirmRarity', value, setConfirmRarity, confirmRarity);
   const handleSetLootRevealRarity = (value: ConfirmRarity) =>
     handleSetSetting('lootRevealRarity', value, setLootRevealRarity, lootRevealRarity);
+  const handleSetHomeTown = (zoneId: string) =>
+    handleSetSetting('homeTownId', zoneId, setHomeTownId, homeTownId);
 
   // --- server hydration ---------------------------------------------------------
 
@@ -68,6 +72,7 @@ export function usePlayerSettings() {
     setLowHpWarning(s.lowHpWarning ?? true);
     setConfirmRarity(s.confirmRarity ?? 'uncommon');
     setLootRevealRarity(s.lootRevealRarity ?? 'uncommon');
+    setHomeTownId(s.homeTownId ?? null);
   };
 
   return {
@@ -82,6 +87,7 @@ export function usePlayerSettings() {
     confirmRarity,
     lootRevealRarity,
     guildTaxRate,
+    homeTownId,
 
     // Raw setters for optimistic / external updates
     setCombatLogSpeedMs,
@@ -100,6 +106,7 @@ export function usePlayerSettings() {
     handleSetLowHpWarning,
     handleSetConfirmRarity,
     handleSetLootRevealRarity,
+    handleSetHomeTown,
 
     // Initialization
     initSettingsFromServer,

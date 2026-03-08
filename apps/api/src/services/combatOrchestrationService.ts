@@ -8,6 +8,7 @@ import {
   COMBAT_CONSTANTS,
   GUILD_CONSTANTS,
   type ActionDefinition,
+  type CombatPotion,
   type CombatTemplateSlotData,
   type LootDrop,
   type QuestProgressUpdate,
@@ -20,9 +21,104 @@ import { grantSkillXp, type GrantXpResult } from './xpService';
 import { recordBestiaryKill } from '../utils/routeHelpers.js';
 import { addGuildXp, getPlayerGuildId } from './guildService';
 import { trackProgress } from './progressService';
-import type { PlayerGuildModifiers } from './guildUpgradeService';
+import { getPlayerGuildModifiers, type PlayerGuildModifiers } from './guildUpgradeService';
 import { mapTemplateCombatLog } from './combatLogMapper';
-import type { AttackSkill } from './combatStatsService';
+import { getMainHandAttackSkill, getSkillLevel, buildPerActionScaling, type AttackSkill } from './combatStatsService';
+import { getEquipmentStats, type EquipmentStats } from './equipmentService';
+import { getPlayerProgressionState, type PlayerProgressionState } from './attributesService';
+import { getActiveTemplate } from './combatTemplateService';
+import { getResourceState } from './resourceService';
+import { getSkillPoints } from './skillPointService';
+import { buildPotionPool, templateHasPotionActions } from './potionService';
+
+// ── Prepare player for combat ────────────────────────────────────────
+
+export interface PlayerCombatPrep {
+  attackSkill: AttackSkill;
+  attackLevel: number;
+  progression: PlayerProgressionState;
+  equipmentStats: EquipmentStats;
+  guildMods: PlayerGuildModifiers;
+  perActionScaling: PerActionScaling;
+  playerTemplate: CombatTemplateSlotData[];
+  potionPool: CombatPotion[];
+  resources: {
+    stamina: number; maxStamina: number; staminaRegenPerRound: number;
+    mana: number; maxMana: number; manaRegenPerRound: number;
+  };
+  unlockedActions: string[];
+}
+
+export interface PreparePlayerCombatOptions {
+  requestedAttackSkill?: AttackSkill | null;
+  maxHp: number;
+  /** Pre-fetched data to avoid redundant queries */
+  preloaded?: {
+    mainHandAttackSkill?: AttackSkill | null;
+    equipmentStats?: EquipmentStats;
+    progression?: PlayerProgressionState;
+    guildMods?: PlayerGuildModifiers;
+  };
+}
+
+/**
+ * Fetches all data needed for a player to engage in template combat.
+ * Parallelizes DB queries for optimal performance.
+ */
+export async function preparePlayerForCombat(
+  playerId: string,
+  opts: PreparePlayerCombatOptions,
+): Promise<PlayerCombatPrep> {
+  // Step 1: determine attack skill from weapon (or use preloaded/fallback)
+  const mainHandAttackSkill = opts.preloaded?.mainHandAttackSkill !== undefined
+    ? opts.preloaded.mainHandAttackSkill
+    : await getMainHandAttackSkill(playerId);
+  const attackSkill: AttackSkill = mainHandAttackSkill ?? opts.requestedAttackSkill ?? 'melee';
+
+  // Step 2: fetch everything we can in parallel
+  const [attackLevel, progression, equipmentStats, guildMods, playerTemplate, resourceState, skillPointState] = await Promise.all([
+    getSkillLevel(playerId, attackSkill),
+    opts.preloaded?.progression ?? getPlayerProgressionState(playerId),
+    opts.preloaded?.equipmentStats ?? getEquipmentStats(playerId),
+    opts.preloaded?.guildMods ?? getPlayerGuildModifiers(playerId),
+    getActiveTemplate(playerId),
+    getResourceState(playerId),
+    getSkillPoints(playerId),
+  ]);
+
+  // Step 3: build per-action scaling (needs equipmentStats + progression)
+  const perActionScaling = await buildPerActionScaling(playerId, {
+    equipmentStats,
+    attributes: progression.attributes,
+    weaponRequiredSkill: mainHandAttackSkill,
+    guildDamageMultiplier: guildMods.combatDamage,
+  });
+
+  // Step 4: build potion pool if template uses potions
+  const potionPool = templateHasPotionActions(playerTemplate)
+    ? await buildPotionPool(playerId, opts.maxHp)
+    : [];
+
+  return {
+    attackSkill,
+    attackLevel,
+    progression,
+    equipmentStats,
+    guildMods,
+    perActionScaling,
+    playerTemplate,
+    potionPool,
+    resources: {
+      stamina: resourceState.stamina.current,
+      maxStamina: resourceState.stamina.max,
+      staminaRegenPerRound: resourceState.stamina.regenPerRound,
+      mana: resourceState.mana.current,
+      maxMana: resourceState.mana.max,
+      manaRegenPerRound: resourceState.mana.regenPerRound,
+    },
+    unlockedActions: skillPointState.unlockedActions,
+  };
+}
 
 // ── Build player template combatant ──────────────────────────────────
 

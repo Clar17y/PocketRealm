@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
+import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import { startTrainingFight, getTrainingCooldown } from '@/lib/api';
 import { Swords, Shield, AlertTriangle } from 'lucide-react';
 import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
@@ -163,17 +164,12 @@ export function TrainingGrounds({
   if (trainingState === 'playback' && combatResult) {
     return (
       <div className="space-y-4">
-        {/* Training banner */}
-        <div className="bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg px-4 py-2 text-center">
-          <div className="flex items-center justify-center gap-2">
-            <Swords size={16} className="text-[var(--rpg-gold)]" />
-            <span className="text-sm font-semibold text-[var(--rpg-gold)]">
-              Training — No Rewards
-            </span>
-          </div>
-        </div>
-
-        <PixelCard>
+        <PlaybackSurface
+          mode="stage"
+          title="Training Replay"
+          subtitle={`Against ${mobDisplayName} — no rewards`}
+          autoScrollOnActive
+        >
           <CombatPlayback
             mobDisplayName={mobDisplayName}
             mobImageSrc={selectedMob ? monsterImageSrc(selectedMob.name) : undefined}
@@ -192,7 +188,7 @@ export function TrainingGrounds({
             onComplete={handlePlaybackComplete}
             onSkip={handlePlaybackSkip}
           />
-        </PixelCard>
+        </PlaybackSurface>
       </div>
     );
   }

@@ -63,12 +63,3 @@ export interface PlayerQuestStateData {
   lastDailyReset: string;
   lastWeeklyReset: string;
 }
-
-export interface QuestShopItem {
-  key: string;
-  name: string;
-  description: string;
-  cost: number;
-  category: 'consumable' | 'material' | 'recipe' | 'utility';
-  permanent: boolean;
-}

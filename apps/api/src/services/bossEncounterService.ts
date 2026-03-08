@@ -305,18 +305,16 @@ export async function resolveBossRound(
   // Build participant combatants with carried-forward resources
   const participants: BossRoundParticipant[] = await Promise.all(
     signups.map(async (signup) => {
-      const [hpState, equipStats, template, resources] = await Promise.all([
+      const [hpState, equipStats, template, resources, mainHandSkill, progression] = await Promise.all([
         getHpState(signup.playerId),
         getEquipmentStats(signup.playerId),
         getActiveTemplate(signup.playerId),
         computeResourcePools(signup.playerId),
+        getMainHandAttackSkill(signup.playerId),
+        getPlayerProgressionState(signup.playerId),
       ]);
-
-      const mainHandSkill = await getMainHandAttackSkill(signup.playerId);
       const attackSkill = mainHandSkill ?? 'melee';
       const attackSkillLevel = await getSkillLevel(signup.playerId, attackSkill);
-
-      const progression = await getPlayerProgressionState(signup.playerId);
       const stats = buildPlayerCombatStats(
         hpState.maxHp, hpState.maxHp,
         { attackStyle: attackSkill, skillLevel: attackSkillLevel, attributes: progression.attributes },
