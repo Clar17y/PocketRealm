@@ -10,18 +10,25 @@ import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { normalizePlayerAttributes } from '../services/attributesService';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity } from '@pocketrealm/game-engine';
+import { AppError } from '../middleware/errorHandler';
 import {
   CHARACTER_CONSTANTS,
   SKILL_CONSTANTS,
   EXPLORATION_CONSTANTS,
+  EXPEDITION_CONSTANTS,
   WORLD_EVENT_TEMPLATES,
   ALL_SKILLS,
+  HP_CONSTANTS,
   type PlayerAttributes,
   type ItemRarity,
   type EquipmentSlot,
   type ItemType,
   type ItemStats,
 } from '@pocketrealm/shared';
+import {
+  calculateMaxStamina,
+  calculateMaxMana,
+} from '@pocketrealm/game-engine';
 
 const router = Router();
 router.use(authenticate, requireAdmin);
@@ -521,6 +528,132 @@ router.post('/tokens/grant', asyncHandler(async (req, res) => {
   });
 
   res.json({ success: true, questTokens: state.questTokens });
+}));
+
+// ---------------------------------------------------------------------------
+// Expeditions
+// ---------------------------------------------------------------------------
+
+router.post('/expedition/fill', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+
+  // Get admin's guild
+  const membership = await prisma.guildMember.findUnique({
+    where: { playerId },
+    include: { guild: true },
+  });
+  if (!membership) {
+    throw new AppError(400, 'You must be in a guild', 'NOT_IN_GUILD');
+  }
+
+  // Get active recruiting expedition
+  const expedition = await prisma.guildExpedition.findFirst({
+    where: { guildId: membership.guildId, status: 'recruiting' },
+    include: { members: true },
+  });
+  if (!expedition) {
+    throw new AppError(404, 'No recruiting expedition found', 'NO_EXPEDITION');
+  }
+
+  // Calculate how many bots are needed
+  const tier = expedition.tier;
+  const minParticipants = EXPEDITION_CONSTANTS.MIN_PARTICIPANTS_BY_TIER[tier - 1];
+  const currentCount = expedition.members.length;
+  const botsNeeded = Math.max(0, minParticipants - currentCount);
+
+  if (botsNeeded === 0) {
+    res.json({ message: 'Expedition already has enough participants', botsCreated: 0 });
+    return;
+  }
+
+  const botLevel = EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER[tier - 1] + 5;
+  const botVitality = 20;
+  const botAttributes = { vitality: botVitality, strength: 20, dexterity: 20, intelligence: 20, luck: 10, evasion: 10 };
+
+  // Pre-compute max HP/stamina/mana for all bots (identical stats)
+  const maxHp = HP_CONSTANTS.BASE_HP + botVitality * HP_CONSTANTS.HP_PER_VITALITY;
+  const maxStamina = calculateMaxStamina({ meleeLevel: 10, rangedLevel: 10, evasionLevel: 10, equipmentStaminaBonus: 0 });
+  const maxMana = calculateMaxMana({ magicLevel: 10, equipmentManaBonus: 0 });
+
+  const botIds: string[] = [];
+  const timestamp = Date.now();
+
+  for (let i = 0; i < botsNeeded; i++) {
+    const botName = `ExpBot_${timestamp}_${i}`;
+
+    // Create bot player with attributes matching the tier
+    const bot = await prisma.player.create({
+      data: {
+        username: botName,
+        email: `${botName}@bot.local`,
+        passwordHash: 'bot-no-login',
+        isBot: true,
+        characterLevel: botLevel,
+        attributes: botAttributes,
+      },
+    });
+
+    // Create all supporting records in parallel
+    await Promise.all([
+      // Guild membership
+      prisma.guildMember.create({
+        data: { guildId: membership.guildId, playerId: bot.id, role: 'member' },
+      }),
+      // Turn bank
+      prisma.turnBank.create({
+        data: { playerId: bot.id, currentTurns: 100_000, lastRegenAt: new Date() },
+      }),
+      // Player stats
+      prisma.playerStats.create({
+        data: { playerId: bot.id },
+      }),
+      // Combat skills (needed for stat calculations)
+      prisma.playerSkill.createMany({
+        data: ALL_SKILLS.map(skillType => ({
+          playerId: bot.id,
+          skillType,
+          level: 10,
+          xp: BigInt(0),
+        })),
+      }),
+    ]);
+
+    // Create combat template with basic actions
+    const template = await prisma.combatTemplate.create({
+      data: { playerId: bot.id, name: 'Bot Default', isActive: true },
+    });
+    await prisma.combatTemplateSlot.createMany({
+      data: [
+        { templateId: template.id, sortOrder: 0, actionId: 'normal_attack' },
+        { templateId: template.id, sortOrder: 1, actionId: 'normal_attack' },
+        { templateId: template.id, sortOrder: 2, actionId: 'defend' },
+      ],
+    });
+
+    // Sign up bot for expedition
+    await prisma.guildExpeditionMember.create({
+      data: {
+        expeditionId: expedition.id,
+        playerId: bot.id,
+        currentHp: maxHp,
+        currentStamina: maxStamina,
+        currentMana: maxMana,
+        maxHp,
+        maxStamina,
+        maxMana,
+      },
+    });
+
+    botIds.push(bot.id);
+  }
+
+  res.json({
+    message: `Created ${botsNeeded} bot participants`,
+    botsCreated: botsNeeded,
+    botIds,
+    totalParticipants: currentCount + botsNeeded,
+    minRequired: minParticipants,
+  });
 }));
 
 export const adminRouter = router;
