@@ -103,14 +103,11 @@ export async function awardRoomTokens(
   const tierMultiplier = EXPEDITION_CONSTANTS.TOKEN_TIER_MULTIPLIER[tier - 1] ?? 1;
   const tokens = baseTokens * tierMultiplier;
 
-  await Promise.all(
-    members.map((m) =>
-      prisma.player.update({
-        where: { id: m.playerId },
-        data: { expeditionTokens: { increment: tokens } },
-      }),
-    ),
-  );
+  const playerIds = members.map((m) => m.playerId);
+  await prisma.player.updateMany({
+    where: { id: { in: playerIds } },
+    data: { expeditionTokens: { increment: tokens } },
+  });
 
   return tokens;
 }
@@ -143,14 +140,11 @@ export async function awardCompletionBonus(
 
   if (bonusTokens <= 0) return 0;
 
-  await Promise.all(
-    members.map((m) =>
-      prisma.player.update({
-        where: { id: m.playerId },
-        data: { expeditionTokens: { increment: bonusTokens } },
-      }),
-    ),
-  );
+  const playerIds = members.map((m) => m.playerId);
+  await prisma.player.updateMany({
+    where: { id: { in: playerIds } },
+    data: { expeditionTokens: { increment: bonusTokens } },
+  });
 
   return bonusTokens;
 }

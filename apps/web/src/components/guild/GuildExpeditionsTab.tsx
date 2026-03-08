@@ -516,7 +516,7 @@ function MemberList({
                 <div className="space-y-0.5">
                   <HpBar
                     current={m.currentHp}
-                    max={m.currentHp} // max not provided by API; show current as reference
+                    max={m.maxHp}
                     label="HP"
                     color={m.isKnockedOut ? 'var(--rpg-red)' : 'var(--rpg-green-light)'}
                   />

@@ -7,10 +7,13 @@ import type {
   BossTargetMode,
 } from '@pocketrealm/shared';
 import { COMBAT_CONSTANTS } from '@pocketrealm/shared';
-import { resolveAction } from './actionResolver';
+import {
+  resolveParticipantActions,
+  resolveSupportiveActions,
+  applyResourceCosts,
+} from './combatHelpers';
 import {
   addDamageThreat,
-  addHealThreat,
   applyTaunt,
   getSingleTarget,
   tickTaunts,
@@ -132,29 +135,7 @@ export function resolveBossRound(
   }));
 
   // --- Step 1: Pick actions for all participants ---
-  for (let i = 0; i < input.participants.length; i++) {
-    const p = input.participants[i];
-    const s = pState[i];
-    // Boss combat uses BossActiveEffect[] (different type from ActiveEffect[]),
-    // so player buff/debuff conditions won't trigger in boss fights.
-    // Resource conditions (HP/stamina/mana) still work correctly.
-    const resolved = resolveAction(
-      p.template,
-      s.templateRound,
-      s.hp,
-      p.maxHp,
-      s.stamina,
-      p.maxStamina,
-      s.mana,
-      p.maxMana,
-      [],
-      'combatantA',
-      p.actionDefinitions,
-    );
-    s.actionId = resolved.action.id;
-    s.wasExhausted = resolved.wasExhausted;
-    s.actionDef = resolved.action;
-  }
+  resolveParticipantActions(input.participants, pState);
 
   // Pick boss action
   const bossActionIndex = (input.boss.roundNumber - 1) % input.boss.template.length;
@@ -223,39 +204,7 @@ export function resolveBossRound(
   bossHp = Math.max(0, bossHp);
 
   // --- Step 6: Supportive actions ---
-  const alivePlayerIds = new Set(pState.filter(s => s.hp > 0).map(s => s.playerId));
-  const aggroHolder = getSingleTarget(input.threatTable, alivePlayerIds);
-
-  for (let i = 0; i < input.participants.length; i++) {
-    const p = input.participants[i];
-    const s = pState[i];
-    const def = s.actionDef;
-    if (!def || def.category !== 'supportive') continue;
-
-    // heal_self
-    if (def.actionType === 'heal_self') {
-      const healAmount = (def.healFlat ?? 0) + Math.floor((def.healPercent ?? 0) * p.maxHp);
-      const actualHeal = Math.min(healAmount, p.maxHp - s.hp);
-      s.hp += actualHeal;
-      s.healingDone = actualHeal;
-      addHealThreat(input.threatTable, s.playerId, actualHeal);
-    }
-
-    // heal_ally — auto-targets aggro holder
-    if (def.actionType === 'heal_ally' && aggroHolder) {
-      const healAmount = (def.healFlat ?? 0) + Math.floor((def.healPercent ?? 0) * p.maxHp);
-      const targetState = pState.find(ps => ps.playerId === aggroHolder);
-      const targetParticipant = input.participants.find(pp => pp.playerId === aggroHolder);
-      if (targetState && targetParticipant) {
-        const actualHeal = Math.min(healAmount, targetParticipant.maxHp - targetState.hp);
-        targetState.hp += actualHeal;
-        s.healingDone = actualHeal;
-        addHealThreat(input.threatTable, s.playerId, actualHeal);
-      }
-    }
-
-    // taunt is already handled in step 3
-  }
+  resolveSupportiveActions(input.participants, pState, input.threatTable);
 
   // --- Step 7: Boss action resolves against target(s) ---
   const bossTargetPlayerIds: string[] = [];
@@ -324,24 +273,7 @@ export function resolveBossRound(
   // --- Step 8: End-of-round ---
 
   // Deduct resource costs and apply regen
-  for (let i = 0; i < pState.length; i++) {
-    const s = pState[i];
-    const p = input.participants[i];
-    const def = s.actionDef;
-
-    // Deduct action cost
-    if (def && !s.wasExhausted) {
-      s.stamina -= def.cost.stamina;
-      s.mana -= def.cost.mana;
-    }
-
-    // Regen
-    s.stamina = Math.min(p.maxStamina, s.stamina + p.staminaRegenPerRound);
-    s.mana = Math.min(p.maxMana, s.mana + p.manaRegenPerRound);
-
-    // Advance template round
-    s.templateRound += 1;
-  }
+  applyResourceCosts(input.participants, pState);
 
   // Tick taunt durations
   tickTaunts(input.threatTable);

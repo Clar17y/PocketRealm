@@ -598,7 +598,7 @@ describe('expeditionService', () => {
           members: [makeMemberRow()],
         }),
       );
-      mockPrisma.player.update.mockResolvedValue({});
+      mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.guild.update.mockResolvedValue({});
       mockPrisma.guildExpeditionMember.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.guildExpeditionMember.findMany.mockResolvedValue([makeMemberRow()]);
@@ -607,10 +607,10 @@ describe('expeditionService', () => {
 
       await handleRoomCleared(EXPEDITION_ID);
 
-      // Tier 1 trash room tokens: 5 * 1 = 5
-      expect(mockPrisma.player.update).toHaveBeenCalledWith(
+      // Tier 1 trash room tokens: 5 * 1 = 5 (batched via updateMany)
+      expect(mockPrisma.player.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: PLAYER_ID },
+          where: { id: { in: [PLAYER_ID] } },
           data: { expeditionTokens: { increment: 5 } },
         }),
       );
@@ -684,7 +684,7 @@ describe('expeditionService', () => {
         }),
       );
       mockPrisma.guildExpedition.update.mockResolvedValue({});
-      mockPrisma.player.update.mockResolvedValue({});
+      mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.guild.update.mockResolvedValue({});
       mockPrisma.guildLog.create.mockResolvedValue({});
 
@@ -699,10 +699,10 @@ describe('expeditionService', () => {
           }),
         }),
       );
-      // Bonus tokens awarded: (5+8+20) * 1 (tier mult) * 1.0 (bonus mult) = 33
-      expect(mockPrisma.player.update).toHaveBeenCalledWith(
+      // Bonus tokens awarded: (5+8+20) * 1 (tier mult) * 1.0 (bonus mult) = 33 (batched via updateMany)
+      expect(mockPrisma.player.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: PLAYER_ID },
+          where: { id: { in: [PLAYER_ID] } },
           data: { expeditionTokens: { increment: 33 } },
         }),
       );

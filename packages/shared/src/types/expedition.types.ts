@@ -123,6 +123,9 @@ export interface ExpeditionMemberData {
   currentHp: number;
   currentStamina: number;
   currentMana: number;
+  maxHp: number;
+  maxStamina: number;
+  maxMana: number;
   isKnockedOut: boolean;
   totalDamage: number;
   totalHealing: number;

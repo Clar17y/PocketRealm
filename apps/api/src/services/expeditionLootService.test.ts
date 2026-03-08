@@ -157,7 +157,7 @@ describe('distributeRoomLoot', () => {
 describe('awardRoomTokens', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.player.update.mockResolvedValue({});
+    mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it('calculates correct tokens for room type and tier', async () => {
@@ -169,18 +169,16 @@ describe('awardRoomTokens', () => {
     expect(tokens).toBe(expected);
   });
 
-  it('increments expeditionTokens for all members', async () => {
+  it('increments expeditionTokens for all members via updateMany', async () => {
     const members = [{ playerId: 'p1' }, { playerId: 'p2' }, { playerId: 'p3' }];
 
     await awardRoomTokens(members, 'trash', 1);
 
-    expect(mockPrisma.player.update).toHaveBeenCalledTimes(3);
-    for (const m of members) {
-      expect(mockPrisma.player.update).toHaveBeenCalledWith({
-        where: { id: m.playerId },
-        data: { expeditionTokens: { increment: expect.any(Number) } },
-      });
-    }
+    expect(mockPrisma.player.updateMany).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.player.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['p1', 'p2', 'p3'] } },
+      data: { expeditionTokens: { increment: expect.any(Number) } },
+    });
   });
 
   it('scales tokens by tier multiplier', async () => {
@@ -188,7 +186,7 @@ describe('awardRoomTokens', () => {
 
     const tier1 = await awardRoomTokens(members, 'final_boss', 1);
     vi.clearAllMocks();
-    mockPrisma.player.update.mockResolvedValue({});
+    mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
     const tier2 = await awardRoomTokens(members, 'final_boss', 2);
 
     expect(tier2).toBe(tier1 * EXPEDITION_CONSTANTS.TOKEN_TIER_MULTIPLIER[1] / EXPEDITION_CONSTANTS.TOKEN_TIER_MULTIPLIER[0]);
@@ -207,7 +205,7 @@ describe('awardRoomTokens', () => {
 describe('awardCompletionBonus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.player.update.mockResolvedValue({});
+    mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it('calculates correct bonus from room types and tier', async () => {
@@ -224,19 +222,17 @@ describe('awardCompletionBonus', () => {
     expect(bonus).toBe(expectedBonus);
   });
 
-  it('increments tokens for all members', async () => {
+  it('increments tokens for all members via updateMany', async () => {
     const members = [{ playerId: 'p1' }, { playerId: 'p2' }];
     const roomTypes: Array<'trash' | 'elite'> = ['trash', 'elite'];
 
     await awardCompletionBonus(members, 1, roomTypes.length, roomTypes);
 
-    expect(mockPrisma.player.update).toHaveBeenCalledTimes(2);
-    for (const m of members) {
-      expect(mockPrisma.player.update).toHaveBeenCalledWith({
-        where: { id: m.playerId },
-        data: { expeditionTokens: { increment: expect.any(Number) } },
-      });
-    }
+    expect(mockPrisma.player.updateMany).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.player.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['p1', 'p2'] } },
+      data: { expeditionTokens: { increment: expect.any(Number) } },
+    });
   });
 
   it('scales bonus by tier', async () => {
@@ -245,7 +241,7 @@ describe('awardCompletionBonus', () => {
 
     const tier1 = await awardCompletionBonus(members, 1, 1, roomTypes);
     vi.clearAllMocks();
-    mockPrisma.player.update.mockResolvedValue({});
+    mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
     const tier2 = await awardCompletionBonus(members, 2, 1, roomTypes);
 
     expect(tier2).toBe(tier1 * EXPEDITION_CONSTANTS.TOKEN_TIER_MULTIPLIER[1] / EXPEDITION_CONSTANTS.TOKEN_TIER_MULTIPLIER[0]);
@@ -257,6 +253,6 @@ describe('awardCompletionBonus', () => {
     const bonus = await awardCompletionBonus(members, 1, 0, []);
 
     expect(bonus).toBe(0);
-    expect(mockPrisma.player.update).not.toHaveBeenCalled();
+    expect(mockPrisma.player.updateMany).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,8 @@ export * from './combat/bossContribution';
 export * from './combat/conditionEvaluator';
 export { resolveRaidRound } from './combat/raidRoundResolver';
 export type { RaidRoundRng } from './combat/raidRoundResolver';
+export { resolveParticipantActions, resolveSupportiveActions, applyResourceCosts } from './combat/combatHelpers';
+export type { CombatParticipantInput, CombatParticipantState } from './combat/combatHelpers';
 
 // Turns
 export * from './turns/turnCalculator';

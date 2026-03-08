@@ -25,6 +25,7 @@ import {
   initThreatTable,
   type MobPoolEntry,
 } from '@pocketrealm/game-engine';
+import { awardRoomTokens, awardCompletionBonus } from './expeditionLootService';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { addGuildLog } from './guildService';
@@ -85,6 +86,9 @@ interface GuildExpeditionMemberRow {
   currentHp: number;
   currentStamina: number;
   currentMana: number;
+  maxHp: number;
+  maxStamina: number;
+  maxMana: number;
   isKnockedOut: boolean;
   totalDamage: bigint;
   totalHealing: bigint;
@@ -101,6 +105,9 @@ function toExpeditionMemberData(m: GuildExpeditionMemberRow): ExpeditionMemberDa
     currentHp: m.currentHp,
     currentStamina: m.currentStamina,
     currentMana: m.currentMana,
+    maxHp: m.maxHp,
+    maxStamina: m.maxStamina,
+    maxMana: m.maxMana,
     isKnockedOut: m.isKnockedOut,
     totalDamage: Number(m.totalDamage),
     totalHealing: Number(m.totalHealing),
@@ -333,6 +340,9 @@ export async function signUpForExpedition(
         currentHp: maxHp,
         currentStamina: maxStamina,
         currentMana: maxMana,
+        maxHp,
+        maxStamina,
+        maxMana,
       },
     });
   });
@@ -699,18 +709,7 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
   const roomType = currentRoomDef?.roomType ?? 'trash';
 
   // Award per-room tokens to all members (flat, not contribution-weighted)
-  const baseTokens = EXPEDITION_CONSTANTS.TOKENS_PER_ROOM[roomType];
-  const tierMultiplier = EXPEDITION_CONSTANTS.TOKEN_TIER_MULTIPLIER[expedition.tier - 1];
-  const tokens = baseTokens * tierMultiplier;
-
-  await Promise.all(
-    expedition.members.map(m =>
-      prisma.player.update({
-        where: { id: m.playerId },
-        data: { expeditionTokens: { increment: tokens } },
-      }),
-    ),
-  );
+  await awardRoomTokens(expedition.members, roomType, expedition.tier);
 
   // Award guild XP
   await prisma.guild.update({
@@ -948,24 +947,9 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
   });
 
   // Award completion bonus tokens
-  // Calculate total room tokens earned across all rooms, multiply by bonus multiplier
   const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
-  let totalRoomTokens = 0;
-  for (const room of rooms) {
-    const baseTokens = EXPEDITION_CONSTANTS.TOKENS_PER_ROOM[room.roomType];
-    const tierMultiplier = EXPEDITION_CONSTANTS.TOKEN_TIER_MULTIPLIER[expedition.tier - 1];
-    totalRoomTokens += baseTokens * tierMultiplier;
-  }
-  const bonusTokens = Math.floor(totalRoomTokens * EXPEDITION_CONSTANTS.COMPLETION_BONUS_MULTIPLIER);
-
-  await Promise.all(
-    expedition.members.map(m =>
-      prisma.player.update({
-        where: { id: m.playerId },
-        data: { expeditionTokens: { increment: bonusTokens } },
-      }),
-    ),
-  );
+  const roomTypes = rooms.map(r => r.roomType);
+  await awardCompletionBonus(expedition.members, expedition.tier, rooms.length, roomTypes);
 
   // Award guild XP completion bonus
   await prisma.guild.update({
