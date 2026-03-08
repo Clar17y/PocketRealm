@@ -14,6 +14,7 @@ import { XpRateBadge } from '@/components/common/XpRateBadge';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
+import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { ScreenContainer } from '../common/ScreenContainer';
@@ -182,27 +183,35 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
 
       {/* Exploration Playback (with embedded combat) */}
       {playbackData && (
-        <TurnPlayback
-          totalTurns={playbackData.totalTurns}
-          label={`Exploring ${playbackData.zoneName}`}
-          events={playbackData.events}
-          aborted={playbackData.aborted}
-          refundedTurns={playbackData.refundedTurns}
-          playerHpBefore={playbackData.playerHpBeforeExploration}
-          playerMaxHp={playbackData.playerMaxHp}
-          combatSpeedMs={combatSpeedMs}
-          explorationSpeedMs={explorationSpeedMs}
-          autoSkipKnownCombat={autoSkipKnownCombat}
-          bestiaryMobs={bestiaryMobs}
-          onComplete={onPlaybackComplete!}
-          onSkip={onPlaybackSkip!}
-          onPushLog={onPushLog}
-          combatLogPrefetch={combatLogPrefetch}
-          playerStartStamina={currentStamina}
-          playerStartMana={currentMana}
-          playerMaxStamina={maxStamina}
-          playerMaxMana={maxMana}
-        />
+        <PlaybackSurface
+          mode="overlay"
+          title="Exploration Playback"
+          subtitle={`Exploring ${playbackData.zoneName}`}
+          className="z-20"
+        >
+          <TurnPlayback
+            totalTurns={playbackData.totalTurns}
+            label={`Exploring ${playbackData.zoneName}`}
+            events={playbackData.events}
+            aborted={playbackData.aborted}
+            refundedTurns={playbackData.refundedTurns}
+            playerHpBefore={playbackData.playerHpBeforeExploration}
+            playerMaxHp={playbackData.playerMaxHp}
+            combatSpeedMs={combatSpeedMs}
+            explorationSpeedMs={explorationSpeedMs}
+            autoSkipKnownCombat={autoSkipKnownCombat}
+            bestiaryMobs={bestiaryMobs}
+            onComplete={onPlaybackComplete!}
+            onSkip={onPlaybackSkip!}
+            onPushLog={onPushLog}
+            combatLogPrefetch={combatLogPrefetch}
+            playerStartStamina={currentStamina}
+            playerStartMana={currentMana}
+            playerMaxStamina={maxStamina}
+            playerMaxMana={maxMana}
+            embedded
+          />
+        </PlaybackSurface>
       )}
 
       {/* Normal exploration UI — hide during playback */}

@@ -21,6 +21,7 @@ import {
   type PvpChallengeResponse,
 } from '@/lib/api';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
+import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { PVP_CONSTANTS } from '@pocketrealm/shared';
 import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
@@ -255,9 +256,13 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
     </PixelCard>
   );
 
-  // Challenge result: playback then rating summary
-  const resultPanel = lastResult && (
-    pvpPlaybackActive ? (
+  const playbackPanel = lastResult && pvpPlaybackActive && (
+    <PlaybackSurface
+      mode="overlay"
+      title="Arena Replay"
+      subtitle={`${lastResult.attackerName} vs ${lastResult.defenderName}`}
+      className="mb-4"
+    >
       <CombatPlayback
         mobDisplayName={lastResult.defenderName}
         outcome={lastResult.isDraw ? 'draw' : lastResult.winnerId === playerId ? 'victory' : 'defeat'}
@@ -278,61 +283,63 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
         onComplete={() => { setPvpPlaybackActive(false); void loadArenaData(); }}
         onSkip={() => { setPvpPlaybackActive(false); void loadArenaData(); }}
       />
-    ) : (
-      <PixelCard className="mb-4">
-        <div className="text-center py-2">
-          <div className={`text-xl font-bold mb-1 ${
-            lastResult.isDraw ? 'text-[var(--rpg-gold)]'
-              : lastResult.winnerId === playerId ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'
-          }`}>
-            {lastResult.isDraw ? 'Draw!' : lastResult.winnerId === playerId ? 'Victory!' : 'Defeat!'}
-          </div>
-          <p className="text-sm text-[var(--rpg-text-secondary)]">
-            {lastResult.attackerName} vs {lastResult.defenderName}
-            {lastResult.isDraw && ' — 100 rounds, no winner'}
+    </PlaybackSurface>
+  );
+
+  const resultSummaryPanel = lastResult && !pvpPlaybackActive && (
+    <PixelCard className="mb-4">
+      <div className="text-center py-2">
+        <div className={`text-xl font-bold mb-1 ${
+          lastResult.isDraw ? 'text-[var(--rpg-gold)]'
+            : lastResult.winnerId === playerId ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'
+        }`}>
+          {lastResult.isDraw ? 'Draw!' : lastResult.winnerId === playerId ? 'Victory!' : 'Defeat!'}
+        </div>
+        <p className="text-sm text-[var(--rpg-text-secondary)]">
+          {lastResult.attackerName} vs {lastResult.defenderName}
+          {lastResult.isDraw && ' — 100 rounds, no winner'}
+        </p>
+        <p className="text-[12px] font-pixel mt-1">
+          Rating:{' '}
+          <span className={lastResult.attackerRatingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}>
+            {lastResult.attackerRatingChange >= 0 ? '+' : ''}{lastResult.attackerRatingChange}
+          </span>
+        </p>
+        {lastResult.fleeOutcome === 'knockout' && (
+          <p className="text-sm text-[var(--rpg-red)] mt-1 font-semibold">
+            Knocked out! You need to recover.
           </p>
-          <p className="text-[12px] font-pixel mt-1">
-            Rating:{' '}
-            <span className={lastResult.attackerRatingChange >= 0 ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]'}>
-              {lastResult.attackerRatingChange >= 0 ? '+' : ''}{lastResult.attackerRatingChange}
-            </span>
+        )}
+        {lastResult.fleeOutcome === 'wounded_escape' && (
+          <p className="text-sm text-[var(--rpg-gold)] mt-1">
+            You limp away wounded.
           </p>
-          {lastResult.fleeOutcome === 'knockout' && (
-            <p className="text-sm text-[var(--rpg-red)] mt-1 font-semibold">
-              Knocked out! You need to recover.
-            </p>
-          )}
-          {lastResult.fleeOutcome === 'wounded_escape' && (
-            <p className="text-sm text-[var(--rpg-gold)] mt-1">
-              You limp away wounded.
-            </p>
-          )}
-          {lastResult.fleeOutcome === 'clean_escape' && (
-            <p className="text-sm text-[var(--rpg-text-secondary)] mt-1">
-              You escape relatively unscathed.
-            </p>
-          )}
-          <div className="flex items-center justify-center gap-3 mt-2">
-            {lastResult.attackerKnockedOut && onNavigate && (
-              <button
-                type="button"
-                onClick={() => { setLastResult(null); onNavigate('rest'); }}
-                className="text-sm text-[var(--rpg-gold)] underline font-semibold"
-              >
-                Recover
-              </button>
-            )}
+        )}
+        {lastResult.fleeOutcome === 'clean_escape' && (
+          <p className="text-sm text-[var(--rpg-text-secondary)] mt-1">
+            You escape relatively unscathed.
+          </p>
+        )}
+        <div className="flex items-center justify-center gap-3 mt-2">
+          {lastResult.attackerKnockedOut && onNavigate && (
             <button
               type="button"
-              onClick={() => setLastResult(null)}
-              className="text-xs text-[var(--rpg-text-secondary)] underline"
+              onClick={() => { setLastResult(null); onNavigate('rest'); }}
+              className="text-sm text-[var(--rpg-gold)] underline font-semibold"
             >
-              Dismiss
+              Recover
             </button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setLastResult(null)}
+            className="text-xs text-[var(--rpg-text-secondary)] underline"
+          >
+            Dismiss
+          </button>
         </div>
-      </PixelCard>
-    )
+      </div>
+    </PixelCard>
   );
 
   // View tabs
@@ -610,7 +617,8 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
     <ScreenContainer>
       {levelGate}
       {ratingPanel}
-      {resultPanel}
+      {playbackPanel}
+      {resultSummaryPanel}
 
       {error && (
         <div className="p-3 rounded bg-[var(--rpg-background)] border border-[var(--rpg-red)] text-[var(--rpg-red)] text-sm">
@@ -620,10 +628,11 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
 
       {viewTabs}
 
-      {activeView === 'ladder' && ladderView}
-      {activeView === 'history' && historyView}
-      {activeView === 'notifications' && notificationsView}
-      {activeView === 'rankings' && (
+      <div className={pvpPlaybackActive ? 'opacity-60 saturate-50 transition-all' : 'transition-all'}>
+        {activeView === 'ladder' && ladderView}
+        {activeView === 'history' && historyView}
+        {activeView === 'notifications' && notificationsView}
+        {activeView === 'rankings' && (
         <PixelCard>
           <LeaderboardTable
             entries={rankingsData?.entries ?? []}
@@ -644,7 +653,8 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
             </button>
           )}
         </PixelCard>
-      )}
+        )}
+      </div>
     </ScreenContainer>
   );
 }
