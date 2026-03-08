@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Prisma, prisma } from '@pocketrealm/database';
 import { createActivityLog } from '../../services/activityLogService';
+import type { EventModifierBadge } from '../../services/worldEventService';
 import {
   CRAFTING_CONSTANTS,
   GUILD_CONSTANTS,
@@ -21,6 +22,7 @@ import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
+import { getBuffValue, consumeBuffStandalone } from '../../services/buffService';
 import { trackProgress } from '../../services/progressService';
 import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
 import {
@@ -136,6 +138,9 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       return { turnSpend: spent, taxResult: tax };
     });
 
+    // Fetch shop crafting crit buff (consumed after crafting)
+    const shopCraftingCrit = await getBuffValue(playerId, 'crafting_crit');
+
     // Create result items (stack where possible)
     const craftedItemIds: string[] = [];
     const craftedItemDetails: Array<{
@@ -183,8 +188,9 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         : 'resource';
       const equipStats = await getEquipmentStats(playerId);
       const guildMods = await getPlayerGuildModifiers(playerId);
-      const effectiveLuck = guildMods.craftingCrit > 0
-        ? equipStats.luck + Math.floor(guildMods.craftingCrit / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
+      const combinedCritBonus = guildMods.craftingCrit + shopCraftingCrit;
+      const effectiveLuck = combinedCritBonus > 0
+        ? equipStats.luck + Math.floor(combinedCritBonus / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
         : equipStats.luck;
       const templateBaseStats = recipe.resultTemplate.baseStats as ItemStats | null | undefined;
 
@@ -236,6 +242,9 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         }
       }
     }
+
+    // Consume shop crafting crit buff (one use per craft action)
+    if (shopCraftingCrit > 0) await consumeBuffStandalone(playerId, 'crafting_crit');
 
     const xpGrant = await grantSkillXp(playerId, recipe.skillType, recipe.xpReward * quantity);
 
@@ -294,6 +303,9 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       },
     });
 
+    const craftingBuffBadges: EventModifierBadge[] = [];
+    if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });
+
     res.json({
       logId: log.id,
       turns: turnSpend,
@@ -307,5 +319,6 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       xp: serializeXpGrant(xpGrant),
       tax: taxInfoFromResult(taxResult),
       ...(craftQuestProgress.length > 0 ? { questProgress: craftQuestProgress } : {}),
+      ...(craftingBuffBadges.length > 0 ? { activeEvents: craftingBuffBadges } : {}),
     });
 }));

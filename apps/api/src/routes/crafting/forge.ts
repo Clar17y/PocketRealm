@@ -12,6 +12,7 @@ import {
   rollBonusStatsForRarity,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
+import { getBuffValue, hasActiveBuff, consumeBuff, consumeBuffStandalone } from '../../services/buffService';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
@@ -87,8 +88,19 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
     if (successChance === null) {
       throw new AppError(400, 'Legendary items cannot be upgraded', 'MAX_RARITY');
     }
+
+    // Check forge buffs from quest shop
+    const forgeLuckBonus = await getBuffValue(playerId, 'forge_luck');
+    const hasForgeProtection = await hasActiveBuff(playerId, 'forge_protection');
+
+    // forge_luck uses multiplicative bonus (2.0 = double chance), unlike other buffs which are additive
+    let adjustedChance = successChance;
+    if (forgeLuckBonus > 0) {
+      adjustedChance = Math.min(1, adjustedChance * forgeLuckBonus);
+    }
+
     const roll = Math.random();
-    const success = roll < successChance;
+    const success = roll < adjustedChance;
 
     // --- Achievement stat tracking ---
     await trackAchievements(playerId, { totalForgeUpgrades: 1 });
@@ -140,8 +152,10 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
           toRarity: nextRarity,
           success: true,
           successChance,
+          adjustedChance,
           roll,
           luckStat: equipmentStats.luck,
+          buffUsed: forgeLuckBonus > 0 ? 'forge_luck' : hasForgeProtection ? 'forge_protection' : null,
           sacrificialItem: {
             itemId: sacrificial.id,
             templateId: sacrificial.templateId,
@@ -154,6 +168,9 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         },
       });
 
+      // Consume forge_luck on success (it modified the chance); forge_protection not consumed (wasn't needed)
+      if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
+
       res.json({
         logId: log.id,
         turns: turnSpend,
@@ -161,21 +178,25 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
           action: 'upgrade',
           success: true,
           destroyed: false,
+          protected: false,
           itemId: item.id,
           fromRarity: currentRarity,
           toRarity: nextRarity,
           successChance,
+          adjustedChance,
           roll,
           sacrificialItemId: sacrificial.id,
           addedBonusStat: newRoll.stat,
           addedBonusValue: newRoll.value,
           bonusStats: upgradedBonusStats,
+          buffUsed: forgeLuckBonus > 0 ? 'forge_luck' : hasForgeProtection ? 'forge_protection' : null,
         },
         tax: taxInfoFromResult(taxResult),
       });
       return;
     }
 
+    const destroyed = !hasForgeProtection;
     const destroyedItemSnapshot = {
       itemId: item.id,
       templateId: item.templateId,
@@ -184,7 +205,10 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       currentDurability: item.currentDurability,
       maxDurability: item.maxDurability,
     };
-    await prisma.item.delete({ where: { id: item.id } });
+
+    if (destroyed) {
+      await prisma.item.delete({ where: { id: item.id } });
+    }
 
     const log = await createActivityLog({
       playerId,
@@ -197,17 +221,23 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         toRarity: nextRarity,
         success: false,
         successChance,
+        adjustedChance,
         roll,
         luckStat: equipmentStats.luck,
+        buffUsed: hasForgeProtection ? 'forge_protection' : forgeLuckBonus > 0 ? 'forge_luck' : null,
         sacrificialItem: {
           itemId: sacrificial.id,
           templateId: sacrificial.templateId,
           rarity: sacrificial.rarity,
         },
-        outcome: 'destroyed',
-        destroyedItem: destroyedItemSnapshot,
+        outcome: destroyed ? 'destroyed' : 'protected',
+        destroyedItem: destroyed ? destroyedItemSnapshot : undefined,
       },
     });
+
+    // Consume buffs after failed forge
+    if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
+    if (hasForgeProtection) await consumeBuffStandalone(playerId, 'forge_protection');
 
     res.json({
       logId: log.id,
@@ -215,13 +245,16 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       forge: {
         action: 'upgrade',
         success: false,
-        destroyed: true,
+        destroyed,
+        protected: hasForgeProtection,
         itemId: item.id,
         fromRarity: currentRarity,
         toRarity: nextRarity,
         successChance,
+        adjustedChance,
         roll,
         sacrificialItemId: sacrificial.id,
+        buffUsed: hasForgeProtection ? 'forge_protection' : forgeLuckBonus > 0 ? 'forge_luck' : null,
       },
       tax: taxInfoFromResult(taxResult),
     });

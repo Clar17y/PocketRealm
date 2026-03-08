@@ -8,7 +8,8 @@ export type AchievementCategory =
   | 'general'
   | 'family'
   | 'guild'
-  | 'casino';
+  | 'casino'
+  | 'shop';
 
 export interface AchievementReward {
   type: 'xp' | 'turns' | 'attribute_points' | 'item';

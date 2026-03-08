@@ -132,42 +132,40 @@ export async function getActiveQuests(
   });
   const playerLevel = player?.characterLevel ?? 1;
 
-  // Daily reset check
+  // Daily reset check — claim the reset timestamp first to prevent concurrent generation
   const needsDailyReset = state.lastDailyReset < todayStart;
   if (needsDailyReset) {
-    // Expire old active and unclaimed completed dailies
-    await prisma.playerQuest.updateMany({
-      where: { playerId, cadence: 'daily', status: { in: ['active', 'completed'] } },
-      data: { status: 'expired' },
-    });
-
-    // Generate new daily quests
-    await generateDailyQuests(playerId, playerLevel, now);
-
-    // Update state
-    await prisma.playerQuestState.update({
-      where: { playerId },
+    // Optimistic lock: update timestamp first so concurrent calls skip generation
+    const { count } = await prisma.playerQuestState.updateMany({
+      where: { playerId, lastDailyReset: { lt: todayStart } },
       data: { lastDailyReset: todayStart, dailyBonusClaimed: false, rerollsUsed: 0 },
     });
+
+    if (count > 0) {
+      // We won the race — expire old and generate new
+      await prisma.playerQuest.updateMany({
+        where: { playerId, cadence: 'daily', status: { in: ['active', 'completed'] } },
+        data: { status: 'expired' },
+      });
+      await generateDailyQuests(playerId, playerLevel, now);
+    }
   }
 
-  // Weekly reset check
+  // Weekly reset check — same optimistic lock pattern
   const needsWeeklyReset = state.lastWeeklyReset < weekStart;
   if (needsWeeklyReset) {
-    // Expire old active and unclaimed completed weeklies
-    await prisma.playerQuest.updateMany({
-      where: { playerId, cadence: 'weekly', status: { in: ['active', 'completed'] } },
-      data: { status: 'expired' },
-    });
-
-    // Generate new weekly quest
-    await generateWeeklyQuest(playerId, playerLevel, now);
-
-    // Update state
-    await prisma.playerQuestState.update({
-      where: { playerId },
+    const { count } = await prisma.playerQuestState.updateMany({
+      where: { playerId, lastWeeklyReset: { lt: weekStart } },
       data: { lastWeeklyReset: weekStart },
     });
+
+    if (count > 0) {
+      await prisma.playerQuest.updateMany({
+        where: { playerId, cadence: 'weekly', status: { in: ['active', 'completed'] } },
+        data: { status: 'expired' },
+      });
+      await generateWeeklyQuest(playerId, playerLevel, now);
+    }
   }
 
   // Return active + completed + claimed quests from the current period only

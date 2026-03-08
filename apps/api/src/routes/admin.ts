@@ -504,4 +504,23 @@ router.post('/resource-nodes/spawn', asyncHandler(async (req, res) => {
   res.json({ success: true, node, resourceType: template.resourceType, capacity: finalCapacity });
 }));
 
+// ---------------------------------------------------------------------------
+// Quest Tokens
+// ---------------------------------------------------------------------------
+
+const grantTokensSchema = z.object({ amount: z.number().int().min(1).max(100000) });
+
+router.post('/tokens/grant', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { amount } = grantTokensSchema.parse(req.body);
+
+  const state = await (prisma as any).playerQuestState.upsert({
+    where: { playerId },
+    create: { playerId, questTokens: amount, dailyBonusClaimed: false, lastDailyReset: new Date('2000-01-01'), lastWeeklyReset: new Date('2000-01-01') },
+    update: { questTokens: { increment: amount } },
+  });
+
+  res.json({ success: true, questTokens: state.questTokens });
+}));
+
 export const adminRouter = router;

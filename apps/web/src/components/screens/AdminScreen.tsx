@@ -24,6 +24,7 @@ import {
   adminSpawnEncounter,
   adminGetResourceNodes,
   adminSpawnResourceNode,
+  adminGrantTokens,
   type AdminItemTemplate,
   type AdminZone,
   type AdminMobTemplate,
@@ -74,6 +75,7 @@ function useAdminAction(onAction?: () => void) {
 
 function PlayerTab({ onAction }: { onAction?: () => void }) {
   const [turns, setTurns] = useState(10000);
+  const [tokens, setTokens] = useState(500);
   const [level, setLevel] = useState(10);
   const [xp, setXp] = useState(10000);
   const [attrPoints, setAttrPoints] = useState(10);
@@ -90,6 +92,15 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
           <input type="number" value={turns} onChange={(e) => setTurns(Number(e.target.value))}
             className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-32 text-[var(--rpg-text-primary)]" />
           <PixelButton size="sm" disabled={busy} onClick={() => act('Grant turns', () => adminGrantTurns(turns))}>Grant</PixelButton>
+        </div>
+      </PixelCard>
+
+      <PixelCard>
+        <h3 className="text-sm font-semibold text-[var(--rpg-gold)] mb-3">Quest Tokens</h3>
+        <div className="flex items-center gap-2">
+          <input type="number" value={tokens} onChange={(e) => setTokens(Number(e.target.value))}
+            className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-32 text-[var(--rpg-text-primary)]" />
+          <PixelButton size="sm" disabled={busy} onClick={() => act('Grant tokens', () => adminGrantTokens(tokens))}>Grant</PixelButton>
         </div>
       </PixelCard>
 

@@ -6,9 +6,12 @@ import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { SubNav } from '@/components/common/SubNav';
-import { Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, ShoppingBag, RefreshCw } from 'lucide-react';
-import { getQuestShop, purchaseQuestItem } from '@/lib/api';
-import type { PlayerQuestData, PlayerQuestStateData, QuestCategory, QuestShopItem } from '@pocketrealm/shared';
+import {
+  Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, RefreshCw,
+  Wrench, Zap, Package, Crown, Shield,
+} from 'lucide-react';
+import { getShopItems, purchaseShopItem, getPlayerBuffs, getBestiary, getPlayerGuild, getGuildContracts } from '@/lib/api';
+import type { PlayerQuestData, PlayerQuestStateData, QuestCategory, ShopItemData, PlayerBuffData } from '@pocketrealm/shared';
 import { QUEST_CONSTANTS } from '@pocketrealm/shared';
 
 interface QuestsProps {
@@ -19,6 +22,9 @@ interface QuestsProps {
   onClaimReward: (questId: string) => Promise<void>;
   onClaimBonus: () => Promise<void>;
   onReroll: (questId: string) => Promise<void>;
+  onShopPurchase?: () => void;
+  zones?: Array<{ id: string; name: string; zoneType: string }>;
+  homeTownId?: string | null;
 }
 
 const CATEGORY_ICONS: Record<QuestCategory, typeof Sword> = {
@@ -43,6 +49,14 @@ const SHOP_TABS = [
   { id: 'quests', label: 'Quests' },
   { id: 'shop', label: 'Shop' },
 ] as const;
+
+const SHOP_CATEGORY_CONFIG: Record<ShopItemData['category'], { label: string; icon: typeof Sword; color: string }> = {
+  reset: { label: 'Reset Scrolls', icon: RefreshCw, color: 'var(--rpg-blue-light)' },
+  upgrade: { label: 'Upgrade Scrolls', icon: Wrench, color: 'var(--rpg-gold)' },
+  buff: { label: 'Buff Scrolls', icon: Zap, color: 'var(--rpg-green-light)' },
+  utility: { label: 'Utility', icon: Package, color: 'var(--rpg-text-secondary)' },
+  prestige: { label: 'Prestige', icon: Crown, color: 'var(--rpg-purple)' },
+};
 
 function QuestProgressBar({ current, max, completed }: { current: number; max: number; completed: boolean }) {
   const pct = Math.min((current / max) * 100, 100);
@@ -148,46 +162,113 @@ function QuestCard({
   );
 }
 
-const SHOP_CATEGORY_COLORS: Record<QuestShopItem['category'], string> = {
-  consumable: 'var(--rpg-green-light)',
-  material: 'var(--rpg-blue-light)',
-  recipe: 'var(--rpg-purple)',
-  utility: 'var(--rpg-gold)',
-};
+// Buff badge for active buffs display
+function BuffBadge({ buff }: { buff: PlayerBuffData }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)]">
+      <Shield size={14} className="text-[var(--rpg-green-light)] flex-shrink-0" />
+      <div className="min-w-0">
+        <span className="text-xs text-[var(--rpg-text-primary)] truncate">
+          {buff.shopItemName}
+        </span>
+        <span className="text-[10px] text-[var(--rpg-text-secondary)] ml-1.5">
+          {buff.remainingUses} uses left{' '}
+          {buff.bonusValue >= 2 ? `(${buff.bonusValue}x chance)` : buff.bonusValue === 1 ? '(Active)' : `(+${Math.round(buff.bonusValue * 100)}%)`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ActiveBuffsPanel({ buffs }: { buffs: PlayerBuffData[] }) {
+  if (buffs.length === 0) {
+    return (
+      <PixelCard padding="sm">
+        <div className="text-xs text-[var(--rpg-text-secondary)] text-center py-1">
+          No active buffs
+        </div>
+      </PixelCard>
+    );
+  }
+
+  return (
+    <PixelCard padding="sm">
+      <div className="text-xs font-medium text-[var(--rpg-text-secondary)] mb-2">Active Buffs</div>
+      <div className="space-y-1">
+        {buffs.map((buff) => (
+          <BuffBadge key={buff.id} buff={buff} />
+        ))}
+      </div>
+    </PixelCard>
+  );
+}
 
 function ShopItemCard({
   item,
   tokens,
   onBuy,
-  buyingKey,
+  buyingId,
+  targetOptions,
+  targetValue,
+  onTargetChange,
+  targetPlaceholder,
+  disabledReason,
 }: {
-  item: QuestShopItem;
+  item: ShopItemData;
   tokens: number;
-  onBuy: (key: string) => void;
-  buyingKey: string | null;
+  onBuy: (item: ShopItemData) => void;
+  buyingId: string | null;
+  targetOptions?: Array<{ value: string; label: string }>;
+  targetValue?: string;
+  onTargetChange?: (value: string) => void;
+  targetPlaceholder?: string;
+  disabledReason?: string | null;
 }) {
   const canAfford = tokens >= item.cost;
-  const isBuying = buyingKey === item.key;
-  const categoryColor = SHOP_CATEGORY_COLORS[item.category];
+  const isBuying = buyingId === item.id;
+  const needsTarget = targetOptions != null && targetOptions.length > 0;
+  const config = SHOP_CATEGORY_CONFIG[item.category];
+  const Icon = config.icon;
+
+  // Purchase limit info
+  let limitText: string | null = null;
+  if (item.weeklyLimit != null) {
+    limitText = `${item.purchasesThisWeek ?? 0}/${item.weeklyLimit} this week`;
+  } else if (item.lifetimeLimit != null) {
+    limitText = `${item.purchasesLifetime ?? 0}/${item.lifetimeLimit} lifetime`;
+  }
+
+  // Buff details
+  let buffText: string | null = null;
+  if (item.buffType && item.buffValue != null && item.buffUses != null) {
+    const v = item.buffValue!;
+    const label = v >= 2 ? `${v}x chance` : v === 1 ? 'Active' : `+${Math.round(v * 100)}%`;
+    buffText = `${label} for ${item.buffUses} uses`;
+  }
 
   return (
     <PixelCard padding="sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <ShoppingBag size={16} style={{ color: categoryColor, flexShrink: 0 }} />
+            <Icon size={16} style={{ color: config.color, flexShrink: 0 }} />
             <span className="font-medium text-[var(--rpg-text-primary)] truncate">
               {item.name}
             </span>
-            {!item.permanent && (
+            {limitText && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]">
-                Limited
+                {limitText}
               </span>
             )}
           </div>
           <p className="text-xs text-[var(--rpg-text-secondary)] ml-6">
             {item.description}
           </p>
+          {buffText && (
+            <p className="text-[10px] text-[var(--rpg-green-light)] ml-6 mt-0.5">
+              {buffText}
+            </p>
+          )}
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
           <div className="flex items-center gap-1 text-sm font-mono">
@@ -196,37 +277,94 @@ function ShopItemCard({
               {item.cost}
             </span>
           </div>
+          {needsTarget && (
+            <select
+              value={targetValue ?? ''}
+              onChange={(e) => onTargetChange?.(e.target.value)}
+              className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-xs text-[var(--rpg-text-primary)] w-full"
+            >
+              <option value="">{targetPlaceholder ?? 'Select...'}</option>
+              {targetOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          )}
           <PixelButton
             variant="secondary"
             size="sm"
-            disabled
+            onClick={() => onBuy(item)}
+            disabled={!item.canPurchase || !canAfford || isBuying || (needsTarget && !targetValue) || !!disabledReason}
           >
-            Coming Soon
+            {isBuying ? '...' : 'Buy'}
           </PixelButton>
+          {disabledReason && (
+            <p className="text-[10px] text-[var(--rpg-red)] text-right">{disabledReason}</p>
+          )}
         </div>
       </div>
     </PixelCard>
   );
 }
 
-function ShopTab({ questTokens }: { questTokens: number }) {
-  const [shopItems, setShopItems] = useState<QuestShopItem[]>([]);
+function ShopTab({
+  questTokens,
+  onPurchase,
+  zones,
+  homeTownId,
+}: {
+  questTokens: number;
+  onPurchase?: () => void;
+  zones?: Array<{ id: string; name: string; zoneType: string }>;
+  homeTownId?: string | null;
+}) {
+  const [shopItems, setShopItems] = useState<ShopItemData[]>([]);
   const [tokens, setTokens] = useState(questTokens);
   const [shopLoading, setShopLoading] = useState(true);
   const [shopError, setShopError] = useState<string | null>(null);
-  const [buyingKey, setBuyingKey] = useState<string | null>(null);
+  const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [buffs, setBuffs] = useState<PlayerBuffData[]>([]);
+  const [purchaseMessage, setPurchaseMessage] = useState<string | null>(null);
+  const [targetSelections, setTargetSelections] = useState<Record<string, string>>({});
+  const [mobTemplates, setMobTemplates] = useState<Array<{ id: string; name: string }>>([]);
+  const [guildContracts, setGuildContracts] = useState<Array<{ id: string; name: string }>>([]);
 
   const loadShop = useCallback(async () => {
     setShopLoading(true);
     setShopError(null);
     try {
-      const res = await getQuestShop();
-      if (res.data) {
-        setShopItems(res.data.items);
-        setTokens(res.data.questTokens);
-      } else if (res.error) {
-        setShopError(res.error.message);
+      const [shopRes, buffsRes] = await Promise.all([getShopItems(), getPlayerBuffs()]);
+      if (shopRes.data) {
+        setShopItems(shopRes.data.items);
+        setTokens(shopRes.data.questTokens);
+      } else if (shopRes.error) {
+        setShopError(shopRes.error.message);
       }
+      if (buffsRes.data) {
+        setBuffs(buffsRes.data.buffs);
+      }
+
+      // Fetch bestiary for mob template names (teleport_scroll target)
+      try {
+        const bestiaryRes = await getBestiary();
+        if (bestiaryRes.data) {
+          setMobTemplates(bestiaryRes.data.mobs
+            .filter(m => m.isDiscovered)
+            .map(m => ({ id: m.id, name: m.name })));
+        }
+      } catch { /* bestiary not critical */ }
+
+      // Fetch guild contracts if player is in a guild
+      try {
+        const guildRes = await getPlayerGuild();
+        if (guildRes.data?.guild) {
+          const contractsRes = await getGuildContracts(guildRes.data.guild.id);
+          if (contractsRes.data) {
+            setGuildContracts(contractsRes.data.contracts
+              .filter(c => c.status === 'active')
+              .map(c => ({ id: c.id, name: c.name })));
+          }
+        }
+      } catch { /* not in guild */ }
     } catch {
       setShopError('Failed to load shop');
     } finally {
@@ -238,17 +376,68 @@ function ShopTab({ questTokens }: { questTokens: number }) {
     void loadShop();
   }, [loadShop]);
 
-  const handleBuy = async (itemKey: string) => {
-    setBuyingKey(itemKey);
+  const handleBuy = async (item: ShopItemData) => {
+    setBuyingId(item.id);
+    setPurchaseMessage(null);
     try {
-      const res = await purchaseQuestItem(itemKey);
+      const params: Record<string, string> = {};
+      const target = targetSelections[item.id];
+      if (item.key === 'teleport_scroll' && target) params.targetZoneId = target;
+      if (item.key === 'bestiary_tome' && target) params.targetMobTemplateId = target;
+      if (item.key === 'guild_contract_reroll' && target) params.targetContractId = target;
+
+      const res = await purchaseShopItem(item.id, Object.keys(params).length > 0 ? params : undefined);
       if (res.data) {
         setTokens(res.data.newBalance);
+        setPurchaseMessage(`Purchased ${item.name}!`);
+        // Clear target selection for purchased item
+        setTargetSelections(prev => { const next = { ...prev }; delete next[item.id]; return next; });
+        // Refresh shop state and buffs
+        void loadShop();
+        // Refresh player state (attributes, skills, etc. may have changed)
+        onPurchase?.();
+      } else if (res.error) {
+        setPurchaseMessage(res.error.message);
       }
+    } catch {
+      setPurchaseMessage('Purchase failed');
     } finally {
-      setBuyingKey(null);
+      setBuyingId(null);
     }
   };
+
+  function getItemTargetConfig(item: ShopItemData): {
+    options: Array<{ value: string; label: string }>;
+    placeholder: string;
+  } | null {
+    switch (item.key) {
+      case 'teleport_scroll':
+        return {
+          options: (zones ?? [])
+            .filter(z => z.name !== '???')
+            .map(z => ({ value: z.id, label: `${z.name} (${z.zoneType})` })),
+          placeholder: 'Select zone...',
+        };
+      case 'bestiary_tome':
+        return {
+          options: mobTemplates.map(m => ({ value: m.id, label: m.name })),
+          placeholder: 'Select monster...',
+        };
+      case 'guild_contract_reroll':
+        return {
+          options: guildContracts.map(c => ({ value: c.id, label: c.name })),
+          placeholder: 'Select contract...',
+        };
+      default:
+        return null;
+    }
+  }
+
+  function getItemDisabledReason(item: ShopItemData): string | null {
+    if (item.key === 'hearthstone' && !homeTownId) return 'Set a home town first (visit a town zone)';
+    if (item.key === 'guild_contract_reroll' && guildContracts.length === 0) return 'Requires active guild contract';
+    return null;
+  }
 
   if (shopLoading) {
     return <LoadingCard message="Loading shop..." />;
@@ -258,8 +447,17 @@ function ShopTab({ questTokens }: { questTokens: number }) {
     return <ErrorBanner message={shopError} />;
   }
 
-  const permanentItems = shopItems.filter(i => i.permanent);
-  const rotatingItems = shopItems.filter(i => !i.permanent);
+  // Group items by category, preserving sortOrder
+  const groupedItems = new Map<ShopItemData['category'], ShopItemData[]>();
+  const categoryOrder: ShopItemData['category'][] = ['reset', 'upgrade', 'buff', 'utility', 'prestige'];
+  for (const cat of categoryOrder) {
+    const items = shopItems
+      .filter((i) => i.category === cat)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    if (items.length > 0) {
+      groupedItems.set(cat, items);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -276,41 +474,51 @@ function ShopTab({ questTokens }: { questTokens: number }) {
         </div>
       </PixelCard>
 
-      {/* Permanent items */}
-      {permanentItems.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold mb-3 text-[var(--rpg-text-primary)]">Always Available</h2>
-          <div className="space-y-2">
-            {permanentItems.map(item => (
-              <ShopItemCard
-                key={item.key}
-                item={item}
-                tokens={tokens}
-                onBuy={(key) => void handleBuy(key)}
-                buyingKey={buyingKey}
-              />
-            ))}
-          </div>
+      {/* Active buffs */}
+      <ActiveBuffsPanel buffs={buffs} />
+
+      {/* Purchase feedback */}
+      {purchaseMessage && (
+        <div className="text-xs text-center text-[var(--rpg-text-secondary)] py-1">
+          {purchaseMessage}
         </div>
       )}
 
-      {/* Rotating items */}
-      {rotatingItems.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold mb-3 text-[var(--rpg-text-primary)]">Limited Stock</h2>
-          <div className="space-y-2">
-            {rotatingItems.map(item => (
-              <ShopItemCard
-                key={item.key}
-                item={item}
-                tokens={tokens}
-                onBuy={(key) => void handleBuy(key)}
-                buyingKey={buyingKey}
-              />
-            ))}
+      {/* Items grouped by category */}
+      {categoryOrder.map((cat) => {
+        const items = groupedItems.get(cat);
+        if (!items) return null;
+        const config = SHOP_CATEGORY_CONFIG[cat];
+        const CatIcon = config.icon;
+
+        return (
+          <div key={cat}>
+            <h2 className="text-sm font-semibold mb-2 text-[var(--rpg-text-primary)] flex items-center gap-1.5">
+              <CatIcon size={14} style={{ color: config.color }} />
+              {config.label}
+            </h2>
+            <div className="space-y-2">
+              {items.map((item) => {
+                const targetConfig = getItemTargetConfig(item);
+                return (
+                  <ShopItemCard
+                    key={item.id}
+                    item={item}
+                    tokens={tokens}
+                    onBuy={(i) => void handleBuy(i)}
+                    buyingId={buyingId}
+                    targetOptions={targetConfig?.options}
+                    targetValue={targetSelections[item.id]}
+                    onTargetChange={(v) => setTargetSelections(prev => ({ ...prev, [item.id]: v }))}
+                    targetPlaceholder={targetConfig?.placeholder}
+                    disabledReason={getItemDisabledReason(item)}
+                  />
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })}
 
       {shopItems.length === 0 && (
         <p className="text-center text-[var(--rpg-text-secondary)] py-8">
@@ -321,7 +529,7 @@ function ShopTab({ questTokens }: { questTokens: number }) {
   );
 }
 
-export function Quests({ quests, questState, loading, error, onClaimReward, onClaimBonus, onReroll }: QuestsProps) {
+export function Quests({ quests, questState, loading, error, onClaimReward, onClaimBonus, onReroll, onShopPurchase, zones, homeTownId }: QuestsProps) {
   const [activeTab, setActiveTab] = useState('quests');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [rerollingId, setRerollingId] = useState<string | null>(null);
@@ -376,7 +584,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
       <SubNav tabs={[...SHOP_TABS]} activeId={activeTab} onSelect={setActiveTab} />
 
       {activeTab === 'shop' ? (
-        <ShopTab questTokens={questState?.questTokens ?? 0} />
+        <ShopTab questTokens={questState?.questTokens ?? 0} onPurchase={onShopPurchase} zones={zones} homeTownId={homeTownId} />
       ) : (
         <>
           {/* Quest Token Balance + Daily Bonus */}
