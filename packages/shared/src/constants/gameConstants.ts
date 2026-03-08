@@ -7,7 +7,7 @@ import type {
   GuildProjectDefinition,
   GuildSpecializationDefinition,
 } from '../types/guild.types';
-import type { QuestTemplateDefinition, QuestShopItem } from '../types/quest.types';
+import type { QuestTemplateDefinition } from '../types/quest.types';
 
 // =============================================================================
 // TURN ECONOMY
@@ -1311,22 +1311,6 @@ export const QUEST_TEMPLATE_DEFINITIONS: readonly QuestTemplateDefinition[] = [
   { key: 'weekly_gather',   name: 'Stockpile',           description: 'Gather resources {target} times this week', category: 'gathering',   cadence: 'weekly', progressType: 'gather_actions',    targets: { low: 75, mid: 200, high: 400 },     rewards: { low: [15, 20], mid: [18, 25], high: [22, 30] } },
   { key: 'weekly_explore',  name: 'Cartographer',        description: 'Spend {target} turns exploring this week',  category: 'exploration', cadence: 'weekly', progressType: 'exploration_turns', targets: { low: 1000, mid: 3000, high: 8000 }, rewards: { low: [15, 20], mid: [18, 25], high: [22, 30] } },
   { key: 'weekly_craft',    name: 'Quality Crafter',     description: 'Craft {target} rare+ items this week',      category: 'crafting',    cadence: 'weekly', progressType: 'craft_rare',        targets: { low: 2, mid: 5, high: 10 },         rewards: { low: [15, 20], mid: [18, 25], high: [22, 30] } },
-] as const;
-
-// =============================================================================
-// QUEST SHOP
-// =============================================================================
-
-export const QUEST_SHOP_ITEMS: readonly QuestShopItem[] = [
-  // Permanent items
-  { key: 'minor_health_potion',  name: 'Minor Health Potion',    description: 'Restores a small amount of HP',               cost: 5,   category: 'consumable', permanent: true },
-  { key: 'health_potion',        name: 'Health Potion',          description: 'Restores a moderate amount of HP',            cost: 10,  category: 'consumable', permanent: true },
-  { key: 'repair_kit',           name: 'Repair Kit',             description: 'Repairs equipped gear without gold cost',     cost: 12,  category: 'utility',    permanent: true },
-  { key: 'xp_scroll_small',      name: 'Minor XP Scroll',       description: 'Grants a small amount of character XP',       cost: 15,  category: 'utility',    permanent: true },
-  { key: 'xp_scroll_large',      name: 'Major XP Scroll',       description: 'Grants a large amount of character XP',       cost: 30,  category: 'utility',    permanent: true },
-  // Rotating items (shown only some weeks -- for now, show all)
-  { key: 'rare_material_bundle', name: 'Rare Material Bundle',   description: 'A bundle of assorted rare crafting materials', cost: 25,  category: 'material',   permanent: false },
-  { key: 'stat_reset_scroll',    name: 'Stat Reset Scroll',      description: 'Reset your attribute points',                 cost: 40,  category: 'utility',    permanent: false },
 ] as const;
 
 // =============================================================================

@@ -88,7 +88,7 @@ Active buffs from scroll purchases. Rows deleted when `remainingUses` hits 0.
 | Key | Name | Cost | Weekly | Lifetime | Effect |
 |---|---|---|---|---|---|
 | `forge_luck_scroll` | Forge Luck Scroll | 35 | 2 | - | Double forge upgrade chance for next 3 upgrades |
-| `forge_protection_scroll` | Forge Protection Scroll | 150 | 1 | - | Guaranteed success on next forge upgrade (item preserved on failure, sacrificial item still consumed) |
+| `forge_protection_scroll` | Forge Protection Scroll | 75 | 2 | - | Protects item from destruction on next failed forge upgrade (sacrificial item still consumed) |
 
 ### Buff Scrolls (action-count based)
 

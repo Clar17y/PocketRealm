@@ -50,6 +50,8 @@ import { getIo } from '../../socket';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
 import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
+import { getCombatBuffs, applyCombatBuffs, consumeBuffIfActive } from '../../services/buffService';
+import type { EventModifierBadge } from '../../services/worldEventService';
 import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
@@ -129,6 +131,17 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const attackLevel = await getSkillLevel(playerId, attackSkill);
 
     const guildMods = await getPlayerGuildModifiers(playerId);
+    const combatBuffs = await getCombatBuffs(playerId);
+    const buffUsesLeft = { damage: 0, defence: 0, durability: 0 };
+    if (combatBuffs.damageBoost > 0 || combatBuffs.defenceBoost > 0 || combatBuffs.durabilityShield > 0) {
+      const allBuffs = await (prisma as any).playerBuff.findMany({ where: { playerId, buffType: { in: ['combat_damage', 'combat_defence', 'durability_shield'] } }, select: { buffType: true, remainingUses: true } });
+      for (const b of allBuffs) {
+        if (b.buffType === 'combat_damage') buffUsesLeft.damage = b.remainingUses;
+        if (b.buffType === 'combat_defence') buffUsesLeft.defence = b.remainingUses;
+        if (b.buffType === 'durability_shield') buffUsesLeft.durability = b.remainingUses;
+      }
+    }
+
     const perActionScaling = await buildPerActionScaling(playerId, {
       equipmentStats,
       attributes: progression.attributes,
@@ -330,6 +343,13 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           equipmentStats
         );
 
+        // Apply quest shop combat buffs
+        const mobBuffs = {
+          damageBoost: buffUsesLeft.damage > 0 ? combatBuffs.damageBoost : 0,
+          defenceBoost: buffUsesLeft.defence > 0 ? combatBuffs.defenceBoost : 0,
+        };
+        applyCombatBuffs(playerStats, mobBuffs);
+
         const combatOptions: CombatOptions | undefined = potionPool.length > 0
           ? { potions: [...potionPool] }
           : undefined;
@@ -358,7 +378,16 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           allPotionsConsumed.push(consumed);
         }
 
-        const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
+        const durabilityLost = buffUsesLeft.durability > 0
+          ? []
+          : await degradeEquippedDurability(playerId, combatResult.log);
+
+        // Consume combat buff charges per ambush mob
+        await prisma.$transaction(async (tx) => {
+          if (buffUsesLeft.damage > 0) { await consumeBuffIfActive(tx, playerId, 'combat_damage'); buffUsesLeft.damage--; }
+          if (buffUsesLeft.defence > 0) { await consumeBuffIfActive(tx, playerId, 'combat_defence'); buffUsesLeft.defence--; }
+          if (buffUsesLeft.durability > 0) { await consumeBuffIfActive(tx, playerId, 'durability_shield'); buffUsesLeft.durability--; }
+        });
 
         // Determine mob family once for event modifier badges (used in both victory and defeat paths)
         const ambushMobFamily = zoneFamilies.find((f: ZoneFamilyRow) =>
@@ -367,6 +396,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         const ambushEventModifiers = ambushMobFamily
           ? filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: ambushMobFamily.mobFamilyId })
           : [];
+
+        // Build buff badges for this ambush (reflect state at time of fight)
+        const ambushBuffBadges: (EventModifierBadge & { appliedToThisMob: boolean })[] = [];
+        if (mobBuffs.damageBoost > 0) ambushBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: mobBuffs.damageBoost, isGlobal: false, appliedToThisMob: true });
+        if (mobBuffs.defenceBoost > 0) ambushBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: mobBuffs.defenceBoost, isGlobal: false, appliedToThisMob: true });
+        if (buffUsesLeft.durability + 1 > 0 && combatBuffs.durabilityShield > 0 && durabilityLost.length === 0) {
+          ambushBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: combatBuffs.durabilityShield, isGlobal: false, appliedToThisMob: true });
+        }
 
         let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
         let xpGain = 0;
@@ -410,7 +447,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 durabilityLost,
                 skillXpGrants: xpGrants.map(serializeXpGrant),
               },
-              eventModifiers: ambushEventModifiers,
+              eventModifiers: [...ambushEventModifiers, ...ambushBuffBadges],
             }),
           });
 
@@ -431,7 +468,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
               xp: xpGain,
               loot,
               durabilityLost,
-              eventModifiers: ambushEventModifiers,
+              eventModifiers: [...ambushEventModifiers, ...ambushBuffBadges],
             },
           });
         } else {
@@ -480,7 +517,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 durabilityLost,
                 skillXpGrants: [],
               },
-              eventModifiers: ambushEventModifiers,
+              eventModifiers: [...ambushEventModifiers, ...ambushBuffBadges],
             }),
           });
 
@@ -505,7 +542,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
                 recoveryCost: fleeResult.recoveryCost,
               },
               durabilityLost,
-              eventModifiers: ambushEventModifiers,
+              eventModifiers: [...ambushEventModifiers, ...ambushBuffBadges],
             },
           });
 

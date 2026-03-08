@@ -61,6 +61,7 @@ import { incrementStats } from '../../services/statsService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
+import { getCombatBuffs, applyCombatBuffs, consumeCombatBuffs, consumeBuffIfActive } from '../../services/buffService';
 import { buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import {
   prismaAny,
@@ -175,6 +176,19 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   // Guild combat modifiers
   const guildMods = await getPlayerGuildModifiers(playerId);
 
+  // Quest shop combat buffs — track remaining uses locally for per-mob consumption
+  const combatBuffs = await getCombatBuffs(playerId);
+  const buffUsesLeft = { damage: combatBuffs.damageBoost > 0 ? 1 : 0, defence: combatBuffs.defenceBoost > 0 ? 1 : 0, durability: combatBuffs.durabilityShield > 0 ? 1 : 0 };
+  // Resolve actual remaining uses from DB for encounter site multi-mob fights
+  if (combatBuffs.damageBoost > 0 || combatBuffs.defenceBoost > 0 || combatBuffs.durabilityShield > 0) {
+    const allBuffs = await (prisma as any).playerBuff.findMany({ where: { playerId, buffType: { in: ['combat_damage', 'combat_defence', 'durability_shield'] } }, select: { buffType: true, remainingUses: true } });
+    for (const b of allBuffs) {
+      if (b.buffType === 'combat_damage') buffUsesLeft.damage = b.remainingUses;
+      if (b.buffType === 'combat_defence') buffUsesLeft.defence = b.remainingUses;
+      if (b.buffType === 'durability_shield') buffUsesLeft.durability = b.remainingUses;
+    }
+  }
+
   // Per-action scaling for template combat engine
   const perActionScaling = await buildPerActionScaling(playerId, {
     equipmentStats,
@@ -250,6 +264,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
       applyGuildCombatModifiers(playerStats, guildMods);
 
+      // Apply quest shop combat buffs only if uses remain
+      const mobBuffs = {
+        damageBoost: buffUsesLeft.damage > 0 ? combatBuffs.damageBoost : 0,
+        defenceBoost: buffUsesLeft.defence > 0 ? combatBuffs.defenceBoost : 0,
+      };
+      applyCombatBuffs(playerStats, mobBuffs);
+
       const combatOptions: CombatOptions | undefined = potionPool.length > 0
         ? { potions: [...potionPool] }
         : undefined;
@@ -283,7 +304,16 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       let mobLoot: LootDropWithName[] = [];
       let mobXpGrants: GrantXpResult[] = [];
       const mobXpAwarded = combatResult.outcome === 'victory' ? Math.max(0, prefixedMob.xpReward) : 0;
-      const mobDurabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
+      const mobDurabilityLost = buffUsesLeft.durability > 0
+        ? []
+        : await degradeEquippedDurability(playerId, combatResult.log);
+
+      // Consume combat buff charges per mob
+      await prisma.$transaction(async (tx) => {
+        if (buffUsesLeft.damage > 0) { await consumeBuffIfActive(tx, playerId, 'combat_damage'); buffUsesLeft.damage--; }
+        if (buffUsesLeft.defence > 0) { await consumeBuffIfActive(tx, playerId, 'combat_defence'); buffUsesLeft.defence--; }
+        if (buffUsesLeft.durability > 0) { await consumeBuffIfActive(tx, playerId, 'durability_shield'); buffUsesLeft.durability--; }
+      });
 
       if (combatResult.outcome === 'victory') {
         await setAllResources(playerId, combatResult.combatantAHpRemaining, currentStamina, currentMana);
@@ -432,6 +462,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   if (allSiteOverflow.length > 0) {
     sitePendingLootSessionId = await storePendingLoot(playerId, allSiteOverflow);
   }
+
+  // Combat buffs already consumed per-mob inside the fight loop above
 
   // --- Defeat handling (last fight only) ---
   const lastFight = fightResults[fightResults.length - 1];
@@ -688,9 +720,17 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       percent: explorationProgress.percent,
       turnsToExplore: explorationProgress.turnsToExplore,
     },
-    activeEvents: activeEventEffects.length > 0
-      ? tagEventsWithApplicability(activeEventEffects, siteMobBadges)
-      : undefined,
+    activeEvents: (() => {
+      const siteBuffBadges = [];
+      if (combatBuffs.damageBoost > 0) siteBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: combatBuffs.damageBoost, isGlobal: false, appliedToThisMob: true });
+      if (combatBuffs.defenceBoost > 0) siteBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: combatBuffs.defenceBoost, isGlobal: false, appliedToThisMob: true });
+      if (combatBuffs.durabilityShield > 0) siteBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: combatBuffs.durabilityShield, isGlobal: false, appliedToThisMob: true });
+      const all = [
+        ...tagEventsWithApplicability(activeEventEffects, siteMobBadges),
+        ...siteBuffBadges,
+      ];
+      return all.length > 0 ? all : undefined;
+    })(),
     ...(allQuestProgress.length > 0 ? { questProgress: allQuestProgress } : {}),
   });
 }
@@ -790,6 +830,9 @@ export function registerStartRoutes(router: Router): void {
       // Guild combat modifiers
       const guildMods = await getPlayerGuildModifiers(playerId);
 
+      // Quest shop combat buffs
+      const zoneCombatBuffs = await getCombatBuffs(playerId);
+
       // Per-action scaling for template combat engine
       const perActionScaling = await buildPerActionScaling(playerId, {
         equipmentStats,
@@ -810,6 +853,9 @@ export function registerStartRoutes(router: Router): void {
       );
 
       applyGuildCombatModifiers(playerStats, guildMods);
+
+      // Apply quest shop combat buffs
+      applyCombatBuffs(playerStats, zoneCombatBuffs);
 
       const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
       const [zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyRow] = await Promise.all([
@@ -871,7 +917,9 @@ export function registerStartRoutes(router: Router): void {
       let pendingLootSessionId: string | null = null;
       let xpGrants: GrantXpResult[] = [];
       let zoneQuestProgress: QuestProgressUpdate[] = [];
-      const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
+      const durabilityLost = zoneCombatBuffs.durabilityShield > 0
+        ? []
+        : await degradeEquippedDurability(playerId, combatResult.log);
       let fleeResult = null as null | ReturnType<typeof calculateFleeResult>;
       let respawnedTo: { townId: string; townName: string } | null = null;
 
@@ -920,6 +968,13 @@ export function registerStartRoutes(router: Router): void {
         await removePersistedMob(persistedMobId);
       } else if (combatResult.outcome === 'defeat' && combatResult.combatantBHpRemaining > 0) {
         await persistMobHp(playerId, prefixedMob.id, zoneId, combatResult.combatantBHpRemaining, prefixedMob.hp);
+      }
+
+      // Consume quest shop combat buffs (regardless of outcome)
+      if (zoneCombatBuffs.damageBoost > 0 || zoneCombatBuffs.defenceBoost > 0 || zoneCombatBuffs.durabilityShield > 0) {
+        await prisma.$transaction(async (tx) => {
+          await consumeCombatBuffs(tx, playerId, zoneCombatBuffs);
+        });
       }
 
       const lootWithNames = await enrichLootWithNames(loot);
@@ -1039,9 +1094,17 @@ export function registerStartRoutes(router: Router): void {
           percent: explorationProgress.percent,
           turnsToExplore: explorationProgress.turnsToExplore,
         },
-        activeEvents: activeEventEffects.length > 0
-          ? tagEventsWithApplicability(activeEventEffects, zoneMobBadges)
-          : undefined,
+        activeEvents: (() => {
+          const combatBuffBadges = [];
+          if (zoneCombatBuffs.damageBoost > 0) combatBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: zoneCombatBuffs.damageBoost, isGlobal: false, appliedToThisMob: true });
+          if (zoneCombatBuffs.defenceBoost > 0) combatBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: zoneCombatBuffs.defenceBoost, isGlobal: false, appliedToThisMob: true });
+          if (zoneCombatBuffs.durabilityShield > 0) combatBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: zoneCombatBuffs.durabilityShield, isGlobal: false, appliedToThisMob: true });
+          const all = [
+            ...tagEventsWithApplicability(activeEventEffects, zoneMobBadges),
+            ...combatBuffBadges,
+          ];
+          return all.length > 0 ? all : undefined;
+        })(),
         ...(zoneQuestProgress.length > 0 ? { questProgress: zoneQuestProgress } : {}),
       });
   }));

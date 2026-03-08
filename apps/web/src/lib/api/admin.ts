@@ -184,3 +184,10 @@ export async function adminSpawnResourceNode(resourceNodeId: string, capacity?: 
     body: JSON.stringify({ resourceNodeId, ...(capacity !== undefined && { capacity }) }),
   });
 }
+
+export async function adminGrantTokens(amount: number) {
+  return fetchApi<{ success: boolean; questTokens: number }>('/api/v1/admin/tokens/grant', {
+    method: 'POST',
+    body: JSON.stringify({ amount }),
+  });
+}

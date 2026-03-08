@@ -329,9 +329,12 @@ export async function forgeUpgrade(itemId: string, sacrificialItemId: string) {
       fromRarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
       toRarity: 'uncommon' | 'rare' | 'epic' | 'legendary';
       successChance: number;
+      adjustedChance?: number;
       roll: number;
       sacrificialItemId: string;
       bonusStats?: Record<string, number> | null;
+      buffUsed?: string | null;
+      protected?: boolean;
     };
     tax: TaxInfo | null;
   }>('/api/v1/crafting/forge/upgrade', {
