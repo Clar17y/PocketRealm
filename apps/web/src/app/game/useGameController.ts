@@ -1292,6 +1292,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       travelRouteRef.current = null;
       setPlaybackActive(false);
       setActionError(res.error?.message ?? 'Travel failed');
+      // Earlier hops may have committed — reload world state and drain queued loot
+      await loadAll();
+      if (pendingLootQueueRef.current.length > 0) {
+        await activateNextQueuedLoot();
+      }
       return;
     }
 
