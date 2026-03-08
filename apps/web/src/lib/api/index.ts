@@ -253,6 +253,7 @@ export {
   getExpeditionHistory,
   launchExpedition,
   signUpForExpedition,
+  forceStartExpedition,
   recoverFromExpeditionKO,
   getExpeditionShop,
   purchaseExpeditionItem,

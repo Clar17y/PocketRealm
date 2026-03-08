@@ -9,6 +9,7 @@ import {
   launchExpedition,
   signUpForExpedition,
   recoverFromKO,
+  forceStartExpedition,
 } from '../services/expeditionService';
 import {
   getShopItems,
@@ -162,6 +163,13 @@ expeditionRouter.post('/:id/signup', asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
   const member = await signUpForExpedition(id, req.player!.playerId);
   res.json({ member });
+}));
+
+// POST /:id/force-start
+expeditionRouter.post('/:id/force-start', asyncHandler(async (req, res) => {
+  const { id } = expeditionIdSchema.parse(req.params);
+  const result = await forceStartExpedition(id, req.player!.playerId);
+  res.json(result);
 }));
 
 // POST /:id/recover

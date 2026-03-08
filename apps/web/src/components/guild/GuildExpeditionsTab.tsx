@@ -9,6 +9,7 @@ import {
   getExpeditionStatus,
   launchExpedition,
   signUpForExpedition,
+  forceStartExpedition,
   recoverFromExpeditionKO,
 } from '@/lib/api/expedition';
 import type {
@@ -173,6 +174,23 @@ export function GuildExpeditionsTab({
     }
   };
 
+  const handleForceStart = async () => {
+    if (!expedition) return;
+    if (!confirm('Force start the expedition now? The signup window will end immediately.')) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await forceStartExpedition(expedition.id);
+      if (res.error) { setError(res.error.message); return; }
+      void loadExpedition();
+      onRefresh?.();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to force start');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleRecover = async () => {
     if (!expedition) return;
     setActionLoading(true);
@@ -205,7 +223,9 @@ export function GuildExpeditionsTab({
           members={members}
           characterLevel={characterLevel}
           actionLoading={actionLoading}
+          isOfficer={isOfficer}
           onSignup={handleSignup}
+          onForceStart={handleForceStart}
         />
       );
     case 'in_progress':
@@ -306,13 +326,17 @@ function RecruitingView({
   members,
   characterLevel,
   actionLoading,
+  isOfficer,
   onSignup,
+  onForceStart,
 }: {
   expedition: ExpeditionData;
   members: ExpeditionMemberData[];
   characterLevel: number;
   actionLoading: boolean;
+  isOfficer: boolean;
   onSignup: () => void;
+  onForceStart: () => void;
 }) {
   const tierCfg = TIER_CONFIGS.find((c) => c.tier === expedition.tier);
   const meetsLevel = tierCfg ? characterLevel >= tierCfg.levelReq : true;
@@ -345,13 +369,25 @@ function RecruitingView({
           <Countdown expiresAt={expedition.nextRoundAt} />
         </div>
 
-        <PixelButton
-          size="sm"
-          onClick={onSignup}
-          disabled={actionLoading || !meetsLevel}
-        >
-          {!meetsLevel ? `Level ${tierCfg?.levelReq} Required` : actionLoading ? 'Signing up...' : 'Sign Up'}
-        </PixelButton>
+        <div className="flex gap-2">
+          <PixelButton
+            size="sm"
+            onClick={onSignup}
+            disabled={actionLoading || !meetsLevel}
+          >
+            {!meetsLevel ? `Level ${tierCfg?.levelReq} Required` : actionLoading ? 'Signing up...' : 'Sign Up'}
+          </PixelButton>
+          {isOfficer && members.length > 0 && (
+            <PixelButton
+              size="sm"
+              variant="danger"
+              onClick={onForceStart}
+              disabled={actionLoading}
+            >
+              Force Start
+            </PixelButton>
+          )}
+        </div>
       </PixelCard>
 
       {members.length > 0 && (

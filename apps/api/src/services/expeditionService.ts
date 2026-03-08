@@ -359,6 +359,64 @@ export async function signUpForExpedition(
 }
 
 // ---------------------------------------------------------------------------
+// Force Start Expedition
+// ---------------------------------------------------------------------------
+
+export async function forceStartExpedition(
+  expeditionId: string,
+  playerId: string,
+): Promise<{ success: boolean; message: string }> {
+  const [expedition, membership] = await Promise.all([
+    prisma.guildExpedition.findUnique({
+      where: { id: expeditionId },
+      include: { _count: { select: { members: true } } },
+    }),
+    prisma.guildMember.findUnique({
+      where: { playerId },
+      select: { guildId: true, role: true },
+    }),
+  ]);
+
+  if (!expedition || expedition.status !== 'recruiting') {
+    throw new AppError(400, 'Expedition is not in recruiting phase', 'NOT_RECRUITING');
+  }
+  if (!membership || membership.guildId !== expedition.guildId) {
+    throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
+  }
+  if (membership.role === 'member') {
+    throw new AppError(403, 'Officer or leader role required', 'INSUFFICIENT_ROLE');
+  }
+  if (expedition._count.members === 0) {
+    throw new AppError(400, 'No participants signed up', 'NO_PARTICIPANTS');
+  }
+
+  // Transition to in_progress (same pattern as checkAndResolveExpeditionRounds)
+  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
+  const snapshot = {
+    mobs: rooms[0]?.mobs ?? [],
+    members: await getMembers(expeditionId),
+  };
+
+  await prisma.guildExpedition.update({
+    where: { id: expeditionId },
+    data: {
+      status: 'in_progress',
+      roomStartSnapshot: JSON.parse(JSON.stringify(snapshot)),
+      nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.ROUND_INTERVAL_MS),
+    },
+  });
+
+  await addGuildLog(
+    expedition.guildId,
+    'expedition_started',
+    `Tier ${expedition.tier} expedition force-started with ${expedition._count.members} members`,
+    { expeditionId },
+  );
+
+  return { success: true, message: 'Expedition started' };
+}
+
+// ---------------------------------------------------------------------------
 // Get Active Expedition
 // ---------------------------------------------------------------------------
 

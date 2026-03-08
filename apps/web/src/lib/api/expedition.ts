@@ -68,6 +68,12 @@ export async function signUpForExpedition(id: string) {
   });
 }
 
+export async function forceStartExpedition(id: string) {
+  return fetchApi<{ success: boolean; message: string }>(`/api/v1/expedition/${id}/force-start`, {
+    method: 'POST',
+  });
+}
+
 export async function recoverFromExpeditionKO(id: string) {
   return fetchApi<{ member: ExpeditionMemberData }>(`/api/v1/expedition/${id}/recover`, {
     method: 'POST',
