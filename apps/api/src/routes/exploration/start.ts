@@ -40,14 +40,14 @@ import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
 import { addExplorationTurns, calculateExplorationPercent, getExplorationPercent } from '../../services/zoneExplorationService';
-import { computeZoneModifiers, computeSpawnRateModifiers, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, spawnWorldEvent, type EventModifierBadge } from '../../services/worldEventService';
+import { computeZoneModifiers, computeSpawnRateModifiers, getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers, spawnWorldEvent } from '../../services/worldEventService';
 import { createBossEncounter } from '../../services/bossEncounterService';
 import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { getIo } from '../../socket';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
 import { deductConsumedPotions } from '../../services/potionService';
-import { getCombatBuffs, applyCombatBuffs, consumeBuffIfActive } from '../../services/buffService';
+import { getCombatBuffsWithUses, applyCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges, type CombatBuffBadge } from '../../services/buffService';
 import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
@@ -131,16 +131,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const { attackSkill, attackLevel, guildMods, perActionScaling, playerTemplate, potionPool, resources, unlockedActions: explorationUnlockedActions } = combatPrep;
 
     // Quest shop combat buffs — track remaining uses for per-ambush consumption
-    const combatBuffs = await getCombatBuffs(playerId);
-    const buffUsesLeft = { damage: 0, defence: 0, durability: 0 };
-    if (combatBuffs.damageBoost > 0 || combatBuffs.defenceBoost > 0 || combatBuffs.durabilityShield > 0) {
-      const allBuffs = await (prisma as any).playerBuff.findMany({ where: { playerId, buffType: { in: ['combat_damage', 'combat_defence', 'durability_shield'] } }, select: { buffType: true, remainingUses: true } });
-      for (const b of allBuffs) {
-        if (b.buffType === 'combat_damage') buffUsesLeft.damage = b.remainingUses;
-        if (b.buffType === 'combat_defence') buffUsesLeft.defence = b.remainingUses;
-        if (b.buffType === 'durability_shield') buffUsesLeft.durability = b.remainingUses;
-      }
-    }
+    const { buffs: combatBuffs, uses: buffUsesLeft } = await getCombatBuffsWithUses(playerId);
 
     const explorationProgress = await getExplorationPercent(playerId, body.zoneId);
     const zoneTiers = zone.explorationTiers as Record<string, number> | null;
@@ -362,9 +353,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
         // Consume combat buff charges per ambush mob
         await prisma.$transaction(async (tx) => {
-          if (buffUsesLeft.damage > 0) { await consumeBuffIfActive(tx, playerId, 'combat_damage'); buffUsesLeft.damage--; }
-          if (buffUsesLeft.defence > 0) { await consumeBuffIfActive(tx, playerId, 'combat_defence'); buffUsesLeft.defence--; }
-          if (buffUsesLeft.durability > 0) { await consumeBuffIfActive(tx, playerId, 'durability_shield'); buffUsesLeft.durability--; }
+          await consumeBuffChargesPerMob(tx, playerId, buffUsesLeft);
         });
 
         // Determine mob family once for event modifier badges (used in both victory and defeat paths)
@@ -376,12 +365,12 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           : [];
 
         // Build buff badges for this ambush (reflect state at time of fight)
-        const ambushBuffBadges: (EventModifierBadge & { appliedToThisMob: boolean })[] = [];
-        if (mobBuffs.damageBoost > 0) ambushBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: mobBuffs.damageBoost, isGlobal: false, appliedToThisMob: true });
-        if (mobBuffs.defenceBoost > 0) ambushBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: mobBuffs.defenceBoost, isGlobal: false, appliedToThisMob: true });
-        if (buffUsesLeft.durability + 1 > 0 && combatBuffs.durabilityShield > 0 && durabilityLost.length === 0) {
-          ambushBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: combatBuffs.durabilityShield, isGlobal: false, appliedToThisMob: true });
-        }
+        const shieldWasActive = buffUsesLeft.durability + 1 > 0 && combatBuffs.durabilityShield > 0 && durabilityLost.length === 0;
+        const ambushBuffBadges: CombatBuffBadge[] = buildCombatBuffBadges({
+          damageBoost: mobBuffs.damageBoost,
+          defenceBoost: mobBuffs.defenceBoost,
+          durabilityShield: shieldWasActive ? combatBuffs.durabilityShield : 0,
+        });
 
         let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
         let xpGain = 0;
