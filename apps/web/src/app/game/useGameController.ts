@@ -79,6 +79,7 @@ import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@po
 import type { RouletteBetType } from '@pocketrealm/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
+import { findShortestZonePath } from '@/lib/zoneRoutes';
 import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
 export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
@@ -116,6 +117,27 @@ function showQuestToasts(updates?: QuestProgressUpdate[]) {
     | undefined;
   if (!show) return;
   for (const update of updates) show(update);
+}
+
+interface TravelRouteState {
+  remainingZoneIds: string[];
+  totalHops: number;
+  finalDestinationName: string;
+}
+
+interface TravelPlaybackState {
+  totalTurns: number;
+  destinationName: string;
+  events: Array<{ turn: number; type: string; description: string; details?: Record<string, unknown> }>;
+  aborted: boolean;
+  refundedTurns: number;
+  playerHpBefore: number;
+  playerMaxHp: number;
+  respawnedToName?: string;
+  pendingLootSessionId?: string;
+  currentHop: number;
+  totalHops: number;
+  finalDestinationName: string;
 }
 
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
@@ -268,6 +290,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const activatePendingLootRef = useRef<(sessionId: string) => Promise<void>>(async () => {});
   const pendingLootQueueRef = useRef<string[]>([]);
   const arrivedInTownRef = useRef(false);
+  const travelRouteRef = useRef<TravelRouteState | null>(null);
   const lastEventLogTimeRef = useRef(0);
   const prevInventoryIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedOnceRef = useRef(false);
@@ -289,22 +312,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     playerMaxHp: number;
     pendingLootSessionIds?: string[];
   } | null>(null);
-  const [travelPlaybackData, setTravelPlaybackData] = useState<{
-    totalTurns: number;
-    destinationName: string;
-    events: Array<{ turn: number; type: string; description: string; details?: Record<string, unknown> }>;
-    aborted: boolean;
-    refundedTurns: number;
-    playerHpBefore: number;
-    playerMaxHp: number;
-    respawnedToName?: string;
-    pendingLootSessionId?: string;
-  } | null>(null);
+  const [travelPlaybackData, setTravelPlaybackData] = useState<TravelPlaybackState | null>(null);
+  const hpStateRef = useRef(hpState);
+  useEffect(() => {
+    hpStateRef.current = hpState;
+  }, [hpState]);
 
   const loadTurnsAndHp = useCallback(async () => {
     const [turnRes, hpRes, resourceRes] = await Promise.all([getTurns(), getHpState(), getResources()]);
     if (turnRes.data) setTurns(turnRes.data.currentTurns);
-    if (hpRes.data) setHpState(hpRes.data);
+    if (hpRes.data) {
+      setHpState(hpRes.data);
+      hpStateRef.current = hpRes.data;
+    }
     if (resourceRes.data) {
       setStaminaState(resourceRes.data.stamina);
       setManaState(resourceRes.data.mana);
@@ -377,7 +397,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setTutorialStep(playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED);
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
-    if (hpRes.data) setHpState(hpRes.data);
+    if (hpRes.data) {
+      setHpState(hpRes.data);
+      hpStateRef.current = hpRes.data;
+    }
     if (resourceRes.data) {
       setStaminaState(resourceRes.data.stamina);
       setManaState(resourceRes.data.mana);
@@ -1238,6 +1261,106 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const [confirmAbandonLoot, setConfirmAbandonLoot] = useState<{ travelZoneId: string } | null>(null);
 
+  const completeQueuedTravelRoute = async () => {
+    travelRouteRef.current = null;
+    setPlaybackActive(false);
+
+    if (arrivedInTownRef.current) {
+      arrivedInTownRef.current = false;
+      advanceTutorial(TUTORIAL_STEP_TRAVEL);
+    }
+
+    if (!pendingLootSession && pendingLootQueueRef.current.length > 0) {
+      await activateNextQueuedLoot();
+    }
+  };
+
+  const executeNextTravelHop = async () => {
+    const route = travelRouteRef.current;
+    if (!route || route.remainingZoneIds.length === 0) {
+      await completeQueuedTravelRoute();
+      return;
+    }
+
+    const nextZoneId = route.remainingZoneIds[0]!;
+    const currentHop = route.totalHops - route.remainingZoneIds.length + 1;
+    const hpBefore = hpStateRef.current.currentHp;
+    const playerMaxHp = hpStateRef.current.maxHp;
+
+    const res = await travelToZone(nextZoneId);
+    const data = res.data;
+    if (!data) {
+      travelRouteRef.current = null;
+      setPlaybackActive(false);
+      setActionError(res.error?.message ?? 'Travel failed');
+      return;
+    }
+
+    setTurns(data.turns.currentTurns);
+    route.remainingZoneIds.shift();
+
+    const arrivedInTown = data.zone.zoneType === 'town';
+    if (arrivedInTown) arrivedInTownRef.current = true;
+
+    if (data.pendingLootSessionId) {
+      pendingLootQueueRef.current.push(data.pendingLootSessionId);
+    }
+
+    if (data.breadcrumbReturn) {
+      setActiveZoneId(data.zone.id);
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Returned to ${data.zone.name}.` });
+      await loadAll();
+
+      if (route.remainingZoneIds.length > 0) {
+        await executeNextTravelHop();
+        return;
+      }
+
+      await completeQueuedTravelRoute();
+      return;
+    }
+
+    const travelCost = data.travelCost ?? 0;
+    if (travelCost > 0) {
+      const hopSuffix = route.totalHops > 1
+        ? ` (${currentHop}/${route.totalHops} to ${route.finalDestinationName})`
+        : '';
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'info',
+        message: `Travelling to ${data.zone.name}${hopSuffix}...`,
+      });
+
+      setTravelPlaybackData({
+        totalTurns: travelCost,
+        destinationName: data.zone.name,
+        events: data.events,
+        aborted: data.aborted,
+        refundedTurns: data.refundedTurns,
+        playerHpBefore: hpBefore,
+        playerMaxHp,
+        respawnedToName: data.respawnedTo?.townName,
+        pendingLootSessionId: data.pendingLootSessionId,
+        currentHop,
+        totalHops: route.totalHops,
+        finalDestinationName: route.finalDestinationName,
+      });
+      setPlaybackActive(true);
+      return;
+    }
+
+    setActiveZoneId(data.zone.id);
+    pushLog({ timestamp: nowStamp(), type: 'success', message: `Arrived at ${data.zone.name}.` });
+    await loadAll();
+
+    if (route.remainingZoneIds.length > 0) {
+      await executeNextTravelHop();
+      return;
+    }
+
+    await completeQueuedTravelRoute();
+  };
+
   const abandonLootAndTravel = async () => {
     if (!confirmAbandonLoot) return;
     const zoneId = confirmAbandonLoot.travelZoneId;
@@ -1247,7 +1370,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     pendingLootQueueRef.current = [];
     setConfirmAbandonLoot(null);
-    await doTravel(zoneId);
+    await handleTravelToZone(zoneId);
   };
 
   const handleTravelToZone = async (id: string) => {
@@ -1255,63 +1378,28 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setConfirmAbandonLoot({ travelZoneId: id });
       return;
     }
-    await doTravel(id);
-  };
 
-  const doTravel = async (id: string) => {
-    const hpBefore = hpState.currentHp;
+    if (!activeZoneId) return;
+    if (id === activeZoneId) return;
+
+    const route = findShortestZonePath(activeZoneId, id, zoneConnections);
+    if (!route) {
+      setActionError('No route to that zone');
+      return;
+    }
+
+    const hops = route.slice(1);
+    if (hops.length === 0) return;
+
+    const finalDestinationName = zones.find((zone) => zone.id === id)?.name ?? 'that zone';
+    travelRouteRef.current = {
+      remainingZoneIds: hops,
+      totalHops: hops.length,
+      finalDestinationName,
+    };
 
     await runAction('travel', async () => {
-      const res = await travelToZone(id);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Travel failed');
-        return;
-      }
-
-      setTurns(data.turns.currentTurns);
-      const arrivedInTown = data.zone.zoneType === 'town';
-
-      // Breadcrumb return — instant, no playback
-      if (data.breadcrumbReturn) {
-        setActiveZoneId(data.zone.id);
-        pushLog({ timestamp: nowStamp(), type: 'success', message: `Returned to ${data.zone.name}.` });
-        await loadAll();
-        if (arrivedInTown) advanceTutorial(TUTORIAL_STEP_TRAVEL);
-        return;
-      }
-
-      // Trigger travel playback (progress bar + combat if ambushed)
-      // Don't update activeZoneId or loadAll yet — defer until playback completes
-      // so the map doesn't show "HERE" on the destination prematurely.
-      const travelCost = data.travelCost ?? 0;
-      if (travelCost > 0) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'info',
-          message: `Travelling to ${data.zone.name}...`,
-        });
-
-        if (arrivedInTown) arrivedInTownRef.current = true;
-        setTravelPlaybackData({
-          totalTurns: travelCost,
-          destinationName: data.zone.name,
-          events: data.events,
-          aborted: data.aborted,
-          refundedTurns: data.refundedTurns,
-          playerHpBefore: hpBefore,
-          playerMaxHp: hpState.maxHp,
-          respawnedToName: data.respawnedTo?.townName,
-          pendingLootSessionId: data.pendingLootSessionId,
-        });
-        setPlaybackActive(true);
-      } else {
-        // Zero-cost travel (shouldn't happen normally, but handle gracefully)
-        setActiveZoneId(data.zone.id);
-        pushLog({ timestamp: nowStamp(), type: 'success', message: `Arrived at ${data.zone.name}.` });
-        await loadAll();
-        if (arrivedInTown) advanceTutorial(TUTORIAL_STEP_TRAVEL);
-      }
+      await executeNextTravelHop();
     });
   };
 
@@ -1345,19 +1433,27 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   };
 
   const finalizeTravelPlayback = async () => {
-    const travelPendingId = travelPlaybackData?.pendingLootSessionId;
+    const currentPlayback = travelPlaybackData;
+    if (!currentPlayback) return;
+
+    const shouldContinueRoute =
+      !currentPlayback.aborted &&
+      (travelRouteRef.current?.remainingZoneIds.length ?? 0) > 0;
+
     setTravelPlaybackData(null);
     setPlaybackActive(false);
     await loadAll();
 
-    if (arrivedInTownRef.current) {
-      arrivedInTownRef.current = false;
-      advanceTutorial(TUTORIAL_STEP_TRAVEL);
+    if (currentPlayback.aborted) {
+      travelRouteRef.current = null;
     }
 
-    if (travelPendingId) {
-      await activatePendingLoot(travelPendingId);
+    if (shouldContinueRoute) {
+      await executeNextTravelHop();
+      return;
     }
+
+    await completeQueuedTravelRoute();
   };
 
   const handleTravelPlaybackSkip = async () => {
