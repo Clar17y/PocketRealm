@@ -6,6 +6,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { groupAchievementChains } from '@pocketrealm/shared';
 import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
+import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { ScreenContainer } from '../common/ScreenContainer';
 import type { PlayerAchievementProgress as SharedProgress } from '@pocketrealm/shared';
 import type { PlayerAchievementProgress, AchievementRewardResponse } from '@/lib/api';
@@ -106,6 +107,21 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
 
   return (
     <ScreenContainer>
+      <FeatureTutorial storageKey="howto_achievements" title="Achievements">
+        <p>
+          Earn achievements by reaching milestones in combat, crafting, gathering,
+          exploration, and more. Each one grants rewards like turns, attribute points, or XP.
+        </p>
+        <p>
+          Many achievements form <strong>chains</strong> with multiple tiers. Complete
+          one tier to unlock the next.
+        </p>
+        <p className="text-[var(--rpg-green-light)]">
+          <strong>Titles:</strong> Some achievements unlock titles you can equip.
+          Set your active title from any completed achievement that offers one.
+        </p>
+      </FeatureTutorial>
+
       {/* Completion counter */}
       <PixelCard padding="sm">
         <div className="flex items-center justify-between mb-1">
