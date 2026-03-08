@@ -12,6 +12,17 @@ import type { BestiarySkipEntry } from '@/app/game/gameController.types';
 import { isMobKnown } from '@/app/game/combatHelpers';
 import { cn } from '@/lib/utils';
 
+const EVENT_SEVERITY: Record<string, 'info' | 'success' | 'danger'> = {
+  ambush_defeat: 'danger',
+  ambush_victory: 'success',
+  encounter_site: 'success',
+  resource_node: 'success',
+};
+
+function nowStamp(): string {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 interface TurnPlaybackProps {
   totalTurns: number;
   label: string;
@@ -111,15 +122,9 @@ export function TurnPlayback({
   const handleEventRevealed = (event: ExplorationPlaybackEvent) => {
     if (isAmbushWithCombatLog(event)) return;
 
-    const typeMap: Record<string, 'info' | 'success' | 'danger'> = {
-      ambush_defeat: 'danger',
-      ambush_victory: 'success',
-      encounter_site: 'success',
-      resource_node: 'success',
-    };
     onPushLog?.({
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: typeMap[event.type] ?? 'info',
+      timestamp: nowStamp(),
+      type: EVENT_SEVERITY[event.type] ?? 'info',
       message: `Turn ${event.turn}: ${event.description}`,
     });
   };
@@ -136,7 +141,7 @@ export function TurnPlayback({
         if (hpRemaining !== undefined) setPlayerHpForNextCombat(hpRemaining);
 
         onPushLog?.({
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: nowStamp(),
           type: 'success',
           message: `Turn ${event.turn}: ${event.description}`,
         });
@@ -169,13 +174,9 @@ export function TurnPlayback({
       }
     }
 
-    const typeMap: Record<string, 'info' | 'success' | 'danger'> = {
-      ambush_defeat: 'danger',
-      ambush_victory: 'success',
-    };
     onPushLog?.({
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: typeMap[combatEvent.type] ?? 'info',
+      timestamp: nowStamp(),
+      type: EVENT_SEVERITY[combatEvent.type] ?? 'info',
       message: `Turn ${combatEvent.turn}: ${combatEvent.description}`,
     });
 

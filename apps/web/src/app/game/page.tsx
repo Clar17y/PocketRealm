@@ -387,19 +387,6 @@ export default function GamePage() {
   // Mail compose recipient (set when clicking "Send Mail" from friend profile)
   const [mailRecipient, setMailRecipient] = useState<{ id: string; name: string } | null>(null);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[var(--rpg-background)] flex items-center justify-center">
-        <p className="text-[var(--rpg-text-secondary)]">Loading...</p>
-      </div>
-    );
-  }
-
-  const activeTab = getActiveTab();
-  const activeGatheringSkillMeta = SKILL_META[activeGatheringSkill];
-  const activeCraftingSkillMeta = SKILL_META[activeCraftingSkill];
-  const activeGatheringSkillData = skills.find((s) => s.skillType === activeGatheringSkill);
-  const activeCraftingSkillData = skills.find((s) => s.skillType === activeCraftingSkill);
   const filteredGatheringNodes = useMemo(() => gatheringNodes.filter((n) => n.skillRequired === activeGatheringSkill), [gatheringNodes, activeGatheringSkill]);
   const filteredCraftingRecipes = useMemo(() => craftingRecipes.filter((recipe) => recipe.skillType === activeCraftingSkill), [craftingRecipes, activeCraftingSkill]);
   const ownedResourceNames = useMemo(() => new Set(
@@ -425,6 +412,20 @@ export default function GamePage() {
     }
     return stats;
   }, [equipment]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--rpg-background)] flex items-center justify-center">
+        <p className="text-[var(--rpg-text-secondary)]">Loading...</p>
+      </div>
+    );
+  }
+
+  const activeTab = getActiveTab();
+  const activeGatheringSkillMeta = SKILL_META[activeGatheringSkill];
+  const activeCraftingSkillMeta = SKILL_META[activeCraftingSkill];
+  const activeGatheringSkillData = skills.find((s) => s.skillType === activeGatheringSkill);
+  const activeCraftingSkillData = skills.find((s) => s.skillType === activeCraftingSkill);
 
   const renderScreen = () => {
     switch (activeScreen) {

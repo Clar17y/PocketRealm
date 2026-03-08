@@ -134,7 +134,6 @@ interface TravelPlaybackState {
   playerHpBefore: number;
   playerMaxHp: number;
   respawnedToName?: string;
-  pendingLootSessionId?: string;
   currentHop: number;
   totalHops: number;
   finalDestinationName: string;
@@ -1309,13 +1308,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (data.breadcrumbReturn) {
       setActiveZoneId(data.zone.id);
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Returned to ${data.zone.name}.` });
-      await loadAll();
 
       if (route.remainingZoneIds.length > 0) {
+        await loadTurnsAndHp();
         await executeNextTravelHop();
         return;
       }
 
+      await loadAll();
       await completeQueuedTravelRoute();
       return;
     }
@@ -1340,7 +1340,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         playerHpBefore: hpBefore,
         playerMaxHp,
         respawnedToName: data.respawnedTo?.townName,
-        pendingLootSessionId: data.pendingLootSessionId,
         currentHop,
         totalHops: route.totalHops,
         finalDestinationName: route.finalDestinationName,
@@ -1351,13 +1350,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
     setActiveZoneId(data.zone.id);
     pushLog({ timestamp: nowStamp(), type: 'success', message: `Arrived at ${data.zone.name}.` });
-    await loadAll();
 
     if (route.remainingZoneIds.length > 0) {
+      await loadTurnsAndHp();
       await executeNextTravelHop();
       return;
     }
 
+    await loadAll();
     await completeQueuedTravelRoute();
   };
 
@@ -1442,17 +1442,18 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
     setTravelPlaybackData(null);
     setPlaybackActive(false);
-    await loadAll();
 
     if (currentPlayback.aborted) {
       travelRouteRef.current = null;
     }
 
     if (shouldContinueRoute) {
+      await loadTurnsAndHp();
       await executeNextTravelHop();
       return;
     }
 
+    await loadAll();
     await completeQueuedTravelRoute();
   };
 

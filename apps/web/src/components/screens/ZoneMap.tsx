@@ -206,7 +206,7 @@ export function ZoneMap({
     () => new Map(zones.map((zone) => [zone.id, zone])),
     [zones],
   );
-  const selectedZone = zones.find((z) => z.id === selectedZoneId);
+  const selectedZone = selectedZoneId ? zoneById.get(selectedZoneId) : undefined;
   const currentZone = zoneById.get(currentZoneId);
   const selectedRouteIds = useMemo(() => {
     if (!selectedZoneId) return null;
@@ -378,14 +378,13 @@ export function ZoneMap({
 
             const lockedExits = connections
               .filter((conn) => conn.fromId === selectedZone.id && conn.explorationThreshold > 0)
-              .filter((conn) => {
-                const targetZone = zones.find((z) => z.id === conn.toId);
-                return targetZone && !targetZone.discovered && selectedExploration.percent < conn.explorationThreshold;
-              })
-              .map((conn) => {
-                const targetZone = zones.find((z) => z.id === conn.toId);
-                return { toId: conn.toId, toName: targetZone?.name ?? '???', explorationThreshold: conn.explorationThreshold };
-              });
+              .reduce<Array<{ toId: string; toName: string; explorationThreshold: number }>>((acc, conn) => {
+                const targetZone = zoneById.get(conn.toId);
+                if (targetZone && !targetZone.discovered && selectedExploration.percent < conn.explorationThreshold) {
+                  acc.push({ toId: conn.toId, toName: targetZone.name, explorationThreshold: conn.explorationThreshold });
+                }
+                return acc;
+              }, []);
 
             if (lockedExits.length === 0) return null;
 
@@ -400,6 +399,29 @@ export function ZoneMap({
               </div>
             );
           })()}
+
+          {/* Home town button — only when physically in a town zone */}
+          {selectedZone.zoneType === 'town' && onSetHomeTown && selectedZone.id === currentZoneId && (
+            <div className="mb-2">
+              {homeTownId === selectedZone.id ? (
+                <div className="flex items-center gap-1.5 text-xs text-[var(--rpg-gold)]">
+                  <Home size={12} />
+                  <span>Current Home Town</span>
+                </div>
+              ) : (
+                <PixelButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => onSetHomeTown(selectedZone.id)}
+                >
+                  <div className="flex items-center gap-1">
+                    <Home size={12} />
+                    Set as Home Town
+                  </div>
+                </PixelButton>
+              )}
+            </div>
+          )}
 
           {selectedZone.id === currentZoneId && (
             <PixelButton
