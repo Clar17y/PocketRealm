@@ -162,6 +162,7 @@ export {
   adminGetResourceNodes,
   adminSpawnResourceNode,
   adminGrantTokens,
+  adminFillExpedition,
 } from './admin';
 export type {
   AdminItemTemplate,

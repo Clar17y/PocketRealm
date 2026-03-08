@@ -191,3 +191,10 @@ export async function adminGrantTokens(amount: number) {
     body: JSON.stringify({ amount }),
   });
 }
+
+export async function adminFillExpedition() {
+  return fetchApi<{ message: string; botsCreated: number; totalParticipants: number; minRequired: number }>(
+    '/api/v1/admin/expedition/fill',
+    { method: 'POST' },
+  );
+}

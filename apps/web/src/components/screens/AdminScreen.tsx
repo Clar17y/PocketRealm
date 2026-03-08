@@ -25,6 +25,7 @@ import {
   adminGetResourceNodes,
   adminSpawnResourceNode,
   adminGrantTokens,
+  adminFillExpedition,
   type AdminItemTemplate,
   type AdminZone,
   type AdminMobTemplate,
@@ -421,6 +422,22 @@ function WorldTab({ onAction }: { onAction?: () => void }) {
           </select>
           <PixelButton size="sm" disabled={busy} onClick={handleSpawnBoss}>Spawn</PixelButton>
         </div>
+      </PixelCard>
+
+      <PixelCard>
+        <div style={{ fontWeight: 'bold', marginBottom: 8, color: 'var(--rpg-gold)' }}>
+          Expedition Testing
+        </div>
+        <p style={{ fontSize: '0.75rem', color: '#aaa', marginBottom: 8 }}>
+          Fill active recruiting expedition with bot players
+        </p>
+        <PixelButton
+          size="sm"
+          disabled={busy}
+          onClick={() => act('Fill expedition', () => adminFillExpedition())}
+        >
+          Fill Expedition with Bots
+        </PixelButton>
       </PixelCard>
 
       <StatusMsg msg={msg} />
