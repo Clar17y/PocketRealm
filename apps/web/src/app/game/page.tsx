@@ -387,6 +387,32 @@ export default function GamePage() {
   // Mail compose recipient (set when clicking "Send Mail" from friend profile)
   const [mailRecipient, setMailRecipient] = useState<{ id: string; name: string } | null>(null);
 
+  const filteredGatheringNodes = useMemo(() => gatheringNodes.filter((n) => n.skillRequired === activeGatheringSkill), [gatheringNodes, activeGatheringSkill]);
+  const filteredCraftingRecipes = useMemo(() => craftingRecipes.filter((recipe) => recipe.skillType === activeCraftingSkill), [craftingRecipes, activeCraftingSkill]);
+  const ownedResourceNames = useMemo(() => new Set(
+    inventory.filter((i) => i.template.stackable && i.template.itemType === 'resource' && !i.equippedSlot).map((i) => i.template.name),
+  ), [inventory]);
+  const discountLookup = useMemo(() => buildRecipeDiscountLookup(craftingRecipes, skills), [craftingRecipes, skills]);
+  const equipmentStats = useMemo(() => {
+    const stats = { attack: 0, defence: 0, magicDefence: 0, hp: 0, dodge: 0, accuracy: 0, critChance: 0, critDamage: 0 };
+    for (const e of equipment) {
+      const base = e.item?.template?.baseStats as Record<string, unknown> | undefined;
+      const bonus = e.item?.bonusStats ?? undefined;
+      for (const src of [base, bonus]) {
+        if (!src) continue;
+        if (typeof src.attack === 'number') stats.attack += src.attack;
+        if (typeof src.armor === 'number') stats.defence += src.armor;
+        if (typeof src.magicDefence === 'number') stats.magicDefence += src.magicDefence;
+        if (typeof src.health === 'number') stats.hp += src.health;
+        if (typeof src.dodge === 'number') stats.dodge += src.dodge;
+        if (typeof src.accuracy === 'number') stats.accuracy += src.accuracy;
+        if (typeof src.critChance === 'number') stats.critChance += src.critChance;
+        if (typeof src.critDamage === 'number') stats.critDamage += src.critDamage;
+      }
+    }
+    return stats;
+  }, [equipment]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[var(--rpg-background)] flex items-center justify-center">
@@ -395,15 +421,11 @@ export default function GamePage() {
     );
   }
 
+  const activeTab = getActiveTab();
   const activeGatheringSkillMeta = SKILL_META[activeGatheringSkill];
   const activeCraftingSkillMeta = SKILL_META[activeCraftingSkill];
   const activeGatheringSkillData = skills.find((s) => s.skillType === activeGatheringSkill);
   const activeCraftingSkillData = skills.find((s) => s.skillType === activeCraftingSkill);
-  const filteredGatheringNodes = gatheringNodes.filter((n) => n.skillRequired === activeGatheringSkill);
-  const filteredCraftingRecipes = craftingRecipes.filter((recipe) => recipe.skillType === activeCraftingSkill);
-  const ownedResourceNames = new Set(
-    inventory.filter((i) => i.template.stackable && i.template.itemType === 'resource' && !i.equippedSlot).map((i) => i.template.name),
-  );
 
   const renderScreen = () => {
     switch (activeScreen) {
@@ -514,7 +536,6 @@ export default function GamePage() {
           />
         );
       case 'inventory': {
-        const discountLookup = buildRecipeDiscountLookup(craftingRecipes, skills);
         return (
           <Inventory
             items={inventory.map((item) => {
@@ -627,41 +648,7 @@ export default function GamePage() {
             onRepairItem={handleRepairItem}
             onRepairAll={handleRepairAllEquipped}
             turns={turns}
-            stats={(() => {
-              let attack = 0;
-              let defence = 0;
-              let magicDefence = 0;
-              let hp = 0;
-              let dodge = 0;
-              let accuracy = 0;
-              let critChance = 0;
-              let critDamage = 0;
-              for (const e of equipment) {
-                const base = e.item?.template?.baseStats as Record<string, unknown> | undefined;
-                const bonus = e.item?.bonusStats ?? undefined;
-                if (base) {
-                  if (typeof base.attack === 'number') attack += base.attack;
-                  if (typeof base.armor === 'number') defence += base.armor;
-                  if (typeof base.magicDefence === 'number') magicDefence += base.magicDefence;
-                  if (typeof base.health === 'number') hp += base.health;
-                  if (typeof base.dodge === 'number') dodge += base.dodge;
-                  if (typeof base.accuracy === 'number') accuracy += base.accuracy;
-                  if (typeof base.critChance === 'number') critChance += base.critChance;
-                  if (typeof base.critDamage === 'number') critDamage += base.critDamage;
-                }
-                if (bonus) {
-                  if (typeof bonus.attack === 'number') attack += bonus.attack;
-                  if (typeof bonus.armor === 'number') defence += bonus.armor;
-                  if (typeof bonus.magicDefence === 'number') magicDefence += bonus.magicDefence;
-                  if (typeof bonus.health === 'number') hp += bonus.health;
-                  if (typeof bonus.dodge === 'number') dodge += bonus.dodge;
-                  if (typeof bonus.accuracy === 'number') accuracy += bonus.accuracy;
-                  if (typeof bonus.critChance === 'number') critChance += bonus.critChance;
-                  if (typeof bonus.critDamage === 'number') critDamage += bonus.critDamage;
-                }
-              }
-              return { attack, defence, magicDefence, hp, dodge, accuracy, critChance, critDamage };
-            })()}
+            stats={equipmentStats}
           />
         );
       case 'skills':
@@ -827,14 +814,12 @@ export default function GamePage() {
           </div>
         );
       case 'forge': {
-        const lookup = buildRecipeDiscountLookup(craftingRecipes, skills);
-
         return (
           <Forge
             items={inventory
               .filter((item) => ['weapon', 'armor'].includes(item.template.itemType) && item.quantity === 1)
               .map((item) => {
-                const info = getRecipeSkillInfo(lookup, item.template.id);
+                const info = getRecipeSkillInfo(discountLookup, item.template.id);
                 return {
                   id: item.id,
                   templateId: item.template.id,
@@ -1235,7 +1220,7 @@ export default function GamePage() {
         />
 
         {/* Sub-navigation for screens */}
-        {getActiveTab() === 'home' && (
+        {activeTab === 'home' && (
           <SubNav
             tabs={[
               { id: 'home', label: 'Dashboard' },
@@ -1257,7 +1242,7 @@ export default function GamePage() {
           />
         )}
 
-        {getActiveTab() === 'explore' && (
+        {activeTab === 'explore' && (
           <SubNav
             tabs={[
               { id: 'explore', label: 'Explore' },
@@ -1270,7 +1255,7 @@ export default function GamePage() {
           />
         )}
 
-        {getActiveTab() === 'inventory' && (
+        {activeTab === 'inventory' && (
           <SubNav
             tabs={[
               { id: 'inventory', label: 'Items' },
@@ -1281,7 +1266,7 @@ export default function GamePage() {
           />
         )}
 
-        {getActiveTab() === 'combat' && (
+        {activeTab === 'combat' && (
           <SubNav
             tabs={[
               { id: 'combat', label: 'Combat' },
@@ -1294,7 +1279,7 @@ export default function GamePage() {
           />
         )}
 
-        {getActiveTab() === 'social' && (
+        {activeTab === 'social' && (
           <SubNav
             tabs={[
               { id: 'guild', label: 'Guild' },
@@ -1342,7 +1327,7 @@ export default function GamePage() {
         pinnedMessage={chat.activeChannel === 'casino' ? null : chat.activeChannel === 'world' ? chat.pinnedWorld : chat.pinnedZone}
       />
       <BottomNav
-        activeTab={getActiveTab()}
+        activeTab={activeTab}
         onNavigate={handleNavigate}
         badgeTabs={badgeTabs}
         pulseTabs={tutorialPulseTabs}

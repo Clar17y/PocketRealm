@@ -8,6 +8,7 @@ import { LowHpWarningDialog } from '@/components/common/LowHpWarningDialog';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
+import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import { CombatHistory } from '@/components/screens/CombatHistory';
 import { FightNavigationBar } from '@/components/common/FightNavigationBar';
 import { BossHistory } from '@/components/screens/BossHistory';
@@ -347,15 +348,17 @@ export function CombatScreen({
 
           {/* Combat Playback (animated) */}
           {combatPlaybackData && !roomTransition && (
-            <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3">
-              {fightProgress && fightProgress.total > 1 && (
-                <div className="text-sm text-[var(--rpg-gold)] font-semibold mb-2">
-                  {fightProgress.room
-                    ? <>Room <span className="font-pixel font-normal text-[12px]">{fightProgress.room}</span> — Fight <span className="font-pixel font-normal text-[12px]">{fightProgress.current}/{fightProgress.total}</span></>
-                    : <>Fight <span className="font-pixel font-normal text-[12px]">{fightProgress.current}/{fightProgress.total}</span></>
-                  }
-                </div>
-              )}
+            <PlaybackSurface
+              mode="stage"
+              title="Combat Replay"
+              subtitle={`Against ${combatPlaybackData.mobDisplayName}`}
+              progressLabel={fightProgress && fightProgress.total > 1
+                ? fightProgress.room
+                  ? `Room ${fightProgress.room} • ${fightProgress.current}/${fightProgress.total}`
+                  : `${fightProgress.current}/${fightProgress.total}`
+                : undefined}
+              className="mb-4"
+            >
               {combatPlaybackData.log ? (
                 <CombatPlayback
                   key={fightProgress ? fightProgress.current : 0}
@@ -384,7 +387,7 @@ export function CombatScreen({
                   <div className="animate-pulse">Loading combat data...</div>
                 </div>
               )}
-            </div>
+            </PlaybackSurface>
           )}
 
           {/* Last Combat (detailed log — shown after playback completes) */}

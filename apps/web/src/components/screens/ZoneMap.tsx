@@ -4,10 +4,12 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { PixelButton } from '@/components/PixelButton';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
+import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { MapPin, Star, Hourglass, Lock, Home } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';
+import { buildZoneAdjacency, findShortestZonePath } from '@/lib/zoneRoutes';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 function getMilestoneHint(percent: number): ReactNode {
@@ -48,6 +50,9 @@ interface ZoneMapProps {
     refundedTurns: number;
     playerHpBefore: number;
     playerMaxHp: number;
+    currentHop: number;
+    totalHops: number;
+    finalDestinationName: string;
   } | null;
   onTravelPlaybackComplete?: () => void;
   onTravelPlaybackSkip?: () => void;
@@ -70,6 +75,8 @@ interface ZoneMapProps {
   onSetHomeTown?: (zoneId: string) => void;
 }
 
+type ZoneMapZone = ZoneMapProps['zones'][number];
+
 /** BFS from the starter zone to compute shortest-path tier for each zone. */
 function computeTiers(
   zones: ZoneMapProps['zones'],
@@ -80,14 +87,7 @@ function computeTiers(
   );
   if (!starterZone) return new Map();
 
-  // Build adjacency as undirected so BFS can traverse both directions
-  const graph = new Map<string, string[]>();
-  for (const conn of connections) {
-    if (!graph.has(conn.fromId)) graph.set(conn.fromId, []);
-    graph.get(conn.fromId)!.push(conn.toId);
-    if (!graph.has(conn.toId)) graph.set(conn.toId, []);
-    graph.get(conn.toId)!.push(conn.fromId);
-  }
+  const graph = buildZoneAdjacency(connections, { bidirectional: true });
 
   const tiers = new Map<string, number>();
   const queue = [starterZone.id];
@@ -202,15 +202,42 @@ export function ZoneMap({
     };
   }, [tierRows]);
 
-  const selectedZone = zones.find((z) => z.id === selectedZoneId);
+  const zoneById = useMemo(
+    () => new Map(zones.map((zone) => [zone.id, zone])),
+    [zones],
+  );
+  const selectedZone = selectedZoneId ? zoneById.get(selectedZoneId) : undefined;
+  const currentZone = zoneById.get(currentZoneId);
+  const selectedRouteIds = useMemo(() => {
+    if (!selectedZoneId) return null;
+    return findShortestZonePath(currentZoneId, selectedZoneId, connections);
+  }, [selectedZoneId, currentZoneId, connections]);
+  const selectedRouteZones = useMemo(
+    () => (selectedRouteIds ?? [])
+      .map((zoneId) => zoneById.get(zoneId))
+      .filter((zone): zone is ZoneMapZone => zone !== undefined),
+    [selectedRouteIds, zoneById],
+  );
+  const routeHopCount = Math.max(0, selectedRouteZones.length - 1);
+  const nextHopZone = routeHopCount > 0 ? selectedRouteZones[1] : null;
+  const firstHopBaseCost = (() => {
+    if (!selectedZone || selectedZone.id === currentZoneId || !currentZone || !nextHopZone) return null;
+    if (currentZone.zoneType === 'town') return nextHopZone.travelCost;
+    return currentZone.travelCost;
+  })();
+  const firstHopInflatedCost = firstHopBaseCost === null
+    ? null
+    : inflateCost(firstHopBaseCost, guildTaxRate);
+  const displayedTravelCost = firstHopInflatedCost ?? inflateCost(selectedZone?.travelCost ?? 0, guildTaxRate);
   const canTravel =
     selectedZone &&
     selectedZone.discovered &&
     selectedZone.id !== currentZoneId &&
+    !!selectedRouteIds &&
     !isRecovering &&
     !isOverEncumbered &&
     !playbackActive &&
-    availableTurns >= inflateCost(selectedZone.travelCost, guildTaxRate);
+    (firstHopInflatedCost === null || availableTurns >= firstHopInflatedCost);
 
   return (
     <ScreenContainer>
@@ -219,8 +246,219 @@ export function ZoneMap({
         <MapPin size={20} color="var(--rpg-gold)" />
       </div>
 
+      {/* Primary action/playback region — stays in the focus area while the map scrolls */}
+      {travelPlaybackData ? (
+        <PlaybackSurface
+          mode="overlay"
+          title="Travel Playback"
+          subtitle={`Travelling to ${travelPlaybackData.destinationName}`}
+          progressLabel={travelPlaybackData.totalHops > 1
+            ? `${travelPlaybackData.currentHop}/${travelPlaybackData.totalHops} to ${travelPlaybackData.finalDestinationName}`
+            : undefined}
+        >
+          <TurnPlayback
+            totalTurns={travelPlaybackData.totalTurns}
+            label={travelPlaybackData.totalHops > 1
+              ? `Travelling to ${travelPlaybackData.destinationName} (${travelPlaybackData.currentHop}/${travelPlaybackData.totalHops} to ${travelPlaybackData.finalDestinationName})`
+              : `Travelling to ${travelPlaybackData.destinationName}`}
+            events={travelPlaybackData.events}
+            aborted={travelPlaybackData.aborted}
+            refundedTurns={travelPlaybackData.refundedTurns}
+            playerHpBefore={travelPlaybackData.playerHpBefore}
+            playerMaxHp={travelPlaybackData.playerMaxHp}
+            combatSpeedMs={combatSpeedMs}
+            explorationSpeedMs={explorationSpeedMs}
+            autoSkipKnownCombat={autoSkipKnownCombat}
+            bestiaryMobs={bestiaryMobs}
+            onComplete={onTravelPlaybackComplete!}
+            onSkip={onTravelPlaybackSkip!}
+            onPushLog={onPushLog}
+            combatLogPrefetch={combatLogPrefetch}
+            playerStartStamina={playerStartStamina}
+            playerStartMana={playerStartMana}
+            playerMaxStamina={playerMaxStamina}
+            playerMaxMana={playerMaxMana}
+            embedded
+          />
+        </PlaybackSurface>
+      ) : selectedZone && selectedZone.discovered && (
+        <div
+          className="sticky top-2 z-20"
+          style={{
+            background: 'color-mix(in srgb, var(--rpg-surface) 94%, transparent)',
+            border: '1px solid var(--rpg-border)',
+            borderRadius: 8,
+            padding: 12,
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.28)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)]">
+              {selectedZone.name}
+              {selectedZone.id === currentZoneId && (
+                <span className="ml-2 text-xs text-[var(--rpg-gold)]">(Current)</span>
+              )}
+            </h3>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(selectedZone.difficulty, 5) }).map((_, idx) => (
+                <Star key={idx} size={12} fill="var(--rpg-gold)" color="var(--rpg-gold)" />
+              ))}
+            </div>
+          </div>
+
+          {selectedZone.description && (
+            <p className="text-sm leading-snug text-[var(--rpg-text-secondary)] mb-2">
+              {selectedZone.description}
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mb-3">
+            {selectedZone.zoneType === 'town' && (
+              <span className="text-[var(--rpg-text-secondary)]">{'\u{1F3D8}\uFE0F'} Town</span>
+            )}
+            {selectedZone.travelCost > 0 && selectedZone.id !== currentZoneId && (
+              <div className="flex items-center gap-1 text-[var(--rpg-gold)]">
+                <Hourglass size={12} />
+                <span>
+                  {routeHopCount > 1
+                    ? `${displayedTravelCost} turns next hop`
+                    : `${displayedTravelCost} turns`}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {selectedZone.id !== currentZoneId && (
+            <div className="mb-3 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)]/70 px-3 py-2">
+              {selectedRouteIds ? (
+                <>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--rpg-text-secondary)] mb-1">
+                    Route
+                  </p>
+                  <p className="text-sm text-[var(--rpg-text-primary)]">
+                    {routeHopCount > 1
+                      ? `${routeHopCount} hops via ${selectedRouteZones
+                        .slice(1, -1)
+                        .map((zone) => zone.name)
+                        .join(' -> ')}`
+                      : `Direct travel to ${selectedZone.name}`}
+                  </p>
+                  <p className="text-xs text-[var(--rpg-text-secondary)] mt-1">
+                    {selectedRouteZones.map((zone) => zone.name).join(' -> ')}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-red-300">No discovered route to this zone yet.</p>
+              )}
+            </div>
+          )}
+
+          {/* Exploration progress bar */}
+          {selectedZone.exploration && selectedZone.exploration.turnsToExplore && (
+            <div className="mb-3">
+              <div className="flex justify-between text-xs text-[var(--rpg-text-secondary)] mb-1">
+                <span><span className="font-pixel text-[8px]">{Math.floor(selectedZone.exploration.percent)}%</span> Explored</span>
+                <span className="font-pixel text-[8px]">{selectedZone.exploration.turnsExplored.toLocaleString()} / {selectedZone.exploration.turnsToExplore.toLocaleString()}</span>
+              </div>
+              <div className="h-2 rounded-full bg-[var(--rpg-background)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[var(--rpg-gold)] transition-all"
+                  style={{ width: `${Math.min(100, selectedZone.exploration.percent)}%` }}
+                />
+              </div>
+              {getMilestoneHint(selectedZone.exploration.percent)}
+            </div>
+          )}
+
+          {/* Locked zone exits */}
+          {(() => {
+            const selectedExploration = selectedZone.exploration;
+            if (!selectedExploration || selectedZone.zoneType === 'town') return null;
+
+            const lockedExits = connections
+              .filter((conn) => conn.fromId === selectedZone.id && conn.explorationThreshold > 0)
+              .reduce<Array<{ toId: string; toName: string; explorationThreshold: number }>>((acc, conn) => {
+                const targetZone = zoneById.get(conn.toId);
+                if (targetZone && !targetZone.discovered && selectedExploration.percent < conn.explorationThreshold) {
+                  acc.push({ toId: conn.toId, toName: targetZone.name, explorationThreshold: conn.explorationThreshold });
+                }
+                return acc;
+              }, []);
+
+            if (lockedExits.length === 0) return null;
+
+            return (
+              <div className="mb-3 space-y-1">
+                {lockedExits.map((exit) => (
+                  <div key={exit.toId} className="flex items-center gap-1.5 text-xs text-[var(--rpg-text-secondary)] opacity-50">
+                    <Lock size={10} />
+                    <span>{exit.toName} -- requires {exit.explorationThreshold}% explored (currently {Math.floor(selectedExploration.percent)}%)</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Home town button — only when physically in a town zone */}
+          {selectedZone.zoneType === 'town' && onSetHomeTown && selectedZone.id === currentZoneId && (
+            <div className="mb-2">
+              {homeTownId === selectedZone.id ? (
+                <div className="flex items-center gap-1.5 text-xs text-[var(--rpg-gold)]">
+                  <Home size={12} />
+                  <span>Current Home Town</span>
+                </div>
+              ) : (
+                <PixelButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => onSetHomeTown(selectedZone.id)}
+                >
+                  <div className="flex items-center gap-1">
+                    <Home size={12} />
+                    Set as Home Town
+                  </div>
+                </PixelButton>
+              )}
+            </div>
+          )}
+
+          {selectedZone.id === currentZoneId && (
+            <PixelButton
+              variant="primary"
+              size="md"
+              className="w-full"
+              onClick={onExploreCurrentZone}
+            >
+              Explore {selectedZone.name}
+            </PixelButton>
+          )}
+
+          {selectedZone.id !== currentZoneId && (
+            <PixelButton
+              variant="gold"
+              size="md"
+              className="w-full"
+              onClick={() => onTravel(selectedZone.id)}
+              disabled={!canTravel}
+            >
+              {(() => {
+                if (!selectedRouteIds) return 'No route available';
+                if (isOverEncumbered) return 'Over-encumbered';
+                if (isRecovering) return 'Recover first to travel';
+                if (firstHopInflatedCost !== null && availableTurns < firstHopInflatedCost) {
+                  return `Need ${firstHopInflatedCost} turns for next hop`;
+                }
+                if (routeHopCount > 1) return `Auto-travel to ${selectedZone.name} (${routeHopCount} hops)`;
+                return `Travel to ${selectedZone.name} (${displayedTravelCost} turns)`;
+              })()}
+            </PixelButton>
+          )}
+        </div>
+      )}
+
       {/* Tiered map */}
-      <div className="overflow-x-auto pb-1">
+      <div className={travelPlaybackData ? 'overflow-x-auto pb-1 opacity-60 saturate-50 transition-all' : 'overflow-x-auto pb-1 transition-all'}>
         <div
           className="relative mx-auto"
           style={{ width: svgSize.width, minHeight: svgSize.height }}
@@ -416,153 +654,6 @@ export function ZoneMap({
         </div>
       </div>
 
-      {/* Selected zone details panel — hidden during travel playback */}
-      {!travelPlaybackData && selectedZone && selectedZone.discovered && (
-        <div
-          style={{
-            background: 'var(--rpg-surface)',
-            border: '1px solid var(--rpg-border)',
-            borderRadius: 8,
-            padding: 12,
-          }}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)]">
-              {selectedZone.name}
-              {selectedZone.id === currentZoneId && (
-                <span className="ml-2 text-xs text-[var(--rpg-gold)]">(Current)</span>
-              )}
-            </h3>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(selectedZone.difficulty, 5) }).map((_, idx) => (
-                <Star key={idx} size={12} fill="var(--rpg-gold)" color="var(--rpg-gold)" />
-              ))}
-            </div>
-          </div>
-
-          {selectedZone.description && (
-            <p className="text-sm leading-snug text-[var(--rpg-text-secondary)] mb-2">
-              {selectedZone.description}
-            </p>
-          )}
-
-          <div className="flex items-center gap-4 text-sm mb-3">
-            {selectedZone.zoneType === 'town' && (
-              <span className="text-[var(--rpg-text-secondary)]">{'\u{1F3D8}\uFE0F'} Town</span>
-            )}
-            {selectedZone.travelCost > 0 && (() => {
-              const inflated = inflateCost(selectedZone.travelCost, guildTaxRate);
-              const taxAmount = inflated - selectedZone.travelCost;
-              return (
-                <div className="flex items-center gap-1 text-[var(--rpg-gold)]">
-                  <Hourglass size={12} />
-                  <span>{inflated} turns{taxAmount > 0 ? ` (${taxAmount} tax)` : ''}</span>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* Exploration progress bar */}
-          {selectedZone.exploration && selectedZone.exploration.turnsToExplore && (
-            <div className="mb-3">
-              <div className="flex justify-between text-xs text-[var(--rpg-text-secondary)] mb-1">
-                <span><span className="font-pixel text-[8px]">{Math.floor(selectedZone.exploration.percent)}%</span> Explored</span>
-                <span className="font-pixel text-[8px]">{selectedZone.exploration.turnsExplored.toLocaleString()} / {selectedZone.exploration.turnsToExplore.toLocaleString()}</span>
-              </div>
-              <div className="h-2 rounded-full bg-[var(--rpg-background)] overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-[var(--rpg-gold)] transition-all"
-                  style={{ width: `${Math.min(100, selectedZone.exploration.percent)}%` }}
-                />
-              </div>
-              {getMilestoneHint(selectedZone.exploration.percent)}
-            </div>
-          )}
-
-          {/* Locked zone exits */}
-          {(() => {
-            const selectedExploration = selectedZone.exploration;
-            if (!selectedExploration || selectedZone.zoneType === 'town') return null;
-
-            const lockedExits = connections
-              .filter((conn) => conn.fromId === selectedZone.id && conn.explorationThreshold > 0)
-              .filter((conn) => {
-                const targetZone = zones.find((z) => z.id === conn.toId);
-                return targetZone && !targetZone.discovered && selectedExploration.percent < conn.explorationThreshold;
-              })
-              .map((conn) => {
-                const targetZone = zones.find((z) => z.id === conn.toId);
-                return { toId: conn.toId, toName: targetZone?.name ?? '???', explorationThreshold: conn.explorationThreshold };
-              });
-
-            if (lockedExits.length === 0) return null;
-
-            return (
-              <div className="mb-3 space-y-1">
-                {lockedExits.map((exit) => (
-                  <div key={exit.toId} className="flex items-center gap-1.5 text-xs text-[var(--rpg-text-secondary)] opacity-50">
-                    <Lock size={10} />
-                    <span>{exit.toName} -- requires {exit.explorationThreshold}% explored (currently {Math.floor(selectedExploration.percent)}%)</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-
-          {/* Home town button — only when physically in a town zone */}
-          {selectedZone.zoneType === 'town' && onSetHomeTown && selectedZone.id === currentZoneId && (
-            <div className="mb-2">
-              {homeTownId === selectedZone.id ? (
-                <div className="flex items-center gap-1.5 text-xs text-[var(--rpg-gold)]">
-                  <Home size={12} />
-                  <span>Current Home Town</span>
-                </div>
-              ) : (
-                <PixelButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => onSetHomeTown(selectedZone.id)}
-                >
-                  <div className="flex items-center gap-1">
-                    <Home size={12} />
-                    Set as Home Town
-                  </div>
-                </PixelButton>
-              )}
-            </div>
-          )}
-
-          {selectedZone.id === currentZoneId && (
-            <PixelButton
-              variant="primary"
-              size="md"
-              className="w-full"
-              onClick={onExploreCurrentZone}
-            >
-              Explore {selectedZone.name}
-            </PixelButton>
-          )}
-
-          {selectedZone.id !== currentZoneId && (
-            <PixelButton
-              variant="gold"
-              size="md"
-              className="w-full"
-              onClick={() => onTravel(selectedZone.id)}
-              disabled={!canTravel}
-            >
-              {(() => {
-                const inflated = inflateCost(selectedZone.travelCost, guildTaxRate);
-                if (isOverEncumbered) return 'Over-encumbered';
-                if (isRecovering) return 'Recover first to travel';
-                if (availableTurns < inflated) return `Need ${inflated} turns (have ${availableTurns})`;
-                return `Travel to ${selectedZone.name} (${inflated} turns)`;
-              })()}
-            </PixelButton>
-          )}
-        </div>
-      )}
-
       {/* Undiscovered zone hints */}
       {!travelPlaybackData && undiscoveredZones && undiscoveredZones.length > 0 && (
         <div
@@ -590,40 +681,6 @@ export function ZoneMap({
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* Travel playback panel */}
-      {travelPlaybackData && (
-        <div
-          style={{
-            background: 'var(--rpg-surface)',
-            border: '1px solid var(--rpg-border)',
-            borderRadius: 8,
-            padding: 12,
-          }}
-        >
-          <TurnPlayback
-            totalTurns={travelPlaybackData.totalTurns}
-            label={`Travelling to ${travelPlaybackData.destinationName}`}
-            events={travelPlaybackData.events}
-            aborted={travelPlaybackData.aborted}
-            refundedTurns={travelPlaybackData.refundedTurns}
-            playerHpBefore={travelPlaybackData.playerHpBefore}
-            playerMaxHp={travelPlaybackData.playerMaxHp}
-            combatSpeedMs={combatSpeedMs}
-            explorationSpeedMs={explorationSpeedMs}
-            autoSkipKnownCombat={autoSkipKnownCombat}
-            bestiaryMobs={bestiaryMobs}
-            onComplete={onTravelPlaybackComplete!}
-            onSkip={onTravelPlaybackSkip!}
-            onPushLog={onPushLog}
-            combatLogPrefetch={combatLogPrefetch}
-            playerStartStamina={playerStartStamina}
-            playerStartMana={playerStartMana}
-            playerMaxStamina={playerMaxStamina}
-            playerMaxMana={playerMaxMana}
-          />
         </div>
       )}
 

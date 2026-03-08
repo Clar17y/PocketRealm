@@ -7,6 +7,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.31',
+    date: '2026-03-08',
+    title: 'Playback Overhaul & Multi-Hop Travel',
+    summary:
+      'Combat, exploration, and travel playback now share a unified replay surface that stays pinned at the top of the screen — no more scrolling to find your fight. The Arena, Training Grounds, Friends sparring, and encounter sites all use the same sticky playback region. Map travel supports multi-hop routes: click any discovered zone and the game auto-paths through intermediate zones, showing hop-by-hop travel playback with ambush encounters along the way. The map action area is now a top primary-action region with Explore and Travel always reachable, swapping into playback during travel.',
+  },
+  {
+    version: '0.30',
+    date: '2026-03-08',
+    title: 'Quest Shop & Combat Buffs',
+    summary:
+      'Spend your hard-earned Quest Tokens at the new Quest Shop! Buy combat scrolls — Combat Power, Iron Skin, and Durability Shield — that boost your stats for a set number of fights. Reset your attributes, talents, or XP rate for a price. Teleport to any discovered zone, set a new home town, or reroll a guild contract you don\'t like. Unlock prestige titles tied to achievements. Use a Bestiary Tome to reveal mob prefix details you haven\'t discovered yet. Active buffs show as badges on combat, crafting, gathering, and forge screens so you always know what\'s boosting you. Forge Protection scrolls save your item on a failed upgrade. Forge Luck scrolls increase your success chance.',
+  },
+  {
     version: '0.29',
     date: '2026-03-07',
     title: 'Friends & Social',

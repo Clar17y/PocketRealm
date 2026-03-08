@@ -16,31 +16,25 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
 import { getHpState, enterRecoveringState, setHp } from '../services/hpService';
-import { getEquipmentStats } from '../services/equipmentService';
-import { getPlayerProgressionState } from '../services/attributesService';
 import { storePendingLoot, type PendingLootItem } from '../services/pendingLootService';
 import { serializeXpGrant, toMobTemplate, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
-import { buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../services/combatOrchestrationService';
+import { preparePlayerForCombat, buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../services/combatOrchestrationService';
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
-import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../services/potionService';
+import { deductConsumedPotions } from '../services/potionService';
 import {
   ensureStarterDiscoveries,
   getDiscoveredZoneIds,
   discoverZonesFromTown,
   respawnToHomeTown,
 } from '../services/zoneDiscoveryService';
-import { getMainHandAttackSkill, getSkillLevel, buildPerActionScaling, type AttackSkill } from '../services/combatStatsService';
-import { getActiveTemplate } from '../services/combatTemplateService';
-import { getResourceState, setAllResources } from '../services/resourceService';
-import { getSkillPoints } from '../services/skillPointService';
+import { setAllResources } from '../services/resourceService';
 import { mapTemplateCombatLog } from '../services/combatLogMapper';
 import { calculateExplorationPercent, getExplorationPercent } from '../services/zoneExplorationService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { assertNotOverEncumbered } from '../services/inventoryService';
 import { applyGuildTax, getPlayerTaxRate, calculateInflatedCost, taxInfoFromResult } from '../services/guildTaxService';
-
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 import { trackProgress } from '../services/progressService';
@@ -308,27 +302,23 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     if (ambushes.length > 0) {
       const allPotionsConsumed: PotionConsumed[] = [];
 
-      // Get player combat stats (same pattern as combat route)
-      const mainHandAttackSkill = await getMainHandAttackSkill(playerId);
-      const attackSkill: AttackSkill = mainHandAttackSkill ?? 'melee';
-      const [attackLevel, progression, equipmentStats, travelZoneEvents, travelWorldEvents] = await Promise.all([
-        getSkillLevel(playerId, attackSkill),
-        getPlayerProgressionState(playerId),
-        getEquipmentStats(playerId),
+      // Prepare player combat data (parallelized) + zone-specific data
+      const [combatPrep, mobTemplates, explorationProgress, travelZoneEvents, travelWorldEvents, mobFamilyMembers] = await Promise.all([
+        preparePlayerForCombat(playerId, { maxHp: hpState.maxHp, preloaded: { guildMods } }),
+        prisma.mobTemplate.findMany({ where: { zoneId: currentZoneId } }),
+        getExplorationPercent(playerId, currentZoneId),
         getActiveEventsForZone(currentZoneId),
         getActiveWorldWideEvents(),
+        prisma.mobFamilyMember.findMany({
+          where: { mobTemplate: { zoneId: currentZoneId } },
+          select: { mobTemplateId: true, mobFamilyId: true },
+        }),
       ]);
 
-      const perActionScaling = await buildPerActionScaling(playerId, {
-        equipmentStats,
-        attributes: progression.attributes,
-        weaponRequiredSkill: mainHandAttackSkill,
-        guildDamageMultiplier: guildMods.combatDamage,
-      });
+      const { attackSkill, attackLevel, progression, equipmentStats, perActionScaling, playerTemplate, potionPool, resources, unlockedActions } = combatPrep;
+      // Pre-build mob→family lookup to avoid N+1 queries in the loop
+      const mobToFamilyMap = new Map(mobFamilyMembers.map(m => [m.mobTemplateId, m.mobFamilyId]));
 
-      // Get mob pool from current zone, filtered by exploration tier
-      const mobTemplates = await prisma.mobTemplate.findMany({ where: { zoneId: currentZoneId } });
-      const explorationProgress = await getExplorationPercent(playerId, currentZoneId);
       const zoneTiers = (currentZone as unknown as { explorationTiers: Record<string, number> | null }).explorationTiers;
       const tieredMobs = filterAndWeightMobsByTier(
         mobTemplates.map(m => ({
@@ -339,23 +329,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         zoneTiers,
       );
 
-      // Fetch combat template, resource state, and unlocked actions for template combat
-      const [playerTemplate, resourceState, travelSkillPoints] = await Promise.all([
-        getActiveTemplate(playerId),
-        getResourceState(playerId),
-        getSkillPoints(playerId),
-      ]);
-      const travelUnlockedActions = travelSkillPoints.unlockedActions;
-      const potionPool = templateHasPotionActions(playerTemplate)
-        ? await buildPotionPool(playerId, hpState.maxHp)
-        : [];
-      let currentStamina = resourceState.stamina.current;
-      let currentMana = resourceState.mana.current;
-      const maxStamina = resourceState.stamina.max;
-      const maxMana = resourceState.mana.max;
-      const staminaRegenPerRound = resourceState.stamina.regenPerRound;
-      const manaRegenPerRound = resourceState.mana.regenPerRound;
-
+      let currentStamina = resources.stamina;
+      let currentMana = resources.mana;
       let currentHp = hpState.currentHp;
       let ambushAbort: {
         type: 'knockout';
@@ -393,12 +368,12 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           playerStats,
           template: playerTemplate,
           stamina: currentStamina,
-          maxStamina,
-          staminaRegenPerRound,
+          maxStamina: resources.maxStamina,
+          staminaRegenPerRound: resources.staminaRegenPerRound,
           mana: currentMana,
-          maxMana,
-          manaRegenPerRound,
-          unlockedActions: travelUnlockedActions,
+          maxMana: resources.maxMana,
+          manaRegenPerRound: resources.manaRegenPerRound,
+          unlockedActions,
           perActionScaling,
         });
         const combatantB = mobToTemplateCombatant(prefixedMob);
@@ -419,13 +394,10 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
 
         const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
 
-        // Resolve mob family for event badges + achievement tracking
-        const familyMember = await prisma.mobFamilyMember.findFirst({
-          where: { mobTemplateId: prefixedMob.id },
-          select: { mobFamilyId: true },
-        });
-        const travelMobBadges = familyMember?.mobFamilyId
-          ? filterEventModifiers(travelZoneEvents, travelWorldEvents, { mobFamilyId: familyMember.mobFamilyId })
+        // Resolve mob family for event badges + achievement tracking (pre-fetched)
+        const travelMobFamilyId = mobToFamilyMap.get(prefixedMob.id) ?? null;
+        const travelMobBadges = travelMobFamilyId
+          ? filterEventModifiers(travelZoneEvents, travelWorldEvents, { mobFamilyId: travelMobFamilyId })
           : [];
 
         if (combatResult.outcome === 'victory') {
@@ -443,8 +415,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
 
           // Track ambush kill for achievement checks
           ambushKillCount++;
-          if (familyMember) {
-            ambushMobFamilyIds.push(familyMember.mobFamilyId);
+          if (travelMobFamilyId) {
+            ambushMobFamilyIds.push(travelMobFamilyId);
           }
 
           await createActivityLog({

@@ -9,9 +9,12 @@ import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
 import { DURABILITY_CONSTANTS } from '@pocketrealm/shared';
 import { getStaggerDelay } from '@/lib/animations';
-import { numStat, formatSignedStatValue, signedClass, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
+import { numStat, formatSignedStatValue, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { Divider } from '@/components/common/Divider';
+import { ItemIcon } from '@/components/common/ItemIcon';
+import { StatLine } from '@/components/common/StatLine';
+import { StatBlock } from '@/components/common/StatBlock';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface EquippedItem {
@@ -161,15 +164,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
         >
           {item ? (
             <>
-              {item.imageSrc ? (
-                <img
-                  src={item.imageSrc}
-                  alt={item.name}
-                  className="w-10 h-10 object-contain image-rendering-pixelated"
-                />
-              ) : (
-                <span className="text-2xl">{item.icon ?? '❓'}</span>
-              )}
+              <ItemIcon imageSrc={item.imageSrc} name={item.name} size="lg" fallback={<span className="text-2xl">{item.icon ?? '❓'}</span>} />
               {item.maxDurability > 0 && item.durability <= 0 && (
                 <div className="absolute -top-1 -right-1 bg-[var(--rpg-red)] text-white text-[8px] font-bold px-1 rounded leading-tight">
                   !
@@ -268,15 +263,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         className="w-10 h-10 rounded border-2 flex items-center justify-center text-xl flex-shrink-0"
                         style={{ borderColor: RARITY_COLORS[currentItem.rarity] }}
                       >
-                        {currentItem.imageSrc ? (
-                          <img
-                            src={currentItem.imageSrc}
-                            alt={currentItem.name}
-                            className="w-8 h-8 object-contain image-rendering-pixelated"
-                          />
-                        ) : (
-                          currentItem.icon
-                        )}
+                        <ItemIcon imageSrc={currentItem.imageSrc} name={currentItem.name} size="md" fallback={currentItem.icon} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold font-almendra text-[var(--rpg-text-primary)] text-sm">{currentItem.name}</div>
@@ -302,60 +289,12 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                     )}
 
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack') !== 0 && (
-                        <div className="flex items-center gap-2">
-                          <Sword size={16} className="text-[var(--rpg-red)]" />
-                          <span className="text-[var(--rpg-text-secondary)]">Attack</span>
-                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack'), 'text-[var(--rpg-red)]')}`}>
-                            {formatSignedStatValue('attack', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack'))}
-                          </span>
-                        </div>
-                      )}
-                      {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor') !== 0 && (
-                        <div className="flex items-center gap-2">
-                          <Shield size={16} className="text-[var(--rpg-blue-light)]" />
-                          <span className="text-[var(--rpg-text-secondary)]">Armor</span>
-                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor'), 'text-[var(--rpg-blue-light)]')}`}>
-                            {formatSignedStatValue('armor', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor'))}
-                          </span>
-                        </div>
-                      )}
-                      {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence') !== 0 && (
-                        <div className="flex items-center gap-2">
-                          <Sparkles size={16} className="text-[var(--rpg-purple)]" />
-                          <span className="text-[var(--rpg-text-secondary)]">Magic Def</span>
-                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence'), 'text-[var(--rpg-purple)]')}`}>
-                            {formatSignedStatValue('magicDefence', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence'))}
-                          </span>
-                        </div>
-                      )}
-                      {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health') !== 0 && (
-                        <div className="flex items-center gap-2">
-                          <Heart size={16} className="text-[var(--rpg-green-light)]" />
-                          <span className="text-[var(--rpg-text-secondary)]">HP</span>
-                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health'), 'text-[var(--rpg-green-light)]')}`}>
-                            {formatSignedStatValue('health', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health'))}
-                          </span>
-                        </div>
-                      )}
-                      {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge') !== 0 && (
-                        <div className="flex items-center gap-2">
-                          <Zap size={16} className="text-[var(--rpg-gold)]" />
-                          <span className="text-[var(--rpg-text-secondary)]">Dodge</span>
-                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge'), 'text-[var(--rpg-gold)]')}`}>
-                            {formatSignedStatValue('dodge', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge'))}
-                          </span>
-                        </div>
-                      )}
-                      {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy') !== 0 && (
-                        <div className="flex items-center gap-2">
-                          <Crosshair size={16} className="text-[var(--rpg-blue-light)]" />
-                          <span className="text-[var(--rpg-text-secondary)]">Accuracy</span>
-                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy'), 'text-[var(--rpg-blue-light)]')}`}>
-                            {formatSignedStatValue('accuracy', totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy'))}
-                          </span>
-                        </div>
-                      )}
+                      <StatLine icon={Sword} label="Attack" statKey="attack" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack')} color="text-[var(--rpg-red)]" />
+                      <StatLine icon={Shield} label="Armor" statKey="armor" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor')} color="text-[var(--rpg-blue-light)]" />
+                      <StatLine icon={Sparkles} label="Magic Def" statKey="magicDefence" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence')} color="text-[var(--rpg-purple)]" />
+                      <StatLine icon={Heart} label="HP" statKey="health" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health')} color="text-[var(--rpg-green-light)]" />
+                      <StatLine icon={Zap} label="Dodge" statKey="dodge" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge')} color="text-[var(--rpg-gold)]" />
+                      <StatLine icon={Crosshair} label="Accuracy" statKey="accuracy" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy')} color="text-[var(--rpg-blue-light)]" />
                       {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'inventorySlots') !== 0 && (
                         <div className="flex items-center gap-2">
                           <Backpack size={16} className="text-[var(--rpg-gold)]" />
@@ -436,15 +375,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                               className="w-10 h-10 rounded border-2 flex items-center justify-center text-xl flex-shrink-0"
                               style={{ borderColor: RARITY_COLORS[item.rarity] }}
                             >
-                              {item.imageSrc ? (
-                                <img
-                                  src={item.imageSrc}
-                                  alt={item.name}
-                                  className="w-8 h-8 object-contain image-rendering-pixelated"
-                                />
-                              ) : (
-                                item.icon
-                              )}
+                              <ItemIcon imageSrc={item.imageSrc} name={item.name} size="md" fallback={item.icon} />
                             </div>
 
                             <div className="flex-1 min-w-0">
@@ -565,11 +496,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
               {repairableItems.map((r) => (
                 <div key={r.slotId} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    {r.item.imageSrc ? (
-                      <img src={r.item.imageSrc} alt={r.item.name} className="w-6 h-6 object-contain image-rendering-pixelated" />
-                    ) : (
-                      <span className="text-sm">{r.item.icon ?? '?'}</span>
-                    )}
+                    <ItemIcon imageSrc={r.item.imageSrc} name={r.item.name} size="xs" fallback={<span className="text-sm">{r.item.icon ?? '?'}</span>} />
                     <span className="text-[var(--rpg-text-primary)]">{r.item.name}</span>
                     {r.item.maxDurability > 0 && r.item.durability <= 0 && (
                       <span className="text-[8px] font-bold text-[var(--rpg-red)] bg-[var(--rpg-red)]/10 px-1 rounded">BROKEN</span>
@@ -628,85 +555,18 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
       <PixelCard variant="framed">
         <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)] mb-4">Total Stats</h3>
         <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
-              <Sword size={20} color="var(--rpg-red)" />
-            </div>
-            <div>
-              <div className="text-xs text-[var(--rpg-text-secondary)]">Attack</div>
-              <div className="text-[24px] text-[var(--rpg-red)] font-pixel">{stats.attack}</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
-              <Shield size={20} color="var(--rpg-blue-light)" />
-            </div>
-            <div>
-              <div className="text-xs text-[var(--rpg-text-secondary)]">Defence</div>
-              <div className="text-[24px] text-[var(--rpg-blue-light)] font-pixel">{stats.defence}</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
-              <Sparkles size={20} color="var(--rpg-purple)" />
-            </div>
-            <div>
-              <div className="text-xs text-[var(--rpg-text-secondary)]">Magic Def</div>
-              <div className="text-[24px] text-[var(--rpg-purple)] font-pixel">{stats.magicDefence}</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
-              <Heart size={20} color="var(--rpg-green-light)" />
-            </div>
-            <div>
-              <div className="text-xs text-[var(--rpg-text-secondary)]">HP</div>
-              <div className="text-[24px] text-[var(--rpg-green-light)] font-pixel">{stats.hp}</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
-              <Zap size={20} color="var(--rpg-gold)" />
-            </div>
-            <div>
-              <div className="text-xs text-[var(--rpg-text-secondary)]">Dodge</div>
-              <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{stats.dodge}</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
-              <Crosshair size={20} color="var(--rpg-blue-light)" />
-            </div>
-            <div>
-              <div className="text-xs text-[var(--rpg-text-secondary)]">Accuracy</div>
-              <div className="text-[24px] text-[var(--rpg-blue-light)] font-pixel">{stats.accuracy}</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
-              <Zap size={20} color="var(--rpg-gold)" />
-            </div>
-            <div>
-              <div className="text-xs text-[var(--rpg-text-secondary)]">Crit Chance</div>
-              <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{Math.round((0.05 + stats.critChance) * 100)}%</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center">
-              <Zap size={20} color="var(--rpg-gold)" />
-            </div>
-            <div>
-              <div className="text-xs text-[var(--rpg-text-secondary)]">Crit Damage</div>
-              <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{Math.round((1.5 + stats.critDamage) * 100)}%</div>
-            </div>
-          </div>
+          {([
+            { icon: Sword, label: 'Attack', value: String(stats.attack), color: 'var(--rpg-red)' },
+            { icon: Shield, label: 'Defence', value: String(stats.defence), color: 'var(--rpg-blue-light)' },
+            { icon: Sparkles, label: 'Magic Def', value: String(stats.magicDefence), color: 'var(--rpg-purple)' },
+            { icon: Heart, label: 'HP', value: String(stats.hp), color: 'var(--rpg-green-light)' },
+            { icon: Zap, label: 'Dodge', value: String(stats.dodge), color: 'var(--rpg-gold)' },
+            { icon: Crosshair, label: 'Accuracy', value: String(stats.accuracy), color: 'var(--rpg-blue-light)' },
+            { icon: Zap, label: 'Crit Chance', value: `${Math.round((0.05 + stats.critChance) * 100)}%`, color: 'var(--rpg-gold)' },
+            { icon: Zap, label: 'Crit Damage', value: `${Math.round((1.5 + stats.critDamage) * 100)}%`, color: 'var(--rpg-gold)' },
+          ] as const).map((s) => (
+            <StatBlock key={s.label} icon={s.icon} label={s.label} value={s.value} color={s.color} />
+          ))}
         </div>
       </PixelCard>
 
@@ -722,15 +582,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                   className="w-10 h-10 rounded border-2 flex items-center justify-center text-xl flex-shrink-0"
                   style={{ borderColor: slot.item ? RARITY_COLORS[slot.item.rarity] : 'var(--rpg-border)' }}
                 >
-                  {slot.item?.imageSrc ? (
-                    <img
-                      src={slot.item.imageSrc}
-                      alt={slot.item.name}
-                      className="w-8 h-8 object-contain image-rendering-pixelated"
-                    />
-                  ) : (
-                    slot.item?.icon
-                  )}
+                  <ItemIcon imageSrc={slot.item?.imageSrc} name={slot.item?.name ?? ''} size="md" fallback={slot.item?.icon} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between mb-1">

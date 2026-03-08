@@ -28,6 +28,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { FriendProfileModal } from '@/components/friends/FriendProfileModal';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
+import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -407,7 +408,13 @@ export function FriendsScreen({
 
       {/* Spar combat playback */}
       {sparPlaybackActive && sparResult && (
-        <PixelCard className="mb-4">
+        <PlaybackSurface
+          mode="stage"
+          title="Friendly Spar"
+          subtitle={`${sparResult.attackerName} vs ${sparResult.defenderName}`}
+          autoScrollOnActive
+          className="mb-4"
+        >
           <CombatPlayback
             mobDisplayName={sparResult.defenderName}
             outcome={sparResult.isDraw ? 'draw' : sparResult.winnerId === playerId ? 'victory' : 'defeat'}
@@ -428,7 +435,7 @@ export function FriendsScreen({
             onComplete={dismissSparPlayback}
             onSkip={dismissSparPlayback}
           />
-        </PixelCard>
+        </PlaybackSurface>
       )}
 
       {/* Spar result summary (after playback) */}

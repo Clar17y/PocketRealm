@@ -12,6 +12,7 @@ import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { xpRateColor } from '@/lib/format';
 import { XpRateTooltip } from '@/components/common/XpRateTooltip';
+import { ItemIcon } from '@/components/common/ItemIcon';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface Material {
@@ -167,15 +168,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                       className="w-12 h-12 rounded border-2 flex items-center justify-center text-2xl flex-shrink-0"
                       style={{ borderColor: RARITY_COLORS[recipe.rarity] }}
                     >
-                      {recipe.imageSrc ? (
-                        <img
-                          src={recipe.imageSrc}
-                          alt={recipe.name}
-                          className="w-10 h-10 object-contain image-rendering-pixelated"
-                        />
-                      ) : (
-                        recipe.icon
-                      )}
+                      <ItemIcon imageSrc={recipe.imageSrc} name={recipe.name} size="lg" fallback={recipe.icon} />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-baseline justify-between">
@@ -231,15 +224,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
               className="w-16 h-16 rounded-lg border-2 flex items-center justify-center text-3xl flex-shrink-0"
               style={{ borderColor: RARITY_COLORS[selectedRecipe.rarity] }}
             >
-              {selectedRecipe.imageSrc ? (
-                <img
-                  src={selectedRecipe.imageSrc}
-                  alt={selectedRecipe.name}
-                  className="w-14 h-14 object-contain image-rendering-pixelated"
-                />
-              ) : (
-                selectedRecipe.icon
-              )}
+              <ItemIcon imageSrc={selectedRecipe.imageSrc} name={selectedRecipe.name} size="2xl" fallback={selectedRecipe.icon} />
             </div>
             <div>
               <h3 className="font-bold font-almendra text-[var(--rpg-text-primary)] text-lg">{selectedRecipe.name}</h3>
@@ -285,15 +270,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
               const hasEnough = material.owned >= totalRequired;
               return (
                 <div key={idx} className="flex items-center gap-3">
-                  {material.imageSrc ? (
-                    <img
-                      src={material.imageSrc}
-                      alt={material.name}
-                      className="w-8 h-8 object-contain image-rendering-pixelated"
-                    />
-                  ) : (
-                    <span className="text-2xl">{material.icon || '?'}</span>
-                  )}
+                  <ItemIcon imageSrc={material.imageSrc} name={material.name} size="md" fallback={<span className="text-2xl">{material.icon || '?'}</span>} />
                   <div className="flex-1">
                     <div className="flex justify-between items-baseline">
                       <span className="text-sm text-[var(--rpg-text-primary)]">{material.name}</span>

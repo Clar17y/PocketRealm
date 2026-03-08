@@ -13,6 +13,7 @@ import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { ForgeTutorial } from '@/components/common/ForgeTutorial';
+import { ItemIcon } from '@/components/common/ItemIcon';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 function SacrificePicker({
@@ -270,11 +271,7 @@ export function Forge({
                     className="w-9 h-9 rounded border-2 flex items-center justify-center bg-[var(--rpg-background)]"
                     style={{ borderColor: RARITY_COLORS[item.rarity] }}
                   >
-                    {item.imageSrc ? (
-                      <img src={item.imageSrc} alt={item.name} className="w-7 h-7 object-contain image-rendering-pixelated" />
-                    ) : (
-                      <Anvil size={16} />
-                    )}
+                    <ItemIcon imageSrc={item.imageSrc} name={item.name} size="sm" fallback={<Anvil size={16} />} />
                   </div>
                   <div className="min-w-0">
                     <div className="text-sm text-[var(--rpg-text-primary)] font-semibold truncate">{item.name}</div>

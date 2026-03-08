@@ -30,15 +30,12 @@ import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankSe
 import { enterRecoveringState, setHp } from '../../services/hpService';
 import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { trackProgress } from '../../services/progressService';
-import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
-import { buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../../services/combatOrchestrationService';
+import { preparePlayerForCombat, buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../../services/combatOrchestrationService';
 import { getEquipmentStats } from '../../services/equipmentService';
-import { getActiveTemplate } from '../../services/combatTemplateService';
-import { getSkillPoints } from '../../services/skillPointService';
-import { getResourceState, setAllResources } from '../../services/resourceService';
+import { setAllResources } from '../../services/resourceService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { getPlayerProgressionState } from '../../services/attributesService';
 import { discoverZone, getUndiscoveredNeighborZones, respawnToHomeTown } from '../../services/zoneDiscoveryService';
@@ -49,13 +46,12 @@ import { checkAndSpawnEvents } from '../../services/eventSchedulerService';
 import { getIo } from '../../socket';
 import { emitSystemMessage } from '../../services/systemMessageService';
 import { persistMobHp } from '../../services/persistedMobService';
-import { buildPotionPool, deductConsumedPotions, templateHasPotionActions } from '../../services/potionService';
-import { getCombatBuffs, applyCombatBuffs, consumeBuffIfActive } from '../../services/buffService';
-import type { EventModifierBadge } from '../../services/worldEventService';
+import { deductConsumedPotions } from '../../services/potionService';
+import { getCombatBuffsWithUses, applyCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges, type CombatBuffBadge } from '../../services/buffService';
 import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
-import { getMainHandAttackSkill, getSkillLevel, buildPerActionScaling, type AttackSkill } from '../../services/combatStatsService';
+import { getMainHandAttackSkill } from '../../services/combatStatsService';
 import {
   startSchema,
   pickWeighted,
@@ -127,27 +123,15 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       getMainHandAttackSkill(playerId),
     ]);
 
-    const attackSkill: AttackSkill = mainHandAttackSkill ?? 'melee';
-    const attackLevel = await getSkillLevel(playerId, attackSkill);
-
-    const guildMods = await getPlayerGuildModifiers(playerId);
-    const combatBuffs = await getCombatBuffs(playerId);
-    const buffUsesLeft = { damage: 0, defence: 0, durability: 0 };
-    if (combatBuffs.damageBoost > 0 || combatBuffs.defenceBoost > 0 || combatBuffs.durabilityShield > 0) {
-      const allBuffs = await (prisma as any).playerBuff.findMany({ where: { playerId, buffType: { in: ['combat_damage', 'combat_defence', 'durability_shield'] } }, select: { buffType: true, remainingUses: true } });
-      for (const b of allBuffs) {
-        if (b.buffType === 'combat_damage') buffUsesLeft.damage = b.remainingUses;
-        if (b.buffType === 'combat_defence') buffUsesLeft.defence = b.remainingUses;
-        if (b.buffType === 'durability_shield') buffUsesLeft.durability = b.remainingUses;
-      }
-    }
-
-    const perActionScaling = await buildPerActionScaling(playerId, {
-      equipmentStats,
-      attributes: progression.attributes,
-      weaponRequiredSkill: mainHandAttackSkill,
-      guildDamageMultiplier: guildMods.combatDamage,
+    // Prepare player combat data (using pre-fetched equipment/progression/weapon)
+    const combatPrep = await preparePlayerForCombat(playerId, {
+      maxHp: hpState.maxHp,
+      preloaded: { mainHandAttackSkill, equipmentStats, progression },
     });
+    const { attackSkill, attackLevel, guildMods, perActionScaling, playerTemplate, potionPool, resources, unlockedActions: explorationUnlockedActions } = combatPrep;
+
+    // Quest shop combat buffs — track remaining uses for per-ambush consumption
+    const { buffs: combatBuffs, uses: buffUsesLeft } = await getCombatBuffsWithUses(playerId);
 
     const explorationProgress = await getExplorationPercent(playerId, body.zoneId);
     const zoneTiers = zone.explorationTiers as Record<string, number> | null;
@@ -253,23 +237,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     let wasKnockedOut = false;
 
     let currentHp = hpState.currentHp;
-
-    // Fetch combat template, resource state, and unlocked actions for template combat
-    const [playerTemplate, resourceState, explorationSkillPoints] = await Promise.all([
-      getActiveTemplate(playerId),
-      getResourceState(playerId),
-      getSkillPoints(playerId),
-    ]);
-    const explorationUnlockedActions = explorationSkillPoints.unlockedActions;
-    const potionPool = templateHasPotionActions(playerTemplate)
-      ? await buildPotionPool(playerId, hpState.maxHp)
-      : [];
-    let currentStamina = resourceState.stamina.current;
-    let currentMana = resourceState.mana.current;
-    const maxStamina = resourceState.stamina.max;
-    const maxMana = resourceState.mana.max;
-    const staminaRegenPerRound = resourceState.stamina.regenPerRound;
-    const manaRegenPerRound = resourceState.mana.regenPerRound;
+    let currentStamina = resources.stamina;
+    let currentMana = resources.mana;
 
     let aborted = false;
     let abortedAtTurn: number | null = null;
@@ -360,11 +329,11 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           playerStats,
           template: playerTemplate,
           stamina: currentStamina,
-          maxStamina,
-          staminaRegenPerRound,
+          maxStamina: resources.maxStamina,
+          staminaRegenPerRound: resources.staminaRegenPerRound,
           mana: currentMana,
-          maxMana,
-          manaRegenPerRound,
+          maxMana: resources.maxMana,
+          manaRegenPerRound: resources.manaRegenPerRound,
           unlockedActions: explorationUnlockedActions,
           perActionScaling,
         });
@@ -384,9 +353,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
         // Consume combat buff charges per ambush mob
         await prisma.$transaction(async (tx) => {
-          if (buffUsesLeft.damage > 0) { await consumeBuffIfActive(tx, playerId, 'combat_damage'); buffUsesLeft.damage--; }
-          if (buffUsesLeft.defence > 0) { await consumeBuffIfActive(tx, playerId, 'combat_defence'); buffUsesLeft.defence--; }
-          if (buffUsesLeft.durability > 0) { await consumeBuffIfActive(tx, playerId, 'durability_shield'); buffUsesLeft.durability--; }
+          await consumeBuffChargesPerMob(tx, playerId, buffUsesLeft);
         });
 
         // Determine mob family once for event modifier badges (used in both victory and defeat paths)
@@ -398,12 +365,12 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           : [];
 
         // Build buff badges for this ambush (reflect state at time of fight)
-        const ambushBuffBadges: (EventModifierBadge & { appliedToThisMob: boolean })[] = [];
-        if (mobBuffs.damageBoost > 0) ambushBuffBadges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: mobBuffs.damageBoost, isGlobal: false, appliedToThisMob: true });
-        if (mobBuffs.defenceBoost > 0) ambushBuffBadges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: mobBuffs.defenceBoost, isGlobal: false, appliedToThisMob: true });
-        if (buffUsesLeft.durability + 1 > 0 && combatBuffs.durabilityShield > 0 && durabilityLost.length === 0) {
-          ambushBuffBadges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: combatBuffs.durabilityShield, isGlobal: false, appliedToThisMob: true });
-        }
+        const shieldWasActive = buffUsesLeft.durability + 1 > 0 && combatBuffs.durabilityShield > 0 && durabilityLost.length === 0;
+        const ambushBuffBadges: CombatBuffBadge[] = buildCombatBuffBadges({
+          damageBoost: mobBuffs.damageBoost,
+          defenceBoost: mobBuffs.defenceBoost,
+          durabilityShield: shieldWasActive ? combatBuffs.durabilityShield : 0,
+        });
 
         let loot: Array<{ itemTemplateId: string; quantity: number; rarity?: string }> = [];
         let xpGain = 0;

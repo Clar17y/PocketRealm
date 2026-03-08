@@ -78,14 +78,51 @@ export async function consumeBuffIfActive(tx: any, playerId: string, buffType: s
   return buff.bonusValue;
 }
 
-/** Fetch all combat-related buff values for a player. */
+/** Fetch all combat-related buff values for a player (single query). */
 export async function getCombatBuffs(playerId: string): Promise<CombatBuffs> {
-  const [damageBoost, defenceBoost, durabilityShield] = await Promise.all([
-    getBuffValue(playerId, 'combat_damage'),
-    getBuffValue(playerId, 'combat_defence'),
-    getBuffValue(playerId, 'durability_shield'),
-  ]);
-  return { damageBoost, defenceBoost, durabilityShield };
+  const buffs = await (prisma as any).playerBuff.findMany({
+    where: { playerId, buffType: { in: ['combat_damage', 'combat_defence', 'durability_shield'] } },
+    select: { buffType: true, bonusValue: true },
+  });
+  const map = new Map<string, number>(buffs.map((b: any) => [b.buffType as string, b.bonusValue as number]));
+  return {
+    damageBoost: map.get('combat_damage') ?? 0,
+    defenceBoost: map.get('combat_defence') ?? 0,
+    durabilityShield: map.get('durability_shield') ?? 0,
+  };
+}
+
+export interface CombatBuffRemainingUses {
+  damage: number;
+  defence: number;
+  durability: number;
+}
+
+/** Fetch combat buff bonus values AND remaining use counts in a single query. */
+export async function getCombatBuffsWithUses(playerId: string): Promise<{ buffs: CombatBuffs; uses: CombatBuffRemainingUses }> {
+  const rows = await (prisma as any).playerBuff.findMany({
+    where: { playerId, buffType: { in: ['combat_damage', 'combat_defence', 'durability_shield'] } },
+    select: { buffType: true, bonusValue: true, remainingUses: true },
+  });
+  const buffs: CombatBuffs = { damageBoost: 0, defenceBoost: 0, durabilityShield: 0 };
+  const uses: CombatBuffRemainingUses = { damage: 0, defence: 0, durability: 0 };
+  for (const b of rows) {
+    if (b.buffType === 'combat_damage') { buffs.damageBoost = b.bonusValue; uses.damage = b.remainingUses; }
+    if (b.buffType === 'combat_defence') { buffs.defenceBoost = b.bonusValue; uses.defence = b.remainingUses; }
+    if (b.buffType === 'durability_shield') { buffs.durabilityShield = b.bonusValue; uses.durability = b.remainingUses; }
+  }
+  return { buffs, uses };
+}
+
+/** Consume one charge of each active combat buff. Mutates `uses` in place. */
+export async function consumeBuffChargesPerMob(
+  tx: any,
+  playerId: string,
+  uses: CombatBuffRemainingUses,
+): Promise<void> {
+  if (uses.damage > 0) { await consumeBuffIfActive(tx, playerId, 'combat_damage'); uses.damage--; }
+  if (uses.defence > 0) { await consumeBuffIfActive(tx, playerId, 'combat_defence'); uses.defence--; }
+  if (uses.durability > 0) { await consumeBuffIfActive(tx, playerId, 'durability_shield'); uses.durability--; }
 }
 
 /** Apply combat buffs to player stats before combat resolution. Mutates in place. */
@@ -118,4 +155,27 @@ export async function consumeBuffStandalone(playerId: string, buffType: string):
   await (prisma as any).$transaction(async (tx: any) => {
     await consumeBuffIfActive(tx, playerId, buffType);
   });
+}
+
+export interface CombatBuffBadge {
+  title: string;
+  effectType: string;
+  effectValue: number;
+  isGlobal: boolean;
+  appliedToThisMob: boolean;
+}
+
+/** Build event-style badges for active combat buffs. */
+export function buildCombatBuffBadges(buffs: CombatBuffs): CombatBuffBadge[] {
+  const badges: CombatBuffBadge[] = [];
+  if (buffs.damageBoost > 0) {
+    badges.push({ title: 'Combat Power Scroll', effectType: 'player_damage_up', effectValue: buffs.damageBoost, isGlobal: false, appliedToThisMob: true });
+  }
+  if (buffs.defenceBoost > 0) {
+    badges.push({ title: 'Iron Skin Scroll', effectType: 'player_defence_up', effectValue: buffs.defenceBoost, isGlobal: false, appliedToThisMob: true });
+  }
+  if (buffs.durabilityShield > 0) {
+    badges.push({ title: 'Durability Shield Scroll', effectType: 'durability_shield', effectValue: buffs.durabilityShield, isGlobal: false, appliedToThisMob: true });
+  }
+  return badges;
 }

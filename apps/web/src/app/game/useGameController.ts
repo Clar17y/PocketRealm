@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { RARITY_RANK } from '@/lib/rarity';
@@ -64,6 +64,7 @@ import {
   allocateSkillPoint,
   respecSkillPoints,
   getTemplates,
+  type ApiResponse,
   type PendingLootItem,
   type WorldEventResponse,
   type SkillPointState,
@@ -78,6 +79,7 @@ import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@po
 import type { RouletteBetType } from '@pocketrealm/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
+import { findShortestZonePath } from '@/lib/zoneRoutes';
 import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
 export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
@@ -94,6 +96,20 @@ import { useCombatPlayback } from './hooks/useCombatPlayback';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
+function mapPlaybackEventsToLogs(
+  events: Array<{ turn: number; type: string; description: string }>,
+): Array<{ timestamp: string; type: 'info' | 'success' | 'danger'; message: string }> {
+  return events.slice().reverse().map((event) => ({
+    timestamp: nowStamp(),
+    type: (event.type === 'ambush_defeat'
+      ? 'danger'
+      : event.type === 'ambush_victory' || event.type === 'encounter_site' || event.type === 'resource_node'
+        ? 'success'
+        : 'info') as 'info' | 'success' | 'danger',
+    message: `Turn ${event.turn}: ${event.description}`,
+  }));
+}
+
 function showQuestToasts(updates?: QuestProgressUpdate[]) {
   if (!updates?.length) return;
   const show = (window as unknown as Record<string, unknown>).__showQuestToast as
@@ -101,6 +117,26 @@ function showQuestToasts(updates?: QuestProgressUpdate[]) {
     | undefined;
   if (!show) return;
   for (const update of updates) show(update);
+}
+
+interface TravelRouteState {
+  remainingZoneIds: string[];
+  totalHops: number;
+  finalDestinationName: string;
+}
+
+interface TravelPlaybackState {
+  totalTurns: number;
+  destinationName: string;
+  events: Array<{ turn: number; type: string; description: string; details?: Record<string, unknown> }>;
+  aborted: boolean;
+  refundedTurns: number;
+  playerHpBefore: number;
+  playerMaxHp: number;
+  respawnedToName?: string;
+  currentHop: number;
+  totalHops: number;
+  finalDestinationName: string;
 }
 
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
@@ -253,6 +289,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const activatePendingLootRef = useRef<(sessionId: string) => Promise<void>>(async () => {});
   const pendingLootQueueRef = useRef<string[]>([]);
   const arrivedInTownRef = useRef(false);
+  const travelRouteRef = useRef<TravelRouteState | null>(null);
   const lastEventLogTimeRef = useRef(0);
   const prevInventoryIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedOnceRef = useRef(false);
@@ -274,22 +311,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     playerMaxHp: number;
     pendingLootSessionIds?: string[];
   } | null>(null);
-  const [travelPlaybackData, setTravelPlaybackData] = useState<{
-    totalTurns: number;
-    destinationName: string;
-    events: Array<{ turn: number; type: string; description: string; details?: Record<string, unknown> }>;
-    aborted: boolean;
-    refundedTurns: number;
-    playerHpBefore: number;
-    playerMaxHp: number;
-    respawnedToName?: string;
-    pendingLootSessionId?: string;
-  } | null>(null);
+  const [travelPlaybackData, setTravelPlaybackData] = useState<TravelPlaybackState | null>(null);
+  const hpStateRef = useRef(hpState);
+  useEffect(() => {
+    hpStateRef.current = hpState;
+  }, [hpState]);
 
   const loadTurnsAndHp = useCallback(async () => {
     const [turnRes, hpRes, resourceRes] = await Promise.all([getTurns(), getHpState(), getResources()]);
     if (turnRes.data) setTurns(turnRes.data.currentTurns);
-    if (hpRes.data) setHpState(hpRes.data);
+    if (hpRes.data) {
+      setHpState(hpRes.data);
+      hpStateRef.current = hpRes.data;
+    }
     if (resourceRes.data) {
       setStaminaState(resourceRes.data.stamina);
       setManaState(resourceRes.data.mana);
@@ -362,7 +396,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setTutorialStep(playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED);
     }
     if (skillsRes.data) setSkills(skillsRes.data.skills);
-    if (hpRes.data) setHpState(hpRes.data);
+    if (hpRes.data) {
+      setHpState(hpRes.data);
+      hpStateRef.current = hpRes.data;
+    }
     if (resourceRes.data) {
       setStaminaState(resourceRes.data.stamina);
       setManaState(resourceRes.data.mana);
@@ -554,20 +591,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (entries.length > 0) pushLog(...entries);
   };
 
-  const currentZone =
+  const currentZone = useMemo(() =>
     zones.find((z) => z.id === activeZoneId) ??
     zones.find((z) => z.discovered) ??
     zones.find((z) => z.isStarter) ??
-    null;
+    null, [zones, activeZoneId]);
 
-  const ownedByTemplateId = (() => {
+  const ownedByTemplateId = useMemo(() => {
     const map = new Map<string, number>();
-    // Use materialTotals (backpack + stash combined) so crafting sees all owned materials
     for (const [templateId, qty] of Object.entries(materialTotals)) {
       map.set(templateId, qty);
     }
     return map;
-  })();
+  }, [materialTotals]);
 
   const runAction = async (actionName: string, fn: () => Promise<void>) => {
     if (busyAction) return;
@@ -578,6 +614,23 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     } finally {
       setBusyAction(null);
     }
+  };
+
+  // Helper for simple API-call-then-reload actions
+  const simpleAction = async <T>(
+    actionName: string,
+    apiFn: () => Promise<ApiResponse<T>>,
+    onSuccess?: (data: T) => void,
+  ) => {
+    await runAction(actionName, async () => {
+      const res = await apiFn();
+      if (!res.data) {
+        setActionError(res.error?.message ?? `${actionName.replace(/_/g, ' ')} failed`);
+        return;
+      }
+      onSuccess?.(res.data);
+      await loadAll();
+    });
   };
 
   const handleStartExploration = async (turnSpend: number, tier?: number) => {
@@ -657,27 +710,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   };
 
   const handlePlaybackSkip = async () => {
-    // Dump all remaining events to activity log at once
     if (explorationPlaybackData) {
-      const entries = explorationPlaybackData.events
-        .slice()
-        .reverse()
-        .map((event) => ({
-          timestamp: nowStamp(),
-          type: (event.type === 'ambush_defeat'
-            ? 'danger'
-            : event.type === 'ambush_victory' || event.type === 'encounter_site' || event.type === 'resource_node'
-              ? 'success'
-              : 'info') as 'info' | 'success' | 'danger',
-          message: `Turn ${event.turn}: ${event.description}`,
-        }));
       pushLog(
         {
           timestamp: nowStamp(),
           type: 'info',
           message: `Explored ${explorationPlaybackData.totalTurns.toLocaleString()} turns in ${explorationPlaybackData.zoneName}.`,
         },
-        ...entries,
+        ...mapPlaybackEventsToLogs(explorationPlaybackData.events),
       );
       if (explorationPlaybackData.aborted && explorationPlaybackData.refundedTurns > 0) {
         pushLog({
@@ -830,7 +870,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       // Store pending loot session ID for activation after playback
       combatPendingLootRef.current = data.pendingLootSessionId ?? null;
 
-      await Promise.all([loadAll(), loadTurnsAndHp(), loadBestiary()]);
+      await Promise.all([loadAll(), loadBestiary()]);
     });
   };
 
@@ -1043,59 +1083,22 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
-  const handleSalvageItem = async (itemId: string) => {
-    await runAction('salvage', async () => {
-      const res = await salvage(itemId);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Salvage failed');
-        return;
-      }
-
+  const handleSalvageItem = (itemId: string) =>
+    simpleAction('salvage', () => salvage(itemId), (data) => {
       setTurns(data.turns.currentTurns);
-      const materialSummary = data.salvage.returnedMaterials
-        .map((entry) => `${entry.name} x${entry.quantity}`)
-        .join(', ');
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Salvaged item for: ${materialSummary}.`,
-      });
-      await loadAll();
+      const materialSummary = data.salvage.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged item for: ${materialSummary}.` });
     });
-  };
 
-  const handleSalvageBatch = async (itemIds: string[]) => {
-    await runAction('salvage_batch', async () => {
-      const res = await salvageBatch(itemIds);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Batch salvage failed');
-        return;
-      }
-
+  const handleSalvageBatch = (itemIds: string[]) =>
+    simpleAction('salvage_batch', () => salvageBatch(itemIds), (data) => {
       setTurns(data.turns.currentTurns);
-      const materialSummary = data.returnedMaterials
-        .map((entry) => `${entry.name} x${entry.quantity}`)
-        .join(', ');
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Salvaged ${data.salvaged.length} items (${data.totalTurnCost} turns). Recovered: ${materialSummary}`,
-      });
-      await loadAll();
+      const materialSummary = data.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged ${data.salvaged.length} items (${data.totalTurnCost} turns). Recovered: ${materialSummary}` });
     });
-  };
 
-  const handleForgeUpgrade = async (itemId: string, sacrificialItemId: string) => {
-    await runAction('forge_upgrade', async () => {
-      const res = await forgeUpgrade(itemId, sacrificialItemId);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Forge upgrade failed');
-        return;
-      }
-
+  const handleForgeUpgrade = (itemId: string, sacrificialItemId: string) =>
+    simpleAction('forge_upgrade', () => forgeUpgrade(itemId, sacrificialItemId), (data) => {
       setTurns(data.turns.currentTurns);
       const fromLabel = data.forge.fromRarity.charAt(0).toUpperCase() + data.forge.fromRarity.slice(1);
       const toLabel = data.forge.toRarity.charAt(0).toUpperCase() + data.forge.toRarity.slice(1);
@@ -1124,200 +1127,70 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           message: `Forge failed at ${fromLabel} (${chancePct}% chance).${buffTag} Target and sacrifice consumed.`,
         });
       }
-
-      await loadAll();
     });
-  };
 
-  const handleForgeReroll = async (itemId: string, sacrificialItemId: string) => {
-    await runAction('forge_reroll', async () => {
-      const res = await forgeReroll(itemId, sacrificialItemId);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Forge reroll failed');
-        return;
-      }
-
+  const handleForgeReroll = (itemId: string, sacrificialItemId: string) =>
+    simpleAction('forge_reroll', () => forgeReroll(itemId, sacrificialItemId), (data) => {
       setTurns(data.turns.currentTurns);
       const rarityLabel = data.forge.rarity.charAt(0).toUpperCase() + data.forge.rarity.slice(1);
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Re-rolled ${rarityLabel} item bonus stats. Sacrificial duplicate consumed.`,
-      });
-
-      await loadAll();
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Re-rolled ${rarityLabel} item bonus stats. Sacrificial duplicate consumed.` });
     });
-  };
 
-  const handleDestroyItem = async (itemId: string) => {
-    await runAction('destroy', async () => {
-      const res = await destroyInventoryItem(itemId);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Destroy failed');
-        return;
-      }
-      await loadAll();
-    });
-  };
+  const handleDestroyItem = (itemId: string) =>
+    simpleAction('destroy', () => destroyInventoryItem(itemId));
 
-  const handleRepairItem = async (itemId: string) => {
-    await runAction('repair', async () => {
-      const res = await repairItem(itemId);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Repair failed');
-        return;
-      }
+  const handleRepairItem = (itemId: string) =>
+    simpleAction('repair', () => repairItem(itemId), (data) => {
       if (data.turns) setTurns(data.turns.currentTurns);
-      await loadAll();
     });
-  };
 
-  const handleRepairAllEquipped = async () => {
-    await runAction('repair_all', async () => {
-      const res = await repairAllEquipped();
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Repair all failed');
-        return;
-      }
+  const handleRepairAllEquipped = () =>
+    simpleAction('repair_all', () => repairAllEquipped(), (data) => {
       if (data.turns) setTurns(data.turns.currentTurns);
-      await loadAll();
     });
-  };
 
-  const handleUseItem = async (itemId: string) => {
-    await runAction('use_item', async () => {
-      const res = await useItem(itemId);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Use item failed');
-        return;
-      }
-      await loadAll();
-    });
-  };
+  const handleUseItem = (itemId: string) =>
+    simpleAction('use_item', () => useItem(itemId));
 
-  const handleEquipItem = async (itemId: string, slot: string) => {
-    await runAction('equip', async () => {
-      const res = await equip(itemId, slot);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Equip failed');
-        return;
-      }
-      await loadAll();
+  const handleEquipItem = (itemId: string, slot: string) =>
+    simpleAction('equip', () => equip(itemId, slot), () => {
       advanceTutorial(TUTORIAL_STEP_EQUIP);
     });
-  };
 
-  const handleUnequipSlot = async (slot: string) => {
-    await runAction('unequip', async () => {
-      const res = await unequip(slot);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Unequip failed');
-        return;
-      }
-      await loadAll();
-    });
-  };
+  const handleUnequipSlot = (slot: string) =>
+    simpleAction('unequip', () => unequip(slot));
 
-  const handleSellItem = async (itemId: string) => {
-    await runAction('sell', async () => {
-      const res = await sellItem(itemId);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Sell failed');
-        return;
-      }
-      setGold(res.data.newGold);
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Sold item for ${res.data.goldEarned} gold`,
-      });
-      await loadAll();
+  const handleSellItem = (itemId: string) =>
+    simpleAction('sell', () => sellItem(itemId), (data) => {
+      setGold(data.newGold);
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Sold item for ${data.goldEarned} gold` });
     });
-  };
 
-  const handleSellBatch = async (itemIds: string[]) => {
-    await runAction('sell_batch', async () => {
-      const res = await sellBulk(itemIds);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Batch sell failed');
-        return;
-      }
-      setGold(res.data.newGold);
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Sold ${res.data.soldCount} item(s) for ${res.data.totalGoldEarned} gold`,
-      });
-      await loadAll();
+  const handleSellBatch = (itemIds: string[]) =>
+    simpleAction('sell_batch', () => sellBulk(itemIds), (data) => {
+      setGold(data.newGold);
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Sold ${data.soldCount} item(s) for ${data.totalGoldEarned} gold` });
     });
-  };
 
-  const handleDepositItem = async (itemId: string) => {
-    await runAction('deposit', async () => {
-      const res = await depositToStash(itemId);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Deposit failed');
-        return;
-      }
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: 'Item deposited to stash',
-      });
-      await loadAll();
+  const handleDepositItem = (itemId: string) =>
+    simpleAction('deposit', () => depositToStash(itemId), () => {
+      pushLog({ timestamp: nowStamp(), type: 'success', message: 'Item deposited to stash' });
     });
-  };
 
-  const handleDepositBatch = async (itemIds: string[]) => {
-    await runAction('deposit_batch', async () => {
-      const res = await depositBatchToStash(itemIds);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Batch deposit failed');
-        return;
-      }
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `${res.data.depositedCount} item(s) deposited to stash`,
-      });
-      await loadAll();
+  const handleDepositBatch = (itemIds: string[]) =>
+    simpleAction('deposit_batch', () => depositBatchToStash(itemIds), (data) => {
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `${data.depositedCount} item(s) deposited to stash` });
     });
-  };
 
-  const handleWithdrawItem = async (itemId: string) => {
-    await runAction('withdraw', async () => {
-      const res = await withdrawFromStash(itemId);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Withdraw failed');
-        return;
-      }
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: 'Item withdrawn from stash',
-      });
-      await loadAll();
+  const handleWithdrawItem = (itemId: string) =>
+    simpleAction('withdraw', () => withdrawFromStash(itemId), () => {
+      pushLog({ timestamp: nowStamp(), type: 'success', message: 'Item withdrawn from stash' });
     });
-  };
 
-  const handleWithdrawBatch = async (itemIds: string[]) => {
-    await runAction('withdraw_batch', async () => {
-      const res = await withdrawBatchFromStash(itemIds);
-      if (!res.data) {
-        setActionError(res.error?.message ?? 'Batch withdraw failed');
-        return;
-      }
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `${res.data.withdrawnCount} item(s) withdrawn from stash`,
-      });
-      await loadAll();
+  const handleWithdrawBatch = (itemIds: string[]) =>
+    simpleAction('withdraw_batch', () => withdrawBatchFromStash(itemIds), (data) => {
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `${data.withdrawnCount} item(s) withdrawn from stash` });
     });
-  };
 
   const activateNextQueuedLoot = async () => {
     const next = pendingLootQueueRef.current.shift();
@@ -1387,6 +1260,112 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const [confirmAbandonLoot, setConfirmAbandonLoot] = useState<{ travelZoneId: string } | null>(null);
 
+  const completeQueuedTravelRoute = async () => {
+    travelRouteRef.current = null;
+    setPlaybackActive(false);
+
+    if (arrivedInTownRef.current) {
+      arrivedInTownRef.current = false;
+      advanceTutorial(TUTORIAL_STEP_TRAVEL);
+    }
+
+    if (!pendingLootSession && pendingLootQueueRef.current.length > 0) {
+      await activateNextQueuedLoot();
+    }
+  };
+
+  const executeNextTravelHop = async () => {
+    const route = travelRouteRef.current;
+    if (!route || route.remainingZoneIds.length === 0) {
+      await completeQueuedTravelRoute();
+      return;
+    }
+
+    const nextZoneId = route.remainingZoneIds[0]!;
+    const currentHop = route.totalHops - route.remainingZoneIds.length + 1;
+    const hpBefore = hpStateRef.current.currentHp;
+    const playerMaxHp = hpStateRef.current.maxHp;
+
+    const res = await travelToZone(nextZoneId);
+    const data = res.data;
+    if (!data) {
+      travelRouteRef.current = null;
+      setPlaybackActive(false);
+      setActionError(res.error?.message ?? 'Travel failed');
+      // Earlier hops may have committed — reload world state and drain queued loot
+      await loadAll();
+      if (pendingLootQueueRef.current.length > 0) {
+        await activateNextQueuedLoot();
+      }
+      return;
+    }
+
+    setTurns(data.turns.currentTurns);
+    route.remainingZoneIds.shift();
+
+    const arrivedInTown = data.zone.zoneType === 'town';
+    if (arrivedInTown) arrivedInTownRef.current = true;
+
+    if (data.pendingLootSessionId) {
+      pendingLootQueueRef.current.push(data.pendingLootSessionId);
+    }
+
+    if (data.breadcrumbReturn) {
+      setActiveZoneId(data.zone.id);
+      pushLog({ timestamp: nowStamp(), type: 'success', message: `Returned to ${data.zone.name}.` });
+
+      if (route.remainingZoneIds.length > 0) {
+        await loadTurnsAndHp();
+        await executeNextTravelHop();
+        return;
+      }
+
+      await loadAll();
+      await completeQueuedTravelRoute();
+      return;
+    }
+
+    const travelCost = data.travelCost ?? 0;
+    if (travelCost > 0) {
+      const hopSuffix = route.totalHops > 1
+        ? ` (${currentHop}/${route.totalHops} to ${route.finalDestinationName})`
+        : '';
+      pushLog({
+        timestamp: nowStamp(),
+        type: 'info',
+        message: `Travelling to ${data.zone.name}${hopSuffix}...`,
+      });
+
+      setTravelPlaybackData({
+        totalTurns: travelCost,
+        destinationName: data.zone.name,
+        events: data.events,
+        aborted: data.aborted,
+        refundedTurns: data.refundedTurns,
+        playerHpBefore: hpBefore,
+        playerMaxHp,
+        respawnedToName: data.respawnedTo?.townName,
+        currentHop,
+        totalHops: route.totalHops,
+        finalDestinationName: route.finalDestinationName,
+      });
+      setPlaybackActive(true);
+      return;
+    }
+
+    setActiveZoneId(data.zone.id);
+    pushLog({ timestamp: nowStamp(), type: 'success', message: `Arrived at ${data.zone.name}.` });
+
+    if (route.remainingZoneIds.length > 0) {
+      await loadTurnsAndHp();
+      await executeNextTravelHop();
+      return;
+    }
+
+    await loadAll();
+    await completeQueuedTravelRoute();
+  };
+
   const abandonLootAndTravel = async () => {
     if (!confirmAbandonLoot) return;
     const zoneId = confirmAbandonLoot.travelZoneId;
@@ -1396,7 +1375,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     pendingLootQueueRef.current = [];
     setConfirmAbandonLoot(null);
-    await doTravel(zoneId);
+    await handleTravelToZone(zoneId);
   };
 
   const handleTravelToZone = async (id: string) => {
@@ -1404,63 +1383,28 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setConfirmAbandonLoot({ travelZoneId: id });
       return;
     }
-    await doTravel(id);
-  };
 
-  const doTravel = async (id: string) => {
-    const hpBefore = hpState.currentHp;
+    if (!activeZoneId) return;
+    if (id === activeZoneId) return;
+
+    const route = findShortestZonePath(activeZoneId, id, zoneConnections);
+    if (!route) {
+      setActionError('No route to that zone');
+      return;
+    }
+
+    const hops = route.slice(1);
+    if (hops.length === 0) return;
+
+    const finalDestinationName = zones.find((zone) => zone.id === id)?.name ?? 'that zone';
+    travelRouteRef.current = {
+      remainingZoneIds: hops,
+      totalHops: hops.length,
+      finalDestinationName,
+    };
 
     await runAction('travel', async () => {
-      const res = await travelToZone(id);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Travel failed');
-        return;
-      }
-
-      setTurns(data.turns.currentTurns);
-      const arrivedInTown = data.zone.zoneType === 'town';
-
-      // Breadcrumb return — instant, no playback
-      if (data.breadcrumbReturn) {
-        setActiveZoneId(data.zone.id);
-        pushLog({ timestamp: nowStamp(), type: 'success', message: `Returned to ${data.zone.name}.` });
-        await loadAll();
-        if (arrivedInTown) advanceTutorial(TUTORIAL_STEP_TRAVEL);
-        return;
-      }
-
-      // Trigger travel playback (progress bar + combat if ambushed)
-      // Don't update activeZoneId or loadAll yet — defer until playback completes
-      // so the map doesn't show "HERE" on the destination prematurely.
-      const travelCost = data.travelCost ?? 0;
-      if (travelCost > 0) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'info',
-          message: `Travelling to ${data.zone.name}...`,
-        });
-
-        if (arrivedInTown) arrivedInTownRef.current = true;
-        setTravelPlaybackData({
-          totalTurns: travelCost,
-          destinationName: data.zone.name,
-          events: data.events,
-          aborted: data.aborted,
-          refundedTurns: data.refundedTurns,
-          playerHpBefore: hpBefore,
-          playerMaxHp: hpState.maxHp,
-          respawnedToName: data.respawnedTo?.townName,
-          pendingLootSessionId: data.pendingLootSessionId,
-        });
-        setPlaybackActive(true);
-      } else {
-        // Zero-cost travel (shouldn't happen normally, but handle gracefully)
-        setActiveZoneId(data.zone.id);
-        pushLog({ timestamp: nowStamp(), type: 'success', message: `Arrived at ${data.zone.name}.` });
-        await loadAll();
-        if (arrivedInTown) advanceTutorial(TUTORIAL_STEP_TRAVEL);
-      }
+      await executeNextTravelHop();
     });
   };
 
@@ -1494,32 +1438,33 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   };
 
   const finalizeTravelPlayback = async () => {
-    const travelPendingId = travelPlaybackData?.pendingLootSessionId;
+    const currentPlayback = travelPlaybackData;
+    if (!currentPlayback) return;
+
+    const shouldContinueRoute =
+      !currentPlayback.aborted &&
+      (travelRouteRef.current?.remainingZoneIds.length ?? 0) > 0;
+
     setTravelPlaybackData(null);
     setPlaybackActive(false);
+
+    if (currentPlayback.aborted) {
+      travelRouteRef.current = null;
+    }
+
+    if (shouldContinueRoute) {
+      await loadTurnsAndHp();
+      await executeNextTravelHop();
+      return;
+    }
+
     await loadAll();
-
-    if (arrivedInTownRef.current) {
-      arrivedInTownRef.current = false;
-      advanceTutorial(TUTORIAL_STEP_TRAVEL);
-    }
-
-    if (travelPendingId) {
-      await activatePendingLoot(travelPendingId);
-    }
+    await completeQueuedTravelRoute();
   };
 
   const handleTravelPlaybackSkip = async () => {
     if (travelPlaybackData) {
-      const entries = travelPlaybackData.events
-        .slice()
-        .reverse()
-        .map((event) => ({
-          timestamp: nowStamp(),
-          type: (event.type === 'ambush_defeat' ? 'danger' : event.type === 'ambush_victory' ? 'success' : 'info') as 'info' | 'success' | 'danger',
-          message: `Turn ${event.turn}: ${event.description}`,
-        }));
-      pushLog(...entries);
+      pushLog(...mapPlaybackEventsToLogs(travelPlaybackData.events));
 
       if (travelPlaybackData.aborted && travelPlaybackData.respawnedToName) {
         pushLog({
