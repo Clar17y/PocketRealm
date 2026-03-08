@@ -20,18 +20,15 @@ interface PurchaseParams {
 
 export async function getShopItems(playerId: string) {
   const db = prisma as any;
-  const [items, questState] = await Promise.all([
+  const [items, questState, purchases, activeBuffs] = await Promise.all([
     db.shopItem.findMany({ where: { enabled: true }, orderBy: { sortOrder: 'asc' } }),
     db.playerQuestState.findUnique({ where: { playerId } }),
+    db.playerShopPurchase.findMany({ where: { playerId }, select: { shopItemId: true, purchasedAt: true } }) as Promise<any[]>,
+    db.playerBuff.findMany({ where: { playerId }, select: { buffType: true } }) as Promise<any[]>,
   ]);
 
   const questTokens = questState?.questTokens ?? 0;
   const weekStart = getWeekStart(new Date());
-
-  const purchases: any[] = await db.playerShopPurchase.findMany({
-    where: { playerId },
-    select: { shopItemId: true, purchasedAt: true },
-  });
 
   // Count purchases per item
   const weeklyCountMap = new Map<string, number>();
@@ -43,11 +40,6 @@ export async function getShopItems(playerId: string) {
     }
   }
 
-  // Check active buffs
-  const activeBuffs: any[] = await db.playerBuff.findMany({
-    where: { playerId },
-    select: { buffType: true },
-  });
   const activeBuffTypes = new Set(activeBuffs.map((b: any) => b.buffType));
 
   const mapped: ShopItemData[] = items.map((item: any) => {

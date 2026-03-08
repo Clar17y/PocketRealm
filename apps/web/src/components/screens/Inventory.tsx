@@ -18,6 +18,7 @@ import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { StashTutorial } from '@/components/common/StashTutorial';
 import { getStaggerDelay } from '@/lib/animations';
+import { ItemIcon } from '@/components/common/ItemIcon';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface Item {
@@ -488,11 +489,7 @@ export function Inventory({
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
                     {selectedStashItem.imageSrc && (
-                      <img
-                        src={selectedStashItem.imageSrc}
-                        alt={selectedStashItem.name}
-                        className="w-12 h-12 object-contain image-rendering-pixelated"
-                      />
+                      <ItemIcon imageSrc={selectedStashItem.imageSrc} name={selectedStashItem.name} size="xl" />
                     )}
                     <div>
                       <h3 className="text-lg font-bold text-[var(--rpg-text-primary)]">{selectedStashItem.name}</h3>
@@ -708,15 +705,7 @@ export function Inventory({
                         : 'var(--rpg-border)',
                   }}
                 >
-                  {selectedItem.imageSrc ? (
-                    <img
-                      src={selectedItem.imageSrc}
-                      alt={selectedItem.name}
-                      className="w-14 h-14 object-contain image-rendering-pixelated"
-                    />
-                  ) : (
-                    selectedItem.icon
-                  )}
+                  <ItemIcon imageSrc={selectedItem.imageSrc} name={selectedItem.name} size="2xl" fallback={selectedItem.icon} />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedItem.name}</h3>

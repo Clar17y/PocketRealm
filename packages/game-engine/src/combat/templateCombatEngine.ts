@@ -11,8 +11,9 @@ import type {
   ActionEffect,
   CombatAction,
   PerActionScaling,
+  CombatPotion,
 } from '@pocketrealm/shared';
-import { COMBAT_ACTION_CONSTANTS, COMBAT_CONSTANTS, POTION_CONSTANTS } from '@pocketrealm/shared';
+import { COMBAT_ACTION_CONSTANTS, COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type RoundInteraction } from './actionResolver';
 import {
   rollD20,
@@ -83,118 +84,112 @@ export interface TemplateCombatResult {
 
 // --- Internal State ---
 
+interface CombatantState {
+  hp: number;
+  maxHp: number;
+  stamina: number;
+  maxStamina: number;
+  staminaRegen: number;
+  mana: number;
+  maxMana: number;
+  manaRegen: number;
+}
+
 interface TemplateCombatState {
-  combatantAHp: number;
-  combatantAMaxHp: number;
-  combatantBHp: number;
-  combatantBMaxHp: number;
-  combatantAStamina: number;
-  combatantAMaxStamina: number;
-  combatantAStaminaRegen: number;
-  combatantBStamina: number;
-  combatantBMaxStamina: number;
-  combatantBStaminaRegen: number;
-  combatantAMana: number;
-  combatantAMaxMana: number;
-  combatantAManaRegen: number;
-  combatantBMana: number;
-  combatantBMaxMana: number;
-  combatantBManaRegen: number;
+  combatants: Record<CombatActor, CombatantState>;
   round: number;
   log: TemplateCombatLogEntry[];
   outcome: CombatOutcome | null;
   activeEffects: ActiveEffect[];
-  combatantADamageByScalingStat: { melee: number; ranged: number; magic: number };
-  combatantAResourceCostByScalingStat: { melee: number; ranged: number; magic: number };
+  damageByScalingStat: { melee: number; ranged: number; magic: number };
+  resourceCostByScalingStat: { melee: number; ranged: number; magic: number };
+}
+
+/** Shared params passed through every action execution within a round. */
+interface RoundContext {
+  combatantAAction: string;
+  combatantBAction: string;
+  wasExhausted: boolean;
+  interactionResult: string;
 }
 
 // --- Helpers ---
-
-function getHp(state: TemplateCombatState, actor: CombatActor): number {
-  return actor === 'combatantA' ? state.combatantAHp : state.combatantBHp;
-}
-
-function applyDamage(state: TemplateCombatState, target: CombatActor, damage: number): void {
-  if (target === 'combatantA') {
-    state.combatantAHp -= damage;
-  } else {
-    state.combatantBHp -= damage;
-  }
-}
-
-function applyHeal(state: TemplateCombatState, target: CombatActor, heal: number): number {
-  if (target === 'combatantA') {
-    const before = state.combatantAHp;
-    state.combatantAHp = Math.min(state.combatantAMaxHp, state.combatantAHp + heal);
-    return state.combatantAHp - before;
-  } else {
-    const before = state.combatantBHp;
-    state.combatantBHp = Math.min(state.combatantBMaxHp, state.combatantBHp + heal);
-    return state.combatantBHp - before;
-  }
-}
 
 function opponent(actor: CombatActor): CombatActor {
   return actor === 'combatantA' ? 'combatantB' : 'combatantA';
 }
 
-function hpSnapshot(state: TemplateCombatState): { combatantAHpAfter: number; combatantBHpAfter: number } {
+/** Build a log entry with HP/resource snapshots and round context baked in. */
+function buildLogEntry(
+  state: TemplateCombatState,
+  ctx: RoundContext | null,
+  fields: Partial<TemplateCombatLogEntry> & Pick<TemplateCombatLogEntry, 'actor' | 'actorName' | 'action' | 'message'>,
+): TemplateCombatLogEntry {
+  const a = state.combatants.combatantA;
+  const b = state.combatants.combatantB;
   return {
-    combatantAHpAfter: Math.max(0, state.combatantAHp),
-    combatantBHpAfter: Math.max(0, state.combatantBHp),
+    round: state.round,
+    combatantAHpAfter: Math.max(0, a.hp),
+    combatantBHpAfter: Math.max(0, b.hp),
+    combatantAStaminaAfter: a.stamina,
+    combatantBStaminaAfter: b.stamina,
+    combatantAManaAfter: a.mana,
+    combatantBManaAfter: b.mana,
+    combatantAAction: ctx?.combatantAAction ?? '',
+    combatantBAction: ctx?.combatantBAction ?? '',
+    wasExhausted: ctx?.wasExhausted,
+    interactionResult: ctx?.interactionResult,
+    ...fields,
   };
 }
 
-function resourceSnapshot(state: TemplateCombatState) {
-  return {
-    combatantAStaminaAfter: state.combatantAStamina,
-    combatantBStaminaAfter: state.combatantBStamina,
-    combatantAManaAfter: state.combatantAMana,
-    combatantBManaAfter: state.combatantBMana,
+/**
+ * Apply an action's effect (buff/debuff/DOT/HOT) to the state.
+ * Same-name effects refresh rather than stack. Buffs respect the cap; debuffs always apply.
+ * Returns the list of applied effects (for log display), or undefined if none.
+ */
+function applyActionEffect(
+  state: TemplateCombatState,
+  effect: ActionEffect,
+  actorKey: CombatActor,
+  opts?: { damageForPercentCalc?: number; sourceScalingStat?: 'melee' | 'ranged' | 'magic' },
+): Array<{ stat: string; modifier: number; duration: number; target: CombatActor }> | undefined {
+  const targetKey = effect.isDebuff !== false ? opponent(actorKey) : actorKey;
+
+  const newEffect: ActiveEffect = {
+    name: effect.name,
+    target: targetKey,
+    stat: effect.stat,
+    modifier: effect.modifier,
+    remainingRounds: effect.duration,
+    ...(opts?.sourceScalingStat ? { sourceScalingStat: opts.sourceScalingStat } : {}),
+    ...snapshotEffectValues(effect, opts?.damageForPercentCalc),
   };
-}
 
-function getStamina(state: TemplateCombatState, actor: CombatActor): number {
-  return actor === 'combatantA' ? state.combatantAStamina : state.combatantBStamina;
-}
-
-function getMana(state: TemplateCombatState, actor: CombatActor): number {
-  return actor === 'combatantA' ? state.combatantAMana : state.combatantBMana;
-}
-
-function deductStamina(state: TemplateCombatState, actor: CombatActor, amount: number): void {
-  if (actor === 'combatantA') {
-    state.combatantAStamina = Math.max(0, state.combatantAStamina - amount);
-  } else {
-    state.combatantBStamina = Math.max(0, state.combatantBStamina - amount);
+  // Same-name effects refresh, not stack
+  const existingIdx = state.activeEffects.findIndex(
+    e => e.name === newEffect.name && e.target === newEffect.target,
+  );
+  if (existingIdx >= 0) {
+    state.activeEffects[existingIdx] = { ...state.activeEffects[existingIdx], ...newEffect };
+    return [{ stat: effect.stat, modifier: effect.modifier, duration: effect.duration, target: targetKey }];
   }
-}
 
-function deductMana(state: TemplateCombatState, actor: CombatActor, amount: number): void {
-  if (actor === 'combatantA') {
-    state.combatantAMana = Math.max(0, state.combatantAMana - amount);
-  } else {
-    state.combatantBMana = Math.max(0, state.combatantBMana - amount);
+  if (effect.isDebuff) {
+    state.activeEffects.push(newEffect);
+    return [{ stat: effect.stat, modifier: effect.modifier, duration: effect.duration, target: targetKey }];
   }
-}
 
-function applyResourceRegen(state: TemplateCombatState): void {
-  state.combatantAStamina = Math.min(
-    state.combatantAMaxStamina,
-    state.combatantAStamina + state.combatantAStaminaRegen,
-  );
-  state.combatantBStamina = Math.min(
-    state.combatantBMaxStamina,
-    state.combatantBStamina + state.combatantBStaminaRegen,
-  );
-  state.combatantAMana = Math.min(
-    state.combatantAMaxMana,
-    state.combatantAMana + state.combatantAManaRegen,
-  );
-  state.combatantBMana = Math.min(
-    state.combatantBMaxMana,
-    state.combatantBMana + state.combatantBManaRegen,
-  );
+  // Buffs respect cap
+  const activeBufCount = state.activeEffects.filter(
+    (e) => e.target === actorKey && e.stat !== 'potionSickness' && e.modifier >= 0,
+  ).length;
+  if (activeBufCount >= COMBAT_ACTION_CONSTANTS.MAX_ACTIVE_BUFFS) {
+    return undefined;
+  }
+
+  state.activeEffects.push(newEffect);
+  return [{ stat: effect.stat, modifier: effect.modifier, duration: effect.duration, target: targetKey }];
 }
 
 function getEffectiveStats(
@@ -267,16 +262,15 @@ function applyEffectTicks(
         Math.floor(effect.resolvedDamagePerRound * (1 - reduction)),
       );
 
-      applyDamage(state, targetKey, tickDamage);
+      state.combatants[targetKey].hp -= tickDamage;
 
       // Track DOT damage by scaling stat (combatantA dealing to combatantB)
       if (targetKey === 'combatantB' && tickDamage > 0) {
         const dotStat = effect.sourceScalingStat ?? (effect.dotDamageType === 'physical' ? 'melee' : 'magic');
-        state.combatantADamageByScalingStat[dotStat] += tickDamage;
+        state.damageByScalingStat[dotStat] += tickDamage;
       }
 
-      state.log.push({
-        round: state.round,
+      state.log.push(buildLogEntry(state, null, {
         actor: targetKey === 'combatantA' ? 'combatantB' : 'combatantA',
         actorName: targetKey === 'combatantA' ? combatantB.name : combatantA.name,
         action: 'spell',
@@ -284,25 +278,20 @@ function applyEffectTicks(
         damage: tickDamage,
         message: `${effect.name} deals ${tickDamage} ${effect.dotDamageType ?? 'magic'} damage to ${target.name}`,
         tickType: 'dot_tick',
-        combatantAAction: '',
-        combatantBAction: '',
-        ...hpSnapshot(state),
-        ...resourceSnapshot(state),
-      });
+      }));
     }
 
     // HOT tick
     if (effect.resolvedHealPerRound && effect.resolvedHealPerRound > 0) {
       const targetKey = effect.target;
       const target = targetKey === 'combatantA' ? combatantA : combatantB;
-      const currentHp = getHp(state, targetKey);
-      const maxHeal = target.stats.maxHp - currentHp;
+      const c = state.combatants[targetKey];
+      const maxHeal = target.stats.maxHp - c.hp;
       const actualHeal = Math.min(effect.resolvedHealPerRound, maxHeal);
 
       if (actualHeal > 0) {
-        applyHeal(state, targetKey, actualHeal);
-        state.log.push({
-          round: state.round,
+        c.hp = Math.min(c.maxHp, c.hp + actualHeal);
+        state.log.push(buildLogEntry(state, null, {
           actor: targetKey,
           actorName: target.name,
           action: 'spell',
@@ -310,11 +299,7 @@ function applyEffectTicks(
           healAmount: actualHeal,
           message: `${effect.name} heals ${target.name} for ${actualHeal} HP`,
           tickType: 'hot_tick',
-          combatantAAction: '',
-          combatantBAction: '',
-          ...hpSnapshot(state),
-          ...resourceSnapshot(state),
-        });
+        }));
       }
     }
   }
@@ -368,27 +353,17 @@ function executeOffensiveAction(
   damageReduction: number,
   actorName: string,
   targetName: string,
-  combatantAAction: string,
-  combatantBAction: string,
-  wasExhausted: boolean,
-  interactionResult: string,
+  ctx: RoundContext,
   perActionScaling?: PerActionScaling,
 ): void {
   // Guaranteed miss (counter/ward blocked the attack)
   if (hitOverride === 'guaranteed_miss') {
-    state.log.push({
-      round: state.round,
+    state.log.push(buildLogEntry(state, ctx, {
       actor: actorKey,
       actorName,
       action: actionToCombatAction(action),
       message: `${targetName} avoids ${actorName}'s ${action.name}!`,
-      combatantAAction,
-      combatantBAction,
-      wasExhausted,
-      interactionResult,
-      ...hpSnapshot(state),
-      ...resourceSnapshot(state),
-    });
+    }));
     return;
   }
 
@@ -431,8 +406,7 @@ function executeOffensiveAction(
   const hits = hitOverride === 'guaranteed_hit' || doesAttackHit(attackRoll, accuracyBonus, targetStats.dodge, targetStats.evasion);
 
   if (!hits) {
-    state.log.push({
-      round: state.round,
+    state.log.push(buildLogEntry(state, ctx, {
       actor: actorKey,
       actorName,
       action: actionToCombatAction(action),
@@ -441,13 +415,7 @@ function executeOffensiveAction(
       targetDodge: targetStats.dodge,
       targetEvasion: targetStats.evasion,
       message: `${actorName} uses ${action.name} but misses ${targetName}!`,
-      combatantAAction,
-      combatantBAction,
-      wasExhausted,
-      interactionResult,
-      ...hpSnapshot(state),
-      ...resourceSnapshot(state),
-    });
+    }));
     return;
   }
 
@@ -458,8 +426,8 @@ function executeOffensiveAction(
 
   // Determine damage type from the action.
   // If the action doesn't specify, resolve from scalingStat:
-  // - 'weapon' scalingStat → use weapon's combat style (magic weapons deal magic damage)
-  // - explicit scalingStat → default to 'physical' (cross-type actions set damageType explicitly)
+  // - 'weapon' scalingStat -> use weapon's combat style (magic weapons deal magic damage)
+  // - explicit scalingStat -> default to 'physical' (cross-type actions set damageType explicitly)
   let actionDamageType: 'physical' | 'magic' = action.damageType ?? 'physical';
   if (!action.damageType && (action.scalingStat ?? 'weapon') === 'weapon' && resolvedScaling) {
     actionDamageType = resolvedScaling === 'magic' ? 'magic' : 'physical';
@@ -485,14 +453,14 @@ function executeOffensiveAction(
     finalDamage = Math.max(1, Math.floor(finalDamage * (1 - damageReduction)));
   }
 
-  applyDamage(state, opponent(actorKey), finalDamage);
+  state.combatants[opponent(actorKey)].hp -= finalDamage;
 
   // Resolved scaling stat for XP attribution (damage tracking + DOT source)
   const xpStat = resolvedScaling ?? (actorStats.damageType === 'magic' ? 'magic' as const : 'melee' as const);
 
   // Track damage by scaling stat for XP splitting (combatantA only)
   if (actorKey === 'combatantA' && finalDamage > 0) {
-    state.combatantADamageByScalingStat[xpStat] += finalDamage;
+    state.damageByScalingStat[xpStat] += finalDamage;
   }
 
   // Life leech -- heal attacker for % of damage dealt
@@ -500,7 +468,10 @@ function executeOffensiveAction(
   if (action.lifeLeechPercent && action.lifeLeechPercent > 0 && finalDamage > 0) {
     const rawLeech = Math.floor(finalDamage * action.lifeLeechPercent / 100);
     if (rawLeech > 0) {
-      leechHeal = applyHeal(state, actorKey, rawLeech);
+      const ac = state.combatants[actorKey];
+      const before = ac.hp;
+      ac.hp = Math.min(ac.maxHp, ac.hp + rawLeech);
+      leechHeal = ac.hp - before;
     }
   }
 
@@ -508,8 +479,7 @@ function executeOffensiveAction(
   const critText = crit ? ' CRITICAL HIT!' : '';
   const leechText = leechHeal > 0 ? ` Leeches ${leechHeal} HP!` : '';
 
-  state.log.push({
-    round: state.round,
+  state.log.push(buildLogEntry(state, ctx, {
     actor: actorKey,
     actorName,
     action: actionToCombatAction(action),
@@ -527,65 +497,25 @@ function executeOffensiveAction(
     armorReduction: actionDamageType === 'magic' ? undefined : armorReduction,
     magicDefenceReduction: actionDamageType === 'magic' ? armorReduction : undefined,
     message: `${actorName} uses ${action.name} on ${targetName} for ${finalDamage} damage!${critText}${leechText}`,
-    combatantAAction,
-    combatantBAction,
-    wasExhausted,
-    interactionResult,
-    ...hpSnapshot(state),
-    ...resourceSnapshot(state),
-  });
+  }));
 
   // Apply effect (DOT debuff on the target)
   if (action.effect) {
-    const effect = action.effect;
-    const targetKey = effect.isDebuff !== false ? opponent(actorKey) : actorKey;
-
-    const newEffect: ActiveEffect = {
-      name: effect.name,
-      target: targetKey,
-      stat: effect.stat,
-      modifier: effect.modifier,
-      remainingRounds: effect.duration,
+    applyActionEffect(state, action.effect, actorKey, {
+      damageForPercentCalc: finalDamage,
       sourceScalingStat: xpStat,
-    };
-
-    Object.assign(newEffect, snapshotEffectValues(action.effect, finalDamage));
-
-    // Same-name effects refresh, not stack
-    const existingIdx = state.activeEffects.findIndex(
-      e => e.name === newEffect.name && e.target === newEffect.target,
-    );
-    if (existingIdx >= 0) {
-      state.activeEffects[existingIdx] = { ...state.activeEffects[existingIdx], ...newEffect };
-    } else {
-      // Debuffs always apply; buffs respect cap
-      if (effect.isDebuff) {
-        state.activeEffects.push(newEffect);
-      } else {
-        const activeBufCount = state.activeEffects.filter(
-          (e) => e.target === actorKey && e.stat !== 'potionSickness' && e.modifier >= 0,
-        ).length;
-        if (activeBufCount < COMBAT_ACTION_CONSTANTS.MAX_ACTIVE_BUFFS) {
-          state.activeEffects.push(newEffect);
-        }
-      }
-    }
+    });
   }
 
   // Check for kill
-  if (getHp(state, opponent(actorKey)) <= 0) {
+  if (state.combatants[opponent(actorKey)].hp <= 0) {
     state.outcome = actorKey === 'combatantA' ? 'victory' : 'defeat';
-    state.log.push({
-      round: state.round,
+    state.log.push(buildLogEntry(state, ctx, {
       actor: actorKey,
       actorName,
       action: actionToCombatAction(action),
       message: `${targetName} falls defeated!`,
-      combatantAAction,
-      combatantBAction,
-      ...hpSnapshot(state),
-      ...resourceSnapshot(state),
-    });
+    }));
   }
 }
 
@@ -595,94 +525,40 @@ function executeSupportiveAction(
   actorStats: CombatantStats,
   action: ActionDefinition,
   actorName: string,
-  combatantAAction: string,
-  combatantBAction: string,
-  wasExhausted: boolean,
-  interactionResult: string,
-  availablePotions: import('@pocketrealm/shared').CombatPotion[],
+  ctx: RoundContext,
+  availablePotions: CombatPotion[],
   potionsConsumed: PotionConsumed[],
 ): void {
   // Potion use
   if (action.actionType === 'use_potion') {
-    executePotionAction(
-      state, actorKey, action, actorName,
-      combatantAAction, combatantBAction, wasExhausted, interactionResult,
-      availablePotions, potionsConsumed,
-    );
+    executePotionAction(state, actorKey, action, actorName, ctx, availablePotions, potionsConsumed);
     return;
   }
 
   // Buff or heal
   let healAmount = 0;
-  const appliedEffects: CombatLogEntry['effectsApplied'] = [];
+  let appliedEffects: CombatLogEntry['effectsApplied'];
 
   // Apply heal
   if (action.healFlat || action.healPercent) {
-    const maxHp = actorKey === 'combatantA' ? state.combatantAMaxHp : state.combatantBMaxHp;
+    const c = state.combatants[actorKey];
     const flatHeal = action.healFlat ?? 0;
-    const percentHeal = Math.floor((action.healPercent ?? 0) * maxHp);
-    healAmount = applyHeal(state, actorKey, flatHeal + percentHeal);
+    const percentHeal = Math.floor((action.healPercent ?? 0) * c.maxHp);
+    const before = c.hp;
+    c.hp = Math.min(c.maxHp, c.hp + flatHeal + percentHeal);
+    healAmount = c.hp - before;
   }
 
-  // Apply buff/debuff effect (enforce MAX_ACTIVE_BUFFS for non-debuff effects)
+  // Apply buff/debuff effect
   if (action.effect) {
-    const effect = action.effect;
-    const target = effect.isDebuff ? opponent(actorKey) : actorKey;
-
-    const newEffect: ActiveEffect = {
-      name: effect.name,
-      target,
-      stat: effect.stat,
-      modifier: effect.modifier,
-      remainingRounds: effect.duration,
-    };
-
-    Object.assign(newEffect, snapshotEffectValues(action.effect));
-
-    // Same-name effects refresh, not stack
-    const existingIdx = state.activeEffects.findIndex(
-      e => e.name === newEffect.name && e.target === newEffect.target,
-    );
-    if (existingIdx >= 0) {
-      state.activeEffects[existingIdx] = { ...state.activeEffects[existingIdx], ...newEffect };
-      appliedEffects.push({
-        stat: effect.stat,
-        modifier: effect.modifier,
-        duration: effect.duration,
-        target,
-      });
-    } else if (!effect.isDebuff) {
-      const activeBufCount = state.activeEffects.filter(
-        (e) => e.target === actorKey && e.stat !== 'potionSickness' && e.modifier >= 0,
-      ).length;
-      if (activeBufCount >= COMBAT_ACTION_CONSTANTS.MAX_ACTIVE_BUFFS) {
-        // At buff cap — skip applying the new buff
-      } else {
-        state.activeEffects.push(newEffect);
-        appliedEffects.push({
-          stat: effect.stat,
-          modifier: effect.modifier,
-          duration: effect.duration,
-          target,
-        });
-      }
-    } else {
-      // Debuffs are always applied (no cap)
-      state.activeEffects.push(newEffect);
-      appliedEffects.push({
-        stat: effect.stat,
-        modifier: effect.modifier,
-        duration: effect.duration,
-        target,
-      });
-    }
+    appliedEffects = applyActionEffect(state, action.effect, actorKey);
   }
 
   const parts: string[] = [];
   if (healAmount > 0) {
     parts.push(`+${healAmount} HP`);
   }
-  if (appliedEffects.length > 0) {
+  if (appliedEffects && appliedEffects.length > 0) {
     const desc = appliedEffects.map(
       (e) => `${e.stat} ${e.modifier > 0 ? '+' : ''}${e.modifier} (${e.duration} rds)`,
     ).join(', ');
@@ -691,46 +567,15 @@ function executeSupportiveAction(
 
   const detail = parts.length > 0 ? ` — ${parts.join(', ')}` : '';
 
-  state.log.push({
-    round: state.round,
+  state.log.push(buildLogEntry(state, ctx, {
     actor: actorKey,
     actorName,
     action: 'spell',
     spellName: action.name,
     healAmount: healAmount > 0 ? healAmount : undefined,
-    effectsApplied: appliedEffects.length > 0 ? appliedEffects : undefined,
+    effectsApplied: appliedEffects && appliedEffects.length > 0 ? appliedEffects : undefined,
     message: `${actorName} uses ${action.name}!${detail}`,
-    combatantAAction,
-    combatantBAction,
-    wasExhausted,
-    interactionResult,
-    ...hpSnapshot(state),
-    ...resourceSnapshot(state),
-  });
-}
-
-function getMaxStamina(state: TemplateCombatState, actor: CombatActor): number {
-  return actor === 'combatantA' ? state.combatantAMaxStamina : state.combatantBMaxStamina;
-}
-
-function getMaxMana(state: TemplateCombatState, actor: CombatActor): number {
-  return actor === 'combatantA' ? state.combatantAMaxMana : state.combatantBMaxMana;
-}
-
-function setStamina(state: TemplateCombatState, actor: CombatActor, value: number): void {
-  if (actor === 'combatantA') {
-    state.combatantAStamina = value;
-  } else {
-    state.combatantBStamina = value;
-  }
-}
-
-function setMana(state: TemplateCombatState, actor: CombatActor, value: number): void {
-  if (actor === 'combatantA') {
-    state.combatantAMana = value;
-  } else {
-    state.combatantBMana = value;
-  }
+  }));
 }
 
 function executePotionAction(
@@ -738,79 +583,54 @@ function executePotionAction(
   actorKey: CombatActor,
   action: ActionDefinition,
   actorName: string,
-  combatantAAction: string,
-  combatantBAction: string,
-  wasExhausted: boolean,
-  interactionResult: string,
-  availablePotions: import('@pocketrealm/shared').CombatPotion[],
+  ctx: RoundContext,
+  availablePotions: CombatPotion[],
   potionsConsumed: PotionConsumed[],
 ): void {
   const potionType = action.potionType ?? 'hp';
 
   // Check potion sickness
   if (hasPotionSickness(state, actorKey)) {
-    state.log.push({
-      round: state.round,
+    state.log.push(buildLogEntry(state, ctx, {
       actor: actorKey,
       actorName,
       action: 'potion',
       message: `${actorName} tries to drink a potion but is still sick!`,
-      combatantAAction,
-      combatantBAction,
-      wasExhausted,
-      interactionResult,
-      ...hpSnapshot(state),
-      ...resourceSnapshot(state),
-    });
+    }));
     return;
   }
 
   // Find a matching potion by type
   const potionIndex = availablePotions.findIndex(p => p.potionType === potionType);
   if (potionIndex === -1) {
-    state.log.push({
-      round: state.round,
+    state.log.push(buildLogEntry(state, ctx, {
       actor: actorKey,
       actorName,
       action: 'potion',
       message: `${actorName} tries to drink a potion but has none left!`,
-      combatantAAction,
-      combatantBAction,
-      wasExhausted,
-      interactionResult,
-      ...hpSnapshot(state),
-      ...resourceSnapshot(state),
-    });
+    }));
     return;
   }
 
   const potion = availablePotions[potionIndex];
+  const c = state.combatants[actorKey];
   let actualRestore = 0;
   let resourceLabel: string;
 
   if (potionType === 'hp') {
-    const hpBefore = getHp(state, actorKey);
-    const maxHp = actorKey === 'combatantA' ? state.combatantAMaxHp : state.combatantBMaxHp;
-    if (actorKey === 'combatantA') {
-      state.combatantAHp = Math.min(maxHp, state.combatantAHp + potion.healAmount);
-    } else {
-      state.combatantBHp = Math.min(maxHp, state.combatantBHp + potion.healAmount);
-    }
-    actualRestore = Math.round(getHp(state, actorKey) - hpBefore);
+    const hpBefore = c.hp;
+    c.hp = Math.min(c.maxHp, c.hp + potion.healAmount);
+    actualRestore = Math.round(c.hp - hpBefore);
     resourceLabel = 'HP';
   } else if (potionType === 'stamina') {
-    const before = getStamina(state, actorKey);
-    const maxStam = getMaxStamina(state, actorKey);
-    const newStam = Math.min(before + potion.healAmount, maxStam);
-    setStamina(state, actorKey, newStam);
-    actualRestore = Math.round(newStam - before);
+    const before = c.stamina;
+    c.stamina = Math.min(c.maxStamina, c.stamina + potion.healAmount);
+    actualRestore = Math.round(c.stamina - before);
     resourceLabel = 'Stamina';
   } else {
-    const before = getMana(state, actorKey);
-    const maxM = getMaxMana(state, actorKey);
-    const newMana = Math.min(before + potion.healAmount, maxM);
-    setMana(state, actorKey, newMana);
-    actualRestore = Math.round(newMana - before);
+    const before = c.mana;
+    c.mana = Math.min(c.maxMana, c.mana + potion.healAmount);
+    actualRestore = Math.round(c.mana - before);
     resourceLabel = 'Mana';
   }
 
@@ -826,17 +646,15 @@ function executePotionAction(
   });
 
   // Apply potion sickness (shared across all potion types)
-  const sicknessEffect: ActiveEffect = {
+  state.activeEffects.push({
     name: 'Potion Sickness',
     target: actorKey,
     stat: 'potionSickness',
     modifier: 0,
     remainingRounds: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS,
-  };
-  state.activeEffects.push(sicknessEffect);
+  });
 
-  state.log.push({
-    round: state.round,
+  state.log.push(buildLogEntry(state, ctx, {
     actor: actorKey,
     actorName,
     action: 'potion',
@@ -850,13 +668,7 @@ function executePotionAction(
       target: actorKey,
     }],
     message: `${actorName} drinks a ${potion.name}! +${actualRestore} ${resourceLabel}`,
-    combatantAAction,
-    combatantBAction,
-    wasExhausted,
-    interactionResult,
-    ...hpSnapshot(state),
-    ...resourceSnapshot(state),
-  });
+  }));
 }
 
 function executeDefensiveAction(
@@ -864,27 +676,16 @@ function executeDefensiveAction(
   actorKey: CombatActor,
   action: ActionDefinition,
   actorName: string,
-  combatantAAction: string,
-  combatantBAction: string,
-  wasExhausted: boolean,
-  interactionResult: string,
+  ctx: RoundContext,
 ): void {
-  // Defensive actions are passive — they modify the interaction result,
+  // Defensive actions are passive -- they modify the interaction result,
   // which is already factored into the opponent's attack execution.
-  // Just log the defensive stance.
-  state.log.push({
-    round: state.round,
+  state.log.push(buildLogEntry(state, ctx, {
     actor: actorKey,
     actorName,
     action: 'defend',
     message: `${actorName} uses ${action.name}!`,
-    combatantAAction,
-    combatantBAction,
-    wasExhausted,
-    interactionResult,
-    ...hpSnapshot(state),
-    ...resourceSnapshot(state),
-  });
+  }));
 }
 
 // --- Main Engine ---
@@ -898,28 +699,34 @@ export function runTemplateCombat(
   const potionsConsumed: PotionConsumed[] = [];
 
   const state: TemplateCombatState = {
-    combatantAHp: combatantA.stats.hp,
-    combatantAMaxHp: combatantA.stats.maxHp,
-    combatantBHp: combatantB.stats.hp,
-    combatantBMaxHp: combatantB.stats.maxHp,
-    combatantAStamina: combatantA.stamina,
-    combatantAMaxStamina: combatantA.maxStamina,
-    combatantAStaminaRegen: combatantA.staminaRegenPerRound,
-    combatantBStamina: combatantB.stamina,
-    combatantBMaxStamina: combatantB.maxStamina,
-    combatantBStaminaRegen: combatantB.staminaRegenPerRound,
-    combatantAMana: combatantA.mana,
-    combatantAMaxMana: combatantA.maxMana,
-    combatantAManaRegen: combatantA.manaRegenPerRound,
-    combatantBMana: combatantB.mana,
-    combatantBMaxMana: combatantB.maxMana,
-    combatantBManaRegen: combatantB.manaRegenPerRound,
+    combatants: {
+      combatantA: {
+        hp: combatantA.stats.hp,
+        maxHp: combatantA.stats.maxHp,
+        stamina: combatantA.stamina,
+        maxStamina: combatantA.maxStamina,
+        staminaRegen: combatantA.staminaRegenPerRound,
+        mana: combatantA.mana,
+        maxMana: combatantA.maxMana,
+        manaRegen: combatantA.manaRegenPerRound,
+      },
+      combatantB: {
+        hp: combatantB.stats.hp,
+        maxHp: combatantB.stats.maxHp,
+        stamina: combatantB.stamina,
+        maxStamina: combatantB.maxStamina,
+        staminaRegen: combatantB.staminaRegenPerRound,
+        mana: combatantB.mana,
+        maxMana: combatantB.maxMana,
+        manaRegen: combatantB.manaRegenPerRound,
+      },
+    },
     round: 0,
     log: [],
     outcome: null,
     activeEffects: [],
-    combatantADamageByScalingStat: { melee: 0, ranged: 0, magic: 0 },
-    combatantAResourceCostByScalingStat: { melee: 0, ranged: 0, magic: 0 },
+    damageByScalingStat: { melee: 0, ranged: 0, magic: 0 },
+    resourceCostByScalingStat: { melee: 0, ranged: 0, magic: 0 },
   };
 
   // Roll initiative
@@ -930,26 +737,28 @@ export function runTemplateCombat(
   // Main combat loop
   while (state.round < MAX_ROUNDS && state.outcome === null) {
     state.round++;
+    const cA = state.combatants.combatantA;
+    const cB = state.combatants.combatantB;
 
     // Resource regen at the start of each round (skip round 1)
     if (state.round > 1) {
-      const beforeA = { stamina: state.combatantAStamina, mana: state.combatantAMana };
-      const beforeB = { stamina: state.combatantBStamina, mana: state.combatantBMana };
-      applyResourceRegen(state);
-      const aChanged = state.combatantAStamina !== beforeA.stamina || state.combatantAMana !== beforeA.mana;
-      const bChanged = state.combatantBStamina !== beforeB.stamina || state.combatantBMana !== beforeB.mana;
+      const beforeA = { stamina: cA.stamina, mana: cA.mana };
+      const beforeB = { stamina: cB.stamina, mana: cB.mana };
+
+      cA.stamina = Math.min(cA.maxStamina, cA.stamina + cA.staminaRegen);
+      cB.stamina = Math.min(cB.maxStamina, cB.stamina + cB.staminaRegen);
+      cA.mana = Math.min(cA.maxMana, cA.mana + cA.manaRegen);
+      cB.mana = Math.min(cB.maxMana, cB.mana + cB.manaRegen);
+
+      const aChanged = cA.stamina !== beforeA.stamina || cA.mana !== beforeA.mana;
+      const bChanged = cB.stamina !== beforeB.stamina || cB.mana !== beforeB.mana;
       if (aChanged || bChanged) {
-        state.log.push({
-          round: state.round,
+        state.log.push(buildLogEntry(state, null, {
           actor: 'combatantA',
           actorName: combatantA.name,
           action: 'regen',
           message: 'Resources regenerate.',
-          combatantAAction: '',
-          combatantBAction: '',
-          ...hpSnapshot(state),
-          ...resourceSnapshot(state),
-        });
+        }));
       }
     }
 
@@ -957,12 +766,9 @@ export function runTemplateCombat(
     let resolvedA = resolveAction(
       combatantA.template,
       state.round,
-      getHp(state, 'combatantA'),
-      state.combatantAMaxHp,
-      getStamina(state, 'combatantA'),
-      state.combatantAMaxStamina,
-      getMana(state, 'combatantA'),
-      state.combatantAMaxMana,
+      cA.hp, cA.maxHp,
+      cA.stamina, cA.maxStamina,
+      cA.mana, cA.maxMana,
       state.activeEffects,
       'combatantA',
       combatantA.actionDefinitions,
@@ -970,12 +776,9 @@ export function runTemplateCombat(
     let resolvedB = resolveAction(
       combatantB.template,
       state.round,
-      getHp(state, 'combatantB'),
-      state.combatantBMaxHp,
-      getStamina(state, 'combatantB'),
-      state.combatantBMaxStamina,
-      getMana(state, 'combatantB'),
-      state.combatantBMaxMana,
+      cB.hp, cB.maxHp,
+      cB.stamina, cB.maxStamina,
+      cB.mana, cB.maxMana,
       state.activeEffects,
       'combatantB',
       combatantB.actionDefinitions,
@@ -1016,50 +819,46 @@ export function runTemplateCombat(
     // Deduct each combatant's resource cost immediately before their action
     // so the log entry snapshot reflects the cost at the right moment.
     if (aGoesFirst) {
-      deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
-      deductMana(state, 'combatantA', resolvedA.action.cost.mana);
+      cA.stamina = Math.max(0, cA.stamina - resolvedA.action.cost.stamina);
+      cA.mana = Math.max(0, cA.mana - resolvedA.action.cost.mana);
       executeAction(
         state, 'combatantA', effectiveA, effectiveB,
         resolvedA.action, interaction, true,
         combatantA.name, combatantB.name,
-        combatantAAction, combatantBAction,
-        resolvedA.wasExhausted, interactionResult,
+        { combatantAAction, combatantBAction, wasExhausted: resolvedA.wasExhausted, interactionResult },
         availablePotions, potionsConsumed,
         combatantA.perActionScaling,
       );
-      deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
-      deductMana(state, 'combatantB', resolvedB.action.cost.mana);
+      cB.stamina = Math.max(0, cB.stamina - resolvedB.action.cost.stamina);
+      cB.mana = Math.max(0, cB.mana - resolvedB.action.cost.mana);
       if (state.outcome) break;
       executeAction(
         state, 'combatantB', effectiveB, effectiveA,
         resolvedB.action, interaction, false,
         combatantB.name, combatantA.name,
-        combatantAAction, combatantBAction,
-        resolvedB.wasExhausted, interactionResult,
+        { combatantAAction, combatantBAction, wasExhausted: resolvedB.wasExhausted, interactionResult },
         availablePotions, potionsConsumed,
         combatantB.perActionScaling,
       );
     } else {
-      deductStamina(state, 'combatantB', resolvedB.action.cost.stamina);
-      deductMana(state, 'combatantB', resolvedB.action.cost.mana);
+      cB.stamina = Math.max(0, cB.stamina - resolvedB.action.cost.stamina);
+      cB.mana = Math.max(0, cB.mana - resolvedB.action.cost.mana);
       executeAction(
         state, 'combatantB', effectiveB, effectiveA,
         resolvedB.action, interaction, false,
         combatantB.name, combatantA.name,
-        combatantAAction, combatantBAction,
-        resolvedB.wasExhausted, interactionResult,
+        { combatantAAction, combatantBAction, wasExhausted: resolvedB.wasExhausted, interactionResult },
         availablePotions, potionsConsumed,
         combatantB.perActionScaling,
       );
-      deductStamina(state, 'combatantA', resolvedA.action.cost.stamina);
-      deductMana(state, 'combatantA', resolvedA.action.cost.mana);
+      cA.stamina = Math.max(0, cA.stamina - resolvedA.action.cost.stamina);
+      cA.mana = Math.max(0, cA.mana - resolvedA.action.cost.mana);
       if (state.outcome) break;
       executeAction(
         state, 'combatantA', effectiveA, effectiveB,
         resolvedA.action, interaction, true,
         combatantA.name, combatantB.name,
-        combatantAAction, combatantBAction,
-        resolvedA.wasExhausted, interactionResult,
+        { combatantAAction, combatantBAction, wasExhausted: resolvedA.wasExhausted, interactionResult },
         availablePotions, potionsConsumed,
         combatantA.perActionScaling,
       );
@@ -1071,10 +870,10 @@ export function runTemplateCombat(
     applyEffectTicks(state, combatantA, combatantB);
 
     // Check for DOT death
-    if (getHp(state, 'combatantA') <= 0 || getHp(state, 'combatantB') <= 0) {
-      if (getHp(state, 'combatantA') <= 0 && getHp(state, 'combatantB') <= 0) {
+    if (cA.hp <= 0 || cB.hp <= 0) {
+      if (cA.hp <= 0 && cB.hp <= 0) {
         state.outcome = 'draw';
-      } else if (getHp(state, 'combatantA') <= 0) {
+      } else if (cA.hp <= 0) {
         state.outcome = 'defeat';
       } else {
         state.outcome = 'victory';
@@ -1088,29 +887,34 @@ export function runTemplateCombat(
 
   // Handle draw / timeout
   if (state.outcome === null) {
-    const bothAlive = state.combatantAHp > 0 && state.combatantBHp > 0;
+    const a = state.combatants.combatantA;
+    const b = state.combatants.combatantB;
+    const bothAlive = a.hp > 0 && b.hp > 0;
     state.outcome = bothAlive ? 'draw' : 'defeat';
   }
+
+  const a = state.combatants.combatantA;
+  const b = state.combatants.combatantB;
 
   return {
     outcome: state.outcome,
     log: state.log,
-    combatantAMaxHp: state.combatantAMaxHp,
-    combatantBMaxHp: state.combatantBMaxHp,
-    combatantAHpRemaining: Math.max(0, state.combatantAHp),
-    combatantBHpRemaining: Math.max(0, state.combatantBHp),
-    combatantAMaxStamina: state.combatantAMaxStamina,
-    combatantBMaxStamina: state.combatantBMaxStamina,
-    combatantAStaminaRemaining: state.combatantAStamina,
-    combatantBStaminaRemaining: state.combatantBStamina,
-    combatantAMaxMana: state.combatantAMaxMana,
-    combatantBMaxMana: state.combatantBMaxMana,
-    combatantAManaRemaining: state.combatantAMana,
-    combatantBManaRemaining: state.combatantBMana,
+    combatantAMaxHp: a.maxHp,
+    combatantBMaxHp: b.maxHp,
+    combatantAHpRemaining: Math.max(0, a.hp),
+    combatantBHpRemaining: Math.max(0, b.hp),
+    combatantAMaxStamina: a.maxStamina,
+    combatantBMaxStamina: b.maxStamina,
+    combatantAStaminaRemaining: a.stamina,
+    combatantBStaminaRemaining: b.stamina,
+    combatantAMaxMana: a.maxMana,
+    combatantBMaxMana: b.maxMana,
+    combatantAManaRemaining: a.mana,
+    combatantBManaRemaining: b.mana,
     potionsConsumed,
     totalRounds: state.round,
-    damageByScalingStat: { ...state.combatantADamageByScalingStat },
-    resourceCostByScalingStat: { ...state.combatantAResourceCostByScalingStat },
+    damageByScalingStat: { ...state.damageByScalingStat },
+    resourceCostByScalingStat: { ...state.resourceCostByScalingStat },
   };
 }
 
@@ -1125,11 +929,8 @@ function executeAction(
   isAttacker: boolean,
   actorName: string,
   targetName: string,
-  combatantAAction: string,
-  combatantBAction: string,
-  wasExhausted: boolean,
-  interactionResult: string,
-  availablePotions: import('@pocketrealm/shared').CombatPotion[],
+  ctx: RoundContext,
+  availablePotions: CombatPotion[],
   potionsConsumed: PotionConsumed[],
   perActionScaling?: PerActionScaling,
 ): void {
@@ -1146,7 +947,7 @@ function executeAction(
     const cost = action.cost.stamina + action.cost.mana;
     if (cost > 0) {
       const resolved = resolveScalingStat(action.scalingStat ?? 'weapon', perActionScaling.weaponRequiredSkill, perActionScaling.skillLevels);
-      state.combatantAResourceCostByScalingStat[resolved] += cost;
+      state.resourceCostByScalingStat[resolved] += cost;
     }
   }
 
@@ -1154,24 +955,17 @@ function executeAction(
     executeOffensiveAction(
       state, actorKey, actorStats, targetStats, action,
       hitOverride, interactionDmgMult, dmgReduction,
-      actorName, targetName,
-      combatantAAction, combatantBAction,
-      wasExhausted, interactionResult,
+      actorName, targetName, ctx,
       perActionScaling,
     );
   } else if (action.category === 'supportive') {
     executeSupportiveAction(
       state, actorKey, actorStats, action,
-      actorName, combatantAAction, combatantBAction,
-      wasExhausted, interactionResult,
+      actorName, ctx,
       availablePotions, potionsConsumed,
     );
   } else {
-    executeDefensiveAction(
-      state, actorKey, action, actorName,
-      combatantAAction, combatantBAction,
-      wasExhausted, interactionResult,
-    );
+    executeDefensiveAction(state, actorKey, action, actorName, ctx);
   }
 }
 
