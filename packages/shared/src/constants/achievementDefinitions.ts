@@ -830,6 +830,28 @@ const CASINO_ACHIEVEMENTS: AchievementDef[] = [
   },
 ];
 
+// --- Shop achievements (unlocked by quest shop purchase, not stats) ---
+const SHOP_ACHIEVEMENTS: AchievementDef[] = [
+  {
+    id: 'shop_title_questmaster',
+    category: 'shop',
+    title: 'Questmaster',
+    description: 'Purchase the Questmaster title from the quest shop',
+    titleReward: 'Questmaster',
+    threshold: 0,
+    tier: 4,
+  },
+  {
+    id: 'shop_title_token_hoarder',
+    category: 'shop',
+    title: 'Token Hoarder',
+    description: 'Purchase the Token Hoarder title from the quest shop',
+    titleReward: 'Token Hoarder',
+    threshold: 0,
+    tier: 5,
+  },
+];
+
 export const ALL_ACHIEVEMENTS: AchievementDef[] = [
   ...COMBAT_ACHIEVEMENTS,
   ...EXPLORATION_ACHIEVEMENTS,
@@ -841,6 +863,7 @@ export const ALL_ACHIEVEMENTS: AchievementDef[] = [
   ...FAMILY_ACHIEVEMENTS,
   ...GUILD_ACHIEVEMENTS,
   ...CASINO_ACHIEVEMENTS,
+  ...SHOP_ACHIEVEMENTS,
 ];
 
 // Lookup maps for efficient access

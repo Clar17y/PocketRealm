@@ -16,6 +16,7 @@ import { rollGemCritBatch, computeEventTurnCost } from '@pocketrealm/game-engine
 import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
+import { getBuffValue, consumeBuffStandalone } from '../services/buffService';
 import { trackProgress } from '../services/progressService';
 
 export const gatheringRouter = Router();
@@ -164,9 +165,15 @@ gatheringRouter.get('/nodes', asyncHandler(async (req, res) => {
     }
   }
 
+  const shopGatheringYieldForList = await getBuffValue(playerId, 'gathering_yield');
+  const gatheringBuffBadge: EventModifierBadge | null = shopGatheringYieldForList > 0
+    ? { title: 'Gathering Yield Scroll', effectType: 'yield_up', effectValue: shopGatheringYieldForList, isGlobal: false }
+    : null;
+
   res.json({
     nodes: pageNodes.map((pn) => {
       const template = pn.resourceNode;
+      const eventMods = nodeBadgeCache.get(`${template.zoneId}:${template.resourceType}`) ?? [];
       return {
         id: pn.id, // PlayerResourceNode ID (what frontend uses to mine)
         templateId: template.id,
@@ -182,7 +189,7 @@ gatheringRouter.get('/nodes', asyncHandler(async (req, res) => {
         sizeName: getNodeSizeName(pn.effectiveCapacity, template.maxCapacity),
         discoveredAt: pn.discoveredAt.toISOString(),
         weathered: pn.decayedCapacity > 0,
-        eventModifiers: nodeBadgeCache.get(`${template.zoneId}:${template.resourceType}`) ?? [],
+        eventModifiers: [...eventMods, ...(gatheringBuffBadge ? [gatheringBuffBadge] : [])],
       };
     }),
     pagination: { ...pagination, page },
@@ -310,10 +317,12 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { resourceType: template.resourceType });
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
   const guildMods = await getPlayerGuildModifiers(playerId);
+  const shopGatheringYield = await getBuffValue(playerId, 'gathering_yield');
 
-  // Guild bonus applies per action (permanent infrastructure benefit)
-  const guildYieldPerAction = guildMods.gatheringYield > 0
-    ? Math.max(1, Math.floor(baseYieldPerAction * (1 + guildMods.gatheringYield)))
+  // Guild + shop buff bonus applies per action
+  const combinedYieldBonus = guildMods.gatheringYield + shopGatheringYield;
+  const guildYieldPerAction = combinedYieldBonus > 0
+    ? Math.max(1, Math.floor(baseYieldPerAction * (1 + combinedYieldBonus)))
     : baseYieldPerAction;
 
   // yield_down → increase turn cost (so players still collect the full amount)
@@ -390,6 +399,9 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       stack: minedStack,
     };
   });
+
+  // Consume shop gathering yield buff (one use per gather action)
+  if (shopGatheringYield > 0) await consumeBuffStandalone(playerId, 'gathering_yield');
 
   // XP: scaled by node level requirement
   const xpPerAction = GATHERING_CONSTANTS.XP_PER_ACTION_BASE
@@ -482,7 +494,13 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     },
     xp: serializeXpGrant(xpGrant),
     gemCrit: gemCrit ?? undefined,
-    activeEvents: activeEventEffects.length > 0 ? activeEventEffects : undefined,
+    activeEvents: (() => {
+      const badges = [
+        ...activeEventEffects,
+        ...(shopGatheringYield > 0 ? [{ title: 'Gathering Yield Scroll', effectType: 'yield_up', effectValue: shopGatheringYield, isGlobal: false }] : []),
+      ];
+      return badges.length > 0 ? badges : undefined;
+    })(),
     yieldBreakdown: zoneModifiers.resourceYieldMultiplier !== 1
       ? {
           baseYieldPerAction,

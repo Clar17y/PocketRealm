@@ -312,6 +312,50 @@ async function seedBots() {
 }
 
 // ============================================================================
+// Shop Items
+// ============================================================================
+
+async function seedShopItems() {
+  console.log('  Seeding shop items...');
+
+  const items = [
+    // Reset Scrolls
+    { key: 'attribute_reset_scroll', name: 'Attribute Reset Scroll', description: 'Reset all attribute points for reallocation', cost: 40, category: 'reset', weeklyLimit: 1, lifetimeLimit: null, buffType: null, buffValue: null, buffUses: null, sortOrder: 10 },
+    { key: 'talent_reset_scroll', name: 'Talent Reset Scroll', description: 'Reset all skill point allocations without turn cost', cost: 40, category: 'reset', weeklyLimit: 1, lifetimeLimit: null, buffType: null, buffValue: null, buffUses: null, sortOrder: 11 },
+    { key: 'efficiency_reset_scroll', name: 'Efficiency Reset Scroll', description: 'Reset all skill XP efficiencies to 100%', cost: 35, category: 'reset', weeklyLimit: 2, lifetimeLimit: null, buffType: null, buffValue: null, buffUses: null, sortOrder: 12 },
+    // Upgrade Scrolls
+    { key: 'forge_luck_scroll', name: 'Forge Luck Scroll', description: 'Double forge upgrade chance for next 3 upgrades', cost: 35, category: 'upgrade', weeklyLimit: 2, lifetimeLimit: null, buffType: 'forge_luck', buffValue: 2.0, buffUses: 3, sortOrder: 20 },
+    { key: 'forge_protection_scroll', name: 'Forge Protection Scroll', description: 'Protects your item from destruction on next failed forge upgrade', cost: 75, category: 'upgrade', weeklyLimit: 2, lifetimeLimit: null, buffType: 'forge_protection', buffValue: 1.0, buffUses: 1, sortOrder: 21 },
+    // Buff Scrolls
+    { key: 'xp_boost_scroll', name: 'XP Boost Scroll', description: '+10% XP for next 100 XP-granting actions', cost: 25, category: 'buff', weeklyLimit: 2, lifetimeLimit: null, buffType: 'xp_boost', buffValue: 0.10, buffUses: 100, sortOrder: 30 },
+    { key: 'gathering_yield_scroll', name: 'Gathering Yield Scroll', description: '+15% gathering yield for next 50 gathers', cost: 25, category: 'buff', weeklyLimit: 2, lifetimeLimit: null, buffType: 'gathering_yield', buffValue: 0.15, buffUses: 50, sortOrder: 31 },
+    { key: 'crafting_fortune_scroll', name: 'Crafting Fortune Scroll', description: '+10% crafting crit for next 30 crafts', cost: 30, category: 'buff', weeklyLimit: 2, lifetimeLimit: null, buffType: 'crafting_crit', buffValue: 0.10, buffUses: 30, sortOrder: 32 },
+    { key: 'combat_power_scroll', name: 'Combat Power Scroll', description: '+10% damage for next 50 combats', cost: 30, category: 'buff', weeklyLimit: 2, lifetimeLimit: null, buffType: 'combat_damage', buffValue: 0.10, buffUses: 50, sortOrder: 33 },
+    { key: 'iron_skin_scroll', name: 'Iron Skin Scroll', description: '+10% defence for next 50 combats', cost: 30, category: 'buff', weeklyLimit: 2, lifetimeLimit: null, buffType: 'combat_defence', buffValue: 0.10, buffUses: 50, sortOrder: 34 },
+    { key: 'durability_shield_scroll', name: 'Durability Shield Scroll', description: 'No durability loss for next 50 combats', cost: 20, category: 'buff', weeklyLimit: 2, lifetimeLimit: null, buffType: 'durability_shield', buffValue: 1.0, buffUses: 50, sortOrder: 35 },
+    // Utility
+    { key: 'teleport_scroll', name: 'Teleport Scroll', description: 'Instantly travel to any discovered zone', cost: 15, category: 'utility', weeklyLimit: 3, lifetimeLimit: null, buffType: null, buffValue: null, buffUses: null, sortOrder: 40 },
+    { key: 'hearthstone', name: 'Hearthstone', description: 'Instantly teleport to your home town', cost: 10, category: 'utility', weeklyLimit: 5, lifetimeLimit: null, buffType: null, buffValue: null, buffUses: null, sortOrder: 41 },
+    { key: 'bestiary_tome', name: 'Bestiary Tome', description: 'Fully unlock bestiary entry for one chosen mob', cost: 35, category: 'utility', weeklyLimit: 1, lifetimeLimit: null, buffType: null, buffValue: null, buffUses: null, sortOrder: 42 },
+    { key: 'recipe_scroll', name: 'Recipe Scroll', description: 'Unlock a random unlearned recipe you can craft', cost: 30, category: 'utility', weeklyLimit: 1, lifetimeLimit: null, buffType: null, buffValue: null, buffUses: null, sortOrder: 43 },
+    { key: 'guild_contract_reroll', name: 'Guild Contract Reroll', description: 'Reroll one guild contract (leader/officer only)', cost: 20, category: 'utility', weeklyLimit: 1, lifetimeLimit: null, buffType: null, buffValue: null, buffUses: null, sortOrder: 44 },
+    // Prestige
+    { key: 'title_questmaster', name: 'Title: Questmaster', description: 'Exclusive cosmetic title for dedicated questers', cost: 500, category: 'prestige', weeklyLimit: null, lifetimeLimit: 1, buffType: null, buffValue: null, buffUses: null, sortOrder: 50 },
+    { key: 'title_token_hoarder', name: 'Title: Token Hoarder', description: 'Exclusive cosmetic title for the most dedicated', cost: 1000, category: 'prestige', weeklyLimit: null, lifetimeLimit: 1, buffType: null, buffValue: null, buffUses: null, sortOrder: 51 },
+  ];
+
+  for (const item of items) {
+    await prisma.shopItem.upsert({
+      where: { key: item.key },
+      create: item,
+      update: { name: item.name, description: item.description, cost: item.cost, category: item.category, weeklyLimit: item.weeklyLimit, lifetimeLimit: item.lifetimeLimit, buffType: item.buffType, buffValue: item.buffValue, buffUses: item.buffUses, sortOrder: item.sortOrder },
+    });
+  }
+
+  console.log(`  Seeded ${items.length} shop items`);
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -339,6 +383,9 @@ async function main() {
 
   // Batch 5: PvP Arena bots
   await seedBots();
+
+  // Batch 6: Quest shop
+  await seedShopItems();
 
   console.log('Seed complete.');
 }

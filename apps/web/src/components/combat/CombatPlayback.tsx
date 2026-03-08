@@ -201,8 +201,8 @@ export function CombatPlayback({
           <img src={mobImageSrc} alt={mobDisplayName} className="w-10 h-10 rounded object-cover" />
         )}
         {mobDisplayName}
-        {activeEvents && activeEvents.some(e => e.appliedToThisMob) && (
-          <EventBadges inline modifiers={activeEvents.filter(e => e.appliedToThisMob).map(e => ({
+        {activeEvents && activeEvents.some(e => e.appliedToThisMob && !e.effectType.startsWith('player_') && e.effectType !== 'durability_shield') && (
+          <EventBadges inline modifiers={activeEvents.filter(e => e.appliedToThisMob && !e.effectType.startsWith('player_') && e.effectType !== 'durability_shield').map(e => ({
             title: e.title, effectType: e.effectType, effectValue: e.effectValue, isGlobal: false,
           }))} />
         )}
@@ -212,8 +212,13 @@ export function CombatPlayback({
       <div className="space-y-3 my-4">
         {/* Player HP + resources */}
         <div className={shakeTarget === 'combatantA' ? 'animate-shake' : ''}>
-          <div className="text-xs mb-1">
+          <div className="text-xs mb-1 flex items-center gap-2">
             <span className="text-[var(--rpg-green-light)]">{playerLabel}</span>
+            {activeEvents && (
+              <EventBadges inline modifiers={activeEvents.filter(e => e.effectType.startsWith('player_') || e.effectType === 'durability_shield').map(e => ({
+                title: e.title, effectType: e.effectType, effectValue: e.effectValue, isGlobal: false,
+              }))} />
+            )}
           </div>
           <ResourceStatusBar
             currentHp={currentPlayerHp}

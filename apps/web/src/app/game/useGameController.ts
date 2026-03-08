@@ -72,7 +72,9 @@ import {
   placeRouletteBet,
   getIncomingFriendRequests,
   getFriendMailUnreadCount,
+  getPlayerBuffs,
 } from '@/lib/api';
+import type { PlayerBuffData } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
@@ -120,6 +122,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [activeScreen, setActiveScreen] = useState<Screen>('home');
   const [turns, setTurns] = useState(0);
   const [gold, setGold] = useState(0);
+  const [activeBuffs, setActiveBuffs] = useState<PlayerBuffData[]>([]);
   const [trainingCooldown, setTrainingCooldown] = useState(0);
   const [zones, setZones] = useState<Array<{
     id: string;
@@ -347,7 +350,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const loadAll = useCallback(async () => {
     setActionError(null);
 
-    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, recipesRes, hpRes, resourceRes, skillPointRes] = await Promise.all([
+    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, recipesRes, hpRes, resourceRes, skillPointRes, buffsRes] = await Promise.all([
       getTurns(),
       getPlayer(),
       getSkills(),
@@ -358,6 +361,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       getHpState(),
       getResources(),
       getSkillPointState(),
+      getPlayerBuffs(),
     ]);
 
     if (turnRes.data) setTurns(turnRes.data.currentTurns);
@@ -379,6 +383,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setManaState(resourceRes.data.mana);
     }
     if (skillPointRes.data) setSkillPointState(skillPointRes.data);
+    if (buffsRes.data) setActiveBuffs(buffsRes.data.buffs);
     if (zonesRes.data) {
       setZones(zonesRes.data.zones);
       setZoneConnections(zonesRes.data.connections);
@@ -1075,11 +1080,30 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setTurns(data.turns.currentTurns);
       const fromLabel = data.forge.fromRarity.charAt(0).toUpperCase() + data.forge.fromRarity.slice(1);
       const toLabel = data.forge.toRarity.charAt(0).toUpperCase() + data.forge.toRarity.slice(1);
-      const chancePct = (data.forge.successChance * 100).toFixed(1);
+      const effectiveChance = data.forge.adjustedChance ?? data.forge.successChance;
+      const chancePct = (effectiveChance * 100).toFixed(1);
+      const buffTag = data.forge.buffUsed === 'forge_luck' ? ' [Forge Luck active]'
+        : data.forge.buffUsed === 'forge_protection' ? ' [Forge Protection active]'
+        : '';
+
       if (data.forge.success) {
-        pushLog({ timestamp: nowStamp(), type: 'success', message: `Forge success: ${fromLabel} -> ${toLabel} (${chancePct}% chance). Sacrificial item consumed.` });
+        pushLog({
+          timestamp: nowStamp(),
+          type: 'success',
+          message: `Forge success: ${fromLabel} -> ${toLabel} (${chancePct}% chance).${buffTag} Sacrificial item consumed.`,
+        });
+      } else if (data.forge.protected) {
+        pushLog({
+          timestamp: nowStamp(),
+          type: 'info',
+          message: `Forge failed at ${fromLabel} (${chancePct}% chance) but item was protected!${buffTag} Sacrifice consumed.`,
+        });
       } else {
-        pushLog({ timestamp: nowStamp(), type: 'info', message: `Forge failed at ${fromLabel} (${chancePct}% chance). Target and sacrifice consumed.` });
+        pushLog({
+          timestamp: nowStamp(),
+          type: 'info',
+          message: `Forge failed at ${fromLabel} (${chancePct}% chance).${buffTag} Target and sacrifice consumed.`,
+        });
       }
     });
 
@@ -1441,6 +1465,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setTurns,
     gold,
     setGold,
+    activeBuffs,
     trainingCooldown,
     setTrainingCooldown,
     zones,
@@ -1531,6 +1556,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
     // Guild
     guildTaxRate,
+
+    // Home Town
+    homeTownId: playerSettings.homeTownId,
+    handleSetHomeTown: playerSettings.handleSetHomeTown,
 
     // Changelog
     showChangelog,

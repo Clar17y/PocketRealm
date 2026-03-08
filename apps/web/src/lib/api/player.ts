@@ -22,6 +22,7 @@ export async function getPlayer() {
       confirmRarity: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
       lootRevealRarity: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
       gold: number;
+      homeTownId: string | null;
       attributes: {
         vitality: number;
         strength: number;
@@ -44,6 +45,7 @@ export interface PlayerSettings {
   lowHpWarning?: boolean;
   confirmRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   lootRevealRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+  homeTownId?: string;
 }
 
 export async function updatePlayerSettings(settings: PlayerSettings) {

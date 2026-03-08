@@ -3,6 +3,7 @@ import type { SkillType, SkillXpResult } from '@pocketrealm/shared';
 import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { getPlayerGuildModifiers } from './guildUpgradeService';
+import { getBuffValue, consumeBuff } from './buffService';
 
 export interface GrantXpResult {
   skillType: SkillType;
@@ -28,8 +29,10 @@ export async function grantSkillXp(
 ): Promise<GrantXpResult> {
   // Apply guild XP boost if active (use pre-resolved value if provided)
   const xpBoost = guildXpBoost ?? (await getPlayerGuildModifiers(playerId)).xpBoost;
-  const boostedXpGain = xpBoost > 0
-    ? Math.floor(rawXpGain * (1 + xpBoost))
+  const shopXpBoost = await getBuffValue(playerId, 'xp_boost');
+  const totalXpBoost = xpBoost + shopXpBoost;
+  const boostedXpGain = totalXpBoost > 0
+    ? Math.floor(rawXpGain * (1 + totalXpBoost))
     : rawXpGain;
 
   return prisma.$transaction(async (tx) => {
@@ -105,6 +108,10 @@ export async function grantSkillXp(
         attributePoints: attributePointsAfter,
       },
     });
+
+    if (shopXpBoost > 0) {
+      await consumeBuff(tx, playerId, 'xp_boost');
+    }
 
     return {
       skillType,

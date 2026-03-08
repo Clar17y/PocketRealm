@@ -13,6 +13,7 @@ import {
 } from '../services/attributesService';
 import { trackAchievements } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
+import { getActiveBuffs } from '../services/buffService';
 
 import { prismaAny } from '../utils/prismaAny.js';
 
@@ -52,6 +53,7 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       lootRevealRarity: true,
       activeTitle: true,
       gold: true,
+      homeTownId: true,
     },
   });
 
@@ -136,6 +138,7 @@ const SETTINGS_FIELDS = [
   'combatLogSpeedMs', 'explorationSpeedMs',
   'autoSkipKnownCombat', 'defaultExploreTurns', 'quickRestHealPercent', 'defaultRefiningMax',
   'lowHpWarning', 'confirmRarity', 'lootRevealRarity',
+  'homeTownId',
 ] as const;
 
 const settingsSchema = z.object({
@@ -148,6 +151,7 @@ const settingsSchema = z.object({
   lowHpWarning: z.boolean().optional(),
   confirmRarity: z.enum(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
   lootRevealRarity: z.enum(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
+  homeTownId: z.string().uuid().optional(),
 }).refine(data => Object.values(data).some(v => v !== undefined), { message: 'At least one setting required' });
 
 /**
@@ -157,6 +161,23 @@ const settingsSchema = z.object({
 playerRouter.patch('/settings', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = settingsSchema.parse(req.body);
+
+  if (body.homeTownId) {
+    const player = await prismaAny.player.findUniqueOrThrow({
+      where: { id: playerId },
+      select: { currentZoneId: true },
+    });
+    if (player.currentZoneId !== body.homeTownId) {
+      throw new AppError(400, 'Must be in the town to set it as home', 'NOT_IN_ZONE');
+    }
+    const zone = await prismaAny.zone.findUniqueOrThrow({
+      where: { id: body.homeTownId },
+      select: { zoneType: true },
+    });
+    if (zone.zoneType !== 'town') {
+      throw new AppError(400, 'Can only set a town as home', 'NOT_A_TOWN');
+    }
+  }
 
   const updated = await prismaAny.player.update({
     where: { id: playerId },
@@ -210,6 +231,13 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
   }
 
   res.json({ tutorialStep: body.step });
+}));
+
+// GET /api/v1/player/buffs — list active buffs
+playerRouter.get('/buffs', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const buffs = await getActiveBuffs(playerId);
+  res.json({ buffs });
 }));
 
 /**

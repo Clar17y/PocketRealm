@@ -232,6 +232,8 @@ export default function GamePage() {
     handleSetLootRevealRarity,
     handleQuickRest,
     guildTaxRate,
+    homeTownId,
+    handleSetHomeTown,
     showChangelog,
     dismissChangelog,
     openChangelog,
@@ -255,6 +257,7 @@ export default function GamePage() {
     handleRerollQuest,
     tutorialStep, skipTutorial, advanceTutorial,
     loadAll,
+    activeBuffs,
     combatLogPrefetch,
     inventoryCapacity,
     inventoryUsedSlots,
@@ -707,6 +710,8 @@ export default function GamePage() {
             playerStartMana={manaState.current}
             playerMaxStamina={staminaState.max}
             playerMaxMana={manaState.max}
+            homeTownId={homeTownId}
+            onSetHomeTown={(zoneId) => void handleSetHomeTown(zoneId)}
           />
         );
       case 'bestiary':
@@ -842,6 +847,8 @@ export default function GamePage() {
             recoveryCost={hpState.recoveryCost}
             zoneCraftingLevel={zoneCraftingLevel}
             guildTaxRate={guildTaxRate}
+            forgeLuckUses={activeBuffs.find(b => b.buffType === 'forge_luck')?.remainingUses ?? 0}
+            forgeProtectionUses={activeBuffs.find(b => b.buffType === 'forge_protection')?.remainingUses ?? 0}
           />
         );
       }
@@ -1042,6 +1049,9 @@ export default function GamePage() {
             onClaimReward={handleClaimQuestReward}
             onClaimBonus={handleClaimDailyBonus}
             onReroll={handleRerollQuest}
+            onShopPurchase={loadAll}
+            zones={zones.filter(z => z.discovered).map(z => ({ id: z.id, name: z.name, zoneType: z.zoneType }))}
+            homeTownId={homeTownId}
           />
         );
       case 'leaderboard':
