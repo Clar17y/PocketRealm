@@ -10,6 +10,7 @@ import {
   launchExpedition,
   signUpForExpedition,
   forceStartExpedition,
+  forceNextRound,
   recoverFromExpeditionKO,
 } from '@/lib/api/expedition';
 import type {
@@ -191,6 +192,22 @@ export function GuildExpeditionsTab({
     }
   };
 
+  const handleForceRound = async () => {
+    if (!expedition) return;
+    if (!confirm('Skip the round timer and resolve the next round immediately?')) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await forceNextRound(expedition.id);
+      if (res.error) { setError(res.error.message); return; }
+      void loadExpedition();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to force round');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleRecover = async () => {
     if (!expedition) return;
     setActionLoading(true);
@@ -234,7 +251,9 @@ export function GuildExpeditionsTab({
           expedition={expedition}
           members={members}
           actionLoading={actionLoading}
+          isOfficer={isOfficer}
           onRecover={handleRecover}
+          onForceRound={handleForceRound}
         />
       );
     case 'completed':
@@ -405,12 +424,16 @@ function InProgressView({
   expedition,
   members,
   actionLoading,
+  isOfficer,
   onRecover,
+  onForceRound,
 }: {
   expedition: ExpeditionData;
   members: ExpeditionMemberData[];
   actionLoading: boolean;
+  isOfficer: boolean;
   onRecover: () => void;
+  onForceRound: () => void;
 }) {
   const roomBadge = roomTypeBadge(expedition.currentRoomType);
   const roomPct = expedition.totalRooms > 0
@@ -462,6 +485,22 @@ function InProgressView({
           <span className="text-[var(--rpg-text-secondary)]">Next Round:</span>
           <Countdown expiresAt={expedition.nextRoundAt} />
         </div>
+
+        {isOfficer && expedition.nextRoundAt && (
+          <div className="mt-3 pt-2 border-t border-[var(--rpg-border)]">
+            <PixelButton
+              size="sm"
+              variant="danger"
+              onClick={onForceRound}
+              disabled={actionLoading}
+            >
+              {actionLoading ? 'Resolving...' : 'Force Next Round'}
+            </PixelButton>
+            <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-1">
+              Skip wait — resolve next round now
+            </p>
+          </div>
+        )}
       </PixelCard>
 
       {/* Member status */}

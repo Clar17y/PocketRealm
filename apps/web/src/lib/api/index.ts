@@ -254,6 +254,7 @@ export {
   launchExpedition,
   signUpForExpedition,
   forceStartExpedition,
+  forceNextRound,
   recoverFromExpeditionKO,
   getExpeditionShop,
   purchaseExpeditionItem,

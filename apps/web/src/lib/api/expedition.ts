@@ -74,6 +74,13 @@ export async function forceStartExpedition(id: string) {
   });
 }
 
+export async function forceNextRound(id: string) {
+  return fetchApi<{ success: boolean; status: string; currentRoom: number; roundNumber: number }>(
+    `/api/v1/expedition/${id}/force-round`,
+    { method: 'POST' },
+  );
+}
+
 export async function recoverFromExpeditionKO(id: string) {
   return fetchApi<{ member: ExpeditionMemberData }>(`/api/v1/expedition/${id}/recover`, {
     method: 'POST',

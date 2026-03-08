@@ -10,6 +10,7 @@ import {
   signUpForExpedition,
   recoverFromKO,
   forceStartExpedition,
+  checkAndResolveExpeditionRounds,
 } from '../services/expeditionService';
 import {
   getShopItems,
@@ -170,6 +171,54 @@ expeditionRouter.post('/:id/force-start', asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
   const result = await forceStartExpedition(id, req.player!.playerId);
   res.json(result);
+}));
+
+// POST /:id/force-round
+expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { id } = expeditionIdSchema.parse(req.params);
+
+  const expedition = await prisma.guildExpedition.findUnique({
+    where: { id },
+    select: { id: true, guildId: true, status: true },
+  });
+  if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
+  if (expedition.status !== 'in_progress') {
+    throw new AppError(400, 'Expedition is not active', 'NOT_ACTIVE');
+  }
+
+  const membership = await prisma.guildMember.findUnique({
+    where: { playerId },
+    select: { guildId: true, role: true },
+  });
+  if (!membership || membership.guildId !== expedition.guildId) {
+    throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
+  }
+  if (membership.role === 'member') {
+    throw new AppError(403, 'Officer or leader role required', 'INSUFFICIENT_ROLE');
+  }
+
+  // Set nextRoundAt to past so checkAndResolve processes it immediately
+  await prisma.guildExpedition.update({
+    where: { id },
+    data: { nextRoundAt: new Date(0) },
+  });
+
+  // Trigger resolution now (same function the background timer calls)
+  await checkAndResolveExpeditionRounds(null);
+
+  // Fetch updated state
+  const updated = await prisma.guildExpedition.findUnique({
+    where: { id },
+    select: { status: true, currentRoom: true, roundNumber: true },
+  });
+
+  res.json({
+    success: true,
+    status: updated?.status,
+    currentRoom: updated?.currentRoom,
+    roundNumber: updated?.roundNumber,
+  });
 }));
 
 // POST /:id/recover
