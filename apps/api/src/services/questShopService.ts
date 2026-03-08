@@ -320,17 +320,17 @@ async function applyBestiaryTome(tx: any, playerId: string, targetMobTemplateId?
   for (const prefix of allPrefixes) {
     await tx.playerBestiaryPrefix.upsert({
       where: {
-        playerId_mobTemplateId_prefixKey: {
+        playerId_mobTemplateId_prefix: {
           playerId,
           mobTemplateId: targetMobTemplateId,
-          prefixKey: prefix.key,
+          prefix: prefix.key,
         },
       },
       update: { kills: 999 },
       create: {
         playerId,
         mobTemplateId: targetMobTemplateId,
-        prefixKey: prefix.key,
+        prefix: prefix.key,
         kills: 999,
       },
     });
@@ -434,9 +434,9 @@ async function applyContractReroll(tx: any, playerId: string, targetContractId?:
   await tx.guildLog.create({
     data: {
       guildId: membership.guildId,
-      action: 'contract_rerolled',
-      details: `Contract rerolled from ${contract.contractKey} to ${newDef.key}`,
-      actorId: playerId,
+      eventType: 'contract_rerolled',
+      message: `Contract rerolled from ${contract.contractKey} to ${newDef.key}`,
+      metadata: { oldKey: contract.contractKey, newKey: newDef.key, playerId },
     },
   });
 
