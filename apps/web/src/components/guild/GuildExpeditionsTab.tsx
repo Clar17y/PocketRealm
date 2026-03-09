@@ -588,7 +588,6 @@ function InProgressView({
             </div>
           )}
         </div>
-        )}
       </PixelCard>
 
       {/* Current Room Mobs */}
