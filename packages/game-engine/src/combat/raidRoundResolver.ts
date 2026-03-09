@@ -210,6 +210,20 @@ export function resolveRaidRound(
       target.hp = Math.max(0, target.hp - damage);
       totalDamageDealt += damage;
 
+      // Apply debuff/DoT effect to mob on hit
+      if (def.effect?.isDebuff && target.hp > 0) {
+        const dotFlat = def.effect.damagePerRound ?? 0;
+        const dotPct = def.effect.damagePerRoundPercent ?? 0;
+        const resolvedDot = dotFlat + Math.floor((dotPct / 100) * damage);
+        target.activeEffects.push({
+          name: def.effect.name,
+          stat: def.effect.stat,
+          modifier: def.effect.modifier,
+          roundsRemaining: def.effect.duration,
+          ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
+        });
+      }
+
       logPlayerAttacks.push({ ...baseEntry, hit: true, crit, damageRoll: rawDmg, totalDamage: damage });
     }
 
@@ -399,9 +413,17 @@ export function resolveRaidRound(
   applyResourceCosts(input.participants, pState);
 
   // --- Step 9: Tick effects ---
+  // Tick mob effects: apply DoT damage, then decrement duration
   for (const mob of mobState) {
+    if (mob.hp <= 0) continue;
     const remaining: BossActiveEffect[] = [];
     for (const effect of mob.activeEffects) {
+      // Apply DoT damage
+      if (effect.damagePerRound && effect.damagePerRound > 0 && mob.hp > 0) {
+        const defence = effect.dotDamageType === 'physical' ? mob.stats.defence : mob.stats.magicDefence;
+        const dotDmg = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, effect.damagePerRound - defence);
+        mob.hp = Math.max(0, mob.hp - dotDmg);
+      }
       effect.roundsRemaining -= 1;
       if (effect.roundsRemaining > 0) {
         remaining.push(effect);
