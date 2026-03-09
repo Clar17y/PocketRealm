@@ -3,11 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildPlayerCombatStats, doesAttackHit } from '../../../game-engine/src/combat/damageCalculator';
 import { getAllMobTemplates } from './mobs';
 import { IDS } from './ids';
-
-const STARTER_TARGETS = {
-  tutorialHitRateMin: 0.45,
-  forestEdgeTier1HitRateMin: 0.4,
-};
+import { STARTER_TARGETS } from './validation';
 
 function getHitRate(accuracyBonus: number, targetDodge: number, targetEvasion = 0) {
   let hits = 0;
