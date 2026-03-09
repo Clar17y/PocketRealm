@@ -393,9 +393,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       });
       setGold(playerRes.data.player.gold ?? 0);
       initSettingsFromServer(playerRes.data.player);
-      setTutorialStep(playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED);
-      // Don't show changelog to brand new players (step 0)
       const serverTutorialStep = playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED;
+      setTutorialStep(serverTutorialStep);
+      // Don't show changelog to brand new players (step 0)
       const latestVer = getLatestVersion();
       if (latestVer && localStorage.getItem(CHANGELOG_STORAGE_KEY) !== latestVer) {
         if (serverTutorialStep === 0) {

@@ -3,6 +3,7 @@ import { RARITY_COLORS, RARITY_GLOW, RARITY_RANK } from '@/lib/rarity';
 import { getStaggerDelay } from '@/lib/animations';
 import { PixelButton } from '@/components/PixelButton';
 import { PixelCard } from '@/components/PixelCard';
+import { ModalOverlay } from '@/components/common/ModalOverlay';
 
 export interface LootRevealItem {
   name: string;
@@ -38,7 +39,7 @@ export function LootReveal({ items, onContinue }: LootRevealProps) {
   const gridCols = items.length <= 2 ? 'grid-cols-2' : 'grid-cols-3';
 
   return (
-    <div className="bg-black/70 fixed inset-0 z-50 flex items-center justify-center">
+    <ModalOverlay>
       <PixelCard variant="ornate" className="rpg-screen-enter max-w-sm w-full mx-4">
         <h2
           className="font-almendra text-center text-lg mb-4"
@@ -95,6 +96,6 @@ export function LootReveal({ items, onContinue }: LootRevealProps) {
           </PixelButton>
         </div>
       </PixelCard>
-    </div>
+    </ModalOverlay>
   );
 }
