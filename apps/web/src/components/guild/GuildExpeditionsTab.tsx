@@ -397,9 +397,9 @@ export function GuildExpeditionsTab({
         />
       );
     case 'completed':
-      return <CompletedView expedition={expedition} members={members} />;
+      return <CompletedView expedition={expedition} members={members} onDismiss={() => { setExpedition(null); setMembers([]); }} />;
     case 'failed':
-      return <FailedView expedition={expedition} members={members} />;
+      return <FailedView expedition={expedition} members={members} onDismiss={() => { setExpedition(null); setMembers([]); }} />;
     default:
       return null;
   }
@@ -1011,7 +1011,7 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
 // Completed View
 // ---------------------------------------------------------------------------
 
-function CompletedView({ expedition, members }: { expedition: ExpeditionData; members: ExpeditionMemberData[] }) {
+function CompletedView({ expedition, members, onDismiss }: { expedition: ExpeditionData; members: ExpeditionMemberData[]; onDismiss: () => void }) {
   const sorted = [...members].sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing));
 
   return (
@@ -1027,6 +1027,9 @@ function CompletedView({ expedition, members }: { expedition: ExpeditionData; me
               Completed: {new Date(expedition.completedAt).toLocaleString()}
             </p>
           )}
+          <PixelButton size="sm" onClick={onDismiss} className="mt-2">
+            Back to Expeditions
+          </PixelButton>
         </div>
       </PixelCard>
 
@@ -1066,7 +1069,7 @@ function CompletedView({ expedition, members }: { expedition: ExpeditionData; me
 // Failed View
 // ---------------------------------------------------------------------------
 
-function FailedView({ expedition, members }: { expedition: ExpeditionData; members: ExpeditionMemberData[] }) {
+function FailedView({ expedition, members, onDismiss }: { expedition: ExpeditionData; members: ExpeditionMemberData[]; onDismiss: () => void }) {
   const sorted = [...members].sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing));
 
   return (
@@ -1087,6 +1090,9 @@ function FailedView({ expedition, members }: { expedition: ExpeditionData; membe
               Not enough participants joined in time.
             </p>
           )}
+          <PixelButton size="sm" onClick={onDismiss} className="mt-2">
+            Back to Expeditions
+          </PixelButton>
         </div>
       </PixelCard>
 
