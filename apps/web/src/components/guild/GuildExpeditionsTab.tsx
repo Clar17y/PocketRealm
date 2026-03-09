@@ -76,16 +76,22 @@ function Countdown({ expiresAt, onExpired }: { expiresAt: string | null; onExpir
   const [remaining, setRemaining] = useState('');
   const firedRef = useRef(false);
   const onExpiredRef = useRef(onExpired);
-  onExpiredRef.current = onExpired;
+
+  useEffect(() => {
+    onExpiredRef.current = onExpired;
+  }, [onExpired]);
 
   useEffect(() => {
     if (!expiresAt) return;
-    // Only reset the fired guard if the new expiry is in the future
-    if (new Date(expiresAt).getTime() > Date.now()) {
+    const expiresAtMs = new Date(expiresAt).getTime();
+
+    // Only reset the fired guard if the new expiry is in the future.
+    if (expiresAtMs > Date.now()) {
       firedRef.current = false;
     }
+
     const tick = () => {
-      const ms = new Date(expiresAt).getTime() - Date.now();
+      const ms = expiresAtMs - Date.now();
       if (ms <= 0 && !firedRef.current) {
         firedRef.current = true;
         onExpiredRef.current?.();
@@ -137,8 +143,10 @@ export function GuildExpeditionsTab({
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
 
-  const loadExpedition = useCallback(async () => {
-    setLoading(true);
+  const loadExpedition = useCallback(async (showSpinner = false) => {
+    if (showSpinner) {
+      setLoading(true);
+    }
     try {
       const res = await getActiveExpedition();
       if (res.error) { setError(res.error.message); return; }
@@ -171,11 +179,13 @@ export function GuildExpeditionsTab({
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load expedition');
     } finally {
-      setLoading(false);
+      if (showSpinner) {
+        setLoading(false);
+      }
     }
   }, [setError]);
 
-  useEffect(() => { void loadExpedition(); }, [loadExpedition]);
+  useEffect(() => { void loadExpedition(true); }, [loadExpedition]);
 
   // Auto-refresh every 30s when expedition is active
   useEffect(() => {
