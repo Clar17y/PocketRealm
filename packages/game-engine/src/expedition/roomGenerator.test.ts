@@ -1,15 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { generateExpeditionRooms, type MobPoolEntry } from './roomGenerator';
-import type { CombatantStats, ExpeditionRoomType } from '@pocketrealm/shared';
-import {
-  EXPEDITION_CONSTANTS,
-  MINI_BOSS_TEMPLATE,
-  TRASH_MOB_TEMPLATE,
-  ELITE_MOB_TEMPLATE,
-  FINAL_BOSS_PHASE1_TEMPLATE,
-} from '@pocketrealm/shared';
+import { generateExpeditionRooms } from './roomGenerator';
+import type { CombatantStats, ExpeditionRoomType, ExpeditionTheme } from '@pocketrealm/shared';
+import { EXPEDITION_CONSTANTS } from '@pocketrealm/shared';
 
-// --- Test mob pool ---
+// --- Test theme ---
 
 function makeStats(overrides: Partial<CombatantStats> = {}): CombatantStats {
   return {
@@ -29,16 +23,78 @@ function makeStats(overrides: Partial<CombatantStats> = {}): CombatantStats {
   };
 }
 
-const TEST_MOB_POOL: MobPoolEntry[] = [
-  { mobTemplateId: 'goblin', name: 'Goblin', level: 5, hp: 80, stats: makeStats({ hp: 80, maxHp: 80 }) },
-  { mobTemplateId: 'skeleton', name: 'Skeleton', level: 6, hp: 100, stats: makeStats() },
-  { mobTemplateId: 'wolf', name: 'Dire Wolf', level: 4, hp: 60, stats: makeStats({ hp: 60, maxHp: 60, speed: 15 }) },
-  { mobTemplateId: 'orc', name: 'Orc Warrior', level: 8, hp: 150, stats: makeStats({ hp: 150, maxHp: 150, attack: 25 }) },
-  { mobTemplateId: 'spider', name: 'Giant Spider', level: 5, hp: 70, stats: makeStats({ hp: 70, maxHp: 70, dodge: 10 }) },
-  { mobTemplateId: 'bat', name: 'Cave Bat', level: 3, hp: 40, stats: makeStats({ hp: 40, maxHp: 40, speed: 20 }) },
-  { mobTemplateId: 'troll', name: 'Troll', level: 10, hp: 200, stats: makeStats({ hp: 200, maxHp: 200, defence: 15 }) },
-  { mobTemplateId: 'wraith', name: 'Wraith', level: 9, hp: 120, stats: makeStats({ hp: 120, maxHp: 120, damageType: 'magic' }) },
-];
+const TEST_THEME: ExpeditionTheme = {
+  id: 'test_theme',
+  name: 'Test Theme',
+  tier: 1,
+  mobFamilyKeys: ['test'],
+  trash: [
+    {
+      key: 'testTrash1', name: 'Goblin', hp: 80,
+      stats: makeStats({ hp: 80, maxHp: 80 }),
+      actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+    },
+    {
+      key: 'testTrash2', name: 'Skeleton', hp: 100,
+      stats: makeStats(),
+      actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+    },
+  ],
+  elites: [
+    {
+      key: 'testElite1', name: 'Dire Wolf', hp: 300,
+      stats: makeStats({ hp: 300, maxHp: 300, attack: 25 }),
+      actionTemplate: [
+        { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+        { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
+      ],
+    },
+  ],
+  miniBoss: {
+    key: 'testMiniBoss', name: 'Orc Warlord', hp: 600,
+    stats: makeStats({ hp: 600, maxHp: 600, attack: 30 }),
+    actionTemplate: [
+      { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+      { actionId: 'boss_enrage', targetMode: 'single_target' },
+    ],
+  },
+  miniBossAdds: [
+    {
+      key: 'testMiniBossAdd', name: 'Orc Grunt', hp: 80,
+      stats: makeStats({ hp: 80, maxHp: 80 }),
+      actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+    },
+  ],
+  casterAdd: {
+    key: 'testCaster', name: 'Orc Shaman', hp: 60,
+    stats: makeStats({ hp: 60, maxHp: 60, damageType: 'magic' }),
+    actionTemplate: [{ actionId: 'boss_magic_attack', targetMode: 'single_target' }],
+  },
+  regularAdd: {
+    key: 'testRegularAdd', name: 'Orc Peon', hp: 50,
+    stats: makeStats({ hp: 50, maxHp: 50 }),
+    actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+  },
+  finalBoss: {
+    mob: {
+      key: 'testBoss', name: 'Dragon Lord', hp: 1200,
+      stats: makeStats({ hp: 1200, maxHp: 1200, attack: 40 }),
+      actionTemplate: [],
+    },
+    phase1: [
+      { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+      { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
+    ],
+    phase2: [
+      { actionId: 'boss_magic_attack', targetMode: 'single_target' },
+      { actionId: 'boss_arcane_storm', targetMode: 'aoe', isTelegraphed: true },
+    ],
+    phase3: [
+      { actionId: 'boss_enrage', targetMode: 'single_target' },
+      { actionId: 'boss_arcane_storm', targetMode: 'aoe', isTelegraphed: true },
+    ],
+  },
+};
 
 // Deterministic seeded RNG for reproducible tests
 function seededRng(seed: number): () => number {
@@ -58,13 +114,13 @@ function countRoomTypes(rooms: { roomType: ExpeditionRoomType }[]): Record<strin
 }
 
 describe('generateExpeditionRooms', () => {
-  // Composition from constants (design doc):
+  // Composition from constants:
   // Tier 0: 3 trash + 1 elite + 1 final_boss = 5 rooms
   // Tier 1: 3 trash + 1 elite + 1 mini_boss + 1 final_boss = 6 rooms
   // Tier 2: 3 trash + 2 elite + 1 mini_boss + 1 event + 1 final_boss = 8 rooms
 
   it('tier 0 generates 5 rooms with correct composition', () => {
-    const rooms = generateExpeditionRooms(0, TEST_MOB_POOL, seededRng(1));
+    const rooms = generateExpeditionRooms(0, TEST_THEME, seededRng(1));
     expect(rooms).toHaveLength(5);
     const counts = countRoomTypes(rooms);
     expect(counts['trash']).toBe(3);
@@ -73,7 +129,7 @@ describe('generateExpeditionRooms', () => {
   });
 
   it('tier 1 generates 6 rooms with correct composition', () => {
-    const rooms = generateExpeditionRooms(1, TEST_MOB_POOL, seededRng(42));
+    const rooms = generateExpeditionRooms(1, TEST_THEME, seededRng(42));
     expect(rooms).toHaveLength(6);
     const counts = countRoomTypes(rooms);
     expect(counts['trash']).toBe(3);
@@ -83,7 +139,7 @@ describe('generateExpeditionRooms', () => {
   });
 
   it('tier 2 generates 8 rooms with correct composition', () => {
-    const rooms = generateExpeditionRooms(2, TEST_MOB_POOL, seededRng(99));
+    const rooms = generateExpeditionRooms(2, TEST_THEME, seededRng(99));
     expect(rooms).toHaveLength(8);
     const counts = countRoomTypes(rooms);
     expect(counts['trash']).toBe(3);
@@ -95,10 +151,9 @@ describe('generateExpeditionRooms', () => {
 
   it('final boss is always the last room', () => {
     for (let tier = 0; tier <= 2; tier++) {
-      const rooms = generateExpeditionRooms(tier, TEST_MOB_POOL, seededRng(tier + 10));
+      const rooms = generateExpeditionRooms(tier, TEST_THEME, seededRng(tier + 10));
       const lastRoom = rooms[rooms.length - 1];
       expect(lastRoom.roomType).toBe('final_boss');
-      // Ensure no final_boss appears earlier
       for (let i = 0; i < rooms.length - 1; i++) {
         expect(rooms[i].roomType).not.toBe('final_boss');
       }
@@ -108,7 +163,7 @@ describe('generateExpeditionRooms', () => {
   it('mob counts are within expected range per room type', () => {
     const { MOB_COUNTS } = EXPEDITION_CONSTANTS;
     for (let tier = 0; tier <= 2; tier++) {
-      const rooms = generateExpeditionRooms(tier, TEST_MOB_POOL, seededRng(tier + 100));
+      const rooms = generateExpeditionRooms(tier, TEST_THEME, seededRng(tier + 100));
       for (const room of rooms) {
         switch (room.roomType) {
           case 'trash':
@@ -136,12 +191,26 @@ describe('generateExpeditionRooms', () => {
     }
   });
 
-  it('mobs have valid stats from pool', () => {
-    const rooms = generateExpeditionRooms(0, TEST_MOB_POOL, seededRng(55));
-    const poolTemplateIds = new Set(TEST_MOB_POOL.map((m) => m.mobTemplateId));
+  it('mobs use theme roster data directly (no HP scaling)', () => {
+    const rooms = generateExpeditionRooms(0, TEST_THEME, seededRng(55));
+    const trashNames = new Set(TEST_THEME.trash.map((m) => m.name));
+    for (const room of rooms) {
+      if (room.roomType === 'trash') {
+        for (const mob of room.mobs) {
+          expect(trashNames.has(mob.name)).toBe(true);
+          const themeMob = TEST_THEME.trash.find((t) => t.name === mob.name)!;
+          expect(mob.hp).toBe(themeMob.hp);
+          expect(mob.maxHp).toBe(themeMob.hp);
+          expect(mob.stats.attack).toBe(themeMob.stats.attack);
+        }
+      }
+    }
+  });
+
+  it('mobs have valid structure', () => {
+    const rooms = generateExpeditionRooms(0, TEST_THEME, seededRng(55));
     for (const room of rooms) {
       for (const mob of room.mobs) {
-        expect(poolTemplateIds.has(mob.mobTemplateId)).toBe(true);
         expect(mob.hp).toBeGreaterThan(0);
         expect(mob.maxHp).toBeGreaterThan(0);
         expect(mob.hp).toBe(mob.maxHp);
@@ -149,89 +218,83 @@ describe('generateExpeditionRooms', () => {
         expect(mob.stats.damageType).toBeDefined();
         expect(mob.prefix).toBeNull();
         expect(mob.activeEffects).toEqual([]);
+        expect(mob.mobTemplateId).toBe('');
       }
     }
   });
 
   it('event rooms have environmentalDotPercent set', () => {
-    // Only tier 2 has event rooms in the new composition
-    const rooms = generateExpeditionRooms(2, TEST_MOB_POOL, seededRng(200));
+    const rooms = generateExpeditionRooms(2, TEST_THEME, seededRng(200));
     const eventRooms = rooms.filter((r) => r.roomType === 'event');
     expect(eventRooms.length).toBeGreaterThan(0);
     for (const room of eventRooms) {
       expect(room.environmentalDotPercent).toBe(EXPEDITION_CONSTANTS.EVENT_DOT_PERCENT);
     }
-    // Non-event rooms should not have it
     const nonEventRooms = rooms.filter((r) => r.roomType !== 'event');
     for (const room of nonEventRooms) {
       expect(room.environmentalDotPercent).toBeUndefined();
     }
   });
 
-  it('mini-boss rooms have 1 main mob with MINI_BOSS_TEMPLATE', () => {
-    // Only tiers 1 and 2 have mini_boss rooms in the new composition
+  it('mini-boss rooms have the theme miniBoss as first mob', () => {
     for (let tier = 1; tier <= 2; tier++) {
-      const rooms = generateExpeditionRooms(tier, TEST_MOB_POOL, seededRng(tier + 300));
+      const rooms = generateExpeditionRooms(tier, TEST_THEME, seededRng(tier + 300));
       const miniBossRooms = rooms.filter((r) => r.roomType === 'mini_boss');
       expect(miniBossRooms.length).toBe(1);
       for (const room of miniBossRooms) {
-        // First mob is the main mini-boss
         const mainMob = room.mobs[0];
-        expect(mainMob.actionTemplate).toEqual([...MINI_BOSS_TEMPLATE]);
-        // Remaining mobs are adds with a different template
+        expect(mainMob.name).toBe(TEST_THEME.miniBoss.name);
+        expect(mainMob.actionTemplate).toEqual([...TEST_THEME.miniBoss.actionTemplate]);
+        // Adds should be from miniBossAdds or casterAdd
+        const addNames = new Set([
+          ...TEST_THEME.miniBossAdds.map((a) => a.name),
+          TEST_THEME.casterAdd.name,
+        ]);
         for (let i = 1; i < room.mobs.length; i++) {
-          expect(room.mobs[i].actionTemplate).not.toEqual([...MINI_BOSS_TEMPLATE]);
+          expect(addNames.has(room.mobs[i].name)).toBe(true);
         }
       }
     }
   });
 
-  it('assigns correct action templates per room type', () => {
-    // Use tier 2 to cover all room types including event
-    const rooms = generateExpeditionRooms(2, TEST_MOB_POOL, seededRng(500));
+  it('trash rooms use theme trash mob templates', () => {
+    const rooms = generateExpeditionRooms(0, TEST_THEME, seededRng(500));
+    const trashTemplates = TEST_THEME.trash.map((t) => [...t.actionTemplate]);
     for (const room of rooms) {
-      for (const mob of room.mobs) {
-        switch (room.roomType) {
-          case 'trash':
-            expect(mob.actionTemplate).toEqual([...TRASH_MOB_TEMPLATE]);
-            break;
-          case 'elite':
-            expect(mob.actionTemplate).toEqual([...ELITE_MOB_TEMPLATE]);
-            break;
-          case 'event':
-            expect(mob.actionTemplate).toEqual([...TRASH_MOB_TEMPLATE]);
-            break;
-          case 'final_boss':
-            expect(mob.actionTemplate).toEqual([...FINAL_BOSS_PHASE1_TEMPLATE]);
-            break;
-          // mini_boss handled in dedicated test
+      if (room.roomType === 'trash') {
+        for (const mob of room.mobs) {
+          expect(trashTemplates).toContainEqual(mob.actionTemplate);
         }
       }
     }
   });
 
-  it('HP scales by tier', () => {
-    const baseMob = TEST_MOB_POOL[0]; // goblin, hp=80
-    // Use a pool with only one mob to ensure deterministic picks
-    const singlePool = [baseMob];
+  it('elite rooms use theme elite mob templates', () => {
+    const rooms = generateExpeditionRooms(0, TEST_THEME, seededRng(500));
+    const eliteTemplates = TEST_THEME.elites.map((t) => [...t.actionTemplate]);
+    for (const room of rooms) {
+      if (room.roomType === 'elite') {
+        for (const mob of room.mobs) {
+          expect(eliteTemplates).toContainEqual(mob.actionTemplate);
+        }
+      }
+    }
+  });
 
-    const rooms0 = generateExpeditionRooms(0, singlePool, seededRng(1));
-    const rooms1 = generateExpeditionRooms(1, singlePool, seededRng(1));
-    const rooms2 = generateExpeditionRooms(2, singlePool, seededRng(1));
-
-    // Find a trash mob in each tier's rooms
-    const trashRoom0 = rooms0.find((r) => r.roomType === 'trash')!;
-    const trashRoom1 = rooms1.find((r) => r.roomType === 'trash')!;
-    const trashRoom2 = rooms2.find((r) => r.roomType === 'trash')!;
-
-    // T0: 1x, T1: 1.5x, T2: 2x
-    expect(trashRoom0.mobs[0].hp).toBe(Math.round(baseMob.hp * 1));
-    expect(trashRoom1.mobs[0].hp).toBe(Math.round(baseMob.hp * 1.5));
-    expect(trashRoom2.mobs[0].hp).toBe(Math.round(baseMob.hp * 2));
+  it('final boss uses phase templates from theme', () => {
+    const rooms = generateExpeditionRooms(0, TEST_THEME, seededRng(500));
+    const bossRoom = rooms.find((r) => r.roomType === 'final_boss')!;
+    const boss = bossRoom.mobs[0];
+    expect(boss.name).toBe(TEST_THEME.finalBoss.mob.name);
+    expect(boss.actionTemplate).toEqual([...TEST_THEME.finalBoss.phase1]);
+    expect(boss.phaseTemplates).toBeDefined();
+    expect(boss.phaseTemplates).toHaveLength(2);
+    expect(boss.phaseTemplates![0].template).toEqual([...TEST_THEME.finalBoss.phase3]);
+    expect(boss.phaseTemplates![1].template).toEqual([...TEST_THEME.finalBoss.phase2]);
   });
 
   it('generates unique mob IDs within a room', () => {
-    const rooms = generateExpeditionRooms(2, TEST_MOB_POOL, seededRng(777));
+    const rooms = generateExpeditionRooms(2, TEST_THEME, seededRng(777));
     for (const room of rooms) {
       const ids = room.mobs.map((m) => m.id);
       expect(new Set(ids).size).toBe(ids.length);
@@ -239,19 +302,19 @@ describe('generateExpeditionRooms', () => {
   });
 
   it('generates unique mob IDs across all rooms', () => {
-    const rooms = generateExpeditionRooms(2, TEST_MOB_POOL, seededRng(888));
+    const rooms = generateExpeditionRooms(2, TEST_THEME, seededRng(888));
     const allIds = rooms.flatMap((r) => r.mobs.map((m) => m.id));
     expect(new Set(allIds).size).toBe(allIds.length);
   });
 
   it('roomIndex is sequential starting from 0', () => {
-    const rooms = generateExpeditionRooms(2, TEST_MOB_POOL, seededRng(999));
+    const rooms = generateExpeditionRooms(2, TEST_THEME, seededRng(999));
     for (let i = 0; i < rooms.length; i++) {
       expect(rooms[i].roomIndex).toBe(i);
     }
   });
 
   it('throws for invalid tier', () => {
-    expect(() => generateExpeditionRooms(5, TEST_MOB_POOL)).toThrow();
+    expect(() => generateExpeditionRooms(5, TEST_THEME)).toThrow();
   });
 });
