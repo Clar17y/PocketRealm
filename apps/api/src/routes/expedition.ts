@@ -11,6 +11,7 @@ import {
   recoverFromKO,
   forceStartExpedition,
   checkAndResolveExpeditionRounds,
+  setTargetMob,
 } from '../services/expeditionService';
 import {
   getShopItems,
@@ -219,6 +220,16 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
     currentRoom: updated?.currentRoom,
     roundNumber: updated?.roundNumber,
   });
+}));
+
+// PATCH /:id/target
+const targetSchema = z.object({ targetMobId: z.string().nullable() });
+
+expeditionRouter.patch('/:id/target', asyncHandler(async (req, res) => {
+  const { id } = expeditionIdSchema.parse(req.params);
+  const { targetMobId } = targetSchema.parse(req.body);
+  await setTargetMob(id, req.player!.playerId, targetMobId);
+  res.json({ success: true });
 }));
 
 // POST /:id/recover

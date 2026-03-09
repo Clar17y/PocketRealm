@@ -116,6 +116,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
       {activeTab === 'expeditions' && (
         <GuildExpeditionsTab
           guildId={guildData.guild.id}
+          playerId={playerId}
           myRole={guildData.role as 'leader' | 'officer' | 'member'}
           characterLevel={characterLevel}
           setError={setError}

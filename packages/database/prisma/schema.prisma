@@ -972,6 +972,8 @@ model GuildExpeditionMember {
   totalHealing   BigInt   @default(0) @map("total_healing")
   roomDamage     BigInt   @default(0) @map("room_damage")
   roomHealing    BigInt   @default(0) @map("room_healing")
+  targetMobId    String?  @map("target_mob_id")
+  tokensEarned   Int      @default(0) @map("tokens_earned")
   signedUpAt     DateTime @default(now()) @map("signed_up_at")
 
   expedition GuildExpedition @relation(fields: [expeditionId], references: [id], onDelete: Cascade)

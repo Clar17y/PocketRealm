@@ -95,9 +95,10 @@ export async function distributeRoomLoot(
  * Returns the token amount per player.
  */
 export async function awardRoomTokens(
-  members: { playerId: string }[],
+  members: { playerId: string; expeditionId?: string }[],
   roomType: ExpeditionRoomType,
   tier: number,
+  expeditionId?: string,
 ): Promise<number> {
   const baseTokens = EXPEDITION_CONSTANTS.TOKENS_PER_ROOM[roomType];
   const tierMultiplier = EXPEDITION_CONSTANTS.TOKEN_TIER_MULTIPLIER[tier - 1] ?? 1;
@@ -108,6 +109,14 @@ export async function awardRoomTokens(
     where: { id: { in: playerIds } },
     data: { expeditionTokens: { increment: tokens } },
   });
+
+  // Track tokens earned on member records
+  if (expeditionId) {
+    await prisma.guildExpeditionMember.updateMany({
+      where: { expeditionId, playerId: { in: playerIds } },
+      data: { tokensEarned: { increment: tokens } },
+    });
+  }
 
   return tokens;
 }
@@ -125,6 +134,7 @@ export async function awardCompletionBonus(
   tier: number,
   totalRooms: number,
   roomTypes: ExpeditionRoomType[],
+  expeditionId?: string,
 ): Promise<number> {
   // Sum the token value of every room
   let totalRoomTokens = 0;
@@ -145,6 +155,14 @@ export async function awardCompletionBonus(
     where: { id: { in: playerIds } },
     data: { expeditionTokens: { increment: bonusTokens } },
   });
+
+  // Track tokens earned on member records
+  if (expeditionId) {
+    await prisma.guildExpeditionMember.updateMany({
+      where: { expeditionId, playerId: { in: playerIds } },
+      data: { tokensEarned: { increment: bonusTokens } },
+    });
+  }
 
   return bonusTokens;
 }

@@ -8,7 +8,7 @@ import {
   type ExpeditionMemberData,
   type ExpeditionStatus,
   type ExpeditionRoomDefinition,
-  type ExpeditionRoundSummary,
+  type ExpeditionRoundLog,
   type RaidRoundInput,
   type RaidParticipant,
   type RaidThreatEntry,
@@ -50,6 +50,7 @@ interface GuildExpeditionRow {
   totalRooms: number;
   roomDefinitions: unknown;
   roundNumber: number;
+  roundSummaries?: unknown;
   nextRoundAt: Date | null;
   startedAt: Date;
   completedAt: Date | null;
@@ -60,9 +61,13 @@ interface GuildExpeditionRow {
 function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
   const rooms = exp.roomDefinitions as unknown as ExpeditionRoomDefinition[];
   const currentRoomDef = rooms[exp.currentRoom];
-  const mobsRemaining = currentRoomDef
-    ? currentRoomDef.mobs.filter((m) => m.hp > 0).length
-    : 0;
+  const aliveMobs = currentRoomDef
+    ? currentRoomDef.mobs.filter((m) => m.hp > 0)
+    : [];
+
+  const roundLogs = (Array.isArray(exp.roundSummaries)
+    ? exp.roundSummaries
+    : []) as unknown as ExpeditionRoundLog[];
 
   return {
     id: exp.id,
@@ -78,7 +83,15 @@ function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
     completedAt: exp.completedAt?.toISOString() ?? null,
     launchedBy: exp.launchedBy,
     participantCount: exp._count?.members ?? 0,
-    mobsRemaining,
+    mobsRemaining: aliveMobs.length,
+    currentRoomMobs: aliveMobs.map(m => ({
+      id: m.id,
+      name: m.name,
+      prefix: m.prefix,
+      hp: m.hp,
+      maxHp: m.maxHp,
+    })),
+    roundLogs,
   };
 }
 
@@ -95,6 +108,8 @@ interface GuildExpeditionMemberRow {
   totalHealing: bigint;
   roomDamage: bigint;
   roomHealing: bigint;
+  targetMobId: string | null;
+  tokensEarned: number;
   signedUpAt: Date;
   player?: { username: string };
 }
@@ -114,6 +129,8 @@ function toExpeditionMemberData(m: GuildExpeditionMemberRow): ExpeditionMemberDa
     totalHealing: Number(m.totalHealing),
     roomDamage: Number(m.roomDamage),
     roomHealing: Number(m.roomHealing),
+    targetMobId: m.targetMobId,
+    tokensEarned: m.tokensEarned,
     signedUpAt: m.signedUpAt.toISOString(),
   };
 }
@@ -464,7 +481,7 @@ export async function getExpeditionStatus(
 // ---------------------------------------------------------------------------
 
 async function buildRaidParticipant(
-  member: { playerId: string; currentHp: number; currentStamina: number; currentMana: number; templateRound: number; activeEffects: unknown },
+  member: { playerId: string; currentHp: number; currentStamina: number; currentMana: number; templateRound: number; activeEffects: unknown; targetMobId?: string | null; player?: { username: string } },
 ): Promise<RaidParticipant> {
   // Fetch equipment + progression first to compute maxHp (needed by preparePlayerForCombat)
   const [equipStats, progression] = await Promise.all([
@@ -501,6 +518,8 @@ async function buildRaidParticipant(
 
   return {
     playerId: member.playerId,
+    username: member.player?.username,
+    targetMobId: member.targetMobId ?? null,
     stats,
     template: prep.playerTemplate.map(s => ({
       actionId: s.actionId,
@@ -609,7 +628,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id: expeditionId },
     include: {
-      members: true,
+      members: { include: { player: { select: { username: true } } } },
     },
   });
   if (!expedition || expedition.status !== 'in_progress') return;
@@ -706,19 +725,15 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
     }),
   };
 
-  // Build round summary
-  const roundSummary: ExpeditionRoundSummary = {
-    roundNumber: nextRound,
+  // Build round log from engine result
+  const roundLog: ExpeditionRoundLog = {
+    ...result.roundLog,
     roomIndex: expedition.currentRoom,
-    participantResults: result.participantResults,
-    mobActionResults: result.mobActionResults,
-    roomCleared: result.roomCleared,
-    allPlayersDead: result.allPlayersDead,
   };
-  const existingSummaries = (Array.isArray(expedition.roundSummaries)
+  const existingLogs = (Array.isArray(expedition.roundSummaries)
     ? expedition.roundSummaries
-    : []) as unknown as ExpeditionRoundSummary[];
-  const newSummaries = [...existingSummaries, roundSummary];
+    : []) as unknown as ExpeditionRoundLog[];
+  const newSummaries = [...existingLogs, roundLog];
 
   if (result.roomCleared) {
     await prisma.guildExpedition.update({
@@ -768,7 +783,7 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
   const roomType = currentRoomDef?.roomType ?? 'trash';
 
   // Award per-room tokens to all members (flat, not contribution-weighted)
-  await awardRoomTokens(expedition.members, roomType, expedition.tier);
+  await awardRoomTokens(expedition.members, roomType, expedition.tier, expeditionId);
 
   // Distribute item loot weighted by contribution
   const contributors: ExpeditionContributor[] = expedition.members.map(m => ({
@@ -799,7 +814,7 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
 
   await prisma.guildExpeditionMember.updateMany({
     where: { expeditionId },
-    data: { roomDamage: 0, roomHealing: 0, isKnockedOut: false, threatValue: 0 },
+    data: { roomDamage: 0, roomHealing: 0, isKnockedOut: false, threatValue: 0, targetMobId: null },
   });
 
   // Apply rest regen to all members using stored max stats (no N+1 queries)
@@ -852,12 +867,12 @@ export async function handleWipe(expeditionId: string): Promise<void> {
   });
   if (!expedition) return;
 
-  // Count total wipes from round summaries (allPlayersDead entries)
-  const summaries = (Array.isArray(expedition.roundSummaries)
+  // Count total wipes from round logs (wipe outcome entries)
+  const logs = (Array.isArray(expedition.roundSummaries)
     ? expedition.roundSummaries
-    : []) as unknown as ExpeditionRoundSummary[];
+    : []) as unknown as ExpeditionRoundLog[];
   // +1 for the current wipe that triggered this call
-  const wipeCount = summaries.filter(s => s.allPlayersDead).length + 1;
+  const wipeCount = logs.filter(l => l.phases?.outcome?.wipe).length + 1;
 
   if (wipeCount >= EXPEDITION_CONSTANTS.MAX_WIPES_PER_EXPEDITION) {
     await prisma.guildExpedition.update({
@@ -918,6 +933,7 @@ export async function handleWipe(expeditionId: string): Promise<void> {
             roomDamage: 0,
             roomHealing: 0,
             threatValue: 0,
+            targetMobId: null,
           },
         }),
       ),
@@ -931,6 +947,7 @@ export async function handleWipe(expeditionId: string): Promise<void> {
         roomDamage: 0,
         roomHealing: 0,
         threatValue: 0,
+        targetMobId: null,
       },
     });
   }
@@ -1024,7 +1041,7 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
   // Award completion bonus tokens
   const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
   const roomTypes = rooms.map(r => r.roomType);
-  await awardCompletionBonus(expedition.members, expedition.tier, rooms.length, roomTypes);
+  await awardCompletionBonus(expedition.members, expedition.tier, rooms.length, roomTypes, expeditionId);
 
   // Award guild XP completion bonus
   await prisma.guild.update({
@@ -1038,4 +1055,39 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
     `Tier ${expedition.tier} expedition completed!`,
     { expeditionId },
   );
+}
+
+// ---------------------------------------------------------------------------
+// Set Target Mob
+// ---------------------------------------------------------------------------
+
+export async function setTargetMob(
+  expeditionId: string,
+  playerId: string,
+  targetMobId: string | null,
+): Promise<void> {
+  const [expedition, member] = await Promise.all([
+    prisma.guildExpedition.findUnique({ where: { id: expeditionId } }),
+    prisma.guildExpeditionMember.findUnique({
+      where: { expeditionId_playerId: { expeditionId, playerId } },
+    }),
+  ]);
+
+  if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
+  if (expedition.status !== 'in_progress') throw new AppError(400, 'Expedition is not in progress', 'NOT_IN_PROGRESS');
+  if (!member) throw new AppError(400, 'Not a member of this expedition', 'NOT_A_MEMBER');
+
+  // Validate targetMobId if set
+  if (targetMobId !== null) {
+    const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
+    const currentRoomDef = rooms[expedition.currentRoom];
+    if (!currentRoomDef) throw new AppError(400, 'No current room', 'NO_ROOM');
+    const mob = currentRoomDef.mobs.find(m => m.id === targetMobId && m.hp > 0);
+    if (!mob) throw new AppError(400, 'Target mob not found or dead', 'INVALID_TARGET');
+  }
+
+  await prisma.guildExpeditionMember.update({
+    where: { expeditionId_playerId: { expeditionId, playerId } },
+    data: { targetMobId },
+  });
 }

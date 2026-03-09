@@ -87,6 +87,13 @@ export async function recoverFromExpeditionKO(id: string) {
   });
 }
 
+export async function setExpeditionTarget(id: string, targetMobId: string | null) {
+  return fetchApi<{ success: boolean }>(`/api/v1/expedition/${id}/target`, {
+    method: 'PATCH',
+    body: JSON.stringify({ targetMobId }),
+  });
+}
+
 export async function getExpeditionShop() {
   return fetchApi<ExpeditionShopResponse>('/api/v1/expedition/shop');
 }

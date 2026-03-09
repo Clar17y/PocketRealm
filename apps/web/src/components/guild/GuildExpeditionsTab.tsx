@@ -12,11 +12,18 @@ import {
   forceStartExpedition,
   forceNextRound,
   recoverFromExpeditionKO,
+  setExpeditionTarget,
 } from '@/lib/api/expedition';
 import type {
   ExpeditionDetailResponse,
 } from '@/lib/api/expedition';
-import type { ExpeditionData, ExpeditionMemberData, ExpeditionRoomType } from '@pocketrealm/shared';
+import type {
+  ExpeditionData,
+  ExpeditionMemberData,
+  ExpeditionRoomType,
+  ExpeditionMobInfo,
+  ExpeditionRoundLog,
+} from '@pocketrealm/shared';
 import { EXPEDITION_CONSTANTS } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
 
@@ -41,6 +48,7 @@ const TIER_CONFIGS = EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER.map((levelRe
 
 interface GuildExpeditionsTabProps {
   guildId: string;
+  playerId: string | null;
   myRole: 'leader' | 'officer' | 'member';
   characterLevel: number;
   setError: (msg: string | null) => void;
@@ -63,15 +71,24 @@ function roomTypeBadge(roomType: ExpeditionRoomType | null): { label: string; co
   }
 }
 
-function Countdown({ expiresAt }: { expiresAt: string | null }) {
+function Countdown({ expiresAt, onExpired }: { expiresAt: string | null; onExpired?: () => void }) {
   const [remaining, setRemaining] = useState('');
+  const [fired, setFired] = useState(false);
   useEffect(() => {
     if (!expiresAt) return;
-    const tick = () => setRemaining(formatTimeRemaining(expiresAt));
+    setFired(false);
+    const tick = () => {
+      const ms = new Date(expiresAt).getTime() - Date.now();
+      if (ms <= 0 && !fired) {
+        setFired(true);
+        onExpired?.();
+      }
+      setRemaining(formatTimeRemaining(expiresAt));
+    };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [expiresAt]);
+  }, [expiresAt, onExpired, fired]);
   if (!expiresAt) return null;
   return <span className="text-xs text-[var(--rpg-text-secondary)]">{remaining}</span>;
 }
@@ -93,12 +110,17 @@ function HpBar({ current, max, label, color }: { current: number; max: number; l
   );
 }
 
+function mobDisplayName(mob: ExpeditionMobInfo): string {
+  return mob.prefix ? `${mob.prefix} ${mob.name}` : mob.name;
+}
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
 export function GuildExpeditionsTab({
   guildId,
+  playerId,
   myRole,
   characterLevel,
   setError,
@@ -121,6 +143,7 @@ export function GuildExpeditionsTab({
         setExpedition(res.data.expedition);
         const detail = await getExpeditionStatus(res.data.expedition.id);
         if (detail.data) {
+          setExpedition(detail.data.expedition);
           setMembers(detail.data.members);
         }
       } else {
@@ -224,6 +247,18 @@ export function GuildExpeditionsTab({
     }
   };
 
+  const handleSetTarget = async (targetMobId: string | null) => {
+    if (!expedition) return;
+    setError(null);
+    try {
+      const res = await setExpeditionTarget(expedition.id, targetMobId);
+      if (res.error) { setError(res.error.message); return; }
+      void loadExpedition();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to set target');
+    }
+  };
+
   if (loading) return <LoadingCard />;
 
   // No active expedition
@@ -238,11 +273,13 @@ export function GuildExpeditionsTab({
         <RecruitingView
           expedition={expedition}
           members={members}
+          playerId={playerId}
           characterLevel={characterLevel}
           actionLoading={actionLoading}
           isOfficer={isOfficer}
           onSignup={handleSignup}
           onForceStart={handleForceStart}
+          onExpired={loadExpedition}
         />
       );
     case 'in_progress':
@@ -250,16 +287,19 @@ export function GuildExpeditionsTab({
         <InProgressView
           expedition={expedition}
           members={members}
+          playerId={playerId}
           actionLoading={actionLoading}
           isOfficer={isOfficer}
           onRecover={handleRecover}
           onForceRound={handleForceRound}
+          onSetTarget={handleSetTarget}
+          onExpired={loadExpedition}
         />
       );
     case 'completed':
-      return <CompletedView expedition={expedition} />;
+      return <CompletedView expedition={expedition} members={members} />;
     case 'failed':
-      return <FailedView expedition={expedition} />;
+      return <FailedView expedition={expedition} members={members} />;
     default:
       return null;
   }
@@ -343,22 +383,27 @@ function IdleView({
 function RecruitingView({
   expedition,
   members,
+  playerId,
   characterLevel,
   actionLoading,
   isOfficer,
   onSignup,
   onForceStart,
+  onExpired,
 }: {
   expedition: ExpeditionData;
   members: ExpeditionMemberData[];
+  playerId: string | null;
   characterLevel: number;
   actionLoading: boolean;
   isOfficer: boolean;
   onSignup: () => void;
   onForceStart: () => void;
+  onExpired: () => void;
 }) {
   const tierCfg = TIER_CONFIGS.find((c) => c.tier === expedition.tier);
   const meetsLevel = tierCfg ? characterLevel >= tierCfg.levelReq : true;
+  const alreadySignedUp = members.some(m => m.playerId === playerId);
 
   return (
     <div className="space-y-3">
@@ -384,17 +429,23 @@ function RecruitingView({
           </span>
           <span className="text-[var(--rpg-text-secondary)]">Rooms:</span>
           <span className="text-[var(--rpg-text-primary)]">{expedition.totalRooms}</span>
-          <span className="text-[var(--rpg-text-secondary)]">First Round:</span>
-          <Countdown expiresAt={expedition.nextRoundAt} />
+          <span className="text-[var(--rpg-text-secondary)]">Starts In:</span>
+          <Countdown expiresAt={expedition.nextRoundAt} onExpired={onExpired} />
         </div>
 
         <div className="flex gap-2">
           <PixelButton
             size="sm"
             onClick={onSignup}
-            disabled={actionLoading || !meetsLevel}
+            disabled={actionLoading || !meetsLevel || alreadySignedUp}
           >
-            {!meetsLevel ? `Level ${tierCfg?.levelReq} Required` : actionLoading ? 'Signing up...' : 'Sign Up'}
+            {alreadySignedUp
+              ? 'Signed Up'
+              : !meetsLevel
+                ? `Level ${tierCfg?.levelReq} Required`
+                : actionLoading
+                  ? 'Signing up...'
+                  : 'Sign Up'}
           </PixelButton>
           {isOfficer && members.length > 0 && (
             <PixelButton
@@ -423,17 +474,23 @@ function RecruitingView({
 function InProgressView({
   expedition,
   members,
+  playerId,
   actionLoading,
   isOfficer,
   onRecover,
   onForceRound,
+  onSetTarget,
+  onExpired,
 }: {
   expedition: ExpeditionData;
   members: ExpeditionMemberData[];
+  playerId: string | null;
   actionLoading: boolean;
   isOfficer: boolean;
   onRecover: () => void;
   onForceRound: () => void;
+  onSetTarget: (targetMobId: string | null) => void;
+  onExpired: () => void;
 }) {
   const roomBadge = roomTypeBadge(expedition.currentRoomType);
   const roomPct = expedition.totalRooms > 0
@@ -441,6 +498,16 @@ function InProgressView({
     : 0;
 
   const isResting = expedition.currentRoomType === null && expedition.status === 'in_progress';
+  const myMember = members.find(m => m.playerId === playerId);
+  const myTargetMobId = myMember?.targetMobId ?? null;
+
+  // Count how many players target each mob
+  const targetCounts = new Map<string, number>();
+  for (const m of members) {
+    if (m.targetMobId) {
+      targetCounts.set(m.targetMobId, (targetCounts.get(m.targetMobId) ?? 0) + 1);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -483,7 +550,7 @@ function InProgressView({
           <span className="text-[var(--rpg-text-secondary)]">Round:</span>
           <span className="text-[var(--rpg-text-primary)]">{expedition.roundNumber}</span>
           <span className="text-[var(--rpg-text-secondary)]">Next Round:</span>
-          <Countdown expiresAt={expedition.nextRoundAt} />
+          <Countdown expiresAt={expedition.nextRoundAt} onExpired={onExpired} />
         </div>
 
         {isOfficer && expedition.nextRoundAt && (
@@ -503,6 +570,69 @@ function InProgressView({
         )}
       </PixelCard>
 
+      {/* Current Room Mobs */}
+      {expedition.currentRoomMobs.length > 0 && (
+        <PixelCard>
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-xs font-bold text-[var(--rpg-text-primary)]">Current Room</h4>
+            {myTargetMobId && (
+              <button
+                onClick={() => onSetTarget(null)}
+                className="text-[10px] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] underline"
+              >
+                Clear Target
+              </button>
+            )}
+          </div>
+          <div className="space-y-2">
+            {expedition.currentRoomMobs.map((mob) => {
+              const isMyTarget = myTargetMobId === mob.id;
+              const count = targetCounts.get(mob.id) ?? 0;
+              return (
+                <button
+                  key={mob.id}
+                  onClick={() => onSetTarget(isMyTarget ? null : mob.id)}
+                  className={`w-full text-left p-2 rounded border transition-colors ${
+                    isMyTarget
+                      ? 'border-[var(--rpg-gold)] bg-[var(--rpg-gold)]/10'
+                      : 'border-[var(--rpg-border)] hover:border-[var(--rpg-text-secondary)]'
+                  }`}
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-[var(--rpg-text-primary)] font-bold">
+                      {mobDisplayName(mob)}
+                    </span>
+                    <div className="flex gap-1 items-center">
+                      {count > 0 && (
+                        <span className="text-[10px] px-1.5 py-0 rounded bg-[var(--rpg-blue-light)]/20 text-[var(--rpg-blue-light)]">
+                          {count} targeting
+                        </span>
+                      )}
+                      {isMyTarget && (
+                        <span className="text-[10px] px-1.5 py-0 rounded bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
+                          YOUR TARGET
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <HpBar
+                    current={mob.hp}
+                    max={mob.maxHp}
+                    label="HP"
+                    color={mob.hp <= mob.maxHp * 0.25 ? 'var(--rpg-red)' : 'var(--rpg-green-light)'}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </PixelCard>
+      )}
+
+      {/* Round Logs */}
+      {expedition.roundLogs.length > 0 && (
+        <RoundLogList logs={expedition.roundLogs} playerId={playerId} />
+      )}
+
       {/* Member status */}
       <MemberList members={members} showResources actionLoading={actionLoading} onRecover={onRecover} />
     </div>
@@ -510,24 +640,246 @@ function InProgressView({
 }
 
 // ---------------------------------------------------------------------------
+// Round Log Display
+// ---------------------------------------------------------------------------
+
+function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId: string | null }) {
+  const [expandedRound, setExpandedRound] = useState<number | null>(null);
+
+  // Auto-expand latest round
+  const latestRound = logs.length > 0 ? logs[logs.length - 1].round : null;
+  const effectiveExpanded = expandedRound ?? latestRound;
+
+  return (
+    <PixelCard>
+      <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-2">Round Log</h4>
+      <div className="space-y-1">
+        {[...logs].reverse().map((log) => {
+          const isExpanded = effectiveExpanded === log.round;
+          const outcome = log.phases.outcome;
+          return (
+            <div key={log.round}>
+              <button
+                onClick={() => setExpandedRound(isExpanded ? -1 : log.round)}
+                className="w-full flex justify-between items-center px-2 py-1 rounded text-xs hover:bg-[var(--rpg-surface)]"
+              >
+                <span className="text-[var(--rpg-text-primary)] font-bold">
+                  Round {log.round}
+                </span>
+                <div className="flex gap-2 text-[10px]">
+                  {outcome.mobsKilled > 0 && (
+                    <span className="text-[var(--rpg-green-light)]">{outcome.mobsKilled} killed</span>
+                  )}
+                  {outcome.playersKnockedOut > 0 && (
+                    <span className="text-[var(--rpg-red)]">{outcome.playersKnockedOut} KO</span>
+                  )}
+                  {outcome.roomCleared && (
+                    <span className="text-[var(--rpg-gold)]">CLEARED</span>
+                  )}
+                  {outcome.wipe && (
+                    <span className="text-[var(--rpg-red)]">WIPE</span>
+                  )}
+                  <span className="text-[var(--rpg-text-secondary)]">{isExpanded ? '▲' : '▼'}</span>
+                </div>
+              </button>
+
+              {isExpanded && (
+                <div className="px-2 pb-2 space-y-2">
+                  {/* Player Attacks */}
+                  {log.phases.playerAttacks.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-[var(--rpg-text-secondary)] font-bold mb-0.5">Attacks</p>
+                      {log.phases.playerAttacks.map((atk, j) => {
+                        const isMe = atk.playerId === playerId;
+                        if (isMe) {
+                          return (
+                            <div key={j} className="text-[10px] ml-2 mb-0.5 p-1 rounded bg-[var(--rpg-surface)]">
+                              <span className="text-[var(--rpg-gold)] font-bold">{atk.actionLabel}</span>
+                              {' → '}
+                              <span className="text-[var(--rpg-text-primary)]">{atk.targetMobName}</span>
+                              {' | '}
+                              <span className="text-[var(--rpg-text-secondary)]">
+                                d20({atk.attackRoll})+{atk.modifier} vs {atk.defenseTarget}
+                              </span>
+                              {' | '}
+                              {atk.hit ? (
+                                <>
+                                  <span className={atk.crit ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-green-light)]'}>
+                                    {atk.crit ? 'CRIT' : 'HIT'}
+                                  </span>
+                                  {atk.totalDamage !== undefined && (
+                                    <span className="text-[var(--rpg-red)]"> {atk.totalDamage} dmg</span>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-[var(--rpg-text-secondary)]">MISS</span>
+                              )}
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={j} className="text-[10px] ml-2 text-[var(--rpg-text-secondary)]">
+                            <span className="text-[var(--rpg-text-primary)]">{atk.username}</span>
+                            {': '}
+                            {atk.actionLabel}
+                            {' → '}
+                            {atk.hit ? (
+                              <>
+                                <span className={atk.crit ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-green-light)]'}>
+                                  {atk.crit ? 'CRIT' : 'HIT'}
+                                </span>
+                                {atk.totalDamage !== undefined && ` ${atk.totalDamage} dmg`}
+                              </>
+                            ) : (
+                              'MISS'
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Healing */}
+                  {log.phases.healing.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-[var(--rpg-text-secondary)] font-bold mb-0.5">Healing</p>
+                      {log.phases.healing.map((h, j) => (
+                        <div key={j} className="text-[10px] ml-2 text-[var(--rpg-green-light)]">
+                          {h.username}: {h.actionLabel} → {h.targetUsername} +{h.amountHealed} HP
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Mob Actions */}
+                  {log.phases.mobActions.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-[var(--rpg-text-secondary)] font-bold mb-0.5">Enemy Actions</p>
+                      {log.phases.mobActions.map((ma, j) => (
+                        <div
+                          key={j}
+                          className={`text-[10px] ml-2 mb-0.5 p-1 rounded ${
+                            ma.wasTelegraphed
+                              ? 'border border-[var(--rpg-gold)] bg-[var(--rpg-gold)]/5'
+                              : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="text-[var(--rpg-red)] font-bold">{ma.mobName}</span>
+                            <span className="text-[var(--rpg-text-secondary)]">uses</span>
+                            <span className="text-[var(--rpg-text-primary)]">{ma.actionLabel}</span>
+                            {ma.wasTelegraphed && (
+                              <span className="px-1 py-0 rounded text-[8px] bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
+                                TELEGRAPHED
+                              </span>
+                            )}
+                            {ma.targetMode === 'aoe' && (
+                              <span className="px-1 py-0 rounded text-[8px] bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]">
+                                AOE
+                              </span>
+                            )}
+                          </div>
+                          {ma.targets.length > 0 && (
+                            <div className="ml-2 mt-0.5">
+                              {ma.targets.map((t, k) => (
+                                <div key={k} className="text-[var(--rpg-text-secondary)]">
+                                  {t.username}: {t.blocked ? (
+                                    <span className="text-[var(--rpg-blue-light)]">BLOCKED</span>
+                                  ) : (
+                                    <>
+                                      <span className="text-[var(--rpg-red)]">-{t.damageTaken} HP</span>
+                                      {t.knockedOut && <span className="text-[var(--rpg-red)] font-bold"> KO!</span>}
+                                    </>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Telegraphs */}
+                  {log.telegraphs.length > 0 && (
+                    <div className="border border-[var(--rpg-gold)] bg-[var(--rpg-gold)]/5 rounded p-1.5">
+                      <p className="text-[10px] text-[var(--rpg-gold)] font-bold mb-0.5">Next Round Warning</p>
+                      {log.telegraphs.map((t, j) => (
+                        <div key={j} className="text-[10px] text-[var(--rpg-gold)]">
+                          {t.warningText}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Outcome */}
+                  <div className="text-[10px] text-[var(--rpg-text-secondary)] border-t border-[var(--rpg-border)] pt-1">
+                    Mobs: {outcome.mobsAlive} alive, {outcome.mobsKilled} killed
+                    {' | '}
+                    Players: {outcome.playersAlive} alive{outcome.playersKnockedOut > 0 && `, ${outcome.playersKnockedOut} KO`}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </PixelCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Completed View
 // ---------------------------------------------------------------------------
 
-function CompletedView({ expedition }: { expedition: ExpeditionData }) {
+function CompletedView({ expedition, members }: { expedition: ExpeditionData; members: ExpeditionMemberData[] }) {
+  const sorted = [...members].sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing));
+
   return (
-    <PixelCard>
-      <div className="text-center space-y-2 py-2">
-        <p className="text-sm font-bold text-[var(--rpg-green-light)]">Expedition Complete!</p>
-        <p className="text-xs text-[var(--rpg-text-secondary)]">
-          Tier {expedition.tier} — {expedition.totalRooms} rooms cleared
-        </p>
-        {expedition.completedAt && (
+    <div className="space-y-3">
+      <PixelCard>
+        <div className="text-center space-y-2 py-2">
+          <p className="text-sm font-bold text-[var(--rpg-green-light)]">Expedition Complete!</p>
           <p className="text-xs text-[var(--rpg-text-secondary)]">
-            Completed: {new Date(expedition.completedAt).toLocaleString()}
+            Tier {expedition.tier} — {expedition.totalRooms} rooms cleared
           </p>
-        )}
-      </div>
-    </PixelCard>
+          {expedition.completedAt && (
+            <p className="text-xs text-[var(--rpg-text-secondary)]">
+              Completed: {new Date(expedition.completedAt).toLocaleString()}
+            </p>
+          )}
+        </div>
+      </PixelCard>
+
+      {sorted.length > 0 && (
+        <PixelCard>
+          <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-2">Contributions</h4>
+          <div className="space-y-1">
+            {sorted.map((m, i) => (
+              <div key={m.playerId} className="flex justify-between items-center text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[var(--rpg-gold)] font-bold w-4">{i + 1}.</span>
+                  <span className="text-[var(--rpg-text-primary)]">{m.username ?? m.playerId.slice(0, 8)}</span>
+                </div>
+                <div className="flex gap-3 text-[10px]">
+                  <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
+                  {m.totalHealing > 0 && (
+                    <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
+                  )}
+                  {m.tokensEarned > 0 && (
+                    <span className="text-[var(--rpg-gold)]">{formatNumber(m.tokensEarned)} tokens</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </PixelCard>
+      )}
+
+      {expedition.roundLogs.length > 0 && (
+        <RoundLogList logs={expedition.roundLogs} playerId={null} />
+      )}
+    </div>
   );
 }
 
@@ -535,21 +887,54 @@ function CompletedView({ expedition }: { expedition: ExpeditionData }) {
 // Failed View
 // ---------------------------------------------------------------------------
 
-function FailedView({ expedition }: { expedition: ExpeditionData }) {
+function FailedView({ expedition, members }: { expedition: ExpeditionData; members: ExpeditionMemberData[] }) {
+  const sorted = [...members].sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing));
+
   return (
-    <PixelCard>
-      <div className="text-center space-y-2 py-2">
-        <p className="text-sm font-bold text-[var(--rpg-red)]">Expedition Failed</p>
-        <p className="text-xs text-[var(--rpg-text-secondary)]">
-          Tier {expedition.tier} — Reached room {expedition.currentRoom + 1} / {expedition.totalRooms}
-        </p>
-        {expedition.participantCount < (TIER_CONFIGS.find((c) => c.tier === expedition.tier)?.minParticipants ?? 0) && (
+    <div className="space-y-3">
+      <PixelCard>
+        <div className="text-center space-y-2 py-2">
+          <p className="text-sm font-bold text-[var(--rpg-red)]">Expedition Failed</p>
           <p className="text-xs text-[var(--rpg-text-secondary)]">
-            Not enough participants joined in time.
+            Tier {expedition.tier} — Reached room {expedition.currentRoom + 1} / {expedition.totalRooms}
           </p>
-        )}
-      </div>
-    </PixelCard>
+          {expedition.participantCount < (TIER_CONFIGS.find((c) => c.tier === expedition.tier)?.minParticipants ?? 0) && (
+            <p className="text-xs text-[var(--rpg-text-secondary)]">
+              Not enough participants joined in time.
+            </p>
+          )}
+        </div>
+      </PixelCard>
+
+      {sorted.length > 0 && sorted.some(m => m.totalDamage > 0 || m.totalHealing > 0) && (
+        <PixelCard>
+          <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-2">Contributions</h4>
+          <div className="space-y-1">
+            {sorted.map((m, i) => (
+              <div key={m.playerId} className="flex justify-between items-center text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[var(--rpg-text-secondary)] font-bold w-4">{i + 1}.</span>
+                  <span className="text-[var(--rpg-text-primary)]">{m.username ?? m.playerId.slice(0, 8)}</span>
+                </div>
+                <div className="flex gap-3 text-[10px]">
+                  <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
+                  {m.totalHealing > 0 && (
+                    <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
+                  )}
+                  {m.tokensEarned > 0 && (
+                    <span className="text-[var(--rpg-gold)]">{formatNumber(m.tokensEarned)} tokens</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </PixelCard>
+      )}
+
+      {expedition.roundLogs.length > 0 && (
+        <RoundLogList logs={expedition.roundLogs} playerId={null} />
+      )}
+    </div>
   );
 }
 

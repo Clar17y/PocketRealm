@@ -6,6 +6,11 @@ import type {
   MobActionResult,
   RaidRoundResult,
   ExpeditionMobState,
+  PlayerAttackEntry,
+  MobActionLogEntry,
+  HealingEntry,
+  MobTelegraphEntry,
+  ExpeditionRoundLog,
 } from '@pocketrealm/shared';
 import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, BOSS_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 import {
@@ -42,11 +47,6 @@ const AOE_ACTION_IDS = new Set([
 
 // --- Phase Transition ---
 
-/**
- * Check if a mob's HP has dropped below a phase threshold and swap its action
- * template to the more aggressive phase. phaseTemplates must be sorted by
- * threshold ascending (lowest/most aggressive first) so the first match wins.
- */
 function checkPhaseTransition(mob: ExpeditionMobState): void {
   if (!mob.phaseTemplates || mob.phaseTemplates.length === 0) return;
   for (const phase of mob.phaseTemplates) {
@@ -55,6 +55,14 @@ function checkPhaseTransition(mob: ExpeditionMobState): void {
       break;
     }
   }
+}
+
+function mobDisplayName(mob: { prefix: string | null; name: string }): string {
+  return mob.prefix ? `${mob.prefix} ${mob.name}` : mob.name;
+}
+
+function actionLabel(actionId: string, defs: Record<string, ActionDefinition>): string {
+  return defs[actionId]?.name ?? actionId.replace(/_/g, ' ');
 }
 
 // --- Resolver ---
@@ -69,6 +77,12 @@ export function resolveRaidRound(
     rollCrit: defaultIsCriticalHit,
   };
 
+  // Username lookup from participants
+  const usernameMap = new Map<string, string>();
+  for (const p of input.participants) {
+    usernameMap.set(p.playerId, p.username ?? p.playerId.slice(0, 8));
+  }
+
   // Mutable copies of mob state
   const mobState = input.mobs.map(m => ({
     ...m,
@@ -78,6 +92,9 @@ export function resolveRaidRound(
 
   // Merge boss action definitions for mob lookups
   const mobActionDefs: Record<string, ActionDefinition> = { ...BOSS_ACTION_DEFINITIONS };
+
+  // Player action definitions (from first participant, all share the same pool)
+  const playerActionDefs = (input.participants[0]?.actionDefinitions ?? {}) as Record<string, ActionDefinition>;
 
   // Mutable copies of participant state
   const pState = input.participants.map(p => ({
@@ -96,6 +113,11 @@ export function resolveRaidRound(
     targetMobId: null as string | null,
     actionDef: null as ActionDefinition | null,
   }));
+
+  // Round log collectors
+  const logPlayerAttacks: PlayerAttackEntry[] = [];
+  const logMobActions: MobActionLogEntry[] = [];
+  const logHealing: HealingEntry[] = [];
 
   // --- Step 1: Pick actions for all alive participants ---
   resolveParticipantActions(input.participants, pState);
@@ -137,24 +159,46 @@ export function resolveRaidRound(
     const aliveMobs = mobState.filter(m => m.hp > 0);
     if (aliveMobs.length === 0) continue;
 
-    const targets = isAoe
-      ? aliveMobs
-      : [aliveMobs.reduce((lowest, m) => m.hp < lowest.hp ? m : lowest)];
+    // Per-player targeting: use targetMobId if set and mob is alive, else lowest HP
+    let targets: typeof mobState;
+    if (isAoe) {
+      targets = aliveMobs;
+    } else if (p.targetMobId) {
+      const preferred = aliveMobs.find(m => m.id === p.targetMobId);
+      targets = [preferred ?? aliveMobs.reduce((lowest, m) => m.hp < lowest.hp ? m : lowest)];
+    } else {
+      targets = [aliveMobs.reduce((lowest, m) => m.hp < lowest.hp ? m : lowest)];
+    }
 
     s.targetMobId = isAoe ? null : targets[0].id;
 
     let totalDamageDealt = 0;
+    const modifier = p.stats.accuracy + (def.accuracyModifier ?? 0);
 
     for (const target of targets) {
       const attackRoll = roll.rollD20();
-      const hits = doesAttackHit(
-        attackRoll,
-        p.stats.accuracy + (def.accuracyModifier ?? 0),
-        target.stats.dodge,
-        0,
-      );
+      const defenseTarget = target.stats.dodge;
+      const hits = doesAttackHit(attackRoll, modifier, defenseTarget, 0);
 
-      if (!hits) continue;
+      if (!hits) {
+        // Log miss
+        logPlayerAttacks.push({
+          playerId: p.playerId,
+          username: usernameMap.get(p.playerId) ?? p.playerId.slice(0, 8),
+          actionId: s.actionId,
+          actionLabel: actionLabel(s.actionId, playerActionDefs),
+          targetMobId: target.id,
+          targetMobName: mobDisplayName(target),
+          attackRoll,
+          modifier,
+          defenseTarget,
+          hit: false,
+          crit: false,
+          staminaCost: def.cost.stamina,
+          manaCost: def.cost.mana,
+        });
+        continue;
+      }
 
       s.hit = true;
       const rawDmg = roll.rollDamage(p.stats.damageMin, p.stats.damageMax);
@@ -169,6 +213,24 @@ export function resolveRaidRound(
 
       target.hp = Math.max(0, target.hp - damage);
       totalDamageDealt += damage;
+
+      logPlayerAttacks.push({
+        playerId: p.playerId,
+        username: usernameMap.get(p.playerId) ?? p.playerId.slice(0, 8),
+        actionId: s.actionId,
+        actionLabel: actionLabel(s.actionId, playerActionDefs),
+        targetMobId: target.id,
+        targetMobName: mobDisplayName(target),
+        attackRoll,
+        modifier,
+        defenseTarget,
+        hit: true,
+        crit,
+        damageRoll: rawDmg,
+        totalDamage: damage,
+        staminaCost: def.cost.stamina,
+        manaCost: def.cost.mana,
+      });
     }
 
     s.damageDealt = totalDamageDealt;
@@ -183,7 +245,38 @@ export function resolveRaidRound(
   }
 
   // --- Step 5: Player supportive phase ---
+  // Capture healing entries from supportive actions
+  const hpBefore = new Map(pState.map(s => [s.playerId, s.hp]));
   resolveSupportiveActions(input.participants, pState, input.threatTable);
+
+  for (let i = 0; i < pState.length; i++) {
+    const s = pState[i];
+    const def = s.actionDef;
+    if (!def || def.category !== 'supportive') continue;
+    if (s.healingDone <= 0) continue;
+
+    const aggroHolder = getSingleTarget(input.threatTable, new Set(pState.filter(ps => ps.hp > 0).map(ps => ps.playerId)));
+
+    if (def.actionType === 'heal_self') {
+      logHealing.push({
+        playerId: s.playerId,
+        username: usernameMap.get(s.playerId) ?? s.playerId.slice(0, 8),
+        actionLabel: actionLabel(s.actionId, playerActionDefs),
+        amountHealed: s.healingDone,
+        targetPlayerId: s.playerId,
+        targetUsername: usernameMap.get(s.playerId) ?? s.playerId.slice(0, 8),
+      });
+    } else if (def.actionType === 'heal_ally' && aggroHolder) {
+      logHealing.push({
+        playerId: s.playerId,
+        username: usernameMap.get(s.playerId) ?? s.playerId.slice(0, 8),
+        actionLabel: actionLabel(s.actionId, playerActionDefs),
+        amountHealed: s.healingDone,
+        targetPlayerId: aggroHolder,
+        targetUsername: usernameMap.get(aggroHolder) ?? aggroHolder.slice(0, 8),
+      });
+    }
+  }
 
   // --- Step 6: Mob offensive phase ---
   const mobActionResults: MobActionResult[] = [];
@@ -193,8 +286,8 @@ export function resolveRaidRound(
 
     const actionIndex = (input.roundNumber - 1) % mob.actionTemplate.length;
     const templateAction = mob.actionTemplate[actionIndex];
-    const actionDef = mobActionDefs[templateAction.actionId];
-    if (!actionDef) continue;
+    const mActionDef = mobActionDefs[templateAction.actionId];
+    if (!mActionDef) continue;
 
     const mobResult: MobActionResult = {
       mobId: mob.id,
@@ -205,14 +298,25 @@ export function resolveRaidRound(
       healingDone: 0,
     };
 
+    const mobLogEntry: MobActionLogEntry = {
+      mobId: mob.id,
+      mobName: mobDisplayName(mob),
+      actionId: templateAction.actionId,
+      actionLabel: actionLabel(templateAction.actionId, mobActionDefs),
+      targetMode: templateAction.targetMode,
+      wasTelegraphed: templateAction.isTelegraphed ?? false,
+      targets: [],
+    };
+
     // Refresh alive set
     const aliveAfterOffensive = new Set(pState.filter(s => s.hp > 0).map(s => s.playerId));
     if (aliveAfterOffensive.size === 0) {
       mobActionResults.push(mobResult);
+      logMobActions.push(mobLogEntry);
       continue;
     }
 
-    if (actionDef.category === 'offensive' || actionDef.actionType === 'debuff_spell') {
+    if (mActionDef.category === 'offensive' || mActionDef.actionType === 'debuff_spell') {
       let targets: string[] = [];
       const currentAggroHolder = getSingleTarget(input.threatTable, aliveAfterOffensive);
 
@@ -222,7 +326,7 @@ export function resolveRaidRound(
         targets = Array.from(aliveAfterOffensive);
       }
 
-      const isMagic = actionDef.damageType === 'magic';
+      const isMagic = mActionDef.damageType === 'magic';
       const isPhysical = !isMagic;
 
       for (const targetId of targets) {
@@ -234,12 +338,20 @@ export function resolveRaidRound(
         const stance = defStances.get(targetId);
 
         // Counter avoids physical
-        if (stance?.avoidsPhysical && isPhysical) continue;
-        // Ward avoids magic
-        if (stance?.resistsMagic && isMagic) continue;
+        const blocked = (stance?.avoidsPhysical && isPhysical) || (stance?.resistsMagic && isMagic);
+        if (blocked) {
+          mobLogEntry.targets.push({
+            playerId: targetId,
+            username: usernameMap.get(targetId) ?? targetId.slice(0, 8),
+            damageTaken: 0,
+            blocked: true,
+            knockedOut: false,
+          });
+          continue;
+        }
 
         const dmgRaw = roll.rollDamage(mob.stats.damageMin, mob.stats.damageMax);
-        const scaledDmg = Math.floor(dmgRaw * (actionDef.damageMultiplier ?? 1.0));
+        const scaledDmg = Math.floor(dmgRaw * (mActionDef.damageMultiplier ?? 1.0));
 
         const effectivePlayerDefence = isMagic
           ? targetParticipant.stats.magicDefence
@@ -247,12 +359,10 @@ export function resolveRaidRound(
 
         let damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, scaledDmg - effectivePlayerDefence);
 
-        // Channeling vulnerability: +50% damage via CHANNELING_BONUS_DAMAGE
         if (stance?.isChanneling) {
           damage = Math.floor(damage * COMBAT_ACTION_CONSTANTS.CHANNELING_BONUS_DAMAGE);
         }
 
-        // Defend damage reduction
         if (stance?.damageReductionPercent && stance.damageReductionPercent > 0) {
           damage = Math.floor(damage * (1 - stance.damageReductionPercent));
           damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, damage);
@@ -261,28 +371,37 @@ export function resolveRaidRound(
         targetState.damageTaken += damage;
         targetState.hp = Math.max(0, targetState.hp - damage);
         mobResult.damageDealt += damage;
+
+        mobLogEntry.targets.push({
+          playerId: targetId,
+          username: usernameMap.get(targetId) ?? targetId.slice(0, 8),
+          damageTaken: damage,
+          blocked: false,
+          knockedOut: targetState.hp <= 0,
+        });
       }
     }
 
     // Mob heal_self
-    if (actionDef.actionType === 'heal_self') {
-      const healAmount = Math.floor((actionDef.healPercent ?? 0) * mob.maxHp) + (actionDef.healFlat ?? 0);
+    if (mActionDef.actionType === 'heal_self') {
+      const healAmount = Math.floor((mActionDef.healPercent ?? 0) * mob.maxHp) + (mActionDef.healFlat ?? 0);
       const actualHeal = Math.min(healAmount, mob.maxHp - mob.hp);
       mob.hp += actualHeal;
       mobResult.healingDone = actualHeal;
     }
 
     // Mob enrage/buff — applied to the mob itself
-    if (actionDef.actionType === 'buff' && actionDef.effect) {
+    if (mActionDef.actionType === 'buff' && mActionDef.effect) {
       mob.activeEffects.push({
-        name: actionDef.effect.name,
-        stat: actionDef.effect.stat,
-        modifier: actionDef.effect.modifier,
-        roundsRemaining: actionDef.effect.duration,
+        name: mActionDef.effect.name,
+        stat: mActionDef.effect.stat,
+        modifier: mActionDef.effect.modifier,
+        roundsRemaining: mActionDef.effect.duration,
       });
     }
 
     mobActionResults.push(mobResult);
+    logMobActions.push(mobLogEntry);
   }
 
   // --- Step 7: Environmental DoT ---
@@ -302,7 +421,6 @@ export function resolveRaidRound(
   applyResourceCosts(input.participants, pState);
 
   // --- Step 9: Tick effects ---
-  // Tick mob active effects
   for (const mob of mobState) {
     const remaining: BossActiveEffect[] = [];
     for (const effect of mob.activeEffects) {
@@ -314,7 +432,6 @@ export function resolveRaidRound(
     mob.activeEffects = remaining;
   }
 
-  // Tick player active effects
   const participantEffectsAfter: BossActiveEffect[][] = input.participants.map(p => {
     const remaining: BossActiveEffect[] = [];
     for (const effect of p.activeEffects) {
@@ -366,6 +483,46 @@ export function resolveRaidRound(
     activeEffectsAfter: participantEffectsAfter[i],
   }));
 
+  // --- Step 12: Build telegraphs (look ahead to each alive mob's NEXT action) ---
+  const telegraphs: MobTelegraphEntry[] = [];
+  for (const mob of mobState) {
+    if (mob.hp <= 0) continue;
+    const nextIndex = input.roundNumber % mob.actionTemplate.length;
+    const nextAction = mob.actionTemplate[nextIndex];
+    if (nextAction?.isTelegraphed) {
+      const nextDef = mobActionDefs[nextAction.actionId];
+      telegraphs.push({
+        mobId: mob.id,
+        mobName: mobDisplayName(mob),
+        actionId: nextAction.actionId,
+        actionLabel: nextAction.label ?? actionLabel(nextAction.actionId, mobActionDefs),
+        targetMode: nextAction.targetMode,
+        warningText: `${mobDisplayName(mob)} is preparing ${nextAction.label ?? actionLabel(nextAction.actionId, mobActionDefs)}!`,
+      });
+    }
+  }
+
+  // --- Build round log ---
+  const mobsKilledThisRound = input.mobs.filter(m => m.hp > 0).length - mobsAfter.length;
+  const roundLog: ExpeditionRoundLog = {
+    round: input.roundNumber,
+    roomIndex: 0, // Will be set by the service layer
+    phases: {
+      playerAttacks: logPlayerAttacks,
+      mobActions: logMobActions,
+      healing: logHealing,
+      outcome: {
+        mobsAlive: mobsAfter.length,
+        mobsKilled: mobsKilledThisRound,
+        playersAlive: pState.filter(s => s.hp > 0).length,
+        playersKnockedOut: pState.filter(s => s.hp <= 0).length,
+        roomCleared,
+        wipe: allPlayersDead,
+      },
+    },
+    telegraphs,
+  };
+
   return {
     mobsAfter,
     participantResults,
@@ -373,5 +530,6 @@ export function resolveRaidRound(
     threatTableAfter: input.threatTable,
     roomCleared,
     allPlayersDead,
+    roundLog,
   };
 }
