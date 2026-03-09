@@ -36,6 +36,7 @@ import { getSkillLevel, getMainHandAttackSkill } from './combatStatsService';
 import { getPlayerProgressionState } from './attributesService';
 import { getActiveTemplate } from './combatTemplateService';
 import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
+import { buildPotionPool, templateHasPotionActions, deductConsumedPotions } from './potionService';
 
 // ---------------------------------------------------------------------------
 // Data Transformation
@@ -541,7 +542,7 @@ function getRoundInterval(rooms: ExpeditionRoomDefinition[], currentRoom: number
 // ---------------------------------------------------------------------------
 
 async function buildRaidParticipant(
-  member: { playerId: string; currentHp: number; currentStamina: number; currentMana: number; templateRound: number; activeEffects: unknown; targetMobId?: string | null; player?: { username: string } },
+  member: { playerId: string; currentHp: number; currentStamina: number; currentMana: number; templateRound: number; activeEffects: unknown; targetMobId?: string | null; healTargetPlayerId?: string | null; player?: { username: string } },
 ): Promise<RaidParticipant> {
   // Fetch equipment + progression first to compute maxHp (needed by preparePlayerForCombat)
   const [equipStats, progression] = await Promise.all([
@@ -576,10 +577,16 @@ async function buildRaidParticipant(
 
   const effects = Array.isArray(member.activeEffects) ? member.activeEffects : [];
 
+  // Build potion pool if template uses potion actions
+  const potionPool = templateHasPotionActions(prep.playerTemplate)
+    ? await buildPotionPool(member.playerId, maxHp)
+    : [];
+
   return {
     playerId: member.playerId,
     username: member.player?.username,
     targetMobId: member.targetMobId ?? null,
+    healTargetPlayerId: member.healTargetPlayerId ?? null,
     stats,
     template: prep.playerTemplate.map(s => ({
       actionId: s.actionId,
@@ -598,6 +605,7 @@ async function buildRaidParticipant(
     manaRegenPerRound: prep.resources.manaRegenPerRound,
     templateRound: member.templateRound,
     activeEffects: effects as RaidParticipant['activeEffects'],
+    availablePotions: potionPool,
   };
 }
 
@@ -771,6 +779,13 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
       });
     }),
   );
+
+  // Deduct consumed potions from player inventories
+  for (const pr of result.participantResults) {
+    if (pr.potionsConsumed.length > 0) {
+      await deductConsumedPotions(pr.playerId, pr.potionsConsumed);
+    }
+  }
 
   // Update room mob state in roomDefinitions JSON
   const updatedRooms = [...rooms];
