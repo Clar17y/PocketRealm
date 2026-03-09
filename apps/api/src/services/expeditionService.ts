@@ -1,6 +1,7 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import {
   EXPEDITION_CONSTANTS,
+  EXPEDITION_THEMES,
   ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
   type ActionDefinition,
@@ -24,7 +25,6 @@ import {
   calculateStaminaRegenPerRound,
   calculateManaRegenPerRound,
   initThreatTable,
-  type MobPoolEntry,
 } from '@pocketrealm/game-engine';
 import { awardRoomTokens, awardCompletionBonus, distributeRoomLoot } from './expeditionLootService';
 import type { ExpeditionContributor } from './expeditionLootService';
@@ -58,6 +58,7 @@ interface GuildExpeditionRow {
   completedAt: Date | null;
   launchedBy: string;
   wipeCount?: number;
+  themeId?: string | null;
   _count?: { members: number };
 }
 
@@ -98,6 +99,8 @@ function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
       activeEffects: m.activeEffects ?? [],
     })),
     roundLogs,
+    themeId: exp.themeId ?? null,
+    themeName: EXPEDITION_THEMES.find(t => t.id === exp.themeId)?.name ?? null,
   };
 }
 
@@ -186,53 +189,6 @@ export async function getExpeditionCooldowns(guildId: string): Promise<Expeditio
 }
 
 // ---------------------------------------------------------------------------
-// Mob Pool Helper
-// ---------------------------------------------------------------------------
-
-async function fetchMobPool(tier: number): Promise<MobPoolEntry[]> {
-  const tierLevelMin = EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER[tier - 1];
-  const tierLevelMax = tierLevelMin + 10;
-  const mobTemplates = await prisma.mobTemplate.findMany({
-    where: { level: { gte: tierLevelMin, lte: tierLevelMax } },
-  });
-  if (mobTemplates.length === 0) {
-    throw new AppError(500, 'No mobs available for this tier', 'NO_MOBS');
-  }
-  return mobTemplates.map((m: {
-    id: string;
-    name: string;
-    level: number | null;
-    hp: number;
-    accuracy: number;
-    defence: number;
-    magicDefence: number;
-    evasion: number;
-    damageMin: number;
-    damageMax: number;
-    damageType: string | null;
-  }) => ({
-    mobTemplateId: m.id,
-    name: m.name,
-    level: m.level ?? 1,
-    hp: m.hp,
-    stats: {
-      hp: m.hp,
-      maxHp: m.hp,
-      attack: m.accuracy,
-      accuracy: m.accuracy,
-      defence: m.defence,
-      magicDefence: m.magicDefence,
-      dodge: m.evasion,
-      evasion: 0,
-      damageMin: m.damageMin,
-      damageMax: m.damageMax,
-      speed: 0,
-      damageType: (m.damageType as 'physical' | 'magic') ?? 'physical',
-    },
-  }));
-}
-
-// ---------------------------------------------------------------------------
 // Launch Expedition
 // ---------------------------------------------------------------------------
 
@@ -292,9 +248,13 @@ export async function launchExpedition(
     throw new AppError(400, 'Insufficient guild treasury', 'INSUFFICIENT_TREASURY');
   }
 
-  // Fetch mob pool and generate rooms
-  const mobPool = await fetchMobPool(tier);
-  const rooms = generateExpeditionRooms(tier - 1, mobPool);
+  // Select a random theme for this tier
+  const tierThemes = EXPEDITION_THEMES.filter(t => t.tier === tier);
+  if (tierThemes.length === 0) {
+    throw new AppError(500, 'No themes available for this tier', 'NO_THEMES');
+  }
+  const theme = tierThemes[Math.floor(Math.random() * tierThemes.length)];
+  const rooms = generateExpeditionRooms(tier - 1, theme);
 
   // Transaction: deduct treasury + create expedition + log
   const expedition = await prisma.$transaction(async (tx) => {
@@ -307,6 +267,7 @@ export async function launchExpedition(
       data: {
         guildId,
         tier,
+        themeId: theme.id,
         status: 'recruiting',
         currentRoom: 0,
         totalRooms: rooms.length,
@@ -999,9 +960,12 @@ export async function handleWipe(expeditionId: string): Promise<void> {
     return;
   }
 
-  // Reset to recruiting: delete all members, regenerate rooms, clear round summaries
-  const mobPool = await fetchMobPool(expedition.tier);
-  const rooms = generateExpeditionRooms(expedition.tier - 1, mobPool);
+  // Reset to recruiting: delete all members, regenerate rooms using same theme
+  const wipeTheme = EXPEDITION_THEMES.find(t => t.id === expedition.themeId);
+  if (!wipeTheme) {
+    throw new AppError(500, 'Theme not found for expedition', 'NO_THEMES');
+  }
+  const rooms = generateExpeditionRooms(expedition.tier - 1, wipeTheme);
 
   await prisma.$transaction(async (tx) => {
     await tx.guildExpeditionMember.deleteMany({ where: { expeditionId } });

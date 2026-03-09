@@ -144,6 +144,8 @@ export interface ExpeditionData {
   mobsRemaining: number;
   currentRoomMobs: ExpeditionMobInfo[];
   roundLogs: ExpeditionRoundLog[];
+  themeId?: string | null;
+  themeName?: string | null;
 }
 
 export interface ExpeditionMemberData {
