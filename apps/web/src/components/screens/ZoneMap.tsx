@@ -10,6 +10,7 @@ import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { MapPin, Star, Hourglass, Lock, Home } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';
 import { buildZoneAdjacency, findShortestZonePath } from '@/lib/zoneRoutes';
+import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 function getMilestoneHint(percent: number): ReactNode {
@@ -241,6 +242,24 @@ export function ZoneMap({
 
   return (
     <ScreenContainer>
+      <FeatureTutorial storageKey="howto_zones" title="Zone Map">
+        <p>
+          The world is made up of connected zones. <strong>Travel</strong> between them
+          by spending turns. Click any discovered zone to auto-path through intermediate zones.
+        </p>
+        <p>
+          <strong>Wild zones</strong> have monsters and resources. <strong>Town zones</strong>
+          offer crafting, the forge, stash, and shops.
+        </p>
+        <p>
+          Explore deeper into a zone to unlock higher-tier mobs and discover connections
+          to new areas.
+        </p>
+        <p className="text-[var(--rpg-green-light)]">
+          <strong>Tip:</strong> Returning to a previously visited zone via breadcrumb is free.
+        </p>
+      </FeatureTutorial>
+
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">World Map</h2>
         <MapPin size={20} color="var(--rpg-gold)" />

@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { BossEncounterPanel } from '@/components/BossEncounterPanel';
 import { formatTimeRemaining } from '@/lib/format';
+import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 function effectLabel(effectType: string, effectValue: number): string {
@@ -108,6 +109,22 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
 
   return (
     <ScreenContainer>
+      <FeatureTutorial storageKey="howto_world_events" title="World Events">
+        <p>
+          World events are timed occurrences that modify zones with buffs and debuffs.
+          Events can boost drop rates, increase mob spawns, or change resource yields.
+        </p>
+        <p>
+          <strong>Global events</strong> affect all zones. <strong>Zone events</strong> only
+          affect specific areas. Check the event badges on encounter sites and gathering nodes
+          to see active modifiers.
+        </p>
+        <p className="text-[var(--rpg-green-light)]">
+          <strong>Tip:</strong> Boss encounters spawn during certain events. Rally other
+          players to take them down for unique loot.
+        </p>
+      </FeatureTutorial>
+
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold font-almendra" style={{ color: 'var(--rpg-gold)' }}>
           World Events

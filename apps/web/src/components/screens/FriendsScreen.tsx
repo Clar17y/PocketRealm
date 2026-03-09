@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   getFriendsList,
   searchPlayerByUsername,
@@ -690,8 +689,7 @@ export function FriendsScreen({
         </div>
       )}
 
-      {/* Friend profile modal — portal to body to escape transform stacking context */}
-      {selectedFriendshipId && createPortal(
+      {selectedFriendshipId && (
         <FriendProfileModal
           friendshipId={selectedFriendshipId}
           onClose={() => setSelectedFriendshipId(null)}
@@ -707,8 +705,7 @@ export function FriendsScreen({
             void loadFriends();
             onFriendCountsChanged?.();
           }}
-        />,
-        document.body,
+        />
       )}
     </ScreenContainer>
   );

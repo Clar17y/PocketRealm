@@ -10,6 +10,7 @@ import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { getMobPrefixDefinition, getTierName } from '@pocketrealm/shared';
 import { StatBar } from '@/components/StatBar';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
+import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface MonsterDrop {
@@ -189,6 +190,22 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
 
   return (
     <ScreenContainer>
+      <FeatureTutorial storageKey="howto_bestiary" title="Bestiary">
+        <p>
+          The Bestiary tracks every monster you&apos;ve encountered. Discover new mobs by
+          exploring different zones and tiers.
+        </p>
+        <p>
+          Each entry shows the mob&apos;s stats, drops, and which zones it appears in.
+          <strong> Prefixes</strong> are variant modifiers that make mobs stronger with
+          unique abilities.
+        </p>
+        <p className="text-[var(--rpg-green-light)]">
+          <strong>Tip:</strong> Fight boss encounters to progressively reveal their attack
+          rotation in the Bestiary.
+        </p>
+      </FeatureTutorial>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
