@@ -529,8 +529,10 @@ function InProgressView({
     : 0;
 
   const isResting = expedition.currentRoomType === null && expedition.status === 'in_progress';
+  const isBetweenRooms = expedition.roundNumber === 0;
   const myMember = members.find(m => m.playerId === playerId);
   const myTargetMobId = myMember?.targetMobId ?? null;
+  const amKnockedOut = myMember?.isKnockedOut ?? false;
 
   // Count how many players target each mob
   const targetCounts = new Map<string, number>();
@@ -611,7 +613,7 @@ function InProgressView({
         <PixelCard>
           <div className="flex justify-between items-center mb-2">
             <h4 className="text-xs font-bold text-[var(--rpg-text-primary)]">Current Room</h4>
-            {myTargetMobId && (
+            {myTargetMobId && !amKnockedOut && (
               <button
                 onClick={() => onSetTarget(null)}
                 className="text-[10px] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] underline"
@@ -627,11 +629,14 @@ function InProgressView({
               return (
                 <button
                   key={mob.id}
-                  onClick={() => onSetTarget(isMyTarget ? null : mob.id)}
+                  onClick={() => !amKnockedOut && onSetTarget(isMyTarget ? null : mob.id)}
+                  disabled={amKnockedOut}
                   className={`w-full text-left p-2 rounded border transition-colors ${
-                    isMyTarget
-                      ? 'border-[var(--rpg-gold)] bg-[var(--rpg-gold)]/10'
-                      : 'border-[var(--rpg-border)] hover:border-[var(--rpg-text-secondary)]'
+                    amKnockedOut
+                      ? 'border-[var(--rpg-border)] opacity-50 cursor-not-allowed'
+                      : isMyTarget
+                        ? 'border-[var(--rpg-gold)] bg-[var(--rpg-gold)]/10'
+                        : 'border-[var(--rpg-border)] hover:border-[var(--rpg-text-secondary)]'
                   }`}
                 >
                   <div className="flex justify-between items-center mb-1">
@@ -670,7 +675,7 @@ function InProgressView({
       )}
 
       {/* Member status */}
-      <MemberList members={members} playerId={playerId} showResources actionLoading={actionLoading} onRecover={onRecover} />
+      <MemberList members={members} playerId={playerId} showResources actionLoading={actionLoading} onRecover={isBetweenRooms ? onRecover : undefined} />
     </div>
   );
 }

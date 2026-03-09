@@ -703,6 +703,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
           roomDamage: { increment: pr.damageDealt },
           roomHealing: { increment: pr.healingDone },
           isKnockedOut: pr.isDead,
+          ...(pr.isDead ? { targetMobId: null } : {}),
           templateRound: pr.templateRoundAfter,
           activeEffects: JSON.parse(JSON.stringify(pr.activeEffectsAfter)),
           threatValue: threatEntry?.threat ?? 0,
@@ -976,6 +977,9 @@ export async function recoverFromKO(
   if (expedition.status !== 'in_progress') {
     throw new AppError(400, 'Expedition is not in progress', 'NOT_IN_PROGRESS');
   }
+  if (expedition.roundNumber > 0) {
+    throw new AppError(400, 'Can only recover between rooms', 'ROOM_IN_PROGRESS');
+  }
 
   const member = await prisma.guildExpeditionMember.findUnique({
     where: { expeditionId_playerId: { expeditionId, playerId } },
@@ -1075,6 +1079,7 @@ export async function setTargetMob(
   if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
   if (expedition.status !== 'in_progress') throw new AppError(400, 'Expedition is not in progress', 'NOT_IN_PROGRESS');
   if (!member) throw new AppError(400, 'Not a member of this expedition', 'NOT_A_MEMBER');
+  if (member.isKnockedOut) throw new AppError(400, 'Cannot set target while knocked out', 'KNOCKED_OUT');
 
   // Validate targetMobId if set
   if (targetMobId !== null) {
