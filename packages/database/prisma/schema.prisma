@@ -319,6 +319,7 @@ model MobTemplate {
   explorationTier Int     @default(1) @map("exploration_tier")
   spellPattern    Json    @default("[]") @map("spell_pattern")
   damageType      String  @default("physical") @map("damage_type")
+  isExpeditionMob Boolean @default(false) @map("is_expedition_mob")
   isBoss          Boolean @default(false) @map("is_boss")
   bossAoeDmg      Int?    @map("boss_aoe_dmg")
   bossBaseHp      Int?    @map("boss_base_hp")
@@ -932,6 +933,7 @@ model GuildExpedition {
   id                String    @id @default(uuid())
   guildId           String    @map("guild_id")
   tier              Int
+  themeId         String?   @map("theme_id") @db.VarChar(64)
   status            String    @default("recruiting") @db.VarChar(16)
   currentRoom       Int       @default(0) @map("current_room")
   totalRooms        Int       @map("total_rooms")

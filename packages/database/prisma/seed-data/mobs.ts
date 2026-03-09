@@ -20,6 +20,7 @@ type MobRow = {
   bossAoeDmg?: number;
   bossBaseHp?: number;
   explorationTier?: number;
+  isExpeditionMob?: boolean;
 };
 
 function mob(r: MobRow) {
@@ -43,6 +44,7 @@ function mob(r: MobRow) {
     bossAoeDmg: r.bossAoeDmg ?? null,
     bossBaseHp: r.bossBaseHp ?? null,
     explorationTier: r.explorationTier ?? 1,
+    isExpeditionMob: r.isExpeditionMob ?? false,
   };
 }
 
