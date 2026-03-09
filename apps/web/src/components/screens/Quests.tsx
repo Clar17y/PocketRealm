@@ -6,6 +6,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { SubNav } from '@/components/common/SubNav';
+import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import {
   Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, RefreshCw,
   Wrench, Zap, Package, Crown, Shield,
@@ -581,6 +582,21 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
 
   return (
     <div className="space-y-4">
+      <FeatureTutorial storageKey="howto_quests" title="Quests & Shop">
+        <p>
+          You receive <strong>three daily quests</strong> and <strong>one weekly quest</strong>,
+          randomly assigned from categories like combat, exploration, crafting, and gathering.
+        </p>
+        <p>
+          Complete quests to earn <strong>Quest Tokens</strong>. Finish all three dailies
+          for a bonus payout. Don&apos;t like a quest? Use your free daily reroll.
+        </p>
+        <p>
+          Spend tokens in the <strong>Shop</strong> tab on combat buffs, reset scrolls,
+          teleport scrolls, and prestige titles.
+        </p>
+      </FeatureTutorial>
+
       <SubNav tabs={[...SHOP_TABS]} activeId={activeTab} onSelect={setActiveTab} />
 
       {activeTab === 'shop' ? (

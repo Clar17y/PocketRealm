@@ -15,6 +15,7 @@ import { Divider } from '@/components/common/Divider';
 import { ItemIcon } from '@/components/common/ItemIcon';
 import { StatLine } from '@/components/common/StatLine';
 import { StatBlock } from '@/components/common/StatBlock';
+import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface EquippedItem {
@@ -201,6 +202,21 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
 
   return (
     <ScreenContainer>
+      <FeatureTutorial storageKey="howto_equipment" title="Equipment">
+        <p>
+          Equip gear across <strong>11 slots</strong>: head, neck, chest, gloves, belt, legs,
+          boots, main hand, off hand, ring, and charm.
+        </p>
+        <p>
+          Equipment has <strong>durability</strong> that degrades per hit. Weapons lose durability
+          when you attack; armour loses durability when you take hits. Broken gear has reduced stats.
+        </p>
+        <p className="text-[var(--rpg-green-light)]">
+          <strong>Tip:</strong> Use Repair All after long sessions to keep your gear in shape.
+          Craft or find a backpack to increase carrying capacity.
+        </p>
+      </FeatureTutorial>
+
       <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Equipment</h2>
 
       {/* Slot Selection Modal */}
