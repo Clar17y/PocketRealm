@@ -870,7 +870,7 @@ describe('resolveRaidRound', () => {
       expect(pr.potionsConsumed).toHaveLength(1);
     });
 
-    it('hp potion does not overheal past maxHp', () => {
+    it('hp potion does not overheal past maxHp (cap)', () => {
       const potion = makePotion({ healAmount: 80 });
       const p1 = makeParticipant({
         playerId: 'p1',
@@ -893,6 +893,65 @@ describe('resolveRaidRound', () => {
       // Should cap at maxHp, not 160
       expect(pr.hpAfter).toBe(100);
       expect(pr.healingDone).toBe(20); // only healed 20 (100 - 80)
+    });
+  });
+
+  describe('rooted effect', () => {
+    it('rooted participant is forced to defend', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 100, maxHp: 100,
+        template: [{ actionId: 'normal_attack', sortOrder: 0 }],
+        activeEffects: [{
+          name: 'Rooted',
+          stat: 'rooted',
+          modifier: 0,
+          roundsRemaining: 1,
+        }],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        hp: 80, maxHp: 80,
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      const pr = result.participantResults[0];
+      // Should have been forced to defend — no damage dealt
+      expect(pr.actionId).toBe('defend');
+      expect(pr.damageDealt).toBe(0);
+      // Mob HP should be unchanged
+      expect(result.mobsAfter[0].hp).toBe(80);
+      // Rooted effect should be consumed (ticked down, roundsRemaining was 1 → 0 → removed)
+      const rootedAfter = pr.activeEffectsAfter.find(e => e.stat === 'rooted');
+      expect(rootedAfter).toBeUndefined();
+    });
+
+    it('non-rooted participant attacks normally', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 100, maxHp: 100,
+        template: [{ actionId: 'normal_attack', sortOrder: 0 }],
+        activeEffects: [],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        hp: 80, maxHp: 80,
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      const pr = result.participantResults[0];
+      expect(pr.actionId).toBe('normal_attack');
+      expect(pr.damageDealt).toBeGreaterThan(0);
     });
   });
 });

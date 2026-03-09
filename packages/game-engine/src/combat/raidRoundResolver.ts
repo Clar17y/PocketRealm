@@ -129,6 +129,22 @@ export function resolveRaidRound(
   // --- Step 1: Pick actions for all alive participants ---
   resolveParticipantActions(input.participants, pState);
 
+  // --- Step 1b: Rooted/feared override — force defend ---
+  for (const s of pState) {
+    if (s.hp <= 0) continue;
+    const isRooted = input.participants[pState.indexOf(s)]?.activeEffects?.some(
+      e => e.stat === 'rooted' && e.roundsRemaining > 0,
+    );
+    if (isRooted) {
+      const defendDef = playerActionDefs['defend'];
+      if (defendDef) {
+        s.actionId = 'defend';
+        s.actionDef = defendDef;
+        s.wasExhausted = false;
+      }
+    }
+  }
+
   // --- Step 2: Apply taunts ---
   for (const s of pState) {
     if (s.hp <= 0 || !s.wasExhausted || !s.exhaustedReason || !s.intendedActionId) continue;
