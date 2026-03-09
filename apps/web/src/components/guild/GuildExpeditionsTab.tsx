@@ -305,6 +305,7 @@ export function GuildExpeditionsTab({
           onRecover={handleRecover}
           onForceRound={handleForceRound}
           onSetTarget={handleSetTarget}
+          onRefresh={loadExpedition}
           onExpired={loadExpedition}
         />
       );
@@ -492,6 +493,7 @@ function InProgressView({
   onRecover,
   onForceRound,
   onSetTarget,
+  onRefresh,
   onExpired,
 }: {
   expedition: ExpeditionData;
@@ -502,6 +504,7 @@ function InProgressView({
   onRecover: () => void;
   onForceRound: () => void;
   onSetTarget: (targetMobId: string | null) => void;
+  onRefresh: () => void;
   onExpired: () => void;
 }) {
   const roomBadge = roomTypeBadge(expedition.currentRoomType);
@@ -565,20 +568,26 @@ function InProgressView({
           <Countdown expiresAt={expedition.nextRoundAt} onExpired={onExpired} />
         </div>
 
-        {isOfficer && expedition.nextRoundAt && (
-          <div className="mt-3 pt-2 border-t border-[var(--rpg-border)]">
-            <PixelButton
-              size="sm"
-              variant="danger"
-              onClick={onForceRound}
-              disabled={actionLoading}
-            >
-              {actionLoading ? 'Resolving...' : 'Force Next Round'}
-            </PixelButton>
-            <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-1">
-              Skip wait — resolve next round now
-            </p>
-          </div>
+        <div className="mt-3 pt-2 border-t border-[var(--rpg-border)] flex gap-2 items-start">
+          <PixelButton size="sm" onClick={onRefresh}>
+            Refresh
+          </PixelButton>
+          {isOfficer && expedition.nextRoundAt && (
+            <div>
+              <PixelButton
+                size="sm"
+                variant="danger"
+                onClick={onForceRound}
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Resolving...' : 'Force Next Round'}
+              </PixelButton>
+              <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-1">
+                Skip wait — resolve next round now
+              </p>
+            </div>
+          )}
+        </div>
         )}
       </PixelCard>
 
