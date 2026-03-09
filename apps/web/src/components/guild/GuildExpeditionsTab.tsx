@@ -124,6 +124,20 @@ function HpBar({ current, max, label, color }: { current: number; max: number; l
   );
 }
 
+function EffectBadge({ name, roundsRemaining, isDebuff }: { name: string; roundsRemaining: number; isDebuff: boolean }) {
+  return (
+    <span
+      className={`text-[8px] px-1 py-0 rounded ${
+        isDebuff
+          ? 'bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]'
+          : 'bg-[var(--rpg-green-light)]/20 text-[var(--rpg-green-light)]'
+      }`}
+    >
+      {name} ({roundsRemaining})
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -700,6 +714,13 @@ function InProgressView({
                     label="HP"
                     color={mob.hp <= mob.maxHp * 0.25 ? 'var(--rpg-red)' : 'var(--rpg-green-light)'}
                   />
+                  {mob.activeEffects?.length > 0 && (
+                    <div className="flex flex-wrap gap-0.5 mt-0.5">
+                      {mob.activeEffects.map((eff, idx) => (
+                        <EffectBadge key={idx} name={eff.name} roundsRemaining={eff.roundsRemaining} isDebuff={true} />
+                      ))}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -1061,6 +1082,14 @@ function MemberList({
                   </span>
                 )}
               </div>
+              {m.activeEffects?.length > 0 && (
+                <div className="flex flex-wrap gap-0.5">
+                  {m.activeEffects.map((eff, idx) => {
+                    const isDebuff = eff.stat === 'potionSickness' || (eff.modifier ?? 0) < 0;
+                    return <EffectBadge key={idx} name={eff.name} roundsRemaining={eff.roundsRemaining} isDebuff={isDebuff} />;
+                  })}
+                </div>
+              )}
               {showResources && (
                 <div className="space-y-0.5">
                   <HpBar
