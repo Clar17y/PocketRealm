@@ -1359,14 +1359,20 @@ export const EXPEDITION_CONSTANTS = {
     event: [3, 4] as const,
   } as const,
   SIGNUP_WINDOW_MS: 10 * 60 * 1000,
-  ROUND_INTERVAL_MS: 5 * 60 * 1000,
+  ROUND_INTERVAL_BY_ROOM_TYPE: {
+    trash: 2 * 60 * 1000,
+    elite: 2 * 60 * 1000,
+    mini_boss: 3 * 60 * 1000,
+    event: 2 * 60 * 1000,
+    final_boss: 3 * 60 * 1000,
+  } as Record<string, number>,
   REST_DURATION_MS: 5 * 60 * 1000,
   REST_HP_REGEN: 0.20,
   REST_STAMINA_REGEN: 0.30,
   REST_MANA_REGEN: 0.30,
   EVENT_DOT_PERCENT: 0.03,
   WEEKLY_COOLDOWN_MS: 7 * 24 * 60 * 60 * 1000,
-  BETWEEN_EXPEDITION_COOLDOWN_MS: 24 * 60 * 60 * 1000,
+  BETWEEN_EXPEDITION_COOLDOWN_MS: 18 * 60 * 60 * 1000,
   SIGNUP_TURN_COST: 300,
   TOKENS_PER_ROOM: {
     trash: 5,
@@ -1389,7 +1395,7 @@ export const EXPEDITION_CONSTANTS = {
   KO_RECOVERY_TURN_COST: 500,
   BOSS_PHASE_THRESHOLDS: [0.50, 0.25] as const,
   SOULBOUND_DURABILITY_MULTIPLIER: 2,
-  MAX_WIPES_PER_EXPEDITION: 5,
+  MAX_ATTEMPTS: 3,
 } as const;
 
 export const EXPEDITION_TOKEN_CONSTANTS = {
