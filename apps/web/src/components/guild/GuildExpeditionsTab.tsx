@@ -167,6 +167,7 @@ export function GuildExpeditionsTab({
   onTurnsChanged,
   onRefresh,
 }: GuildExpeditionsTabProps) {
+  const [subTab, setSubTab] = useState<'active' | 'history'>('active');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [expedition, setExpedition] = useState<ExpeditionData | null>(null);
@@ -191,22 +192,8 @@ export function GuildExpeditionsTab({
           setExpedition(res.data.expedition);
         }
       } else {
-        // No active expedition — check if one recently finished (show results briefly)
-        const history = await getExpeditionHistory(1);
-        const latest = history.data?.expeditions?.[0];
-        if (latest?.completedAt && Date.now() - new Date(latest.completedAt).getTime() < 3600_000) {
-          const detail = await getExpeditionStatus(latest.id);
-          if (detail.data) {
-            setExpedition(detail.data.expedition);
-            setMembers(detail.data.members);
-          } else {
-            setExpedition(null);
-            setMembers([]);
-          }
-        } else {
-          setExpedition(null);
-          setMembers([]);
-        }
+        setExpedition(null);
+        setMembers([]);
       }
       // Fetch cooldowns when no active expedition (for IdleView)
       if (!res.data?.expedition) {
@@ -355,54 +342,89 @@ export function GuildExpeditionsTab({
     }
   };
 
-  if (loading) return <LoadingCard />;
+  const tabBar = (
+    <div className="flex gap-1 mb-3">
+      <button
+        onClick={() => setSubTab('active')}
+        className={`px-3 py-1 text-xs rounded ${subTab === 'active' ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'}`}
+      >
+        Active
+      </button>
+      <button
+        onClick={() => setSubTab('history')}
+        className={`px-3 py-1 text-xs rounded ${subTab === 'history' ? 'bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'}`}
+      >
+        History
+      </button>
+    </div>
+  );
 
-  // No active expedition
+  if (subTab === 'history') {
+    return (
+      <>
+        {tabBar}
+        <HistoryView guildId={guildId} playerId={playerId} />
+      </>
+    );
+  }
+
+  // Active tab
+  if (loading) return <>{tabBar}<LoadingCard /></>;
+
   if (!expedition) {
-    return <IdleView isOfficer={isOfficer} characterLevel={characterLevel} actionLoading={actionLoading} onLaunch={handleLaunch} cooldowns={cooldowns} />;
+    return (
+      <>
+        {tabBar}
+        <IdleView isOfficer={isOfficer} characterLevel={characterLevel} actionLoading={actionLoading} onLaunch={handleLaunch} cooldowns={cooldowns} />
+      </>
+    );
   }
 
-  // Render based on status
-  switch (expedition.status) {
-    case 'recruiting':
-      return (
-        <RecruitingView
-          expedition={expedition}
-          members={members}
-          playerId={playerId}
-          characterLevel={characterLevel}
-          actionLoading={actionLoading}
-          isOfficer={isOfficer}
-          onSignup={handleSignup}
-          onForceStart={handleForceStart}
-          onAbandon={handleAbandon}
-          onExpired={loadExpedition}
-        />
-      );
-    case 'in_progress':
-      return (
-        <InProgressView
-          expedition={expedition}
-          members={members}
-          playerId={playerId}
-          actionLoading={actionLoading}
-          isOfficer={isOfficer}
-          onRecover={handleRecover}
-          onForceRound={handleForceRound}
-          onSetTarget={handleSetTarget}
-          onSetHealTarget={handleSetHealTarget}
-          onAbandon={handleAbandon}
-          onRefresh={loadExpedition}
-          onExpired={loadExpedition}
-        />
-      );
-    case 'completed':
-      return <CompletedView expedition={expedition} members={members} onDismiss={() => { setExpedition(null); setMembers([]); }} />;
-    case 'failed':
-      return <FailedView expedition={expedition} members={members} onDismiss={() => { setExpedition(null); setMembers([]); }} />;
-    default:
-      return null;
-  }
+  const activeContent = (() => {
+    switch (expedition.status) {
+      case 'recruiting':
+        return (
+          <RecruitingView
+            expedition={expedition}
+            members={members}
+            playerId={playerId}
+            characterLevel={characterLevel}
+            actionLoading={actionLoading}
+            isOfficer={isOfficer}
+            onSignup={handleSignup}
+            onForceStart={handleForceStart}
+            onAbandon={handleAbandon}
+            onExpired={loadExpedition}
+          />
+        );
+      case 'in_progress':
+        return (
+          <InProgressView
+            expedition={expedition}
+            members={members}
+            playerId={playerId}
+            actionLoading={actionLoading}
+            isOfficer={isOfficer}
+            onRecover={handleRecover}
+            onForceRound={handleForceRound}
+            onSetTarget={handleSetTarget}
+            onSetHealTarget={handleSetHealTarget}
+            onAbandon={handleAbandon}
+            onRefresh={loadExpedition}
+            onExpired={loadExpedition}
+          />
+        );
+      default:
+        return null;
+    }
+  })();
+
+  return (
+    <>
+      {tabBar}
+      {activeContent}
+    </>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1008,121 +1030,132 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
 }
 
 // ---------------------------------------------------------------------------
-// Completed View
+// History View
 // ---------------------------------------------------------------------------
 
-function CompletedView({ expedition, members, onDismiss }: { expedition: ExpeditionData; members: ExpeditionMemberData[]; onDismiss: () => void }) {
-  const sorted = [...members].sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing));
+function HistoryView({ guildId, playerId }: { guildId: string; playerId: string | null }) {
+  const [loading, setLoading] = useState(true);
+  const [expeditions, setExpeditions] = useState<ExpeditionData[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedDetail, setExpandedDetail] = useState<{ expedition: ExpeditionData; members: ExpeditionMemberData[] } | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    getExpeditionHistory(page).then(res => {
+      if (res.data) {
+        setExpeditions(res.data.expeditions);
+        setTotalPages(res.data.pagination.totalPages);
+      }
+    }).finally(() => setLoading(false));
+  }, [page]);
+
+  const handleExpand = async (id: string) => {
+    if (expandedId === id) {
+      setExpandedId(null);
+      setExpandedDetail(null);
+      return;
+    }
+    setExpandedId(id);
+    const detail = await getExpeditionStatus(id);
+    if (detail.data) setExpandedDetail(detail.data);
+  };
+
+  if (loading) return <LoadingCard />;
+
+  if (expeditions.length === 0) {
+    return (
+      <PixelCard>
+        <p className="text-xs text-[var(--rpg-text-secondary)] text-center py-4">No expedition history yet.</p>
+      </PixelCard>
+    );
+  }
 
   return (
-    <div className="space-y-3">
-      <PixelCard>
-        <div className="text-center space-y-2 py-2">
-          <p className="text-sm font-bold text-[var(--rpg-green-light)]">Expedition Complete!</p>
-          <p className="text-xs text-[var(--rpg-text-secondary)]">
-            Tier {expedition.tier} — {expedition.totalRooms} rooms cleared
-          </p>
-          {expedition.completedAt && (
-            <p className="text-xs text-[var(--rpg-text-secondary)]">
-              Completed: {new Date(expedition.completedAt).toLocaleString()}
-            </p>
+    <div className="space-y-2">
+      {expeditions.map(exp => (
+        <PixelCard key={exp.id}>
+          <button
+            onClick={() => handleExpand(exp.id)}
+            className="w-full text-left"
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-xs font-bold text-[var(--rpg-text-primary)]">
+                  Tier {exp.tier}
+                </span>
+                <span className={`ml-2 text-[10px] px-1.5 py-0 rounded ${
+                  exp.status === 'completed'
+                    ? 'bg-[var(--rpg-green-light)]/20 text-[var(--rpg-green-light)]'
+                    : 'bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]'
+                }`}>
+                  {exp.status === 'completed' ? 'Completed' : 'Failed'}
+                </span>
+              </div>
+              <span className="text-[10px] text-[var(--rpg-text-secondary)]">
+                {expandedId === exp.id ? '\u25B2' : '\u25BC'}
+              </span>
+            </div>
+            <div className="flex gap-3 mt-1 text-[10px] text-[var(--rpg-text-secondary)]">
+              <span>Room {exp.currentRoom + 1}/{exp.totalRooms}</span>
+              {exp.wipeCount > 0 && <span>{exp.wipeCount} wipe{exp.wipeCount > 1 ? 's' : ''}</span>}
+              {exp.completedAt && <span>{new Date(exp.completedAt).toLocaleDateString()}</span>}
+            </div>
+          </button>
+
+          {expandedId === exp.id && expandedDetail && (
+            <div className="mt-3 pt-2 border-t border-[var(--rpg-border)] space-y-3">
+              {/* Contributions */}
+              {expandedDetail.members.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
+                  <div className="space-y-0.5">
+                    {[...expandedDetail.members]
+                      .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
+                      .map((m, i) => (
+                        <div key={m.playerId} className="flex justify-between text-xs">
+                          <span className="text-[var(--rpg-text-secondary)]">
+                            <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
+                            {m.username ?? m.playerId.slice(0, 8)}
+                          </span>
+                          <div className="flex gap-2 text-[10px]">
+                            <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
+                            {m.totalHealing > 0 && (
+                              <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
+                            )}
+                            {m.tokensEarned > 0 && (
+                              <span className="text-[var(--rpg-gold)]">{formatNumber(m.tokensEarned)} tokens</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Round logs */}
+              {expandedDetail.expedition.roundLogs.length > 0 && (
+                <RoundLogList logs={expandedDetail.expedition.roundLogs} playerId={playerId} />
+              )}
+            </div>
           )}
-          <PixelButton size="sm" onClick={onDismiss} className="mt-2">
-            Back to Expeditions
+        </PixelCard>
+      ))}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 pt-2">
+          <PixelButton size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>
+            Prev
+          </PixelButton>
+          <span className="text-xs text-[var(--rpg-text-secondary)] self-center">
+            {page} / {totalPages}
+          </span>
+          <PixelButton size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+            Next
           </PixelButton>
         </div>
-      </PixelCard>
-
-      {sorted.length > 0 && (
-        <PixelCard>
-          <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-2">Contributions</h4>
-          <div className="space-y-1">
-            {sorted.map((m, i) => (
-              <div key={m.playerId} className="flex justify-between items-center text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[var(--rpg-gold)] font-bold w-4">{i + 1}.</span>
-                  <span className="text-[var(--rpg-text-primary)]">{m.username ?? m.playerId.slice(0, 8)}</span>
-                </div>
-                <div className="flex gap-3 text-[10px]">
-                  <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
-                  {m.totalHealing > 0 && (
-                    <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
-                  )}
-                  {m.tokensEarned > 0 && (
-                    <span className="text-[var(--rpg-gold)]">{formatNumber(m.tokensEarned)} tokens</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </PixelCard>
-      )}
-
-      {expedition.roundLogs.length > 0 && (
-        <RoundLogList logs={expedition.roundLogs} playerId={null} />
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Failed View
-// ---------------------------------------------------------------------------
-
-function FailedView({ expedition, members, onDismiss }: { expedition: ExpeditionData; members: ExpeditionMemberData[]; onDismiss: () => void }) {
-  const sorted = [...members].sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing));
-
-  return (
-    <div className="space-y-3">
-      <PixelCard>
-        <div className="text-center space-y-2 py-2">
-          <p className="text-sm font-bold text-[var(--rpg-red)]">Expedition Failed</p>
-          <p className="text-xs text-[var(--rpg-text-secondary)]">
-            Tier {expedition.tier} — Reached room {expedition.currentRoom + 1} / {expedition.totalRooms}
-          </p>
-          {expedition.wipeCount > 0 && (
-            <p className="text-xs text-[var(--rpg-text-secondary)]">
-              Failed after {expedition.wipeCount} wipe{expedition.wipeCount > 1 ? 's' : ''} across {expedition.attemptNumber} attempt{expedition.attemptNumber > 1 ? 's' : ''}
-            </p>
-          )}
-          {expedition.participantCount < (TIER_CONFIGS.find((c) => c.tier === expedition.tier)?.minParticipants ?? 0) && (
-            <p className="text-xs text-[var(--rpg-text-secondary)]">
-              Not enough participants joined in time.
-            </p>
-          )}
-          <PixelButton size="sm" onClick={onDismiss} className="mt-2">
-            Back to Expeditions
-          </PixelButton>
-        </div>
-      </PixelCard>
-
-      {sorted.length > 0 && sorted.some(m => m.totalDamage > 0 || m.totalHealing > 0) && (
-        <PixelCard>
-          <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-2">Contributions</h4>
-          <div className="space-y-1">
-            {sorted.map((m, i) => (
-              <div key={m.playerId} className="flex justify-between items-center text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[var(--rpg-text-secondary)] font-bold w-4">{i + 1}.</span>
-                  <span className="text-[var(--rpg-text-primary)]">{m.username ?? m.playerId.slice(0, 8)}</span>
-                </div>
-                <div className="flex gap-3 text-[10px]">
-                  <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
-                  {m.totalHealing > 0 && (
-                    <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
-                  )}
-                  {m.tokensEarned > 0 && (
-                    <span className="text-[var(--rpg-gold)]">{formatNumber(m.tokensEarned)} tokens</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </PixelCard>
-      )}
-
-      {expedition.roundLogs.length > 0 && (
-        <RoundLogList logs={expedition.roundLogs} playerId={null} />
       )}
     </div>
   );
