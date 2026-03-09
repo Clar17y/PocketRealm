@@ -469,7 +469,7 @@ export async function forceStartExpedition(
     data: {
       status: 'in_progress',
       roomStartSnapshot: JSON.parse(JSON.stringify(snapshot)),
-      nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.ROUND_INTERVAL_MS),
+      nextRoundAt: new Date(Date.now() + getRoundInterval(rooms, 0)),
     },
   });
 
@@ -524,6 +524,16 @@ export async function getExpeditionStatus(
     expedition: toExpeditionData(expedition),
     members: members.map(toExpeditionMemberData),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Round Interval Helper
+// ---------------------------------------------------------------------------
+
+function getRoundInterval(rooms: ExpeditionRoomDefinition[], currentRoom: number): number {
+  const roomType = rooms[currentRoom]?.roomType ?? 'trash';
+  return EXPEDITION_CONSTANTS.ROUND_INTERVAL_BY_ROOM_TYPE[roomType]
+    ?? EXPEDITION_CONSTANTS.ROUND_INTERVAL_BY_ROOM_TYPE.trash;
 }
 
 // ---------------------------------------------------------------------------
@@ -623,7 +633,7 @@ export async function checkAndResolveExpeditionRounds(io: unknown): Promise<void
           data: {
             status: 'in_progress',
             roomStartSnapshot: JSON.parse(JSON.stringify(snapshot)),
-            nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.ROUND_INTERVAL_MS),
+            nextRoundAt: new Date(Date.now() + getRoundInterval(rooms, 0)),
           },
         });
 
@@ -812,7 +822,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
       data: {
         roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),
         roundSummaries: JSON.parse(JSON.stringify(newSummaries)),
-        nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.ROUND_INTERVAL_MS),
+        nextRoundAt: new Date(Date.now() + getRoundInterval(rooms, expedition.currentRoom)),
       },
     });
   }
