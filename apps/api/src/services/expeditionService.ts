@@ -55,6 +55,7 @@ interface GuildExpeditionRow {
   startedAt: Date;
   completedAt: Date | null;
   launchedBy: string;
+  wipeCount?: number;
   _count?: { members: number };
 }
 
@@ -82,6 +83,8 @@ function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
     startedAt: exp.startedAt.toISOString(),
     completedAt: exp.completedAt?.toISOString() ?? null,
     launchedBy: exp.launchedBy,
+    wipeCount: exp.wipeCount ?? 0,
+    attemptNumber: (exp.wipeCount ?? 0) + 1,
     participantCount: exp._count?.members ?? 0,
     mobsRemaining: aliveMobs.length,
     currentRoomMobs: aliveMobs.map(m => ({
@@ -180,6 +183,53 @@ export async function getExpeditionCooldowns(guildId: string): Promise<{
 }
 
 // ---------------------------------------------------------------------------
+// Mob Pool Helper
+// ---------------------------------------------------------------------------
+
+async function fetchMobPool(tier: number): Promise<MobPoolEntry[]> {
+  const tierLevelMin = EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER[tier - 1];
+  const tierLevelMax = tierLevelMin + 10;
+  const mobTemplates = await prisma.mobTemplate.findMany({
+    where: { level: { gte: tierLevelMin, lte: tierLevelMax } },
+  });
+  if (mobTemplates.length === 0) {
+    throw new AppError(500, 'No mobs available for this tier', 'NO_MOBS');
+  }
+  return mobTemplates.map((m: {
+    id: string;
+    name: string;
+    level: number | null;
+    hp: number;
+    accuracy: number;
+    defence: number;
+    magicDefence: number;
+    evasion: number;
+    damageMin: number;
+    damageMax: number;
+    damageType: string | null;
+  }) => ({
+    mobTemplateId: m.id,
+    name: m.name,
+    level: m.level ?? 1,
+    hp: m.hp,
+    stats: {
+      hp: m.hp,
+      maxHp: m.hp,
+      attack: m.accuracy,
+      accuracy: m.accuracy,
+      defence: m.defence,
+      magicDefence: m.magicDefence,
+      dodge: m.evasion,
+      evasion: 0,
+      damageMin: m.damageMin,
+      damageMax: m.damageMax,
+      speed: 0,
+      damageType: (m.damageType as 'physical' | 'magic') ?? 'physical',
+    },
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // Launch Expedition
 // ---------------------------------------------------------------------------
 
@@ -239,52 +289,8 @@ export async function launchExpedition(
     throw new AppError(400, 'Insufficient guild treasury', 'INSUFFICIENT_TREASURY');
   }
 
-  // Fetch mob pool for room generation
-  const tierLevelMin = EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER[tier - 1];
-  const tierLevelMax = tierLevelMin + 10;
-  const mobTemplates = await prisma.mobTemplate.findMany({
-    where: {
-      level: { gte: tierLevelMin, lte: tierLevelMax },
-    },
-  });
-  if (mobTemplates.length === 0) {
-    throw new AppError(500, 'No mobs available for this tier', 'NO_MOBS');
-  }
-
-  const mobPool: MobPoolEntry[] = mobTemplates.map((m: {
-    id: string;
-    name: string;
-    level: number | null;
-    hp: number;
-    accuracy: number;
-    defence: number;
-    magicDefence: number;
-    evasion: number;
-    damageMin: number;
-    damageMax: number;
-    damageType: string | null;
-  }) => ({
-    mobTemplateId: m.id,
-    name: m.name,
-    level: m.level ?? 1,
-    hp: m.hp,
-    stats: {
-      hp: m.hp,
-      maxHp: m.hp,
-      attack: m.accuracy,
-      accuracy: m.accuracy,
-      defence: m.defence,
-      magicDefence: m.magicDefence,
-      dodge: m.evasion,
-      evasion: 0,
-      damageMin: m.damageMin,
-      damageMax: m.damageMax,
-      speed: 0,
-      damageType: (m.damageType as 'physical' | 'magic') ?? 'physical',
-    },
-  }));
-
-  // Generate rooms
+  // Fetch mob pool and generate rooms
+  const mobPool = await fetchMobPool(tier);
   const rooms = generateExpeditionRooms(tier - 1, mobPool);
 
   // Transaction: deduct treasury + create expedition + log
@@ -909,98 +915,144 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
 export async function handleWipe(expeditionId: string): Promise<void> {
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id: expeditionId },
+    include: { members: { select: { playerId: true, totalDamage: true, totalHealing: true } } },
   });
   if (!expedition) return;
 
-  // Count total wipes from round logs (current wipe is already stored before this call)
-  const logs = (Array.isArray(expedition.roundSummaries)
+  const newWipeCount = (expedition.wipeCount ?? 0) + 1;
+
+  // Archive current attempt logs (round logs, room reached, participant stats)
+  const roundLogs = (Array.isArray(expedition.roundSummaries)
     ? expedition.roundSummaries
     : []) as unknown as ExpeditionRoundLog[];
-  const wipeCount = logs.filter(l => l.phases?.outcome?.wipe).length;
+  const attemptLog = {
+    attempt: newWipeCount,
+    roomReached: expedition.currentRoom,
+    roundLogs,
+    participants: expedition.members.map(m => ({
+      playerId: m.playerId,
+      totalDamage: Number(m.totalDamage),
+      totalHealing: Number(m.totalHealing),
+    })),
+  };
+  const existingAttemptLogs = Array.isArray(expedition.expeditionAttemptLogs)
+    ? expedition.expeditionAttemptLogs
+    : [];
+  const newAttemptLogs = [...existingAttemptLogs, attemptLog];
 
-  if (wipeCount >= EXPEDITION_CONSTANTS.MAX_WIPES_PER_EXPEDITION) {
+  if (newWipeCount >= EXPEDITION_CONSTANTS.MAX_ATTEMPTS) {
+    // Auto-abandon: max attempts reached
     await prisma.guildExpedition.update({
       where: { id: expeditionId },
-      data: { status: 'failed', completedAt: new Date(), nextRoundAt: null },
+      data: {
+        wipeCount: newWipeCount,
+        expeditionAttemptLogs: JSON.parse(JSON.stringify(newAttemptLogs)),
+        status: 'failed',
+        completedAt: new Date(),
+        nextRoundAt: null,
+      },
     });
     await addGuildLog(
       expedition.guildId,
       'expedition_failed',
-      `Expedition failed after ${wipeCount} wipes`,
-      { expeditionId, wipeCount },
+      `Expedition failed after ${newWipeCount} attempts`,
+      { expeditionId, wipeCount: newWipeCount },
     );
     return;
   }
 
-  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
-  const snapshot = expedition.roomStartSnapshot as {
-    mobs: ExpeditionRoomDefinition['mobs'];
-    members: { playerId: string; currentHp: number; currentStamina: number; currentMana: number }[];
-  } | null;
+  // Reset to recruiting: delete all members, regenerate rooms, clear round summaries
+  const mobPool = await fetchMobPool(expedition.tier);
+  const rooms = generateExpeditionRooms(expedition.tier - 1, mobPool);
 
-  // Restore mob HP from snapshot
-  if (snapshot?.mobs) {
-    const updatedRooms = [...rooms];
-    updatedRooms[expedition.currentRoom] = {
-      ...rooms[expedition.currentRoom],
-      mobs: snapshot.mobs,
-    };
-    await prisma.guildExpedition.update({
-      where: { id: expeditionId },
-      data: {
-        roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),
-        roundNumber: 0,
-        nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.REST_DURATION_MS),
-      },
-    });
-  } else {
-    await prisma.guildExpedition.update({
-      where: { id: expeditionId },
-      data: {
-        roundNumber: 0,
-        nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.REST_DURATION_MS),
-      },
-    });
-  }
+  await prisma.guildExpeditionMember.deleteMany({ where: { expeditionId } });
 
-  // Restore player HP/resources from snapshot and reset KO/room tracking
-  if (snapshot?.members) {
-    await Promise.all(
-      snapshot.members.map(m =>
-        prisma.guildExpeditionMember.updateMany({
-          where: { expeditionId, playerId: m.playerId },
-          data: {
-            currentHp: m.currentHp,
-            currentStamina: m.currentStamina,
-            currentMana: m.currentMana,
-            isKnockedOut: false,
-            roomDamage: 0,
-            roomHealing: 0,
-            threatValue: 0,
-            targetMobId: null,
-          },
-        }),
-      ),
-    );
-  } else {
-    // No snapshot, just reset KO flags
-    await prisma.guildExpeditionMember.updateMany({
-      where: { expeditionId },
-      data: {
-        isKnockedOut: false,
-        roomDamage: 0,
-        roomHealing: 0,
-        threatValue: 0,
-        targetMobId: null,
-      },
-    });
-  }
+  await prisma.guildExpedition.update({
+    where: { id: expeditionId },
+    data: {
+      wipeCount: newWipeCount,
+      expeditionAttemptLogs: JSON.parse(JSON.stringify(newAttemptLogs)),
+      status: 'recruiting',
+      currentRoom: 0,
+      totalRooms: rooms.length,
+      roomDefinitions: JSON.parse(JSON.stringify(rooms)),
+      roomStartSnapshot: null,
+      roundNumber: 0,
+      roundSummaries: null,
+      nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.SIGNUP_WINDOW_MS),
+    },
+  });
 
   await addGuildLog(
     expedition.guildId,
     'expedition_wipe',
-    `Expedition wipe in room ${expedition.currentRoom + 1}`,
-    { expeditionId, roomIndex: expedition.currentRoom },
+    `Expedition wipe in room ${expedition.currentRoom + 1} (attempt ${newWipeCount}/${EXPEDITION_CONSTANTS.MAX_ATTEMPTS})`,
+    { expeditionId, roomIndex: expedition.currentRoom, attempt: newWipeCount },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Abandon Expedition
+// ---------------------------------------------------------------------------
+
+export async function abandonExpedition(expeditionId: string, playerId: string): Promise<void> {
+  const [expedition, membership] = await Promise.all([
+    prisma.guildExpedition.findUnique({
+      where: { id: expeditionId },
+      include: { members: { select: { playerId: true, totalDamage: true, totalHealing: true } } },
+    }),
+    prisma.guildMember.findUnique({
+      where: { playerId },
+      select: { guildId: true, role: true },
+    }),
+  ]);
+
+  if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
+  if (!membership || membership.guildId !== expedition.guildId) {
+    throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
+  }
+  if (membership.role === 'member') {
+    throw new AppError(403, 'Officer or leader role required', 'INSUFFICIENT_ROLE');
+  }
+  if (expedition.status !== 'recruiting' && expedition.status !== 'in_progress') {
+    throw new AppError(400, 'Expedition is not active', 'NOT_ACTIVE');
+  }
+
+  // Archive current round logs if any
+  const roundLogs = (Array.isArray(expedition.roundSummaries)
+    ? expedition.roundSummaries
+    : []) as unknown as ExpeditionRoundLog[];
+  const attemptLog = {
+    attempt: (expedition.wipeCount ?? 0) + 1,
+    roomReached: expedition.currentRoom,
+    roundLogs,
+    participants: expedition.members.map(m => ({
+      playerId: m.playerId,
+      totalDamage: Number(m.totalDamage),
+      totalHealing: Number(m.totalHealing),
+    })),
+    abandoned: true,
+  };
+  const existingAttemptLogs = Array.isArray(expedition.expeditionAttemptLogs)
+    ? expedition.expeditionAttemptLogs
+    : [];
+  const newAttemptLogs = [...existingAttemptLogs, attemptLog];
+
+  await prisma.guildExpedition.update({
+    where: { id: expeditionId },
+    data: {
+      expeditionAttemptLogs: JSON.parse(JSON.stringify(newAttemptLogs)),
+      status: 'failed',
+      completedAt: new Date(),
+      nextRoundAt: null,
+    },
+  });
+
+  await addGuildLog(
+    expedition.guildId,
+    'expedition_failed',
+    'Expedition abandoned by officer',
+    { expeditionId },
   );
 }
 

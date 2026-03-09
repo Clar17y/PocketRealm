@@ -13,6 +13,7 @@ import {
   forceStartExpedition,
   resolveExpeditionRound,
   setTargetMob,
+  abandonExpedition,
 } from '../services/expeditionService';
 import {
   getShopItems,
@@ -229,6 +230,13 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
     currentRoom: updated?.currentRoom,
     roundNumber: updated?.roundNumber,
   });
+}));
+
+// POST /:id/abandon
+expeditionRouter.post('/:id/abandon', asyncHandler(async (req, res) => {
+  const { id } = expeditionIdSchema.parse(req.params);
+  await abandonExpedition(id, req.player!.playerId);
+  res.json({ data: { success: true } });
 }));
 
 // PATCH /:id/target
