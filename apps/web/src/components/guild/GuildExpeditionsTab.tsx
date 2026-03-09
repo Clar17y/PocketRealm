@@ -444,9 +444,9 @@ function IdleView({
   onLaunch: (tier: number) => void;
   cooldowns: ExpeditionCooldownInfo | null;
 }) {
-  // Determine cooldown reason per tier
+  // Determine cooldown reason per tier (null cooldowns = still loading, disable buttons)
   function getCooldownReason(tier: number): string | null {
-    if (!cooldowns) return null;
+    if (!cooldowns) return 'Loading...';
     if (cooldowns.hasActiveExpedition) return 'Expedition active';
     const weeklyExpiry = cooldowns.weeklyCooldowns?.[tier];
     if (weeklyExpiry && new Date(weeklyExpiry).getTime() > Date.now()) {
