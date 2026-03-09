@@ -58,10 +58,10 @@ export function getAllMobTemplates() {
   return [
     // ── Forest Edge (diff 1) ──────────────────────────────────────────────
     mob({ id: m.forestRat, name: 'Forest Rat', zoneId: z.forestEdge, level: 1, hp: 12, accuracy: 6, defence: 2, magicDefence: 1, evasion: 3, damageMin: 1, damageMax: 3, xpReward: 6, explorationTier: 1 }),
-    mob({ id: m.fieldMouse, name: 'Field Mouse', zoneId: z.forestEdge, level: 1, hp: 8, accuracy: 5, defence: 1, magicDefence: 0, evasion: 5, damageMin: 1, damageMax: 2, xpReward: 4, explorationTier: 1 }),
+    mob({ id: m.fieldMouse, name: 'Field Mouse', zoneId: z.forestEdge, level: 1, hp: 8, accuracy: 5, defence: 1, magicDefence: 0, evasion: 2, damageMin: 1, damageMax: 2, xpReward: 4, explorationTier: 1 }),
     mob({ id: m.giantRat, name: 'Giant Rat', zoneId: z.forestEdge, level: 2, hp: 22, accuracy: 8, defence: 5, magicDefence: 2, evasion: 3, damageMin: 2, damageMax: 5, xpReward: 14, explorationTier: 2 }),
     mob({ id: m.ratKing, name: 'Rat King', zoneId: z.forestEdge, level: 3, hp: 40, accuracy: 10, defence: 7, magicDefence: 3, evasion: 2, damageMin: 3, damageMax: 7, xpReward: 30, spellPattern: [spell(3, 'Frenzy', { damage: 6 })], explorationTier: 3 }),
-    mob({ id: m.forestSpider, name: 'Forest Spider', zoneId: z.forestEdge, level: 1, hp: 10, accuracy: 7, defence: 2, magicDefence: 1, evasion: 4, damageMin: 1, damageMax: 3, xpReward: 7, explorationTier: 1 }),
+    mob({ id: m.forestSpider, name: 'Forest Spider', zoneId: z.forestEdge, level: 1, hp: 10, accuracy: 7, defence: 2, magicDefence: 1, evasion: 3, damageMin: 1, damageMax: 3, xpReward: 7, explorationTier: 1 }),
     mob({ id: m.webSpinner, name: 'Web Spinner', zoneId: z.forestEdge, level: 1, hp: 14, accuracy: 6, defence: 3, magicDefence: 1, evasion: 3, damageMin: 1, damageMax: 4, xpReward: 8, explorationTier: 1 }),
     mob({ id: m.venomousSpider, name: 'Venomous Spider', zoneId: z.forestEdge, level: 2, hp: 20, accuracy: 9, defence: 4, magicDefence: 2, evasion: 5, damageMin: 2, damageMax: 6, xpReward: 16, spellPattern: [spell(4, 'Venom Bite', { damage: 5 })], explorationTier: 2 }),
     mob({ id: m.broodMother, name: 'Brood Mother', zoneId: z.forestEdge, level: 3, hp: 45, accuracy: 10, defence: 8, magicDefence: 3, evasion: 3, damageMin: 3, damageMax: 8, xpReward: 35, spellPattern: [spell(3, 'Web Spit', { damage: 4 }), spell(6, 'Poison Spray', { damage: 8 })], explorationTier: 3 }),
@@ -182,4 +182,3 @@ export function getAllMobTemplates() {
     mob({ id: m.eldritchAbomination, name: 'Eldritch Abomination', zoneId: z.sunkenRuins, level: 36, hp: 140, accuracy: 24, defence: 28, magicDefence: 32, evasion: 3, damageMin: 10, damageMax: 20, xpReward: 120, spellPattern: [spell(2, 'Madness Aura', { effects: [{ stat: 'accuracy', modifier: -5, duration: 3 }] }), spell(4, 'Void Bolt', { damage: 14 }), spell(6, 'Tentacle Storm', { damage: 18 }), spell(9, 'Consume', { damage: 28 })], damageType: 'magic', explorationTier: 4 }),
   ];
 }
-

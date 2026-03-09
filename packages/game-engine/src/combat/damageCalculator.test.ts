@@ -315,7 +315,7 @@ describe('doesAttackHit', () => {
   });
 
   it('starter accuracy should meet the tutorial hit-rate floor against a Field Mouse profile', () => {
-    expect(hitRate(0, 5)).toBeGreaterThanOrEqual(0.45);
+    expect(hitRate(0, 2)).toBeGreaterThanOrEqual(0.45);
   });
 });
 
