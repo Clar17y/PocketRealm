@@ -14,6 +14,7 @@ import {
   forceNextRound,
   recoverFromExpeditionKO,
   setExpeditionTarget,
+  getExpeditionCooldowns,
 } from '@/lib/api/expedition';
 import type {
   ExpeditionDetailResponse,
@@ -140,6 +141,11 @@ export function GuildExpeditionsTab({
   const [actionLoading, setActionLoading] = useState(false);
   const [expedition, setExpedition] = useState<ExpeditionData | null>(null);
   const [members, setMembers] = useState<ExpeditionMemberData[]>([]);
+  const [cooldowns, setCooldowns] = useState<{
+    weeklyCooldowns: Record<number, string | null>;
+    betweenCooldown: string | null;
+    hasActiveExpedition: boolean;
+  } | null>(null);
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
 
@@ -175,6 +181,13 @@ export function GuildExpeditionsTab({
           setExpedition(null);
           setMembers([]);
         }
+      }
+      // Fetch cooldowns when no active expedition (for IdleView)
+      if (!res.data?.expedition) {
+        try {
+          const cdRes = await getExpeditionCooldowns();
+          if (cdRes.data) setCooldowns(cdRes.data);
+        } catch { /* ignore cooldown fetch errors */ }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load expedition');
@@ -291,7 +304,7 @@ export function GuildExpeditionsTab({
 
   // No active expedition
   if (!expedition) {
-    return <IdleView isOfficer={isOfficer} characterLevel={characterLevel} actionLoading={actionLoading} onLaunch={handleLaunch} />;
+    return <IdleView isOfficer={isOfficer} characterLevel={characterLevel} actionLoading={actionLoading} onLaunch={handleLaunch} cooldowns={cooldowns} />;
   }
 
   // Render based on status
@@ -343,12 +356,32 @@ function IdleView({
   characterLevel,
   actionLoading,
   onLaunch,
+  cooldowns,
 }: {
   isOfficer: boolean;
   characterLevel: number;
   actionLoading: boolean;
   onLaunch: (tier: number) => void;
+  cooldowns: {
+    weeklyCooldowns: Record<number, string | null>;
+    betweenCooldown: string | null;
+    hasActiveExpedition: boolean;
+  } | null;
 }) {
+  // Determine cooldown reason per tier
+  function getCooldownReason(tier: number): string | null {
+    if (!cooldowns) return null;
+    if (cooldowns.hasActiveExpedition) return 'Expedition active';
+    const weeklyExpiry = cooldowns.weeklyCooldowns[tier];
+    if (weeklyExpiry && new Date(weeklyExpiry).getTime() > Date.now()) {
+      return `Weekly: ${formatTimeRemaining(weeklyExpiry)}`;
+    }
+    if (cooldowns.betweenCooldown && new Date(cooldowns.betweenCooldown).getTime() > Date.now()) {
+      return `Cooldown: ${formatTimeRemaining(cooldowns.betweenCooldown)}`;
+    }
+    return null;
+  }
+
   return (
     <div className="space-y-3">
       <PixelCard>
@@ -362,6 +395,8 @@ function IdleView({
         <div className="space-y-2">
           {TIER_CONFIGS.map((cfg) => {
             const levelTooLow = characterLevel < cfg.levelReq;
+            const cooldownReason = getCooldownReason(cfg.tier);
+            const isDisabled = actionLoading || levelTooLow || !!cooldownReason;
             return (
               <PixelCard key={cfg.tier}>
                 <div className="flex justify-between items-start">
@@ -381,11 +416,14 @@ function IdleView({
                       <span className="text-[var(--rpg-text-secondary)]">Rooms:</span>
                       <span className="text-[var(--rpg-text-primary)]">{cfg.totalRooms}</span>
                     </div>
+                    {cooldownReason && (
+                      <p className="mt-1 text-[10px] text-[var(--rpg-gold)]">{cooldownReason}</p>
+                    )}
                   </div>
                   <PixelButton
                     size="sm"
                     onClick={() => onLaunch(cfg.tier)}
-                    disabled={actionLoading || levelTooLow}
+                    disabled={isDisabled}
                   >
                     Launch
                   </PixelButton>
