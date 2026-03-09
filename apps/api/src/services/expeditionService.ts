@@ -1,4 +1,4 @@
-import { prisma } from '@pocketrealm/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import {
   EXPEDITION_CONSTANTS,
   ALWAYS_AVAILABLE_ACTION_IDS,
@@ -1006,9 +1006,9 @@ export async function handleWipe(expeditionId: string): Promise<void> {
       currentRoom: 0,
       totalRooms: rooms.length,
       roomDefinitions: JSON.parse(JSON.stringify(rooms)),
-      roomStartSnapshot: null,
+      roomStartSnapshot: Prisma.DbNull,
       roundNumber: 0,
-      roundSummaries: null,
+      roundSummaries: Prisma.DbNull,
       nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.SIGNUP_WINDOW_MS),
     },
   });
