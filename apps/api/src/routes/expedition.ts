@@ -11,6 +11,7 @@ import {
   signUpForExpedition,
   recoverFromKO,
   forceStartExpedition,
+  checkAndResolveExpeditionRounds,
   resolveExpeditionRound,
   setTargetMob,
   setHealTarget,
@@ -34,11 +35,11 @@ expeditionRouter.get('/cooldowns', asyncHandler(async (req, res) => {
     select: { guildId: true },
   });
   if (!membership) {
-    res.json({ data: { weeklyCooldowns: {}, betweenCooldown: null, hasActiveExpedition: false } });
+    res.json({ weeklyCooldowns: {}, betweenCooldown: null, hasActiveExpedition: false });
     return;
   }
   const cooldowns = await getExpeditionCooldowns(membership.guildId);
-  res.json({ data: cooldowns });
+  res.json(cooldowns);
 }));
 
 // GET /active
@@ -52,6 +53,9 @@ expeditionRouter.get('/active', asyncHandler(async (req, res) => {
     res.json({ expedition: null });
     return;
   }
+
+  // Resolve any due rounds before returning data (same pattern as boss routes)
+  await checkAndResolveExpeditionRounds(null);
 
   const expedition = await getActiveExpedition(membership.guildId);
   res.json({ expedition });
@@ -137,6 +141,10 @@ const expeditionIdSchema = z.object({ id: z.string().uuid() });
 expeditionRouter.get('/:id', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { id } = expeditionIdSchema.parse(req.params);
+
+  // Resolve any due rounds before returning data
+  await checkAndResolveExpeditionRounds(null);
+
   const data = await getExpeditionStatus(id);
   if (!data) {
     throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
