@@ -1,4 +1,7 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalOverlayProps {
   children: ReactNode;
@@ -14,7 +17,7 @@ const opacityClass = {
 } as const;
 
 export function ModalOverlay({ children, opacity = 70, onClose }: ModalOverlayProps) {
-  return (
+  const overlay = (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${opacityClass[opacity]}`}
       onClick={(e) => {
@@ -24,4 +27,7 @@ export function ModalOverlay({ children, opacity = 70, onClose }: ModalOverlayPr
       {children}
     </div>
   );
+
+  if (typeof document === 'undefined') return overlay;
+  return createPortal(overlay, document.body);
 }
