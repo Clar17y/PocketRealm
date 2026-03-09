@@ -94,6 +94,7 @@ function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
       prefix: m.prefix,
       hp: m.hp,
       maxHp: m.maxHp,
+      activeEffects: m.activeEffects ?? [],
     })),
     roundLogs,
   };
@@ -113,6 +114,8 @@ interface GuildExpeditionMemberRow {
   roomDamage: bigint;
   roomHealing: bigint;
   targetMobId: string | null;
+  healTargetPlayerId?: string | null;
+  activeEffects?: unknown;
   tokensEarned: number;
   signedUpAt: Date;
   player?: { username: string };
@@ -134,6 +137,8 @@ function toExpeditionMemberData(m: GuildExpeditionMemberRow): ExpeditionMemberDa
     roomDamage: Number(m.roomDamage),
     roomHealing: Number(m.roomHealing),
     targetMobId: m.targetMobId,
+    activeEffects: (Array.isArray(m.activeEffects) ? m.activeEffects : []) as ExpeditionMemberData['activeEffects'],
+    healTargetPlayerId: m.healTargetPlayerId ?? null,
     tokensEarned: m.tokensEarned,
     signedUpAt: m.signedUpAt.toISOString(),
   };
@@ -1214,5 +1219,43 @@ export async function setTargetMob(
   await prisma.guildExpeditionMember.update({
     where: { expeditionId_playerId: { expeditionId, playerId } },
     data: { targetMobId },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Set Heal Target
+// ---------------------------------------------------------------------------
+
+export async function setHealTarget(
+  expeditionId: string,
+  playerId: string,
+  healTargetPlayerId: string | null,
+): Promise<void> {
+  const [expedition, member] = await Promise.all([
+    prisma.guildExpedition.findUnique({ where: { id: expeditionId } }),
+    prisma.guildExpeditionMember.findUnique({
+      where: { expeditionId_playerId: { expeditionId, playerId } },
+    }),
+  ]);
+
+  if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
+  if (expedition.status !== 'in_progress') throw new AppError(400, 'Expedition is not in progress', 'NOT_IN_PROGRESS');
+  if (!member) throw new AppError(400, 'Not a member of this expedition', 'NOT_A_MEMBER');
+  if (member.isKnockedOut) throw new AppError(400, 'Cannot set heal target while knocked out', 'KNOCKED_OUT');
+
+  // Validate target is a living member of the expedition
+  if (healTargetPlayerId !== null) {
+    const target = await prisma.guildExpeditionMember.findUnique({
+      where: { expeditionId_playerId: { expeditionId, playerId: healTargetPlayerId } },
+    });
+    if (!target) throw new AppError(400, 'Target player is not a member of this expedition', 'INVALID_HEAL_TARGET');
+    if (target.isKnockedOut || target.currentHp <= 0) {
+      throw new AppError(400, 'Cannot target a knocked out player', 'TARGET_KNOCKED_OUT');
+    }
+  }
+
+  await prisma.guildExpeditionMember.update({
+    where: { expeditionId_playerId: { expeditionId, playerId } },
+    data: { healTargetPlayerId },
   });
 }

@@ -13,6 +13,7 @@ import {
   forceStartExpedition,
   resolveExpeditionRound,
   setTargetMob,
+  setHealTarget,
   abandonExpedition,
 } from '../services/expeditionService';
 import {
@@ -247,6 +248,16 @@ expeditionRouter.patch('/:id/target', asyncHandler(async (req, res) => {
   const { targetMobId } = targetSchema.parse(req.body);
   await setTargetMob(id, req.player!.playerId, targetMobId);
   res.json({ success: true });
+}));
+
+// PATCH /:id/heal-target
+const healTargetSchema = z.object({ healTargetPlayerId: z.string().uuid().nullable() });
+
+expeditionRouter.patch('/:id/heal-target', asyncHandler(async (req, res) => {
+  const { id } = expeditionIdSchema.parse(req.params);
+  const { healTargetPlayerId } = healTargetSchema.parse(req.body);
+  await setHealTarget(id, req.player!.playerId, healTargetPlayerId ?? null);
+  res.json({ data: { success: true } });
 }));
 
 // POST /:id/recover

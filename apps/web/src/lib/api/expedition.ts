@@ -94,6 +94,27 @@ export async function setExpeditionTarget(id: string, targetMobId: string | null
   });
 }
 
+export async function setExpeditionHealTarget(id: string, healTargetPlayerId: string | null) {
+  return fetchApi<{ success: boolean }>(
+    `/api/v1/expedition/${id}/heal-target`,
+    { method: 'PATCH', body: JSON.stringify({ healTargetPlayerId }) },
+  );
+}
+
+export async function abandonExpedition(id: string) {
+  return fetchApi<{ success: boolean }>(`/api/v1/expedition/${id}/abandon`, {
+    method: 'POST',
+  });
+}
+
+export async function getExpeditionCooldowns() {
+  return fetchApi<{
+    weeklyCooldowns: Record<number, string | null>;
+    betweenCooldown: string | null;
+    hasActiveExpedition: boolean;
+  }>('/api/v1/expedition/cooldowns');
+}
+
 export async function getExpeditionShop() {
   return fetchApi<ExpeditionShopResponse>('/api/v1/expedition/shop');
 }
