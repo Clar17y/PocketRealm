@@ -45,6 +45,7 @@ export interface RaidRoundInput {
   threatTable: RaidThreatEntry[];
   roundNumber: number;
   environmentalDotPercent?: number;
+  summonPool?: ExpeditionMobState[];
 }
 
 export interface RaidParticipant {

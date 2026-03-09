@@ -79,6 +79,7 @@ function makeInput(overrides: Partial<RaidRoundInput> = {}): RaidRoundInput {
     threatTable: overrides.threatTable ?? initThreatTable(participants.map(p => p.playerId)),
     roundNumber: overrides.roundNumber ?? 1,
     environmentalDotPercent: overrides.environmentalDotPercent,
+    summonPool: overrides.summonPool,
   };
 }
 
@@ -1021,6 +1022,105 @@ describe('resolveRaidRound', () => {
 
       // Dead mob is not included in mobsAfter
       expect(result.mobsAfter.find(m => m.id === 'dead-mob')).toBeUndefined();
+    });
+  });
+
+  describe('boss_summon_adds', () => {
+    it('spawns new mobs from summon pool', () => {
+      const boss = makeMob({
+        id: 'boss1',
+        name: 'Necromancer',
+        hp: 200, maxHp: 200,
+        actionTemplate: [{ actionId: 'boss_summon_adds', targetMode: 'aoe' }],
+      });
+      const summonTemplate = makeMob({
+        id: 'template-skeleton',
+        name: 'Skeleton',
+        hp: 40, maxHp: 40,
+      });
+
+      const result = resolveRaidRound(
+        makeInput({
+          mobs: [boss],
+          roundNumber: 1,
+          summonPool: [summonTemplate],
+        }),
+        alwaysHitRng,
+      );
+
+      // Original boss + 2-3 spawned mobs
+      expect(result.mobsAfter.length).toBeGreaterThanOrEqual(3); // 1 boss + 2 adds minimum
+      expect(result.mobsAfter.length).toBeLessThanOrEqual(4);    // 1 boss + 3 adds maximum
+
+      // Spawned mobs have unique IDs with the summon pattern
+      const spawned = result.mobsAfter.filter(m => m.id.startsWith('mob-summon-'));
+      expect(spawned.length).toBeGreaterThanOrEqual(2);
+      expect(spawned.length).toBeLessThanOrEqual(3);
+
+      // Each spawned mob has full HP and the template name
+      for (const s of spawned) {
+        expect(s.hp).toBe(40);
+        expect(s.maxHp).toBe(40);
+        expect(s.name).toBe('Skeleton');
+        expect(s.activeEffects).toEqual([]);
+      }
+
+      // All spawned IDs are unique
+      const ids = spawned.map(m => m.id);
+      expect(new Set(ids).size).toBe(ids.length);
+
+      // Mob action log contains the summon entry
+      const summonLog = result.roundLog.phases.mobActions.find(
+        a => a.actionId === 'boss_summon_adds',
+      );
+      expect(summonLog).toBeDefined();
+      expect(summonLog!.mobId).toBe('boss1');
+      expect(summonLog!.targets).toEqual([]);
+    });
+
+    it('does nothing when summon pool is empty', () => {
+      const boss = makeMob({
+        id: 'boss1',
+        name: 'Necromancer',
+        hp: 200, maxHp: 200,
+        actionTemplate: [{ actionId: 'boss_summon_adds', targetMode: 'aoe' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({
+          mobs: [boss],
+          roundNumber: 1,
+          summonPool: [],
+        }),
+        alwaysHitRng,
+      );
+
+      // Only the original boss remains, no crash, no spawned mobs
+      expect(result.mobsAfter.length).toBe(1);
+      expect(result.mobsAfter[0].id).toBe('boss1');
+      const spawned = result.mobsAfter.filter(m => m.id.startsWith('mob-summon-'));
+      expect(spawned.length).toBe(0);
+    });
+
+    it('does nothing when summon pool is undefined', () => {
+      const boss = makeMob({
+        id: 'boss1',
+        name: 'Necromancer',
+        hp: 200, maxHp: 200,
+        actionTemplate: [{ actionId: 'boss_summon_adds', targetMode: 'aoe' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({
+          mobs: [boss],
+          roundNumber: 1,
+          // No summonPool provided
+        }),
+        alwaysHitRng,
+      );
+
+      expect(result.mobsAfter.length).toBe(1);
+      expect(result.mobsAfter[0].id).toBe('boss1');
     });
   });
 });

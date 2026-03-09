@@ -413,6 +413,42 @@ export function resolveRaidRound(
       targets: [],
     };
 
+    // boss_summon_adds: spawn new mobs from the summon pool
+    if (templateAction.actionId === 'boss_summon_adds' && input.summonPool && input.summonPool.length > 0) {
+      const spawnCount = 2 + (roll.rollDamage(0, 1) >= 1 ? 1 : 0); // 2-3 adds
+      const spawned: ExpeditionMobState[] = [];
+      for (let s = 0; s < spawnCount && input.summonPool.length > 0; s++) {
+        const poolIndex = roll.rollDamage(0, input.summonPool.length - 1);
+        const template = input.summonPool[poolIndex];
+        const spawnedMob: ExpeditionMobState = {
+          ...template,
+          id: `mob-summon-${input.roundNumber}-${s}`,
+          hp: template.maxHp,
+          activeEffects: [],
+        };
+        spawned.push(spawnedMob);
+        mobState.push(spawnedMob);
+      }
+      logMobActions.push({
+        mobId: mob.id,
+        mobName: mobDisplayName(mob),
+        actionId: 'boss_summon_adds',
+        actionLabel: 'Summon Adds',
+        targetMode: 'aoe',
+        wasTelegraphed: templateAction.isTelegraphed ?? false,
+        targets: [],
+      });
+      mobActionResults.push({
+        mobId: mob.id,
+        actionId: 'boss_summon_adds',
+        targetMode: 'aoe',
+        targetPlayerIds: [],
+        damageDealt: 0,
+        healingDone: 0,
+      });
+      continue;
+    }
+
     // Refresh alive set
     const aliveAfterOffensive = new Set(pState.filter(s => s.hp > 0).map(s => s.playerId));
     if (aliveAfterOffensive.size === 0) {
