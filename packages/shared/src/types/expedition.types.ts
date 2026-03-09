@@ -170,6 +170,7 @@ export interface ExpeditionMemberData {
 // --- Round Log (detailed action-level breakdown) ---
 
 export interface PlayerAttackEntry {
+  entryType?: 'attack';
   playerId: string;
   username: string;
   actionId: string;
@@ -186,6 +187,25 @@ export interface PlayerAttackEntry {
   staminaCost: number;
   manaCost: number;
 }
+
+export type ExhaustedActionReason =
+  | 'stamina'
+  | 'mana'
+  | 'stamina_and_mana'
+  | 'invalid_action';
+
+export interface ExhaustedActionEntry {
+  entryType: 'exhausted';
+  playerId: string;
+  username: string;
+  intendedActionId: string;
+  intendedActionLabel: string;
+  fallbackActionId: string;
+  fallbackActionLabel: string;
+  reason: ExhaustedActionReason;
+}
+
+export type PlayerRoundActionEntry = PlayerAttackEntry | ExhaustedActionEntry;
 
 export interface MobActionLogEntry {
   mobId: string;
@@ -234,7 +254,7 @@ export interface ExpeditionRoundLog {
   round: number;
   roomIndex: number;
   phases: {
-    playerAttacks: PlayerAttackEntry[];
+    playerAttacks: PlayerRoundActionEntry[];
     mobActions: MobActionLogEntry[];
     healing: HealingEntry[];
     outcome: RoundOutcomeEntry;

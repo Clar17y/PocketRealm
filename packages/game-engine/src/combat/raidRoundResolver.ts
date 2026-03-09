@@ -7,6 +7,8 @@ import type {
   RaidRoundResult,
   ExpeditionMobState,
   PlayerAttackEntry,
+  ExhaustedActionEntry,
+  PlayerRoundActionEntry,
   MobActionLogEntry,
   HealingEntry,
   MobTelegraphEntry,
@@ -111,11 +113,14 @@ export function resolveRaidRound(
     isCritical: false,
     targetMobId: null as string | null,
     actionDef: null as ActionDefinition | null,
+    intendedActionId: null as string | null,
+    intendedActionDef: null as ActionDefinition | null,
+    exhaustedReason: null as import('@pocketrealm/shared').ExhaustedActionReason | null,
     healTargetPlayerId: null as string | null,
   }));
 
   // Round log collectors
-  const logPlayerAttacks: PlayerAttackEntry[] = [];
+  const logPlayerAttacks: PlayerRoundActionEntry[] = [];
   const logMobActions: MobActionLogEntry[] = [];
   const logHealing: HealingEntry[] = [];
 
@@ -123,6 +128,22 @@ export function resolveRaidRound(
   resolveParticipantActions(input.participants, pState);
 
   // --- Step 2: Apply taunts ---
+  for (const s of pState) {
+    if (s.hp <= 0 || !s.wasExhausted || !s.exhaustedReason || !s.intendedActionId) continue;
+
+    const exhaustedEntry: ExhaustedActionEntry = {
+      entryType: 'exhausted',
+      playerId: s.playerId,
+      username: getUsername(s.playerId),
+      intendedActionId: s.intendedActionId,
+      intendedActionLabel: actionLabel(s.intendedActionId, playerActionDefs),
+      fallbackActionId: s.actionId,
+      fallbackActionLabel: actionLabel(s.actionId, playerActionDefs),
+      reason: s.exhaustedReason,
+    };
+    logPlayerAttacks.push(exhaustedEntry);
+  }
+
   for (const s of pState) {
     if (s.hp <= 0) continue;
     if (s.actionDef?.tauntDuration && s.actionDef.tauntDuration > 0) {
@@ -181,6 +202,7 @@ export function resolveRaidRound(
       const hits = doesAttackHit(attackRoll, modifier, defenseTarget, 0);
 
       const baseEntry = {
+        entryType: 'attack' as const,
         playerId: p.playerId,
         username: getUsername(p.playerId),
         actionId: s.actionId,

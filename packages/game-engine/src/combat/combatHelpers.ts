@@ -1,6 +1,7 @@
 import type {
   ActionDefinition,
   CombatTemplateSlotData,
+  ExhaustedActionReason,
 } from '@pocketrealm/shared';
 import { resolveAction } from './actionResolver';
 import {
@@ -36,6 +37,9 @@ export interface CombatParticipantState {
   actionId: string;
   wasExhausted: boolean;
   actionDef: ActionDefinition | null;
+  intendedActionId?: string | null;
+  intendedActionDef?: ActionDefinition | null;
+  exhaustedReason?: ExhaustedActionReason | null;
   healTargetPlayerId?: string | null;
 }
 
@@ -85,6 +89,9 @@ export function resolveParticipantActions(
     s.actionId = resolved.action.id;
     s.wasExhausted = resolved.wasExhausted;
     s.actionDef = resolved.action;
+    s.intendedActionId = resolved.intendedActionId ?? resolved.action.id;
+    s.intendedActionDef = resolved.intendedAction ?? resolved.action;
+    s.exhaustedReason = resolved.exhaustedReason ?? null;
   }
 }
 

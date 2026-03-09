@@ -31,6 +31,7 @@ import type {
 } from '@pocketrealm/shared';
 import { EXPEDITION_CONSTANTS, mobDisplayName } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
+import { RoundLogAttackRow } from './guildExpeditionRoundLog';
 
 // ---------------------------------------------------------------------------
 // Tier definitions — derived from shared constants
@@ -891,50 +892,12 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
                     <div>
                       <p className="text-[10px] text-[var(--rpg-text-secondary)] font-bold mb-0.5">Attacks</p>
                       {log.phases.playerAttacks.map((atk, j) => {
-                        const isMe = atk.playerId === playerId;
-                        if (isMe) {
-                          return (
-                            <div key={j} className="text-[10px] ml-2 mb-0.5 p-1 rounded bg-[var(--rpg-surface)]">
-                              <span className="text-[var(--rpg-gold)] font-bold">{atk.actionLabel}</span>
-                              {' → '}
-                              <span className="text-[var(--rpg-text-primary)]">{atk.targetMobName}</span>
-                              {' | '}
-                              <span className="text-[var(--rpg-text-secondary)]">
-                                d20({atk.attackRoll})+{atk.modifier} vs {atk.defenseTarget}
-                              </span>
-                              {' | '}
-                              {atk.hit ? (
-                                <>
-                                  <span className={atk.crit ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-green-light)]'}>
-                                    {atk.crit ? 'CRIT' : 'HIT'}
-                                  </span>
-                                  {atk.totalDamage !== undefined && (
-                                    <span className="text-[var(--rpg-red)]"> {atk.totalDamage} dmg</span>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-[var(--rpg-text-secondary)]">MISS</span>
-                              )}
-                            </div>
-                          );
-                        }
                         return (
-                          <div key={j} className="text-[10px] ml-2 text-[var(--rpg-text-secondary)]">
-                            <span className="text-[var(--rpg-text-primary)]">{atk.username}</span>
-                            {': '}
-                            {atk.actionLabel}
-                            {' → '}
-                            {atk.hit ? (
-                              <>
-                                <span className={atk.crit ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-green-light)]'}>
-                                  {atk.crit ? 'CRIT' : 'HIT'}
-                                </span>
-                                {atk.totalDamage !== undefined && ` ${atk.totalDamage} dmg`}
-                              </>
-                            ) : (
-                              'MISS'
-                            )}
-                          </div>
+                          <RoundLogAttackRow
+                            key={j}
+                            attack={atk}
+                            currentPlayerId={playerId}
+                          />
                         );
                       })}
                     </div>

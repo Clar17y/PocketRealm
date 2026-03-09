@@ -1,4 +1,10 @@
-import type { ActionDefinition, CombatTemplateSlotData, ActiveEffect, CombatActor } from '@pocketrealm/shared';
+import type {
+  ActionDefinition,
+  CombatTemplateSlotData,
+  ActiveEffect,
+  CombatActor,
+  ExhaustedActionReason,
+} from '@pocketrealm/shared';
 import { BASE_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
 import { evaluateCondition } from './conditionEvaluator';
 
@@ -7,6 +13,9 @@ import { evaluateCondition } from './conditionEvaluator';
 export interface ResolvedAction {
   action: ActionDefinition;
   wasExhausted: boolean;
+  intendedActionId?: string;
+  intendedAction?: ActionDefinition;
+  exhaustedReason?: ExhaustedActionReason;
   /** The other branch's action (else when condition matched, then when it didn't) */
   alternateAction?: ActionDefinition;
 }
@@ -34,6 +43,22 @@ function canAfford(
   return (
     currentStamina >= action.cost.stamina && currentMana >= action.cost.mana
   );
+}
+
+function getExhaustedReason(
+  action: ActionDefinition | undefined,
+  currentStamina: number,
+  currentMana: number,
+): ExhaustedActionReason {
+  if (!action) return 'invalid_action';
+
+  const lacksStamina = currentStamina < action.cost.stamina;
+  const lacksMana = currentMana < action.cost.mana;
+
+  if (lacksStamina && lacksMana) return 'stamina_and_mana';
+  if (lacksStamina) return 'stamina';
+  if (lacksMana) return 'mana';
+  return 'invalid_action';
 }
 
 // --- Public API ---
@@ -75,10 +100,22 @@ export function resolveAction(
   const alternateAction = altDef && canAfford(altDef, currentStamina, currentMana) ? altDef : undefined;
 
   if (!definition || !canAfford(definition, currentStamina, currentMana)) {
-    return { action: DEFEND_FALLBACK, wasExhausted: true };
+    return {
+      action: DEFEND_FALLBACK,
+      wasExhausted: true,
+      intendedActionId: actionId,
+      intendedAction: definition,
+      exhaustedReason: getExhaustedReason(definition, currentStamina, currentMana),
+    };
   }
 
-  return { action: definition, wasExhausted: false, alternateAction };
+  return {
+    action: definition,
+    wasExhausted: false,
+    intendedActionId: actionId,
+    intendedAction: definition,
+    alternateAction,
+  };
 }
 
 /**

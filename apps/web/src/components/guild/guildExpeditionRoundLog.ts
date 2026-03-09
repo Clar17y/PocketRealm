@@ -1,0 +1,1 @@
+export { RoundLogAttackRow } from './guildExpeditionRoundLogView';

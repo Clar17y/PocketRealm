@@ -426,6 +426,44 @@ describe('resolveRaidRound', () => {
       const result = resolveRaidRound(makeInput({ participants: [p1] }), alwaysHitRng);
       expect(result.participantResults[0].templateRoundAfter).toBe(4);
     });
+
+    it('logs intended actions that fall back to Defend when resources are insufficient', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        username: 'GuardBot',
+        stamina: 0,
+        maxStamina: 100,
+        mana: 50,
+        maxMana: 50,
+        template: [{ actionId: 'counter', sortOrder: 0 }],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      expect(result.participantResults[0].actionId).toBe('defend');
+      expect(result.participantResults[0].wasExhausted).toBe(true);
+      expect(result.roundLog.phases.playerAttacks).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            entryType: 'exhausted',
+            playerId: 'p1',
+            username: 'GuardBot',
+            intendedActionId: 'counter',
+            intendedActionLabel: 'Counter',
+            fallbackActionId: 'defend',
+            fallbackActionLabel: 'Defend',
+            reason: 'stamina',
+          }),
+        ]),
+      );
+    });
   });
 
   describe('channeling vulnerability', () => {
