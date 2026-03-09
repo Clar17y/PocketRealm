@@ -1025,6 +1025,198 @@ describe('resolveRaidRound', () => {
     });
   });
 
+  describe('player DoT effects', () => {
+    it('player takes damage from DoT effect each round', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 100, maxHp: 100,
+        stats: makeStats({ magicDefence: 3 }),
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+        activeEffects: [{
+          name: 'Poison',
+          stat: 'poison',
+          modifier: 0,
+          roundsRemaining: 3,
+          damagePerRound: 10,
+          dotDamageType: 'magic',
+        }],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const pr = result.participantResults[0];
+      // DoT: 10 - 3 magicDefence = 7 damage
+      expect(pr.damageTaken).toBe(7);
+      expect(pr.hpAfter).toBe(93);
+    });
+
+    it('stacking DoTs accumulate damage', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 100, maxHp: 100,
+        stats: makeStats({ magicDefence: 2 }),
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+        activeEffects: [
+          {
+            name: 'Poison 1',
+            stat: 'poison',
+            modifier: 0,
+            roundsRemaining: 3,
+            damagePerRound: 5,
+            dotDamageType: 'magic',
+          },
+          {
+            name: 'Poison 2',
+            stat: 'poison',
+            modifier: 0,
+            roundsRemaining: 2,
+            damagePerRound: 5,
+            dotDamageType: 'magic',
+          },
+        ],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const pr = result.participantResults[0];
+      // Each DoT: 5 - 2 magicDefence = 3 damage, two stacks = 6 total
+      expect(pr.damageTaken).toBe(6);
+      expect(pr.hpAfter).toBe(94);
+    });
+
+    it('physical DoT uses physical defence', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 100, maxHp: 100,
+        stats: makeStats({ defence: 4, magicDefence: 0 }),
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+        activeEffects: [{
+          name: 'Bleed',
+          stat: 'bleed',
+          modifier: 0,
+          roundsRemaining: 2,
+          damagePerRound: 8,
+          dotDamageType: 'physical',
+        }],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const pr = result.participantResults[0];
+      // 8 - 4 defence = 4 damage
+      expect(pr.damageTaken).toBe(4);
+      expect(pr.hpAfter).toBe(96);
+    });
+  });
+
+  describe('mark for death + execution strike', () => {
+    it('execution_strike deals 3x damage to marked target', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 500, maxHp: 500,
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+        activeEffects: [{
+          name: 'Marked for Death',
+          stat: 'marked_for_death',
+          modifier: 0,
+          roundsRemaining: 2,
+        }],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        stats: makeStats({ damageMin: 20, damageMax: 20 }),
+        actionTemplate: [{ actionId: 'boss_execution_strike', targetMode: 'single_target' }],
+      });
+
+      const resultMarked = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      // Same setup without the mark
+      const p2 = makeParticipant({
+        playerId: 'p1',
+        hp: 500, maxHp: 500,
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+        activeEffects: [],
+      });
+      const mob2 = makeMob({
+        id: 'mob1',
+        stats: makeStats({ damageMin: 20, damageMax: 20 }),
+        actionTemplate: [{ actionId: 'boss_execution_strike', targetMode: 'single_target' }],
+      });
+
+      const resultUnmarked = resolveRaidRound(
+        makeInput({ participants: [p2], mobs: [mob2] }),
+        alwaysHitRng,
+      );
+
+      const markedDmg = resultMarked.participantResults[0].damageTaken;
+      const unmarkedDmg = resultUnmarked.participantResults[0].damageTaken;
+
+      // Marked should take exactly 3x damage
+      expect(markedDmg).toBe(unmarkedDmg * 3);
+      expect(markedDmg).toBeGreaterThan(0);
+    });
+
+    it('execution_strike deals normal damage without mark', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 500, maxHp: 500,
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+        activeEffects: [],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        stats: makeStats({ damageMin: 20, damageMax: 20 }),
+        actionTemplate: [{ actionId: 'boss_execution_strike', targetMode: 'single_target' }],
+      });
+
+      // Compare with a normal boss_physical_attack using same stats
+      const mob2 = makeMob({
+        id: 'mob2',
+        stats: makeStats({ damageMin: 20, damageMax: 20 }),
+        actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+      });
+
+      const resultExec = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+      const resultNormal = resolveRaidRound(
+        makeInput({ participants: [{ ...p1 }], mobs: [mob2] }),
+        alwaysHitRng,
+      );
+
+      // Execution strike has 5.0 multiplier vs physical_attack 1.0 multiplier
+      // Without mark, no 3x bonus — just the base multiplier difference
+      expect(resultExec.participantResults[0].damageTaken).toBeGreaterThan(
+        resultNormal.participantResults[0].damageTaken,
+      );
+    });
+  });
+
   describe('boss_summon_adds', () => {
     it('spawns new mobs from summon pool', () => {
       const boss = makeMob({

@@ -509,6 +509,15 @@ export function resolveRaidRound(
           damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, damage);
         }
 
+        // Execution strike + marked_for_death combo: 3x damage
+        if (templateAction.actionId === 'boss_execution_strike') {
+          const targetEffects = targetParticipant.activeEffects ?? [];
+          const isMarked = targetEffects.some(e => e.stat === 'marked_for_death' && e.roundsRemaining > 0);
+          if (isMarked) {
+            damage *= 3;
+          }
+        }
+
         targetState.damageTaken += damage;
         targetState.hp = Math.max(0, targetState.hp - damage);
         mobResult.damageDealt += damage;
@@ -611,9 +620,17 @@ export function resolveRaidRound(
         roundsRemaining: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS,
       });
     }
-    // Tick all effects and filter expired
+    // Apply DoT damage from player effects, then tick and filter expired
     const remaining: BossActiveEffect[] = [];
     for (const effect of effects) {
+      if (effect.damagePerRound && effect.damagePerRound > 0 && pState[idx].hp > 0) {
+        const defence = effect.dotDamageType === 'physical'
+          ? p.stats.defence
+          : p.stats.magicDefence;
+        const dotDmg = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, effect.damagePerRound - defence);
+        pState[idx].hp = Math.max(0, pState[idx].hp - dotDmg);
+        pState[idx].damageTaken += dotDmg;
+      }
       const ticked = { ...effect, roundsRemaining: effect.roundsRemaining - 1 };
       if (ticked.roundsRemaining > 0) {
         remaining.push(ticked);
