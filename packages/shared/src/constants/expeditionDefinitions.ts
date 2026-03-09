@@ -1,6 +1,6 @@
 import type { BossTemplateAction } from '../types/bossTemplate.types';
 import type { CombatantStats } from '../types/combat.types';
-import type { ExpeditionRoomType, ExpeditionShopItem, ExpeditionSetId, ExpeditionTheme } from '../types/expedition.types';
+import type { ExpeditionRoomType, ExpeditionShopItem, ExpeditionSetId, ExpeditionTheme, ExpeditionThemeMob } from '../types/expedition.types';
 
 // =============================================================================
 // ROOM COMPOSITIONS PER TIER
@@ -95,6 +95,44 @@ function mobStats(
   };
 }
 
+// --- Shared add mob definitions (referenced by regularAdd and miniBossAdds) ---
+
+const SPIDER_NEST_ADD: ExpeditionThemeMob = {
+  key: 'expSpiderling', name: 'Spiderling', hp: 100,
+  stats: mobStats(100, 14, 8, 4, 4, 6, 10, 'physical'),
+  actionTemplate: [
+    { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+    { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+  ] as BossTemplateAction[],
+};
+
+const WOLF_PACK_ADD: ExpeditionThemeMob = {
+  key: 'expFrenziedWolf', name: 'Frenzied Wolf', hp: 100,
+  stats: mobStats(100, 16, 10, 4, 6, 8, 14, 'physical'),
+  actionTemplate: [
+    { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+    { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+  ] as BossTemplateAction[],
+};
+
+const BANDIT_CAMP_ADD: ExpeditionThemeMob = {
+  key: 'expBanditGrunt', name: 'Bandit Grunt', hp: 90,
+  stats: mobStats(90, 14, 10, 6, 4, 8, 12, 'physical'),
+  actionTemplate: [
+    { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+    { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+  ] as BossTemplateAction[],
+};
+
+const CORRUPTED_GROVE_ADD: ExpeditionThemeMob = {
+  key: 'expThornVine', name: 'Thorn Vine', hp: 80,
+  stats: mobStats(80, 14, 10, 6, 2, 6, 10, 'physical'),
+  actionTemplate: [
+    { actionId: 'boss_physical_attack', targetMode: 'single_target' },
+    { actionId: 'boss_root', targetMode: 'single_target' },
+  ] as BossTemplateAction[],
+};
+
 export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
   // ─── Theme 1: Spider Nest ─────────────────────────────────────────────
   {
@@ -156,15 +194,8 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
       ] as BossTemplateAction[],
     },
-    miniBossAdds: [],
-    regularAdd: {
-      key: 'expSpiderling', name: 'Spiderling', hp: 100,
-      stats: mobStats(100, 14, 8, 4, 4, 6, 10, 'physical'),
-      actionTemplate: [
-        { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
-    },
+    miniBossAdds: [SPIDER_NEST_ADD],
+    regularAdd: SPIDER_NEST_ADD,
     casterAdd: {
       key: 'expVenomousSpitter', name: 'Venomous Spitter', hp: 70,
       stats: mobStats(70, 12, 6, 10, 6, 4, 8, 'magic'),
@@ -268,15 +299,8 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
       ] as BossTemplateAction[],
     },
-    miniBossAdds: [],
-    regularAdd: {
-      key: 'expFrenziedWolf', name: 'Frenzied Wolf', hp: 100,
-      stats: mobStats(100, 16, 10, 4, 6, 8, 14, 'physical'),
-      actionTemplate: [
-        { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
-    },
+    miniBossAdds: [WOLF_PACK_ADD],
+    regularAdd: WOLF_PACK_ADD,
     casterAdd: {
       key: 'expHowlingSpirit', name: 'Howling Spirit', hp: 65,
       stats: mobStats(65, 14, 6, 12, 8, 4, 8, 'magic'),
@@ -379,15 +403,8 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_shield_wall', targetMode: 'single_target' },
       ] as BossTemplateAction[],
     },
-    miniBossAdds: [],
-    regularAdd: {
-      key: 'expBanditGrunt', name: 'Bandit Grunt', hp: 90,
-      stats: mobStats(90, 14, 10, 6, 4, 8, 12, 'physical'),
-      actionTemplate: [
-        { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
-    },
+    miniBossAdds: [BANDIT_CAMP_ADD],
+    regularAdd: BANDIT_CAMP_ADD,
     casterAdd: {
       key: 'expKnifeThrower', name: 'Knife Thrower', hp: 70,
       stats: mobStats(70, 18, 8, 6, 8, 6, 10, 'physical'),
@@ -490,15 +507,8 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
       ] as BossTemplateAction[],
     },
-    miniBossAdds: [],
-    regularAdd: {
-      key: 'expThornVine', name: 'Thorn Vine', hp: 80,
-      stats: mobStats(80, 14, 10, 6, 2, 6, 10, 'physical'),
-      actionTemplate: [
-        { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        { actionId: 'boss_root', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
-    },
+    miniBossAdds: [CORRUPTED_GROVE_ADD],
+    regularAdd: CORRUPTED_GROVE_ADD,
     casterAdd: {
       key: 'expBlightedSpore', name: 'Blighted Spore', hp: 60,
       stats: mobStats(60, 12, 6, 12, 4, 4, 8, 'magic'),

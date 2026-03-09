@@ -14,6 +14,7 @@ import {
   type RaidParticipant,
   type RaidThreatEntry,
   type ExpeditionCooldownInfo,
+  type ExpeditionMobState,
 } from '@pocketrealm/shared';
 import {
   generateExpeditionRooms,
@@ -700,12 +701,33 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
     }
   }
 
+  // Build summon pool from theme add mobs
+  const theme = EXPEDITION_THEMES.find(t => t.id === expedition.themeId);
+  const summonPool: ExpeditionMobState[] = [];
+  if (theme) {
+    const addMobs = [theme.regularAdd, theme.casterAdd];
+    addMobs.forEach((add, i) => {
+      summonPool.push({
+        id: `summon-template-${i}`,
+        mobTemplateId: '',
+        name: add.name,
+        prefix: null,
+        hp: add.hp,
+        maxHp: add.hp,
+        stats: { ...add.stats, hp: add.hp, maxHp: add.hp },
+        actionTemplate: [...add.actionTemplate],
+        activeEffects: [],
+      });
+    });
+  }
+
   const input: RaidRoundInput = {
     mobs: survivingMobs,
     participants,
     threatTable,
     roundNumber: nextRound,
     environmentalDotPercent: currentRoomDef.environmentalDotPercent,
+    summonPool,
   };
 
   const result = resolveRaidRound(input);

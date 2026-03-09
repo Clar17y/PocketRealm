@@ -492,13 +492,32 @@ export function resolveRaidRound(
         }
 
         const dmgRaw = roll.rollDamage(mob.stats.damageMin, mob.stats.damageMax);
-        const scaledDmg = Math.floor(dmgRaw * (mActionDef.damageMultiplier ?? 1.0));
+        let baseDmg = Math.floor(dmgRaw * (mActionDef.damageMultiplier ?? 1.0));
+
+        // Execution strike + marked_for_death combo: 3x damage (before defence)
+        if (templateAction.actionId === 'boss_execution_strike') {
+          const targetEffects = targetParticipant.activeEffects ?? [];
+          const isMarked = targetEffects.some(e => e.stat === 'marked_for_death' && e.roundsRemaining > 0);
+          if (isMarked) {
+            baseDmg *= 3;
+          }
+        }
+
+        // Nature cursed: magic damage amplified 3x (before defence)
+        if (isMagic) {
+          const isCursed = targetParticipant.activeEffects?.some(
+            e => e.stat === 'nature_cursed' && e.roundsRemaining > 0,
+          );
+          if (isCursed) {
+            baseDmg *= 3;
+          }
+        }
 
         const effectivePlayerDefence = isMagic
           ? targetParticipant.stats.magicDefence
           : targetParticipant.stats.defence;
 
-        let damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, scaledDmg - effectivePlayerDefence);
+        let damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, baseDmg - effectivePlayerDefence);
 
         if (stance?.isChanneling) {
           damage = Math.floor(damage * COMBAT_ACTION_CONSTANTS.CHANNELING_BONUS_DAMAGE);
@@ -507,15 +526,6 @@ export function resolveRaidRound(
         if (stance?.damageReductionPercent && stance.damageReductionPercent > 0) {
           damage = Math.floor(damage * (1 - stance.damageReductionPercent));
           damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, damage);
-        }
-
-        // Execution strike + marked_for_death combo: 3x damage
-        if (templateAction.actionId === 'boss_execution_strike') {
-          const targetEffects = targetParticipant.activeEffects ?? [];
-          const isMarked = targetEffects.some(e => e.stat === 'marked_for_death' && e.roundsRemaining > 0);
-          if (isMarked) {
-            damage *= 3;
-          }
         }
 
         targetState.damageTaken += damage;
