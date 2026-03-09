@@ -495,6 +495,22 @@ export function resolveRaidRound(
       mobResult.healingDone = actualHeal;
     }
 
+    // boss_rally — buff ALL alive mobs, not just self
+    if (templateAction.actionId === 'boss_rally' && mActionDef.effect) {
+      for (const m of mobState) {
+        if (m.hp <= 0) continue;
+        m.activeEffects.push({
+          name: mActionDef.effect.name,
+          stat: mActionDef.effect.stat,
+          modifier: mActionDef.effect.modifier,
+          roundsRemaining: mActionDef.effect.duration,
+        });
+      }
+      mobActionResults.push(mobResult);
+      logMobActions.push(mobLogEntry);
+      continue;
+    }
+
     // Mob enrage/buff — applied to the mob itself
     if (mActionDef.actionType === 'buff' && mActionDef.effect) {
       mob.activeEffects.push({

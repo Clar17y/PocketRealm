@@ -954,4 +954,73 @@ describe('resolveRaidRound', () => {
       expect(pr.damageDealt).toBeGreaterThan(0);
     });
   });
+
+  describe('boss_rally', () => {
+    it('buffs all alive mobs, not just the caster', () => {
+      const p1 = makeParticipant({ playerId: 'p1' });
+      const rallyMob = makeMob({
+        id: 'rally-mob',
+        hp: 80, maxHp: 80,
+        actionTemplate: [{ actionId: 'boss_rally', targetMode: 'single_target' }],
+        activeEffects: [],
+      });
+      const allyMob1 = makeMob({
+        id: 'ally-mob-1',
+        hp: 60, maxHp: 60,
+        actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+        activeEffects: [],
+      });
+      const allyMob2 = makeMob({
+        id: 'ally-mob-2',
+        hp: 50, maxHp: 50,
+        actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+        activeEffects: [],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [rallyMob, allyMob1, allyMob2] }),
+        alwaysHitRng,
+      );
+
+      // All 3 alive mobs should have the Rallied effect
+      // Duration is 3 but end-of-round ticks it down by 1, so expect 2
+      expect(result.mobsAfter.length).toBe(3);
+      for (const mob of result.mobsAfter) {
+        const rallied = mob.activeEffects.find(e => e.name === 'Rallied');
+        expect(rallied, `mob ${mob.id} should have Rallied effect`).toBeDefined();
+        expect(rallied!.stat).toBe('attack');
+        expect(rallied!.modifier).toBe(8);
+        expect(rallied!.roundsRemaining).toBe(2);
+      }
+    });
+
+    it('does not buff dead mobs', () => {
+      const p1 = makeParticipant({ playerId: 'p1' });
+      const rallyMob = makeMob({
+        id: 'rally-mob',
+        hp: 80, maxHp: 80,
+        actionTemplate: [{ actionId: 'boss_rally', targetMode: 'single_target' }],
+        activeEffects: [],
+      });
+      const deadMob = makeMob({
+        id: 'dead-mob',
+        hp: 0, maxHp: 60,
+        actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+        activeEffects: [],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [rallyMob, deadMob] }),
+        alwaysHitRng,
+      );
+
+      // Only the alive mob should be in mobsAfter (dead mobs are filtered out)
+      expect(result.mobsAfter.length).toBe(1);
+      const aliveMob = result.mobsAfter.find(m => m.id === 'rally-mob')!;
+      expect(aliveMob.activeEffects.find(e => e.name === 'Rallied')).toBeDefined();
+
+      // Dead mob is not included in mobsAfter
+      expect(result.mobsAfter.find(m => m.id === 'dead-mob')).toBeUndefined();
+    });
+  });
 });
