@@ -181,6 +181,7 @@ const makeExpeditionRow = (overrides: Record<string, unknown> = {}) => ({
   startedAt: new Date(),
   completedAt: null,
   launchedBy: PLAYER_ID,
+  themeId: 'spider_nest',
   _count: { members: 0 },
   ...overrides,
 });

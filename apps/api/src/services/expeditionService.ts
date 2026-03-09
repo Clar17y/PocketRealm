@@ -910,7 +910,7 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
 
   await prisma.guildExpeditionMember.updateMany({
     where: { expeditionId },
-    data: { roomDamage: 0, roomHealing: 0, isKnockedOut: false, threatValue: 0, targetMobId: null },
+    data: { roomDamage: 0, roomHealing: 0, isKnockedOut: false, threatValue: 0, targetMobId: null, activeEffects: [] },
   });
 
   // Apply rest regen to all members using stored max stats (no N+1 queries)
