@@ -36,6 +36,7 @@ export interface CombatParticipantState {
   actionId: string;
   wasExhausted: boolean;
   actionDef: ActionDefinition | null;
+  healTargetPlayerId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +145,7 @@ export function resolveSupportiveActions(
         const actualHeal = Math.min(healAmount, targetParticipant.maxHp - targetState.hp);
         targetState.hp += actualHeal;
         s.healingDone = actualHeal;
+        s.healTargetPlayerId = targetId;
         addHealThreat(threatTable, s.playerId, actualHeal);
       }
     }

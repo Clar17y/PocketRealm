@@ -27,6 +27,7 @@ import type {
   ExpeditionRoomType,
   ExpeditionMobInfo,
   ExpeditionRoundLog,
+  ExpeditionCooldownInfo,
 } from '@pocketrealm/shared';
 import { EXPEDITION_CONSTANTS, mobDisplayName } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
@@ -45,6 +46,19 @@ const TIER_CONFIGS = EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER.map((levelRe
   minParticipants: EXPEDITION_CONSTANTS.MIN_PARTICIPANTS_BY_TIER[i],
   totalRooms: EXPEDITION_CONSTANTS.ROOMS_BY_TIER[i],
 }));
+
+// ---------------------------------------------------------------------------
+// Attempt Badge
+// ---------------------------------------------------------------------------
+
+function AttemptBadge({ attemptNumber }: { attemptNumber: number }) {
+  if (attemptNumber <= 1) return null;
+  return (
+    <span className="text-xs text-[var(--rpg-text-secondary)]">
+      Attempt {attemptNumber}/{EXPEDITION_CONSTANTS.MAX_ATTEMPTS}
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -157,11 +171,7 @@ export function GuildExpeditionsTab({
   const [actionLoading, setActionLoading] = useState(false);
   const [expedition, setExpedition] = useState<ExpeditionData | null>(null);
   const [members, setMembers] = useState<ExpeditionMemberData[]>([]);
-  const [cooldowns, setCooldowns] = useState<{
-    weeklyCooldowns: Record<number, string | null>;
-    betweenCooldown: string | null;
-    hasActiveExpedition: boolean;
-  } | null>(null);
+  const [cooldowns, setCooldowns] = useState<ExpeditionCooldownInfo | null>(null);
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
 
@@ -410,11 +420,7 @@ function IdleView({
   characterLevel: number;
   actionLoading: boolean;
   onLaunch: (tier: number) => void;
-  cooldowns: {
-    weeklyCooldowns: Record<number, string | null>;
-    betweenCooldown: string | null;
-    hasActiveExpedition: boolean;
-  } | null;
+  cooldowns: ExpeditionCooldownInfo | null;
 }) {
   // Determine cooldown reason per tier
   function getCooldownReason(tier: number): string | null {
@@ -538,11 +544,7 @@ function RecruitingView({
             <span className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-blue-light)]/20 text-[var(--rpg-blue-light)]">
               Recruiting
             </span>
-            {expedition.attemptNumber > 1 && (
-              <span className="text-xs text-[var(--rpg-text-secondary)]">
-                Attempt {expedition.attemptNumber}/{EXPEDITION_CONSTANTS.MAX_ATTEMPTS}
-              </span>
-            )}
+            <AttemptBadge attemptNumber={expedition.attemptNumber} />
           </div>
         </div>
 
@@ -664,11 +666,7 @@ function InProgressView({
             <span className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
               In Progress
             </span>
-            {expedition.attemptNumber > 1 && (
-              <span className="text-xs text-[var(--rpg-text-secondary)]">
-                Attempt {expedition.attemptNumber}/{EXPEDITION_CONSTANTS.MAX_ATTEMPTS}
-              </span>
-            )}
+            <AttemptBadge attemptNumber={expedition.attemptNumber} />
           </div>
         </div>
 

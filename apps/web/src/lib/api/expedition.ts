@@ -3,6 +3,7 @@ import type {
   ExpeditionData,
   ExpeditionMemberData,
   ExpeditionShopItem,
+  ExpeditionCooldownInfo,
 } from '@pocketrealm/shared';
 
 // ---------------------------------------------------------------------------
@@ -108,11 +109,7 @@ export async function abandonExpedition(id: string) {
 }
 
 export async function getExpeditionCooldowns() {
-  return fetchApi<{
-    weeklyCooldowns: Record<number, string | null>;
-    betweenCooldown: string | null;
-    hasActiveExpedition: boolean;
-  }>('/api/v1/expedition/cooldowns');
+  return fetchApi<ExpeditionCooldownInfo>('/api/v1/expedition/cooldowns');
 }
 
 export async function getExpeditionShop() {

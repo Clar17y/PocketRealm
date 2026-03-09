@@ -1365,7 +1365,7 @@ export const EXPEDITION_CONSTANTS = {
     mini_boss: 3 * 60 * 1000,
     event: 2 * 60 * 1000,
     final_boss: 3 * 60 * 1000,
-  } as Record<string, number>,
+  } as Record<'trash' | 'elite' | 'mini_boss' | 'event' | 'final_boss', number>,
   REST_DURATION_MS: 5 * 60 * 1000,
   REST_HP_REGEN: 0.20,
   REST_STAMINA_REGEN: 0.30,

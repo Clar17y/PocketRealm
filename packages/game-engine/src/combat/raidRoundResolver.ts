@@ -111,6 +111,7 @@ export function resolveRaidRound(
     isCritical: false,
     targetMobId: null as string | null,
     actionDef: null as ActionDefinition | null,
+    healTargetPlayerId: null as string | null,
   }));
 
   // Round log collectors
@@ -241,8 +242,6 @@ export function resolveRaidRound(
   }
 
   // --- Step 5: Player supportive phase ---
-  // Snapshot HP before healing to determine who was healed by heal_ally
-  const hpBeforeHeal = new Map(pState.map(ps => [ps.playerId, ps.hp]));
   resolveSupportiveActions(input.participants, pState, input.threatTable);
 
   for (let i = 0; i < pState.length; i++) {
@@ -251,41 +250,26 @@ export function resolveRaidRound(
     if (!def || def.category !== 'supportive') continue;
     if (s.healingDone <= 0) continue;
 
-    if (def.actionType === 'heal_self') {
-      logHealing.push({
-        playerId: s.playerId,
-        username: getUsername(s.playerId),
-        actionLabel: actionLabel(s.actionId, playerActionDefs),
-        amountHealed: s.healingDone,
-        targetPlayerId: s.playerId,
-        targetUsername: getUsername(s.playerId),
-      });
-    } else if (def.actionType === 'heal_ally') {
-      // Find the actual heal target by comparing HP snapshots
-      let healTargetId = s.playerId;
-      for (const ps of pState) {
-        if (ps.playerId === s.playerId) continue;
-        const before = hpBeforeHeal.get(ps.playerId) ?? ps.hp;
-        if (ps.hp > before) {
-          healTargetId = ps.playerId;
-          break;
-        }
-      }
-      logHealing.push({
-        playerId: s.playerId,
-        username: getUsername(s.playerId),
-        actionLabel: actionLabel(s.actionId, playerActionDefs),
-        amountHealed: s.healingDone,
-        targetPlayerId: healTargetId,
-        targetUsername: getUsername(healTargetId),
-      });
-    }
+    const healTargetId = (def.actionType === 'heal_ally' && s.healTargetPlayerId)
+      ? s.healTargetPlayerId
+      : s.playerId;
+
+    logHealing.push({
+      playerId: s.playerId,
+      username: getUsername(s.playerId),
+      actionLabel: actionLabel(s.actionId, playerActionDefs),
+      amountHealed: s.healingDone,
+      targetPlayerId: healTargetId,
+      targetUsername: getUsername(healTargetId),
+    });
   }
 
   // --- Step 5b: Potion actions ---
   const allPotionsConsumed: PotionConsumed[] = [];
   const perParticipantPotions: Map<number, PotionConsumed[]> = new Map();
   const potionSicknessToApply: { participantIndex: number }[] = [];
+  // Track consumed potion indices per participant to avoid mutating input
+  const consumedPotionIndices: Map<number, Set<number>> = new Map();
 
   for (let i = 0; i < pState.length; i++) {
     const s = pState[i];
@@ -303,8 +287,11 @@ export function resolveRaidRound(
     );
     if (hasSickness) continue;
 
-    // Find matching potion
-    const potionIndex = potions.findIndex((pt: CombatPotion) => pt.potionType === potionType);
+    // Find matching potion, skipping already-consumed indices
+    const usedIndices = consumedPotionIndices.get(i);
+    const potionIndex = potions.findIndex((pt: CombatPotion, idx: number) =>
+      pt.potionType === potionType && (!usedIndices || !usedIndices.has(idx)),
+    );
     if (potionIndex === -1) continue;
 
     const potion = potions[potionIndex];
@@ -322,7 +309,8 @@ export function resolveRaidRound(
       s.mana += actualRestore;
     }
 
-    potions.splice(potionIndex, 1);
+    if (!consumedPotionIndices.has(i)) consumedPotionIndices.set(i, new Set());
+    consumedPotionIndices.get(i)!.add(potionIndex);
     const consumed: PotionConsumed = { templateId: potion.templateId, name: potion.name, healAmount: actualRestore, round: input.roundNumber };
     allPotionsConsumed.push(consumed);
     if (!perParticipantPotions.has(i)) perParticipantPotions.set(i, []);
@@ -503,20 +491,23 @@ export function resolveRaidRound(
     mob.activeEffects = remaining;
   }
 
-  // Apply potion sickness before ticking existing effects
-  for (const { participantIndex } of potionSicknessToApply) {
-    const existing = input.participants[participantIndex].activeEffects ?? [];
-    existing.push({
-      name: 'Potion Sickness',
-      stat: 'potionSickness',
-      modifier: 0,
-      roundsRemaining: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS,
-    });
-  }
+  // Build potion sickness effects per participant (without mutating input)
+  const sicknessByParticipant = new Set(potionSicknessToApply.map(p => p.participantIndex));
 
-  const participantEffectsAfter: BossActiveEffect[][] = input.participants.map(p => {
+  const participantEffectsAfter: BossActiveEffect[][] = input.participants.map((p, idx) => {
+    const effects = [...(p.activeEffects ?? [])];
+    // Add potion sickness if this participant consumed a potion
+    if (sicknessByParticipant.has(idx)) {
+      effects.push({
+        name: 'Potion Sickness',
+        stat: 'potionSickness',
+        modifier: 0,
+        roundsRemaining: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS,
+      });
+    }
+    // Tick all effects and filter expired
     const remaining: BossActiveEffect[] = [];
-    for (const effect of p.activeEffects) {
+    for (const effect of effects) {
       const ticked = { ...effect, roundsRemaining: effect.roundsRemaining - 1 };
       if (ticked.roundsRemaining > 0) {
         remaining.push(ticked);

@@ -7,6 +7,14 @@ import type { CombatantStats, CombatPotion, PotionConsumed } from './combat.type
 export type ExpeditionStatus = 'recruiting' | 'in_progress' | 'completed' | 'failed';
 export type ExpeditionRoomType = 'trash' | 'elite' | 'mini_boss' | 'event' | 'final_boss';
 
+// --- Cooldown Info ---
+
+export interface ExpeditionCooldownInfo {
+  weeklyCooldowns: Record<number, string | null>;
+  betweenCooldown: string | null;
+  hasActiveExpedition: boolean;
+}
+
 // --- Room & Mob Definitions ---
 
 export interface ExpeditionMobState {

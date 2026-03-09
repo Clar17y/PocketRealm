@@ -12,6 +12,7 @@ import {
   type RaidRoundInput,
   type RaidParticipant,
   type RaidThreatEntry,
+  type ExpeditionCooldownInfo,
 } from '@pocketrealm/shared';
 import {
   generateExpeditionRooms,
@@ -148,11 +149,7 @@ function toExpeditionMemberData(m: GuildExpeditionMemberRow): ExpeditionMemberDa
 // Cooldowns
 // ---------------------------------------------------------------------------
 
-export async function getExpeditionCooldowns(guildId: string): Promise<{
-  weeklyCooldowns: Record<number, string | null>;
-  betweenCooldown: string | null;
-  hasActiveExpedition: boolean;
-}> {
+export async function getExpeditionCooldowns(guildId: string): Promise<ExpeditionCooldownInfo> {
   const weeklyAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.WEEKLY_COOLDOWN_MS);
   const betweenAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
 
@@ -286,7 +283,7 @@ export async function launchExpedition(
     throw new AppError(400, 'Weekly cooldown for this tier has not expired', 'WEEKLY_COOLDOWN');
   }
   if (recentAnyExpedition) {
-    throw new AppError(400, '24-hour cooldown between expeditions has not expired', 'BETWEEN_COOLDOWN');
+    throw new AppError(400, 'Cooldown between expeditions has not expired', 'BETWEEN_COOLDOWN');
   }
 
   // Check treasury
@@ -939,6 +936,35 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Attempt-Log Archival Helper
+// ---------------------------------------------------------------------------
+
+function buildUpdatedAttemptLogs(
+  expedition: { roundSummaries: unknown; expeditionAttemptLogs: unknown; currentRoom: number; wipeCount: number; members?: Array<{ playerId: string; player?: { username: string }; totalDamage: bigint; totalHealing: bigint }> },
+  extra?: Record<string, unknown>,
+): unknown[] {
+  const currentLogs = Array.isArray(expedition.roundSummaries) ? expedition.roundSummaries : [];
+  const existing = Array.isArray(expedition.expeditionAttemptLogs) ? expedition.expeditionAttemptLogs : [];
+  if (currentLogs.length === 0 && !extra) return existing as unknown[];
+
+  const attemptLog: Record<string, unknown> = {
+    attempt: (expedition.wipeCount ?? 0) + 1,
+    roomReached: expedition.currentRoom,
+    roundLogs: currentLogs,
+    ...(expedition.members ? {
+      participants: expedition.members.map(m => ({
+        playerId: m.playerId,
+        username: m.player?.username,
+        totalDamage: Number(m.totalDamage),
+        totalHealing: Number(m.totalHealing),
+      })),
+    } : {}),
+    ...extra,
+  };
+  return [...(existing as unknown[]), attemptLog];
+}
+
+// ---------------------------------------------------------------------------
 // Handle Wipe
 // ---------------------------------------------------------------------------
 
@@ -950,25 +976,7 @@ export async function handleWipe(expeditionId: string): Promise<void> {
   if (!expedition) return;
 
   const newWipeCount = (expedition.wipeCount ?? 0) + 1;
-
-  // Archive current attempt logs (round logs, room reached, participant stats)
-  const roundLogs = (Array.isArray(expedition.roundSummaries)
-    ? expedition.roundSummaries
-    : []) as unknown as ExpeditionRoundLog[];
-  const attemptLog = {
-    attempt: newWipeCount,
-    roomReached: expedition.currentRoom,
-    roundLogs,
-    participants: expedition.members.map(m => ({
-      playerId: m.playerId,
-      totalDamage: Number(m.totalDamage),
-      totalHealing: Number(m.totalHealing),
-    })),
-  };
-  const existingAttemptLogs = Array.isArray(expedition.expeditionAttemptLogs)
-    ? expedition.expeditionAttemptLogs
-    : [];
-  const newAttemptLogs = [...existingAttemptLogs, attemptLog];
+  const newAttemptLogs = buildUpdatedAttemptLogs(expedition);
 
   if (newWipeCount >= EXPEDITION_CONSTANTS.MAX_ATTEMPTS) {
     // Auto-abandon: max attempts reached
@@ -995,22 +1003,24 @@ export async function handleWipe(expeditionId: string): Promise<void> {
   const mobPool = await fetchMobPool(expedition.tier);
   const rooms = generateExpeditionRooms(expedition.tier - 1, mobPool);
 
-  await prisma.guildExpeditionMember.deleteMany({ where: { expeditionId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.guildExpeditionMember.deleteMany({ where: { expeditionId } });
 
-  await prisma.guildExpedition.update({
-    where: { id: expeditionId },
-    data: {
-      wipeCount: newWipeCount,
-      expeditionAttemptLogs: JSON.parse(JSON.stringify(newAttemptLogs)),
-      status: 'recruiting',
-      currentRoom: 0,
-      totalRooms: rooms.length,
-      roomDefinitions: JSON.parse(JSON.stringify(rooms)),
-      roomStartSnapshot: Prisma.DbNull,
-      roundNumber: 0,
-      roundSummaries: Prisma.DbNull,
-      nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.SIGNUP_WINDOW_MS),
-    },
+    await tx.guildExpedition.update({
+      where: { id: expeditionId },
+      data: {
+        wipeCount: newWipeCount,
+        expeditionAttemptLogs: JSON.parse(JSON.stringify(newAttemptLogs)),
+        status: 'recruiting',
+        currentRoom: 0,
+        totalRooms: rooms.length,
+        roomDefinitions: JSON.parse(JSON.stringify(rooms)),
+        roomStartSnapshot: Prisma.DbNull,
+        roundNumber: 0,
+        roundSummaries: Prisma.DbNull,
+        nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.SIGNUP_WINDOW_MS),
+      },
+    });
   });
 
   await addGuildLog(
@@ -1049,24 +1059,7 @@ export async function abandonExpedition(expeditionId: string, playerId: string):
   }
 
   // Archive current round logs if any
-  const roundLogs = (Array.isArray(expedition.roundSummaries)
-    ? expedition.roundSummaries
-    : []) as unknown as ExpeditionRoundLog[];
-  const attemptLog = {
-    attempt: (expedition.wipeCount ?? 0) + 1,
-    roomReached: expedition.currentRoom,
-    roundLogs,
-    participants: expedition.members.map(m => ({
-      playerId: m.playerId,
-      totalDamage: Number(m.totalDamage),
-      totalHealing: Number(m.totalHealing),
-    })),
-    abandoned: true,
-  };
-  const existingAttemptLogs = Array.isArray(expedition.expeditionAttemptLogs)
-    ? expedition.expeditionAttemptLogs
-    : [];
-  const newAttemptLogs = [...existingAttemptLogs, attemptLog];
+  const newAttemptLogs = buildUpdatedAttemptLogs(expedition, { abandoned: true });
 
   await prisma.guildExpedition.update({
     where: { id: expeditionId },
@@ -1187,6 +1180,27 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Shared Validation: Active Expedition Member
+// ---------------------------------------------------------------------------
+
+async function assertActiveMember(
+  expeditionId: string,
+  playerId: string,
+): Promise<{ expedition: NonNullable<Awaited<ReturnType<typeof prisma.guildExpedition.findUnique>>>; member: NonNullable<Awaited<ReturnType<typeof prisma.guildExpeditionMember.findUnique>>> }> {
+  const [expedition, member] = await Promise.all([
+    prisma.guildExpedition.findUnique({ where: { id: expeditionId } }),
+    prisma.guildExpeditionMember.findUnique({
+      where: { expeditionId_playerId: { expeditionId, playerId } },
+    }),
+  ]);
+  if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
+  if (expedition.status !== 'in_progress') throw new AppError(400, 'Expedition is not in progress', 'NOT_IN_PROGRESS');
+  if (!member) throw new AppError(400, 'Not a member of this expedition', 'NOT_A_MEMBER');
+  if (member.isKnockedOut) throw new AppError(400, 'Cannot perform action while knocked out', 'KNOCKED_OUT');
+  return { expedition, member };
+}
+
+// ---------------------------------------------------------------------------
 // Set Target Mob
 // ---------------------------------------------------------------------------
 
@@ -1195,17 +1209,7 @@ export async function setTargetMob(
   playerId: string,
   targetMobId: string | null,
 ): Promise<void> {
-  const [expedition, member] = await Promise.all([
-    prisma.guildExpedition.findUnique({ where: { id: expeditionId } }),
-    prisma.guildExpeditionMember.findUnique({
-      where: { expeditionId_playerId: { expeditionId, playerId } },
-    }),
-  ]);
-
-  if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
-  if (expedition.status !== 'in_progress') throw new AppError(400, 'Expedition is not in progress', 'NOT_IN_PROGRESS');
-  if (!member) throw new AppError(400, 'Not a member of this expedition', 'NOT_A_MEMBER');
-  if (member.isKnockedOut) throw new AppError(400, 'Cannot set target while knocked out', 'KNOCKED_OUT');
+  const { expedition } = await assertActiveMember(expeditionId, playerId);
 
   // Validate targetMobId if set
   if (targetMobId !== null) {
@@ -1231,17 +1235,7 @@ export async function setHealTarget(
   playerId: string,
   healTargetPlayerId: string | null,
 ): Promise<void> {
-  const [expedition, member] = await Promise.all([
-    prisma.guildExpedition.findUnique({ where: { id: expeditionId } }),
-    prisma.guildExpeditionMember.findUnique({
-      where: { expeditionId_playerId: { expeditionId, playerId } },
-    }),
-  ]);
-
-  if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
-  if (expedition.status !== 'in_progress') throw new AppError(400, 'Expedition is not in progress', 'NOT_IN_PROGRESS');
-  if (!member) throw new AppError(400, 'Not a member of this expedition', 'NOT_A_MEMBER');
-  if (member.isKnockedOut) throw new AppError(400, 'Cannot set heal target while knocked out', 'KNOCKED_OUT');
+  await assertActiveMember(expeditionId, playerId);
 
   // Validate target is a living member of the expedition
   if (healTargetPlayerId !== null) {
