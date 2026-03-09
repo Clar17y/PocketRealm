@@ -59,35 +59,37 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
 
   if (!guildData) {
     return (
-      <NoGuildView
-        playerId={playerId}
-        characterLevel={characterLevel}
-        error={error}
-        onGuildJoined={() => { void loadGuild(); onTurnsChanged(); }}
-      />
+      <>
+        <FeatureTutorial storageKey="howto_guild" title="Guilds">
+          <p>
+            Guilds are player-run groups. Join one to access shared upgrades,
+            weekly contracts, and collaborative projects.
+          </p>
+          <p>
+            <strong>Roles:</strong> Leaders manage settings and promotions. Officers can
+            accept join requests and kick members. Members contribute to projects and contracts.
+          </p>
+          <p>
+            <strong>Tax:</strong> A percentage of your turn income goes to the guild treasury,
+            funding upgrades and projects.
+          </p>
+          <p className="text-[var(--rpg-green-light)]">
+            <strong>Tip:</strong> Check the Contracts tab for weekly bounties that reward
+            the whole guild when completed.
+          </p>
+        </FeatureTutorial>
+        <NoGuildView
+          playerId={playerId}
+          characterLevel={characterLevel}
+          error={error}
+          onGuildJoined={() => { void loadGuild(); onTurnsChanged(); }}
+        />
+      </>
     );
   }
 
   return (
     <ScreenContainer>
-      <FeatureTutorial storageKey="howto_guild" title="Guilds">
-        <p>
-          Guilds are player-run groups. Join one to access shared upgrades,
-          weekly contracts, and collaborative projects.
-        </p>
-        <p>
-          <strong>Roles:</strong> Leaders manage settings and promotions. Officers can
-          accept join requests and kick members. Members contribute to projects and contracts.
-        </p>
-        <p>
-          <strong>Tax:</strong> A percentage of your turn income goes to the guild treasury,
-          funding upgrades and projects.
-        </p>
-        <p className="text-[var(--rpg-green-light)]">
-          <strong>Tip:</strong> Check the Contracts tab for weekly bounties that reward
-          the whole guild when completed.
-        </p>
-      </FeatureTutorial>
 
       <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">
         [{guildData.guild.tag}] {guildData.guild.name}
