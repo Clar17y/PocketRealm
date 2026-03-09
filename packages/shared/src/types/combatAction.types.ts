@@ -61,6 +61,8 @@ export interface ActionDefinition {
   avoidsPhysical?: boolean;
   /** Whether this action guarantees resistance to magical attacks */
   resistsMagic?: boolean;
+  /** Whether this action bypasses hit resolution entirely */
+  alwaysHits?: boolean;
   /** Buff/debuff effect applied */
   effect?: ActionEffect;
   /** Heal amount (flat + percent of max HP) */
@@ -94,6 +96,8 @@ export interface ActionEffect {
   duration: number;
   /** Whether this is a debuff applied to the target (vs buff on self) */
   isDebuff?: boolean;
+  /** Whether this effect bypasses application hit/evasion checks */
+  alwaysApplies?: boolean;
   /** Whether this is a DoT/HoT */
   damagePerRound?: number;
   healPerRound?: number;

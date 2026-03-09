@@ -2,6 +2,21 @@ import type { ItemRarity } from './item.types';
 
 export type DamageType = 'physical' | 'magic';
 
+export type CombatMode = 'pvp' | 'pve_open_world' | 'pve_expedition' | 'pve_boss';
+
+export interface HitCurveConfig {
+  minHitChance: number;
+  maxHitChance: number;
+  bias: number;
+  exponent: number;
+}
+
+export interface HitScoreBreakdown {
+  hitScore: number;
+  avoidScore: number;
+  hitChance: number;
+}
+
 export interface MobTemplate {
   id: string;
   name: string;
@@ -62,6 +77,10 @@ export interface CombatLogEntry {
   blocked?: number;
   evaded?: boolean;
   message: string;
+  hitChance?: number;
+  hitRollValue?: number;
+  attackerHitScore?: number;
+  defenderAvoidScore?: number;
   attackModifier?: number;
   accuracyModifier?: number;
   targetDodge?: number;
