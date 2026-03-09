@@ -426,7 +426,7 @@ function IdleView({
   function getCooldownReason(tier: number): string | null {
     if (!cooldowns) return null;
     if (cooldowns.hasActiveExpedition) return 'Expedition active';
-    const weeklyExpiry = cooldowns.weeklyCooldowns[tier];
+    const weeklyExpiry = cooldowns.weeklyCooldowns?.[tier];
     if (weeklyExpiry && new Date(weeklyExpiry).getTime() > Date.now()) {
       return `Weekly: ${formatTimeRemaining(weeklyExpiry)}`;
     }
