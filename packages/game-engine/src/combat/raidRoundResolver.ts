@@ -66,6 +66,14 @@ function actionLabel(actionId: string, defs: Record<string, ActionDefinition>): 
   return defs[actionId]?.name ?? actionId.replace(/_/g, ' ');
 }
 
+// Sum stat modifiers from active effects for a given stat name
+function getEffectiveStatValue(baseStat: number, effects: BossActiveEffect[], statName: string): number {
+  const modifier = effects
+    .filter(e => e.stat === statName && e.roundsRemaining > 0)
+    .reduce((sum, e) => sum + e.modifier, 0);
+  return Math.max(0, baseStat + modifier);
+}
+
 // --- Resolver ---
 
 export function resolveRaidRound(
@@ -259,9 +267,10 @@ export function resolveRaidRound(
       const crit = roll.rollCrit(p.stats.critChance ?? 0);
       if (crit) s.isCritical = true;
 
-      const effectiveDefence = (def.damageType === 'magic' || p.stats.damageType === 'magic')
-        ? target.stats.magicDefence
-        : target.stats.defence;
+      const isMagicAttack = def.damageType === 'magic' || p.stats.damageType === 'magic';
+      const effectiveDefence = isMagicAttack
+        ? getEffectiveStatValue(target.stats.magicDefence, target.activeEffects, 'magicDefence')
+        : getEffectiveStatValue(target.stats.defence, target.activeEffects, 'defence');
       const { damage } = calculateFinalDamage(scaledDmg, effectiveDefence, crit, p.stats.critDamage ?? 0);
 
       target.hp = Math.max(0, target.hp - damage);
@@ -384,6 +393,8 @@ export function resolveRaidRound(
   }
 
   // --- Step 6: Mob offensive phase ---
+  // Accumulator for new effects applied to players this round by mob actions
+  const newPlayerEffects: Map<number, BossActiveEffect[]> = new Map();
   const mobActionResults: MobActionResult[] = [];
 
   for (const mob of mobState) {
@@ -492,12 +503,20 @@ export function resolveRaidRound(
         }
 
         const dmgRaw = roll.rollDamage(mob.stats.damageMin, mob.stats.damageMax);
-        let baseDmg = Math.floor(dmgRaw * (mActionDef.damageMultiplier ?? 1.0));
+        // Apply mob attack buffs (rally/frenzy) as flat bonus damage
+        const mobAttackBonus = getEffectiveStatValue(0, mob.activeEffects, 'attack');
+        let baseDmg = Math.floor(dmgRaw * (mActionDef.damageMultiplier ?? 1.0)) + mobAttackBonus;
+
+        // Combine input effects + newly applied effects this round for target checks
+        const targetIdx = pState.findIndex(ps => ps.playerId === targetId);
+        const combinedTargetEffects = [
+          ...(targetParticipant.activeEffects ?? []),
+          ...(targetIdx >= 0 ? (newPlayerEffects.get(targetIdx) ?? []) : []),
+        ];
 
         // Execution strike + marked_for_death combo: 3x damage (before defence)
         if (templateAction.actionId === 'boss_execution_strike') {
-          const targetEffects = targetParticipant.activeEffects ?? [];
-          const isMarked = targetEffects.some(e => e.stat === 'marked_for_death' && e.roundsRemaining > 0);
+          const isMarked = combinedTargetEffects.some(e => e.stat === 'marked_for_death' && e.roundsRemaining > 0);
           if (isMarked) {
             baseDmg *= 3;
           }
@@ -505,7 +524,7 @@ export function resolveRaidRound(
 
         // Nature cursed: magic damage amplified 3x (before defence)
         if (isMagic) {
-          const isCursed = targetParticipant.activeEffects?.some(
+          const isCursed = combinedTargetEffects.some(
             e => e.stat === 'nature_cursed' && e.roundsRemaining > 0,
           );
           if (isCursed) {
@@ -513,9 +532,10 @@ export function resolveRaidRound(
           }
         }
 
+        // Use effect-modified player defence (accounts for wither etc.)
         const effectivePlayerDefence = isMagic
-          ? targetParticipant.stats.magicDefence
-          : targetParticipant.stats.defence;
+          ? getEffectiveStatValue(targetParticipant.stats.magicDefence, combinedTargetEffects, 'magicDefence')
+          : getEffectiveStatValue(targetParticipant.stats.defence, combinedTargetEffects, 'defence');
 
         let damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, baseDmg - effectivePlayerDefence);
 
@@ -539,6 +559,22 @@ export function resolveRaidRound(
           blocked: false,
           knockedOut: targetState.hp <= 0,
         });
+
+        // Apply mob debuff/DoT effects to player on hit
+        if (mActionDef.effect?.isDebuff && targetState.hp > 0 && targetIdx >= 0) {
+          const newEffect: BossActiveEffect = {
+            name: mActionDef.effect.name,
+            stat: mActionDef.effect.stat,
+            modifier: mActionDef.effect.modifier,
+            roundsRemaining: mActionDef.effect.duration,
+            ...(mActionDef.effect.damagePerRound ? {
+              damagePerRound: mActionDef.effect.damagePerRound,
+              dotDamageType: mActionDef.effect.dotDamageType,
+            } : {}),
+          };
+          if (!newPlayerEffects.has(targetIdx)) newPlayerEffects.set(targetIdx, []);
+          newPlayerEffects.get(targetIdx)!.push(newEffect);
+        }
       }
     }
 
@@ -621,6 +657,11 @@ export function resolveRaidRound(
 
   const participantEffectsAfter: BossActiveEffect[][] = input.participants.map((p, idx) => {
     const effects = [...(p.activeEffects ?? [])];
+    // Merge new effects applied by mob actions this round
+    const mobAppliedEffects = newPlayerEffects.get(idx);
+    if (mobAppliedEffects) {
+      effects.push(...mobAppliedEffects);
+    }
     // Add potion sickness if this participant consumed a potion
     if (sicknessByParticipant.has(idx)) {
       effects.push({
