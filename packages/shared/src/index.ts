@@ -32,3 +32,4 @@ export * from './constants/expeditionDefinitions';
 // Utils
 export * from './utils/achievementChains';
 export * from './utils/tierUtils';
+export * from './utils/mobUtils';

@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import {
   getActiveExpedition,
   getExpeditionStatus,
+  getExpeditionHistory,
   launchExpedition,
   signUpForExpedition,
   forceStartExpedition,
@@ -24,7 +25,7 @@ import type {
   ExpeditionMobInfo,
   ExpeditionRoundLog,
 } from '@pocketrealm/shared';
-import { EXPEDITION_CONSTANTS } from '@pocketrealm/shared';
+import { EXPEDITION_CONSTANTS, mobDisplayName } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
 
 // ---------------------------------------------------------------------------
@@ -73,14 +74,14 @@ function roomTypeBadge(roomType: ExpeditionRoomType | null): { label: string; co
 
 function Countdown({ expiresAt, onExpired }: { expiresAt: string | null; onExpired?: () => void }) {
   const [remaining, setRemaining] = useState('');
-  const [fired, setFired] = useState(false);
+  const firedRef = useRef(false);
   useEffect(() => {
     if (!expiresAt) return;
-    setFired(false);
+    firedRef.current = false;
     const tick = () => {
       const ms = new Date(expiresAt).getTime() - Date.now();
-      if (ms <= 0 && !fired) {
-        setFired(true);
+      if (ms <= 0 && !firedRef.current) {
+        firedRef.current = true;
         onExpired?.();
       }
       setRemaining(formatTimeRemaining(expiresAt));
@@ -88,7 +89,7 @@ function Countdown({ expiresAt, onExpired }: { expiresAt: string | null; onExpir
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [expiresAt, onExpired, fired]);
+  }, [expiresAt, onExpired]);
   if (!expiresAt) return null;
   return <span className="text-xs text-[var(--rpg-text-secondary)]">{remaining}</span>;
 }
@@ -108,10 +109,6 @@ function HpBar({ current, max, label, color }: { current: number; max: number; l
       </div>
     </div>
   );
-}
-
-function mobDisplayName(mob: ExpeditionMobInfo): string {
-  return mob.prefix ? `${mob.prefix} ${mob.name}` : mob.name;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,15 +137,30 @@ export function GuildExpeditionsTab({
       const res = await getActiveExpedition();
       if (res.error) { setError(res.error.message); return; }
       if (res.data?.expedition) {
-        setExpedition(res.data.expedition);
         const detail = await getExpeditionStatus(res.data.expedition.id);
         if (detail.data) {
           setExpedition(detail.data.expedition);
           setMembers(detail.data.members);
+        } else {
+          setExpedition(res.data.expedition);
         }
       } else {
-        setExpedition(null);
-        setMembers([]);
+        // No active expedition — check if one recently finished (show results briefly)
+        const history = await getExpeditionHistory(1);
+        const latest = history.data?.expeditions?.[0];
+        if (latest?.completedAt && Date.now() - new Date(latest.completedAt).getTime() < 3600_000) {
+          const detail = await getExpeditionStatus(latest.id);
+          if (detail.data) {
+            setExpedition(detail.data.expedition);
+            setMembers(detail.data.members);
+          } else {
+            setExpedition(null);
+            setMembers([]);
+          }
+        } else {
+          setExpedition(null);
+          setMembers([]);
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load expedition');
@@ -494,7 +506,7 @@ function InProgressView({
 }) {
   const roomBadge = roomTypeBadge(expedition.currentRoomType);
   const roomPct = expedition.totalRooms > 0
-    ? Math.min((expedition.currentRoom / expedition.totalRooms) * 100, 100)
+    ? Math.min(((expedition.currentRoom + 0.5) / expedition.totalRooms) * 100, 100)
     : 0;
 
   const isResting = expedition.currentRoomType === null && expedition.status === 'in_progress';
@@ -634,7 +646,7 @@ function InProgressView({
       )}
 
       {/* Member status */}
-      <MemberList members={members} showResources actionLoading={actionLoading} onRecover={onRecover} />
+      <MemberList members={members} playerId={playerId} showResources actionLoading={actionLoading} onRecover={onRecover} />
     </div>
   );
 }
@@ -643,28 +655,33 @@ function InProgressView({
 // Round Log Display
 // ---------------------------------------------------------------------------
 
+function roundKey(log: ExpeditionRoundLog): string {
+  return `${log.roomIndex}-${log.round}`;
+}
+
 function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId: string | null }) {
-  const [expandedRound, setExpandedRound] = useState<number | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   // Auto-expand latest round
-  const latestRound = logs.length > 0 ? logs[logs.length - 1].round : null;
-  const effectiveExpanded = expandedRound ?? latestRound;
+  const latestKey = logs.length > 0 ? roundKey(logs[logs.length - 1]) : null;
+  const effectiveExpanded = expandedKey ?? latestKey;
 
   return (
     <PixelCard>
       <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-2">Round Log</h4>
       <div className="space-y-1">
         {[...logs].reverse().map((log) => {
-          const isExpanded = effectiveExpanded === log.round;
+          const key = roundKey(log);
+          const isExpanded = effectiveExpanded === key;
           const outcome = log.phases.outcome;
           return (
-            <div key={log.round}>
+            <div key={key}>
               <button
-                onClick={() => setExpandedRound(isExpanded ? -1 : log.round)}
+                onClick={() => setExpandedKey(isExpanded ? null : key)}
                 className="w-full flex justify-between items-center px-2 py-1 rounded text-xs hover:bg-[var(--rpg-surface)]"
               >
                 <span className="text-[var(--rpg-text-primary)] font-bold">
-                  Round {log.round}
+                  {logs.some(l => l.roomIndex !== logs[0]?.roomIndex) ? `R${log.roomIndex + 1} · ` : ''}Round {log.round}
                 </span>
                 <div className="flex gap-2 text-[10px]">
                   {outcome.mobsKilled > 0 && (
@@ -944,11 +961,13 @@ function FailedView({ expedition, members }: { expedition: ExpeditionData; membe
 
 function MemberList({
   members,
+  playerId,
   showResources,
   actionLoading,
   onRecover,
 }: {
   members: ExpeditionMemberData[];
+  playerId?: string | null;
   showResources?: boolean;
   actionLoading?: boolean;
   onRecover?: () => void;
@@ -983,7 +1002,7 @@ function MemberList({
                 </div>
               )}
             </div>
-            {showResources && m.isKnockedOut && onRecover && (
+            {showResources && m.isKnockedOut && m.playerId === playerId && onRecover && (
               <PixelButton size="sm" variant="danger" onClick={onRecover} disabled={actionLoading}>
                 Recover
               </PixelButton>

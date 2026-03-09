@@ -12,7 +12,7 @@ import type {
   MobTelegraphEntry,
   ExpeditionRoundLog,
 } from '@pocketrealm/shared';
-import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, BOSS_ACTION_DEFINITIONS } from '@pocketrealm/shared';
+import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, BOSS_ACTION_DEFINITIONS, mobDisplayName } from '@pocketrealm/shared';
 import {
   resolveParticipantActions,
   resolveSupportiveActions,
@@ -57,10 +57,6 @@ function checkPhaseTransition(mob: ExpeditionMobState): void {
   }
 }
 
-function mobDisplayName(mob: { prefix: string | null; name: string }): string {
-  return mob.prefix ? `${mob.prefix} ${mob.name}` : mob.name;
-}
-
 function actionLabel(actionId: string, defs: Record<string, ActionDefinition>): string {
   return defs[actionId]?.name ?? actionId.replace(/_/g, ' ');
 }
@@ -82,6 +78,7 @@ export function resolveRaidRound(
   for (const p of input.participants) {
     usernameMap.set(p.playerId, p.username ?? p.playerId.slice(0, 8));
   }
+  const getUsername = (id: string) => usernameMap.get(id) ?? id.slice(0, 8);
 
   // Mutable copies of mob state
   const mobState = input.mobs.map(m => ({
@@ -180,23 +177,22 @@ export function resolveRaidRound(
       const defenseTarget = target.stats.dodge;
       const hits = doesAttackHit(attackRoll, modifier, defenseTarget, 0);
 
+      const baseEntry = {
+        playerId: p.playerId,
+        username: getUsername(p.playerId),
+        actionId: s.actionId,
+        actionLabel: actionLabel(s.actionId, playerActionDefs),
+        targetMobId: target.id,
+        targetMobName: mobDisplayName(target),
+        attackRoll,
+        modifier,
+        defenseTarget,
+        staminaCost: def.cost.stamina,
+        manaCost: def.cost.mana,
+      };
+
       if (!hits) {
-        // Log miss
-        logPlayerAttacks.push({
-          playerId: p.playerId,
-          username: usernameMap.get(p.playerId) ?? p.playerId.slice(0, 8),
-          actionId: s.actionId,
-          actionLabel: actionLabel(s.actionId, playerActionDefs),
-          targetMobId: target.id,
-          targetMobName: mobDisplayName(target),
-          attackRoll,
-          modifier,
-          defenseTarget,
-          hit: false,
-          crit: false,
-          staminaCost: def.cost.stamina,
-          manaCost: def.cost.mana,
-        });
+        logPlayerAttacks.push({ ...baseEntry, hit: false, crit: false });
         continue;
       }
 
@@ -214,23 +210,7 @@ export function resolveRaidRound(
       target.hp = Math.max(0, target.hp - damage);
       totalDamageDealt += damage;
 
-      logPlayerAttacks.push({
-        playerId: p.playerId,
-        username: usernameMap.get(p.playerId) ?? p.playerId.slice(0, 8),
-        actionId: s.actionId,
-        actionLabel: actionLabel(s.actionId, playerActionDefs),
-        targetMobId: target.id,
-        targetMobName: mobDisplayName(target),
-        attackRoll,
-        modifier,
-        defenseTarget,
-        hit: true,
-        crit,
-        damageRoll: rawDmg,
-        totalDamage: damage,
-        staminaCost: def.cost.stamina,
-        manaCost: def.cost.mana,
-      });
+      logPlayerAttacks.push({ ...baseEntry, hit: true, crit, damageRoll: rawDmg, totalDamage: damage });
     }
 
     s.damageDealt = totalDamageDealt;
@@ -245,8 +225,8 @@ export function resolveRaidRound(
   }
 
   // --- Step 5: Player supportive phase ---
-  // Capture healing entries from supportive actions
-  const hpBefore = new Map(pState.map(s => [s.playerId, s.hp]));
+  // Capture aggro holder BEFORE healing changes threat (matches resolveSupportiveActions logic)
+  const preHealAggroHolder = getSingleTarget(input.threatTable, new Set(pState.filter(ps => ps.hp > 0).map(ps => ps.playerId)));
   resolveSupportiveActions(input.participants, pState, input.threatTable);
 
   for (let i = 0; i < pState.length; i++) {
@@ -255,25 +235,23 @@ export function resolveRaidRound(
     if (!def || def.category !== 'supportive') continue;
     if (s.healingDone <= 0) continue;
 
-    const aggroHolder = getSingleTarget(input.threatTable, new Set(pState.filter(ps => ps.hp > 0).map(ps => ps.playerId)));
-
     if (def.actionType === 'heal_self') {
       logHealing.push({
         playerId: s.playerId,
-        username: usernameMap.get(s.playerId) ?? s.playerId.slice(0, 8),
+        username: getUsername(s.playerId),
         actionLabel: actionLabel(s.actionId, playerActionDefs),
         amountHealed: s.healingDone,
         targetPlayerId: s.playerId,
-        targetUsername: usernameMap.get(s.playerId) ?? s.playerId.slice(0, 8),
+        targetUsername: getUsername(s.playerId),
       });
-    } else if (def.actionType === 'heal_ally' && aggroHolder) {
+    } else if (def.actionType === 'heal_ally' && preHealAggroHolder) {
       logHealing.push({
         playerId: s.playerId,
-        username: usernameMap.get(s.playerId) ?? s.playerId.slice(0, 8),
+        username: getUsername(s.playerId),
         actionLabel: actionLabel(s.actionId, playerActionDefs),
         amountHealed: s.healingDone,
-        targetPlayerId: aggroHolder,
-        targetUsername: usernameMap.get(aggroHolder) ?? aggroHolder.slice(0, 8),
+        targetPlayerId: preHealAggroHolder,
+        targetUsername: getUsername(preHealAggroHolder),
       });
     }
   }
@@ -342,7 +320,7 @@ export function resolveRaidRound(
         if (blocked) {
           mobLogEntry.targets.push({
             playerId: targetId,
-            username: usernameMap.get(targetId) ?? targetId.slice(0, 8),
+            username: getUsername(targetId),
             damageTaken: 0,
             blocked: true,
             knockedOut: false,
@@ -374,7 +352,7 @@ export function resolveRaidRound(
 
         mobLogEntry.targets.push({
           playerId: targetId,
-          username: usernameMap.get(targetId) ?? targetId.slice(0, 8),
+          username: getUsername(targetId),
           damageTaken: damage,
           blocked: false,
           knockedOut: targetState.hp <= 0,

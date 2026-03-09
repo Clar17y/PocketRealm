@@ -718,7 +718,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
     mobs: currentRoomDef.mobs.map(mob => {
       const afterMob = result.mobsAfter.find(m => m.id === mob.id);
       if (afterMob) {
-        return { ...mob, hp: afterMob.hp, activeEffects: afterMob.activeEffects };
+        return { ...mob, hp: afterMob.hp, activeEffects: afterMob.activeEffects, actionTemplate: afterMob.actionTemplate };
       }
       // Mob was killed
       return { ...mob, hp: 0 };
@@ -867,12 +867,11 @@ export async function handleWipe(expeditionId: string): Promise<void> {
   });
   if (!expedition) return;
 
-  // Count total wipes from round logs (wipe outcome entries)
+  // Count total wipes from round logs (current wipe is already stored before this call)
   const logs = (Array.isArray(expedition.roundSummaries)
     ? expedition.roundSummaries
     : []) as unknown as ExpeditionRoundLog[];
-  // +1 for the current wipe that triggered this call
-  const wipeCount = logs.filter(l => l.phases?.outcome?.wipe).length + 1;
+  const wipeCount = logs.filter(l => l.phases?.outcome?.wipe).length;
 
   if (wipeCount >= EXPEDITION_CONSTANTS.MAX_WIPES_PER_EXPEDITION) {
     await prisma.guildExpedition.update({

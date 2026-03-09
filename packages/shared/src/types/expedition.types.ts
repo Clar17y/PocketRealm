@@ -150,15 +150,6 @@ export interface ExpeditionMemberData {
   signedUpAt: string;
 }
 
-export interface ExpeditionRoundSummary {
-  roundNumber: number;
-  roomIndex: number;
-  participantResults: RaidParticipantResult[];
-  mobActionResults: MobActionResult[];
-  roomCleared: boolean;
-  allPlayersDead: boolean;
-}
-
 // --- Round Log (detailed action-level breakdown) ---
 
 export interface PlayerAttackEntry {

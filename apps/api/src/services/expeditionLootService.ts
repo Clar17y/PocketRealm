@@ -87,6 +87,18 @@ export async function distributeRoomLoot(
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function trackTokensEarned(expeditionId: string | undefined, playerIds: string[], amount: number): Promise<void> {
+  if (!expeditionId || amount <= 0) return;
+  await prisma.guildExpeditionMember.updateMany({
+    where: { expeditionId, playerId: { in: playerIds } },
+    data: { tokensEarned: { increment: amount } },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Room Token Awards
 // ---------------------------------------------------------------------------
 
@@ -95,7 +107,7 @@ export async function distributeRoomLoot(
  * Returns the token amount per player.
  */
 export async function awardRoomTokens(
-  members: { playerId: string; expeditionId?: string }[],
+  members: { playerId: string }[],
   roomType: ExpeditionRoomType,
   tier: number,
   expeditionId?: string,
@@ -109,14 +121,7 @@ export async function awardRoomTokens(
     where: { id: { in: playerIds } },
     data: { expeditionTokens: { increment: tokens } },
   });
-
-  // Track tokens earned on member records
-  if (expeditionId) {
-    await prisma.guildExpeditionMember.updateMany({
-      where: { expeditionId, playerId: { in: playerIds } },
-      data: { tokensEarned: { increment: tokens } },
-    });
-  }
+  await trackTokensEarned(expeditionId, playerIds, tokens);
 
   return tokens;
 }
@@ -155,14 +160,7 @@ export async function awardCompletionBonus(
     where: { id: { in: playerIds } },
     data: { expeditionTokens: { increment: bonusTokens } },
   });
-
-  // Track tokens earned on member records
-  if (expeditionId) {
-    await prisma.guildExpeditionMember.updateMany({
-      where: { expeditionId, playerId: { in: playerIds } },
-      data: { tokensEarned: { increment: bonusTokens } },
-    });
-  }
+  await trackTokensEarned(expeditionId, playerIds, bonusTokens);
 
   return bonusTokens;
 }

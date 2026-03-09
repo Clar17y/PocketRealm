@@ -10,7 +10,7 @@ import {
   signUpForExpedition,
   recoverFromKO,
   forceStartExpedition,
-  checkAndResolveExpeditionRounds,
+  resolveExpeditionRound,
   setTargetMob,
 } from '../services/expeditionService';
 import {
@@ -199,14 +199,8 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
     throw new AppError(403, 'Officer or leader role required', 'INSUFFICIENT_ROLE');
   }
 
-  // Set nextRoundAt to past so checkAndResolve processes it immediately
-  await prisma.guildExpedition.update({
-    where: { id },
-    data: { nextRoundAt: new Date(0) },
-  });
-
-  // Trigger resolution now (same function the background timer calls)
-  await checkAndResolveExpeditionRounds(null);
+  // Resolve this expedition's round directly (not the global scheduler)
+  await resolveExpeditionRound(id, null);
 
   // Fetch updated state
   const updated = await prisma.guildExpedition.findUnique({
