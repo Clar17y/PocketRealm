@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ModalOverlay } from './ModalOverlay';
 
 interface FeatureTutorialProps {
@@ -26,7 +27,7 @@ export function FeatureTutorial({ storageKey, title, children, condition = true 
     setShow(false);
   };
 
-  return (
+  return createPortal(
     <ModalOverlay opacity={60}>
       <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-xl p-6 max-w-sm mx-4 shadow-2xl max-h-[80vh] overflow-y-auto">
         <h3 className="text-lg font-bold text-[var(--rpg-gold)] mb-3">{title}</h3>
@@ -41,6 +42,7 @@ export function FeatureTutorial({ storageKey, title, children, condition = true 
           Got it
         </button>
       </div>
-    </ModalOverlay>
+    </ModalOverlay>,
+    document.body,
   );
 }
