@@ -14,6 +14,7 @@ import {
   forceNextRound,
   recoverFromExpeditionKO,
   setExpeditionTarget,
+  setExpeditionHealTarget,
   getExpeditionCooldowns,
 } from '@/lib/api/expedition';
 import type {
@@ -314,6 +315,18 @@ export function GuildExpeditionsTab({
     }
   };
 
+  const handleSetHealTarget = async (healTargetPlayerId: string | null) => {
+    if (!expedition) return;
+    setError(null);
+    try {
+      const res = await setExpeditionHealTarget(expedition.id, healTargetPlayerId);
+      if (res.error) { setError(res.error.message); return; }
+      void loadExpedition();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to set heal target');
+    }
+  };
+
   if (loading) return <LoadingCard />;
 
   // No active expedition
@@ -348,6 +361,7 @@ export function GuildExpeditionsTab({
           onRecover={handleRecover}
           onForceRound={handleForceRound}
           onSetTarget={handleSetTarget}
+          onSetHealTarget={handleSetHealTarget}
           onRefresh={loadExpedition}
           onExpired={loadExpedition}
         />
@@ -561,6 +575,7 @@ function InProgressView({
   onRecover,
   onForceRound,
   onSetTarget,
+  onSetHealTarget,
   onRefresh,
   onExpired,
 }: {
@@ -572,6 +587,7 @@ function InProgressView({
   onRecover: () => void;
   onForceRound: () => void;
   onSetTarget: (targetMobId: string | null) => void;
+  onSetHealTarget: (healTargetPlayerId: string | null) => void;
   onRefresh: () => void;
   onExpired: () => void;
 }) {
@@ -734,7 +750,16 @@ function InProgressView({
       )}
 
       {/* Member status */}
-      <MemberList members={members} playerId={playerId} showResources actionLoading={actionLoading} onRecover={isBetweenRooms ? onRecover : undefined} />
+      <MemberList
+        members={members}
+        playerId={playerId}
+        showResources
+        actionLoading={actionLoading}
+        onRecover={isBetweenRooms ? onRecover : undefined}
+        onSetHealTarget={onSetHealTarget}
+        myHealTargetPlayerId={myMember?.healTargetPlayerId ?? null}
+        amKnockedOut={amKnockedOut}
+      />
     </div>
   );
 }
@@ -1056,21 +1081,40 @@ function MemberList({
   showResources,
   actionLoading,
   onRecover,
+  onSetHealTarget,
+  myHealTargetPlayerId,
+  amKnockedOut,
 }: {
   members: ExpeditionMemberData[];
   playerId?: string | null;
   showResources?: boolean;
   actionLoading?: boolean;
   onRecover?: () => void;
+  onSetHealTarget?: (playerId: string | null) => void;
+  myHealTargetPlayerId?: string | null;
+  amKnockedOut?: boolean;
 }) {
   if (members.length === 0) return null;
 
+  const canHealTarget = showResources && onSetHealTarget && !amKnockedOut;
+
   return (
     <PixelCard>
-      <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-2">Participants ({members.length})</h4>
+      <div className="flex justify-between items-center mb-2">
+        <h4 className="text-xs font-bold text-[var(--rpg-text-primary)]">Participants ({members.length})</h4>
+        {canHealTarget && myHealTargetPlayerId && (
+          <button
+            onClick={() => onSetHealTarget(null)}
+            className="text-[10px] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] underline"
+          >
+            Clear Heal Target
+          </button>
+        )}
+      </div>
       <div className="space-y-2">
-        {members.map((m) => (
-          <div key={m.playerId} className="flex items-center gap-2">
+        {members.map((m) => {
+          const isMyHealTarget = myHealTargetPlayerId === m.playerId;
+          const memberRow = (
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <span className="text-xs text-[var(--rpg-text-primary)] truncate">
@@ -1079,6 +1123,11 @@ function MemberList({
                 {m.isKnockedOut && (
                   <span className="text-[10px] px-1.5 py-0 rounded bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]">
                     KO
+                  </span>
+                )}
+                {isMyHealTarget && (
+                  <span className="text-[10px] px-1.5 py-0 rounded bg-[var(--rpg-green-light)]/20 text-[var(--rpg-green-light)]">
+                    HEAL TARGET
                   </span>
                 )}
               </div>
@@ -1101,13 +1150,36 @@ function MemberList({
                 </div>
               )}
             </div>
-            {showResources && m.isKnockedOut && m.playerId === playerId && onRecover && (
-              <PixelButton size="sm" variant="danger" onClick={onRecover} disabled={actionLoading}>
-                Recover
-              </PixelButton>
-            )}
-          </div>
-        ))}
+          );
+
+          return (
+            <div
+              key={m.playerId}
+              className={`flex items-center gap-2 ${
+                canHealTarget
+                  ? `rounded border p-1.5 transition-colors cursor-pointer ${
+                      isMyHealTarget
+                        ? 'border-[var(--rpg-green-light)] bg-[var(--rpg-green-light)]/10'
+                        : 'border-[var(--rpg-border)] hover:border-[var(--rpg-text-secondary)]'
+                    }`
+                  : ''
+              }`}
+              onClick={canHealTarget ? () => onSetHealTarget(isMyHealTarget ? null : m.playerId) : undefined}
+            >
+              {memberRow}
+              {showResources && m.isKnockedOut && m.playerId === playerId && onRecover && (
+                <PixelButton
+                  size="sm"
+                  variant="danger"
+                  onClick={(e: React.MouseEvent) => { e.stopPropagation(); onRecover(); }}
+                  disabled={actionLoading}
+                >
+                  Recover
+                </PixelButton>
+              )}
+            </div>
+          );
+        })}
       </div>
       {showResources && members.some((m) => m.totalDamage > 0 || m.totalHealing > 0) && (
         <div className="mt-3 pt-2 border-t border-[var(--rpg-border)]">
