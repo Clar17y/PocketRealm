@@ -1226,17 +1226,18 @@ describe('resolveRaidRound', () => {
         hp: 200, maxHp: 200,
         actionTemplate: [{ actionId: 'boss_summon_adds', targetMode: 'aoe' }],
       });
-      const summonTemplate = makeMob({
-        id: 'template-skeleton',
-        name: 'Skeleton',
-        hp: 40, maxHp: 40,
-      });
+      // Provide 3 templates so pool can support full 2-3 spawn count
+      const summonTemplates = [
+        makeMob({ id: 'template-skeleton-1', name: 'Skeleton', hp: 40, maxHp: 40 }),
+        makeMob({ id: 'template-skeleton-2', name: 'Skeleton', hp: 40, maxHp: 40 }),
+        makeMob({ id: 'template-skeleton-3', name: 'Skeleton', hp: 40, maxHp: 40 }),
+      ];
 
       const result = resolveRaidRound(
         makeInput({
           mobs: [boss],
           roundNumber: 1,
-          summonPool: [summonTemplate],
+          summonPool: summonTemplates,
         }),
         alwaysHitRng,
       );
@@ -1314,6 +1315,102 @@ describe('resolveRaidRound', () => {
 
       expect(result.mobsAfter.length).toBe(1);
       expect(result.mobsAfter[0].id).toBe('boss1');
+    });
+
+    it('spawned mobs do not act in the round they are summoned', () => {
+      // Boss summons, then the adds should NOT attack this round
+      const boss = makeMob({
+        id: 'boss1',
+        name: 'Necromancer',
+        hp: 200, maxHp: 200,
+        actionTemplate: [{ actionId: 'boss_summon_adds', targetMode: 'aoe' }],
+      });
+      const summonTemplate = makeMob({
+        id: 'template-skeleton',
+        name: 'Skeleton',
+        hp: 40, maxHp: 40,
+        stats: makeStats({ damageMin: 20, damageMax: 20 }),
+        actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+      });
+      const player = makeParticipant({ hp: 100, maxHp: 100 });
+
+      const result = resolveRaidRound(
+        makeInput({
+          mobs: [boss],
+          participants: [player],
+          roundNumber: 1,
+          summonPool: [summonTemplate],
+        }),
+        alwaysHitRng,
+      );
+
+      // The mob action log should only have the summon action, no skeleton attacks
+      const skeletonAttacks = result.roundLog.phases.mobActions.filter(
+        a => a.mobName === 'Skeleton',
+      );
+      expect(skeletonAttacks.length).toBe(0);
+
+      // Player should take 0 damage (boss only summons, doesn't attack)
+      expect(result.participantResults[0].damageTaken).toBe(0);
+    });
+
+    it('kill count does not go negative when mobs are summoned', () => {
+      const boss = makeMob({
+        id: 'boss1',
+        name: 'Necromancer',
+        hp: 200, maxHp: 200,
+        actionTemplate: [{ actionId: 'boss_summon_adds', targetMode: 'aoe' }],
+      });
+      const summonTemplate = makeMob({
+        id: 'template-skeleton',
+        name: 'Skeleton',
+        hp: 40, maxHp: 40,
+      });
+
+      const result = resolveRaidRound(
+        makeInput({
+          mobs: [boss],
+          roundNumber: 1,
+          summonPool: [summonTemplate],
+        }),
+        alwaysHitRng,
+      );
+
+      // mobsKilled in the outcome should never be negative
+      expect(result.roundLog.phases.outcome.mobsKilled).toBeGreaterThanOrEqual(0);
+    });
+
+    it('total summons are capped at 8 across the fight', () => {
+      // Start with a boss + 6 existing summons
+      const boss = makeMob({
+        id: 'boss1',
+        name: 'Necromancer',
+        hp: 200, maxHp: 200,
+        actionTemplate: [{ actionId: 'boss_summon_adds', targetMode: 'aoe' }],
+      });
+      const existingSummons = Array.from({ length: 6 }, (_, i) => makeMob({
+        id: `mob-summon-prev-${i}`,
+        name: 'Skeleton',
+        hp: 40, maxHp: 40,
+      }));
+      const summonTemplate = makeMob({
+        id: 'template-skeleton',
+        name: 'Skeleton',
+        hp: 40, maxHp: 40,
+      });
+
+      const result = resolveRaidRound(
+        makeInput({
+          mobs: [boss, ...existingSummons],
+          roundNumber: 1,
+          summonPool: [summonTemplate],
+        }),
+        alwaysHitRng,
+      );
+
+      // Should have at most 8 summons total (6 existing + 2 new max)
+      const allSummons = result.mobsAfter.filter(m => m.id.startsWith('mob-summon-'));
+      expect(allSummons.length).toBeLessThanOrEqual(8);
     });
   });
 

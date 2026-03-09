@@ -100,6 +100,12 @@ export function resolveRaidRound(
     activeEffects: [...m.activeEffects],
   }));
 
+  // Track original mob count (before summons) for kill counting
+  const originalMobCount = mobState.filter(m => m.hp > 0).length;
+
+  // Collect spawned mobs separately so they don't act in the round they're summoned
+  const spawnedThisRound: ExpeditionMobState[] = [];
+
   // Merge boss action definitions for mob lookups
   const mobActionDefs: Record<string, ActionDefinition> = { ...BOSS_ACTION_DEFINITIONS };
 
@@ -426,19 +432,24 @@ export function resolveRaidRound(
 
     // boss_summon_adds: spawn new mobs from the summon pool
     if (templateAction.actionId === 'boss_summon_adds' && input.summonPool && input.summonPool.length > 0) {
-      const spawnCount = 2 + (roll.rollDamage(0, 1) >= 1 ? 1 : 0); // 2-3 adds
-      const spawned: ExpeditionMobState[] = [];
-      for (let s = 0; s < spawnCount && input.summonPool.length > 0; s++) {
-        const poolIndex = roll.rollDamage(0, input.summonPool.length - 1);
-        const template = input.summonPool[poolIndex];
-        const spawnedMob: ExpeditionMobState = {
-          ...template,
-          id: `mob-summon-${input.roundNumber}-${s}`,
-          hp: template.maxHp,
-          activeEffects: [],
-        };
-        spawned.push(spawnedMob);
-        mobState.push(spawnedMob);
+      const MAX_TOTAL_SUMMONS = 8;
+      const existingSummonCount = mobState.filter(m => m.id.startsWith('mob-summon-')).length + spawnedThisRound.length;
+      const remainingBudget = MAX_TOTAL_SUMMONS - existingSummonCount;
+
+      if (remainingBudget > 0) {
+        const spawnCount = Math.min(2 + (roll.rollDamage(0, 1) >= 1 ? 1 : 0), remainingBudget); // 2-3 adds, capped
+        const mutablePool = [...input.summonPool];
+        for (let s = 0; s < spawnCount && mutablePool.length > 0; s++) {
+          const poolIndex = roll.rollDamage(0, mutablePool.length - 1);
+          const template = mutablePool.splice(poolIndex, 1)[0];
+          const spawnedMob: ExpeditionMobState = {
+            ...template,
+            id: `mob-summon-${input.roundNumber}-${s}`,
+            hp: template.maxHp,
+            activeEffects: [],
+          };
+          spawnedThisRound.push(spawnedMob);
+        }
       }
       logMobActions.push({
         mobId: mob.id,
@@ -616,6 +627,11 @@ export function resolveRaidRound(
     logMobActions.push(mobLogEntry);
   }
 
+  // Push spawned mobs into mobState AFTER the mob loop so they don't act this round
+  for (const spawned of spawnedThisRound) {
+    mobState.push(spawned);
+  }
+
   // --- Step 7: Environmental DoT ---
   if (input.environmentalDotPercent && input.environmentalDotPercent > 0) {
     for (let i = 0; i < pState.length; i++) {
@@ -751,7 +767,8 @@ export function resolveRaidRound(
   }
 
   // --- Build round log ---
-  const mobsKilledThisRound = input.mobs.filter(m => m.hp > 0).length - mobsAfter.length;
+  // Count kills from mobs that were alive at start (excludes summons from inflating count)
+  const mobsKilledThisRound = Math.max(0, originalMobCount - mobsAfter.filter(m => !m.id.startsWith('mob-summon-')).length);
   const roundLog: ExpeditionRoundLog = {
     round: input.roundNumber,
     roomIndex: 0, // Will be set by the service layer

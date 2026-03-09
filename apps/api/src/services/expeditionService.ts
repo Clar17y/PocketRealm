@@ -775,16 +775,24 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
 
   // Update room mob state in roomDefinitions JSON
   const updatedRooms = [...rooms];
+  const existingMobIds = new Set(currentRoomDef.mobs.map(m => m.id));
+  const updatedMobs = currentRoomDef.mobs.map(mob => {
+    const afterMob = result.mobsAfter.find(m => m.id === mob.id);
+    if (afterMob) {
+      return { ...mob, hp: afterMob.hp, activeEffects: afterMob.activeEffects, actionTemplate: afterMob.actionTemplate };
+    }
+    // Mob was killed
+    return { ...mob, hp: 0 };
+  });
+  // Persist spawned mobs (summons) that weren't in the original room definition
+  for (const afterMob of result.mobsAfter) {
+    if (!existingMobIds.has(afterMob.id)) {
+      updatedMobs.push(afterMob);
+    }
+  }
   updatedRooms[expedition.currentRoom] = {
     ...currentRoomDef,
-    mobs: currentRoomDef.mobs.map(mob => {
-      const afterMob = result.mobsAfter.find(m => m.id === mob.id);
-      if (afterMob) {
-        return { ...mob, hp: afterMob.hp, activeEffects: afterMob.activeEffects, actionTemplate: afterMob.actionTemplate };
-      }
-      // Mob was killed
-      return { ...mob, hp: 0 };
-    }),
+    mobs: updatedMobs,
   };
 
   // Build round log from engine result
