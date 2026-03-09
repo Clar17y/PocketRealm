@@ -6,6 +6,7 @@ import { AppError } from '../middleware/errorHandler';
 import {
   getActiveExpedition,
   getExpeditionStatus,
+  getExpeditionCooldowns,
   launchExpedition,
   signUpForExpedition,
   recoverFromKO,
@@ -23,6 +24,20 @@ import { paginationSchema, buildPagination } from '../utils/routeHelpers';
 
 export const expeditionRouter = Router();
 expeditionRouter.use(authenticate);
+
+// GET /cooldowns
+expeditionRouter.get('/cooldowns', asyncHandler(async (req, res) => {
+  const membership = await prisma.guildMember.findUnique({
+    where: { playerId: req.player!.playerId },
+    select: { guildId: true },
+  });
+  if (!membership) {
+    res.json({ data: { weeklyCooldowns: {}, betweenCooldown: null, hasActiveExpedition: false } });
+    return;
+  }
+  const cooldowns = await getExpeditionCooldowns(membership.guildId);
+  res.json({ data: cooldowns });
+}));
 
 // GET /active
 expeditionRouter.get('/active', asyncHandler(async (req, res) => {

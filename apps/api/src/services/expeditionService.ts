@@ -136,6 +136,50 @@ function toExpeditionMemberData(m: GuildExpeditionMemberRow): ExpeditionMemberDa
 }
 
 // ---------------------------------------------------------------------------
+// Cooldowns
+// ---------------------------------------------------------------------------
+
+export async function getExpeditionCooldowns(guildId: string): Promise<{
+  weeklyCooldowns: Record<number, string | null>;
+  betweenCooldown: string | null;
+  hasActiveExpedition: boolean;
+}> {
+  const weeklyAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.WEEKLY_COOLDOWN_MS);
+  const betweenAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
+
+  const [activeExp, recentCompleted, recentAny] = await Promise.all([
+    prisma.guildExpedition.findFirst({
+      where: { guildId, status: { in: ['recruiting', 'in_progress'] } },
+    }),
+    prisma.guildExpedition.findMany({
+      where: { guildId, status: 'completed', completedAt: { gt: weeklyAgo } },
+      select: { tier: true, completedAt: true },
+    }),
+    prisma.guildExpedition.findFirst({
+      where: { guildId, status: { in: ['completed', 'failed'] }, completedAt: { gt: betweenAgo } },
+      select: { completedAt: true },
+      orderBy: { completedAt: 'desc' },
+    }),
+  ]);
+
+  const weeklyCooldowns: Record<number, string | null> = { 1: null, 2: null, 3: null };
+  for (const exp of recentCompleted) {
+    if (exp.completedAt) {
+      const expiry = new Date(exp.completedAt.getTime() + EXPEDITION_CONSTANTS.WEEKLY_COOLDOWN_MS);
+      if (!weeklyCooldowns[exp.tier] || expiry > new Date(weeklyCooldowns[exp.tier]!)) {
+        weeklyCooldowns[exp.tier] = expiry.toISOString();
+      }
+    }
+  }
+
+  const betweenCooldown = recentAny?.completedAt
+    ? new Date(recentAny.completedAt.getTime() + EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS).toISOString()
+    : null;
+
+  return { weeklyCooldowns, betweenCooldown, hasActiveExpedition: !!activeExp };
+}
+
+// ---------------------------------------------------------------------------
 // Launch Expedition
 // ---------------------------------------------------------------------------
 
@@ -172,7 +216,7 @@ export async function launchExpedition(
       where: { guildId, status: { in: ['recruiting', 'in_progress'] } },
     }),
     prisma.guildExpedition.findFirst({
-      where: { guildId, tier, status: { in: ['completed', 'failed'] }, completedAt: { gt: weeklyAgo } },
+      where: { guildId, tier, status: 'completed', completedAt: { gt: weeklyAgo } },
     }),
     prisma.guildExpedition.findFirst({
       where: { guildId, status: { in: ['completed', 'failed'] }, completedAt: { gt: dayAgo } },
