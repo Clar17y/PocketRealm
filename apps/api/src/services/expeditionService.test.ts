@@ -91,6 +91,7 @@ vi.mock('@pocketrealm/game-engine', async () => {
         hit: true,
         isCritical: false,
         activeEffectsAfter: [],
+        potionsConsumed: [],
       }],
       mobActionResults: [{
         mobId: 'mob-0-0',
@@ -637,42 +638,37 @@ describe('expeditionService', () => {
   // =========================================================================
 
   describe('handleWipe', () => {
-    it('restores mob and player HP from snapshot', async () => {
-      const snapshot = {
-        mobs: [{ id: 'mob-0-0', hp: 100, maxHp: 100, stats: {}, actionTemplate: [], activeEffects: [] }],
-        members: [{ playerId: PLAYER_ID, currentHp: 100, currentStamina: 80, currentMana: 50 }],
-      };
-
+    it('resets expedition to recruiting, deletes members, and regenerates rooms', async () => {
       mockPrisma.guildExpedition.findUnique.mockResolvedValue(
         makeExpeditionRow({
           status: 'in_progress',
-          roomStartSnapshot: snapshot,
+          wipeCount: 0,
+          expeditionAttemptLogs: [],
+          members: [{ playerId: PLAYER_ID, totalDamage: 50n, totalHealing: 0n }],
         }),
       );
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([makeMobTemplate()]);
+      mockPrisma.guildExpeditionMember.deleteMany.mockResolvedValue({ count: 1 });
       mockPrisma.guildExpedition.update.mockResolvedValue({});
-      mockPrisma.guildExpeditionMember.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.guildLog.create.mockResolvedValue({});
 
       await handleWipe(EXPEDITION_ID);
 
-      // Mob HP restored via roomDefinitions update
+      // Members deleted for re-signup
+      expect(mockPrisma.guildExpeditionMember.deleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { expeditionId: EXPEDITION_ID },
+        }),
+      );
+      // Expedition reset to recruiting with incremented wipeCount
       expect(mockPrisma.guildExpedition.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: EXPEDITION_ID },
           data: expect.objectContaining({
+            wipeCount: 1,
+            status: 'recruiting',
+            currentRoom: 0,
             roundNumber: 0,
-          }),
-        }),
-      );
-      // Player HP/resources restored from snapshot
-      expect(mockPrisma.guildExpeditionMember.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { expeditionId: EXPEDITION_ID, playerId: PLAYER_ID },
-          data: expect.objectContaining({
-            currentHp: 100,
-            currentStamina: 80,
-            currentMana: 50,
-            isKnockedOut: false,
           }),
         }),
       );
