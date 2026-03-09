@@ -1,6 +1,6 @@
 import type { BossActiveEffect } from './worldEvent.types';
 import type { BossTargetMode, BossTemplateAction } from './bossTemplate.types';
-import type { CombatantStats } from './combat.types';
+import type { CombatantStats, CombatPotion, PotionConsumed } from './combat.types';
 
 // --- Expedition Status ---
 
@@ -56,6 +56,8 @@ export interface RaidParticipant {
   manaRegenPerRound: number;
   templateRound: number;
   activeEffects: BossActiveEffect[];
+  healTargetPlayerId: string | null;
+  availablePotions: CombatPotion[];
 }
 
 export interface RaidThreatEntry {
@@ -89,6 +91,7 @@ export interface RaidParticipantResult {
   hit: boolean;
   isCritical: boolean;
   activeEffectsAfter: BossActiveEffect[];
+  potionsConsumed: PotionConsumed[];
 }
 
 export interface RaidRoundResult {
@@ -99,6 +102,7 @@ export interface RaidRoundResult {
   roomCleared: boolean;
   allPlayersDead: boolean;
   roundLog: ExpeditionRoundLog;
+  allPotionsConsumed: PotionConsumed[];
 }
 
 // --- Expedition Data (API responses) ---
@@ -109,6 +113,7 @@ export interface ExpeditionMobInfo {
   prefix: string | null;
   hp: number;
   maxHp: number;
+  activeEffects: BossActiveEffect[];
 }
 
 export interface ExpeditionData {
@@ -125,6 +130,8 @@ export interface ExpeditionData {
   completedAt: string | null;
   launchedBy: string;
   launchedByUsername?: string;
+  wipeCount: number;
+  attemptNumber: number;
   participantCount: number;
   mobsRemaining: number;
   currentRoomMobs: ExpeditionMobInfo[];
@@ -146,6 +153,8 @@ export interface ExpeditionMemberData {
   roomDamage: number;
   roomHealing: number;
   targetMobId: string | null;
+  activeEffects: BossActiveEffect[];
+  healTargetPlayerId: string | null;
   tokensEarned: number;
   signedUpAt: string;
 }
