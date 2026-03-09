@@ -92,6 +92,37 @@ describe('getEquipmentStats', () => {
     // null ?? 50 = 50, 50 > 0, so stats count
     expect(stats.attack).toBe(5);
   });
+
+  it('ignores unsupported stat keys while still summing supported combat stats', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([
+      {
+        item: {
+          currentDurability: 25,
+          template: {
+            baseStats: {
+              evasion: 10,
+              defence: 7,
+              healthRegen: 2,
+              dodge: 3,
+              magicDefence: 1,
+            },
+            maxDurability: 50,
+          },
+          bonusStats: {
+            defence: 4,
+            health: 5,
+          },
+        },
+      },
+    ]);
+
+    const stats = await getEquipmentStats('p1');
+    expect(stats.dodge).toBe(3);
+    expect(stats.magicDefence).toBe(1);
+    expect(stats.health).toBe(5);
+    expect(stats.attack).toBe(0);
+    expect(stats.armor).toBe(0);
+  });
 });
 
 describe('equipItem', () => {

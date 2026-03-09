@@ -292,6 +292,16 @@ describe('mobToCombatantStats', () => {
 });
 
 describe('doesAttackHit', () => {
+  const hitRate = (accuracyBonus: number, targetDodge: number, targetEvasion = 0) => {
+    let hits = 0;
+    for (let roll = 1; roll <= 20; roll += 1) {
+      if (doesAttackHit(roll, accuracyBonus, targetDodge, targetEvasion)) {
+        hits += 1;
+      }
+    }
+    return hits / 20;
+  };
+
   it('uses only roll + accuracy against dodge/evasion threshold', () => {
     // roll + accuracy = 10 + 4 = 14
     // threshold = 10 + dodge(4) + evasion(6) = 20
@@ -302,6 +312,10 @@ describe('doesAttackHit', () => {
   it('still applies nat 1 auto-miss and nat 20 auto-hit', () => {
     expect(doesAttackHit(1, 999, 999, 999)).toBe(false);
     expect(doesAttackHit(20, 0, 999, 999)).toBe(true);
+  });
+
+  it('starter accuracy should meet the tutorial hit-rate floor against a Field Mouse profile', () => {
+    expect(hitRate(0, 5)).toBeGreaterThanOrEqual(0.45);
   });
 });
 
