@@ -15,6 +15,7 @@ import {
   recoverFromExpeditionKO,
   setExpeditionTarget,
   setExpeditionHealTarget,
+  abandonExpedition,
   getExpeditionCooldowns,
 } from '@/lib/api/expedition';
 import type {
@@ -327,6 +328,23 @@ export function GuildExpeditionsTab({
     }
   };
 
+  const handleAbandon = async () => {
+    if (!expedition) return;
+    if (!confirm('Abandon this expedition? This will end the expedition and trigger a cooldown.')) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await abandonExpedition(expedition.id);
+      if (res.error) { setError(res.error.message); return; }
+      void loadExpedition();
+      onRefresh?.();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to abandon expedition');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) return <LoadingCard />;
 
   // No active expedition
@@ -347,6 +365,7 @@ export function GuildExpeditionsTab({
           isOfficer={isOfficer}
           onSignup={handleSignup}
           onForceStart={handleForceStart}
+          onAbandon={handleAbandon}
           onExpired={loadExpedition}
         />
       );
@@ -362,6 +381,7 @@ export function GuildExpeditionsTab({
           onForceRound={handleForceRound}
           onSetTarget={handleSetTarget}
           onSetHealTarget={handleSetHealTarget}
+          onAbandon={handleAbandon}
           onRefresh={loadExpedition}
           onExpired={loadExpedition}
         />
@@ -484,6 +504,7 @@ function RecruitingView({
   isOfficer,
   onSignup,
   onForceStart,
+  onAbandon,
   onExpired,
 }: {
   expedition: ExpeditionData;
@@ -494,6 +515,7 @@ function RecruitingView({
   isOfficer: boolean;
   onSignup: () => void;
   onForceStart: () => void;
+  onAbandon: () => void;
   onExpired: () => void;
 }) {
   const tierCfg = TIER_CONFIGS.find((c) => c.tier === expedition.tier);
@@ -512,9 +534,16 @@ function RecruitingView({
               <p className="text-xs text-[var(--rpg-text-secondary)]">{tierCfg.name}</p>
             )}
           </div>
-          <span className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-blue-light)]/20 text-[var(--rpg-blue-light)]">
-            Recruiting
-          </span>
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-blue-light)]/20 text-[var(--rpg-blue-light)]">
+              Recruiting
+            </span>
+            {expedition.attemptNumber > 1 && (
+              <span className="text-xs text-[var(--rpg-text-secondary)]">
+                Attempt {expedition.attemptNumber}/{EXPEDITION_CONSTANTS.MAX_ATTEMPTS}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs mb-3">
@@ -552,6 +581,11 @@ function RecruitingView({
               Force Start
             </PixelButton>
           )}
+          {isOfficer && (
+            <PixelButton size="sm" variant="danger" onClick={onAbandon} disabled={actionLoading}>
+              Abandon
+            </PixelButton>
+          )}
         </div>
       </PixelCard>
 
@@ -576,6 +610,7 @@ function InProgressView({
   onForceRound,
   onSetTarget,
   onSetHealTarget,
+  onAbandon,
   onRefresh,
   onExpired,
 }: {
@@ -588,6 +623,7 @@ function InProgressView({
   onForceRound: () => void;
   onSetTarget: (targetMobId: string | null) => void;
   onSetHealTarget: (healTargetPlayerId: string | null) => void;
+  onAbandon: () => void;
   onRefresh: () => void;
   onExpired: () => void;
 }) {
@@ -624,9 +660,16 @@ function InProgressView({
               <p className="text-xs" style={{ color: roomBadge.color }}>{roomBadge.label}</p>
             )}
           </div>
-          <span className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
-            In Progress
-          </span>
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
+              In Progress
+            </span>
+            {expedition.attemptNumber > 1 && (
+              <span className="text-xs text-[var(--rpg-text-secondary)]">
+                Attempt {expedition.attemptNumber}/{EXPEDITION_CONSTANTS.MAX_ATTEMPTS}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Room progress bar */}
@@ -672,6 +715,11 @@ function InProgressView({
                 Skip wait — resolve next round now
               </p>
             </div>
+          )}
+          {isOfficer && (
+            <PixelButton size="sm" variant="danger" onClick={onAbandon} disabled={actionLoading}>
+              Abandon
+            </PixelButton>
           )}
         </div>
       </PixelCard>
@@ -1031,6 +1079,11 @@ function FailedView({ expedition, members }: { expedition: ExpeditionData; membe
           <p className="text-xs text-[var(--rpg-text-secondary)]">
             Tier {expedition.tier} — Reached room {expedition.currentRoom + 1} / {expedition.totalRooms}
           </p>
+          {expedition.wipeCount > 0 && (
+            <p className="text-xs text-[var(--rpg-text-secondary)]">
+              Failed after {expedition.wipeCount} wipe{expedition.wipeCount > 1 ? 's' : ''} across {expedition.attemptNumber} attempt{expedition.attemptNumber > 1 ? 's' : ''}
+            </p>
+          )}
           {expedition.participantCount < (TIER_CONFIGS.find((c) => c.tier === expedition.tier)?.minParticipants ?? 0) && (
             <p className="text-xs text-[var(--rpg-text-secondary)]">
               Not enough participants joined in time.
