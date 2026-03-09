@@ -309,6 +309,33 @@ describe('runTemplateCombat', () => {
       // The buff expires after 3 rounds of ticking
       expect(result.totalRounds).toBeGreaterThanOrEqual(4);
     });
+
+    it('defensive buff actions still apply their effects', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Guardian', {
+        template: templateOf('fortify', 'light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 10, damageMax: 10 }),
+        stamina: 500,
+        maxStamina: 500,
+        mana: 500,
+        maxMana: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+      const fortifyEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.spellName === 'Fortify',
+      );
+
+      expect(fortifyEntry).toBeDefined();
+      expect(fortifyEntry?.effectsApplied).toEqual([
+        expect.objectContaining({ stat: 'defence', modifier: 30, duration: 3, target: 'combatantA' }),
+      ]);
+    });
   });
 
   describe('combat outcomes', () => {
@@ -847,6 +874,14 @@ describe('runTemplateCombat', () => {
       weaponRequiredSkill: 'magic',
     };
 
+    const rangedScaling: PerActionScaling = {
+      skillLevels: { melee: 5, ranged: 30, magic: 5 },
+      attributes: { strength: 3, dexterity: 25, intelligence: 3 },
+      weaponPower: { attack: 5, rangedPower: 24, magicPower: 5 },
+      equipmentAccuracy: 10,
+      weaponRequiredSkill: 'ranged',
+    };
+
     it('magic-scaling action uses magic stats for damage', () => {
       // fire_bolt: scalingStat='magic', damageMultiplier=1.2, damageType='magic'
       // magic resolved: totalAttack = 30 + 24 + 25 = 79
@@ -1012,6 +1047,74 @@ describe('runTemplateCombat', () => {
       expect(buffAttack?.rawDamage).toBe(23);
       // Verify the buff added exactly 20 raw damage (23 - 3 = 20, because floor(18*1.3) - floor(3*1.3))
       expect(buffAttack!.rawDamage! - baseAttack!.rawDamage!).toBe(20);
+    });
+
+    it('piercing_shot ignores half of the target defence', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Ranger', {
+        template: templateOf('piercing_shot'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({
+          hp: 500, maxHp: 500,
+          damageMin: 1, damageMax: 1, accuracy: 0,
+        }),
+        stamina: 500,
+        maxStamina: 500,
+        perActionScaling: rangedScaling,
+      });
+      const b = makeCombatant('Target', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, defence: 100 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+
+      expect(attackEntry).toBeDefined();
+      expect(attackEntry?.rawDamage).toBe(28);
+      expect(attackEntry?.damage).toBe(18);
+    });
+
+    it('berserker_rage applies a percent-based attack buff instead of flat damage', () => {
+      mockCombatRandom();
+
+      const baseline = makeCombatant('Warrior', {
+        template: templateOf('normal_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 20, damageMax: 20 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const buffed = makeCombatant('Warrior', {
+        template: templateOf('berserker_rage', 'normal_attack'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 20, damageMax: 20 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const target = makeCombatant('Target', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, defence: 0 }),
+      });
+
+      const baselineResult = runTemplateCombat(baseline, target);
+      const baselineAttack = baselineResult.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(baselineAttack?.rawDamage).toBe(20);
+
+      vi.restoreAllMocks();
+      mockCombatRandom();
+
+      const buffedResult = runTemplateCombat(buffed, target);
+      const buffedAttack = buffedResult.log.find(
+        (e) => e.round === 2 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+
+      expect(buffedAttack).toBeDefined();
+      expect(buffedAttack?.rawDamage).toBe(26);
     });
 
     it('action damageType determines which defence is used', () => {

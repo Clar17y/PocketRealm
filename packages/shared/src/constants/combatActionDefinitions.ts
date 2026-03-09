@@ -166,13 +166,12 @@ const devastatingBlow: ActionDefinition = {
 const berserkerRage: ActionDefinition = {
   id: 'berserker_rage',
   name: 'Berserker Rage',
-  description: 'Enter a frenzy: +30% attack but -15% defence for 5 rounds.',
+  description: 'Enter a frenzy: +30% attack for 5 rounds.',
   actionType: 'buff',
   category: 'supportive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.BERSERKER_RAGE_STAMINA, mana: 0 },
-  effect: { name: 'Berserker Rage', stat: 'attack', modifier: 30, duration: 5, isDebuff: false },
-  defenceReduction: 15,
+  effect: { name: 'Berserker Rage', stat: 'attackPercent', modifier: 0.30, duration: 5, isDebuff: false },
 };
 
 const execute: ActionDefinition = {

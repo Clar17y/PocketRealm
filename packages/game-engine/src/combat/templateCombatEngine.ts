@@ -119,6 +119,14 @@ function opponent(actor: CombatActor): CombatActor {
   return actor === 'combatantA' ? 'combatantB' : 'combatantA';
 }
 
+function applyActionDefenceReduction(defence: number, reductionPercent?: number): number {
+  if (!reductionPercent || reductionPercent <= 0) {
+    return defence;
+  }
+
+  return Math.max(0, Math.floor(defence * (1 - reductionPercent / 100)));
+}
+
 /** Build a log entry with HP/resource snapshots and round context baked in. */
 function buildLogEntry(
   state: TemplateCombatState,
@@ -401,6 +409,15 @@ function executeOffensiveAction(
     baseDamageMax = Math.max(baseDamageMin, baseDamageMax);
   }
 
+  const attackPercentModifier = state.activeEffects
+    .filter((effect) => effect.target === actorKey && effect.stat === 'attackPercent')
+    .reduce((total, effect) => total + effect.modifier, 0);
+
+  if (attackPercentModifier !== 0) {
+    baseDamageMin = Math.max(1, Math.floor(baseDamageMin * (1 + attackPercentModifier)));
+    baseDamageMax = Math.max(baseDamageMin, Math.floor(baseDamageMax * (1 + attackPercentModifier)));
+  }
+
   const attackRoll = hitOverride === 'guaranteed_hit' ? 20 : rollD20();
   const accuracyBonus = baseAccuracy + (action.accuracyModifier ?? 0);
   const hits = hitOverride === 'guaranteed_hit' || doesAttackHit(attackRoll, accuracyBonus, targetStats.dodge, targetStats.evasion);
@@ -432,7 +449,9 @@ function executeOffensiveAction(
   if (!action.damageType && (action.scalingStat ?? 'weapon') === 'weapon' && resolvedScaling) {
     actionDamageType = resolvedScaling === 'magic' ? 'magic' : 'physical';
   }
-  const effectiveDefence = actionDamageType === 'magic' ? targetStats.magicDefence : targetStats.defence;
+  const effectiveDefence = actionDamageType === 'magic'
+    ? targetStats.magicDefence
+    : applyActionDefenceReduction(targetStats.defence, action.defenceReduction);
 
   // Roll and apply damage multiplier from action
   let rawDamage = rollDamage(baseDamageMin, baseDamageMax);
@@ -959,6 +978,12 @@ function executeAction(
       perActionScaling,
     );
   } else if (action.category === 'supportive') {
+    executeSupportiveAction(
+      state, actorKey, actorStats, action,
+      actorName, ctx,
+      availablePotions, potionsConsumed,
+    );
+  } else if (action.effect || action.healFlat || action.healPercent) {
     executeSupportiveAction(
       state, actorKey, actorStats, action,
       actorName, ctx,
