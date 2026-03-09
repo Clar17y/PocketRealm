@@ -271,6 +271,35 @@ export interface ExpeditionRoundLog {
   telegraphs: MobTelegraphEntry[];
 }
 
+// --- Theme Definitions ---
+
+export interface ExpeditionThemeMob {
+  key: string;
+  name: string;
+  hp: number;
+  stats: CombatantStats;
+  actionTemplate: BossTemplateAction[];
+}
+
+export interface ExpeditionTheme {
+  id: string;
+  name: string;
+  tier: number;
+  mobFamilyKeys: string[];
+  trash: ExpeditionThemeMob[];
+  elites: ExpeditionThemeMob[];
+  miniBoss: ExpeditionThemeMob;
+  miniBossAdds: ExpeditionThemeMob[];
+  casterAdd: ExpeditionThemeMob;
+  finalBoss: {
+    mob: ExpeditionThemeMob;
+    phase1: BossTemplateAction[];
+    phase2: BossTemplateAction[];
+    phase3: BossTemplateAction[];
+  };
+  regularAdd: ExpeditionThemeMob;
+}
+
 // --- Token Shop Types ---
 
 export type ExpeditionSetId = 'vanguard' | 'sharpshooter' | 'arcanist';
