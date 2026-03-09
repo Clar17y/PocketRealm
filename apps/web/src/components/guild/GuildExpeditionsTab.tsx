@@ -560,8 +560,8 @@ function RecruitingView({
             <p className="text-sm font-bold text-[var(--rpg-gold)]">
               Tier {expedition.tier} Expedition — Recruiting
             </p>
-            {tierCfg && (
-              <p className="text-xs text-[var(--rpg-text-secondary)]">{tierCfg.name}</p>
+            {(expedition.themeName || tierCfg) && (
+              <p className="text-xs text-[var(--rpg-text-secondary)]">{expedition.themeName ?? tierCfg?.name}</p>
             )}
           </div>
           <div className="flex flex-col items-end gap-0.5">
@@ -678,7 +678,7 @@ function InProgressView({
         <div className="flex justify-between items-start mb-2">
           <div>
             <p className="text-sm font-bold text-[var(--rpg-gold)]">
-              Tier {expedition.tier} Expedition
+              {expedition.themeName ?? `Tier ${expedition.tier} Expedition`}
             </p>
             {isResting ? (
               <p className="text-xs text-[var(--rpg-green-light)]">Resting...</p>
@@ -1059,7 +1059,7 @@ function HistoryView({ guildId, playerId }: { guildId: string; playerId: string 
             <div className="flex justify-between items-center">
               <div>
                 <span className="text-xs font-bold text-[var(--rpg-text-primary)]">
-                  Tier {exp.tier}
+                  {exp.themeName ?? `Tier ${exp.tier}`}
                 </span>
                 <span className={`ml-2 text-[10px] px-1.5 py-0 rounded ${
                   exp.status === 'completed'
