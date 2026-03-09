@@ -558,6 +558,21 @@ router.post('/guild/treasury', asyncHandler(async (req, res) => {
 // Expeditions
 // ---------------------------------------------------------------------------
 
+router.post('/expedition/reset-cooldowns', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const membership = await prisma.guildMember.findUnique({ where: { playerId } });
+  if (!membership) throw new AppError(400, 'You must be in a guild', 'NOT_IN_GUILD');
+
+  // Set completedAt to far in the past so both weekly and between-expedition cooldowns clear
+  const farPast = new Date('2000-01-01');
+  const { count } = await prisma.guildExpedition.updateMany({
+    where: { guildId: membership.guildId, status: { in: ['completed', 'failed'] } },
+    data: { completedAt: farPast },
+  });
+
+  res.json({ success: true, expeditionsReset: count });
+}));
+
 router.post('/expedition/fill', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
 

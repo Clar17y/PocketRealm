@@ -26,6 +26,7 @@ import {
   adminSpawnResourceNode,
   adminGrantTokens,
   adminGrantGuildTreasury,
+  adminResetExpeditionCooldowns,
   adminFillExpedition,
   type AdminItemTemplate,
   type AdminZone,
@@ -617,12 +618,17 @@ function GuildTab({ onAction }: { onAction?: () => void }) {
 
       <PixelCard>
         <h3 className="text-sm font-semibold text-[var(--rpg-gold)] mb-3">Expedition Testing</h3>
-        <p className="text-xs text-[var(--rpg-text-secondary)] mb-2">
-          Fill active recruiting expedition with bot players
+        <div className="flex flex-wrap gap-2">
+          <PixelButton size="sm" disabled={busy} onClick={() => act('Reset cooldowns', () => adminResetExpeditionCooldowns())}>
+            Reset Cooldowns
+          </PixelButton>
+          <PixelButton size="sm" disabled={busy} onClick={() => act('Fill expedition', () => adminFillExpedition())}>
+            Fill with Bots
+          </PixelButton>
+        </div>
+        <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-1.5">
+          Reset clears weekly + between-expedition cooldowns. Fill adds bots to a recruiting expedition.
         </p>
-        <PixelButton size="sm" disabled={busy} onClick={() => act('Fill expedition', () => adminFillExpedition())}>
-          Fill Expedition with Bots
-        </PixelButton>
       </PixelCard>
 
       <StatusMsg msg={msg} />

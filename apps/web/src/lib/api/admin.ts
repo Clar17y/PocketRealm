@@ -199,6 +199,13 @@ export async function adminGrantGuildTreasury(amount: number) {
   });
 }
 
+export async function adminResetExpeditionCooldowns() {
+  return fetchApi<{ success: boolean; expeditionsReset: number }>(
+    '/api/v1/admin/expedition/reset-cooldowns',
+    { method: 'POST' },
+  );
+}
+
 export async function adminFillExpedition() {
   return fetchApi<{ message: string; botsCreated: number; totalParticipants: number; minRequired: number }>(
     '/api/v1/admin/expedition/fill',
