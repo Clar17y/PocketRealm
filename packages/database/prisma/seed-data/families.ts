@@ -165,6 +165,42 @@ export function getAllMobFamilyMembers() {
     { mobFamilyId: f.abominations, mobTemplateId: m.tentacleHorror, role: 'trash' },
     { mobFamilyId: f.abominations, mobTemplateId: m.fleshGolem, role: 'elite' },
     { mobFamilyId: f.abominations, mobTemplateId: m.eldritchAbomination, role: 'boss' },
+    // Expedition: Spider Nest → Spiders family
+    { mobFamilyId: f.spiders, mobTemplateId: m.expCavernSpider, role: 'expedition_trash' },
+    { mobFamilyId: f.spiders, mobTemplateId: m.expWebweaver, role: 'expedition_trash' },
+    { mobFamilyId: f.spiders, mobTemplateId: m.expBroodguard, role: 'expedition_elite' },
+    { mobFamilyId: f.spiders, mobTemplateId: m.expSilkStalker, role: 'expedition_elite' },
+    { mobFamilyId: f.spiders, mobTemplateId: m.expSpiderMatriarch, role: 'expedition_mini_boss' },
+    { mobFamilyId: f.spiders, mobTemplateId: m.expSpiderling, role: 'expedition_add' },
+    { mobFamilyId: f.spiders, mobTemplateId: m.expVenomousSpitter, role: 'expedition_caster' },
+    { mobFamilyId: f.spiders, mobTemplateId: m.expBroodqueen, role: 'expedition_boss' },
+    // Expedition: Wolf Pack → Wolves family
+    { mobFamilyId: f.wolves, mobTemplateId: m.expTimberWolf, role: 'expedition_trash' },
+    { mobFamilyId: f.wolves, mobTemplateId: m.expSnarler, role: 'expedition_trash' },
+    { mobFamilyId: f.wolves, mobTemplateId: m.expDireWolfExp, role: 'expedition_elite' },
+    { mobFamilyId: f.wolves, mobTemplateId: m.expShadowWolf, role: 'expedition_elite' },
+    { mobFamilyId: f.wolves, mobTemplateId: m.expPackAlphaExp, role: 'expedition_mini_boss' },
+    { mobFamilyId: f.wolves, mobTemplateId: m.expFrenziedWolf, role: 'expedition_add' },
+    { mobFamilyId: f.wolves, mobTemplateId: m.expHowlingSpirit, role: 'expedition_caster' },
+    { mobFamilyId: f.wolves, mobTemplateId: m.expFenris, role: 'expedition_boss' },
+    // Expedition: Bandit Camp → Bandits family
+    { mobFamilyId: f.bandits, mobTemplateId: m.expBanditThug, role: 'expedition_trash' },
+    { mobFamilyId: f.bandits, mobTemplateId: m.expBanditArcherExp, role: 'expedition_trash' },
+    { mobFamilyId: f.bandits, mobTemplateId: m.expBanditAssassin, role: 'expedition_elite' },
+    { mobFamilyId: f.bandits, mobTemplateId: m.expBanditShaman, role: 'expedition_elite' },
+    { mobFamilyId: f.bandits, mobTemplateId: m.expWarChief, role: 'expedition_mini_boss' },
+    { mobFamilyId: f.bandits, mobTemplateId: m.expBanditGrunt, role: 'expedition_add' },
+    { mobFamilyId: f.bandits, mobTemplateId: m.expKnifeThrower, role: 'expedition_caster' },
+    { mobFamilyId: f.bandits, mobTemplateId: m.expBanditKing, role: 'expedition_boss' },
+    // Expedition: Corrupted Grove → Treants family
+    { mobFamilyId: f.treants, mobTemplateId: m.expBlightedSapling, role: 'expedition_trash' },
+    { mobFamilyId: f.treants, mobTemplateId: m.expFungalSpore, role: 'expedition_trash' },
+    { mobFamilyId: f.treants, mobTemplateId: m.expCorruptedTreant, role: 'expedition_elite' },
+    { mobFamilyId: f.treants, mobTemplateId: m.expBlightedDryad, role: 'expedition_elite' },
+    { mobFamilyId: f.treants, mobTemplateId: m.expGroveWarden, role: 'expedition_mini_boss' },
+    { mobFamilyId: f.treants, mobTemplateId: m.expThornVine, role: 'expedition_add' },
+    { mobFamilyId: f.treants, mobTemplateId: m.expBlightedSpore, role: 'expedition_caster' },
+    { mobFamilyId: f.treants, mobTemplateId: m.expRotHeart, role: 'expedition_boss' },
   ];
 }
 
