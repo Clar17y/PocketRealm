@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Prisma 6, Express 4, Next.js 16, Vitest
 
-**Worktree:** `D:/Code/Adventure/.worktrees/pocketrealm-guild-expeditions` (branch: `guild-expeditions`)
+> **CRITICAL — Worktree:** All work MUST be done in the existing expedition worktree at `D:/Code/Adventure/.worktrees/pocketrealm-guild-expeditions` (branch: `guild-expeditions`). Do NOT create a new worktree. Do NOT run `setup-worktree.sh`. The worktree already exists with the expedition feature code, database, and dependencies. Just `cd` into it and start working. All file paths in this plan are relative to this worktree root.
 
 **Design doc:** `docs/plans/2026-03-09-expedition-improvements-design.md`
 
