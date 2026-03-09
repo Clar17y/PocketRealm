@@ -691,16 +691,19 @@ function roundKey(log: ExpeditionRoundLog): string {
 function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId: string | null }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
-  // Auto-expand latest round
-  const latestKey = logs.length > 0 ? roundKey(logs[logs.length - 1]) : null;
-  const effectiveExpanded = expandedKey ?? latestKey;
+  // Auto-expand latest log entry
+  const latestIdx = logs.length > 0 ? logs.length - 1 : null;
+  const effectiveExpanded = expandedKey ?? (latestIdx !== null ? String(latestIdx) : null);
+
+  // Reverse with original indices for stable keys
+  const reversedLogs = logs.map((log, i) => ({ log, idx: i })).reverse();
 
   return (
     <PixelCard>
       <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-2">Round Log</h4>
       <div className="space-y-1">
-        {[...logs].reverse().map((log) => {
-          const key = roundKey(log);
+        {reversedLogs.map(({ log, idx }) => {
+          const key = String(idx);
           const isExpanded = effectiveExpanded === key;
           const outcome = log.phases.outcome;
           return (
