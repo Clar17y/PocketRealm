@@ -2,6 +2,7 @@ import { Prisma, prisma } from '@pocketrealm/database';
 import {
   EXPEDITION_CONSTANTS,
   EXPEDITION_THEMES,
+  EXPEDITION_THEMES_BY_ID,
   ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
   type ActionDefinition,
@@ -101,7 +102,7 @@ function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
     })),
     roundLogs,
     themeId: exp.themeId ?? null,
-    themeName: EXPEDITION_THEMES.find(t => t.id === exp.themeId)?.name ?? null,
+    themeName: EXPEDITION_THEMES_BY_ID.get(exp.themeId ?? '')?.name ?? null,
   };
 }
 
@@ -702,7 +703,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
   }
 
   // Build summon pool from theme add mobs
-  const theme = EXPEDITION_THEMES.find(t => t.id === expedition.themeId);
+  const theme = EXPEDITION_THEMES_BY_ID.get(expedition.themeId ?? '');
   const summonPool: ExpeditionMobState[] = [];
   if (theme) {
     const addMobs = [theme.regularAdd, theme.casterAdd];
@@ -983,7 +984,7 @@ export async function handleWipe(expeditionId: string): Promise<void> {
   }
 
   // Reset to recruiting: delete all members, regenerate rooms using same theme
-  const wipeTheme = EXPEDITION_THEMES.find(t => t.id === expedition.themeId);
+  const wipeTheme = EXPEDITION_THEMES_BY_ID.get(expedition.themeId ?? '');
   if (!wipeTheme) {
     throw new AppError(500, 'Theme not found for expedition', 'NO_THEMES');
   }

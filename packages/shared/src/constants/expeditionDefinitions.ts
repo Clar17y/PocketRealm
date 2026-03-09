@@ -84,14 +84,14 @@ export const FINAL_BOSS_PHASE3_TEMPLATE: readonly BossTemplateAction[] = [
 // EXPEDITION THEMES
 // =============================================================================
 
-function mobStats(
-  hp: number, atk: number, def: number, mdef: number, dodge: number,
-  dmin: number, dmax: number, damageType: 'physical' | 'magic',
-): CombatantStats {
+function mobStats(p: {
+  hp: number; atk: number; def: number; mdef: number; dodge: number;
+  dmin: number; dmax: number; damageType: 'physical' | 'magic';
+}): CombatantStats {
   return {
-    hp, maxHp: hp, attack: atk, accuracy: atk, defence: def,
-    magicDefence: mdef, dodge, evasion: 0, damageMin: dmin, damageMax: dmax,
-    speed: 0, damageType,
+    hp: p.hp, maxHp: p.hp, attack: p.atk, accuracy: p.atk, defence: p.def,
+    magicDefence: p.mdef, dodge: p.dodge, evasion: 0, damageMin: p.dmin, damageMax: p.dmax,
+    speed: 0, damageType: p.damageType,
   };
 }
 
@@ -99,7 +99,7 @@ function mobStats(
 
 const SPIDER_NEST_ADD: ExpeditionThemeMob = {
   key: 'expSpiderling', name: 'Spiderling', hp: 100,
-  stats: mobStats(100, 14, 8, 4, 4, 6, 10, 'physical'),
+  stats: mobStats({ hp: 100, atk: 14, def: 8, mdef: 4, dodge: 4, dmin: 6, dmax: 10, damageType: 'physical' }),
   actionTemplate: [
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -108,7 +108,7 @@ const SPIDER_NEST_ADD: ExpeditionThemeMob = {
 
 const WOLF_PACK_ADD: ExpeditionThemeMob = {
   key: 'expFrenziedWolf', name: 'Frenzied Wolf', hp: 100,
-  stats: mobStats(100, 16, 10, 4, 6, 8, 14, 'physical'),
+  stats: mobStats({ hp: 100, atk: 16, def: 10, mdef: 4, dodge: 6, dmin: 8, dmax: 14, damageType: 'physical' }),
   actionTemplate: [
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -117,7 +117,7 @@ const WOLF_PACK_ADD: ExpeditionThemeMob = {
 
 const BANDIT_CAMP_ADD: ExpeditionThemeMob = {
   key: 'expBanditGrunt', name: 'Bandit Grunt', hp: 90,
-  stats: mobStats(90, 14, 10, 6, 4, 8, 12, 'physical'),
+  stats: mobStats({ hp: 90, atk: 14, def: 10, mdef: 6, dodge: 4, dmin: 8, dmax: 12, damageType: 'physical' }),
   actionTemplate: [
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -126,7 +126,7 @@ const BANDIT_CAMP_ADD: ExpeditionThemeMob = {
 
 const CORRUPTED_GROVE_ADD: ExpeditionThemeMob = {
   key: 'expThornVine', name: 'Thorn Vine', hp: 80,
-  stats: mobStats(80, 14, 10, 6, 2, 6, 10, 'physical'),
+  stats: mobStats({ hp: 80, atk: 14, def: 10, mdef: 6, dodge: 2, dmin: 6, dmax: 10, damageType: 'physical' }),
   actionTemplate: [
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
     { actionId: 'boss_root', targetMode: 'single_target' },
@@ -143,7 +143,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     trash: [
       {
         key: 'expCavernSpider', name: 'Cavern Spider', hp: 150,
-        stats: mobStats(150, 16, 12, 8, 6, 8, 14, 'physical'),
+        stats: mobStats({ hp: 150, atk: 16, def: 12, mdef: 8, dodge: 6, dmin: 8, dmax: 14, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -152,7 +152,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
       },
       {
         key: 'expWebweaver', name: 'Webweaver', hp: 120,
-        stats: mobStats(120, 14, 10, 6, 8, 6, 12, 'physical'),
+        stats: mobStats({ hp: 120, atk: 14, def: 10, mdef: 6, dodge: 8, dmin: 6, dmax: 12, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_root', targetMode: 'single_target' },
@@ -163,7 +163,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     elites: [
       {
         key: 'expBroodguard', name: 'Broodguard', hp: 350,
-        stats: mobStats(350, 20, 16, 12, 6, 12, 20, 'physical'),
+        stats: mobStats({ hp: 350, atk: 20, def: 16, mdef: 12, dodge: 6, dmin: 12, dmax: 20, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_poison_spray', targetMode: 'aoe' },
@@ -173,7 +173,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
       },
       {
         key: 'expSilkStalker', name: 'Silk Stalker', hp: 280,
-        stats: mobStats(280, 22, 14, 10, 10, 14, 22, 'physical'),
+        stats: mobStats({ hp: 280, atk: 22, def: 14, mdef: 10, dodge: 10, dmin: 14, dmax: 22, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_impale', targetMode: 'single_target' },
@@ -184,7 +184,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     ],
     miniBoss: {
       key: 'expSpiderMatriarch', name: 'Spider Matriarch', hp: 650,
-      stats: mobStats(650, 22, 18, 14, 8, 16, 26, 'physical'),
+      stats: mobStats({ hp: 650, atk: 22, def: 18, mdef: 14, dodge: 8, dmin: 16, dmax: 26, damageType: 'physical' }),
       actionTemplate: [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
         { actionId: 'boss_poison_spray', targetMode: 'aoe' },
@@ -198,7 +198,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     regularAdd: SPIDER_NEST_ADD,
     casterAdd: {
       key: 'expVenomousSpitter', name: 'Venomous Spitter', hp: 70,
-      stats: mobStats(70, 12, 6, 10, 6, 4, 8, 'magic'),
+      stats: mobStats({ hp: 70, atk: 12, def: 6, mdef: 10, dodge: 6, dmin: 4, dmax: 8, damageType: 'magic' }),
       actionTemplate: [
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
         { actionId: 'boss_venom_cloud', targetMode: 'aoe' },
@@ -208,7 +208,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     finalBoss: {
       mob: {
         key: 'expBroodqueen', name: 'The Broodqueen', hp: 1300,
-        stats: mobStats(1300, 28, 22, 16, 8, 20, 35, 'physical'),
+        stats: mobStats({ hp: 1300, atk: 28, def: 22, mdef: 16, dodge: 8, dmin: 20, dmax: 35, damageType: 'physical' }),
         actionTemplate: [],
       },
       phase1: [
@@ -247,7 +247,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     trash: [
       {
         key: 'expTimberWolf', name: 'Timber Wolf', hp: 160,
-        stats: mobStats(160, 18, 14, 6, 8, 10, 16, 'physical'),
+        stats: mobStats({ hp: 160, atk: 18, def: 14, mdef: 6, dodge: 8, dmin: 10, dmax: 16, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -256,7 +256,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
       },
       {
         key: 'expSnarler', name: 'Snarler', hp: 130,
-        stats: mobStats(130, 16, 12, 8, 6, 8, 14, 'physical'),
+        stats: mobStats({ hp: 130, atk: 16, def: 12, mdef: 8, dodge: 6, dmin: 8, dmax: 14, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_smoke_bomb', targetMode: 'aoe' },
@@ -267,7 +267,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     elites: [
       {
         key: 'expDireWolfExp', name: 'Dire Wolf', hp: 380,
-        stats: mobStats(380, 22, 18, 8, 8, 14, 24, 'physical'),
+        stats: mobStats({ hp: 380, atk: 22, def: 18, mdef: 8, dodge: 8, dmin: 14, dmax: 24, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -278,7 +278,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
       },
       {
         key: 'expShadowWolf', name: 'Shadow Wolf', hp: 300,
-        stats: mobStats(300, 20, 14, 16, 12, 12, 20, 'magic'),
+        stats: mobStats({ hp: 300, atk: 20, def: 14, mdef: 16, dodge: 12, dmin: 12, dmax: 20, damageType: 'magic' }),
         actionTemplate: [
           { actionId: 'boss_magic_attack', targetMode: 'single_target' },
           { actionId: 'boss_fear_howl', targetMode: 'aoe' },
@@ -289,7 +289,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     ],
     miniBoss: {
       key: 'expPackAlphaExp', name: 'Pack Alpha', hp: 680,
-      stats: mobStats(680, 24, 20, 10, 8, 18, 28, 'physical'),
+      stats: mobStats({ hp: 680, atk: 24, def: 20, mdef: 10, dodge: 8, dmin: 18, dmax: 28, damageType: 'physical' }),
       actionTemplate: [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
         { actionId: 'boss_rally', targetMode: 'single_target' },
@@ -303,7 +303,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     regularAdd: WOLF_PACK_ADD,
     casterAdd: {
       key: 'expHowlingSpirit', name: 'Howling Spirit', hp: 65,
-      stats: mobStats(65, 14, 6, 12, 8, 4, 8, 'magic'),
+      stats: mobStats({ hp: 65, atk: 14, def: 6, mdef: 12, dodge: 8, dmin: 4, dmax: 8, damageType: 'magic' }),
       actionTemplate: [
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
         { actionId: 'boss_shadow_bleed', targetMode: 'aoe' },
@@ -313,7 +313,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     finalBoss: {
       mob: {
         key: 'expFenris', name: 'Fenris, the Ancient', hp: 1400,
-        stats: mobStats(1400, 30, 24, 12, 8, 22, 38, 'physical'),
+        stats: mobStats({ hp: 1400, atk: 30, def: 24, mdef: 12, dodge: 8, dmin: 22, dmax: 38, damageType: 'physical' }),
         actionTemplate: [],
       },
       phase1: [
@@ -352,7 +352,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     trash: [
       {
         key: 'expBanditThug', name: 'Bandit Thug', hp: 170,
-        stats: mobStats(170, 18, 14, 8, 6, 10, 16, 'physical'),
+        stats: mobStats({ hp: 170, atk: 18, def: 14, mdef: 8, dodge: 6, dmin: 10, dmax: 16, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -361,7 +361,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
       },
       {
         key: 'expBanditArcherExp', name: 'Bandit Archer', hp: 130,
-        stats: mobStats(130, 20, 10, 6, 8, 12, 18, 'physical'),
+        stats: mobStats({ hp: 130, atk: 20, def: 10, mdef: 6, dodge: 8, dmin: 12, dmax: 18, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -372,7 +372,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     elites: [
       {
         key: 'expBanditAssassin', name: 'Bandit Assassin', hp: 320,
-        stats: mobStats(320, 24, 16, 10, 12, 16, 26, 'physical'),
+        stats: mobStats({ hp: 320, atk: 24, def: 16, mdef: 10, dodge: 12, dmin: 16, dmax: 26, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_impale', targetMode: 'single_target' },
@@ -382,7 +382,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
       },
       {
         key: 'expBanditShaman', name: 'Bandit Shaman', hp: 280,
-        stats: mobStats(280, 18, 12, 18, 8, 10, 18, 'magic'),
+        stats: mobStats({ hp: 280, atk: 18, def: 12, mdef: 18, dodge: 8, dmin: 10, dmax: 18, damageType: 'magic' }),
         actionTemplate: [
           { actionId: 'boss_magic_attack', targetMode: 'single_target' },
           { actionId: 'boss_weaken', targetMode: 'aoe' },
@@ -393,7 +393,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     ],
     miniBoss: {
       key: 'expWarChief', name: 'War Chief', hp: 640,
-      stats: mobStats(640, 24, 20, 12, 6, 18, 30, 'physical'),
+      stats: mobStats({ hp: 640, atk: 24, def: 20, mdef: 12, dodge: 6, dmin: 18, dmax: 30, damageType: 'physical' }),
       actionTemplate: [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
         { actionId: 'boss_rally', targetMode: 'single_target' },
@@ -407,7 +407,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     regularAdd: BANDIT_CAMP_ADD,
     casterAdd: {
       key: 'expKnifeThrower', name: 'Knife Thrower', hp: 70,
-      stats: mobStats(70, 18, 8, 6, 8, 6, 10, 'physical'),
+      stats: mobStats({ hp: 70, atk: 18, def: 8, mdef: 6, dodge: 8, dmin: 6, dmax: 10, damageType: 'physical' }),
       actionTemplate: [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
         { actionId: 'boss_throwing_knives', targetMode: 'aoe' },
@@ -417,7 +417,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     finalBoss: {
       mob: {
         key: 'expBanditKing', name: 'The Bandit King', hp: 1300,
-        stats: mobStats(1300, 28, 22, 14, 8, 20, 36, 'physical'),
+        stats: mobStats({ hp: 1300, atk: 28, def: 22, mdef: 14, dodge: 8, dmin: 20, dmax: 36, damageType: 'physical' }),
         actionTemplate: [],
       },
       phase1: [
@@ -456,7 +456,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     trash: [
       {
         key: 'expBlightedSapling', name: 'Blighted Sapling', hp: 140,
-        stats: mobStats(140, 16, 14, 10, 4, 8, 14, 'physical'),
+        stats: mobStats({ hp: 140, atk: 16, def: 14, mdef: 10, dodge: 4, dmin: 8, dmax: 14, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -465,7 +465,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
       },
       {
         key: 'expFungalSpore', name: 'Fungal Spore', hp: 100,
-        stats: mobStats(100, 14, 8, 14, 6, 6, 12, 'magic'),
+        stats: mobStats({ hp: 100, atk: 14, def: 8, mdef: 14, dodge: 6, dmin: 6, dmax: 12, damageType: 'magic' }),
         actionTemplate: [
           { actionId: 'boss_magic_attack', targetMode: 'single_target' },
           { actionId: 'boss_poison_spray', targetMode: 'aoe' },
@@ -476,7 +476,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     elites: [
       {
         key: 'expCorruptedTreant', name: 'Corrupted Treant', hp: 400,
-        stats: mobStats(400, 20, 24, 16, 2, 14, 22, 'physical'),
+        stats: mobStats({ hp: 400, atk: 20, def: 24, mdef: 16, dodge: 2, dmin: 14, dmax: 22, damageType: 'physical' }),
         actionTemplate: [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
@@ -486,7 +486,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
       },
       {
         key: 'expBlightedDryad', name: 'Blighted Dryad', hp: 300,
-        stats: mobStats(300, 18, 14, 20, 8, 12, 20, 'magic'),
+        stats: mobStats({ hp: 300, atk: 18, def: 14, mdef: 20, dodge: 8, dmin: 12, dmax: 20, damageType: 'magic' }),
         actionTemplate: [
           { actionId: 'boss_magic_attack', targetMode: 'single_target' },
           { actionId: 'boss_wither', targetMode: 'aoe' },
@@ -497,7 +497,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     ],
     miniBoss: {
       key: 'expGroveWarden', name: 'Grove Warden', hp: 700,
-      stats: mobStats(700, 22, 22, 16, 4, 18, 28, 'physical'),
+      stats: mobStats({ hp: 700, atk: 22, def: 22, mdef: 16, dodge: 4, dmin: 18, dmax: 28, damageType: 'physical' }),
       actionTemplate: [
         { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -511,7 +511,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     regularAdd: CORRUPTED_GROVE_ADD,
     casterAdd: {
       key: 'expBlightedSpore', name: 'Blighted Spore', hp: 60,
-      stats: mobStats(60, 12, 6, 12, 4, 4, 8, 'magic'),
+      stats: mobStats({ hp: 60, atk: 12, def: 6, mdef: 12, dodge: 4, dmin: 4, dmax: 8, damageType: 'magic' }),
       actionTemplate: [
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
         { actionId: 'boss_blight_cloud', targetMode: 'aoe' },
@@ -521,7 +521,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     finalBoss: {
       mob: {
         key: 'expRotHeart', name: 'The Rot Heart', hp: 1400,
-        stats: mobStats(1400, 26, 20, 22, 4, 18, 32, 'magic'),
+        stats: mobStats({ hp: 1400, atk: 26, def: 20, mdef: 22, dodge: 4, dmin: 18, dmax: 32, damageType: 'magic' }),
         actionTemplate: [],
       },
       phase1: [
@@ -551,6 +551,10 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
     },
   },
 ];
+
+export const EXPEDITION_THEMES_BY_ID = new Map(
+  EXPEDITION_THEMES.map(t => [t.id, t]),
+);
 
 // =============================================================================
 // EXPEDITION SHOP ITEMS

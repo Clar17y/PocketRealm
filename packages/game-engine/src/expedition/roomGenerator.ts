@@ -5,6 +5,7 @@ import type {
   ExpeditionTheme,
   ExpeditionThemeMob,
   CombatantStats,
+  BossTemplateAction,
 } from '@pocketrealm/shared';
 import {
   EXPEDITION_ROOM_COMPOSITIONS,
@@ -56,7 +57,7 @@ function buildMobFromTheme(
     hp: themeMob.hp,
     maxHp: themeMob.hp,
     stats: { ...themeMob.stats, hp: themeMob.hp, maxHp: themeMob.hp },
-    actionTemplate: [...themeMob.actionTemplate],
+    actionTemplate: themeMob.actionTemplate as BossTemplateAction[],
     activeEffects: [],
   };
 }
@@ -110,10 +111,10 @@ function generateMobsForRoom(
       const bossThemeMob = theme.finalBoss.mob;
       const bossMob = buildMobFromTheme(bossThemeMob, roomIndex, 0);
       bossMob.phaseTemplates = [
-        { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[1], template: [...theme.finalBoss.phase3] },
-        { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[0], template: [...theme.finalBoss.phase2] },
+        { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[1], template: theme.finalBoss.phase3 as BossTemplateAction[] },
+        { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[0], template: theme.finalBoss.phase2 as BossTemplateAction[] },
       ];
-      bossMob.actionTemplate = [...theme.finalBoss.phase1];
+      bossMob.actionTemplate = theme.finalBoss.phase1 as BossTemplateAction[];
       mobs.push(bossMob);
       break;
     }
