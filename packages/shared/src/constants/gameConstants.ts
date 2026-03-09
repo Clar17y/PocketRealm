@@ -50,12 +50,12 @@ export const COMBAT_CONSTANTS = {
   ENCOUNTER_TURN_COST: 50,
 } as const;
 
-export const HIT_CURVE_CONSTANTS: Record<CombatMode, HitCurveConfig> = {
+export const HIT_CURVE_CONSTANTS = {
   pvp: { minHitChance: 0.10, maxHitChance: 0.95, bias: 5, exponent: 2.4 },
   pve_open_world: { minHitChance: 0.25, maxHitChance: 0.95, bias: 10, exponent: 1.5 },
   pve_expedition: { minHitChance: 0.20, maxHitChance: 0.95, bias: 8, exponent: 1.8 },
   pve_boss: { minHitChance: 0.35, maxHitChance: 0.98, bias: 12, exponent: 1.35 },
-};
+} as const satisfies Record<CombatMode, HitCurveConfig>;
 
 export const CRIT_STAT_CONSTANTS = {
   FIXED_RANGE_BONUS_STATS: {

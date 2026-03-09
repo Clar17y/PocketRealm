@@ -62,6 +62,7 @@ describe('HIT_CURVE_CONSTANTS', () => {
       expect(config.maxHitChance).toBeGreaterThanOrEqual(0);
       expect(config.maxHitChance).toBeLessThanOrEqual(1);
       expect(config.minHitChance).toBeLessThan(config.maxHitChance);
+      expect(config.bias).toBeGreaterThan(0);
       expect(config.exponent).toBeGreaterThan(0);
     }
   });
