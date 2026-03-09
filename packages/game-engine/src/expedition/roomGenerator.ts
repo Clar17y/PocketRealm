@@ -48,10 +48,11 @@ function buildMobFromTheme(
   themeMob: ExpeditionThemeMob,
   roomIndex: number,
   mobIndex: number,
+  templateIdMap?: Map<string, string>,
 ): ExpeditionMobState {
   return {
     id: `mob-${roomIndex}-${mobIndex}`,
-    mobTemplateId: '',
+    mobTemplateId: templateIdMap?.get(themeMob.key) ?? '',
     name: themeMob.name,
     prefix: null,
     hp: themeMob.hp,
@@ -68,6 +69,7 @@ function generateMobsForRoom(
   tier: number,
   theme: ExpeditionTheme,
   rng: () => number,
+  templateIdMap?: Map<string, string>,
 ): ExpeditionMobState[] {
   const { MOB_COUNTS } = EXPEDITION_CONSTANTS;
   const mobs: ExpeditionMobState[] = [];
@@ -77,7 +79,7 @@ function generateMobsForRoom(
       const count = mobCountForTier(MOB_COUNTS.trash, tier);
       for (let i = 0; i < count; i++) {
         const pick = pickRandom(theme.trash, rng);
-        mobs.push(buildMobFromTheme(pick, roomIndex, i));
+        mobs.push(buildMobFromTheme(pick, roomIndex, i, templateIdMap));
       }
       break;
     }
@@ -85,17 +87,17 @@ function generateMobsForRoom(
       const count = mobCountForTier(MOB_COUNTS.elite, tier);
       for (let i = 0; i < count; i++) {
         const pick = pickRandom(theme.elites, rng);
-        mobs.push(buildMobFromTheme(pick, roomIndex, i));
+        mobs.push(buildMobFromTheme(pick, roomIndex, i, templateIdMap));
       }
       break;
     }
     case 'mini_boss': {
-      mobs.push(buildMobFromTheme(theme.miniBoss, roomIndex, 0));
+      mobs.push(buildMobFromTheme(theme.miniBoss, roomIndex, 0, templateIdMap));
       const addCount = mobCountForTier(MOB_COUNTS.mini_boss_adds, tier);
       for (let i = 0; i < addCount; i++) {
         const addPool = [...theme.miniBossAdds, theme.casterAdd];
         const pick = pickRandom(addPool, rng);
-        mobs.push(buildMobFromTheme(pick, roomIndex, i + 1));
+        mobs.push(buildMobFromTheme(pick, roomIndex, i + 1, templateIdMap));
       }
       break;
     }
@@ -103,13 +105,13 @@ function generateMobsForRoom(
       const count = mobCountForTier(MOB_COUNTS.event, tier);
       for (let i = 0; i < count; i++) {
         const pick = pickRandom(theme.trash, rng);
-        mobs.push(buildMobFromTheme(pick, roomIndex, i));
+        mobs.push(buildMobFromTheme(pick, roomIndex, i, templateIdMap));
       }
       break;
     }
     case 'final_boss': {
       const bossThemeMob = theme.finalBoss.mob;
-      const bossMob = buildMobFromTheme(bossThemeMob, roomIndex, 0);
+      const bossMob = buildMobFromTheme(bossThemeMob, roomIndex, 0, templateIdMap);
       bossMob.phaseTemplates = [
         { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[1], template: theme.finalBoss.phase3 as BossTemplateAction[] },
         { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[0], template: theme.finalBoss.phase2 as BossTemplateAction[] },
@@ -130,6 +132,7 @@ export function generateExpeditionRooms(
   tier: number,
   theme: ExpeditionTheme,
   rng: () => number = Math.random,
+  templateIdMap?: Map<string, string>,
 ): ExpeditionRoomDefinition[] {
   const composition = EXPEDITION_ROOM_COMPOSITIONS[tier];
   if (!composition) {
@@ -163,7 +166,7 @@ export function generateExpeditionRooms(
   const rooms: ExpeditionRoomDefinition[] = [];
   for (let i = 0; i < orderedTypes.length; i++) {
     const roomType = orderedTypes[i];
-    const mobs = generateMobsForRoom(roomType, i, tier, theme, rng);
+    const mobs = generateMobsForRoom(roomType, i, tier, theme, rng, templateIdMap);
     const room: ExpeditionRoomDefinition = {
       roomIndex: i,
       roomType,

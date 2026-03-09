@@ -256,7 +256,25 @@ export async function launchExpedition(
     throw new AppError(500, 'No themes available for this tier', 'NO_THEMES');
   }
   const theme = tierThemes[Math.floor(Math.random() * tierThemes.length)];
-  const rooms = generateExpeditionRooms(tier - 1, theme);
+
+  // Build key → UUID mapping for expedition mob templates
+  const expeditionMobTemplates = await prisma.mobTemplate.findMany({
+    where: { isExpeditionMob: true },
+    select: { id: true, name: true },
+  });
+  const templateIdMap = new Map<string, string>();
+  // Collect all mob keys from the theme for name-based lookup
+  const allThemeMobs = [
+    ...theme.trash, ...theme.elites, theme.miniBoss,
+    ...theme.miniBossAdds, theme.casterAdd, theme.finalBoss.mob,
+    theme.regularAdd,
+  ];
+  for (const themeMob of allThemeMobs) {
+    const match = expeditionMobTemplates.find(t => t.name === themeMob.name);
+    if (match) templateIdMap.set(themeMob.key, match.id);
+  }
+
+  const rooms = generateExpeditionRooms(tier - 1, theme, Math.random, templateIdMap);
 
   // Transaction: deduct treasury + create expedition + log
   const expedition = await prisma.$transaction(async (tx) => {
@@ -706,11 +724,19 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
   const theme = EXPEDITION_THEMES_BY_ID.get(expedition.themeId ?? '');
   const summonPool: ExpeditionMobState[] = [];
   if (theme) {
+    // Look up mob template UUIDs for summon mobs
+    const summonNames = [theme.regularAdd.name, theme.casterAdd.name];
+    const summonTemplates = await prisma.mobTemplate.findMany({
+      where: { isExpeditionMob: true, name: { in: summonNames } },
+      select: { id: true, name: true },
+    });
+    const summonIdByName = new Map(summonTemplates.map(t => [t.name, t.id]));
+
     const addMobs = [theme.regularAdd, theme.casterAdd];
     addMobs.forEach((add, i) => {
       summonPool.push({
         id: `summon-template-${i}`,
-        mobTemplateId: '',
+        mobTemplateId: summonIdByName.get(add.name) ?? '',
         name: add.name,
         prefix: null,
         hp: add.hp,
