@@ -943,6 +943,8 @@ model GuildExpedition {
   startedAt         DateTime  @default(now()) @map("started_at")
   completedAt       DateTime? @map("completed_at")
   launchedBy        String    @map("launched_by")
+  wipeCount              Int      @default(0) @map("wipe_count")
+  expeditionAttemptLogs  Json?    @map("expedition_attempt_logs")
 
   guild    Guild                   @relation(fields: [guildId], references: [id], onDelete: Cascade)
   launcher Player                  @relation("ExpeditionLauncher", fields: [launchedBy], references: [id])
@@ -972,8 +974,9 @@ model GuildExpeditionMember {
   totalHealing   BigInt   @default(0) @map("total_healing")
   roomDamage     BigInt   @default(0) @map("room_damage")
   roomHealing    BigInt   @default(0) @map("room_healing")
-  targetMobId    String?  @map("target_mob_id")
-  tokensEarned   Int      @default(0) @map("tokens_earned")
+  targetMobId        String?  @map("target_mob_id")
+  healTargetPlayerId String?  @map("heal_target_player_id")
+  tokensEarned       Int      @default(0) @map("tokens_earned")
   signedUpAt     DateTime @default(now()) @map("signed_up_at")
 
   expedition GuildExpedition @relation(fields: [expeditionId], references: [id], onDelete: Cascade)
