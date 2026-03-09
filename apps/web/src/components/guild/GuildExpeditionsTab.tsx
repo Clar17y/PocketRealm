@@ -75,21 +75,27 @@ function roomTypeBadge(roomType: ExpeditionRoomType | null): { label: string; co
 function Countdown({ expiresAt, onExpired }: { expiresAt: string | null; onExpired?: () => void }) {
   const [remaining, setRemaining] = useState('');
   const firedRef = useRef(false);
+  const onExpiredRef = useRef(onExpired);
+  onExpiredRef.current = onExpired;
+
   useEffect(() => {
     if (!expiresAt) return;
-    firedRef.current = false;
+    // Only reset the fired guard if the new expiry is in the future
+    if (new Date(expiresAt).getTime() > Date.now()) {
+      firedRef.current = false;
+    }
     const tick = () => {
       const ms = new Date(expiresAt).getTime() - Date.now();
       if (ms <= 0 && !firedRef.current) {
         firedRef.current = true;
-        onExpired?.();
+        onExpiredRef.current?.();
       }
       setRemaining(formatTimeRemaining(expiresAt));
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [expiresAt, onExpired]);
+  }, [expiresAt]);
   if (!expiresAt) return null;
   return <span className="text-xs text-[var(--rpg-text-secondary)]">{remaining}</span>;
 }
