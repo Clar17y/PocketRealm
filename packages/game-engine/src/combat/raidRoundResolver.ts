@@ -11,6 +11,8 @@ import type {
   HealingEntry,
   MobTelegraphEntry,
   ExpeditionRoundLog,
+  CombatPotion,
+  PotionConsumed,
 } from '@pocketrealm/shared';
 import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, BOSS_ACTION_DEFINITIONS, mobDisplayName } from '@pocketrealm/shared';
 import {
@@ -239,8 +241,8 @@ export function resolveRaidRound(
   }
 
   // --- Step 5: Player supportive phase ---
-  // Capture aggro holder BEFORE healing changes threat (matches resolveSupportiveActions logic)
-  const preHealAggroHolder = getSingleTarget(input.threatTable, new Set(pState.filter(ps => ps.hp > 0).map(ps => ps.playerId)));
+  // Snapshot HP before healing to determine who was healed by heal_ally
+  const hpBeforeHeal = new Map(pState.map(ps => [ps.playerId, ps.hp]));
   resolveSupportiveActions(input.participants, pState, input.threatTable);
 
   for (let i = 0; i < pState.length; i++) {
@@ -258,14 +260,83 @@ export function resolveRaidRound(
         targetPlayerId: s.playerId,
         targetUsername: getUsername(s.playerId),
       });
-    } else if (def.actionType === 'heal_ally' && preHealAggroHolder) {
+    } else if (def.actionType === 'heal_ally') {
+      // Find the actual heal target by comparing HP snapshots
+      let healTargetId = s.playerId;
+      for (const ps of pState) {
+        if (ps.playerId === s.playerId) continue;
+        const before = hpBeforeHeal.get(ps.playerId) ?? ps.hp;
+        if (ps.hp > before) {
+          healTargetId = ps.playerId;
+          break;
+        }
+      }
       logHealing.push({
         playerId: s.playerId,
         username: getUsername(s.playerId),
         actionLabel: actionLabel(s.actionId, playerActionDefs),
         amountHealed: s.healingDone,
-        targetPlayerId: preHealAggroHolder,
-        targetUsername: getUsername(preHealAggroHolder),
+        targetPlayerId: healTargetId,
+        targetUsername: getUsername(healTargetId),
+      });
+    }
+  }
+
+  // --- Step 5b: Potion actions ---
+  const allPotionsConsumed: PotionConsumed[] = [];
+  const perParticipantPotions: Map<number, PotionConsumed[]> = new Map();
+  const potionSicknessToApply: { participantIndex: number }[] = [];
+
+  for (let i = 0; i < pState.length; i++) {
+    const s = pState[i];
+    const p = input.participants[i];
+    const def = s.actionDef;
+    if (s.hp <= 0) continue;
+    if (!def || def.actionType !== 'use_potion') continue;
+
+    const potionType = def.potionType ?? 'hp';
+    const potions = p.availablePotions ?? [];
+
+    // Check potion sickness
+    const hasSickness = (p.activeEffects ?? []).some(
+      (e: { stat: string }) => e.stat === 'potionSickness',
+    );
+    if (hasSickness) continue;
+
+    // Find matching potion
+    const potionIndex = potions.findIndex((pt: CombatPotion) => pt.potionType === potionType);
+    if (potionIndex === -1) continue;
+
+    const potion = potions[potionIndex];
+    let actualRestore = 0;
+
+    if (potionType === 'hp') {
+      actualRestore = Math.min(potion.healAmount, p.maxHp - s.hp);
+      s.hp += actualRestore;
+      s.healingDone = actualRestore;
+    } else if (potionType === 'stamina') {
+      actualRestore = Math.min(potion.healAmount, p.maxStamina - s.stamina);
+      s.stamina += actualRestore;
+    } else {
+      actualRestore = Math.min(potion.healAmount, p.maxMana - s.mana);
+      s.mana += actualRestore;
+    }
+
+    potions.splice(potionIndex, 1);
+    const consumed: PotionConsumed = { templateId: potion.templateId, name: potion.name, healAmount: actualRestore, round: input.roundNumber };
+    allPotionsConsumed.push(consumed);
+    if (!perParticipantPotions.has(i)) perParticipantPotions.set(i, []);
+    perParticipantPotions.get(i)!.push(consumed);
+    potionSicknessToApply.push({ participantIndex: i });
+
+    if (potionType === 'hp' && actualRestore > 0) {
+      logHealing.push({
+        playerId: s.playerId,
+        username: getUsername(s.playerId),
+        actionLabel: potion.name,
+        amountHealed: actualRestore,
+        targetPlayerId: s.playerId,
+        targetUsername: getUsername(s.playerId),
       });
     }
   }
@@ -432,6 +503,17 @@ export function resolveRaidRound(
     mob.activeEffects = remaining;
   }
 
+  // Apply potion sickness before ticking existing effects
+  for (const { participantIndex } of potionSicknessToApply) {
+    const existing = input.participants[participantIndex].activeEffects ?? [];
+    existing.push({
+      name: 'Potion Sickness',
+      stat: 'potionSickness',
+      modifier: 0,
+      roundsRemaining: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS,
+    });
+  }
+
   const participantEffectsAfter: BossActiveEffect[][] = input.participants.map(p => {
     const remaining: BossActiveEffect[] = [];
     for (const effect of p.activeEffects) {
@@ -481,6 +563,7 @@ export function resolveRaidRound(
     hit: s.hit,
     isCritical: s.isCritical,
     activeEffectsAfter: participantEffectsAfter[i],
+    potionsConsumed: perParticipantPotions.get(i) ?? [],
   }));
 
   // --- Step 12: Build telegraphs (look ahead to each alive mob's NEXT action) ---
@@ -531,5 +614,6 @@ export function resolveRaidRound(
     roomCleared,
     allPlayersDead,
     roundLog,
+    allPotionsConsumed,
   };
 }

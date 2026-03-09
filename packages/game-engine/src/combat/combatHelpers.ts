@@ -5,7 +5,6 @@ import type {
 import { resolveAction } from './actionResolver';
 import {
   addHealThreat,
-  getSingleTarget,
   type ThreatEntry,
 } from './threatSystem';
 
@@ -23,6 +22,7 @@ export interface CombatParticipantInput {
   maxMana: number;
   staminaRegenPerRound: number;
   manaRegenPerRound: number;
+  healTargetPlayerId?: string | null;
 }
 
 /** Minimal per-round mutable state used by all three helpers. */
@@ -101,7 +101,6 @@ export function resolveSupportiveActions(
   threatTable: ThreatEntry[],
 ): void {
   const alivePlayerIds = new Set(pState.filter(s => s.hp > 0).map(s => s.playerId));
-  const aggroHolder = getSingleTarget(threatTable, alivePlayerIds);
 
   for (let i = 0; i < participants.length; i++) {
     const p = participants[i];
@@ -119,11 +118,28 @@ export function resolveSupportiveActions(
       addHealThreat(threatTable, s.playerId, actualHeal);
     }
 
-    // heal_ally — auto-targets aggro holder
-    if (def.actionType === 'heal_ally' && aggroHolder) {
+    // heal_ally — use manual target if set, else lowest HP player
+    if (def.actionType === 'heal_ally') {
+      const manualTarget = p.healTargetPlayerId;
+      let targetId: string | null = null;
+
+      if (manualTarget && alivePlayerIds.has(manualTarget)) {
+        targetId = manualTarget;
+      } else {
+        let lowestHp = Infinity;
+        for (const ps of pState) {
+          if (ps.hp <= 0 || ps.playerId === s.playerId) continue;
+          if (ps.hp < lowestHp) {
+            lowestHp = ps.hp;
+            targetId = ps.playerId;
+          }
+        }
+        if (!targetId) targetId = s.playerId;
+      }
+
       const healAmount = (def.healFlat ?? 0) + Math.floor((def.healPercent ?? 0) * p.maxHp);
-      const targetState = pState.find(ps => ps.playerId === aggroHolder);
-      const targetParticipant = participants.find(pp => pp.playerId === aggroHolder);
+      const targetState = pState.find(ps => ps.playerId === targetId);
+      const targetParticipant = participants.find(pp => pp.playerId === targetId);
       if (targetState && targetParticipant) {
         const actualHeal = Math.min(healAmount, targetParticipant.maxHp - targetState.hp);
         targetState.hp += actualHeal;

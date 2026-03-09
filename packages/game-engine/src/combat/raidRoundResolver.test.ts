@@ -6,8 +6,9 @@ import type {
   RaidRoundInput,
   RaidParticipant,
   ExpeditionMobState,
+  CombatPotion,
 } from '@pocketrealm/shared';
-import { BASE_ACTION_DEFINITIONS, BOSS_ACTION_DEFINITIONS } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS, BOSS_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
 import { resolveRaidRound } from './raidRoundResolver';
 import type { RaidRoundRng } from './raidRoundResolver';
 import { initThreatTable } from './threatSystem';
@@ -39,6 +40,18 @@ function makeParticipant(overrides: Partial<RaidParticipant> = {}): RaidParticip
     manaRegenPerRound: 5,
     templateRound: 1,
     activeEffects: [],
+    healTargetPlayerId: null,
+    availablePotions: [],
+    ...overrides,
+  };
+}
+
+function makePotion(overrides: Partial<CombatPotion> = {}): CombatPotion {
+  return {
+    name: 'Health Potion',
+    healAmount: 50,
+    templateId: 'potion-hp-1',
+    potionType: 'hp',
     ...overrides,
   };
 }
@@ -522,6 +535,326 @@ describe('resolveRaidRound', () => {
       // Mob was killed, should not have attacked
       expect(result.participantResults[0].damageTaken).toBe(0);
       expect(result.roomCleared).toBe(true);
+    });
+  });
+
+  describe('heal_ally targeting', () => {
+    it('heal_ally with manual healTargetPlayerId heals that specific player', () => {
+      const healer = makeParticipant({
+        playerId: 'healer',
+        hp: 100, maxHp: 100,
+        mana: 100, maxMana: 100,
+        template: [{ actionId: 'heal_ally', sortOrder: 0 }],
+        healTargetPlayerId: 'wounded',
+      });
+      const tank = makeParticipant({
+        playerId: 'tank',
+        hp: 30, maxHp: 100,
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+      const wounded = makeParticipant({
+        playerId: 'wounded',
+        hp: 50, maxHp: 100,
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [healer, tank, wounded], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const healerResult = result.participantResults.find(r => r.playerId === 'healer')!;
+      const woundedResult = result.participantResults.find(r => r.playerId === 'wounded')!;
+      const tankResult = result.participantResults.find(r => r.playerId === 'tank')!;
+
+      // Healer should have healed
+      expect(healerResult.healingDone).toBeGreaterThan(0);
+      // Wounded should have received the heal (HP increased from 50)
+      expect(woundedResult.hpAfter).toBeGreaterThan(50);
+      // Tank should NOT have been healed (still at 30 HP)
+      expect(tankResult.hpAfter).toBe(30);
+    });
+
+    it('heal_ally with no manual target heals lowest HP player', () => {
+      const healer = makeParticipant({
+        playerId: 'healer',
+        hp: 100, maxHp: 100,
+        mana: 100, maxMana: 100,
+        template: [{ actionId: 'heal_ally', sortOrder: 0 }],
+        healTargetPlayerId: null,
+      });
+      const highHp = makeParticipant({
+        playerId: 'highHp',
+        hp: 90, maxHp: 100,
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+      const lowHp = makeParticipant({
+        playerId: 'lowHp',
+        hp: 20, maxHp: 100,
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [healer, highHp, lowHp], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const healerResult = result.participantResults.find(r => r.playerId === 'healer')!;
+      const lowHpResult = result.participantResults.find(r => r.playerId === 'lowHp')!;
+      const highHpResult = result.participantResults.find(r => r.playerId === 'highHp')!;
+
+      expect(healerResult.healingDone).toBeGreaterThan(0);
+      // Lowest HP player should receive the heal
+      expect(lowHpResult.hpAfter).toBeGreaterThan(20);
+      // High HP player should stay the same
+      expect(highHpResult.hpAfter).toBe(90);
+    });
+
+    it('heal_ally with dead manual target falls back to lowest HP', () => {
+      const healer = makeParticipant({
+        playerId: 'healer',
+        hp: 100, maxHp: 100,
+        mana: 100, maxMana: 100,
+        template: [{ actionId: 'heal_ally', sortOrder: 0 }],
+        healTargetPlayerId: 'deadPlayer',
+      });
+      const deadPlayer = makeParticipant({
+        playerId: 'deadPlayer',
+        hp: 0, maxHp: 100,
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+      const alivePlayer = makeParticipant({
+        playerId: 'alivePlayer',
+        hp: 30, maxHp: 100,
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [healer, deadPlayer, alivePlayer], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const healerResult = result.participantResults.find(r => r.playerId === 'healer')!;
+      const aliveResult = result.participantResults.find(r => r.playerId === 'alivePlayer')!;
+
+      // Should fall back to lowest HP alive player
+      expect(healerResult.healingDone).toBeGreaterThan(0);
+      expect(aliveResult.hpAfter).toBeGreaterThan(30);
+    });
+  });
+
+  describe('potions in raid', () => {
+    it('use_hp_potion with available potions heals player, potion consumed, sickness applied', () => {
+      const potion = makePotion({ healAmount: 40 });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 50, maxHp: 100,
+        template: [{ actionId: 'use_hp_potion', sortOrder: 0 }],
+        availablePotions: [potion],
+        activeEffects: [],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const pr = result.participantResults[0];
+      // HP should increase by 40 (50 + 40 = 90)
+      expect(pr.hpAfter).toBe(90);
+      expect(pr.healingDone).toBe(40);
+
+      // Potion should be consumed
+      expect(pr.potionsConsumed).toHaveLength(1);
+      expect(pr.potionsConsumed[0].templateId).toBe('potion-hp-1');
+      expect(pr.potionsConsumed[0].healAmount).toBe(40);
+
+      // allPotionsConsumed on the result
+      expect(result.allPotionsConsumed).toHaveLength(1);
+
+      // Potion sickness should be applied
+      const sickness = pr.activeEffectsAfter.find(e => e.stat === 'potionSickness');
+      expect(sickness).toBeDefined();
+      // Sickness rounds = POTION_SICKNESS_ROUNDS - 1 (ticked once)
+      expect(sickness!.roundsRemaining).toBe(COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS - 1);
+    });
+
+    it('use_hp_potion with potion sickness active does not heal or consume', () => {
+      const potion = makePotion({ healAmount: 40 });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 50, maxHp: 100,
+        template: [{ actionId: 'use_hp_potion', sortOrder: 0 }],
+        availablePotions: [potion],
+        activeEffects: [{
+          name: 'Potion Sickness',
+          stat: 'potionSickness',
+          modifier: 0,
+          roundsRemaining: 3,
+        }],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const pr = result.participantResults[0];
+      // HP should not change (no heal)
+      expect(pr.healingDone).toBe(0);
+      // Potion should NOT be consumed
+      expect(pr.potionsConsumed).toHaveLength(0);
+      expect(result.allPotionsConsumed).toHaveLength(0);
+      // Potion was not removed from the pool
+      expect(p1.availablePotions).toHaveLength(1);
+    });
+
+    it('use_hp_potion with no matching potions does nothing', () => {
+      const staminaPotion = makePotion({ potionType: 'stamina', name: 'Stamina Potion', templateId: 'potion-stam-1' });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 50, maxHp: 100,
+        template: [{ actionId: 'use_hp_potion', sortOrder: 0 }],
+        availablePotions: [staminaPotion], // has stamina potion, but action wants HP
+        activeEffects: [],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const pr = result.participantResults[0];
+      expect(pr.healingDone).toBe(0);
+      expect(pr.potionsConsumed).toHaveLength(0);
+      expect(result.allPotionsConsumed).toHaveLength(0);
+    });
+
+    it('potion sickness ticks down across rounds', () => {
+      // Round 1: Player uses potion, gets sickness
+      const potion = makePotion({ healAmount: 40 });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 50, maxHp: 100,
+        template: [{ actionId: 'use_hp_potion', sortOrder: 0 }],
+        availablePotions: [potion],
+        activeEffects: [],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result1 = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1], roundNumber: 1 }),
+        alwaysMissRng,
+      );
+
+      const pr1 = result1.participantResults[0];
+      const sickness1 = pr1.activeEffectsAfter.find(e => e.stat === 'potionSickness');
+      expect(sickness1).toBeDefined();
+      const initialRounds = COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS - 1;
+      expect(sickness1!.roundsRemaining).toBe(initialRounds);
+
+      // Round 2: Feed the effects back in — sickness should tick down
+      const p1Round2 = makeParticipant({
+        playerId: 'p1',
+        hp: pr1.hpAfter,
+        maxHp: 100,
+        stamina: pr1.staminaAfter,
+        mana: pr1.manaAfter,
+        template: [{ actionId: 'use_hp_potion', sortOrder: 0 }],
+        availablePotions: [makePotion({ healAmount: 20 })], // another potion available
+        activeEffects: pr1.activeEffectsAfter,
+        templateRound: pr1.templateRoundAfter,
+      });
+
+      const result2 = resolveRaidRound(
+        makeInput({ participants: [p1Round2], mobs: [mob1], roundNumber: 2 }),
+        alwaysMissRng,
+      );
+
+      const pr2 = result2.participantResults[0];
+      // Should NOT have consumed a potion (sickness blocks it)
+      expect(pr2.potionsConsumed).toHaveLength(0);
+      // Sickness should have ticked down by 1
+      const sickness2 = pr2.activeEffectsAfter.find(e => e.stat === 'potionSickness');
+      expect(sickness2).toBeDefined();
+      expect(sickness2!.roundsRemaining).toBe(initialRounds - 1);
+    });
+
+    it('use_stamina_potion restores stamina', () => {
+      const potion = makePotion({ potionType: 'stamina', name: 'Stamina Potion', templateId: 'potion-stam-1', healAmount: 30 });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        stamina: 20, maxStamina: 100, staminaRegenPerRound: 0,
+        template: [{ actionId: 'use_stamina_potion', sortOrder: 0 }],
+        availablePotions: [potion],
+        activeEffects: [],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const pr = result.participantResults[0];
+      // Stamina should increase: 20 + 30 (potion) - 5 (use_potion cost) = 45
+      expect(pr.staminaAfter).toBe(45);
+      expect(pr.potionsConsumed).toHaveLength(1);
+    });
+
+    it('hp potion does not overheal past maxHp', () => {
+      const potion = makePotion({ healAmount: 80 });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 80, maxHp: 100,
+        template: [{ actionId: 'use_hp_potion', sortOrder: 0 }],
+        availablePotions: [potion],
+        activeEffects: [],
+      });
+      const mob1 = makeMob({
+        id: 'mob1',
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysMissRng,
+      );
+
+      const pr = result.participantResults[0];
+      // Should cap at maxHp, not 160
+      expect(pr.hpAfter).toBe(100);
+      expect(pr.healingDone).toBe(20); // only healed 20 (100 - 80)
     });
   });
 });
