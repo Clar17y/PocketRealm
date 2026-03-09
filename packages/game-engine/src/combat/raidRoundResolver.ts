@@ -8,6 +8,7 @@ import type {
   ExpeditionMobState,
   PlayerAttackEntry,
   ExhaustedActionEntry,
+  DefensiveActionEntry,
   PlayerRoundActionEntry,
   MobActionLogEntry,
   HealingEntry,
@@ -121,6 +122,7 @@ export function resolveRaidRound(
 
   // Round log collectors
   const logPlayerAttacks: PlayerRoundActionEntry[] = [];
+  const logDefences: DefensiveActionEntry[] = [];
   const logMobActions: MobActionLogEntry[] = [];
   const logHealing: HealingEntry[] = [];
 
@@ -165,6 +167,20 @@ export function resolveRaidRound(
       resistsMagic: def?.resistsMagic ?? false,
       damageReductionPercent: def?.damageReductionPercent ?? 0,
       isChanneling: def?.isChanneling ?? false,
+    });
+  }
+
+  // Log defensive actions (non-exhausted participants using defensive category)
+  for (const s of pState) {
+    if (s.hp <= 0 || s.wasExhausted) continue;
+    const def = s.actionDef;
+    if (!def || def.category !== 'defensive') continue;
+    logDefences.push({
+      entryType: 'defensive',
+      playerId: s.playerId,
+      username: getUsername(s.playerId),
+      actionId: s.actionId,
+      actionLabel: actionLabel(s.actionId, playerActionDefs),
     });
   }
 
@@ -605,6 +621,7 @@ export function resolveRaidRound(
     roomIndex: 0, // Will be set by the service layer
     phases: {
       playerAttacks: logPlayerAttacks,
+      defences: logDefences,
       mobActions: logMobActions,
       healing: logHealing,
       outcome: {

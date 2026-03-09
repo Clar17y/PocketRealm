@@ -205,7 +205,15 @@ export interface ExhaustedActionEntry {
   reason: ExhaustedActionReason;
 }
 
-export type PlayerRoundActionEntry = PlayerAttackEntry | ExhaustedActionEntry;
+export interface DefensiveActionEntry {
+  entryType: 'defensive';
+  playerId: string;
+  username: string;
+  actionId: string;
+  actionLabel: string;
+}
+
+export type PlayerRoundActionEntry = PlayerAttackEntry | ExhaustedActionEntry | DefensiveActionEntry;
 
 export interface MobActionLogEntry {
   mobId: string;
@@ -255,6 +263,7 @@ export interface ExpeditionRoundLog {
   roomIndex: number;
   phases: {
     playerAttacks: PlayerRoundActionEntry[];
+    defences: DefensiveActionEntry[];
     mobActions: MobActionLogEntry[];
     healing: HealingEntry[];
     outcome: RoundOutcomeEntry;

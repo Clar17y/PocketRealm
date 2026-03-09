@@ -31,6 +31,7 @@ import type {
 } from '@pocketrealm/shared';
 import { EXPEDITION_CONSTANTS, mobDisplayName } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
+import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { RoundLogAttackRow } from './guildExpeditionRoundLog';
 
 // ---------------------------------------------------------------------------
@@ -903,6 +904,18 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
                     </div>
                   )}
 
+                  {/* Defences */}
+                  {log.phases.defences?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-[var(--rpg-text-secondary)] font-bold mb-0.5">Defences</p>
+                      {log.phases.defences.map((d, j) => (
+                        <div key={j} className="text-[10px] ml-2 text-[var(--rpg-blue-light)]">
+                          {d.username}: {d.actionLabel}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Healing */}
                   {log.phases.healing.length > 0 && (
                     <div>
@@ -1173,11 +1186,6 @@ function MemberList({
                 <span className="text-xs text-[var(--rpg-text-primary)] truncate">
                   {m.username ?? m.playerId.slice(0, 8)}
                 </span>
-                {m.isKnockedOut && (
-                  <span className="text-[10px] px-1.5 py-0 rounded bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]">
-                    KO
-                  </span>
-                )}
                 {isMyHealTarget && (
                   <span className="text-[10px] px-1.5 py-0 rounded bg-[var(--rpg-green-light)]/20 text-[var(--rpg-green-light)]">
                     HEAL TARGET
@@ -1193,14 +1201,16 @@ function MemberList({
                 </div>
               )}
               {showResources && (
-                <div className="space-y-0.5">
-                  <HpBar
-                    current={m.currentHp}
-                    max={m.maxHp}
-                    label="HP"
-                    color={m.isKnockedOut ? 'var(--rpg-red)' : 'var(--rpg-green-light)'}
-                  />
-                </div>
+                <ResourceStatusBar
+                  currentHp={m.currentHp}
+                  maxHp={m.maxHp}
+                  currentStamina={m.currentStamina}
+                  maxStamina={m.maxStamina}
+                  currentMana={m.currentMana}
+                  maxMana={m.maxMana}
+                  isRecovering={m.isKnockedOut}
+                  compact
+                />
               )}
             </div>
           );
