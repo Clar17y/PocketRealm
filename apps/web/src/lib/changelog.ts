@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.32',
+    date: '2026-03-09',
+    title: 'First-Visit Tutorials & UI Polish',
+    summary:
+      'Seven new screens now greet you with a quick tutorial on your first visit: Guilds, Equipment, Bestiary, Achievements, Zone Map, World Events, and Quests. All tutorial and modal popups now render correctly in the centre of the screen instead of getting pushed off by scrollable content. The changelog no longer appears over the new-player tutorial on first login.',
+  },
+  {
     version: '0.31',
     date: '2026-03-08',
     title: 'Playback Overhaul & Multi-Hop Travel',
