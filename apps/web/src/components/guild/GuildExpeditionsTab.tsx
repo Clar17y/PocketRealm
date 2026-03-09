@@ -29,7 +29,7 @@ import type {
   ExpeditionRoundLog,
   ExpeditionCooldownInfo,
 } from '@pocketrealm/shared';
-import { EXPEDITION_CONSTANTS, mobDisplayName } from '@pocketrealm/shared';
+import { EXPEDITION_CONSTANTS, EXPEDITION_THEMES, mobDisplayName } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { RoundLogAttackRow } from './guildExpeditionRoundLog';
@@ -472,9 +472,10 @@ function IdleView({
       {isOfficer ? (
         <div className="space-y-2">
           {TIER_CONFIGS.map((cfg) => {
+            const hasThemes = EXPEDITION_THEMES.some(t => t.tier === cfg.tier);
             const levelTooLow = characterLevel < cfg.levelReq;
             const cooldownReason = getCooldownReason(cfg.tier);
-            const isDisabled = actionLoading || levelTooLow || !!cooldownReason;
+            const isDisabled = actionLoading || levelTooLow || !!cooldownReason || !hasThemes;
             return (
               <PixelCard key={cfg.tier}>
                 <div className="flex justify-between items-start">
@@ -503,7 +504,7 @@ function IdleView({
                     onClick={() => onLaunch(cfg.tier)}
                     disabled={isDisabled}
                   >
-                    Launch
+                    {hasThemes ? 'Launch' : 'Coming Soon'}
                   </PixelButton>
                 </div>
               </PixelCard>
