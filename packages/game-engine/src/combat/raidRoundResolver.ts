@@ -30,17 +30,18 @@ import {
   tickTaunts,
 } from './threatSystem';
 import {
-  rollD20 as defaultRollD20,
   rollDamage as defaultRollDamage,
   isCriticalHit as defaultIsCriticalHit,
-  doesAttackHit,
+  resolveHitCheck,
   calculateFinalDamage,
 } from './damageCalculator';
+import type { CombatMode } from '@pocketrealm/shared';
 
 // --- RNG Interface ---
 
 export interface RaidRoundRng {
-  rollD20: () => number;
+  /** Returns a 0-1 float used as the hit roll against the computed hit probability. */
+  rollHitChance: () => number;
   rollDamage: (min: number, max: number) => number;
   rollCrit: (chance: number) => boolean;
 }
@@ -79,9 +80,10 @@ function getEffectiveStatValue(baseStat: number, effects: BossActiveEffect[], st
 export function resolveRaidRound(
   input: RaidRoundInput,
   rng?: RaidRoundRng,
+  combatMode: CombatMode = 'pve_expedition',
 ): RaidRoundResult {
   const roll = rng ?? {
-    rollD20: defaultRollD20,
+    rollHitChance: () => Math.random(),
     rollDamage: defaultRollDamage,
     rollCrit: defaultIsCriticalHit,
   };
@@ -241,12 +243,27 @@ export function resolveRaidRound(
 
     let totalDamageDealt = 0;
     const effectiveAccuracy = getEffectiveStatValue(p.stats.accuracy, p.activeEffects, 'accuracy');
-    const modifier = effectiveAccuracy + (def.accuracyModifier ?? 0);
+    const hitScore = effectiveAccuracy + (def.accuracyModifier ?? 0);
 
     for (const target of targets) {
-      const attackRoll = roll.rollD20();
-      const defenseTarget = target.stats.dodge;
-      const hits = doesAttackHit(attackRoll, modifier, defenseTarget, 0);
+      const avoidScore = target.stats.dodge + (target.stats.evasion ?? 0);
+
+      const hitResolution = def.alwaysHits
+        ? {
+            hitScore: Math.max(1, hitScore),
+            avoidScore: Math.max(0, avoidScore),
+            hitChance: 1,
+            hitRollValue: 0,
+            didHit: true,
+          }
+        : resolveHitCheck({
+            combatMode,
+            hitScore,
+            avoidScore,
+            hitRollValue: roll.rollHitChance(),
+          });
+
+      const hits = hitResolution.didHit;
 
       const baseEntry = {
         entryType: 'attack' as const,
@@ -256,14 +273,24 @@ export function resolveRaidRound(
         actionLabel: actionLabel(s.actionId, playerActionDefs),
         targetMobId: target.id,
         targetMobName: mobDisplayName(target),
-        attackRoll,
-        modifier,
-        defenseTarget,
+        hitChance: hitResolution.hitChance,
+        hitRollValue: hitResolution.hitRollValue,
+        attackerHitScore: hitResolution.hitScore,
+        defenderAvoidScore: hitResolution.avoidScore,
         staminaCost: def.cost.stamina,
         manaCost: def.cost.mana,
       };
 
       if (!hits) {
+        // Even on miss, apply alwaysApplies effects (debuffs that bypass evasion)
+        if (def.effect?.alwaysApplies && def.effect.isDebuff && target.hp > 0) {
+          target.activeEffects.push({
+            name: def.effect.name,
+            stat: def.effect.stat,
+            modifier: def.effect.modifier,
+            roundsRemaining: def.effect.duration,
+          });
+        }
         logPlayerAttacks.push({ ...baseEntry, hit: false, crit: false });
         continue;
       }

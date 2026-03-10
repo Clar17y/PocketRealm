@@ -180,9 +180,10 @@ export interface PlayerAttackEntry {
   actionLabel: string;
   targetMobId: string | null;
   targetMobName: string | null;
-  attackRoll: number;
-  modifier: number;
-  defenseTarget: number;
+  hitChance: number;
+  hitRollValue: number;
+  attackerHitScore: number;
+  defenderAvoidScore: number;
   hit: boolean;
   crit: boolean;
   damageRoll?: number;

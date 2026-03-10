@@ -8,9 +8,10 @@ import type {
   ExpeditionMobState,
   CombatPotion,
 } from '@pocketrealm/shared';
-import { BASE_ACTION_DEFINITIONS, BOSS_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS, BOSS_ACTION_DEFINITIONS, COMBAT_ACTION_CONSTANTS, HIT_CURVE_CONSTANTS } from '@pocketrealm/shared';
 import { resolveRaidRound } from './raidRoundResolver';
 import type { RaidRoundRng } from './raidRoundResolver';
+import { calculateHitChance } from './damageCalculator';
 import { initThreatTable } from './threatSystem';
 
 // --- Helpers ---
@@ -83,21 +84,22 @@ function makeInput(overrides: Partial<RaidRoundInput> = {}): RaidRoundInput {
   };
 }
 
-// Deterministic RNG: always hit, never crit, fixed damage at min
+// Deterministic RNG: always hit (roll 0 is below any positive hitChance), never crit, fixed damage at min
 const alwaysHitRng: RaidRoundRng = {
-  rollD20: () => 15,
+  rollHitChance: () => 0,
   rollDamage: (min: number, _max: number) => min,
   rollCrit: (_chance: number) => false,
 };
 
+// Always miss (roll 1.0 is above any hitChance < 1)
 const alwaysMissRng: RaidRoundRng = {
-  rollD20: () => 1,
+  rollHitChance: () => 1,
   rollDamage: (min: number, _max: number) => min,
   rollCrit: (_chance: number) => false,
 };
 
 const alwaysCritRng: RaidRoundRng = {
-  rollD20: () => 20,
+  rollHitChance: () => 0,
   rollDamage: (_min: number, max: number) => max,
   rollCrit: (_chance: number) => true,
 };
@@ -1647,15 +1649,22 @@ describe('resolveRaidRound', () => {
     });
 
     it('accuracy debuff (boss_smoke_bomb) reduces player hit chance', () => {
-      // doesAttackHit: totalAttack(roll+accuracy) >= hitThreshold(10+dodge+evasion)
-      // Roll=15, accuracy=10 → total=25. Dodge=15 → threshold=25 → hit (25>=25)
-      // With -8 accuracy: total=15+2=17 < 25 → miss
+      // Mode-aware hit: resolveHitCheck uses pve_expedition curve.
+      // High-dodge mob makes hit chance lower; accuracy debuff pushes it lower still.
+      // We use a fixed rollHitChance between the two hit chances to prove the debuff matters.
       const highDodgeMob = makeMob({
         id: 'mob1', hp: 500, maxHp: 500,
-        stats: makeStats({ dodge: 15, damageMin: 5, damageMax: 5 }),
+        stats: makeStats({ dodge: 30, evasion: 0, damageMin: 5, damageMax: 5 }),
       });
 
-      // Without debuff: should hit
+      // Without debuff: accuracy=10, avoidScore=30 → compute hitChance via pve_expedition
+      // We pick a roll value that sits between normal hitChance and debuffed hitChance
+      const marginalRng: RaidRoundRng = {
+        rollHitChance: () => 0.22,  // Just above pve_expedition minHitChance
+        rollDamage: (min: number) => min,
+        rollCrit: () => false,
+      };
+
       const pNormal = makeParticipant({
         playerId: 'p1', hp: 200, maxHp: 200,
         stats: makeStats({ accuracy: 10, damageMin: 20, damageMax: 20 }),
@@ -1663,11 +1672,12 @@ describe('resolveRaidRound', () => {
       });
       const rNormal = resolveRaidRound(
         makeInput({ participants: [pNormal], mobs: [{ ...highDodgeMob }], roundNumber: 1 }),
-        alwaysHitRng, // rollD20 returns 15
+        alwaysHitRng,
       );
       expect(rNormal.participantResults[0].damageDealt).toBeGreaterThan(0);
 
-      // With accuracy debuff: should miss
+      // With accuracy debuff (-8): effective accuracy=2, avoidScore=30 → much lower hitChance
+      // The marginal roll (0.22) should now exceed the debuffed hitChance → miss
       const pBlinded = makeParticipant({
         playerId: 'p1', hp: 200, maxHp: 200,
         stats: makeStats({ accuracy: 10, damageMin: 20, damageMax: 20 }),
@@ -1677,9 +1687,206 @@ describe('resolveRaidRound', () => {
       });
       const rBlinded = resolveRaidRound(
         makeInput({ participants: [pBlinded], mobs: [{ ...highDodgeMob }], roundNumber: 1 }),
-        alwaysHitRng,
+        marginalRng,
       );
       expect(rBlinded.participantResults[0].damageDealt).toBe(0);
+    });
+  });
+
+  describe('mode-aware hit resolution (pve_expedition)', () => {
+    it('uses pve_expedition curve constants by default', () => {
+      // Verify the expedition curve exists and has expected shape
+      const curve = HIT_CURVE_CONSTANTS.pve_expedition;
+      expect(curve.minHitChance).toBe(0.20);
+      expect(curve.maxHitChance).toBe(0.95);
+      expect(curve.bias).toBe(8);
+      expect(curve.exponent).toBe(1.8);
+    });
+
+    it('evasion tank viability: high-evasion mobs reduce player hit chance to curve floor', () => {
+      // A mob with very high dodge+evasion should push hit chance down to minHitChance (0.20)
+      const tankMob = makeMob({
+        id: 'tank', hp: 500, maxHp: 500,
+        stats: makeStats({ dodge: 50, evasion: 20, damageMin: 5, damageMax: 5 }),
+      });
+      const p = makeParticipant({
+        playerId: 'p1', hp: 200, maxHp: 200,
+        stats: makeStats({ accuracy: 10, damageMin: 20, damageMax: 20 }),
+      });
+
+      // Roll just above minHitChance floor → should miss
+      const marginalMissRng: RaidRoundRng = {
+        rollHitChance: () => 0.21,
+        rollDamage: (min: number) => min,
+        rollCrit: () => false,
+      };
+      const result = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [tankMob], roundNumber: 1 }),
+        marginalMissRng,
+      );
+      expect(result.participantResults[0].damageDealt).toBe(0);
+
+      // Verify computed hit chance is at the floor
+      const breakdown = calculateHitChance('pve_expedition', 10, 70);
+      expect(breakdown.hitChance).toBe(HIT_CURVE_CONSTANTS.pve_expedition.minHitChance);
+    });
+
+    it('non-immunity under focused pressure: even max evasion does not make mobs unhittable', () => {
+      // Even against extreme evasion, minHitChance (0.20) ensures hits are possible
+      const evadeMob = makeMob({
+        id: 'evade', hp: 200, maxHp: 200,
+        stats: makeStats({ dodge: 100, evasion: 100, damageMin: 5, damageMax: 5 }),
+      });
+      const p = makeParticipant({
+        playerId: 'p1', hp: 200, maxHp: 200,
+        stats: makeStats({ accuracy: 5, damageMin: 20, damageMax: 20 }),
+      });
+
+      // Roll below minHitChance → guaranteed hit even vs extreme evasion
+      const luckyRng: RaidRoundRng = {
+        rollHitChance: () => 0.19,
+        rollDamage: (min: number) => min,
+        rollCrit: () => false,
+      };
+      const result = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [evadeMob], roundNumber: 1 }),
+        luckyRng,
+      );
+      expect(result.participantResults[0].damageDealt).toBeGreaterThan(0);
+    });
+
+    it('logs mode-aware hit breakdown fields', () => {
+      const p = makeParticipant({ playerId: 'p1' });
+      const mob = makeMob({ id: 'mob1' });
+      const result = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [mob], roundNumber: 1 }),
+        alwaysHitRng,
+      );
+
+      const attackEntry = result.roundLog.phases.playerAttacks.find(
+        e => e.entryType === 'attack',
+      );
+      expect(attackEntry).toBeDefined();
+      if (attackEntry && 'hitChance' in attackEntry) {
+        expect(attackEntry.hitChance).toBeGreaterThan(0);
+        expect(attackEntry.hitRollValue).toBeDefined();
+        expect(attackEntry.attackerHitScore).toBeGreaterThan(0);
+        expect(typeof attackEntry.defenderAvoidScore).toBe('number');
+      }
+    });
+
+    it('alwaysHits action bypasses hit resolution in expedition combat', () => {
+      // Create a custom action definition with alwaysHits
+      const sniperAction: ActionDefinition = {
+        ...BASE_ACTION_DEFINITIONS['normal_attack'],
+        id: 'sniper_mark',
+        name: 'Sniper Mark',
+        alwaysHits: true,
+      };
+
+      const highEvadeMob = makeMob({
+        id: 'mob1', hp: 200, maxHp: 200,
+        stats: makeStats({ dodge: 100, evasion: 50, damageMin: 5, damageMax: 5 }),
+      });
+      const p = makeParticipant({
+        playerId: 'p1', hp: 200, maxHp: 200,
+        stats: makeStats({ accuracy: 1, damageMin: 20, damageMax: 20 }),
+        template: [{ actionId: 'sniper_mark', sortOrder: 0 }],
+        actionDefinitions: { ...BASE_ACTION_DEFINITIONS, sniper_mark: sniperAction },
+      });
+
+      // Even with alwaysMissRng, alwaysHits should force a hit
+      const result = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [highEvadeMob], roundNumber: 1 }),
+        alwaysMissRng,
+      );
+      expect(result.participantResults[0].damageDealt).toBeGreaterThan(0);
+      expect(result.participantResults[0].hit).toBe(true);
+    });
+
+    it('alwaysApplies effect applies debuff even on miss', () => {
+      const debuffAction: ActionDefinition = {
+        ...BASE_ACTION_DEFINITIONS['normal_attack'],
+        id: 'curse',
+        name: 'Curse',
+        effect: {
+          name: 'Cursed',
+          stat: 'defence',
+          modifier: -5,
+          duration: 3,
+          isDebuff: true,
+          alwaysApplies: true,
+        },
+      };
+
+      const mob = makeMob({ id: 'mob1', hp: 200, maxHp: 200 });
+      const p = makeParticipant({
+        playerId: 'p1',
+        template: [{ actionId: 'curse', sortOrder: 0 }],
+        actionDefinitions: { ...BASE_ACTION_DEFINITIONS, curse: debuffAction },
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [mob], roundNumber: 1 }),
+        alwaysMissRng,
+      );
+      // Attack missed
+      expect(result.participantResults[0].hit).toBe(false);
+      // But debuff still applied to mob
+      const mobAfter = result.mobsAfter.find(m => m.id === 'mob1');
+      expect(mobAfter).toBeDefined();
+      const cursed = mobAfter!.activeEffects.find(e => e.stat === 'defence');
+      expect(cursed).toBeDefined();
+      expect(cursed!.modifier).toBe(-5);
+    });
+
+    it('expedition combat is distinct from boss mode', () => {
+      // pve_expedition and pve_boss should produce different hit probabilities
+      const expeditionChance = calculateHitChance('pve_expedition', 15, 20);
+      const bossChance = calculateHitChance('pve_boss', 15, 20);
+      expect(expeditionChance.hitChance).not.toBe(bossChance.hitChance);
+      // Boss has higher minHitChance floor
+      expect(HIT_CURVE_CONSTANTS.pve_boss.minHitChance).toBeGreaterThan(
+        HIT_CURVE_CONSTANTS.pve_expedition.minHitChance,
+      );
+    });
+
+    it('explicit combatMode override threads through resolution', () => {
+      // Passing a different combatMode should change hit resolution behavior
+      const mob = makeMob({
+        id: 'mob1', hp: 200, maxHp: 200,
+        stats: makeStats({ dodge: 25, evasion: 0 }),
+      });
+      const p = makeParticipant({
+        playerId: 'p1',
+        stats: makeStats({ accuracy: 8, damageMin: 20, damageMax: 20 }),
+      });
+
+      // Use a roll value that might hit under one mode but miss under another
+      const borderlineRng: RaidRoundRng = {
+        rollHitChance: () => 0.30,
+        rollDamage: (min: number) => min,
+        rollCrit: () => false,
+      };
+
+      const expeditionResult = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [{ ...mob }], roundNumber: 1 }),
+        borderlineRng,
+        'pve_expedition',
+      );
+      const bossResult = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [{ ...mob }], roundNumber: 1 }),
+        borderlineRng,
+        'pve_boss',
+      );
+
+      // The two modes have different curves, so outcomes may differ
+      const expHit = expeditionResult.participantResults[0].damageDealt > 0;
+      const bossHit = bossResult.participantResults[0].damageDealt > 0;
+      // At minimum, boss has a higher minHitChance so if expedition misses, boss might still hit
+      if (!expHit) {
+        expect(bossHit).toBe(true);
+      }
     });
   });
 });

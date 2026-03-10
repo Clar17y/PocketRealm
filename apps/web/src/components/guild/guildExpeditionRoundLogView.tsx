@@ -25,7 +25,7 @@ function formatRoundLogAttackRow(
     actionText: attack.actionLabel,
     targetText: attack.targetMobName,
     rollText: attack.playerId === currentPlayerId
-      ? `d20(${attack.attackRoll})+${attack.modifier} vs ${attack.defenseTarget}`
+      ? `${Math.round(attack.hitChance * 100)}% hit (${attack.attackerHitScore} vs ${attack.defenderAvoidScore})`
       : null,
     outcomeText: attack.hit ? (attack.crit ? 'CRIT' : 'HIT') : 'MISS',
     damageText: attack.hit && attack.totalDamage !== undefined ? `${attack.totalDamage} dmg` : null,
