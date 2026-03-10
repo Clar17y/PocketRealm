@@ -30,8 +30,8 @@ export const PVP_TARGETS = {
 
 export const EXPEDITION_TARGETS = {
   dodgeTankDirectHitChanceMin: 0.5,
-  dodgeTankDirectHitChanceMax: 0.8,
-  bossPressureHitChanceMin: 0.35,
+  dodgeTankDirectHitChanceMax: 0.6,
+  bossPressureHitChanceMin: 0.65,
 } as const;
 
 export function getUnsupportedStatKeys(stats: Record<string, number> | null | undefined): string[] {
