@@ -5,6 +5,10 @@ export interface ShareCombatLogEntry {
   roll?: number;
   damage?: number;
   evaded?: boolean;
+  hitChance?: number;
+  hitRollValue?: number;
+  attackerHitScore?: number;
+  defenderAvoidScore?: number;
   combatantAHpAfter?: number;
   combatantBHpAfter?: number;
 }
@@ -66,7 +70,15 @@ export function formatCombatShareText(input: CombatShareInput): string {
   for (const entry of log) {
     const actor = entry.actor === 'combatantA' ? (entry.actorName ?? 'You') : (entry.actorName ?? 'Mob');
     const dmg = entry.damage !== undefined ? ` ${entry.damage} dmg` : '';
-    const status = entry.evaded ? ' Dodged' : (entry.roll !== undefined && entry.damage === undefined ? ' Miss' : '');
+    const isExplicitMiss = (
+      entry.hitChance !== undefined &&
+      entry.hitRollValue !== undefined &&
+      entry.attackerHitScore !== undefined &&
+      entry.defenderAvoidScore !== undefined &&
+      entry.damage === undefined &&
+      entry.hitRollValue >= entry.hitChance
+    );
+    const status = entry.evaded ? ' Dodged' : (isExplicitMiss ? ' Miss' : '');
     lines.push(
       `R${entry.round} ${actor}${dmg}${status} | You ${hpWithMax(entry.combatantAHpAfter, playerMaxHp)} | Mob ${hpWithMax(entry.combatantBHpAfter, mobMaxHp)}`
     );

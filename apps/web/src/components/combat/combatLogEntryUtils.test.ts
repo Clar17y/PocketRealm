@@ -21,7 +21,7 @@ describe('formatHitBreakdown', () => {
     expect(text).not.toContain('10 +');
   });
 
-  it('falls back to legacy threshold breakdowns for old combat logs', () => {
+  it('does not fabricate threshold math for old combat logs', () => {
     const text = formatHitBreakdown({
       roll: 4,
       accuracyModifier: 0,
@@ -29,6 +29,6 @@ describe('formatHitBreakdown', () => {
       targetEvasion: 0,
     });
 
-    expect(text).toBe('Roll: 4 + 0 ACC vs 12 (10 + 2 DOD + 0 EVA) => Miss');
+    expect(text).toBeNull();
   });
 });

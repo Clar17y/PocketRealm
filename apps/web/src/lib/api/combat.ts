@@ -190,10 +190,6 @@ export interface CombatLogEntryResponse {
   hitRollValue?: number;
   attackerHitScore?: number;
   defenderAvoidScore?: number;
-  /** @deprecated Backward compat alias */
-  playerHpAfter?: number;
-  /** @deprecated Backward compat alias */
-  mobHpAfter?: number;
 }
 
 export interface SkillXpGrantResponse {
