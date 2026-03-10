@@ -377,9 +377,10 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           perActionScaling,
         });
         const combatantB = mobToTemplateCombatant(prefixedMob);
-        const combatOptions: CombatOptions | undefined = potionPool.length > 0
-          ? { potions: [...potionPool] }
-          : undefined;
+        const combatOptions: CombatOptions = {
+          combatMode: 'pve_open_world',
+          ...(potionPool.length > 0 ? { potions: [...potionPool] } : {}),
+        };
         const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
         currentHp = combatResult.combatantAHpRemaining;
         currentStamina = combatResult.combatantAStaminaRemaining;

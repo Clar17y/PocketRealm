@@ -222,9 +222,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       };
       applyCombatBuffs(playerStats, mobBuffs);
 
-      const combatOptions: CombatOptions | undefined = potionPool.length > 0
-        ? { potions: [...potionPool] }
-        : undefined;
+      const combatOptions: CombatOptions = {
+        combatMode: 'pve_open_world',
+        ...(potionPool.length > 0 ? { potions: [...potionPool] } : {}),
+      };
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,
@@ -809,9 +810,10 @@ export function registerStartRoutes(router: Router): void {
       const finalMob = mobHpOverride ? { ...prefixedMob, ...mobHpOverride } : prefixedMob;
 
       // Build potion pool into combat options
-      const combatOptions: CombatOptions | undefined = potionPool.length > 0
-        ? { potions: [...potionPool] }
-        : undefined;
+      const combatOptions: CombatOptions = {
+        combatMode: 'pve_open_world',
+        ...(potionPool.length > 0 ? { potions: [...potionPool] } : {}),
+      };
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,

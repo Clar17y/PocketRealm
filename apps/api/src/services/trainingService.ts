@@ -116,7 +116,7 @@ export async function simulateFight(
   const mobCombatant = mobToTemplateCombatant(finalMob);
 
   // Run template combat
-  const combatResult = runTemplateCombat(playerCombatant, mobCombatant);
+  const combatResult = runTemplateCombat(playerCombatant, mobCombatant, { combatMode: 'pve_open_world' });
 
   // Set cooldown
   await redis.set(cooldownKey(playerId), '1', 'EX', TRAINING_CONSTANTS.COOLDOWN_SECONDS);

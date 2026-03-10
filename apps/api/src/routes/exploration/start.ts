@@ -319,9 +319,10 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         };
         applyCombatBuffs(playerStats, mobBuffs);
 
-        const combatOptions: CombatOptions | undefined = potionPool.length > 0
-          ? { potions: [...potionPool] }
-          : undefined;
+        const combatOptions: CombatOptions = {
+          combatMode: 'pve_open_world',
+          ...(potionPool.length > 0 ? { potions: [...potionPool] } : {}),
+        };
 
         const combatantA = buildPlayerTemplateCombatant({
           playerId,
