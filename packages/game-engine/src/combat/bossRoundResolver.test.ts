@@ -69,18 +69,21 @@ function makeInput(overrides: Partial<BossRoundInput> = {}): BossRoundInput {
 // Deterministic RNG: always hit, never crit, fixed damage
 const alwaysHitRng = {
   rollD20: () => 15,
+  rollHit: () => 0,
   rollDamage: (min: number, _max: number) => min,
   rollCrit: (_chance: number) => false,
 };
 
 const alwaysMissRng = {
   rollD20: () => 1,
+  rollHit: () => 0.99,
   rollDamage: (min: number, _max: number) => min,
   rollCrit: (_chance: number) => false,
 };
 
 const alwaysCritRng = {
   rollD20: () => 20,
+  rollHit: () => 0,
   rollDamage: (_min: number, max: number) => max,
   rollCrit: (_chance: number) => true,
 };
@@ -114,6 +117,30 @@ describe('resolveBossRound', () => {
     it('reduces boss HP on hit', () => {
       const result = resolveBossRound(makeInput(), alwaysHitRng);
       expect(result.bossHpAfter).toBeLessThan(500);
+      expect(result.participantResults[0].hit).toBe(true);
+      expect(result.participantResults[0].damageDealt).toBeGreaterThan(0);
+    });
+
+    it('uses boss hit-curve tuning instead of threshold hit checks', () => {
+      const result = resolveBossRound(
+        makeInput({
+          boss: makeBoss({
+            stats: makeStats({ dodge: 25, defence: 10 }),
+          }),
+          participants: [
+            makeParticipant({
+              stats: makeStats({ accuracy: 10, damageMin: 20, damageMax: 20 }),
+            }),
+          ],
+        }),
+        {
+          rollD20: () => 15,
+          rollHit: () => 0.34,
+          rollDamage: (min: number, _max: number) => min,
+          rollCrit: (_chance: number) => false,
+        },
+      );
+
       expect(result.participantResults[0].hit).toBe(true);
       expect(result.participantResults[0].damageDealt).toBeGreaterThan(0);
     });

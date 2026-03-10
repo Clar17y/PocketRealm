@@ -24,6 +24,7 @@ import {
   ROOM_CONSTANTS,
   FULL_CLEAR_CONSTANTS,
   LEADERBOARD_CONSTANTS,
+  HIT_CURVE_CONSTANTS,
 } from './gameConstants';
 
 describe('TURN_CONSTANTS', () => {
@@ -50,6 +51,20 @@ describe('COMBAT_CONSTANTS', () => {
 
   it('min damage is positive', () => {
     expect(COMBAT_CONSTANTS.MIN_DAMAGE).toBeGreaterThan(0);
+  });
+});
+
+describe('HIT_CURVE_CONSTANTS', () => {
+  it('defines valid hit curve bounds for every combat mode', () => {
+    for (const config of Object.values(HIT_CURVE_CONSTANTS)) {
+      expect(config.minHitChance).toBeGreaterThanOrEqual(0);
+      expect(config.minHitChance).toBeLessThanOrEqual(1);
+      expect(config.maxHitChance).toBeGreaterThanOrEqual(0);
+      expect(config.maxHitChance).toBeLessThanOrEqual(1);
+      expect(config.minHitChance).toBeLessThan(config.maxHitChance);
+      expect(config.bias).toBeGreaterThan(0);
+      expect(config.exponent).toBeGreaterThan(0);
+    }
   });
 });
 

@@ -93,6 +93,7 @@ import { useEncounterSites } from './hooks/useEncounterSites';
 import { useAchievements } from './hooks/useAchievements';
 import { useQuests } from './hooks/useQuests';
 import { useCombatPlayback } from './hooks/useCombatPlayback';
+import { runSimpleAction } from './simpleAction';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
@@ -625,16 +626,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const simpleAction = async <T>(
     actionName: string,
     apiFn: () => Promise<ApiResponse<T>>,
-    onSuccess?: (data: T) => void,
+    onSuccess?: (data: T) => void | Promise<void>,
   ) => {
     await runAction(actionName, async () => {
-      const res = await apiFn();
-      if (!res.data) {
-        setActionError(res.error?.message ?? `${actionName.replace(/_/g, ' ')} failed`);
-        return;
-      }
-      onSuccess?.(res.data);
-      await loadAll();
+      await runSimpleAction({
+        actionName,
+        apiFn,
+        onSuccess,
+        loadAll,
+        setActionError,
+      });
     });
   };
 
@@ -1158,8 +1159,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     simpleAction('use_item', () => useItem(itemId));
 
   const handleEquipItem = (itemId: string, slot: string) =>
-    simpleAction('equip', () => equip(itemId, slot), () => {
-      advanceTutorial(TUTORIAL_STEP_EQUIP);
+    simpleAction('equip', () => equip(itemId, slot), async () => {
+      await advanceTutorial(TUTORIAL_STEP_EQUIP);
     });
 
   const handleUnequipSlot = (slot: string) =>
@@ -1738,4 +1739,3 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleDismissLootReveal,
   };
 }
-

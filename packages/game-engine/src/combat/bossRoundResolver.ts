@@ -23,7 +23,7 @@ import {
   rollD20 as defaultRollD20,
   rollDamage as defaultRollDamage,
   isCriticalHit as defaultIsCriticalHit,
-  doesAttackHit,
+  resolveHitCheck,
   calculateFinalDamage,
 } from './damageCalculator';
 
@@ -97,6 +97,7 @@ export interface BossRoundResult {
 
 export interface BossRoundRng {
   rollD20: () => number;
+  rollHit?: () => number;
   rollDamage: (min: number, max: number) => number;
   rollCrit: (chance: number) => boolean;
 }
@@ -107,10 +108,12 @@ export function resolveBossRound(
   input: BossRoundInput,
   rng?: BossRoundRng,
 ): BossRoundResult {
-  const roll = rng ?? {
+  const roll: Required<BossRoundRng> = {
     rollD20: defaultRollD20,
+    rollHit: Math.random,
     rollDamage: defaultRollDamage,
     rollCrit: defaultIsCriticalHit,
+    ...rng,
   };
 
   let bossHp = input.boss.hp;
@@ -178,7 +181,18 @@ export function resolveBossRound(
     if (!def || def.category !== 'offensive' || (def.damageMultiplier ?? 0) <= 0) continue;
 
     const attackRoll = roll.rollD20();
-    const hits = doesAttackHit(attackRoll, p.stats.accuracy + (def.accuracyModifier ?? 0), bossStats.dodge, 0);
+    const hitScore = p.stats.accuracy + (def.accuracyModifier ?? 0);
+    const avoidScore = bossStats.dodge + bossStats.evasion;
+    const hits = attackRoll === 20
+      ? true
+      : attackRoll === 1
+        ? false
+        : resolveHitCheck({
+          combatMode: 'pve_boss',
+          hitScore,
+          avoidScore,
+          hitRollValue: roll.rollHit?.(),
+        }).didHit;
 
     if (!hits) {
       s.hit = false;

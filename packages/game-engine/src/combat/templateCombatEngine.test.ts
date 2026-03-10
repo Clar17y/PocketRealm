@@ -65,12 +65,14 @@ function mockCombatRandom(overrides?: {
   initA?: number;     // 0..1 → d20 for A initiative
   initB?: number;     // 0..1 → d20 for B initiative
   attackRoll?: number; // 0..1 → d20 for attack rolls (repeated)
+  hitRoll?: number;   // 0..1 → sampled hit-roll value for resolveHitCheck (repeated)
   damageRoll?: number; // 0..1 → damage roll position (repeated)
   critRoll?: number;   // 0..1 → crit check (repeated)
 }) {
   const initA = overrides?.initA ?? 0.9;   // d20 = 19
   const initB = overrides?.initB ?? 0.1;   // d20 = 3
   const attackRoll = overrides?.attackRoll ?? 0.85; // d20 = 18 (hits)
+  const hitRoll = overrides?.hitRoll ?? 0.1;        // low enough to hit most non-PvP cases
   const damageRoll = overrides?.damageRoll ?? 0.0;  // min damage
   const critRoll = overrides?.critRoll ?? 0.99;      // no crit
 
@@ -80,10 +82,11 @@ function mockCombatRandom(overrides?: {
     // First two calls are initiative rolls
     if (callCount === 1) return initA;
     if (callCount === 2) return initB;
-    // After that, repeating pattern: attackRoll, damageRoll, critRoll
-    const phase = (callCount - 3) % 3;
+    // After that, repeating pattern: attackRoll, hitRoll, damageRoll, critRoll
+    const phase = (callCount - 3) % 4;
     if (phase === 0) return attackRoll;
-    if (phase === 1) return damageRoll;
+    if (phase === 1) return hitRoll;
+    if (phase === 2) return damageRoll;
     return critRoll;
   });
 }
@@ -119,6 +122,79 @@ describe('runTemplateCombat', () => {
         expect(typeof entry.combatantAManaAfter).toBe('number');
         expect(typeof entry.combatantBManaAfter).toBe('number');
       }
+    });
+  });
+
+  describe('mode-aware hit resolution', () => {
+    it('uses pvp hit curves when combatMode is pvp', () => {
+      mockCombatRandom({ hitRoll: 0.2 });
+
+      const a = makeCombatant('Duelist', {
+        stats: makeStats({ hp: 200, maxHp: 200, accuracy: 30, damageMin: 10, damageMax: 10 }),
+      });
+      const b = makeCombatant('Shade', {
+        stats: makeStats({ hp: 200, maxHp: 200, dodge: 45, evasion: 50, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, { combatMode: 'pvp' });
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+
+      expect(attackEntry).toBeDefined();
+      expect(attackEntry?.hitChance).toBeLessThan(0.30);
+      expect(attackEntry?.damage).toBeUndefined();
+    });
+
+    it('offensive log entries include hit chance and score breakdown fields', () => {
+      mockCombatRandom({ hitRoll: 0.2 });
+
+      const a = makeCombatant('Player', {
+        stats: makeStats({ hp: 200, maxHp: 200, accuracy: 30, damageMin: 20, damageMax: 20 }),
+      });
+      const b = makeCombatant('Goblin', {
+        stats: makeStats({ hp: 200, maxHp: 200, dodge: 0, evasion: 0, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack' && e.damage !== undefined,
+      );
+
+      expect(attackEntry).toBeDefined();
+      expect(attackEntry?.hitChance).toBeDefined();
+      expect(attackEntry?.hitRollValue).toBeDefined();
+      expect(attackEntry?.attackerHitScore).toBeDefined();
+      expect(attackEntry?.defenderAvoidScore).toBeDefined();
+    });
+
+    it('the same hit and avoid scores resolve differently by combat mode', () => {
+      mockCombatRandom({ hitRoll: 0.2 });
+
+      const attacker = makeCombatant('Rogue', {
+        stats: makeStats({ hp: 200, maxHp: 200, accuracy: 30, damageMin: 10, damageMax: 10 }),
+      });
+      const defender = makeCombatant('Guardian', {
+        stats: makeStats({ hp: 200, maxHp: 200, dodge: 45, evasion: 50, damageMin: 1, damageMax: 1 }),
+      });
+
+      const pvpResult = runTemplateCombat(attacker, defender, { combatMode: 'pvp' });
+
+      vi.restoreAllMocks();
+      mockCombatRandom({ hitRoll: 0.2 });
+
+      const bossResult = runTemplateCombat(attacker, defender, { combatMode: 'pve_boss' });
+
+      const pvpEntry = pvpResult.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+      const bossEntry = bossResult.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+
+      expect(pvpEntry?.damage).toBeUndefined();
+      expect(bossEntry?.damage).toBeGreaterThan(0);
+      expect(bossEntry?.hitChance).toBeGreaterThan(pvpEntry?.hitChance ?? 0);
     });
   });
 
@@ -308,6 +384,33 @@ describe('runTemplateCombat', () => {
 
       // The buff expires after 3 rounds of ticking
       expect(result.totalRounds).toBeGreaterThanOrEqual(4);
+    });
+
+    it('defensive buff actions still apply their effects', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Guardian', {
+        template: templateOf('fortify', 'light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 10, damageMax: 10 }),
+        stamina: 500,
+        maxStamina: 500,
+        mana: 500,
+        maxMana: 500,
+      });
+      const b = makeCombatant('Goblin', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+      const fortifyEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.spellName === 'Fortify',
+      );
+
+      expect(fortifyEntry).toBeDefined();
+      expect(fortifyEntry?.effectsApplied).toEqual([
+        expect.objectContaining({ stat: 'defence', modifier: 30, duration: 3, target: 'combatantA' }),
+      ]);
     });
   });
 
@@ -847,6 +950,14 @@ describe('runTemplateCombat', () => {
       weaponRequiredSkill: 'magic',
     };
 
+    const rangedScaling: PerActionScaling = {
+      skillLevels: { melee: 5, ranged: 30, magic: 5 },
+      attributes: { strength: 3, dexterity: 25, intelligence: 3 },
+      weaponPower: { attack: 5, rangedPower: 24, magicPower: 5 },
+      equipmentAccuracy: 10,
+      weaponRequiredSkill: 'ranged',
+    };
+
     it('magic-scaling action uses magic stats for damage', () => {
       // fire_bolt: scalingStat='magic', damageMultiplier=1.2, damageType='magic'
       // magic resolved: totalAttack = 30 + 24 + 25 = 79
@@ -1014,6 +1125,74 @@ describe('runTemplateCombat', () => {
       expect(buffAttack!.rawDamage! - baseAttack!.rawDamage!).toBe(20);
     });
 
+    it('piercing_shot ignores half of the target defence', () => {
+      mockCombatRandom();
+
+      const a = makeCombatant('Ranger', {
+        template: templateOf('piercing_shot'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({
+          hp: 500, maxHp: 500,
+          damageMin: 1, damageMax: 1, accuracy: 0,
+        }),
+        stamina: 500,
+        maxStamina: 500,
+        perActionScaling: rangedScaling,
+      });
+      const b = makeCombatant('Target', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, defence: 100 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+
+      expect(attackEntry).toBeDefined();
+      expect(attackEntry?.rawDamage).toBe(28);
+      expect(attackEntry?.damage).toBe(18);
+    });
+
+    it('berserker_rage applies a percent-based attack buff instead of flat damage', () => {
+      mockCombatRandom();
+
+      const baseline = makeCombatant('Warrior', {
+        template: templateOf('normal_attack'),
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 20, damageMax: 20 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const buffed = makeCombatant('Warrior', {
+        template: templateOf('berserker_rage', 'normal_attack'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+        stats: makeStats({ hp: 500, maxHp: 500, damageMin: 20, damageMax: 20 }),
+        stamina: 500,
+        maxStamina: 500,
+      });
+      const target = makeCombatant('Target', {
+        template: templateOf('light_attack'),
+        stats: makeStats({ hp: 5000, maxHp: 5000, damageMin: 1, damageMax: 1, defence: 0 }),
+      });
+
+      const baselineResult = runTemplateCombat(baseline, target);
+      const baselineAttack = baselineResult.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+      expect(baselineAttack?.rawDamage).toBe(20);
+
+      vi.restoreAllMocks();
+      mockCombatRandom();
+
+      const buffedResult = runTemplateCombat(buffed, target);
+      const buffedAttack = buffedResult.log.find(
+        (e) => e.round === 2 && e.actor === 'combatantA' && e.damage !== undefined,
+      );
+
+      expect(buffedAttack).toBeDefined();
+      expect(buffedAttack?.rawDamage).toBe(26);
+    });
+
     it('action damageType determines which defence is used', () => {
       // Create a custom action: melee scaling but magic damage type
       // This should hit magicDefence, not physical defence
@@ -1068,6 +1247,63 @@ describe('runTemplateCombat', () => {
   });
 
   describe('DOT/HOT tick system', () => {
+    it('ships a minimal live anti-evasion counter package', () => {
+      expect(BASE_ACTION_DEFINITIONS.snipers_mark.alwaysHits).toBe(true);
+      expect(BASE_ACTION_DEFINITIONS.snipers_mark.effect).toEqual(
+        expect.objectContaining({ stat: 'evasion', modifier: -20, alwaysApplies: true }),
+      );
+      expect(BASE_ACTION_DEFINITIONS.frost_nova.effect).toEqual(
+        expect.objectContaining({ stat: 'evasion', modifier: -15, alwaysApplies: true }),
+      );
+      expect(BASE_ACTION_DEFINITIONS.flame_arrow.effect).toEqual(
+        expect.objectContaining({ alwaysApplies: true, damagePerRound: 6 }),
+      );
+    });
+
+    it('always-hit anti-evasion debuffs apply even against extreme avoidance', () => {
+      mockCombatRandom({ hitRoll: 0.95 });
+
+      const sureMark: ActionDefinition = {
+        id: 'sure_mark',
+        name: 'Sure Mark',
+        description: 'A tracking strike that cannot be avoided.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 0.5,
+        alwaysHits: true,
+        effect: {
+          name: 'Sure Mark',
+          stat: 'evasion',
+          modifier: -20,
+          duration: 3,
+          isDebuff: true,
+          alwaysApplies: true,
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, sure_mark: sureMark };
+
+      const a = makeCombatant('Hunter', {
+        template: templateOf('sure_mark'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 200, maxHp: 200, accuracy: 5, damageMin: 10, damageMax: 10 }),
+      });
+      const b = makeCombatant('Phantom', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 200, maxHp: 200, dodge: 45, evasion: 50, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, { combatMode: 'pvp' });
+      const debuffEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+
+      expect(debuffEntry?.effectsApplied).toEqual([
+        expect.objectContaining({ stat: 'evasion', modifier: -20 }),
+      ]);
+    });
+
     it('DOT deals damage each round', () => {
       mockCombatRandom();
 
@@ -1117,6 +1353,55 @@ describe('runTemplateCombat', () => {
         expect(tick.spellName).toBe('Poison');
         expect(tick.message).toContain('magic damage');
       }
+    });
+
+    it('damage-over-time effects marked unavoidable bypass hit checks', () => {
+      mockCombatRandom({ hitRoll: 0.95 });
+
+      const inescapableBurn: ActionDefinition = {
+        id: 'inescapable_burn',
+        name: 'Inescapable Burn',
+        description: 'Scorches the target even on a glancing miss.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'magic',
+        effect: {
+          name: 'Inescapable Burn',
+          stat: 'attack',
+          modifier: 0,
+          duration: 3,
+          isDebuff: true,
+          alwaysApplies: true,
+          damagePerRound: 8,
+          dotDamageType: 'magic',
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, inescapable_burn: inescapableBurn };
+
+      const a = makeCombatant('Mage', {
+        template: templateOf('inescapable_burn', 'defend', 'defend'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 200, maxHp: 200, accuracy: 5, damageMin: 10, damageMax: 10 }),
+      });
+      const b = makeCombatant('Shade', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 200, maxHp: 200, dodge: 45, evasion: 50, magicDefence: 0, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, { combatMode: 'pvp' });
+      const openingAttack = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+      const dotTick = result.log.find((e) => e.tickType === 'dot_tick' && e.spellName === 'Inescapable Burn');
+
+      expect(openingAttack?.damage).toBeUndefined();
+      expect(openingAttack?.effectsApplied).toEqual([
+        expect.objectContaining({ stat: 'attack', modifier: 0 }),
+      ]);
+      expect(dotTick?.damage).toBeGreaterThan(0);
     });
 
     it('HOT heals each round via supportive action', () => {

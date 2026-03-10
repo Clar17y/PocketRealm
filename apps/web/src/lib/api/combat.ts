@@ -186,10 +186,10 @@ export interface CombatLogEntryResponse {
   staminaCost?: number;
   manaCost?: number;
   interactionResult?: string;  // 'countered' | 'warded' | 'defended' | null
-  /** @deprecated Backward compat alias */
-  playerHpAfter?: number;
-  /** @deprecated Backward compat alias */
-  mobHpAfter?: number;
+  hitChance?: number;
+  hitRollValue?: number;
+  attackerHitScore?: number;
+  defenderAvoidScore?: number;
 }
 
 export interface SkillXpGrantResponse {

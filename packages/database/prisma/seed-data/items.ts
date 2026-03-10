@@ -1,5 +1,5 @@
 import { IDS } from './ids';
-import { POTION_CONSTANTS } from '@pocketrealm/shared';
+import { POTION_CONSTANTS, STARTER_LOADOUT } from '@pocketrealm/shared';
 
 type ConsumableEffectJson = { type: 'heal_flat' | 'heal_percent' | 'restore_stamina' | 'restore_mana'; value: number };
 
@@ -288,34 +288,34 @@ function weapon(
 const weapons = [
   // Tier 1
   weapon(IDS.wep.woodenSword, 'Wooden Sword', 1, 'melee', 1, { attack: 4 }),
-  weapon(IDS.wep.oakShortbow, 'Oak Shortbow', 1, 'ranged', 1, { attack: 3 }),
-  weapon(IDS.wep.oakStaff, 'Oak Staff', 1, 'magic', 1, { attack: 2, magicPower: 3 }),
+  weapon(IDS.wep.oakShortbow, 'Oak Shortbow', 1, 'ranged', 1, { rangedPower: 3 }),
+  weapon(IDS.wep.oakStaff, 'Oak Staff', 1, 'magic', 1, { magicPower: 5 }),
   weapon(IDS.wep.copperDagger, 'Copper Dagger', 1, 'melee', 3, { attack: 5, dodge: 1 }),
   // Tier 2
   weapon(IDS.wep.tinSword, 'Tin Sword', 2, 'melee', 5, { attack: 8 }),
-  weapon(IDS.wep.mapleLongbow, 'Maple Longbow', 2, 'ranged', 5, { attack: 7 }),
-  weapon(IDS.wep.mapleStaff, 'Maple Staff', 2, 'magic', 5, { attack: 4, magicPower: 6 }),
+  weapon(IDS.wep.mapleLongbow, 'Maple Longbow', 2, 'ranged', 5, { rangedPower: 7 }),
+  weapon(IDS.wep.mapleStaff, 'Maple Staff', 2, 'magic', 5, { magicPower: 10 }),
   weapon(IDS.wep.boarTuskMace, 'Boar Tusk Mace', 2, 'melee', 8, { attack: 10, armor: 1 }),
-  weapon(IDS.wep.batWingCrossbow, 'Bat Wing Crossbow', 2, 'ranged', 8, { attack: 9, dodge: 1 }),
-  weapon(IDS.wep.goblinHexStaff, 'Goblin Hex Staff', 2, 'magic', 8, { attack: 5, magicPower: 8 }),
+  weapon(IDS.wep.batWingCrossbow, 'Bat Wing Crossbow', 2, 'ranged', 8, { rangedPower: 9, dodge: 1 }),
+  weapon(IDS.wep.goblinHexStaff, 'Goblin Hex Staff', 2, 'magic', 8, { magicPower: 13 }),
   // Tier 3
   weapon(IDS.wep.ironLongsword, 'Iron Longsword', 3, 'melee', 12, { attack: 14 }),
-  weapon(IDS.wep.willowWarbow, 'Willow Warbow', 3, 'ranged', 12, { attack: 12 }),
-  weapon(IDS.wep.elderwoodStaff, 'Elderwood Staff', 3, 'magic', 12, { attack: 7, magicPower: 10 }),
+  weapon(IDS.wep.willowWarbow, 'Willow Warbow', 3, 'ranged', 12, { rangedPower: 12 }),
+  weapon(IDS.wep.elderwoodStaff, 'Elderwood Staff', 3, 'magic', 12, { magicPower: 17 }),
   weapon(IDS.wep.crawlerFangBlade, 'Crawler Fang Blade', 3, 'melee', 16, { attack: 16, critChance: 0.02 }),
-  weapon(IDS.wep.harpyTalonBow, 'Harpy Talon Bow', 3, 'ranged', 16, { attack: 14, dodge: 2 }),
-  weapon(IDS.wep.faeCrystalStaff, 'Fae Crystal Staff', 3, 'magic', 16, { attack: 8, magicPower: 13 }),
+  weapon(IDS.wep.harpyTalonBow, 'Harpy Talon Bow', 3, 'ranged', 16, { rangedPower: 14, dodge: 2 }),
+  weapon(IDS.wep.faeCrystalStaff, 'Fae Crystal Staff', 3, 'magic', 16, { magicPower: 21 }),
   // Tier 4
   weapon(IDS.wep.darkIronGreatsword, 'Dark Iron Greatsword', 4, 'melee', 20, { attack: 22 }),
-  weapon(IDS.wep.bogwoodLongbow, 'Bogwood Longbow', 4, 'ranged', 20, { attack: 19 }),
-  weapon(IDS.wep.crystalStaffWep, 'Crystal Staff', 4, 'magic', 20, { attack: 10, magicPower: 16 }),
+  weapon(IDS.wep.bogwoodLongbow, 'Bogwood Longbow', 4, 'ranged', 20, { rangedPower: 19 }),
+  weapon(IDS.wep.crystalStaffWep, 'Crystal Staff', 4, 'magic', 20, { magicPower: 26 }),
   weapon(IDS.wep.hydraFangSabre, 'Hydra Fang Sabre', 4, 'melee', 25, { attack: 24, critChance: 0.03 }),
-  weapon(IDS.wep.wraithBow, 'Wraith Bow', 4, 'ranged', 25, { attack: 22, magicPower: 4 }),
-  weapon(IDS.wep.witchsSceptre, "Witch's Sceptre", 4, 'magic', 25, { attack: 12, magicPower: 20 }),
+  weapon(IDS.wep.wraithBow, 'Wraith Bow', 4, 'ranged', 25, { rangedPower: 22, magicPower: 4 }),
+  weapon(IDS.wep.witchsSceptre, "Witch's Sceptre", 4, 'magic', 25, { magicPower: 32 }),
   // Tier 5
   weapon(IDS.wep.mithrilBlade, 'Mithril Blade', 5, 'melee', 30, { attack: 30 }),
-  weapon(IDS.wep.ancientBow, 'Ancient Bow', 5, 'ranged', 30, { attack: 27 }),
-  weapon(IDS.wep.lichStaff, 'Lich Staff', 5, 'magic', 30, { attack: 14, magicPower: 24 }),
+  weapon(IDS.wep.ancientBow, 'Ancient Bow', 5, 'ranged', 30, { rangedPower: 27 }),
+  weapon(IDS.wep.lichStaff, 'Lich Staff', 5, 'magic', 30, { magicPower: 38 }),
 ];
 
 // ── Armor (generated) ────────────────────────────────────────────────────────
@@ -366,25 +366,25 @@ const armorTiers: ArmorTierDef[] = [
     tier: 3,
     reqLevel: 12,
     slots: ['head', 'chest', 'legs', 'boots', 'gloves'],
-    heavy: { prefix: 'Iron', chestName: 'Iron Breastplate', stats: { armor: 12 } },
-    medium: { prefix: 'Warg Hide', chestName: 'Warg Hide Coat', stats: { armor: 8, dodge: 3 } },
-    light: { prefix: 'Fae Silk', chestName: 'Fae Silk Robe', stats: { armor: 3, magicDefence: 6, dodge: 5 } },
+    heavy: { prefix: 'Iron', chestName: 'Iron Breastplate', stats: { armor: 13 } },
+    medium: { prefix: 'Warg Hide', chestName: 'Warg Hide Coat', stats: { armor: 9, dodge: 3 } },
+    light: { prefix: 'Fae Silk', chestName: 'Fae Silk Robe', stats: { armor: 4, magicDefence: 7, dodge: 4 } },
   },
   {
     tier: 4,
     reqLevel: 20,
     slots: ['head', 'chest', 'legs', 'boots', 'gloves', 'belt'],
-    heavy: { prefix: 'Dark Iron', chestName: 'Dark Iron Platemail', stats: { armor: 18 } },
-    medium: { prefix: 'Croc Scale', chestName: 'Croc Scale Vest', stats: { armor: 12, dodge: 4 } },
-    light: { prefix: 'Cursed', chestName: 'Cursed Garb', stats: { armor: 5, magicDefence: 10, dodge: 7 } },
+    heavy: { prefix: 'Dark Iron', chestName: 'Dark Iron Platemail', stats: { armor: 20 } },
+    medium: { prefix: 'Croc Scale', chestName: 'Croc Scale Vest', stats: { armor: 13, dodge: 4 } },
+    light: { prefix: 'Cursed', chestName: 'Cursed Garb', stats: { armor: 5, magicDefence: 11, dodge: 4 } },
   },
   {
     tier: 5,
     reqLevel: 30,
     slots: ['head', 'chest', 'legs', 'boots', 'gloves', 'belt'],
-    heavy: { prefix: 'Mithril', chestName: 'Mithril Warplate', stats: { armor: 24 } },
-    medium: { prefix: 'Naga Scale', chestName: 'Naga Scale Armour', stats: { armor: 16, dodge: 6 } },
-    light: { prefix: 'Spectral', chestName: 'Spectral Robe', stats: { armor: 7, magicDefence: 14, dodge: 9 } },
+    heavy: { prefix: 'Mithril', chestName: 'Mithril Warplate', stats: { armor: 26 } },
+    medium: { prefix: 'Naga Scale', chestName: 'Naga Scale Armour', stats: { armor: 18, dodge: 5 } },
+    light: { prefix: 'Spectral', chestName: 'Spectral Robe', stats: { armor: 6, magicDefence: 15, dodge: 5 } },
   },
 ];
 
@@ -438,11 +438,12 @@ const advancedGear = [
   it({ id: IDS.adv.ratHideGloves, name: 'Rat Hide Gloves', itemType: 'armor', slot: 'gloves', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { attack: 2, dodge: 1 }, maxDurability: 60, sellPrice: 0 }),
   it({ id: IDS.adv.spiderSilkBelt, name: 'Spider Silk Belt', itemType: 'armor', slot: 'belt', tier: 1, weightClass: 'light', requiredLevel: 1, baseStats: { health: 3, dodge: 2 }, maxDurability: 60, sellPrice: 0 }),
   it({ id: IDS.adv.boarHideBoots, name: 'Boar Hide Boots', itemType: 'armor', slot: 'boots', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { armor: 2, health: 2 }, maxDurability: 60, sellPrice: 0 }),
+  it({ id: STARTER_LOADOUT.tutorialOffHandTemplateId, name: 'Wayfinder Buckler', itemType: 'armor', slot: 'off_hand', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { accuracy: 12, health: 4 }, maxDurability: 40, sellPrice: 0 }),
   // Tier 2
   it({ id: IDS.adv.wolfFangNecklace, name: 'Wolf Fang Necklace', itemType: 'armor', slot: 'neck', tier: 2, requiredLevel: 5, baseStats: { attack: 3, critChance: 0.01 }, maxDurability: 80, sellPrice: 0 }),
   it({ id: IDS.adv.banditsLuckyRing, name: "Bandit's Lucky Ring", itemType: 'armor', slot: 'ring', tier: 2, requiredLevel: 5, baseStats: { luck: 3, dodge: 2 }, maxDurability: 80, sellPrice: 0 }),
   it({ id: IDS.adv.ironbarkGloves, name: 'Ironbark Gloves', itemType: 'armor', slot: 'gloves', tier: 2, weightClass: 'heavy', requiredLevel: 5, baseStats: { armor: 4, magicDefence: 3 }, maxDurability: 80, sellPrice: 0 }),
-  it({ id: IDS.adv.batWingBoots, name: 'Bat Wing Boots', itemType: 'armor', slot: 'boots', tier: 2, weightClass: 'light', requiredLevel: 5, baseStats: { dodge: 6 }, maxDurability: 80, sellPrice: 0 }),
+  it({ id: IDS.adv.batWingBoots, name: 'Bat Wing Boots', itemType: 'armor', slot: 'boots', tier: 2, weightClass: 'light', requiredLevel: 5, baseStats: { dodge: 5 }, maxDurability: 80, sellPrice: 0 }),
   it({ id: IDS.adv.goblinTrinketCharm, name: 'Goblin Trinket Charm', itemType: 'armor', slot: 'charm', tier: 2, requiredLevel: 5, baseStats: { luck: 2, health: 3 }, maxDurability: 80, sellPrice: 0 }),
   // Tier 3
   it({ id: IDS.adv.spriteDustRing, name: 'Sprite Dust Ring', itemType: 'armor', slot: 'ring', tier: 3, requiredLevel: 12, baseStats: { magicPower: 4, luck: 2 }, maxDurability: 100, sellPrice: 0 }),
@@ -452,7 +453,7 @@ const advancedGear = [
   it({ id: IDS.adv.chitinGauntlets, name: 'Chitin Gauntlets', itemType: 'armor', slot: 'gloves', tier: 3, weightClass: 'medium', requiredLevel: 12, baseStats: { attack: 4, armor: 3 }, maxDurability: 100, sellPrice: 0 }),
   it({ id: IDS.adv.wargRiderBelt, name: 'Warg Rider Belt', itemType: 'armor', slot: 'belt', tier: 3, weightClass: 'medium', requiredLevel: 12, baseStats: { attack: 3, dodge: 3, health: 2 }, maxDurability: 100, sellPrice: 0 }),
   it({ id: IDS.adv.warlordsSignet, name: "Warlord's Signet", itemType: 'armor', slot: 'ring', tier: 3, requiredLevel: 12, baseStats: { attack: 3, critDamage: 0.1 }, maxDurability: 100, sellPrice: 0 }),
-  it({ id: IDS.adv.windcallersCharm, name: "Windcaller's Charm", itemType: 'armor', slot: 'charm', tier: 3, requiredLevel: 12, baseStats: { dodge: 8 }, maxDurability: 100, sellPrice: 0 }),
+  it({ id: IDS.adv.windcallersCharm, name: "Windcaller's Charm", itemType: 'armor', slot: 'charm', tier: 3, requiredLevel: 12, baseStats: { dodge: 6 }, maxDurability: 100, sellPrice: 0 }),
   // Tier 4
   it({ id: IDS.adv.deathKnightsRing, name: "Death Knight's Ring", itemType: 'armor', slot: 'ring', tier: 4, requiredLevel: 20, baseStats: { attack: 5, critChance: 0.02 }, maxDurability: 120, sellPrice: 0 }),
   it({ id: IDS.adv.hydraScaleShield, name: 'Hydra Scale Shield', itemType: 'armor', slot: 'off_hand', tier: 4, weightClass: 'heavy', requiredLevel: 20, baseStats: { armor: 8, health: 6 }, maxDurability: 120, sellPrice: 0 }),
@@ -491,25 +492,25 @@ const bossEquipment = [
 // ── Achievement Family Reward Items ──────────────────────────────────────────
 
 const achievementFamilyItems = [
-  it({ id: 'achievement_vermin_gloves', name: "Ratcatcher's Gloves", itemType: 'armor', slot: 'gloves', tier: 5, weightClass: 'light', baseStats: { attack: 5, evasion: 10 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_spiders_boots', name: 'Venomweave Boots', itemType: 'armor', slot: 'boots', tier: 5, weightClass: 'light', baseStats: { evasion: 12, dodge: 8 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_boars_chest', name: 'Tuskhide Pauldrons', itemType: 'armor', slot: 'chest', tier: 5, weightClass: 'heavy', baseStats: { health: 15, defence: 8 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_wolves_chest', name: 'Wolf Pelt Cloak', itemType: 'armor', slot: 'chest', tier: 5, weightClass: 'light', baseStats: { evasion: 10, dodge: 6 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_bandits_weapon', name: "Bandit Lord's Blade", itemType: 'weapon', slot: 'main_hand', tier: 5, baseStats: { attack: 12, critChance: 0.05 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_treants_shield', name: 'Ironbark Shield', itemType: 'armor', slot: 'off_hand', tier: 5, weightClass: 'heavy', baseStats: { defence: 15, health: 5 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_vermin_gloves', name: "Ratcatcher's Gloves", itemType: 'armor', slot: 'gloves', tier: 5, weightClass: 'light', baseStats: { attack: 5, dodge: 3 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_spiders_boots', name: 'Venomweave Boots', itemType: 'armor', slot: 'boots', tier: 5, weightClass: 'light', baseStats: { dodge: 3 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_boars_chest', name: 'Tuskhide Pauldrons', itemType: 'armor', slot: 'chest', tier: 5, weightClass: 'heavy', baseStats: { health: 15, armor: 8 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_wolves_chest', name: 'Wolf Pelt Cloak', itemType: 'armor', slot: 'chest', tier: 5, weightClass: 'light', baseStats: { dodge: 5 }, maxDurability: 200, sellPrice: 0 }),
+  { ...weapon('achievement_bandits_weapon', "Bandit Lord's Blade", 5, 'melee', 30, { attack: 12, critChance: 0.05 }), maxDurability: 200, sellPrice: 0 },
+  it({ id: 'achievement_treants_shield', name: 'Ironbark Shield', itemType: 'armor', slot: 'off_hand', tier: 5, weightClass: 'heavy', baseStats: { armor: 15, health: 5 }, maxDurability: 200, sellPrice: 0 }),
   it({ id: 'achievement_spirits_charm', name: 'Spectral Lantern', itemType: 'armor', slot: 'charm', tier: 5, baseStats: { magicPower: 12, magicDefence: 5 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_fae_ring', name: 'Pixie Dust Ring', itemType: 'armor', slot: 'ring', tier: 5, baseStats: { luck: 10, evasion: 5 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_bats_helm', name: 'Echolocation Helm', itemType: 'armor', slot: 'head', tier: 5, weightClass: 'light', baseStats: { evasion: 10, accuracy: 8 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_fae_ring', name: 'Pixie Dust Ring', itemType: 'armor', slot: 'ring', tier: 5, baseStats: { luck: 10, dodge: 5 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_bats_helm', name: 'Echolocation Helm', itemType: 'armor', slot: 'head', tier: 5, weightClass: 'light', baseStats: { dodge: 4, accuracy: 8 }, maxDurability: 200, sellPrice: 0 }),
   it({ id: 'achievement_goblins_helm', name: "Goblin King's Crown", itemType: 'armor', slot: 'head', tier: 5, weightClass: 'light', baseStats: { luck: 12, attack: 5 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_golems_charm', name: 'Crystal Core Charm', itemType: 'armor', slot: 'charm', tier: 5, baseStats: { magicDefence: 15, defence: 5 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_crawlers_legs', name: 'Chitin Legguards', itemType: 'armor', slot: 'legs', tier: 5, weightClass: 'heavy', baseStats: { defence: 12, health: 8 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_harpies_boots', name: 'Featherstep Boots', itemType: 'armor', slot: 'boots', tier: 5, weightClass: 'light', baseStats: { evasion: 15, dodge: 5 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_golems_charm', name: 'Crystal Core Charm', itemType: 'armor', slot: 'charm', tier: 5, baseStats: { magicDefence: 15, armor: 5 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_crawlers_legs', name: 'Chitin Legguards', itemType: 'armor', slot: 'legs', tier: 5, weightClass: 'heavy', baseStats: { armor: 12, health: 8 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_harpies_boots', name: 'Featherstep Boots', itemType: 'armor', slot: 'boots', tier: 5, weightClass: 'light', baseStats: { dodge: 3, accuracy: 4 }, maxDurability: 200, sellPrice: 0 }),
   it({ id: 'achievement_undead_gloves', name: "Death Knight's Gauntlets", itemType: 'armor', slot: 'gloves', tier: 5, weightClass: 'heavy', baseStats: { attack: 12, critDamage: 0.1 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_swampBeasts_belt', name: "Mire Walker's Belt", itemType: 'armor', slot: 'belt', tier: 5, baseStats: { health: 12, defence: 5 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_swampBeasts_belt', name: "Mire Walker's Belt", itemType: 'armor', slot: 'belt', tier: 5, baseStats: { health: 12, armor: 5 }, maxDurability: 200, sellPrice: 0 }),
   it({ id: 'achievement_witches_helm', name: 'Hexweave Cowl', itemType: 'armor', slot: 'head', tier: 5, weightClass: 'light', baseStats: { magicPower: 12, magicDefence: 5 }, maxDurability: 200, sellPrice: 0 }),
   it({ id: 'achievement_elementals_neck', name: 'Primordial Shard Necklace', itemType: 'armor', slot: 'neck', tier: 5, baseStats: { magicPower: 8, magicDefence: 8 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_serpents_ring', name: "Naga Queen's Ring", itemType: 'armor', slot: 'ring', tier: 5, baseStats: { magicDefence: 12, evasion: 5 }, maxDurability: 200, sellPrice: 0 }),
-  it({ id: 'achievement_abominations_chest', name: 'Fleshknit Vest', itemType: 'armor', slot: 'chest', tier: 5, weightClass: 'light', baseStats: { health: 18, healthRegen: 2 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_serpents_ring', name: "Naga Queen's Ring", itemType: 'armor', slot: 'ring', tier: 5, baseStats: { magicDefence: 12, dodge: 5 }, maxDurability: 200, sellPrice: 0 }),
+  it({ id: 'achievement_abominations_chest', name: 'Fleshknit Vest', itemType: 'armor', slot: 'chest', tier: 5, weightClass: 'light', baseStats: { health: 20 }, maxDurability: 200, sellPrice: 0 }),
 ];
 
 // ── Export ────────────────────────────────────────────────────────────────────
