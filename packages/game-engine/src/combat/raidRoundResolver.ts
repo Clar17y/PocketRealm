@@ -528,7 +528,7 @@ export function resolveRaidRound(
 
         const stance = defStances.get(targetId);
 
-        // Counter avoids physical
+        // Counter avoids physical, Ward avoids magic
         const blocked = (stance?.avoidsPhysical && isPhysical) || (stance?.resistsMagic && isMagic);
         if (blocked) {
           mobLogEntry.targets.push({
@@ -536,9 +536,34 @@ export function resolveRaidRound(
             username: getUsername(targetId),
             damageTaken: 0,
             blocked: true,
+            dodged: false,
             knockedOut: false,
           });
           continue;
+        }
+
+        // Hit resolution: normal attacks can be dodged, boss specials (alwaysHits) cannot
+        if (!mActionDef.alwaysHits) {
+          const mobHitScore = mob.stats.accuracy + (mActionDef.accuracyModifier ?? 0);
+          const playerAvoidScore = targetParticipant.stats.dodge + (targetParticipant.stats.evasion ?? 0);
+          const hitResult = resolveHitCheck({
+            combatMode,
+            hitScore: mobHitScore,
+            avoidScore: playerAvoidScore,
+            hitRollValue: roll.rollHitChance(),
+          });
+
+          if (!hitResult.didHit) {
+            mobLogEntry.targets.push({
+              playerId: targetId,
+              username: getUsername(targetId),
+              damageTaken: 0,
+              blocked: false,
+              dodged: true,
+              knockedOut: false,
+            });
+            continue;
+          }
         }
 
         const dmgRaw = roll.rollDamage(mob.stats.damageMin, mob.stats.damageMax);
@@ -596,6 +621,7 @@ export function resolveRaidRound(
           username: getUsername(targetId),
           damageTaken: damage,
           blocked: false,
+          dodged: false,
           knockedOut: targetState.hp <= 0,
         });
 

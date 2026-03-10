@@ -35,6 +35,7 @@ const bossEarthquake: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 2.0,
   damageType: 'physical',
+  alwaysHits: true,
 };
 
 const bossArcaneStorm: ActionDefinition = {
@@ -46,6 +47,7 @@ const bossArcaneStorm: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 2.0,
   damageType: 'magic',
+  alwaysHits: true,
 };
 
 const bossWeaken: ActionDefinition = {
@@ -57,6 +59,7 @@ const bossWeaken: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'magic',
+  alwaysHits: true,
   effect: {
     name: 'Weakened',
     stat: 'attack',
@@ -112,6 +115,7 @@ const bossImpale: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 4.0,
   damageType: 'physical',
+  alwaysHits: true,
 };
 
 const bossExecutionStrike: ActionDefinition = {
@@ -123,6 +127,7 @@ const bossExecutionStrike: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 5.0,
   damageType: 'physical',
+  alwaysHits: true,
 };
 
 // --- AoE damage ---
@@ -136,6 +141,7 @@ const bossPoisonSpray: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 1.0,
   damageType: 'magic',
+  alwaysHits: true,
   effect: {
     name: 'Poisoned',
     stat: 'poison',
@@ -156,6 +162,7 @@ const bossBlightWave: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 2.0,
   damageType: 'magic',
+  alwaysHits: true,
 };
 
 const bossDeathBloom: ActionDefinition = {
@@ -167,6 +174,7 @@ const bossDeathBloom: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 3.0,
   damageType: 'magic',
+  alwaysHits: true,
 };
 
 const bossDesperateFury: ActionDefinition = {
@@ -178,6 +186,7 @@ const bossDesperateFury: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 3.0,
   damageType: 'physical',
+  alwaysHits: true,
 };
 
 const bossCocoonBurst: ActionDefinition = {
@@ -189,6 +198,7 @@ const bossCocoonBurst: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 2.0,
   damageType: 'physical',
+  alwaysHits: true,
 };
 
 const bossTerrifyingHowl: ActionDefinition = {
@@ -200,6 +210,7 @@ const bossTerrifyingHowl: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 2.5,
   damageType: 'physical',
+  alwaysHits: true,
 };
 
 // --- Debuffs ---
@@ -213,6 +224,7 @@ const bossMarkForDeath: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'magic',
+  alwaysHits: true,
   effect: {
     name: 'Marked for Death',
     stat: 'marked_for_death',
@@ -231,6 +243,7 @@ const bossWither: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'magic',
+  alwaysHits: true,
   effect: {
     name: 'Withered',
     stat: 'defence',
@@ -249,6 +262,7 @@ const bossSmokeBomb: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'physical',
+  alwaysHits: true,
   effect: {
     name: 'Blinded',
     stat: 'accuracy',
@@ -267,6 +281,7 @@ const bossNatureCurse: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'magic',
+  alwaysHits: true,
   effect: {
     name: "Nature's Curse",
     stat: 'nature_cursed',
@@ -285,6 +300,7 @@ const bossRoot: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'magic',
+  alwaysHits: true,
   effect: {
     name: 'Rooted',
     stat: 'rooted',
@@ -303,6 +319,7 @@ const bossFearHowl: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'magic',
+  alwaysHits: true,
   effect: {
     name: 'Feared',
     stat: 'rooted',
@@ -408,6 +425,7 @@ const bossVenomCloud: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'magic',
+  alwaysHits: true,
   effect: {
     name: 'Venom',
     stat: 'stacking_dot',
@@ -428,6 +446,7 @@ const bossShadowBleed: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'magic',
+  alwaysHits: true,
   effect: {
     name: 'Shadow Bleed',
     stat: 'stacking_dot',
@@ -448,6 +467,7 @@ const bossThrowingKnives: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'physical',
+  alwaysHits: true,
   effect: {
     name: 'Bleeding',
     stat: 'stacking_dot',
@@ -468,6 +488,7 @@ const bossBlightCloud: ActionDefinition = {
   cost: BOSS_ZERO_COST,
   damageMultiplier: 0,
   damageType: 'magic',
+  alwaysHits: true,
   effect: {
     name: 'Blight',
     stat: 'stacking_dot',

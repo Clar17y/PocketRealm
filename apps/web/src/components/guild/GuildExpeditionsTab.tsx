@@ -963,6 +963,8 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
                                 <div key={k} className="text-[var(--rpg-text-secondary)]">
                                   {t.username}: {t.blocked ? (
                                     <span className="text-[var(--rpg-blue-light)]">BLOCKED</span>
+                                  ) : t.dodged ? (
+                                    <span className="text-[var(--rpg-green-light)]">DODGED</span>
                                   ) : (
                                     <>
                                       <span className="text-[var(--rpg-red)]">-{t.damageTaken} HP</span>

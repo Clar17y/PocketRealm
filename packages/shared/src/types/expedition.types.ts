@@ -231,6 +231,7 @@ export interface MobActionLogEntry {
     username: string;
     damageTaken: number;
     blocked: boolean;
+    dodged: boolean;
     knockedOut: boolean;
   }[];
 }

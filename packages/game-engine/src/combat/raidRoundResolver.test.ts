@@ -1889,4 +1889,144 @@ describe('resolveRaidRound', () => {
       }
     });
   });
+
+  describe('mob-vs-player hit resolution', () => {
+    it('normal mob attack (boss_physical_attack) can be dodged by high-evasion player', () => {
+      const mob = makeMob({
+        id: 'mob1', hp: 200, maxHp: 200,
+        stats: makeStats({ accuracy: 10, damageMin: 20, damageMax: 20 }),
+        actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+      });
+      const evasivePlayer = makeParticipant({
+        playerId: 'p1', hp: 200, maxHp: 200,
+        stats: makeStats({ dodge: 30, evasion: 20 }),
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [evasivePlayer], mobs: [mob], roundNumber: 1 }),
+        alwaysMissRng,
+      );
+
+      // Mob attack should be dodged
+      expect(result.participantResults[0].damageTaken).toBe(0);
+      const mobLog = result.roundLog.phases.mobActions[0];
+      expect(mobLog.targets[0].dodged).toBe(true);
+      expect(mobLog.targets[0].blocked).toBe(false);
+    });
+
+    it('normal mob attack hits when roll is below hitChance', () => {
+      const mob = makeMob({
+        id: 'mob1', hp: 200, maxHp: 200,
+        stats: makeStats({ accuracy: 20, damageMin: 10, damageMax: 10 }),
+        actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+      });
+      const p = makeParticipant({
+        playerId: 'p1', hp: 200, maxHp: 200,
+        stats: makeStats({ dodge: 5, evasion: 0 }),
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [mob], roundNumber: 1 }),
+        alwaysHitRng,
+      );
+
+      expect(result.participantResults[0].damageTaken).toBeGreaterThan(0);
+      const mobLog = result.roundLog.phases.mobActions[0];
+      expect(mobLog.targets[0].dodged).toBe(false);
+    });
+
+    it('boss special (alwaysHits) cannot be dodged even by max-evasion player', () => {
+      const mob = makeMob({
+        id: 'mob1', hp: 200, maxHp: 200,
+        stats: makeStats({ accuracy: 5, damageMin: 20, damageMax: 20 }),
+        // boss_earthquake has alwaysHits: true
+        actionTemplate: [{ actionId: 'boss_earthquake', targetMode: 'aoe' }],
+      });
+      const evasivePlayer = makeParticipant({
+        playerId: 'p1', hp: 200, maxHp: 200,
+        stats: makeStats({ dodge: 100, evasion: 50 }),
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [evasivePlayer], mobs: [mob], roundNumber: 1 }),
+        alwaysMissRng,
+      );
+
+      // alwaysHits bypasses hit resolution — damage dealt despite max evasion
+      expect(result.participantResults[0].damageTaken).toBeGreaterThan(0);
+      const mobLog = result.roundLog.phases.mobActions[0];
+      expect(mobLog.targets[0].dodged).toBe(false);
+    });
+
+    it('evasion tank viability: dodge reduces mob normal attack damage taken across rounds', () => {
+      // High-evasion player should take less total damage than a low-evasion player
+      // over multiple rounds against normal attacks
+      const mob = makeMob({
+        id: 'mob1', hp: 999, maxHp: 999,
+        stats: makeStats({ accuracy: 15, damageMin: 20, damageMax: 20 }),
+        actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+      });
+
+      // Low evasion player: roll 0.19 should hit (hitChance ~0.95 for accuracy 15 vs avoid 5)
+      const lowEvade = makeParticipant({
+        playerId: 'p1', hp: 500, maxHp: 500,
+        stats: makeStats({ dodge: 5, evasion: 0 }),
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+
+      // High evasion player: same roll might miss (hitChance lower for accuracy 15 vs avoid 50)
+      const highEvade = makeParticipant({
+        playerId: 'p2', hp: 500, maxHp: 500,
+        stats: makeStats({ dodge: 30, evasion: 20 }),
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+
+      const marginalRng: RaidRoundRng = {
+        rollHitChance: () => 0.25,
+        rollDamage: () => 20,
+        rollCrit: () => false,
+      };
+
+      const lowResult = resolveRaidRound(
+        makeInput({ participants: [lowEvade], mobs: [{ ...mob }], roundNumber: 1 }),
+        marginalRng,
+      );
+      const highResult = resolveRaidRound(
+        makeInput({ participants: [highEvade], mobs: [{ ...mob }], roundNumber: 1 }),
+        marginalRng,
+      );
+
+      // Low evasion should be hit, high evasion should dodge
+      expect(lowResult.participantResults[0].damageTaken).toBeGreaterThan(0);
+      expect(highResult.participantResults[0].damageTaken).toBe(0);
+    });
+
+    it('boss debuff (alwaysHits) cannot be dodged', () => {
+      const mob = makeMob({
+        id: 'mob1', hp: 200, maxHp: 200,
+        stats: makeStats({ accuracy: 5 }),
+        // boss_wither has alwaysHits: true, applies defence debuff
+        actionTemplate: [{ actionId: 'boss_wither', targetMode: 'single_target' }],
+      });
+      const evasivePlayer = makeParticipant({
+        playerId: 'p1', hp: 200, maxHp: 200,
+        stats: makeStats({ dodge: 100, evasion: 50 }),
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [evasivePlayer], mobs: [mob], roundNumber: 1 }),
+        alwaysMissRng,
+      );
+
+      // Debuff should apply despite max evasion (alwaysHits bypasses hit check)
+      const effects = result.participantResults[0].activeEffectsAfter;
+      const withered = effects.find(e => e.stat === 'defence');
+      expect(withered).toBeDefined();
+      expect(withered!.modifier).toBe(-8);
+    });
+  });
 });
