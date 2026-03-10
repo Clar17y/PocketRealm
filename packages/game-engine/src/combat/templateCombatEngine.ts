@@ -424,7 +424,7 @@ function executeOffensiveAction(
   const accuracyBonus = baseAccuracy + (action.accuracyModifier ?? 0);
   const hitScore = accuracyBonus;
   const avoidScore = targetStats.dodge + targetStats.evasion;
-  const hitResolution = hitOverride === 'guaranteed_hit'
+  const hitResolution = hitOverride === 'guaranteed_hit' || action.alwaysHits
     ? {
         hitScore: Math.max(1, hitScore),
         avoidScore: Math.max(0, avoidScore),
@@ -446,7 +446,7 @@ function executeOffensiveAction(
             avoidScore,
             hitRollValue: 0,
           })
-    : resolveHitCheck({
+      : resolveHitCheck({
         combatMode,
         hitScore,
         avoidScore,
@@ -454,6 +454,17 @@ function executeOffensiveAction(
   const hits = hitResolution.didHit;
 
   if (!hits) {
+    const appliedEffects = action.effect?.alwaysApplies
+      ? applyActionEffect(state, action.effect, actorKey, {
+        sourceScalingStat: perActionScaling
+          ? resolveScalingStat(
+            action.scalingStat ?? 'weapon',
+            perActionScaling.weaponRequiredSkill,
+            perActionScaling.skillLevels,
+          )
+          : undefined,
+      })
+      : undefined;
     state.log.push(buildLogEntry(state, ctx, {
       actor: actorKey,
       actorName,
@@ -466,6 +477,7 @@ function executeOffensiveAction(
       accuracyModifier: accuracyBonus,
       targetDodge: targetStats.dodge,
       targetEvasion: targetStats.evasion,
+      effectsApplied: appliedEffects && appliedEffects.length > 0 ? appliedEffects : undefined,
       message: `${actorName} uses ${action.name} but misses ${targetName}!`,
     }));
     return;
@@ -533,6 +545,13 @@ function executeOffensiveAction(
   const critText = crit ? ' CRITICAL HIT!' : '';
   const leechText = leechHeal > 0 ? ` Leeches ${leechHeal} HP!` : '';
 
+  const appliedEffects = action.effect
+    ? applyActionEffect(state, action.effect, actorKey, {
+      damageForPercentCalc: finalDamage,
+      sourceScalingStat: xpStat,
+    })
+    : undefined;
+
   state.log.push(buildLogEntry(state, ctx, {
     actor: actorKey,
     actorName,
@@ -554,16 +573,9 @@ function executeOffensiveAction(
     targetMagicDefence: actionDamageType === 'magic' ? targetStats.magicDefence : undefined,
     armorReduction: actionDamageType === 'magic' ? undefined : armorReduction,
     magicDefenceReduction: actionDamageType === 'magic' ? armorReduction : undefined,
+    effectsApplied: appliedEffects && appliedEffects.length > 0 ? appliedEffects : undefined,
     message: `${actorName} uses ${action.name} on ${targetName} for ${finalDamage} damage!${critText}${leechText}`,
   }));
-
-  // Apply effect (DOT debuff on the target)
-  if (action.effect) {
-    applyActionEffect(state, action.effect, actorKey, {
-      damageForPercentCalc: finalDamage,
-      sourceScalingStat: xpStat,
-    });
-  }
 
   // Check for kill
   if (state.combatants[opponent(actorKey)].hp <= 0) {

@@ -1247,6 +1247,63 @@ describe('runTemplateCombat', () => {
   });
 
   describe('DOT/HOT tick system', () => {
+    it('ships a minimal live anti-evasion counter package', () => {
+      expect(BASE_ACTION_DEFINITIONS.snipers_mark.alwaysHits).toBe(true);
+      expect(BASE_ACTION_DEFINITIONS.snipers_mark.effect).toEqual(
+        expect.objectContaining({ stat: 'evasion', modifier: -20, alwaysApplies: true }),
+      );
+      expect(BASE_ACTION_DEFINITIONS.frost_nova.effect).toEqual(
+        expect.objectContaining({ stat: 'evasion', modifier: -15, alwaysApplies: true }),
+      );
+      expect(BASE_ACTION_DEFINITIONS.flame_arrow.effect).toEqual(
+        expect.objectContaining({ alwaysApplies: true, damagePerRound: 6 }),
+      );
+    });
+
+    it('always-hit anti-evasion debuffs apply even against extreme avoidance', () => {
+      mockCombatRandom({ hitRoll: 0.95 });
+
+      const sureMark: ActionDefinition = {
+        id: 'sure_mark',
+        name: 'Sure Mark',
+        description: 'A tracking strike that cannot be avoided.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 0.5,
+        alwaysHits: true,
+        effect: {
+          name: 'Sure Mark',
+          stat: 'evasion',
+          modifier: -20,
+          duration: 3,
+          isDebuff: true,
+          alwaysApplies: true,
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, sure_mark: sureMark };
+
+      const a = makeCombatant('Hunter', {
+        template: templateOf('sure_mark'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 200, maxHp: 200, accuracy: 5, damageMin: 10, damageMax: 10 }),
+      });
+      const b = makeCombatant('Phantom', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 200, maxHp: 200, dodge: 45, evasion: 50, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, { combatMode: 'pvp' });
+      const debuffEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+
+      expect(debuffEntry?.effectsApplied).toEqual([
+        expect.objectContaining({ stat: 'evasion', modifier: -20 }),
+      ]);
+    });
+
     it('DOT deals damage each round', () => {
       mockCombatRandom();
 
@@ -1296,6 +1353,55 @@ describe('runTemplateCombat', () => {
         expect(tick.spellName).toBe('Poison');
         expect(tick.message).toContain('magic damage');
       }
+    });
+
+    it('damage-over-time effects marked unavoidable bypass hit checks', () => {
+      mockCombatRandom({ hitRoll: 0.95 });
+
+      const inescapableBurn: ActionDefinition = {
+        id: 'inescapable_burn',
+        name: 'Inescapable Burn',
+        description: 'Scorches the target even on a glancing miss.',
+        actionType: 'skill_attack',
+        category: 'offensive',
+        cost: { stamina: 10, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'magic',
+        effect: {
+          name: 'Inescapable Burn',
+          stat: 'attack',
+          modifier: 0,
+          duration: 3,
+          isDebuff: true,
+          alwaysApplies: true,
+          damagePerRound: 8,
+          dotDamageType: 'magic',
+        },
+      };
+
+      const customDefs = { ...BASE_ACTION_DEFINITIONS, inescapable_burn: inescapableBurn };
+
+      const a = makeCombatant('Mage', {
+        template: templateOf('inescapable_burn', 'defend', 'defend'),
+        actionDefinitions: customDefs,
+        stats: makeStats({ hp: 200, maxHp: 200, accuracy: 5, damageMin: 10, damageMax: 10 }),
+      });
+      const b = makeCombatant('Shade', {
+        template: templateOf('defend'),
+        stats: makeStats({ hp: 200, maxHp: 200, dodge: 45, evasion: 50, magicDefence: 0, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, { combatMode: 'pvp' });
+      const openingAttack = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+      const dotTick = result.log.find((e) => e.tickType === 'dot_tick' && e.spellName === 'Inescapable Burn');
+
+      expect(openingAttack?.damage).toBeUndefined();
+      expect(openingAttack?.effectsApplied).toEqual([
+        expect.objectContaining({ stat: 'attack', modifier: 0 }),
+      ]);
+      expect(dotTick?.damage).toBeGreaterThan(0);
     });
 
     it('HOT heals each round via supportive action', () => {
