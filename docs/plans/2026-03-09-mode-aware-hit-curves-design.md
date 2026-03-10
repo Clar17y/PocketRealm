@@ -230,3 +230,27 @@ These targets should live in tests, not just in notes.
 - Rebuilding the attribute system
 - Reworking all mob skill kits in the same pass unless needed for unavoidable-pressure support
 - Frontend combat-log redesign beyond exposing the extra fields needed for debugging
+
+## Verification
+
+### Final Constants
+
+- `pvp`: `minHit = 0.10`, `maxHit = 0.95`, `bias = 5`, `exponent = 2.4`
+- `pve_open_world`: `minHit = 0.25`, `maxHit = 0.95`, `bias = 10`, `exponent = 1.5`
+- `pve_expedition`: `minHit = 0.20`, `maxHit = 0.95`, `bias = 8`, `exponent = 1.8`
+- `pve_boss`: `minHit = 0.35`, `maxHit = 0.98`, `bias = 12`, `exponent = 1.35`
+
+### Recorded Outcomes
+
+- PvP unchecked evasion ceiling: `0.1000` hit chance at `hitScore 35` vs `avoidScore 98`
+- PvP counter-build recovery: `0.4516` hit chance at `hitScore 95` vs `avoidScore 98`
+- Open-world tutorial starter floor: `0.5000` hit chance at `hitScore 12` vs `Field Mouse avoid 2`
+- Open-world Forest Edge tier-1 floor: `0.4700` hit chance at `hitScore 12` vs `avoid 3`
+- Boss floor probe: `0.3500` hit chance at `hitScore 30` vs `avoidScore 95`
+
+### Notes
+
+- No post-constant boss-floor adjustment was needed; boss reliability remained at the planned `0.35` floor once `bossRoundResolver` switched to `pve_boss`.
+- Seed-data retuning only needed two PvP dodge outlier reductions:
+  - `Bat Wing Boots` dodge `6 -> 5`
+  - `Windcaller's Charm` dodge `8 -> 6`

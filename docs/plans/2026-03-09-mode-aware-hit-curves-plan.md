@@ -513,6 +513,50 @@ Append a short verification section to both docs with:
 - open-world starter hit-rate floor result
 - any boss-floor adjustments made during tuning
 
+---
+
+## Execution Record
+
+### Implementation Commits
+
+- `7625558` `feat(shared): add combat mode hit curve types`
+- `1274baf` `fix(shared): make hit curve constants readonly`
+- `1113e29` `feat(engine): add mode-aware hit resolver`
+- `c68d0bc` `fix(engine): sanitize hit curve inputs`
+- `5613d2b` `feat(engine): thread combat modes through template combat`
+- `c167bd3` `feat(api): wire combat modes into live combat callers`
+- `407bf6e` `feat(combat): add explicit anti-evasion counterplay`
+- `578e7f6` `balance: retune combat data for mode-aware hit curves`
+- `c2df169` `fix(seed): align expedition validation targets`
+
+### Final Verification
+
+- `npm test -w packages/shared -- src/constants/gameConstants.test.ts`
+  - `52/52` tests passed
+- `npm test -w packages/game-engine -- src/combat/damageCalculator.test.ts src/combat/templateCombatEngine.test.ts src/combat/bossRoundResolver.test.ts`
+  - `120/120` tests passed
+- `npm test -w apps/api -- src/services/pvpService.test.ts src/services/trainingService.test.ts src/services/bossEncounterService.test.ts src/services/equipmentService.test.ts`
+  - `78/78` tests passed
+- `npx vitest run packages/database/prisma/seed-data/items.test.ts packages/database/prisma/seed-data/mobs.test.ts`
+  - `5/5` tests passed
+
+### Final Recorded Values
+
+- Hit-curve constants:
+  - `pvp`: `0.10 / 0.95 / 5 / 2.4`
+  - `pve_open_world`: `0.25 / 0.95 / 10 / 1.5`
+  - `pve_expedition`: `0.20 / 0.95 / 8 / 1.8`
+  - `pve_boss`: `0.35 / 0.98 / 12 / 1.35`
+- PvP unchecked evasion ceiling:
+  - `0.1000` hit chance at `hitScore 35` vs `avoidScore 98`
+- PvP counter-build recovery:
+  - `0.4516` hit chance at `hitScore 95` vs `avoidScore 98`
+- Open-world starter floor:
+  - `0.5000` hit chance at `hitScore 12` vs `Field Mouse avoid 2`
+  - `0.4700` hit chance at `hitScore 12` vs `Forest Edge tier-1 avoid 3`
+- Boss-floor adjustments:
+  - none after initial constant selection; `pve_boss` remained at `0.3500` on the verification probe
+
 **Step 6: Commit**
 
 ```bash
