@@ -19,6 +19,7 @@ import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type RoundInteracti
 import {
   rollD20,
   rollDamage,
+  calculateHitChance,
   resolveHitCheck,
   isCriticalHit,
   calculateFinalDamage,
@@ -393,13 +394,16 @@ function executeOffensiveAction(
     baseAccuracy = actionStats.accuracy;
 
     // Re-apply buff/debuff modifiers from active effects (these were lost
-    // when per-action stats replaced the pre-computed effective stats)
+    // when per-action stats replaced the pre-computed effective stats).
+    // Also collect attackPercent in the same pass.
+    let attackPercentModifier = 0;
     for (const effect of state.activeEffects) {
       if (effect.target !== actorKey) continue;
       if (effect.stat === 'attack') { baseDamageMin += effect.modifier; baseDamageMax += effect.modifier; }
-      if (effect.stat === 'accuracy') baseAccuracy += effect.modifier;
-      if (effect.stat === 'damageMin') baseDamageMin += effect.modifier;
-      if (effect.stat === 'damageMax') baseDamageMax += effect.modifier;
+      else if (effect.stat === 'accuracy') baseAccuracy += effect.modifier;
+      else if (effect.stat === 'damageMin') baseDamageMin += effect.modifier;
+      else if (effect.stat === 'damageMax') baseDamageMax += effect.modifier;
+      else if (effect.stat === 'attackPercent') attackPercentModifier += effect.modifier;
     }
     // Apply guild damage multiplier
     if (perActionScaling.guildDamageMultiplier && perActionScaling.guildDamageMultiplier > 0) {
@@ -409,15 +413,24 @@ function executeOffensiveAction(
 
     baseDamageMin = Math.max(1, baseDamageMin);
     baseDamageMax = Math.max(baseDamageMin, baseDamageMax);
-  }
 
-  const attackPercentModifier = state.activeEffects
-    .filter((effect) => effect.target === actorKey && effect.stat === 'attackPercent')
-    .reduce((total, effect) => total + effect.modifier, 0);
-
-  if (attackPercentModifier !== 0) {
-    baseDamageMin = Math.max(1, Math.floor(baseDamageMin * (1 + attackPercentModifier)));
-    baseDamageMax = Math.max(baseDamageMin, Math.floor(baseDamageMax * (1 + attackPercentModifier)));
+    if (attackPercentModifier !== 0) {
+      baseDamageMin = Math.max(1, Math.floor(baseDamageMin * (1 + attackPercentModifier)));
+      baseDamageMax = Math.max(baseDamageMin, Math.floor(baseDamageMax * (1 + attackPercentModifier)));
+    }
+  } else {
+    // No per-action scaling (mobs) — effective stats already include flat buffs
+    // from getEffectiveStats, but attackPercent is only handled here.
+    let attackPercentModifier = 0;
+    for (const effect of state.activeEffects) {
+      if (effect.target === actorKey && effect.stat === 'attackPercent') {
+        attackPercentModifier += effect.modifier;
+      }
+    }
+    if (attackPercentModifier !== 0) {
+      baseDamageMin = Math.max(1, Math.floor(baseDamageMin * (1 + attackPercentModifier)));
+      baseDamageMax = Math.max(baseDamageMin, Math.floor(baseDamageMax * (1 + attackPercentModifier)));
+    }
   }
 
   const attackRoll = hitOverride === 'guaranteed_hit' ? 20 : rollD20();
@@ -432,20 +445,8 @@ function executeOffensiveAction(
         hitRollValue: 0,
         didHit: true,
       }
-    : attackRoll === 1
-      ? resolveHitCheck({
-          combatMode,
-          hitScore,
-          avoidScore,
-          hitRollValue: 1,
-        })
-      : attackRoll === 20
-        ? resolveHitCheck({
-            combatMode,
-            hitScore,
-            avoidScore,
-            hitRollValue: 0,
-          })
+    : attackRoll === 1 || attackRoll === 20
+      ? { ...calculateHitChance(combatMode, hitScore, avoidScore), hitRollValue: attackRoll === 1 ? 1 : 0, didHit: attackRoll === 20 }
       : resolveHitCheck({
         combatMode,
         hitScore,

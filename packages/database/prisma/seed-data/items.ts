@@ -1,8 +1,7 @@
 import { IDS } from './ids';
-import { POTION_CONSTANTS } from '@pocketrealm/shared';
+import { POTION_CONSTANTS, STARTER_LOADOUT } from '@pocketrealm/shared';
 
 type ConsumableEffectJson = { type: 'heal_flat' | 'heal_percent' | 'restore_stamina' | 'restore_mana'; value: number };
-const STARTER_TUTORIAL_OFF_HAND_ID = 'starter_wayfinder_buckler';
 
 type ItemRow = {
   id: string;
@@ -439,7 +438,7 @@ const advancedGear = [
   it({ id: IDS.adv.ratHideGloves, name: 'Rat Hide Gloves', itemType: 'armor', slot: 'gloves', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { attack: 2, dodge: 1 }, maxDurability: 60, sellPrice: 0 }),
   it({ id: IDS.adv.spiderSilkBelt, name: 'Spider Silk Belt', itemType: 'armor', slot: 'belt', tier: 1, weightClass: 'light', requiredLevel: 1, baseStats: { health: 3, dodge: 2 }, maxDurability: 60, sellPrice: 0 }),
   it({ id: IDS.adv.boarHideBoots, name: 'Boar Hide Boots', itemType: 'armor', slot: 'boots', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { armor: 2, health: 2 }, maxDurability: 60, sellPrice: 0 }),
-  it({ id: STARTER_TUTORIAL_OFF_HAND_ID, name: 'Wayfinder Buckler', itemType: 'armor', slot: 'off_hand', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { accuracy: 12, health: 4 }, maxDurability: 40, sellPrice: 0 }),
+  it({ id: STARTER_LOADOUT.tutorialOffHandTemplateId, name: 'Wayfinder Buckler', itemType: 'armor', slot: 'off_hand', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { accuracy: 12, health: 4 }, maxDurability: 40, sellPrice: 0 }),
   // Tier 2
   it({ id: IDS.adv.wolfFangNecklace, name: 'Wolf Fang Necklace', itemType: 'armor', slot: 'neck', tier: 2, requiredLevel: 5, baseStats: { attack: 3, critChance: 0.01 }, maxDurability: 80, sellPrice: 0 }),
   it({ id: IDS.adv.banditsLuckyRing, name: "Bandit's Lucky Ring", itemType: 'armor', slot: 'ring', tier: 2, requiredLevel: 5, baseStats: { luck: 3, dodge: 2 }, maxDurability: 80, sellPrice: 0 }),

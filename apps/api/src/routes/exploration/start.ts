@@ -20,7 +20,6 @@ import {
   WORLD_EVENT_CONSTANTS,
   getUnlockedTiers,
   getHighestUnlockedTier,
-  type CombatOptions,
   type MobTemplate,
   type PotionConsumed,
   type QuestProgressUpdate,
@@ -32,7 +31,7 @@ import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxServi
 import { trackProgress } from '../../services/progressService';
 import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, calculateFleeWithGold } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, calculateFleeWithGold, buildPveCombatOptions } from '../../utils/routeHelpers.js';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../../services/combatOrchestrationService';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { setAllResources } from '../../services/resourceService';
@@ -319,10 +318,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         };
         applyCombatBuffs(playerStats, mobBuffs);
 
-        const combatOptions: CombatOptions = {
-          combatMode: 'pve_open_world',
-          ...(potionPool.length > 0 ? { potions: [...potionPool] } : {}),
-        };
+        const combatOptions = buildPveCombatOptions(potionPool);
 
         const combatantA = buildPlayerTemplateCombatant({
           playerId,
