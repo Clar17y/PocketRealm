@@ -141,6 +141,7 @@ export interface CombatPotion {
 
 export interface CombatOptions {
   potions?: CombatPotion[];
+  combatMode?: CombatMode;
 }
 
 export interface PotionConsumed {

@@ -12,13 +12,14 @@ import type {
   CombatAction,
   PerActionScaling,
   CombatPotion,
+  CombatMode,
 } from '@pocketrealm/shared';
 import { COMBAT_ACTION_CONSTANTS, COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type RoundInteraction } from './actionResolver';
 import {
   rollD20,
   rollDamage,
-  doesAttackHit,
+  resolveHitCheck,
   isCriticalHit,
   calculateFinalDamage,
   calculateDefenceReduction,
@@ -362,6 +363,7 @@ function executeOffensiveAction(
   actorName: string,
   targetName: string,
   ctx: RoundContext,
+  combatMode: CombatMode,
   perActionScaling?: PerActionScaling,
 ): void {
   // Guaranteed miss (counter/ward blocked the attack)
@@ -420,7 +422,36 @@ function executeOffensiveAction(
 
   const attackRoll = hitOverride === 'guaranteed_hit' ? 20 : rollD20();
   const accuracyBonus = baseAccuracy + (action.accuracyModifier ?? 0);
-  const hits = hitOverride === 'guaranteed_hit' || doesAttackHit(attackRoll, accuracyBonus, targetStats.dodge, targetStats.evasion);
+  const hitScore = accuracyBonus;
+  const avoidScore = targetStats.dodge + targetStats.evasion;
+  const hitResolution = hitOverride === 'guaranteed_hit'
+    ? {
+        hitScore: Math.max(1, hitScore),
+        avoidScore: Math.max(0, avoidScore),
+        hitChance: 1,
+        hitRollValue: 0,
+        didHit: true,
+      }
+    : attackRoll === 1
+      ? resolveHitCheck({
+          combatMode,
+          hitScore,
+          avoidScore,
+          hitRollValue: 1,
+        })
+      : attackRoll === 20
+        ? resolveHitCheck({
+            combatMode,
+            hitScore,
+            avoidScore,
+            hitRollValue: 0,
+          })
+    : resolveHitCheck({
+        combatMode,
+        hitScore,
+        avoidScore,
+      });
+  const hits = hitResolution.didHit;
 
   if (!hits) {
     state.log.push(buildLogEntry(state, ctx, {
@@ -428,6 +459,10 @@ function executeOffensiveAction(
       actorName,
       action: actionToCombatAction(action),
       roll: attackRoll,
+      hitChance: hitResolution.hitChance,
+      hitRollValue: hitResolution.hitRollValue,
+      attackerHitScore: hitResolution.hitScore,
+      defenderAvoidScore: hitResolution.avoidScore,
       accuracyModifier: accuracyBonus,
       targetDodge: targetStats.dodge,
       targetEvasion: targetStats.evasion,
@@ -503,6 +538,10 @@ function executeOffensiveAction(
     actorName,
     action: actionToCombatAction(action),
     roll: attackRoll,
+    hitChance: hitResolution.hitChance,
+    hitRollValue: hitResolution.hitRollValue,
+    attackerHitScore: hitResolution.hitScore,
+    defenderAvoidScore: hitResolution.avoidScore,
     damage: finalDamage,
     rawDamage,
     isCritical: crit,
@@ -714,6 +753,7 @@ export function runTemplateCombat(
   combatantB: TemplateCombatant,
   options?: CombatOptions,
 ): TemplateCombatResult {
+  const combatMode = options?.combatMode ?? 'pve_open_world';
   const availablePotions = options?.potions ? [...options.potions] : [];
   const potionsConsumed: PotionConsumed[] = [];
 
@@ -845,6 +885,7 @@ export function runTemplateCombat(
         resolvedA.action, interaction, true,
         combatantA.name, combatantB.name,
         { combatantAAction, combatantBAction, wasExhausted: resolvedA.wasExhausted, interactionResult },
+        combatMode,
         availablePotions, potionsConsumed,
         combatantA.perActionScaling,
       );
@@ -856,6 +897,7 @@ export function runTemplateCombat(
         resolvedB.action, interaction, false,
         combatantB.name, combatantA.name,
         { combatantAAction, combatantBAction, wasExhausted: resolvedB.wasExhausted, interactionResult },
+        combatMode,
         availablePotions, potionsConsumed,
         combatantB.perActionScaling,
       );
@@ -867,6 +909,7 @@ export function runTemplateCombat(
         resolvedB.action, interaction, false,
         combatantB.name, combatantA.name,
         { combatantAAction, combatantBAction, wasExhausted: resolvedB.wasExhausted, interactionResult },
+        combatMode,
         availablePotions, potionsConsumed,
         combatantB.perActionScaling,
       );
@@ -878,6 +921,7 @@ export function runTemplateCombat(
         resolvedA.action, interaction, true,
         combatantA.name, combatantB.name,
         { combatantAAction, combatantBAction, wasExhausted: resolvedA.wasExhausted, interactionResult },
+        combatMode,
         availablePotions, potionsConsumed,
         combatantA.perActionScaling,
       );
@@ -949,6 +993,7 @@ function executeAction(
   actorName: string,
   targetName: string,
   ctx: RoundContext,
+  combatMode: CombatMode,
   availablePotions: CombatPotion[],
   potionsConsumed: PotionConsumed[],
   perActionScaling?: PerActionScaling,
@@ -974,7 +1019,7 @@ function executeAction(
     executeOffensiveAction(
       state, actorKey, actorStats, targetStats, action,
       hitOverride, interactionDmgMult, dmgReduction,
-      actorName, targetName, ctx,
+      actorName, targetName, ctx, combatMode,
       perActionScaling,
     );
   } else if (action.category === 'supportive') {

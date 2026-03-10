@@ -65,12 +65,14 @@ function mockCombatRandom(overrides?: {
   initA?: number;     // 0..1 → d20 for A initiative
   initB?: number;     // 0..1 → d20 for B initiative
   attackRoll?: number; // 0..1 → d20 for attack rolls (repeated)
+  hitRoll?: number;   // 0..1 → sampled hit-roll value for resolveHitCheck (repeated)
   damageRoll?: number; // 0..1 → damage roll position (repeated)
   critRoll?: number;   // 0..1 → crit check (repeated)
 }) {
   const initA = overrides?.initA ?? 0.9;   // d20 = 19
   const initB = overrides?.initB ?? 0.1;   // d20 = 3
   const attackRoll = overrides?.attackRoll ?? 0.85; // d20 = 18 (hits)
+  const hitRoll = overrides?.hitRoll ?? 0.1;        // low enough to hit most non-PvP cases
   const damageRoll = overrides?.damageRoll ?? 0.0;  // min damage
   const critRoll = overrides?.critRoll ?? 0.99;      // no crit
 
@@ -80,10 +82,11 @@ function mockCombatRandom(overrides?: {
     // First two calls are initiative rolls
     if (callCount === 1) return initA;
     if (callCount === 2) return initB;
-    // After that, repeating pattern: attackRoll, damageRoll, critRoll
-    const phase = (callCount - 3) % 3;
+    // After that, repeating pattern: attackRoll, hitRoll, damageRoll, critRoll
+    const phase = (callCount - 3) % 4;
     if (phase === 0) return attackRoll;
-    if (phase === 1) return damageRoll;
+    if (phase === 1) return hitRoll;
+    if (phase === 2) return damageRoll;
     return critRoll;
   });
 }
@@ -119,6 +122,79 @@ describe('runTemplateCombat', () => {
         expect(typeof entry.combatantAManaAfter).toBe('number');
         expect(typeof entry.combatantBManaAfter).toBe('number');
       }
+    });
+  });
+
+  describe('mode-aware hit resolution', () => {
+    it('uses pvp hit curves when combatMode is pvp', () => {
+      mockCombatRandom({ hitRoll: 0.2 });
+
+      const a = makeCombatant('Duelist', {
+        stats: makeStats({ hp: 200, maxHp: 200, accuracy: 30, damageMin: 10, damageMax: 10 }),
+      });
+      const b = makeCombatant('Shade', {
+        stats: makeStats({ hp: 200, maxHp: 200, dodge: 45, evasion: 50, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b, { combatMode: 'pvp' });
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+
+      expect(attackEntry).toBeDefined();
+      expect(attackEntry?.hitChance).toBeLessThan(0.30);
+      expect(attackEntry?.damage).toBeUndefined();
+    });
+
+    it('offensive log entries include hit chance and score breakdown fields', () => {
+      mockCombatRandom({ hitRoll: 0.2 });
+
+      const a = makeCombatant('Player', {
+        stats: makeStats({ hp: 200, maxHp: 200, accuracy: 30, damageMin: 20, damageMax: 20 }),
+      });
+      const b = makeCombatant('Goblin', {
+        stats: makeStats({ hp: 200, maxHp: 200, dodge: 0, evasion: 0, damageMin: 1, damageMax: 1 }),
+      });
+
+      const result = runTemplateCombat(a, b);
+      const attackEntry = result.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack' && e.damage !== undefined,
+      );
+
+      expect(attackEntry).toBeDefined();
+      expect(attackEntry?.hitChance).toBeDefined();
+      expect(attackEntry?.hitRollValue).toBeDefined();
+      expect(attackEntry?.attackerHitScore).toBeDefined();
+      expect(attackEntry?.defenderAvoidScore).toBeDefined();
+    });
+
+    it('the same hit and avoid scores resolve differently by combat mode', () => {
+      mockCombatRandom({ hitRoll: 0.2 });
+
+      const attacker = makeCombatant('Rogue', {
+        stats: makeStats({ hp: 200, maxHp: 200, accuracy: 30, damageMin: 10, damageMax: 10 }),
+      });
+      const defender = makeCombatant('Guardian', {
+        stats: makeStats({ hp: 200, maxHp: 200, dodge: 45, evasion: 50, damageMin: 1, damageMax: 1 }),
+      });
+
+      const pvpResult = runTemplateCombat(attacker, defender, { combatMode: 'pvp' });
+
+      vi.restoreAllMocks();
+      mockCombatRandom({ hitRoll: 0.2 });
+
+      const bossResult = runTemplateCombat(attacker, defender, { combatMode: 'pve_boss' });
+
+      const pvpEntry = pvpResult.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+      const bossEntry = bossResult.log.find(
+        (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'attack',
+      );
+
+      expect(pvpEntry?.damage).toBeUndefined();
+      expect(bossEntry?.damage).toBeGreaterThan(0);
+      expect(bossEntry?.hitChance).toBeGreaterThan(pvpEntry?.hitChance ?? 0);
     });
   });
 
