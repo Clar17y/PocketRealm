@@ -442,7 +442,7 @@ const advancedGear = [
   it({ id: IDS.adv.wolfFangNecklace, name: 'Wolf Fang Necklace', itemType: 'armor', slot: 'neck', tier: 2, requiredLevel: 5, baseStats: { attack: 3, critChance: 0.01 }, maxDurability: 80, sellPrice: 0 }),
   it({ id: IDS.adv.banditsLuckyRing, name: "Bandit's Lucky Ring", itemType: 'armor', slot: 'ring', tier: 2, requiredLevel: 5, baseStats: { luck: 3, dodge: 2 }, maxDurability: 80, sellPrice: 0 }),
   it({ id: IDS.adv.ironbarkGloves, name: 'Ironbark Gloves', itemType: 'armor', slot: 'gloves', tier: 2, weightClass: 'heavy', requiredLevel: 5, baseStats: { armor: 4, magicDefence: 3 }, maxDurability: 80, sellPrice: 0 }),
-  it({ id: IDS.adv.batWingBoots, name: 'Bat Wing Boots', itemType: 'armor', slot: 'boots', tier: 2, weightClass: 'light', requiredLevel: 5, baseStats: { dodge: 6 }, maxDurability: 80, sellPrice: 0 }),
+  it({ id: IDS.adv.batWingBoots, name: 'Bat Wing Boots', itemType: 'armor', slot: 'boots', tier: 2, weightClass: 'light', requiredLevel: 5, baseStats: { dodge: 5 }, maxDurability: 80, sellPrice: 0 }),
   it({ id: IDS.adv.goblinTrinketCharm, name: 'Goblin Trinket Charm', itemType: 'armor', slot: 'charm', tier: 2, requiredLevel: 5, baseStats: { luck: 2, health: 3 }, maxDurability: 80, sellPrice: 0 }),
   // Tier 3
   it({ id: IDS.adv.spriteDustRing, name: 'Sprite Dust Ring', itemType: 'armor', slot: 'ring', tier: 3, requiredLevel: 12, baseStats: { magicPower: 4, luck: 2 }, maxDurability: 100, sellPrice: 0 }),
@@ -452,7 +452,7 @@ const advancedGear = [
   it({ id: IDS.adv.chitinGauntlets, name: 'Chitin Gauntlets', itemType: 'armor', slot: 'gloves', tier: 3, weightClass: 'medium', requiredLevel: 12, baseStats: { attack: 4, armor: 3 }, maxDurability: 100, sellPrice: 0 }),
   it({ id: IDS.adv.wargRiderBelt, name: 'Warg Rider Belt', itemType: 'armor', slot: 'belt', tier: 3, weightClass: 'medium', requiredLevel: 12, baseStats: { attack: 3, dodge: 3, health: 2 }, maxDurability: 100, sellPrice: 0 }),
   it({ id: IDS.adv.warlordsSignet, name: "Warlord's Signet", itemType: 'armor', slot: 'ring', tier: 3, requiredLevel: 12, baseStats: { attack: 3, critDamage: 0.1 }, maxDurability: 100, sellPrice: 0 }),
-  it({ id: IDS.adv.windcallersCharm, name: "Windcaller's Charm", itemType: 'armor', slot: 'charm', tier: 3, requiredLevel: 12, baseStats: { dodge: 8 }, maxDurability: 100, sellPrice: 0 }),
+  it({ id: IDS.adv.windcallersCharm, name: "Windcaller's Charm", itemType: 'armor', slot: 'charm', tier: 3, requiredLevel: 12, baseStats: { dodge: 6 }, maxDurability: 100, sellPrice: 0 }),
   // Tier 4
   it({ id: IDS.adv.deathKnightsRing, name: "Death Knight's Ring", itemType: 'armor', slot: 'ring', tier: 4, requiredLevel: 20, baseStats: { attack: 5, critChance: 0.02 }, maxDurability: 120, sellPrice: 0 }),
   it({ id: IDS.adv.hydraScaleShield, name: 'Hydra Scale Shield', itemType: 'armor', slot: 'off_hand', tier: 4, weightClass: 'heavy', requiredLevel: 20, baseStats: { armor: 8, health: 6 }, maxDurability: 120, sellPrice: 0 }),

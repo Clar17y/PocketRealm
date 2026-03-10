@@ -18,8 +18,20 @@ export const SUPPORTED_ITEM_STAT_KEYS = new Set([
 ]);
 
 export const STARTER_TARGETS = {
-  tutorialHitRateMin: 0.45,
-  forestEdgeTier1HitRateMin: 0.4,
+  openWorldStarterHitScore: 12,
+  tutorialHitChanceMin: 0.45,
+  forestEdgeTier1HitChanceMin: 0.4,
+} as const;
+
+export const PVP_TARGETS = {
+  uncheckedDodgeHitChanceMax: 0.25,
+  counterBuildHitChanceMin: 0.45,
+} as const;
+
+export const EXPEDITION_TARGETS = {
+  dodgeTankDirectHitChanceMin: 0.5,
+  dodgeTankDirectHitChanceMax: 0.8,
+  bossPressureHitChanceMin: 0.35,
 } as const;
 
 export function getUnsupportedStatKeys(stats: Record<string, number> | null | undefined): string[] {
