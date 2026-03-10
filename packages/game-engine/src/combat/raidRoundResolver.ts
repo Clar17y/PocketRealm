@@ -17,7 +17,7 @@ import type {
   CombatPotion,
   PotionConsumed,
 } from '@pocketrealm/shared';
-import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, BOSS_ACTION_DEFINITIONS, mobDisplayName } from '@pocketrealm/shared';
+import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, EXPEDITION_CONSTANTS, BOSS_ACTION_DEFINITIONS, mobDisplayName } from '@pocketrealm/shared';
 import {
   resolveParticipantActions,
   resolveSupportiveActions,
@@ -432,7 +432,7 @@ export function resolveRaidRound(
 
     // boss_summon_adds: spawn new mobs from the summon pool
     if (templateAction.actionId === 'boss_summon_adds' && input.summonPool && input.summonPool.length > 0) {
-      const MAX_TOTAL_SUMMONS = 8;
+      const MAX_TOTAL_SUMMONS = EXPEDITION_CONSTANTS.MAX_TOTAL_SUMMONS;
       const existingSummonCount = mobState.filter(m => m.id.startsWith('mob-summon-')).length + spawnedThisRound.length;
       const remainingBudget = MAX_TOTAL_SUMMONS - existingSummonCount;
 

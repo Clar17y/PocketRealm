@@ -289,7 +289,7 @@ const bossRoot: ActionDefinition = {
     name: 'Rooted',
     stat: 'rooted',
     modifier: 0,
-    duration: 1,
+    duration: 2, // Must be 2: applied this round, ticked to 1, forces defend next round
     isDebuff: true,
   },
 };
@@ -307,7 +307,7 @@ const bossFearHowl: ActionDefinition = {
     name: 'Feared',
     stat: 'rooted',
     modifier: 0,
-    duration: 1,
+    duration: 2, // Must be 2: applied this round, ticked to 1, forces defend next round
     isDebuff: true,
   },
 };

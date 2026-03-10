@@ -1470,21 +1470,10 @@ describe('resolveRaidRound', () => {
         alwaysHitRng,
       );
 
-      // Root has duration 1, ticked once = 0, so it expires this round
-      // But it was applied, which means next round the root check would catch it
-      // Since duration=1 and we tick -1, it won't persist. This is correct —
-      // root is meant to last 1 round (the NEXT round), applied in effect tick.
-      // Actually, the effect is applied with roundsRemaining: 1, then ticked to 0 and removed.
-      // For root to affect the next round, it needs to survive. Let's verify:
-      // The root effect has duration: 1, so roundsRemaining starts at 1, tick makes it 0, removed.
-      // This means root currently has no effect because it expires immediately.
-      // However, the design intent seems to be: root applied this round, checked next round.
-      // With the current tick logic (applied then ticked same round), duration=1 effects expire immediately.
-      // For now, verify the effect was at least created and added to the accumulator.
-      // A duration=1 effect ticked to 0 is filtered out. This is expected behavior for the current system.
+      // Root has duration=2, ticked to 1 this round, persists to force defend next round
       const root = result.participantResults[0].activeEffectsAfter.find(e => e.stat === 'rooted');
-      // Root with duration 1 expires after tick, so it should NOT be in activeEffectsAfter
-      expect(root).toBeUndefined();
+      expect(root).toBeDefined();
+      expect(root!.roundsRemaining).toBe(1);
     });
 
     it('boss_poison_spray applies DoT effect to players', () => {
