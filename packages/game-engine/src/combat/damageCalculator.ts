@@ -1,4 +1,15 @@
-import { CHARACTER_CONSTANTS, COMBAT_CONSTANTS, CombatantStats, MobTemplate, type PlayerAttributes, type ScalingStat, type PerActionScaling } from '@pocketrealm/shared';
+import {
+  CHARACTER_CONSTANTS,
+  COMBAT_CONSTANTS,
+  HIT_CURVE_CONSTANTS,
+  CombatantStats,
+  MobTemplate,
+  type CombatMode,
+  type HitScoreBreakdown,
+  type PlayerAttributes,
+  type ScalingStat,
+  type PerActionScaling,
+} from '@pocketrealm/shared';
 import { clamp } from '../utils/math';
 
 function finiteOrFallback(value: number, fallback: number): number {
@@ -19,8 +30,42 @@ export function rollDamage(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+export function calculateHitChance(
+  combatMode: CombatMode,
+  hitScore: number,
+  avoidScore: number,
+): HitScoreBreakdown {
+  const curve = HIT_CURVE_CONSTANTS[combatMode];
+  const normalized = 1 / (1 + ((Math.max(0, avoidScore) + curve.bias) / Math.max(1, hitScore)) ** curve.exponent);
+  const hitChance = clamp(normalized, curve.minHitChance, curve.maxHitChance);
+
+  return {
+    hitScore: Math.max(1, hitScore),
+    avoidScore: Math.max(0, avoidScore),
+    hitChance,
+  };
+}
+
+export function resolveHitCheck(input: {
+  combatMode: CombatMode;
+  hitScore: number;
+  avoidScore: number;
+  hitRollValue?: number;
+}): HitScoreBreakdown & { hitRollValue: number; didHit: boolean } {
+  const breakdown = calculateHitChance(input.combatMode, input.hitScore, input.avoidScore);
+  const hitRollValue = clamp(input.hitRollValue ?? Math.random(), 0, 1);
+
+  return {
+    ...breakdown,
+    hitRollValue,
+    didHit: hitRollValue < breakdown.hitChance,
+  };
+}
+
 /**
- * Check if an attack hits.
+ * Temporary compatibility wrapper for legacy callers that still supply
+ * d20-style inputs. Later tasks migrate production combat paths to
+ * calculateHitChance/resolveHitCheck directly.
  */
 export function doesAttackHit(
   attackRoll: number,
@@ -28,9 +73,7 @@ export function doesAttackHit(
   targetDodge: number,
   targetEvasion: number
 ): boolean {
-  // Natural 20 always hits
   if (attackRoll === 20) return true;
-  // Natural 1 always misses
   if (attackRoll === 1) return false;
 
   const totalAttack = attackRoll + accuracyBonus;

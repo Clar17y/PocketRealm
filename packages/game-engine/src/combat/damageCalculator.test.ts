@@ -3,11 +3,13 @@ import type { MobTemplate } from '@pocketrealm/shared';
 import { COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import {
   buildPlayerCombatStats,
+  calculateHitChance,
   calculateFinalDamage,
   calculateDefenceReduction,
   doesAttackHit,
   isCriticalHit,
   mobToCombatantStats,
+  resolveHitCheck,
   resolveScalingStat,
   resolveActionDamageStats,
   rollD20,
@@ -316,6 +318,39 @@ describe('doesAttackHit', () => {
 
   it('starter accuracy should meet the tutorial hit-rate floor against a Field Mouse profile', () => {
     expect(hitRate(0, 2)).toBeGreaterThanOrEqual(0.45);
+  });
+});
+
+describe('calculateHitChance', () => {
+  it('starter open-world hit math should keep the tutorial floor against a Field Mouse profile', () => {
+    const result = calculateHitChance('pve_open_world', 11, 2);
+    expect(result.hitChance).toBeGreaterThanOrEqual(0.45);
+  });
+});
+
+describe('resolveHitCheck', () => {
+  it('pvp curve allows unchecked evasion to push hit chance below 0.30', () => {
+    const result = resolveHitCheck({
+      combatMode: 'pvp',
+      hitScore: 30,
+      avoidScore: 95,
+      hitRollValue: 0.5,
+    });
+
+    expect(result.hitChance).toBeLessThan(0.30);
+    expect(result.didHit).toBe(false);
+  });
+
+  it('boss curve preserves a stronger minimum hit floor', () => {
+    const result = resolveHitCheck({
+      combatMode: 'pve_boss',
+      hitScore: 30,
+      avoidScore: 95,
+      hitRollValue: 0.5,
+    });
+
+    expect(result.hitChance).toBeGreaterThanOrEqual(0.35);
+    expect(result.didHit).toBe(false);
   });
 });
 
