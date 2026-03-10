@@ -326,6 +326,14 @@ describe('calculateHitChance', () => {
     const result = calculateHitChance('pve_open_world', 11, 2);
     expect(result.hitChance).toBeGreaterThanOrEqual(0.45);
   });
+
+  it('sanitizes non-finite hit and avoid scores', () => {
+    const result = calculateHitChance('pvp', Number.NaN, Number.NEGATIVE_INFINITY);
+
+    expect(result.hitScore).toBe(1);
+    expect(result.avoidScore).toBe(0);
+    expect(result.hitChance).toBeGreaterThanOrEqual(0.10);
+  });
 });
 
 describe('resolveHitCheck', () => {
@@ -351,6 +359,18 @@ describe('resolveHitCheck', () => {
 
     expect(result.hitChance).toBeGreaterThanOrEqual(0.35);
     expect(result.didHit).toBe(false);
+  });
+
+  it('sanitizes a non-finite sampled hit roll value', () => {
+    const result = resolveHitCheck({
+      combatMode: 'pvp',
+      hitScore: 30,
+      avoidScore: 5,
+      hitRollValue: Number.NaN,
+    });
+
+    expect(result.hitRollValue).toBe(0);
+    expect(result.didHit).toBe(true);
   });
 });
 

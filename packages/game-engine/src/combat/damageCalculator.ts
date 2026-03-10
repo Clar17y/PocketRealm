@@ -36,12 +36,14 @@ export function calculateHitChance(
   avoidScore: number,
 ): HitScoreBreakdown {
   const curve = HIT_CURVE_CONSTANTS[combatMode];
-  const normalized = 1 / (1 + ((Math.max(0, avoidScore) + curve.bias) / Math.max(1, hitScore)) ** curve.exponent);
+  const safeHitScore = Math.max(1, finiteOrFallback(hitScore, 1));
+  const safeAvoidScore = Math.max(0, finiteOrFallback(avoidScore, 0));
+  const normalized = 1 / (1 + ((safeAvoidScore + curve.bias) / safeHitScore) ** curve.exponent);
   const hitChance = clamp(normalized, curve.minHitChance, curve.maxHitChance);
 
   return {
-    hitScore: Math.max(1, hitScore),
-    avoidScore: Math.max(0, avoidScore),
+    hitScore: safeHitScore,
+    avoidScore: safeAvoidScore,
     hitChance,
   };
 }
@@ -53,7 +55,7 @@ export function resolveHitCheck(input: {
   hitRollValue?: number;
 }): HitScoreBreakdown & { hitRollValue: number; didHit: boolean } {
   const breakdown = calculateHitChance(input.combatMode, input.hitScore, input.avoidScore);
-  const hitRollValue = clamp(input.hitRollValue ?? Math.random(), 0, 1);
+  const hitRollValue = clamp(finiteOrFallback(input.hitRollValue ?? Math.random(), 0), 0, 1);
 
   return {
     ...breakdown,
