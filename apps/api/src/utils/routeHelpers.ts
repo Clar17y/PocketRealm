@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import type { MobTemplate } from '@pocketrealm/shared';
+import type { MobTemplate, CombatOptions, CombatPotion } from '@pocketrealm/shared';
 import { calculateFleeResult } from '@pocketrealm/game-engine';
 import { prismaAny } from './prismaAny.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -228,4 +228,13 @@ export async function handleCombatDefeat(
   }
 
   return { fleeResult, respawnedTo };
+}
+
+// ── PvE combat options builder ──────────────────────────────────
+
+export function buildPveCombatOptions(potionPool: CombatPotion[]): CombatOptions {
+  return {
+    combatMode: 'pve_open_world',
+    ...(potionPool.length > 0 ? { potions: [...potionPool] } : {}),
+  };
 }

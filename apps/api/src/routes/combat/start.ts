@@ -16,7 +16,6 @@ import {
 import {
   COMBAT_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
-  type CombatOptions,
   type LootDrop,
   type MobTemplate,
   type PotionConsumed,
@@ -54,7 +53,7 @@ import type { AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
-import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, handleCombatDefeat } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, handleCombatDefeat, buildPveCombatOptions } from '../../utils/routeHelpers.js';
 import { getCombatBuffs, getCombatBuffsWithUses, applyCombatBuffs, consumeCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges } from '../../services/buffService';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import {
@@ -222,9 +221,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       };
       applyCombatBuffs(playerStats, mobBuffs);
 
-      const combatOptions: CombatOptions | undefined = potionPool.length > 0
-        ? { potions: [...potionPool] }
-        : undefined;
+      const combatOptions = buildPveCombatOptions(potionPool);
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,
@@ -809,9 +806,7 @@ export function registerStartRoutes(router: Router): void {
       const finalMob = mobHpOverride ? { ...prefixedMob, ...mobHpOverride } : prefixedMob;
 
       // Build potion pool into combat options
-      const combatOptions: CombatOptions | undefined = potionPool.length > 0
-        ? { potions: [...potionPool] }
-        : undefined;
+      const combatOptions = buildPveCombatOptions(potionPool);
 
       const playerCombatant = buildPlayerTemplateCombatant({
         playerId, username: req.player!.username, playerStats, template: playerTemplate,

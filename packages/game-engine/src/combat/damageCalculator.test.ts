@@ -3,11 +3,13 @@ import type { MobTemplate } from '@pocketrealm/shared';
 import { COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import {
   buildPlayerCombatStats,
+  calculateHitChance,
   calculateFinalDamage,
   calculateDefenceReduction,
   doesAttackHit,
   isCriticalHit,
   mobToCombatantStats,
+  resolveHitCheck,
   resolveScalingStat,
   resolveActionDamageStats,
   rollD20,
@@ -292,6 +294,16 @@ describe('mobToCombatantStats', () => {
 });
 
 describe('doesAttackHit', () => {
+  const hitRate = (accuracyBonus: number, targetDodge: number, targetEvasion = 0) => {
+    let hits = 0;
+    for (let roll = 1; roll <= 20; roll += 1) {
+      if (doesAttackHit(roll, accuracyBonus, targetDodge, targetEvasion)) {
+        hits += 1;
+      }
+    }
+    return hits / 20;
+  };
+
   it('uses only roll + accuracy against dodge/evasion threshold', () => {
     // roll + accuracy = 10 + 4 = 14
     // threshold = 10 + dodge(4) + evasion(6) = 20
@@ -302,6 +314,63 @@ describe('doesAttackHit', () => {
   it('still applies nat 1 auto-miss and nat 20 auto-hit', () => {
     expect(doesAttackHit(1, 999, 999, 999)).toBe(false);
     expect(doesAttackHit(20, 0, 999, 999)).toBe(true);
+  });
+
+  it('starter accuracy should meet the tutorial hit-rate floor against a Field Mouse profile', () => {
+    expect(hitRate(0, 2)).toBeGreaterThanOrEqual(0.45);
+  });
+});
+
+describe('calculateHitChance', () => {
+  it('starter open-world hit math should keep the tutorial floor against a Field Mouse profile', () => {
+    const result = calculateHitChance('pve_open_world', 11, 2);
+    expect(result.hitChance).toBeGreaterThanOrEqual(0.45);
+  });
+
+  it('sanitizes non-finite hit and avoid scores', () => {
+    const result = calculateHitChance('pvp', Number.NaN, Number.NEGATIVE_INFINITY);
+
+    expect(result.hitScore).toBe(1);
+    expect(result.avoidScore).toBe(0);
+    expect(result.hitChance).toBeGreaterThanOrEqual(0.10);
+  });
+});
+
+describe('resolveHitCheck', () => {
+  it('pvp curve allows unchecked evasion to push hit chance below 0.30', () => {
+    const result = resolveHitCheck({
+      combatMode: 'pvp',
+      hitScore: 30,
+      avoidScore: 95,
+      hitRollValue: 0.5,
+    });
+
+    expect(result.hitChance).toBeLessThan(0.30);
+    expect(result.didHit).toBe(false);
+  });
+
+  it('boss curve preserves a stronger minimum hit floor', () => {
+    const result = resolveHitCheck({
+      combatMode: 'pve_boss',
+      hitScore: 30,
+      avoidScore: 95,
+      hitRollValue: 0.5,
+    });
+
+    expect(result.hitChance).toBeGreaterThanOrEqual(0.35);
+    expect(result.didHit).toBe(false);
+  });
+
+  it('sanitizes a non-finite sampled hit roll value', () => {
+    const result = resolveHitCheck({
+      combatMode: 'pvp',
+      hitScore: 30,
+      avoidScore: 5,
+      hitRollValue: Number.NaN,
+    });
+
+    expect(result.hitRollValue).toBe(0);
+    expect(result.didHit).toBe(true);
   });
 });
 

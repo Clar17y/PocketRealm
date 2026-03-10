@@ -115,7 +115,7 @@ export async function runSpar(
   const attackerStartStamina = attackerCombatant.stamina;
   const attackerStartMana = attackerCombatant.mana;
 
-  const result = runTemplateCombat(attackerCombatant, defenderCombatant);
+  const result = runTemplateCombat(attackerCombatant, defenderCombatant, { combatMode: 'pvp' });
 
   const isDraw = result.outcome === 'draw';
   const attackerWon = result.outcome === 'victory';

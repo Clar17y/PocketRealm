@@ -366,7 +366,7 @@ export async function challenge(
   const attackerMaxHp = attackerCombatant.stats.maxHp;
   const attackerAttributes = normalizePlayerAttributes(attacker.attributes);
 
-  const combatResult = runTemplateCombat(attackerCombatant, defenderCombatant);
+  const combatResult = runTemplateCombat(attackerCombatant, defenderCombatant, { combatMode: 'pvp' });
 
   const isDraw = combatResult.outcome === 'draw';
   const attackerWon = combatResult.outcome === 'victory';

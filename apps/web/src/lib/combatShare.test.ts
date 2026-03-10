@@ -106,13 +106,36 @@ describe('formatCombatShareText', () => {
     const input: CombatShareInput = {
       outcome: 'victory',
       log: [
-        { round: 1, actor: 'combatantA', roll: 3, combatantAHpAfter: 100, combatantBHpAfter: 50 },
+        {
+          round: 1,
+          actor: 'combatantA',
+          roll: 3,
+          hitChance: 0.25,
+          hitRollValue: 0.9,
+          attackerHitScore: 12,
+          defenderAvoidScore: 4,
+          combatantAHpAfter: 100,
+          combatantBHpAfter: 50,
+        },
       ],
       rewards: { xp: 50, loot: [] },
     };
 
     const text = formatCombatShareText(input);
     expect(text).toContain('Miss');
+  });
+
+  it('does not infer misses from bare legacy roll fields', () => {
+    const input: CombatShareInput = {
+      outcome: 'victory',
+      log: [
+        { round: 1, actor: 'combatantA', roll: 3, combatantAHpAfter: 100, combatantBHpAfter: 50 },
+      ],
+      rewards: { xp: 50, loot: [] },
+    };
+
+    const text = formatCombatShareText(input);
+    expect(text).not.toContain('Miss');
   });
 
   it('handles no loot', () => {

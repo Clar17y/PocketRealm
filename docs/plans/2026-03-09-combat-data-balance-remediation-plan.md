@@ -315,3 +315,22 @@ Expected: PASS
 git add docs/plans/2026-03-09-combat-data-balance-remediation-plan.md
 git commit -m "docs: record combat balance remediation verification"
 ```
+## Final Balance Deltas
+
+- Field Mouse evasion: `5 -> 2`
+- Forest Spider evasion: `4 -> 3`
+- Tutorial starter encounter: `2x Field Mouse -> 1x Field Mouse`
+- Ranged weapons now use `rangedPower` exclusively
+- Magic staffs now spend their offensive budget on `magicPower` instead of dead `attack`
+- Achievement rewards now use supported combat stat keys only
+- Bandit Lord's Blade now requires `melee` level `30`
+- Tier 5 generated light armor full-set dodge: `39 -> 23`
+- Tier 5 best-in-slot light armor dodge across equipable core slots: capped at `23`
+- Tier 5 heavy armor chest value: `24 -> 26`
+- Tier 5 medium armor chest value: `16 armor / 6 dodge -> 18 armor / 5 dodge`
+
+## Verification Run
+
+- `npm test -w packages/game-engine -- src/combat/damageCalculator.test.ts src/combat/templateCombatEngine.test.ts`
+- `npm test -w apps/api -- src/services/equipmentService.test.ts src/services/combatStatsService.test.ts src/services/trainingService.test.ts`
+- `npx vitest run packages/database/prisma/seed-data/items.test.ts packages/database/prisma/seed-data/mobs.test.ts`

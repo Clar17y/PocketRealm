@@ -155,6 +155,10 @@ vi.mock('../../utils/routeHelpers.js', () => ({
   assertCanAct: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
   recordBestiaryKill: vi.fn().mockResolvedValue(undefined),
   trackAchievements: vi.fn().mockResolvedValue(undefined),
+  buildPveCombatOptions: vi.fn((potionPool: any[]) => ({
+    combatMode: 'pve_open_world',
+    ...(potionPool.length > 0 ? { potions: [...potionPool] } : {}),
+  })),
 }));
 
 vi.mock('../../services/combatOrchestrationService', () => ({

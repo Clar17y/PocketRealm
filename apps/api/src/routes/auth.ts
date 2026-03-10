@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { prisma } from '@pocketrealm/database';
-import { TURN_CONSTANTS, ALL_SKILLS } from '@pocketrealm/shared';
+import { TURN_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import {
   generateAccessToken,
@@ -11,6 +11,7 @@ import {
   sessionInactivityCutoff,
   verifyRefreshToken,
 } from '../middleware/auth';
+import { ensureEquipmentSlots } from '../services/equipmentService';
 import { ensureStarterDiscoveries, ensureStarterEncounterAndNodes } from '../services/zoneDiscoveryService';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -63,6 +64,13 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
     include: { toZone: true },
   });
   const startingZone = firstWildConnection?.toZone ?? starterTown;
+  const starterOffHandTemplate = await prisma.itemTemplate.findUnique({
+    where: { id: STARTER_LOADOUT.tutorialOffHandTemplateId },
+    select: { id: true, maxDurability: true },
+  });
+  if (!starterOffHandTemplate) {
+    throw new AppError(500, 'Starter off-hand template is missing', 'MISSING_STARTER_ITEM');
+  }
 
   // Create player with all related records
   const player = await prisma.player.create({
@@ -91,6 +99,23 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
       turnBank: true,
       skills: true,
     },
+  });
+  await ensureEquipmentSlots(player.id);
+  const starterOffHand = await prisma.item.create({
+    data: {
+      ownerId: player.id,
+      templateId: starterOffHandTemplate.id,
+      rarity: 'common',
+      quantity: 1,
+      maxDurability: starterOffHandTemplate.maxDurability,
+      currentDurability: starterOffHandTemplate.maxDurability,
+    },
+    select: { id: true },
+  });
+  await prisma.playerEquipment.upsert({
+    where: { playerId_slot: { playerId: player.id, slot: 'off_hand' } },
+    create: { playerId: player.id, slot: 'off_hand', itemId: starterOffHand.id },
+    update: { itemId: starterOffHand.id },
   });
 
   // Create initial zone discovery records

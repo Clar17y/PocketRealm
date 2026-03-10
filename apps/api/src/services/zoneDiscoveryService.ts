@@ -97,7 +97,8 @@ export async function ensureStarterEncounterAndNodes(playerId: string): Promise<
   });
   if (!zoneMobFamily) return;
 
-  // Use Field Mouse specifically for tutorial — easy guaranteed win
+  // Use a single Field Mouse specifically for tutorial seeding so the first
+  // guaranteed encounter site stays safe even if other starter mobs are retuned later.
   const fieldMouse = await prismaAny.mobTemplate.findFirst({
     where: { zoneId: wildZone.id, name: 'Field Mouse' },
     select: { id: true },
@@ -106,7 +107,6 @@ export async function ensureStarterEncounterAndNodes(playerId: string): Promise<
 
   const mobs = [
     { slot: 0, mobTemplateId: fieldMouse.id, role: 'trash', prefix: null, status: 'alive', room: 1 },
-    { slot: 1, mobTemplateId: fieldMouse.id, role: 'trash', prefix: null, status: 'alive', room: 1 },
   ];
 
   const siteName = `Small ${zoneMobFamily.mobFamily.name} ${zoneMobFamily.mobFamily.siteNounSmall}`;

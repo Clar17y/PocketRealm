@@ -11,13 +11,13 @@ import {
   filterAndWeightMobsByTier,
   runTemplateCombat,
 } from '@pocketrealm/game-engine';
-import type { CombatOptions, PotionConsumed } from '@pocketrealm/shared';
+import type { PotionConsumed } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
 import { getHpState, enterRecoveringState, setHp } from '../services/hpService';
 import { storePendingLoot, type PendingLootItem } from '../services/pendingLootService';
-import { serializeXpGrant, toMobTemplate, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, trackAchievements, calculateFleeWithGold, buildPveCombatOptions } from '../utils/routeHelpers.js';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../services/combatOrchestrationService';
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
@@ -377,9 +377,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           perActionScaling,
         });
         const combatantB = mobToTemplateCombatant(prefixedMob);
-        const combatOptions: CombatOptions | undefined = potionPool.length > 0
-          ? { potions: [...potionPool] }
-          : undefined;
+        const combatOptions = buildPveCombatOptions(potionPool);
         const combatResult = runTemplateCombat(combatantA, combatantB, combatOptions);
         currentHp = combatResult.combatantAHpRemaining;
         currentStamina = combatResult.combatantAStaminaRemaining;

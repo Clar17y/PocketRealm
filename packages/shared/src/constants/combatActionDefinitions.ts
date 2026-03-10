@@ -166,13 +166,12 @@ const devastatingBlow: ActionDefinition = {
 const berserkerRage: ActionDefinition = {
   id: 'berserker_rage',
   name: 'Berserker Rage',
-  description: 'Enter a frenzy: +30% attack but -15% defence for 5 rounds.',
+  description: 'Enter a frenzy: +30% attack for 5 rounds.',
   actionType: 'buff',
   category: 'supportive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.BERSERKER_RAGE_STAMINA, mana: 0 },
-  effect: { name: 'Berserker Rage', stat: 'attack', modifier: 30, duration: 5, isDebuff: false },
-  defenceReduction: 15,
+  effect: { name: 'Berserker Rage', stat: 'attackPercent', modifier: 0.30, duration: 5, isDebuff: false },
 };
 
 const execute: ActionDefinition = {
@@ -253,12 +252,13 @@ const volley: ActionDefinition = {
 const snipersMark: ActionDefinition = {
   id: 'snipers_mark',
   name: "Sniper's Mark",
-  description: 'Mark a target to take +20% damage for 3 rounds.',
+  description: 'Mark a target, reducing evasion for 3 rounds and setting up follow-up shots.',
   actionType: 'debuff_spell',
   category: 'supportive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.SNIPERS_MARK_STAMINA, mana: 0 },
-  effect: { name: "Sniper's Mark", stat: 'defence', modifier: -20, duration: 3, isDebuff: true },
+  alwaysHits: true,
+  effect: { name: "Sniper's Mark", stat: 'evasion', modifier: -20, duration: 3, isDebuff: true, alwaysApplies: true },
 };
 
 const piercingShot: ActionDefinition = {
@@ -316,14 +316,14 @@ const minorHeal: ActionDefinition = {
 const frostNova: ActionDefinition = {
   id: 'frost_nova',
   name: 'Frost Nova',
-  description: 'Blast of frost dealing magic damage and slowing target for 3 rounds.',
+  description: 'Blast of frost dealing magic damage and reducing target evasion for 3 rounds.',
   actionType: 'damage_spell',
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.FROST_NOVA_MANA },
   damageMultiplier: 0.9,
   damageType: 'magic',
-  effect: { name: 'Frozen', stat: 'speed', modifier: -20, duration: 3, isDebuff: true },
+  effect: { name: 'Frozen', stat: 'evasion', modifier: -15, duration: 3, isDebuff: true, alwaysApplies: true },
 };
 
 const enhancedFortitude: ActionDefinition = {
@@ -470,7 +470,7 @@ const rendingSlash: ActionDefinition = {
 const flameArrow: ActionDefinition = {
   id: 'flame_arrow',
   name: 'Flame Arrow',
-  description: 'Ignite your arrow, scorching the target on impact.',
+  description: 'Ignite your arrow, scorching the target even on a glancing hit.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
@@ -483,6 +483,7 @@ const flameArrow: ActionDefinition = {
     modifier: 0,
     duration: 2,
     isDebuff: true,
+    alwaysApplies: true,
     damagePerRound: 6,
     damagePerRoundPercent: 15,
     dotDamageType: 'magic',

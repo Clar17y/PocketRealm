@@ -12,13 +12,15 @@ import type {
   CombatAction,
   PerActionScaling,
   CombatPotion,
+  CombatMode,
 } from '@pocketrealm/shared';
 import { COMBAT_ACTION_CONSTANTS, COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import { resolveAction, resolveInteraction, DEFEND_FALLBACK, type RoundInteraction } from './actionResolver';
 import {
   rollD20,
   rollDamage,
-  doesAttackHit,
+  calculateHitChance,
+  resolveHitCheck,
   isCriticalHit,
   calculateFinalDamage,
   calculateDefenceReduction,
@@ -117,6 +119,14 @@ interface RoundContext {
 
 function opponent(actor: CombatActor): CombatActor {
   return actor === 'combatantA' ? 'combatantB' : 'combatantA';
+}
+
+function applyActionDefenceReduction(defence: number, reductionPercent?: number): number {
+  if (!reductionPercent || reductionPercent <= 0) {
+    return defence;
+  }
+
+  return Math.max(0, Math.floor(defence * (1 - reductionPercent / 100)));
 }
 
 /** Build a log entry with HP/resource snapshots and round context baked in. */
@@ -354,6 +364,7 @@ function executeOffensiveAction(
   actorName: string,
   targetName: string,
   ctx: RoundContext,
+  combatMode: CombatMode,
   perActionScaling?: PerActionScaling,
 ): void {
   // Guaranteed miss (counter/ward blocked the attack)
@@ -383,13 +394,16 @@ function executeOffensiveAction(
     baseAccuracy = actionStats.accuracy;
 
     // Re-apply buff/debuff modifiers from active effects (these were lost
-    // when per-action stats replaced the pre-computed effective stats)
+    // when per-action stats replaced the pre-computed effective stats).
+    // Also collect attackPercent in the same pass.
+    let attackPercentModifier = 0;
     for (const effect of state.activeEffects) {
       if (effect.target !== actorKey) continue;
       if (effect.stat === 'attack') { baseDamageMin += effect.modifier; baseDamageMax += effect.modifier; }
-      if (effect.stat === 'accuracy') baseAccuracy += effect.modifier;
-      if (effect.stat === 'damageMin') baseDamageMin += effect.modifier;
-      if (effect.stat === 'damageMax') baseDamageMax += effect.modifier;
+      else if (effect.stat === 'accuracy') baseAccuracy += effect.modifier;
+      else if (effect.stat === 'damageMin') baseDamageMin += effect.modifier;
+      else if (effect.stat === 'damageMax') baseDamageMax += effect.modifier;
+      else if (effect.stat === 'attackPercent') attackPercentModifier += effect.modifier;
     }
     // Apply guild damage multiplier
     if (perActionScaling.guildDamageMultiplier && perActionScaling.guildDamageMultiplier > 0) {
@@ -399,21 +413,72 @@ function executeOffensiveAction(
 
     baseDamageMin = Math.max(1, baseDamageMin);
     baseDamageMax = Math.max(baseDamageMin, baseDamageMax);
+
+    if (attackPercentModifier !== 0) {
+      baseDamageMin = Math.max(1, Math.floor(baseDamageMin * (1 + attackPercentModifier)));
+      baseDamageMax = Math.max(baseDamageMin, Math.floor(baseDamageMax * (1 + attackPercentModifier)));
+    }
+  } else {
+    // No per-action scaling (mobs) — effective stats already include flat buffs
+    // from getEffectiveStats, but attackPercent is only handled here.
+    let attackPercentModifier = 0;
+    for (const effect of state.activeEffects) {
+      if (effect.target === actorKey && effect.stat === 'attackPercent') {
+        attackPercentModifier += effect.modifier;
+      }
+    }
+    if (attackPercentModifier !== 0) {
+      baseDamageMin = Math.max(1, Math.floor(baseDamageMin * (1 + attackPercentModifier)));
+      baseDamageMax = Math.max(baseDamageMin, Math.floor(baseDamageMax * (1 + attackPercentModifier)));
+    }
   }
 
   const attackRoll = hitOverride === 'guaranteed_hit' ? 20 : rollD20();
   const accuracyBonus = baseAccuracy + (action.accuracyModifier ?? 0);
-  const hits = hitOverride === 'guaranteed_hit' || doesAttackHit(attackRoll, accuracyBonus, targetStats.dodge, targetStats.evasion);
+  const hitScore = accuracyBonus;
+  const avoidScore = targetStats.dodge + targetStats.evasion;
+  const hitResolution = hitOverride === 'guaranteed_hit' || action.alwaysHits
+    ? {
+        hitScore: Math.max(1, hitScore),
+        avoidScore: Math.max(0, avoidScore),
+        hitChance: 1,
+        hitRollValue: 0,
+        didHit: true,
+      }
+    : attackRoll === 1 || attackRoll === 20
+      ? { ...calculateHitChance(combatMode, hitScore, avoidScore), hitRollValue: attackRoll === 1 ? 1 : 0, didHit: attackRoll === 20 }
+      : resolveHitCheck({
+        combatMode,
+        hitScore,
+        avoidScore,
+      });
+  const hits = hitResolution.didHit;
 
   if (!hits) {
+    const appliedEffects = action.effect?.alwaysApplies
+      ? applyActionEffect(state, action.effect, actorKey, {
+        sourceScalingStat: perActionScaling
+          ? resolveScalingStat(
+            action.scalingStat ?? 'weapon',
+            perActionScaling.weaponRequiredSkill,
+            perActionScaling.skillLevels,
+          )
+          : undefined,
+      })
+      : undefined;
     state.log.push(buildLogEntry(state, ctx, {
       actor: actorKey,
       actorName,
       action: actionToCombatAction(action),
       roll: attackRoll,
+      hitChance: hitResolution.hitChance,
+      hitRollValue: hitResolution.hitRollValue,
+      attackerHitScore: hitResolution.hitScore,
+      defenderAvoidScore: hitResolution.avoidScore,
       accuracyModifier: accuracyBonus,
       targetDodge: targetStats.dodge,
       targetEvasion: targetStats.evasion,
+      effectsApplied: appliedEffects && appliedEffects.length > 0 ? appliedEffects : undefined,
       message: `${actorName} uses ${action.name} but misses ${targetName}!`,
     }));
     return;
@@ -432,7 +497,9 @@ function executeOffensiveAction(
   if (!action.damageType && (action.scalingStat ?? 'weapon') === 'weapon' && resolvedScaling) {
     actionDamageType = resolvedScaling === 'magic' ? 'magic' : 'physical';
   }
-  const effectiveDefence = actionDamageType === 'magic' ? targetStats.magicDefence : targetStats.defence;
+  const effectiveDefence = actionDamageType === 'magic'
+    ? targetStats.magicDefence
+    : applyActionDefenceReduction(targetStats.defence, action.defenceReduction);
 
   // Roll and apply damage multiplier from action
   let rawDamage = rollDamage(baseDamageMin, baseDamageMax);
@@ -479,11 +546,22 @@ function executeOffensiveAction(
   const critText = crit ? ' CRITICAL HIT!' : '';
   const leechText = leechHeal > 0 ? ` Leeches ${leechHeal} HP!` : '';
 
+  const appliedEffects = action.effect
+    ? applyActionEffect(state, action.effect, actorKey, {
+      damageForPercentCalc: finalDamage,
+      sourceScalingStat: xpStat,
+    })
+    : undefined;
+
   state.log.push(buildLogEntry(state, ctx, {
     actor: actorKey,
     actorName,
     action: actionToCombatAction(action),
     roll: attackRoll,
+    hitChance: hitResolution.hitChance,
+    hitRollValue: hitResolution.hitRollValue,
+    attackerHitScore: hitResolution.hitScore,
+    defenderAvoidScore: hitResolution.avoidScore,
     damage: finalDamage,
     rawDamage,
     isCritical: crit,
@@ -496,16 +574,9 @@ function executeOffensiveAction(
     targetMagicDefence: actionDamageType === 'magic' ? targetStats.magicDefence : undefined,
     armorReduction: actionDamageType === 'magic' ? undefined : armorReduction,
     magicDefenceReduction: actionDamageType === 'magic' ? armorReduction : undefined,
+    effectsApplied: appliedEffects && appliedEffects.length > 0 ? appliedEffects : undefined,
     message: `${actorName} uses ${action.name} on ${targetName} for ${finalDamage} damage!${critText}${leechText}`,
   }));
-
-  // Apply effect (DOT debuff on the target)
-  if (action.effect) {
-    applyActionEffect(state, action.effect, actorKey, {
-      damageForPercentCalc: finalDamage,
-      sourceScalingStat: xpStat,
-    });
-  }
 
   // Check for kill
   if (state.combatants[opponent(actorKey)].hp <= 0) {
@@ -695,6 +766,7 @@ export function runTemplateCombat(
   combatantB: TemplateCombatant,
   options?: CombatOptions,
 ): TemplateCombatResult {
+  const combatMode = options?.combatMode ?? 'pve_open_world';
   const availablePotions = options?.potions ? [...options.potions] : [];
   const potionsConsumed: PotionConsumed[] = [];
 
@@ -826,6 +898,7 @@ export function runTemplateCombat(
         resolvedA.action, interaction, true,
         combatantA.name, combatantB.name,
         { combatantAAction, combatantBAction, wasExhausted: resolvedA.wasExhausted, interactionResult },
+        combatMode,
         availablePotions, potionsConsumed,
         combatantA.perActionScaling,
       );
@@ -837,6 +910,7 @@ export function runTemplateCombat(
         resolvedB.action, interaction, false,
         combatantB.name, combatantA.name,
         { combatantAAction, combatantBAction, wasExhausted: resolvedB.wasExhausted, interactionResult },
+        combatMode,
         availablePotions, potionsConsumed,
         combatantB.perActionScaling,
       );
@@ -848,6 +922,7 @@ export function runTemplateCombat(
         resolvedB.action, interaction, false,
         combatantB.name, combatantA.name,
         { combatantAAction, combatantBAction, wasExhausted: resolvedB.wasExhausted, interactionResult },
+        combatMode,
         availablePotions, potionsConsumed,
         combatantB.perActionScaling,
       );
@@ -859,6 +934,7 @@ export function runTemplateCombat(
         resolvedA.action, interaction, true,
         combatantA.name, combatantB.name,
         { combatantAAction, combatantBAction, wasExhausted: resolvedA.wasExhausted, interactionResult },
+        combatMode,
         availablePotions, potionsConsumed,
         combatantA.perActionScaling,
       );
@@ -930,6 +1006,7 @@ function executeAction(
   actorName: string,
   targetName: string,
   ctx: RoundContext,
+  combatMode: CombatMode,
   availablePotions: CombatPotion[],
   potionsConsumed: PotionConsumed[],
   perActionScaling?: PerActionScaling,
@@ -955,10 +1032,16 @@ function executeAction(
     executeOffensiveAction(
       state, actorKey, actorStats, targetStats, action,
       hitOverride, interactionDmgMult, dmgReduction,
-      actorName, targetName, ctx,
+      actorName, targetName, ctx, combatMode,
       perActionScaling,
     );
   } else if (action.category === 'supportive') {
+    executeSupportiveAction(
+      state, actorKey, actorStats, action,
+      actorName, ctx,
+      availablePotions, potionsConsumed,
+    );
+  } else if (action.effect || action.healFlat || action.healPercent) {
     executeSupportiveAction(
       state, actorKey, actorStats, action,
       actorName, ctx,
