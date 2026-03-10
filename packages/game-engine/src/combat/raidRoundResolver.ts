@@ -554,6 +554,20 @@ export function resolveRaidRound(
           });
 
           if (!hitResult.didHit) {
+            // Apply alwaysApplies effects even on dodge (symmetrical with player miss path)
+            if (mActionDef.effect?.alwaysApplies && mActionDef.effect.isDebuff && targetState.hp > 0) {
+              const targetIdx = pState.findIndex(ps => ps.playerId === targetId);
+              if (targetIdx >= 0) {
+                const newEffect: BossActiveEffect = {
+                  name: mActionDef.effect.name,
+                  stat: mActionDef.effect.stat,
+                  modifier: mActionDef.effect.modifier,
+                  roundsRemaining: mActionDef.effect.duration,
+                };
+                if (!newPlayerEffects.has(targetIdx)) newPlayerEffects.set(targetIdx, []);
+                newPlayerEffects.get(targetIdx)!.push(newEffect);
+              }
+            }
             mobLogEntry.targets.push({
               playerId: targetId,
               username: getUsername(targetId),

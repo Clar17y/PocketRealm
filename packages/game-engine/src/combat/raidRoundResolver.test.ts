@@ -2004,6 +2004,65 @@ describe('resolveRaidRound', () => {
       expect(highResult.participantResults[0].damageTaken).toBe(0);
     });
 
+    it('mob alwaysApplies effect applies debuff even when attack is dodged', () => {
+      // Create a custom mob action: dodgeable normal attack with alwaysApplies debuff
+      const customMobAction: ActionDefinition = {
+        id: 'mob_cursed_strike',
+        name: 'Cursed Strike',
+        description: 'A cursed blow that marks even on miss.',
+        actionType: 'normal_attack',
+        category: 'offensive',
+        cost: { stamina: 0, mana: 0 },
+        damageMultiplier: 1.0,
+        damageType: 'physical',
+        // No alwaysHits — this can be dodged
+        effect: {
+          name: 'Cursed',
+          stat: 'defence',
+          modifier: -5,
+          duration: 2,
+          isDebuff: true,
+          alwaysApplies: true,
+        },
+      };
+
+      // Temporarily inject into BOSS_ACTION_DEFINITIONS via mob's action defs
+      const originalDefs = { ...BOSS_ACTION_DEFINITIONS };
+      (BOSS_ACTION_DEFINITIONS as Record<string, ActionDefinition>)['mob_cursed_strike'] = customMobAction;
+
+      const mob = makeMob({
+        id: 'mob1', hp: 200, maxHp: 200,
+        stats: makeStats({ accuracy: 5, damageMin: 10, damageMax: 10 }),
+        actionTemplate: [{ actionId: 'mob_cursed_strike', targetMode: 'single_target' }],
+      });
+      const evasivePlayer = makeParticipant({
+        playerId: 'p1', hp: 200, maxHp: 200,
+        stats: makeStats({ dodge: 50, evasion: 30 }),
+        template: [{ actionId: 'defend', sortOrder: 0 }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [evasivePlayer], mobs: [mob], roundNumber: 1 }),
+        alwaysMissRng,
+      );
+
+      // Attack should be dodged (no damage)
+      expect(result.participantResults[0].damageTaken).toBe(0);
+      const mobLog = result.roundLog.phases.mobActions[0];
+      expect(mobLog.targets[0].dodged).toBe(true);
+
+      // But alwaysApplies debuff should still be applied
+      const effects = result.participantResults[0].activeEffectsAfter;
+      const cursed = effects.find(e => e.stat === 'defence' && e.name === 'Cursed');
+      expect(cursed).toBeDefined();
+      expect(cursed!.modifier).toBe(-5);
+
+      // Restore original defs
+      Object.keys(BOSS_ACTION_DEFINITIONS).forEach(k => {
+        if (!(k in originalDefs)) delete (BOSS_ACTION_DEFINITIONS as Record<string, ActionDefinition>)[k];
+      });
+    });
+
     it('boss debuff (alwaysHits) cannot be dodged', () => {
       const mob = makeMob({
         id: 'mob1', hp: 200, maxHp: 200,
