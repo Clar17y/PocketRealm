@@ -1645,5 +1645,41 @@ describe('resolveRaidRound', () => {
       // Base: 10/110 ≈ 9.1% reduction. Debuffed: 2/102 ≈ 2.0% reduction.
       expect(debuffDamage).toBeGreaterThan(baseDamage);
     });
+
+    it('accuracy debuff (boss_smoke_bomb) reduces player hit chance', () => {
+      // doesAttackHit: totalAttack(roll+accuracy) >= hitThreshold(10+dodge+evasion)
+      // Roll=15, accuracy=10 → total=25. Dodge=15 → threshold=25 → hit (25>=25)
+      // With -8 accuracy: total=15+2=17 < 25 → miss
+      const highDodgeMob = makeMob({
+        id: 'mob1', hp: 500, maxHp: 500,
+        stats: makeStats({ dodge: 15, damageMin: 5, damageMax: 5 }),
+      });
+
+      // Without debuff: should hit
+      const pNormal = makeParticipant({
+        playerId: 'p1', hp: 200, maxHp: 200,
+        stats: makeStats({ accuracy: 10, damageMin: 20, damageMax: 20 }),
+        activeEffects: [],
+      });
+      const rNormal = resolveRaidRound(
+        makeInput({ participants: [pNormal], mobs: [{ ...highDodgeMob }], roundNumber: 1 }),
+        alwaysHitRng, // rollD20 returns 15
+      );
+      expect(rNormal.participantResults[0].damageDealt).toBeGreaterThan(0);
+
+      // With accuracy debuff: should miss
+      const pBlinded = makeParticipant({
+        playerId: 'p1', hp: 200, maxHp: 200,
+        stats: makeStats({ accuracy: 10, damageMin: 20, damageMax: 20 }),
+        activeEffects: [{
+          name: 'Blinded', stat: 'accuracy', modifier: -8, roundsRemaining: 2,
+        }],
+      });
+      const rBlinded = resolveRaidRound(
+        makeInput({ participants: [pBlinded], mobs: [{ ...highDodgeMob }], roundNumber: 1 }),
+        alwaysHitRng,
+      );
+      expect(rBlinded.participantResults[0].damageDealt).toBe(0);
+    });
   });
 });

@@ -240,7 +240,8 @@ export function resolveRaidRound(
     s.targetMobId = isAoe ? null : targets[0].id;
 
     let totalDamageDealt = 0;
-    const modifier = p.stats.accuracy + (def.accuracyModifier ?? 0);
+    const effectiveAccuracy = getEffectiveStatValue(p.stats.accuracy, p.activeEffects, 'accuracy');
+    const modifier = effectiveAccuracy + (def.accuracyModifier ?? 0);
 
     for (const target of targets) {
       const attackRoll = roll.rollD20();

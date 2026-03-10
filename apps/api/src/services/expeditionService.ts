@@ -191,6 +191,28 @@ export async function getExpeditionCooldowns(guildId: string): Promise<Expeditio
 }
 
 // ---------------------------------------------------------------------------
+// Mob Template ID Mapping
+// ---------------------------------------------------------------------------
+
+async function buildTemplateIdMap(theme: import('@pocketrealm/shared').ExpeditionTheme): Promise<Map<string, string>> {
+  const expeditionMobTemplates = await prisma.mobTemplate.findMany({
+    where: { isExpeditionMob: true },
+    select: { id: true, name: true },
+  });
+  const templateIdMap = new Map<string, string>();
+  const allThemeMobs = [
+    ...theme.trash, ...theme.elites, theme.miniBoss,
+    ...theme.miniBossAdds, theme.casterAdd, theme.finalBoss.mob,
+    theme.regularAdd,
+  ];
+  for (const themeMob of allThemeMobs) {
+    const match = expeditionMobTemplates.find(t => t.name === themeMob.name);
+    if (match) templateIdMap.set(themeMob.key, match.id);
+  }
+  return templateIdMap;
+}
+
+// ---------------------------------------------------------------------------
 // Launch Expedition
 // ---------------------------------------------------------------------------
 
@@ -257,23 +279,7 @@ export async function launchExpedition(
   }
   const theme = tierThemes[Math.floor(Math.random() * tierThemes.length)];
 
-  // Build key → UUID mapping for expedition mob templates
-  const expeditionMobTemplates = await prisma.mobTemplate.findMany({
-    where: { isExpeditionMob: true },
-    select: { id: true, name: true },
-  });
-  const templateIdMap = new Map<string, string>();
-  // Collect all mob keys from the theme for name-based lookup
-  const allThemeMobs = [
-    ...theme.trash, ...theme.elites, theme.miniBoss,
-    ...theme.miniBossAdds, theme.casterAdd, theme.finalBoss.mob,
-    theme.regularAdd,
-  ];
-  for (const themeMob of allThemeMobs) {
-    const match = expeditionMobTemplates.find(t => t.name === themeMob.name);
-    if (match) templateIdMap.set(themeMob.key, match.id);
-  }
-
+  const templateIdMap = await buildTemplateIdMap(theme);
   const rooms = generateExpeditionRooms(tier - 1, theme, Math.random, templateIdMap);
 
   // Transaction: deduct treasury + create expedition + log
@@ -1022,7 +1028,8 @@ export async function handleWipe(expeditionId: string): Promise<void> {
   if (!wipeTheme) {
     throw new AppError(500, 'Theme not found for expedition', 'NO_THEMES');
   }
-  const rooms = generateExpeditionRooms(expedition.tier - 1, wipeTheme);
+  const wipeTemplateIdMap = await buildTemplateIdMap(wipeTheme);
+  const rooms = generateExpeditionRooms(expedition.tier - 1, wipeTheme, Math.random, wipeTemplateIdMap);
 
   await prisma.$transaction(async (tx) => {
     await tx.guildExpeditionMember.deleteMany({ where: { expeditionId } });
