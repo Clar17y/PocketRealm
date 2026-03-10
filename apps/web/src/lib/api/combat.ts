@@ -186,6 +186,10 @@ export interface CombatLogEntryResponse {
   staminaCost?: number;
   manaCost?: number;
   interactionResult?: string;  // 'countered' | 'warded' | 'defended' | null
+  hitChance?: number;
+  hitRollValue?: number;
+  attackerHitScore?: number;
+  defenderAvoidScore?: number;
   /** @deprecated Backward compat alias */
   playerHpAfter?: number;
   /** @deprecated Backward compat alias */

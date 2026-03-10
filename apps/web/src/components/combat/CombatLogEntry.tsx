@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { LastCombatLogEntry } from '@/app/game/gameController.types';
 import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 import { ACTION_CATEGORY_COLORS } from '@/lib/categoryColors';
+import { formatHitBreakdown } from './combatLogEntryUtils';
 
 function isMagicDamage(entry: LastCombatLogEntry): boolean {
   return entry.targetMagicDefence !== undefined || entry.magicDefenceReduction !== undefined || entry.action === 'spell';
@@ -50,29 +51,6 @@ interface CombatLogEntryProps {
   opponentLabel?: string;
 }
 
-function resolveHitOutcome(entry: LastCombatLogEntry): {
-  result: 'Hit' | 'Miss';
-  threshold: number;
-  evasionContribution: number;
-} | null {
-  if (entry.roll === undefined || entry.targetDodge === undefined) {
-    return null;
-  }
-
-  const evasionContribution = Math.floor((entry.targetEvasion ?? 0) / 2);
-  const threshold = 10 + entry.targetDodge + evasionContribution;
-  const total = entry.roll + (entry.accuracyModifier ?? 0);
-
-  if (entry.roll === 1) {
-    return { result: 'Miss', threshold, evasionContribution };
-  }
-  if (entry.roll === 20) {
-    return { result: 'Hit', threshold, evasionContribution };
-  }
-
-  return { result: total >= threshold ? 'Hit' : 'Miss', threshold, evasionContribution };
-}
-
 export function CombatLogEntry({
   entry,
   playerMaxHp,
@@ -84,7 +62,7 @@ export function CombatLogEntry({
   const [expanded, setExpanded] = useState(false);
   const icon = getActionIcon(entry);
   const hasDetails = entry.accuracyModifier !== undefined || entry.rawDamage !== undefined || entry.spellName !== undefined;
-  const hitOutcome = resolveHitOutcome(entry);
+  const hitBreakdown = formatHitBreakdown(entry);
 
   const isPlayerAction = entry.actor === 'combatantA';
   const actorColor = isPlayerAction ? 'text-[var(--rpg-green-light)]' : 'text-[var(--rpg-red)]';
@@ -170,19 +148,7 @@ export function CombatLogEntry({
       {/* Expanded details */}
       {expanded && hasDetails && (
         <div className="pl-9 pb-1 text-xs text-[var(--rpg-text-secondary)] space-y-0.5">
-          {hitOutcome && (
-            <div>
-              Roll: {entry.roll}
-              {entry.accuracyModifier !== undefined ? ` + ${entry.accuracyModifier} ACC` : ''}
-              {' vs '}
-              {showDetailedBreakdown
-                ? `${hitOutcome.threshold} (10 + ${entry.targetDodge} DOD + ${hitOutcome.evasionContribution} EVA)`
-                : `${hitOutcome.threshold} (target avoid)`}
-              {' => '}{hitOutcome.result}
-              {entry.roll === 1 ? ' (Nat 1 auto-miss)' : ''}
-              {entry.roll === 20 ? ' (Nat 20 auto-hit)' : ''}
-            </div>
-          )}
+          {hitBreakdown && <div>{hitBreakdown}</div>}
           {entry.rawDamage !== undefined && entry.damage !== undefined && (
             <div>
               {(() => {
@@ -213,7 +179,7 @@ export function CombatLogEntry({
               })()}
             </div>
           )}
-          {entry.spellName && !hitOutcome && entry.rawDamage === undefined && (
+          {entry.spellName && !hitBreakdown && entry.rawDamage === undefined && (
             <div>Spell: {entry.spellName}</div>
           )}
           {entry.effectsApplied && entry.effectsApplied.length > 0 && (
