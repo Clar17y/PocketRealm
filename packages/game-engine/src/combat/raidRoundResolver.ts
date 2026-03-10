@@ -33,6 +33,8 @@ import {
   rollDamage as defaultRollDamage,
   isCriticalHit as defaultIsCriticalHit,
   resolveHitCheck,
+  guaranteedHitResult,
+  calculateAvoidScore,
   calculateFinalDamage,
 } from './damageCalculator';
 import type { CombatMode } from '@pocketrealm/shared';
@@ -246,16 +248,10 @@ export function resolveRaidRound(
     const hitScore = effectiveAccuracy + (def.accuracyModifier ?? 0);
 
     for (const target of targets) {
-      const avoidScore = target.stats.dodge + (target.stats.evasion ?? 0);
+      const avoidScore = calculateAvoidScore(target.stats);
 
       const hitResolution = def.alwaysHits
-        ? {
-            hitScore: Math.max(1, hitScore),
-            avoidScore: Math.max(0, avoidScore),
-            hitChance: 1,
-            hitRollValue: 0,
-            didHit: true,
-          }
+        ? guaranteedHitResult(hitScore, avoidScore)
         : resolveHitCheck({
             combatMode,
             hitScore,
@@ -526,6 +522,7 @@ export function resolveRaidRound(
         const targetParticipant = input.participants.find(pp => pp.playerId === targetId);
         if (!targetState || !targetParticipant) continue;
 
+        const targetIdx = pState.findIndex(ps => ps.playerId === targetId);
         const stance = defStances.get(targetId);
 
         // Counter avoids physical, Ward avoids magic
@@ -545,7 +542,7 @@ export function resolveRaidRound(
         // Hit resolution: normal attacks can be dodged, boss specials (alwaysHits) cannot
         if (!mActionDef.alwaysHits) {
           const mobHitScore = mob.stats.accuracy + (mActionDef.accuracyModifier ?? 0);
-          const playerAvoidScore = targetParticipant.stats.dodge + (targetParticipant.stats.evasion ?? 0);
+          const playerAvoidScore = calculateAvoidScore(targetParticipant.stats);
           const hitResult = resolveHitCheck({
             combatMode,
             hitScore: mobHitScore,
@@ -555,18 +552,15 @@ export function resolveRaidRound(
 
           if (!hitResult.didHit) {
             // Apply alwaysApplies effects even on dodge (symmetrical with player miss path)
-            if (mActionDef.effect?.alwaysApplies && mActionDef.effect.isDebuff && targetState.hp > 0) {
-              const targetIdx = pState.findIndex(ps => ps.playerId === targetId);
-              if (targetIdx >= 0) {
-                const newEffect: BossActiveEffect = {
-                  name: mActionDef.effect.name,
-                  stat: mActionDef.effect.stat,
-                  modifier: mActionDef.effect.modifier,
-                  roundsRemaining: mActionDef.effect.duration,
-                };
-                if (!newPlayerEffects.has(targetIdx)) newPlayerEffects.set(targetIdx, []);
-                newPlayerEffects.get(targetIdx)!.push(newEffect);
-              }
+            if (mActionDef.effect?.alwaysApplies && mActionDef.effect.isDebuff && targetState.hp > 0 && targetIdx >= 0) {
+              const newEffect: BossActiveEffect = {
+                name: mActionDef.effect.name,
+                stat: mActionDef.effect.stat,
+                modifier: mActionDef.effect.modifier,
+                roundsRemaining: mActionDef.effect.duration,
+              };
+              if (!newPlayerEffects.has(targetIdx)) newPlayerEffects.set(targetIdx, []);
+              newPlayerEffects.get(targetIdx)!.push(newEffect);
             }
             mobLogEntry.targets.push({
               playerId: targetId,
@@ -584,9 +578,6 @@ export function resolveRaidRound(
         // Apply mob attack buffs (rally/frenzy) as flat bonus damage
         const mobAttackBonus = getEffectiveStatValue(0, mob.activeEffects, 'attack');
         let baseDmg = Math.floor(dmgRaw * (mActionDef.damageMultiplier ?? 1.0)) + mobAttackBonus;
-
-        // Combine input effects + newly applied effects this round for target checks
-        const targetIdx = pState.findIndex(ps => ps.playerId === targetId);
         const combinedTargetEffects = [
           ...(targetParticipant.activeEffects ?? []),
           ...(targetIdx >= 0 ? (newPlayerEffects.get(targetIdx) ?? []) : []),

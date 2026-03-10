@@ -48,12 +48,28 @@ export function calculateHitChance(
   };
 }
 
+export type HitResolution = HitScoreBreakdown & { hitRollValue: number; didHit: boolean };
+
+export function guaranteedHitResult(hitScore: number, avoidScore: number): HitResolution {
+  return {
+    hitScore: Math.max(1, hitScore),
+    avoidScore: Math.max(0, avoidScore),
+    hitChance: 1,
+    hitRollValue: 0,
+    didHit: true,
+  };
+}
+
+export function calculateAvoidScore(stats: { dodge: number; evasion?: number | undefined }): number {
+  return stats.dodge + (stats.evasion ?? 0);
+}
+
 export function resolveHitCheck(input: {
   combatMode: CombatMode;
   hitScore: number;
   avoidScore: number;
   hitRollValue?: number;
-}): HitScoreBreakdown & { hitRollValue: number; didHit: boolean } {
+}): HitResolution {
   const breakdown = calculateHitChance(input.combatMode, input.hitScore, input.avoidScore);
   const hitRollValue = clamp(finiteOrFallback(input.hitRollValue ?? Math.random(), 0), 0, 1);
 

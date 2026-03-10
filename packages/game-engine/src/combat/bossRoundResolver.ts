@@ -24,6 +24,7 @@ import {
   rollDamage as defaultRollDamage,
   isCriticalHit as defaultIsCriticalHit,
   resolveHitCheck,
+  calculateAvoidScore,
   calculateFinalDamage,
 } from './damageCalculator';
 
@@ -182,7 +183,7 @@ export function resolveBossRound(
 
     const attackRoll = roll.rollD20();
     const hitScore = p.stats.accuracy + (def.accuracyModifier ?? 0);
-    const avoidScore = bossStats.dodge + bossStats.evasion;
+    const avoidScore = calculateAvoidScore(bossStats);
     const hits = attackRoll === 20
       ? true
       : attackRoll === 1
