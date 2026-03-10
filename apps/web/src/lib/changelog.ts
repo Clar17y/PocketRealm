@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.33',
+    date: '2026-03-10',
+    title: 'Combat Balance Remediation',
+    summary:
+      'Hit chance now scales by combat mode, so open-world fights, PvP, and bosses can each be tuned separately. Early monsters should feel fairer to hit, dodge-heavy builds are less likely to create miserable nat-20-only fights in normal PvE, and anti-evasion counterplay is clearer when you need it. Starter combat has been smoothed out, the tutorial equip step now completes correctly after you equip your starter weapon, and the Wayfinder Buckler art has been added.',
+  },
+  {
     version: '0.32',
     date: '2026-03-09',
     title: 'First-Visit Tutorials & UI Polish',

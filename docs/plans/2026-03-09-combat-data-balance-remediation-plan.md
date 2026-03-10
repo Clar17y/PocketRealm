@@ -315,7 +315,6 @@ Expected: PASS
 git add docs/plans/2026-03-09-combat-data-balance-remediation-plan.md
 git commit -m "docs: record combat balance remediation verification"
 ```
-
 ## Final Balance Deltas
 
 - Field Mouse evasion: `5 -> 2`
