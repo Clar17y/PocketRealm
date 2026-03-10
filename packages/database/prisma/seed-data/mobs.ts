@@ -58,7 +58,7 @@ export function getAllMobTemplates() {
   return [
     // ── Forest Edge (diff 1) ──────────────────────────────────────────────
     mob({ id: m.forestRat, name: 'Forest Rat', zoneId: z.forestEdge, level: 1, hp: 12, accuracy: 6, defence: 2, magicDefence: 1, evasion: 3, damageMin: 1, damageMax: 3, xpReward: 6, explorationTier: 1 }),
-    mob({ id: m.fieldMouse, name: 'Field Mouse', zoneId: z.forestEdge, level: 1, hp: 8, accuracy: 5, defence: 1, magicDefence: 0, evasion: 2, damageMin: 1, damageMax: 2, xpReward: 4, explorationTier: 1 }),
+    mob({ id: m.fieldMouse, name: 'Field Mouse', zoneId: z.forestEdge, level: 1, hp: 8, accuracy: 7, defence: 1, magicDefence: 0, evasion: 2, damageMin: 1, damageMax: 2, xpReward: 4, explorationTier: 1 }),
     mob({ id: m.giantRat, name: 'Giant Rat', zoneId: z.forestEdge, level: 2, hp: 22, accuracy: 8, defence: 5, magicDefence: 2, evasion: 3, damageMin: 2, damageMax: 5, xpReward: 14, explorationTier: 2 }),
     mob({ id: m.ratKing, name: 'Rat King', zoneId: z.forestEdge, level: 3, hp: 40, accuracy: 10, defence: 7, magicDefence: 3, evasion: 2, damageMin: 3, damageMax: 7, xpReward: 30, spellPattern: [spell(3, 'Frenzy', { damage: 6 })], explorationTier: 3 }),
     mob({ id: m.forestSpider, name: 'Forest Spider', zoneId: z.forestEdge, level: 1, hp: 10, accuracy: 7, defence: 2, magicDefence: 1, evasion: 3, damageMin: 1, damageMax: 3, xpReward: 7, explorationTier: 1 }),

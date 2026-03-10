@@ -18,9 +18,9 @@ export const SUPPORTED_ITEM_STAT_KEYS = new Set([
 ]);
 
 export const STARTER_TARGETS = {
-  openWorldStarterHitScore: 12,
   tutorialHitChanceMin: 0.45,
   forestEdgeTier1HitChanceMin: 0.4,
+  tutorialEnemyHitChanceMin: 0.35,
 } as const;
 
 export const PVP_TARGETS = {

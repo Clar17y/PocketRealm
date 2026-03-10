@@ -57,6 +57,10 @@ export const HIT_CURVE_CONSTANTS = {
   pve_boss: { minHitChance: 0.35, maxHitChance: 0.98, bias: 12, exponent: 1.35 },
 } as const satisfies Record<CombatMode, HitCurveConfig>;
 
+export const STARTER_LOADOUT = {
+  tutorialOffHandTemplateId: 'starter_wayfinder_buckler',
+} as const;
+
 export const CRIT_STAT_CONSTANTS = {
   FIXED_RANGE_BONUS_STATS: {
     critChance: { min: 0.03, max: 0.05 },
