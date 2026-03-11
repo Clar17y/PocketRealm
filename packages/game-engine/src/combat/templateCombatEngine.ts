@@ -21,6 +21,8 @@ import {
   rollDamage,
   calculateHitChance,
   resolveHitCheck,
+  guaranteedHitResult,
+  calculateAvoidScore,
   isCriticalHit,
   calculateFinalDamage,
   calculateDefenceReduction,
@@ -436,15 +438,9 @@ function executeOffensiveAction(
   const attackRoll = hitOverride === 'guaranteed_hit' ? 20 : rollD20();
   const accuracyBonus = baseAccuracy + (action.accuracyModifier ?? 0);
   const hitScore = accuracyBonus;
-  const avoidScore = targetStats.dodge + targetStats.evasion;
+  const avoidScore = calculateAvoidScore(targetStats);
   const hitResolution = hitOverride === 'guaranteed_hit' || action.alwaysHits
-    ? {
-        hitScore: Math.max(1, hitScore),
-        avoidScore: Math.max(0, avoidScore),
-        hitChance: 1,
-        hitRollValue: 0,
-        didHit: true,
-      }
+    ? guaranteedHitResult(hitScore, avoidScore)
     : attackRoll === 1 || attackRoll === 20
       ? { ...calculateHitChance(combatMode, hitScore, avoidScore), hitRollValue: attackRoll === 1 ? 1 : 0, didHit: attackRoll === 20 }
       : resolveHitCheck({

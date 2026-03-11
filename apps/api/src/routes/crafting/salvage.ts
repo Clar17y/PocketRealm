@@ -36,6 +36,9 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
       requireNotStacked: true,
       requireNotEquipped: true,
     });
+    if ((item as any).isSoulbound) {
+      throw new AppError(400, 'Soulbound items cannot be salvaged', 'ITEM_SOULBOUND');
+    }
     const targetStash = Boolean((item as any).inStash);
 
     const recipe = await prisma.craftingRecipe.findFirst({
@@ -198,6 +201,7 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
     const salvageableItems = items.filter((item: any) =>
       (item.template.itemType === 'weapon' || item.template.itemType === 'armor')
       && !equippedItemIds.has(item.id)
+      && !item.isSoulbound
     );
 
     if (salvageableItems.length === 0) {

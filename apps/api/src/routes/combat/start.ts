@@ -56,6 +56,7 @@ import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, handleCombatDefeat, buildPveCombatOptions } from '../../utils/routeHelpers.js';
 import { getCombatBuffs, getCombatBuffsWithUses, applyCombatBuffs, consumeCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges } from '../../services/buffService';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
+import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
 import {
   prismaAny,
   startSchema,
@@ -678,6 +679,7 @@ export function registerStartRoutes(router: Router): void {
    */
   router.post('/start', asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
+      await checkExpeditionLockout(playerId);
       const body = startSchema.parse(req.body);
 
       // Encounter site -> room combat loop

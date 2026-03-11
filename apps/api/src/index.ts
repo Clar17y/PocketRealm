@@ -30,13 +30,14 @@ import { skillPointsRouter } from './routes/skillpoints';
 import { casinoRouter } from './routes/casino';
 import { trainingRouter } from './routes/training';
 import { questsRouter } from './routes/quests';
+import { expeditionRouter } from './routes/expedition';
 import { shopRouter } from './routes/shop';
 import { friendsRouter } from './routes/friends';
 import { errorHandler } from './middleware/errorHandler';
 import { createSocketServer, getIo } from './socket';
-import { checkAndResolveDueBossRounds } from './services/bossEncounterService';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
 import { refreshAllLeaderboards } from './services/leaderboardService';
+import { startRoundResolutionScheduler } from './services/roundResolutionScheduler';
 import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
 
 const app = express();
@@ -120,6 +121,7 @@ app.use('/api/v1/skillpoints', skillPointsRouter);
 app.use('/api/v1/casino', casinoRouter);
 app.use('/api/v1/training', trainingRouter);
 app.use('/api/v1/quests', questsRouter);
+app.use('/api/v1/expedition', expeditionRouter);
 app.use('/api/v1/shop', shopRouter);
 app.use('/api/v1/friends', friendsRouter);
 
@@ -132,12 +134,9 @@ createSocketServer(server, isAllowedCorsOrigin);
 server.listen(PORT, () => {
   console.log(`PocketRealm API running on port ${PORT}`);
 
-  // Boss round resolution timer (every 60 seconds)
-  setInterval(() => {
-    checkAndResolveDueBossRounds(getIo()).catch((err) => {
-      console.error('Boss round resolution error:', err);
-    });
-  }, 60_000);
+  // Adaptive round resolution: ticks every 5s when bosses/expeditions are
+  // active, idles at 60s otherwise.
+  startRoundResolutionScheduler(getIo);
 
   // Persisted mob cleanup timer (every 5 minutes)
   setInterval(() => {

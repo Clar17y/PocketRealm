@@ -1297,9 +1297,21 @@ export default function GamePage() {
         {actionError && (
           <div
             ref={errorRef}
-            className="mb-4 p-3 rounded bg-[var(--rpg-background)] border border-[var(--rpg-red)] text-[var(--rpg-red)] animate-error-flash"
+            className={`mb-4 p-3 rounded bg-[var(--rpg-background)] animate-error-flash ${
+              actionError.includes('active expedition')
+                ? 'border border-[var(--rpg-gold)] text-[var(--rpg-gold)]'
+                : 'border border-[var(--rpg-red)] text-[var(--rpg-red)]'
+            }`}
           >
             {actionError}
+            {actionError.includes('active expedition') && (
+              <button
+                onClick={() => setActiveScreen('guild')}
+                className="block mt-1 text-xs underline text-[var(--rpg-gold)] hover:text-[var(--rpg-text-primary)]"
+              >
+                Go to Guild Expeditions
+              </button>
+            )}
           </div>
         )}
 

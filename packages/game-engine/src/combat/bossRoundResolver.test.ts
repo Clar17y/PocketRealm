@@ -453,7 +453,7 @@ describe('resolveBossRound', () => {
 
       const tank = makeParticipant({
         playerId: 'tank',
-        hp: 150, maxHp: 200, // damaged from previous round — healer can heal
+        hp: 80, maxHp: 200, // damaged from previous round — healer targets lowest HP
         stamina: 100, maxStamina: 100,
         template: slotsOf('taunt'),
         actionDefinitions: { ...BASE_ACTION_DEFINITIONS, taunt: tauntAction },

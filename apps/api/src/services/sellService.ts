@@ -30,6 +30,7 @@ export async function sellItem(
     if (!item || item.ownerId !== playerId) throw new AppError(404, 'Item not found', 'NOT_FOUND');
     if (item.equipment.length > 0) throw new AppError(400, 'Cannot sell equipped items', 'ITEM_EQUIPPED');
     if (item.inStash) throw new AppError(400, 'Cannot sell stashed items', 'ITEM_STASHED');
+    if (item.isSoulbound) throw new AppError(400, 'Soulbound items cannot be sold', 'ITEM_SOULBOUND');
     if (!item.template.sellPrice) throw new AppError(400, 'Item cannot be sold', 'NOT_SELLABLE');
 
     const sellQty = quantity ?? item.quantity;
@@ -70,6 +71,7 @@ export async function sellBulk(
       if (!item || item.ownerId !== playerId) continue;
       if (item.equipment.length > 0) continue;
       if (item.inStash) continue;
+      if (item.isSoulbound) continue;
       if (!item.template.sellPrice) continue;
 
       totalGold += itemSellPrice(item) * item.quantity;

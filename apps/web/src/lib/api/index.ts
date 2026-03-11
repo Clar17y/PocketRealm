@@ -163,6 +163,9 @@ export {
   adminGetResourceNodes,
   adminSpawnResourceNode,
   adminGrantTokens,
+  adminGrantGuildTreasury,
+  adminResetExpeditionCooldowns,
+  adminFillExpedition,
 } from './admin';
 export type {
   AdminItemTemplate,
@@ -245,6 +248,26 @@ export { exchangeGold, getRouletteRound, placeRouletteBet, getRouletteHistory, g
 export type { GoldExchangeResponse, PlaceBetResponse, RouletteNumberStat } from './casino';
 export { startTrainingFight, getTrainingCooldown } from './training';
 export type { TrainingFightResponse, TrainingCooldownResponse } from './training';
+
+export {
+  getActiveExpedition,
+  getExpeditionStatus,
+  getExpeditionHistory,
+  launchExpedition,
+  signUpForExpedition,
+  forceStartExpedition,
+  forceNextRound,
+  recoverFromExpeditionKO,
+  getExpeditionShop,
+  purchaseExpeditionItem,
+} from './expedition';
+export type {
+  ExpeditionStatusResponse,
+  ExpeditionDetailResponse,
+  ExpeditionHistoryResponse,
+  ExpeditionShopResponse,
+  ExpeditionPurchaseResponse,
+} from './expedition';
 
 export {
   getFriendsList,
