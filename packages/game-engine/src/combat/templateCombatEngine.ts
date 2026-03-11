@@ -654,7 +654,7 @@ function executePotionAction(
   availablePotions: CombatPotion[],
   potionsConsumed: PotionConsumed[],
 ): void {
-  const potionType = action.potionType ?? 'hp';
+  const potionType = (action.potionType ?? 'hp') as 'hp' | 'stamina' | 'mana';
 
   // Check potion sickness
   if (hasPotionSickness(state, actorKey)) {
