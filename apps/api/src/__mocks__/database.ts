@@ -77,6 +77,8 @@ export const prisma = {
   rouletteBet: mockModel(),
   playerQuest: mockModel(),
   playerQuestState: mockModel(),
+  guildExpedition: mockModel(),
+  guildExpeditionMember: mockModel(),
   playerBuff: mockModel(),
   shopItem: mockModel(),
   playerShopPurchase: mockModel(),

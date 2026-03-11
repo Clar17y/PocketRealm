@@ -20,6 +20,7 @@ type MobRow = {
   bossAoeDmg?: number;
   bossBaseHp?: number;
   explorationTier?: number;
+  isExpeditionMob?: boolean;
 };
 
 function mob(r: MobRow) {
@@ -43,6 +44,7 @@ function mob(r: MobRow) {
     bossAoeDmg: r.bossAoeDmg ?? null,
     bossBaseHp: r.bossBaseHp ?? null,
     explorationTier: r.explorationTier ?? 1,
+    isExpeditionMob: r.isExpeditionMob ?? false,
   };
 }
 
@@ -180,5 +182,45 @@ export function getAllMobTemplates() {
     mob({ id: m.tentacleHorror, name: 'Tentacle Horror', zoneId: z.sunkenRuins, level: 29, hp: 50, accuracy: 20, defence: 16, magicDefence: 10, evasion: 4, damageMin: 6, damageMax: 11, xpReward: 50, spellPattern: [spell(3, 'Grapple', { effects: [{ stat: 'evasion', modifier: -4, duration: 2 }] })], explorationTier: 2 }),
     mob({ id: m.fleshGolem, name: 'Flesh Golem', zoneId: z.sunkenRuins, level: 32, hp: 90, accuracy: 22, defence: 24, magicDefence: 8, evasion: 0, damageMin: 8, damageMax: 14, xpReward: 72, spellPattern: [spell(3, 'Slam', { damage: 10 }), spell(6, 'Regenerate', { heal: 10 })], explorationTier: 3 }),
     mob({ id: m.eldritchAbomination, name: 'Eldritch Abomination', zoneId: z.sunkenRuins, level: 36, hp: 140, accuracy: 24, defence: 28, magicDefence: 32, evasion: 3, damageMin: 10, damageMax: 20, xpReward: 120, spellPattern: [spell(2, 'Madness Aura', { effects: [{ stat: 'accuracy', modifier: -5, duration: 3 }] }), spell(4, 'Void Bolt', { damage: 14 }), spell(6, 'Tentacle Storm', { damage: 18 }), spell(9, 'Consume', { damage: 28 })], damageType: 'magic', explorationTier: 4 }),
+
+    // ── Expedition: Spider Nest ──
+    mob({ id: m.expCavernSpider, name: 'Cavern Spider', zoneId: z.forestEdge, level: 12, hp: 150, accuracy: 16, defence: 12, magicDefence: 8, evasion: 6, damageMin: 8, damageMax: 14, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expWebweaver, name: 'Webweaver', zoneId: z.forestEdge, level: 12, hp: 120, accuracy: 14, defence: 10, magicDefence: 6, evasion: 8, damageMin: 6, damageMax: 12, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expBroodguard, name: 'Broodguard', zoneId: z.forestEdge, level: 14, hp: 350, accuracy: 20, defence: 16, magicDefence: 12, evasion: 6, damageMin: 12, damageMax: 20, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expSilkStalker, name: 'Silk Stalker', zoneId: z.forestEdge, level: 14, hp: 280, accuracy: 22, defence: 14, magicDefence: 10, evasion: 10, damageMin: 14, damageMax: 22, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expSpiderMatriarch, name: 'Spider Matriarch', zoneId: z.forestEdge, level: 15, hp: 650, accuracy: 22, defence: 18, magicDefence: 14, evasion: 8, damageMin: 16, damageMax: 26, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expSpiderling, name: 'Spiderling', zoneId: z.forestEdge, level: 10, hp: 100, accuracy: 14, defence: 8, magicDefence: 4, evasion: 4, damageMin: 6, damageMax: 10, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expVenomousSpitter, name: 'Venomous Spitter', zoneId: z.forestEdge, level: 10, hp: 70, accuracy: 12, defence: 6, magicDefence: 10, evasion: 6, damageMin: 4, damageMax: 8, xpReward: 0, encounterWeight: 0, isExpeditionMob: true, damageType: 'magic' }),
+    mob({ id: m.expBroodqueen, name: 'The Broodqueen', zoneId: z.forestEdge, level: 16, hp: 1300, accuracy: 28, defence: 22, magicDefence: 16, evasion: 8, damageMin: 20, damageMax: 35, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+
+    // ── Expedition: Wolf Pack ──
+    mob({ id: m.expTimberWolf, name: 'Timber Wolf', zoneId: z.forestEdge, level: 12, hp: 160, accuracy: 18, defence: 14, magicDefence: 6, evasion: 8, damageMin: 10, damageMax: 16, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expSnarler, name: 'Snarler', zoneId: z.forestEdge, level: 12, hp: 130, accuracy: 16, defence: 12, magicDefence: 8, evasion: 6, damageMin: 8, damageMax: 14, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expDireWolfExp, name: 'Dire Wolf', zoneId: z.forestEdge, level: 14, hp: 380, accuracy: 22, defence: 18, magicDefence: 8, evasion: 8, damageMin: 14, damageMax: 24, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expShadowWolf, name: 'Shadow Wolf', zoneId: z.forestEdge, level: 14, hp: 300, accuracy: 20, defence: 14, magicDefence: 16, evasion: 12, damageMin: 12, damageMax: 20, xpReward: 0, encounterWeight: 0, isExpeditionMob: true, damageType: 'magic' }),
+    mob({ id: m.expPackAlphaExp, name: 'Pack Alpha', zoneId: z.forestEdge, level: 15, hp: 680, accuracy: 24, defence: 20, magicDefence: 10, evasion: 8, damageMin: 18, damageMax: 28, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expFrenziedWolf, name: 'Frenzied Wolf', zoneId: z.forestEdge, level: 10, hp: 100, accuracy: 16, defence: 10, magicDefence: 4, evasion: 6, damageMin: 8, damageMax: 14, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expHowlingSpirit, name: 'Howling Spirit', zoneId: z.forestEdge, level: 10, hp: 65, accuracy: 14, defence: 6, magicDefence: 12, evasion: 8, damageMin: 4, damageMax: 8, xpReward: 0, encounterWeight: 0, isExpeditionMob: true, damageType: 'magic' }),
+    mob({ id: m.expFenris, name: 'Fenris, the Ancient', zoneId: z.forestEdge, level: 16, hp: 1400, accuracy: 30, defence: 24, magicDefence: 12, evasion: 8, damageMin: 22, damageMax: 38, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+
+    // ── Expedition: Bandit Camp ──
+    mob({ id: m.expBanditThug, name: 'Bandit Thug', zoneId: z.forestEdge, level: 12, hp: 170, accuracy: 18, defence: 14, magicDefence: 8, evasion: 6, damageMin: 10, damageMax: 16, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expBanditArcherExp, name: 'Bandit Archer', zoneId: z.forestEdge, level: 12, hp: 130, accuracy: 20, defence: 10, magicDefence: 6, evasion: 8, damageMin: 12, damageMax: 18, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expBanditAssassin, name: 'Bandit Assassin', zoneId: z.forestEdge, level: 14, hp: 320, accuracy: 24, defence: 16, magicDefence: 10, evasion: 12, damageMin: 16, damageMax: 26, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expBanditShaman, name: 'Bandit Shaman', zoneId: z.forestEdge, level: 14, hp: 280, accuracy: 18, defence: 12, magicDefence: 18, evasion: 8, damageMin: 10, damageMax: 18, xpReward: 0, encounterWeight: 0, isExpeditionMob: true, damageType: 'magic' }),
+    mob({ id: m.expWarChief, name: 'War Chief', zoneId: z.forestEdge, level: 15, hp: 640, accuracy: 24, defence: 20, magicDefence: 12, evasion: 6, damageMin: 18, damageMax: 30, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expBanditGrunt, name: 'Bandit Grunt', zoneId: z.forestEdge, level: 10, hp: 90, accuracy: 14, defence: 10, magicDefence: 6, evasion: 4, damageMin: 8, damageMax: 12, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expKnifeThrower, name: 'Knife Thrower', zoneId: z.forestEdge, level: 10, hp: 70, accuracy: 18, defence: 8, magicDefence: 6, evasion: 8, damageMin: 6, damageMax: 10, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expBanditKing, name: 'The Bandit King', zoneId: z.forestEdge, level: 16, hp: 1300, accuracy: 28, defence: 22, magicDefence: 14, evasion: 8, damageMin: 20, damageMax: 36, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+
+    // ── Expedition: Corrupted Grove ──
+    mob({ id: m.expBlightedSapling, name: 'Blighted Sapling', zoneId: z.forestEdge, level: 12, hp: 140, accuracy: 16, defence: 14, magicDefence: 10, evasion: 4, damageMin: 8, damageMax: 14, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expFungalSpore, name: 'Fungal Spore', zoneId: z.forestEdge, level: 12, hp: 100, accuracy: 14, defence: 8, magicDefence: 14, evasion: 6, damageMin: 6, damageMax: 12, xpReward: 0, encounterWeight: 0, isExpeditionMob: true, damageType: 'magic' }),
+    mob({ id: m.expCorruptedTreant, name: 'Corrupted Treant', zoneId: z.forestEdge, level: 14, hp: 400, accuracy: 20, defence: 24, magicDefence: 16, evasion: 2, damageMin: 14, damageMax: 22, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expBlightedDryad, name: 'Blighted Dryad', zoneId: z.forestEdge, level: 14, hp: 300, accuracy: 18, defence: 14, magicDefence: 20, evasion: 8, damageMin: 12, damageMax: 20, xpReward: 0, encounterWeight: 0, isExpeditionMob: true, damageType: 'magic' }),
+    mob({ id: m.expGroveWarden, name: 'Grove Warden', zoneId: z.forestEdge, level: 15, hp: 700, accuracy: 22, defence: 22, magicDefence: 16, evasion: 4, damageMin: 18, damageMax: 28, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expThornVine, name: 'Thorn Vine', zoneId: z.forestEdge, level: 10, hp: 80, accuracy: 14, defence: 10, magicDefence: 6, evasion: 2, damageMin: 6, damageMax: 10, xpReward: 0, encounterWeight: 0, isExpeditionMob: true }),
+    mob({ id: m.expBlightedSpore, name: 'Blighted Spore', zoneId: z.forestEdge, level: 10, hp: 60, accuracy: 12, defence: 6, magicDefence: 12, evasion: 4, damageMin: 4, damageMax: 8, xpReward: 0, encounterWeight: 0, isExpeditionMob: true, damageType: 'magic' }),
+    mob({ id: m.expRotHeart, name: 'The Rot Heart', zoneId: z.forestEdge, level: 16, hp: 1400, accuracy: 26, defence: 20, magicDefence: 22, evasion: 4, damageMin: 18, damageMax: 32, xpReward: 0, encounterWeight: 0, isExpeditionMob: true, damageType: 'magic' }),
   ];
 }

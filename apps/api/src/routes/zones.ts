@@ -38,6 +38,7 @@ import { applyGuildTax, getPlayerTaxRate, calculateInflatedCost, taxInfoFromResu
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 import { trackProgress } from '../services/progressService';
+import { checkExpeditionLockout } from '../services/expeditionLockoutService';
 
 
 
@@ -189,11 +190,12 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     throw new AppError(400, 'Already in this zone', 'ALREADY_IN_ZONE');
   }
 
-  // 3. Can't travel while recovering or at 0 HP
+  // 3. Can't travel while recovering, at 0 HP, or on an expedition
   const hpState = await getHpState(playerId);
   if (hpState.isRecovering || hpState.currentHp <= 0) {
     throw new AppError(400, 'Cannot travel while recovering', 'IS_RECOVERING');
   }
+  await checkExpeditionLockout(playerId);
   await assertNotOverEncumbered(playerId);
 
   // 4. Validate destination is discovered

@@ -59,7 +59,7 @@ describe('mob seed starter combat targets', () => {
 
   it('Forest Edge tier-1 mobs should stay within the early-zone hit-rate floor', () => {
     const forestEdgeTier1Mobs = getAllMobTemplates().filter(
-      (mob) => mob.zoneId === IDS.zones.forestEdge && mob.explorationTier === 1
+      (mob) => mob.zoneId === IDS.zones.forestEdge && mob.explorationTier === 1 && !mob.isExpeditionMob
     );
 
     const outOfBand = forestEdgeTier1Mobs

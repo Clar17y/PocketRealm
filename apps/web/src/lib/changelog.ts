@@ -7,6 +7,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.35',
+    date: '2026-03-11',
+    title: 'Expedition Combat Polish',
+    summary:
+      'Monsters in expeditions now use the same mode-aware hit system as the rest of the game, so evasion tanks are viable in dungeon runs. Mob spells like root and fear force affected players to defend, and boss abilities like Rally and Summon Adds make late rooms more dynamic. DOT effects now tick properly between raid rounds, and effect pills throughout the UI are easier to read at a glance. Dungeon rooms show randomised theme names instead of generic tier labels.',
+  },
+  {
+    version: '0.34',
+    date: '2026-03-11',
+    title: 'Guild Expeditions',
+    summary:
+      'Guilds can now launch multi-room dungeon expeditions. Sign up with your guildmates, then fight through themed rooms of increasing difficulty. Four Tier 1 themes are available at launch: Webwood Hollow, Fungal Depths, Verdant Ruins, and Ember Caverns, each with their own mob roster and flavour. Rooms scale in size and danger, ending with a boss encounter. Loot is distributed at the end based on contribution.',
+  },
+  {
     version: '0.33',
     date: '2026-03-10',
     title: 'Combat Balance Remediation',

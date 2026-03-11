@@ -51,6 +51,7 @@ import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
 import { getMainHandAttackSkill } from '../../services/combatStatsService';
+import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
 import {
   startSchema,
   pickWeighted,
@@ -78,6 +79,7 @@ export const startRouter = Router();
  */
 startRouter.post('/start', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
+    await checkExpeditionLockout(playerId);
     const body = startSchema.parse(req.body);
 
     const hpState = await assertCanAct(playerId);

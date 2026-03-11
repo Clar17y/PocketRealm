@@ -39,6 +39,13 @@ describe('sellItem', () => {
     await expect(sellItem('p1', 'item-1')).rejects.toThrow('Cannot sell equipped items');
   });
 
+  it('throws when item is soulbound', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({ isSoulbound: true })
+    );
+    await expect(sellItem('p1', 'item-1')).rejects.toThrow('Soulbound items cannot be sold');
+  });
+
   it('throws when item has no sell price', async () => {
     mockPrisma.item.findUnique.mockResolvedValue(
       makeItem({ template: { sellPrice: null, tier: 1 } })
@@ -125,6 +132,18 @@ describe('sellBulk', () => {
   it('skips equipped items', async () => {
     mockPrisma.item.findUnique.mockResolvedValue(
       makeItem({ equipment: [{ slot: 'main_hand' }] })
+    );
+    mockPrisma.player.update.mockResolvedValue({ gold: 0 });
+
+    const result = await sellBulk('p1', ['item-1']);
+
+    expect(result.soldCount).toBe(0);
+    expect(result.totalGoldEarned).toBe(0);
+  });
+
+  it('skips soulbound items', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue(
+      makeItem({ isSoulbound: true })
     );
     mockPrisma.player.update.mockResolvedValue({ gold: 0 });
 

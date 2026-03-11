@@ -22,6 +22,8 @@ export interface BossActiveEffect {
   stat: string;
   modifier: number;
   roundsRemaining: number;
+  damagePerRound?: number;
+  dotDamageType?: 'physical' | 'magic';
 }
 
 export type WorldEventScope = 'zone' | 'world';
