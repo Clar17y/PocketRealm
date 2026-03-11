@@ -15,7 +15,9 @@ export type SupportiveAction =
   | 'heal_self'
   | 'heal_ally'
   | 'taunt'
-  | 'use_potion';
+  | 'use_potion'
+  | 'use_cleanse_potion'
+  | 'use_buff_potion';
 
 export type DefensiveAction =
   | 'defend'
@@ -77,7 +79,7 @@ export interface ActionDefinition {
   /** Number of rounds this ability forces boss to target the user (taunt) */
   tauntDuration?: number;
   /** Potion type consumed */
-  potionType?: 'hp' | 'stamina' | 'mana';
+  potionType?: 'hp' | 'stamina' | 'mana' | 'cleanse' | 'buff_attack' | 'buff_defence';
   /** Which skill/attribute/weapon stat drives this action's damage.
    * 'weapon' = resolved from equipped weapon's requiredSkill at combat time.
    * Defaults to 'weapon' if omitted. */

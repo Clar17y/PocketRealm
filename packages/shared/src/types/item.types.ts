@@ -17,11 +17,20 @@ export interface ItemTemplate {
   sellPrice?: number | null;
 }
 
-export type ConsumableEffectType = 'heal_flat' | 'heal_percent' | 'restore_stamina' | 'restore_mana';
+export type ConsumableEffectType =
+  | 'heal_flat'
+  | 'heal_percent'
+  | 'restore_stamina'
+  | 'restore_mana'
+  | 'cleanse_magic_dot'
+  | 'buff_attack'
+  | 'buff_defence';
 
 export interface ConsumableEffect {
   type: ConsumableEffectType;
   value: number;
+  /** Duration in rounds (used by buff potions) */
+  duration?: number;
 }
 
 export interface Item {
