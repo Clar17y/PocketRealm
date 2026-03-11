@@ -531,7 +531,7 @@ function getRoundInterval(rooms: ExpeditionRoomDefinition[], currentRoom: number
 // ---------------------------------------------------------------------------
 
 async function buildRaidParticipant(
-  member: { playerId: string; currentHp: number; currentStamina: number; currentMana: number; templateRound: number; activeEffects: unknown; targetMobId?: string | null; healTargetPlayerId?: string | null; player?: { username: string; isBot?: boolean } },
+  member: { playerId: string; currentHp: number; currentStamina: number; currentMana: number; templateRound: number; activeEffects: unknown; targetMobId?: string | null; healTargetPlayerId?: string | null; player?: { username: string } },
 ): Promise<RaidParticipant> {
   // Fetch equipment + progression first to compute maxHp (needed by preparePlayerForCombat)
   const [equipStats, progression] = await Promise.all([
@@ -555,15 +555,18 @@ async function buildRaidParticipant(
   );
   applyGuildCombatModifiers(stats, prep.guildMods);
 
-  // Bots get all actions; players get only unlocked ones
+  // Include unlocked actions + any actions referenced by the player's template
+  const unlockedSet = new Set(prep.unlockedActions);
   const filteredActions: Record<string, ActionDefinition> = {};
-  if (member.player?.isBot) {
-    Object.assign(filteredActions, BASE_ACTION_DEFINITIONS);
-  } else {
-    const unlockedSet = new Set(prep.unlockedActions);
-    for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
-      if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-        filteredActions[id] = def;
+  for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
+    if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
+      filteredActions[id] = def;
+    }
+  }
+  for (const slot of prep.playerTemplate) {
+    for (const actionId of [slot.actionId, slot.thenActionId]) {
+      if (actionId && !filteredActions[actionId] && BASE_ACTION_DEFINITIONS[actionId]) {
+        filteredActions[actionId] = BASE_ACTION_DEFINITIONS[actionId];
       }
     }
   }
@@ -689,7 +692,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id: expeditionId },
     include: {
-      members: { include: { player: { select: { username: true, isBot: true } } } },
+      members: { include: { player: { select: { username: true } } } },
     },
   });
   if (!expedition || expedition.status !== 'in_progress') return;
