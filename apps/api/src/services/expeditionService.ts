@@ -531,7 +531,7 @@ function getRoundInterval(rooms: ExpeditionRoomDefinition[], currentRoom: number
 // ---------------------------------------------------------------------------
 
 async function buildRaidParticipant(
-  member: { playerId: string; currentHp: number; currentStamina: number; currentMana: number; templateRound: number; activeEffects: unknown; targetMobId?: string | null; healTargetPlayerId?: string | null; player?: { username: string } },
+  member: { playerId: string; currentHp: number; currentStamina: number; currentMana: number; templateRound: number; activeEffects: unknown; targetMobId?: string | null; healTargetPlayerId?: string | null; player?: { username: string; isBot?: boolean } },
 ): Promise<RaidParticipant> {
   // Fetch equipment + progression first to compute maxHp (needed by preparePlayerForCombat)
   const [equipStats, progression] = await Promise.all([
@@ -555,12 +555,16 @@ async function buildRaidParticipant(
   );
   applyGuildCombatModifiers(stats, prep.guildMods);
 
-  // Filter actions to only those the player has unlocked
-  const unlockedSet = new Set(prep.unlockedActions);
+  // Bots get all actions; players get only unlocked ones
   const filteredActions: Record<string, ActionDefinition> = {};
-  for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
-    if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-      filteredActions[id] = def;
+  if (member.player?.isBot) {
+    Object.assign(filteredActions, BASE_ACTION_DEFINITIONS);
+  } else {
+    const unlockedSet = new Set(prep.unlockedActions);
+    for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
+      if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
+        filteredActions[id] = def;
+      }
     }
   }
 
@@ -685,7 +689,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id: expeditionId },
     include: {
-      members: { include: { player: { select: { username: true } } } },
+      members: { include: { player: { select: { username: true, isBot: true } } } },
     },
   });
   if (!expedition || expedition.status !== 'in_progress') return;

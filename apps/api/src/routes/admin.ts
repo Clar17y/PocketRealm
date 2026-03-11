@@ -657,17 +657,41 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
       }),
     ]);
 
-    // Create combat template with basic actions
+    // Create combat template: conditional potion usage + buff opener + sustained DPS
     const template = await prisma.combatTemplate.create({
-      data: { playerId: bot.id, name: 'Bot Default', isActive: true },
+      data: { playerId: bot.id, name: 'Bot Expedition', isActive: true },
     });
     await prisma.combatTemplateSlot.createMany({
       data: [
-        { templateId: template.id, sortOrder: 0, actionId: 'normal_attack' },
-        { templateId: template.id, sortOrder: 1, actionId: 'normal_attack' },
-        { templateId: template.id, sortOrder: 2, actionId: 'defend' },
+        // Slot 0: Open with battle_cry buff, else normal_attack
+        { templateId: template.id, sortOrder: 0, actionId: 'normal_attack',
+          condition: { type: 'no_buff', effectName: 'Battle Cry' }, thenActionId: 'battle_cry' },
+        // Slot 1: Venomous strike for DoT, potion if low HP
+        { templateId: template.id, sortOrder: 1, actionId: 'venomous_strike',
+          condition: { type: 'resource_below', resource: 'hp', threshold: 50 }, thenActionId: 'use_hp_potion' },
+        // Slot 2: Rending slash for bleed DoT, potion if low HP
+        { templateId: template.id, sortOrder: 2, actionId: 'rending_slash',
+          condition: { type: 'resource_below', resource: 'hp', threshold: 50 }, thenActionId: 'use_hp_potion' },
+        // Slot 3: Heavy attack for burst, potion if low HP
+        { templateId: template.id, sortOrder: 3, actionId: 'heavy_attack',
+          condition: { type: 'resource_below', resource: 'hp', threshold: 50 }, thenActionId: 'use_hp_potion' },
+        // Slot 4: Normal attack, potion if low HP
+        { templateId: template.id, sortOrder: 4, actionId: 'normal_attack',
+          condition: { type: 'resource_below', resource: 'hp', threshold: 50 }, thenActionId: 'use_hp_potion' },
+        // Slot 5: Normal attack, potion if low HP
+        { templateId: template.id, sortOrder: 5, actionId: 'normal_attack',
+          condition: { type: 'resource_below', resource: 'hp', threshold: 50 }, thenActionId: 'use_hp_potion' },
       ],
     });
+
+    // Grant 100 HP potions (find the tier-appropriate potion template)
+    const potionTemplate = await prisma.itemTemplate.findFirst({
+      where: { itemType: 'consumable', name: { contains: 'Health Potion', mode: 'insensitive' } },
+      orderBy: { tier: 'asc' },
+    });
+    if (potionTemplate) {
+      await addStackableItem(bot.id, potionTemplate.id, 100);
+    }
 
     // Sign up bot for expedition
     await prisma.guildExpeditionMember.create({
