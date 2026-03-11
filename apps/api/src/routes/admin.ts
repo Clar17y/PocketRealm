@@ -663,8 +663,8 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
     });
     await prisma.combatTemplateSlot.createMany({
       data: [
-        // Slot 0: Open with battle_cry buff, else normal_attack
-        { templateId: template.id, sortOrder: 0, actionId: 'normal_attack',
+        // Slot 0: Open with battle_cry buff, else light_attack
+        { templateId: template.id, sortOrder: 0, actionId: 'light_attack',
           condition: { type: 'no_buff', effectName: 'Battle Cry' }, thenActionId: 'battle_cry' },
         // Slot 1: Venomous strike for DoT, potion if low HP
         { templateId: template.id, sortOrder: 1, actionId: 'venomous_strike',
@@ -672,14 +672,11 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
         // Slot 2: Rending slash for bleed DoT, potion if low HP
         { templateId: template.id, sortOrder: 2, actionId: 'rending_slash',
           condition: { type: 'resource_below', resource: 'hp', threshold: 50 }, thenActionId: 'use_hp_potion' },
-        // Slot 3: Heavy attack for burst, potion if low HP
-        { templateId: template.id, sortOrder: 3, actionId: 'heavy_attack',
+        // Slot 3: Light attack, potion if low HP
+        { templateId: template.id, sortOrder: 3, actionId: 'light_attack',
           condition: { type: 'resource_below', resource: 'hp', threshold: 50 }, thenActionId: 'use_hp_potion' },
-        // Slot 4: Normal attack, potion if low HP
-        { templateId: template.id, sortOrder: 4, actionId: 'normal_attack',
-          condition: { type: 'resource_below', resource: 'hp', threshold: 50 }, thenActionId: 'use_hp_potion' },
-        // Slot 5: Normal attack, potion if low HP
-        { templateId: template.id, sortOrder: 5, actionId: 'normal_attack',
+        // Slot 4: Light attack, potion if low HP
+        { templateId: template.id, sortOrder: 4, actionId: 'light_attack',
           condition: { type: 'resource_below', resource: 'hp', threshold: 50 }, thenActionId: 'use_hp_potion' },
       ],
     });
