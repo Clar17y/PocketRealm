@@ -12,9 +12,10 @@ function buildAttack(overrides: Partial<PlayerAttackEntry>): PlayerAttackEntry {
     actionLabel: 'Power Strike',
     targetMobId: 'mob-1',
     targetMobName: 'Crystal Golem',
-    attackRoll: 17,
-    modifier: 5,
-    defenseTarget: 13,
+    hitChance: 0.75,
+    hitRollValue: 0.3,
+    attackerHitScore: 22,
+    defenderAvoidScore: 13,
     hit: true,
     crit: false,
     totalDamage: 12,
@@ -72,7 +73,7 @@ describe('RoundLogAttackRow', () => {
     const exhaustedAction = buildExhaustedAction({});
 
     expect(renderAttackRowText(currentPlayerAttack, 'player-1')).toBe(
-      'Power Strike → Crystal Golem | d20(17)+5 vs 13 | HIT 12 dmg',
+      'Power Strike → Crystal Golem | 75% hit (22 vs 13) | HIT 12 dmg',
     );
     expect(renderAttackRowText(otherPlayerAttack, 'player-1')).toBe(
       'SinStalker: aimed shot → Crystal Golem | HIT 8 dmg',
@@ -81,7 +82,7 @@ describe('RoundLogAttackRow', () => {
       'AutoTurret: suppressing fire → MISS',
     );
     expect(renderAttackRowText(currentPlayerNullTargetAttack, 'player-1')).toBe(
-      'Power Strike | d20(17)+5 vs 13 | HIT 12 dmg',
+      'Power Strike | 75% hit (22 vs 13) | HIT 12 dmg',
     );
     expect(renderAttackRowText(exhaustedAction, 'player-1')).toBe(
       'GuardBot: Counter → Defend (Exhausted: mana)',
