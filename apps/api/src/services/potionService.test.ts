@@ -76,7 +76,7 @@ describe('potionService', () => {
           quantity: 3,
           template: {
             id: 'tmpl-antivenom',
-            name: 'Antivenom Potion',
+            name: 'Cleansing Potion',
             consumableEffect: { type: 'cleanse_magic_dot' },
           },
         },
@@ -85,7 +85,7 @@ describe('potionService', () => {
       const result = await buildPotionPool('player-1', 200);
       expect(result).toHaveLength(3);
       expect(result[0]).toEqual({
-        name: 'Antivenom Potion',
+        name: 'Cleansing Potion',
         healAmount: 0,
         templateId: 'tmpl-antivenom',
         potionType: 'cleanse',

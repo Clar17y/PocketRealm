@@ -1756,7 +1756,7 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b, {
         potions: [
-          { name: 'Antivenom Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse' },
+          { name: 'Cleansing Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse' },
         ],
       });
 
@@ -1787,7 +1787,7 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b, {
         potions: [
-          { name: 'Antivenom Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse' },
+          { name: 'Cleansing Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse' },
         ],
       });
 

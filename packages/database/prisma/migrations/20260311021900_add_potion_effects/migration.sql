@@ -5,7 +5,8 @@
 DO $$
 BEGIN
   UPDATE "ItemTemplate"
-  SET "consumableEffect" = '{"type": "cleanse_magic_dot", "value": 0}'::jsonb
+  SET name = 'Cleansing Potion',
+      "consumableEffect" = '{"type": "cleanse_magic_dot", "value": 0}'::jsonb
   WHERE name = 'Antivenom Potion' AND "consumableEffect" IS NULL;
 
   UPDATE "ItemTemplate"
