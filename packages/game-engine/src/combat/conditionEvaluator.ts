@@ -1,4 +1,5 @@
 import type { ActiveEffect, CombatActor, SlotCondition, ConditionResourceType } from '@pocketrealm/shared';
+import { isStatDebuff, isMagicDot } from './templateCombatEngine';
 
 function getResourcePercent(
   resource: ConditionResourceType,
@@ -41,8 +42,8 @@ export function evaluateCondition(
     case 'no_debuff':
       return !activeEffects.some(e => e.target === actorKey && e.name === condition.effectName);
     case 'any_debuff':
-      return activeEffects.some(e => e.target === actorKey && e.stat !== 'potionSickness' && (e.modifier < 0 || (e.resolvedDamagePerRound != null && e.resolvedDamagePerRound > 0)));
+      return activeEffects.some(e => isStatDebuff(e, actorKey) || isMagicDot(e, actorKey));
     case 'any_magic_dot':
-      return activeEffects.some(e => e.target === actorKey && e.resolvedDamagePerRound != null && e.resolvedDamagePerRound > 0 && e.dotDamageType === 'magic');
+      return activeEffects.some(e => isMagicDot(e, actorKey));
   }
 }
