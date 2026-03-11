@@ -113,6 +113,42 @@ const useManaPotion: ActionDefinition = {
   isChanneling: true,
 };
 
+const useCleansePotion: ActionDefinition = {
+  id: 'use_cleanse_potion',
+  name: 'Use Cleanse Potion',
+  description: 'Drink a cleanse potion to remove magic DOTs (Poison, Burn, etc.). Triggers potion sickness.',
+  actionType: 'use_cleanse_potion',
+  category: 'supportive',
+  scalingStat: 'weapon',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.USE_CLEANSE_POTION_STAMINA, mana: 0 },
+  potionType: 'cleanse',
+  isChanneling: true,
+};
+
+const useResistPotion: ActionDefinition = {
+  id: 'use_resist_potion',
+  name: 'Use Resist Potion',
+  description: 'Drink a resist potion to boost defence and magic defence. Triggers potion sickness.',
+  actionType: 'use_buff_potion',
+  category: 'supportive',
+  scalingStat: 'weapon',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.USE_BUFF_POTION_STAMINA, mana: 0 },
+  potionType: 'buff_defence',
+  isChanneling: true,
+};
+
+const useElixirOfPower: ActionDefinition = {
+  id: 'use_elixir_of_power',
+  name: 'Use Elixir of Power',
+  description: 'Drink an elixir to boost attack damage. Triggers potion sickness.',
+  actionType: 'use_buff_potion',
+  category: 'supportive',
+  scalingStat: 'weapon',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.USE_BUFF_POTION_STAMINA, mana: 0 },
+  potionType: 'buff_attack',
+  isChanneling: true,
+};
+
 // --- Melee Talent Actions ---
 
 const powerStrike: ActionDefinition = {
@@ -630,6 +666,7 @@ export const ALWAYS_AVAILABLE_ACTION_IDS = new Set([
   'light_attack', 'normal_attack', 'heavy_attack',
   'defend', 'counter', 'ward',
   'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
+  'use_cleanse_potion', 'use_resist_potion', 'use_elixir_of_power',
 ]);
 
 export const BASE_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
@@ -643,6 +680,9 @@ export const BASE_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   use_hp_potion: useHpPotion,
   use_stamina_potion: useStaminaPotion,
   use_mana_potion: useManaPotion,
+  use_cleanse_potion: useCleansePotion,
+  use_resist_potion: useResistPotion,
+  use_elixir_of_power: useElixirOfPower,
   // Melee talents
   power_strike: powerStrike,
   cleave,

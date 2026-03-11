@@ -555,6 +555,10 @@ export const COMBAT_ACTION_CONSTANTS = {
   LIFE_DRAIN_MANA: 35,
   CURSE_MANA: 20,
   ENFEEBLE_MANA: 20,
+
+  // Utility potion actions
+  USE_CLEANSE_POTION_STAMINA: 5,
+  USE_BUFF_POTION_STAMINA: 5,
 } as const;
 
 // =============================================================================
@@ -603,6 +607,14 @@ export const POTION_CONSTANTS = {
   MINOR_MANA_RESTORE: 20,
   MANA_RESTORE: 40,
   GREATER_MANA_RESTORE: 70,
+} as const;
+
+export const BUFF_POTION_CONSTANTS = {
+  ELIXIR_ATTACK_PERCENT: 0.25,
+  ELIXIR_DURATION: 5,
+  RESIST_DEFENCE_BONUS: 15,
+  RESIST_MAGIC_DEFENCE_BONUS: 15,
+  RESIST_DURATION: 5,
 } as const;
 
 // =============================================================================
