@@ -58,6 +58,8 @@ const CONDITION_OPTIONS: ConditionOption[] = [
   { value: 'has_debuff', label: 'Debuff active' },
   { value: 'no_buff', label: 'Buff missing' },
   { value: 'no_debuff', label: 'Debuff cleared' },
+  { value: 'any_debuff', label: 'Any debuff active' },
+  { value: 'any_magic_dot', label: 'Any magic DOT active' },
 ];
 
 function conditionToCombo(c: SlotCondition): string {
@@ -78,17 +80,25 @@ function comboToCondition(combo: string, prev?: SlotCondition): SlotCondition {
     mana_below: 'resource_below', mana_above: 'resource_above',
     has_buff: 'has_buff', has_debuff: 'has_debuff',
     no_buff: 'no_buff', no_debuff: 'no_debuff',
+    any_debuff: 'any_debuff', any_magic_dot: 'any_magic_dot',
   };
   const type = typeMap[combo] ?? 'resource_below';
   const resource = resourceMap[combo];
   if (resource) {
     return { type, resource, threshold: prev?.threshold ?? 50 };
   }
+  if (type === 'any_debuff' || type === 'any_magic_dot') {
+    return { type };
+  }
   return { type, effectName: prev?.effectName ?? '' };
 }
 
 function isResourceCondition(c: SlotCondition): boolean {
   return c.type === 'resource_below' || c.type === 'resource_above';
+}
+
+function needsEffectName(c: SlotCondition): boolean {
+  return c.type === 'has_buff' || c.type === 'has_debuff' || c.type === 'no_buff' || c.type === 'no_debuff';
 }
 
 // --- Condition summary helper ---
@@ -100,6 +110,8 @@ function conditionSummary(c: SlotCondition): string {
   if (c.type === 'has_debuff') return `${c.effectName ?? 'debuff'} active`;
   if (c.type === 'no_buff') return `${c.effectName ?? 'buff'} missing`;
   if (c.type === 'no_debuff') return `${c.effectName ?? 'debuff'} cleared`;
+  if (c.type === 'any_debuff') return 'Any debuff active';
+  if (c.type === 'any_magic_dot') return 'Any magic DOT active';
   return c.type;
 }
 
@@ -546,7 +558,7 @@ export function Templates({
                               </select>
                             </div>
 
-                            {/* Value: threshold or effect name */}
+                            {/* Value: threshold, effect name, or nothing (any_debuff/any_magic_dot) */}
                             <div>
                               <label className="text-[10px] text-[var(--rpg-text-secondary)] uppercase font-bold mb-1 block">Value</label>
                               {isResourceCondition(slot.condition!) ? (
@@ -564,7 +576,7 @@ export function Templates({
                                   />
                                   <span className="text-sm text-[var(--rpg-text-secondary)]">%</span>
                                 </div>
-                              ) : (
+                              ) : needsEffectName(slot.condition!) ? (
                                 <select
                                   value={slot.condition!.effectName ?? ''}
                                   onChange={e => updateSlot(i, { condition: { ...slot.condition!, effectName: e.target.value } })}
@@ -585,6 +597,8 @@ export function Templates({
                                     </optgroup>
                                   )}
                                 </select>
+                              ) : (
+                                <span className="text-sm text-[var(--rpg-text-secondary)] italic min-h-[44px] flex items-center">No value needed</span>
                               )}
                             </div>
 
