@@ -28,6 +28,7 @@ import type {
   ExpeditionMobInfo,
   ExpeditionRoundLog,
   ExpeditionCooldownInfo,
+  BossActiveEffect,
 } from '@pocketrealm/shared';
 import { EXPEDITION_CONSTANTS, EXPEDITION_THEMES, mobDisplayName } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
@@ -146,16 +147,48 @@ function HpBar({ current, max, label, color }: { current: number; max: number; l
   );
 }
 
-function EffectBadge({ name, roundsRemaining, isDebuff }: { name: string; roundsRemaining: number; isDebuff: boolean }) {
+function isEffectDebuff(effect: BossActiveEffect): boolean {
+  if (effect.stat === 'potionSickness') return true;
+  if (effect.damagePerRound && effect.damagePerRound > 0) return true;
+  if (effect.stat === 'rooted' || effect.stat === 'marked_for_death' || effect.stat === 'nature_cursed') return true;
+  return (effect.modifier ?? 0) < 0;
+}
+
+function effectDetail(effect: BossActiveEffect): string {
+  const parts: string[] = [];
+  if (effect.modifier && effect.modifier !== 0) {
+    parts.push(`${effect.stat} ${effect.modifier > 0 ? '+' : ''}${effect.modifier}`);
+  }
+  if (effect.damagePerRound && effect.damagePerRound > 0) {
+    parts.push(`${effect.damagePerRound} ${effect.dotDamageType ?? 'magic'} dmg/round`);
+  }
+  parts.push(`${effect.roundsRemaining}r remaining`);
+  return parts.join(' · ');
+}
+
+function EffectPill({ effect, isDebuff }: { effect: BossActiveEffect; isDebuff?: boolean }) {
+  const [showDetail, setShowDetail] = useState(false);
+  const debuff = isDebuff ?? isEffectDebuff(effect);
+
   return (
-    <span
-      className={`text-[8px] px-1 py-0 rounded ${
-        isDebuff
-          ? 'bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]'
-          : 'bg-[var(--rpg-green-light)]/20 text-[var(--rpg-green-light)]'
-      }`}
-    >
-      {name} ({roundsRemaining})
+    <span className="relative">
+      <button
+        type="button"
+        onClick={() => setShowDetail(!showDetail)}
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer ${
+          debuff
+            ? 'bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]'
+            : 'bg-[var(--rpg-blue-light)]/20 text-[var(--rpg-blue-light)]'
+        }`}
+      >
+        {effect.name}
+        <span className="opacity-70">{effect.roundsRemaining}r</span>
+      </button>
+      {showDetail && (
+        <span className="absolute bottom-full left-0 mb-1 px-2 py-1 rounded bg-[var(--rpg-surface)] border border-[var(--rpg-border)] text-[10px] text-[var(--rpg-text-primary)] whitespace-nowrap z-10 shadow-lg">
+          {effectDetail(effect)}
+        </span>
+      )}
     </span>
   );
 }
@@ -811,9 +844,9 @@ function InProgressView({
                     color={mob.hp <= mob.maxHp * 0.25 ? 'var(--rpg-red)' : 'var(--rpg-green-light)'}
                   />
                   {mob.activeEffects?.length > 0 && (
-                    <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    <div className="flex flex-wrap gap-1 mt-0.5">
                       {mob.activeEffects.map((eff, idx) => (
-                        <EffectBadge key={idx} name={eff.name} roundsRemaining={eff.roundsRemaining} isDebuff={true} />
+                        <EffectPill key={idx} effect={eff} isDebuff={true} />
                       ))}
                     </div>
                   )}
@@ -864,7 +897,7 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
 
   return (
     <PixelCard>
-      <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-2">Round Log</h4>
+      <h4 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-2">Round Log</h4>
       <div className="space-y-1">
         {reversedLogs.map(({ log, idx }) => {
           const key = String(idx);
@@ -879,7 +912,7 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
                 <span className="text-[var(--rpg-text-primary)] font-bold">
                   {logs.some(l => l.roomIndex !== logs[0]?.roomIndex) ? `R${log.roomIndex + 1} · ` : ''}Round {log.round}
                 </span>
-                <div className="flex gap-2 text-[10px]">
+                <div className="flex gap-2 text-xs">
                   {outcome.mobsKilled > 0 && (
                     <span className="text-[var(--rpg-green-light)]">{outcome.mobsKilled} killed</span>
                   )}
@@ -901,7 +934,7 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
                   {/* Player Attacks */}
                   {log.phases.playerAttacks.length > 0 && (
                     <div>
-                      <p className="text-[10px] text-[var(--rpg-text-secondary)] font-bold mb-0.5">Attacks</p>
+                      <p className="text-xs text-[var(--rpg-text-secondary)] font-bold mb-0.5">Attacks</p>
                       {log.phases.playerAttacks.map((atk, j) => {
                         return (
                           <RoundLogAttackRow
@@ -917,9 +950,9 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
                   {/* Defences */}
                   {log.phases.defences?.length > 0 && (
                     <div>
-                      <p className="text-[10px] text-[var(--rpg-text-secondary)] font-bold mb-0.5">Defences</p>
+                      <p className="text-xs text-[var(--rpg-text-secondary)] font-bold mb-0.5">Defences</p>
                       {log.phases.defences.map((d, j) => (
-                        <div key={j} className="text-[10px] ml-2 text-[var(--rpg-blue-light)]">
+                        <div key={j} className="text-xs ml-2 text-[var(--rpg-blue-light)]">
                           {d.username}: {d.actionLabel}
                         </div>
                       ))}
@@ -929,9 +962,9 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
                   {/* Healing */}
                   {log.phases.healing.length > 0 && (
                     <div>
-                      <p className="text-[10px] text-[var(--rpg-text-secondary)] font-bold mb-0.5">Healing</p>
+                      <p className="text-xs text-[var(--rpg-text-secondary)] font-bold mb-0.5">Healing</p>
                       {log.phases.healing.map((h, j) => (
-                        <div key={j} className="text-[10px] ml-2 text-[var(--rpg-green-light)]">
+                        <div key={j} className="text-xs ml-2 text-[var(--rpg-green-light)]">
                           {h.username}: {h.actionLabel} → {h.targetUsername} +{h.amountHealed} HP
                         </div>
                       ))}
@@ -941,27 +974,27 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
                   {/* Mob Actions */}
                   {log.phases.mobActions.length > 0 && (
                     <div>
-                      <p className="text-[10px] text-[var(--rpg-text-secondary)] font-bold mb-0.5">Enemy Actions</p>
+                      <p className="text-xs text-[var(--rpg-text-secondary)] font-bold mb-0.5">Enemy Actions</p>
                       {log.phases.mobActions.map((ma, j) => (
                         <div
                           key={j}
-                          className={`text-[10px] ml-2 mb-0.5 p-1 rounded ${
+                          className={`text-xs ml-2 mb-0.5 p-1 rounded ${
                             ma.wasTelegraphed
                               ? 'border border-[var(--rpg-gold)] bg-[var(--rpg-gold)]/5'
                               : ''
                           }`}
                         >
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-wrap">
                             <span className="text-[var(--rpg-red)] font-bold">{ma.mobName}</span>
                             <span className="text-[var(--rpg-text-secondary)]">uses</span>
                             <span className="text-[var(--rpg-text-primary)]">{ma.actionLabel}</span>
                             {ma.wasTelegraphed && (
-                              <span className="px-1 py-0 rounded text-[8px] bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
                                 TELEGRAPHED
                               </span>
                             )}
                             {ma.targetMode === 'aoe' && (
-                              <span className="px-1 py-0 rounded text-[8px] bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]">
                                 AOE
                               </span>
                             )}
@@ -989,12 +1022,30 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
                     </div>
                   )}
 
+                  {/* Effect Ticks (DoT damage) */}
+                  {log.phases.effectTicks?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-[var(--rpg-text-secondary)] font-bold mb-0.5">Effect Ticks</p>
+                      {log.phases.effectTicks.map((tick, j) => (
+                        <div key={j} className="text-xs ml-2">
+                          <span className={tick.targetType === 'mob' ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-primary)]'}>
+                            {tick.targetName}
+                          </span>
+                          <span className="text-[var(--rpg-text-secondary)]"> takes </span>
+                          <span className="text-[var(--rpg-red)]">-{tick.damage} HP</span>
+                          <span className="text-[var(--rpg-text-secondary)]"> from {tick.effectName}</span>
+                          <span className="text-[var(--rpg-text-secondary)] opacity-60"> ({tick.hpAfter} HP)</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Telegraphs */}
                   {log.telegraphs.length > 0 && (
                     <div className="border border-[var(--rpg-gold)] bg-[var(--rpg-gold)]/5 rounded p-1.5">
-                      <p className="text-[10px] text-[var(--rpg-gold)] font-bold mb-0.5">Next Round Warning</p>
+                      <p className="text-xs text-[var(--rpg-gold)] font-bold mb-0.5">Next Round Warning</p>
                       {log.telegraphs.map((t, j) => (
-                        <div key={j} className="text-[10px] text-[var(--rpg-gold)]">
+                        <div key={j} className="text-xs text-[var(--rpg-gold)]">
                           {t.warningText}
                         </div>
                       ))}
@@ -1002,7 +1053,7 @@ function RoundLogList({ logs, playerId }: { logs: ExpeditionRoundLog[]; playerId
                   )}
 
                   {/* Outcome */}
-                  <div className="text-[10px] text-[var(--rpg-text-secondary)] border-t border-[var(--rpg-border)] pt-1">
+                  <div className="text-xs text-[var(--rpg-text-secondary)] border-t border-[var(--rpg-border)] pt-1">
                     Mobs: {outcome.mobsAlive} alive, {outcome.mobsKilled} killed
                     {' | '}
                     Players: {outcome.playersAlive} alive{outcome.playersKnockedOut > 0 && `, ${outcome.playersKnockedOut} KO`}
@@ -1205,11 +1256,10 @@ function MemberList({
                 )}
               </div>
               {m.activeEffects?.length > 0 && (
-                <div className="flex flex-wrap gap-0.5">
-                  {m.activeEffects.map((eff, idx) => {
-                    const isDebuff = eff.stat === 'potionSickness' || (eff.modifier ?? 0) < 0;
-                    return <EffectBadge key={idx} name={eff.name} roundsRemaining={eff.roundsRemaining} isDebuff={isDebuff} />;
-                  })}
+                <div className="flex flex-wrap gap-1">
+                  {m.activeEffects.map((eff, idx) => (
+                    <EffectPill key={idx} effect={eff} />
+                  ))}
                 </div>
               )}
               {showResources && (

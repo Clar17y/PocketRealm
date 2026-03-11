@@ -60,7 +60,7 @@ export function RoundLogAttackRow({
 }) {
   if (isExhaustedActionEntry(attack)) {
     return (
-      <div className="text-[10px] ml-2 text-[var(--rpg-text-secondary)]">
+      <div className="text-xs ml-2 text-[var(--rpg-text-secondary)]">
         <span className="text-[var(--rpg-text-primary)]">{attack.username}</span>
         {': '}
         {attack.intendedActionLabel}
@@ -76,7 +76,7 @@ export function RoundLogAttackRow({
 
   if (formattedAttack.isCurrentPlayer) {
     return (
-      <div className="text-[10px] ml-2 mb-0.5 p-1 rounded bg-[var(--rpg-surface)]">
+      <div className="text-xs ml-2 mb-0.5 p-1 rounded bg-[var(--rpg-surface)]">
         <span className="text-[var(--rpg-gold)] font-bold">{formattedAttack.actionText}</span>
         {formattedAttack.targetText && (
           <>
@@ -108,7 +108,7 @@ export function RoundLogAttackRow({
   }
 
   return (
-    <div className="text-[10px] ml-2 text-[var(--rpg-text-secondary)]">
+    <div className="text-xs ml-2 text-[var(--rpg-text-secondary)]">
       <span className="text-[var(--rpg-text-primary)]">{formattedAttack.actorNameText}</span>
       {': '}
       {formattedAttack.actionText}

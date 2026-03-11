@@ -13,6 +13,7 @@ import type {
   MobActionLogEntry,
   HealingEntry,
   MobTelegraphEntry,
+  EffectTickEntry,
   ExpeditionRoundLog,
   CombatPotion,
   PotionConsumed,
@@ -708,16 +709,26 @@ export function resolveRaidRound(
   applyResourceCosts(input.participants, pState);
 
   // --- Step 9: Tick effects ---
+  const logEffectTicks: EffectTickEntry[] = [];
+
   // Tick mob effects: apply DoT damage, then decrement duration
   for (const mob of mobState) {
     if (mob.hp <= 0) continue;
     const remaining: BossActiveEffect[] = [];
     for (const effect of mob.activeEffects) {
-      // Apply DoT damage
       if (effect.damagePerRound && effect.damagePerRound > 0 && mob.hp > 0) {
         const defence = effect.dotDamageType === 'physical' ? mob.stats.defence : mob.stats.magicDefence;
         const dotDmg = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, effect.damagePerRound - defence);
         mob.hp = Math.max(0, mob.hp - dotDmg);
+        logEffectTicks.push({
+          targetType: 'mob',
+          targetId: mob.id,
+          targetName: mobDisplayName(mob),
+          effectName: effect.name,
+          damage: dotDmg,
+          damageType: effect.dotDamageType ?? 'magic',
+          hpAfter: mob.hp,
+        });
       }
       effect.roundsRemaining -= 1;
       if (effect.roundsRemaining > 0) {
@@ -756,6 +767,15 @@ export function resolveRaidRound(
         const dotDmg = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, effect.damagePerRound - defence);
         pState[idx].hp = Math.max(0, pState[idx].hp - dotDmg);
         pState[idx].damageTaken += dotDmg;
+        logEffectTicks.push({
+          targetType: 'player',
+          targetId: pState[idx].playerId,
+          targetName: getUsername(pState[idx].playerId),
+          effectName: effect.name,
+          damage: dotDmg,
+          damageType: effect.dotDamageType ?? 'magic',
+          hpAfter: pState[idx].hp,
+        });
       }
       const ticked = { ...effect, roundsRemaining: effect.roundsRemaining - 1 };
       if (ticked.roundsRemaining > 0) {
@@ -836,6 +856,7 @@ export function resolveRaidRound(
       defences: logDefences,
       mobActions: logMobActions,
       healing: logHealing,
+      effectTicks: logEffectTicks,
       outcome: {
         mobsAlive: mobsAfter.length,
         mobsKilled: mobsKilledThisRound,

@@ -263,6 +263,16 @@ export interface MobTelegraphEntry {
   warningText: string;
 }
 
+export interface EffectTickEntry {
+  targetType: 'player' | 'mob';
+  targetId: string;
+  targetName: string;
+  effectName: string;
+  damage: number;
+  damageType: 'physical' | 'magic';
+  hpAfter: number;
+}
+
 export interface ExpeditionRoundLog {
   round: number;
   roomIndex: number;
@@ -271,6 +281,7 @@ export interface ExpeditionRoundLog {
     defences: DefensiveActionEntry[];
     mobActions: MobActionLogEntry[];
     healing: HealingEntry[];
+    effectTicks: EffectTickEntry[];
     outcome: RoundOutcomeEntry;
   };
   telegraphs: MobTelegraphEntry[];
