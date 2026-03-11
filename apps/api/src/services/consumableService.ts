@@ -35,8 +35,9 @@ export async function useConsumable(
     throw new AppError(400, 'This consumable has no usable effect yet', 'NO_EFFECT');
   }
 
-  if (effect.type === 'restore_stamina' || effect.type === 'restore_mana') {
-    throw new AppError(400, 'Stamina and mana potions can only be used in combat', 'COMBAT_ONLY');
+  if (effect.type === 'restore_stamina' || effect.type === 'restore_mana'
+      || effect.type === 'cleanse_magic_dot' || effect.type === 'buff_attack' || effect.type === 'buff_defence') {
+    throw new AppError(400, 'This potion can only be used in combat', 'COMBAT_ONLY');
   }
 
   const hpState = await getHpState(playerId, now);
