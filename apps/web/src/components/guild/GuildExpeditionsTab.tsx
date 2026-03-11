@@ -38,16 +38,20 @@ import { RoundLogAttackRow } from './guildExpeditionRoundLog';
 // Tier definitions — derived from shared constants
 // ---------------------------------------------------------------------------
 
-const TIER_NAMES = ['Forest Depths', 'Cavern Descent', 'Ruined Citadel'];
-
-const TIER_CONFIGS = EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER.map((levelReq, i) => ({
-  tier: i + 1,
-  name: TIER_NAMES[i],
-  levelReq,
-  treasuryCost: EXPEDITION_CONSTANTS.TREASURY_COST_BY_TIER[i],
-  minParticipants: EXPEDITION_CONSTANTS.MIN_PARTICIPANTS_BY_TIER[i],
-  totalRooms: EXPEDITION_CONSTANTS.ROOMS_BY_TIER[i],
-}));
+const TIER_CONFIGS = EXPEDITION_CONSTANTS.LEVEL_REQUIREMENT_BY_TIER.map((levelReq, i) => {
+  const tier = i + 1;
+  const themeNames = EXPEDITION_THEMES
+    .filter(t => t.tier === tier)
+    .map(t => t.name);
+  return {
+    tier,
+    themeNames,
+    levelReq,
+    treasuryCost: EXPEDITION_CONSTANTS.TREASURY_COST_BY_TIER[i],
+    minParticipants: EXPEDITION_CONSTANTS.MIN_PARTICIPANTS_BY_TIER[i],
+    totalRooms: EXPEDITION_CONSTANTS.ROOMS_BY_TIER[i],
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Attempt Badge
@@ -465,7 +469,7 @@ function IdleView({
       <PixelCard>
         <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-1">Expeditions</h3>
         <p className="text-xs text-[var(--rpg-text-secondary)]">
-          Embark on multi-room dungeon raids with your guild. Clear rooms of enemies, defeat bosses, and earn expedition tokens for powerful gear.
+          Embark on multi-room dungeon raids with your guild. Each launch selects a random dungeon theme with unique enemies and bosses. Clear rooms, defeat bosses, and earn expedition tokens for powerful gear.
         </p>
       </PixelCard>
 
@@ -481,8 +485,13 @@ function IdleView({
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-sm font-bold text-[var(--rpg-text-primary)]">
-                      Tier {cfg.tier} — {cfg.name}
+                      Tier {cfg.tier} Expedition
                     </p>
+                    {cfg.themeNames.length > 0 && (
+                      <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-0.5">
+                        Random dungeon: {cfg.themeNames.join(', ')}
+                      </p>
+                    )}
                     <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
                       <span className="text-[var(--rpg-text-secondary)]">Level Req:</span>
                       <span className={levelTooLow ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-primary)]'}>
@@ -561,8 +570,8 @@ function RecruitingView({
             <p className="text-sm font-bold text-[var(--rpg-gold)]">
               Tier {expedition.tier} Expedition — Recruiting
             </p>
-            {(expedition.themeName || tierCfg) && (
-              <p className="text-xs text-[var(--rpg-text-secondary)]">{expedition.themeName ?? tierCfg?.name}</p>
+            {expedition.themeName && (
+              <p className="text-xs text-[var(--rpg-text-secondary)]">{expedition.themeName}</p>
             )}
           </div>
           <div className="flex flex-col items-end gap-0.5">
