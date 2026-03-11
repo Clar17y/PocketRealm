@@ -17,7 +17,7 @@ export const templatesRouter = Router();
 templatesRouter.use(authenticate);
 
 const conditionSchema = z.object({
-  type: z.enum(['resource_below', 'resource_above', 'has_buff', 'has_debuff', 'no_buff', 'no_debuff']),
+  type: z.enum(['resource_below', 'resource_above', 'has_buff', 'has_debuff', 'no_buff', 'no_debuff', 'any_debuff', 'any_magic_dot']),
   resource: z.enum(['hp', 'stamina', 'mana']).optional(),
   threshold: z.number().int().min(0).max(100).optional(),
   effectName: z.string().min(1).optional(),
