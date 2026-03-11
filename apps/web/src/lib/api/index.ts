@@ -146,6 +146,7 @@ export {
   adminGrantXp,
   adminSetAttributes,
   adminSetSkillLevel,
+  adminSetSkillLevels,
   adminGetItemTemplates,
   adminGrantItem,
   adminGetEventTemplates,

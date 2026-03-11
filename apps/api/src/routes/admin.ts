@@ -75,6 +75,29 @@ router.post('/set-skill-level', asyncHandler(async (req, res) => {
   res.json({ success: true, skillType, level });
 }));
 
+const setSkillLevelsSchema = z.object({
+  skillTypes: z.array(z.enum(ALL_SKILLS as [string, ...string[]])).min(1),
+  level: z.number().int().min(1).max(SKILL_CONSTANTS.MAX_LEVEL),
+});
+
+router.post('/set-skill-levels', asyncHandler(async (req, res) => {
+  const { skillTypes, level } = setSkillLevelsSchema.parse(req.body);
+  const xp = xpForLevel(level);
+  const playerId = req.player!.playerId;
+
+  await prisma.$transaction(
+    skillTypes.map((skillType) =>
+      prisma.playerSkill.upsert({
+        where: { playerId_skillType: { playerId, skillType } },
+        update: { level, xp: BigInt(xp) },
+        create: { playerId, skillType, level, xp: BigInt(xp) },
+      })
+    )
+  );
+
+  res.json({ success: true, skillTypes, level });
+}));
+
 const grantXpSchema = z.object({ amount: z.number().int().min(1) });
 
 router.post('/player/xp', asyncHandler(async (req, res) => {

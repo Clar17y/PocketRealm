@@ -9,6 +9,7 @@ import {
   adminGrantXp,
   adminSetAttributes,
   adminSetSkillLevel,
+  adminSetSkillLevels,
   adminGetItemTemplates,
   adminGrantItem,
   adminGetEventTemplates,
@@ -80,7 +81,7 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
   const [xp, setXp] = useState(10000);
   const [attrPoints, setAttrPoints] = useState(10);
   const [attrs, setAttrs] = useState({ vitality: 0, strength: 0, dexterity: 0, intelligence: 0, luck: 0, evasion: 0 });
-  const [skillType, setSkillType] = useState('melee');
+  const [selectedSkills, setSelectedSkills] = useState<Set<string>>(new Set());
   const [skillLevel, setSkillLevel] = useState(10);
   const { busy, msg, act } = useAdminAction(onAction);
 
@@ -154,20 +155,42 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
       </PixelCard>
 
       <PixelCard>
-        <h3 className="text-sm font-semibold text-[var(--rpg-gold)] mb-3">Set Skill Level</h3>
+        <h3 className="text-sm font-semibold text-[var(--rpg-gold)] mb-3">Set Skill Levels</h3>
+        <div className="grid grid-cols-3 gap-1 mb-3">
+          {['melee', 'ranged', 'magic', 'mining', 'foraging', 'woodcutting', 'refining', 'tanning', 'weaving',
+            'weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring', 'alchemy', 'jewelcrafting'].map((s) => (
+            <label key={s} className="flex items-center gap-1.5 text-xs text-[var(--rpg-text-primary)] cursor-pointer select-none">
+              <input type="checkbox" checked={selectedSkills.has(s)}
+                onChange={(e) => setSelectedSkills((prev) => {
+                  const next = new Set(prev);
+                  if (e.target.checked) next.add(s); else next.delete(s);
+                  return next;
+                })}
+                className="accent-[var(--rpg-gold)]" />
+              <span className="capitalize">{s}</span>
+            </label>
+          ))}
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <select value={skillType} onChange={(e) => setSkillType(e.target.value)}
-            className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm text-[var(--rpg-text-primary)]">
-            {['melee', 'ranged', 'magic', 'mining', 'foraging', 'woodcutting', 'refining', 'tanning', 'weaving',
-              'weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring', 'alchemy', 'jewelcrafting'].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+          <PixelButton size="sm" variant="gold" onClick={() => {
+            const all = ['melee', 'ranged', 'magic', 'mining', 'foraging', 'woodcutting', 'refining', 'tanning', 'weaving',
+              'weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring', 'alchemy', 'jewelcrafting'];
+            setSelectedSkills((prev) => prev.size === all.length ? new Set() : new Set(all));
+          }}>
+            {selectedSkills.size === 15 ? 'Deselect All' : 'Select All'}
+          </PixelButton>
           <input type="number" value={skillLevel} min={1} max={100}
             onChange={(e) => setSkillLevel(Number(e.target.value))}
             className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-20 text-[var(--rpg-text-primary)]" />
-          <PixelButton size="sm" disabled={busy}
-            onClick={() => act(`Set ${skillType} to ${skillLevel}`, () => adminSetSkillLevel(skillType, skillLevel), `Set ${skillType} to level ${skillLevel}?`)}>
+          <PixelButton size="sm" disabled={busy || selectedSkills.size === 0}
+            onClick={() => {
+              const skills = [...selectedSkills];
+              if (skills.length === 1) {
+                act(`Set ${skills[0]} to ${skillLevel}`, () => adminSetSkillLevel(skills[0], skillLevel), `Set ${skills[0]} to level ${skillLevel}?`);
+              } else {
+                act(`Set ${skills.length} skills to ${skillLevel}`, () => adminSetSkillLevels(skills, skillLevel), `Set ${skills.length} skills to level ${skillLevel}?`);
+              }
+            }}>
             Set Level
           </PixelButton>
         </div>
