@@ -1744,7 +1744,7 @@ describe('runTemplateCombat', () => {
   });
 
   describe('cleanse potion', () => {
-    it('falls back to defend when no magic DOTs are active', () => {
+    it('falls back to defend when no debuffs are active', () => {
       const spy = mockCombatRandom({ initA: 0.9, initB: 0.1, attackRoll: 0.85, damageRoll: 0.0, critRoll: 0.99 });
 
       const a = makeCombatant('Hero', {
@@ -1756,14 +1756,13 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b, {
         potions: [
-          { name: 'Cleansing Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse' },
+          { name: 'Cleansing Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse', buffValue: 1 },
         ],
       });
 
-      // canUsePotionAction returns false (no magic DOTs), so cleanse falls back to Defend
+      // canUsePotionAction returns false (no debuffs), so cleanse falls back to Defend
       const defendLog = result.log.find(l => l.actor === 'combatantA' && l.action === 'defend');
       expect(defendLog).toBeDefined();
-      // Potion should NOT be consumed
       expect(result.potionsConsumed).toHaveLength(0);
 
       spy.mockRestore();
@@ -1787,7 +1786,7 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b, {
         potions: [
-          { name: 'Cleansing Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse' },
+          { name: 'Cleansing Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse', buffValue: 1 },
         ],
       });
 
@@ -1795,6 +1794,35 @@ describe('runTemplateCombat', () => {
       expect(cleanseLog).toBeDefined();
       expect(result.potionsConsumed).toHaveLength(1);
       expect(result.potionsConsumed[0].templateId).toBe('tmpl-av');
+
+      spy.mockRestore();
+    });
+
+    it('cleanses stat debuffs even without magic DOTs', () => {
+      const spy = mockCombatRandom({ initA: 0.9, initB: 0.1, attackRoll: 0.85, damageRoll: 0.0, critRoll: 0.99 });
+
+      // B uses crippling_shot (speed debuff) round 1, A cleanses round 2
+      const a = makeCombatant('Hero', {
+        template: [
+          { id: 'slot-0', sortOrder: 0, actionId: 'defend' },
+          { id: 'slot-1', sortOrder: 1, actionId: 'use_cleanse_potion' },
+        ],
+      });
+      const b = makeCombatant('Archer', {
+        stats: makeStats({ damageMin: 5, damageMax: 5 }),
+        template: templateOf('crippling_shot'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Cleansing Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse', buffValue: 1 },
+        ],
+      });
+
+      const cleanseLog = result.log.find(l => l.message.includes('Cleanses') && l.message.includes('Crippled'));
+      expect(cleanseLog).toBeDefined();
+      expect(result.potionsConsumed).toHaveLength(1);
 
       spy.mockRestore();
     });

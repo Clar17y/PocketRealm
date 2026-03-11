@@ -781,48 +781,74 @@ function executeCleanseAction(
     return;
   }
 
-  // Find magic DOTs on this actor
+  // Find all stat debuffs (negative modifier, not potion sickness)
+  const statDebuffs = state.activeEffects.filter(
+    e => e.target === actorKey && e.stat !== 'potionSickness' && e.modifier < 0 && !e.resolvedDamagePerRound,
+  );
+
+  // Find magic DOTs
   const magicDots = state.activeEffects.filter(
     e => e.target === actorKey && e.resolvedDamagePerRound && e.resolvedDamagePerRound > 0 && e.dotDamageType === 'magic',
   );
 
-  if (magicDots.length === 0) {
+  if (statDebuffs.length === 0 && magicDots.length === 0) {
     state.log.push(buildLogEntry(state, ctx, {
       actor: actorKey,
       actorName,
       action: 'cleanse',
-      message: `${actorName} tries to cleanse but has no magic DOTs to remove!`,
+      message: `${actorName} tries to cleanse but has no debuffs to remove!`,
     }));
     return;
   }
 
-  // Group by name, sum damage per group
-  const groups = new Map<string, { totalDamage: number; count: number }>();
-  for (const dot of magicDots) {
-    const existing = groups.get(dot.name) ?? { totalDamage: 0, count: 0 };
-    existing.totalDamage += dot.resolvedDamagePerRound!;
-    existing.count++;
-    groups.set(dot.name, existing);
-  }
+  const cleansedEntries: Array<{ name: string; target: CombatActor; stacksRemoved: number }> = [];
+  const cleansedNames: string[] = [];
 
-  // Find the group with highest total damage
-  let worstName = '';
-  let worstDamage = -1;
-  for (const [name, group] of groups) {
-    if (group.totalDamage > worstDamage) {
-      worstName = name;
-      worstDamage = group.totalDamage;
+  // Always clear ALL stat debuffs
+  if (statDebuffs.length > 0) {
+    const debuffNames = new Set(statDebuffs.map(e => e.name));
+    state.activeEffects = state.activeEffects.filter(
+      e => !(e.target === actorKey && e.stat !== 'potionSickness' && e.modifier < 0 && !e.resolvedDamagePerRound),
+    );
+    for (const name of debuffNames) {
+      const count = statDebuffs.filter(e => e.name === name).length;
+      cleansedEntries.push({ name, target: actorKey, stacksRemoved: count });
+      cleansedNames.push(`${count}x ${name}`);
     }
   }
 
-  // Remove all effects with that name targeting this actor
-  const removedCount = groups.get(worstName)!.count;
-  state.activeEffects = state.activeEffects.filter(
-    e => !(e.target === actorKey && e.name === worstName && e.resolvedDamagePerRound && e.dotDamageType === 'magic'),
-  );
+  // Clear N worst magic DOT groups (N = potion's buffValue, 0 = all)
+  const potion = availablePotions[potionIndex];
+  const dotGroupsToClear = potion.buffValue ?? 1;
+
+  if (magicDots.length > 0) {
+    // Group by name, sum damage per group
+    const groups = new Map<string, { totalDamage: number; count: number }>();
+    for (const dot of magicDots) {
+      const existing = groups.get(dot.name) ?? { totalDamage: 0, count: 0 };
+      existing.totalDamage += dot.resolvedDamagePerRound!;
+      existing.count++;
+      groups.set(dot.name, existing);
+    }
+
+    // Sort groups by total damage descending
+    const sortedGroups = [...groups.entries()].sort((a, b) => b[1].totalDamage - a[1].totalDamage);
+
+    // Clear N groups (0 = all)
+    const groupsToRemove = dotGroupsToClear === 0 ? sortedGroups : sortedGroups.slice(0, dotGroupsToClear);
+    const namesToRemove = new Set(groupsToRemove.map(([name]) => name));
+
+    state.activeEffects = state.activeEffects.filter(
+      e => !(e.target === actorKey && e.resolvedDamagePerRound && e.dotDamageType === 'magic' && namesToRemove.has(e.name)),
+    );
+
+    for (const [name, group] of groupsToRemove) {
+      cleansedEntries.push({ name, target: actorKey, stacksRemoved: group.count });
+      cleansedNames.push(`${group.count}x ${name}`);
+    }
+  }
 
   // Consume potion
-  const potion = availablePotions[potionIndex];
   availablePotions.splice(potionIndex, 1);
   potionsConsumed.push({
     templateId: potion.templateId,
@@ -845,14 +871,14 @@ function executeCleanseAction(
     actorName,
     action: 'cleanse',
     spellName: potion.name,
-    effectsCleansed: [{ name: worstName, target: actorKey, stacksRemoved: removedCount }],
+    effectsCleansed: cleansedEntries,
     effectsApplied: [{
       stat: 'potionSickness',
       modifier: 0,
       duration: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS,
       target: actorKey,
     }],
-    message: `${actorName} drinks ${potion.name}! Cleanses ${removedCount}x ${worstName}!`,
+    message: `${actorName} drinks ${potion.name}! Cleanses ${cleansedNames.join(', ')}!`,
   }));
 }
 
@@ -969,10 +995,13 @@ function canUsePotionAction(
 
   if (action.potionType === 'cleanse') {
     const hasPotion = availablePotions.some(p => p.potionType === 'cleanse');
-    const hasMagicDot = state.activeEffects.some(
-      e => e.target === actorKey && e.resolvedDamagePerRound && e.resolvedDamagePerRound > 0 && e.dotDamageType === 'magic',
+    const hasDebuff = state.activeEffects.some(
+      e => e.target === actorKey && e.stat !== 'potionSickness' && (
+        (e.modifier < 0 && !e.resolvedDamagePerRound) ||
+        (e.resolvedDamagePerRound != null && e.resolvedDamagePerRound > 0 && e.dotDamageType === 'magic')
+      ),
     );
-    return hasPotion && hasMagicDot;
+    return hasPotion && hasDebuff;
   }
 
   return availablePotions.some(p => p.potionType === action.potionType);

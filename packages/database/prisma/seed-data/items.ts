@@ -251,7 +251,7 @@ const processedLeather = [
 const consumables = [
   consumable(IDS.pots.minorHealthPotion, 'Minor Health Potion', 1, { type: 'heal_flat', value: POTION_CONSTANTS.MINOR_HEALTH_HEAL }),
   consumable(IDS.pots.healthPotion, 'Health Potion', 2, { type: 'heal_flat', value: POTION_CONSTANTS.HEALTH_HEAL }),
-  consumable(IDS.pots.antivenomPotion, 'Cleansing Potion', 2, { type: 'cleanse_magic_dot', value: 0 }),
+  consumable(IDS.pots.antivenomPotion, 'Cleansing Potion', 2, { type: 'cleanse_magic_dot', value: 1 }),
   consumable(IDS.pots.greaterHealthPotion, 'Greater Health Potion', 3, { type: 'heal_flat', value: POTION_CONSTANTS.GREATER_HEALTH_HEAL }),
   consumable(IDS.pots.resistPotion, 'Resist Potion', 4, { type: 'buff_defence', value: BUFF_POTION_CONSTANTS.RESIST_DEFENCE_BONUS, duration: BUFF_POTION_CONSTANTS.RESIST_DURATION }),
   consumable(IDS.pots.manaPotion, 'Mana Potion', 4, { type: 'restore_mana', value: POTION_CONSTANTS.MANA_RESTORE }),

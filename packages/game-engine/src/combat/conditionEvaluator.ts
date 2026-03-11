@@ -40,5 +40,9 @@ export function evaluateCondition(
       return !activeEffects.some(e => e.target === actorKey && e.name === condition.effectName && e.modifier > 0);
     case 'no_debuff':
       return !activeEffects.some(e => e.target === actorKey && e.name === condition.effectName);
+    case 'any_debuff':
+      return activeEffects.some(e => e.target === actorKey && e.stat !== 'potionSickness' && (e.modifier < 0 || (e.resolvedDamagePerRound != null && e.resolvedDamagePerRound > 0)));
+    case 'any_magic_dot':
+      return activeEffects.some(e => e.target === actorKey && e.resolvedDamagePerRound != null && e.resolvedDamagePerRound > 0 && e.dotDamageType === 'magic');
   }
 }

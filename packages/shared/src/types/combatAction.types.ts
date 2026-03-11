@@ -117,7 +117,9 @@ export type ConditionType =
   | 'has_buff'
   | 'has_debuff'
   | 'no_buff'
-  | 'no_debuff';
+  | 'no_debuff'
+  | 'any_debuff'
+  | 'any_magic_dot';
 
 export type ConditionResourceType = 'hp' | 'stamina' | 'mana';
 

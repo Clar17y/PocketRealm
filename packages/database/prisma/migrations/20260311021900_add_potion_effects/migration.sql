@@ -4,7 +4,7 @@
 
 UPDATE "item_templates"
 SET name = 'Cleansing Potion',
-    "consumable_effect" = '{"type": "cleanse_magic_dot", "value": 0}'::jsonb
+    "consumable_effect" = '{"type": "cleanse_magic_dot", "value": 1}'::jsonb
 WHERE name = 'Antivenom Potion' AND "consumable_effect" IS NULL;
 
 UPDATE "item_templates"

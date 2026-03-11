@@ -101,4 +101,58 @@ describe('evaluateCondition', () => {
     const cond: SlotCondition = { type: 'no_buff', effectName: 'strength' };
     expect(evaluateCondition(cond, 100, 100, 50, 50, 50, 50, noEffects, 'combatantA')).toBe(true);
   });
+
+  // --- any_debuff ---
+
+  it('any_debuff: true when actor has a negative modifier effect', () => {
+    const cond: SlotCondition = { type: 'any_debuff' };
+    const effects: ActiveEffect[] = [
+      { name: 'Crippled', target: 'combatantA', stat: 'speed', modifier: -20, remainingRounds: 3 },
+    ];
+    expect(evaluateCondition(cond, 100, 100, 50, 50, 50, 50, effects, 'combatantA')).toBe(true);
+  });
+
+  it('any_debuff: true when actor has a magic DOT', () => {
+    const cond: SlotCondition = { type: 'any_debuff' };
+    const effects: ActiveEffect[] = [
+      { name: 'Poison', target: 'combatantA', stat: 'attack', modifier: 0, remainingRounds: 3, resolvedDamagePerRound: 10, dotDamageType: 'magic' },
+    ];
+    expect(evaluateCondition(cond, 100, 100, 50, 50, 50, 50, effects, 'combatantA')).toBe(true);
+  });
+
+  it('any_debuff: false when only potion sickness is active', () => {
+    const cond: SlotCondition = { type: 'any_debuff' };
+    const effects: ActiveEffect[] = [
+      { name: 'Potion Sickness', target: 'combatantA', stat: 'potionSickness', modifier: 0, remainingRounds: 3 },
+    ];
+    expect(evaluateCondition(cond, 100, 100, 50, 50, 50, 50, effects, 'combatantA')).toBe(false);
+  });
+
+  it('any_debuff: false when no debuffs active', () => {
+    const cond: SlotCondition = { type: 'any_debuff' };
+    expect(evaluateCondition(cond, 100, 100, 50, 50, 50, 50, noEffects, 'combatantA')).toBe(false);
+  });
+
+  // --- any_magic_dot ---
+
+  it('any_magic_dot: true when actor has a magic DOT', () => {
+    const cond: SlotCondition = { type: 'any_magic_dot' };
+    const effects: ActiveEffect[] = [
+      { name: 'Poison', target: 'combatantA', stat: 'attack', modifier: 0, remainingRounds: 3, resolvedDamagePerRound: 10, dotDamageType: 'magic' },
+    ];
+    expect(evaluateCondition(cond, 100, 100, 50, 50, 50, 50, effects, 'combatantA')).toBe(true);
+  });
+
+  it('any_magic_dot: false when only physical DOT active', () => {
+    const cond: SlotCondition = { type: 'any_magic_dot' };
+    const effects: ActiveEffect[] = [
+      { name: 'Bleed', target: 'combatantA', stat: 'attack', modifier: 0, remainingRounds: 3, resolvedDamagePerRound: 5, dotDamageType: 'physical' },
+    ];
+    expect(evaluateCondition(cond, 100, 100, 50, 50, 50, 50, effects, 'combatantA')).toBe(false);
+  });
+
+  it('any_magic_dot: false when no DOTs active', () => {
+    const cond: SlotCondition = { type: 'any_magic_dot' };
+    expect(evaluateCondition(cond, 100, 100, 50, 50, 50, 50, noEffects, 'combatantA')).toBe(false);
+  });
 });
