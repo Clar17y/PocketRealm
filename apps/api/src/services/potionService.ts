@@ -61,8 +61,8 @@ export async function buildPotionPool(playerId: string, maxHp: number): Promise<
         potionType,
       };
 
-      if (effect.duration) potion.buffDuration = effect.duration;
-      if (!isResource && effect.value) potion.buffValue = effect.value;
+      if (effect.duration != null) potion.buffDuration = effect.duration;
+      if (!isResource && effect.value != null) potion.buffValue = effect.value;
 
       potions.push(potion);
     }

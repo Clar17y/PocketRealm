@@ -1,5 +1,5 @@
 import { IDS } from './ids';
-import { POTION_CONSTANTS, STARTER_LOADOUT } from '@pocketrealm/shared';
+import { BUFF_POTION_CONSTANTS, POTION_CONSTANTS, STARTER_LOADOUT } from '@pocketrealm/shared';
 
 type ConsumableEffectJson = {
   type: 'heal_flat' | 'heal_percent' | 'restore_stamina' | 'restore_mana' | 'cleanse_magic_dot' | 'buff_attack' | 'buff_defence';
@@ -253,9 +253,9 @@ const consumables = [
   consumable(IDS.pots.healthPotion, 'Health Potion', 2, { type: 'heal_flat', value: POTION_CONSTANTS.HEALTH_HEAL }),
   consumable(IDS.pots.antivenomPotion, 'Antivenom Potion', 2, { type: 'cleanse_magic_dot', value: 0 }),
   consumable(IDS.pots.greaterHealthPotion, 'Greater Health Potion', 3, { type: 'heal_flat', value: POTION_CONSTANTS.GREATER_HEALTH_HEAL }),
-  consumable(IDS.pots.resistPotion, 'Resist Potion', 4, { type: 'buff_defence', value: 15, duration: 5 }),
+  consumable(IDS.pots.resistPotion, 'Resist Potion', 4, { type: 'buff_defence', value: BUFF_POTION_CONSTANTS.RESIST_DEFENCE_BONUS, duration: BUFF_POTION_CONSTANTS.RESIST_DURATION }),
   consumable(IDS.pots.manaPotion, 'Mana Potion', 4, { type: 'restore_mana', value: POTION_CONSTANTS.MANA_RESTORE }),
-  consumable(IDS.pots.elixirOfPower, 'Elixir of Power', 5, { type: 'buff_attack', value: 0.25, duration: 5 }),
+  consumable(IDS.pots.elixirOfPower, 'Elixir of Power', 5, { type: 'buff_attack', value: BUFF_POTION_CONSTANTS.ELIXIR_ATTACK_PERCENT, duration: BUFF_POTION_CONSTANTS.ELIXIR_DURATION }),
   // Stamina potions
   consumable(IDS.pots.minorStaminaPotion, 'Minor Stamina Potion', 1, { type: 'restore_stamina', value: POTION_CONSTANTS.MINOR_STAMINA_RESTORE }),
   consumable(IDS.pots.staminaPotion, 'Stamina Potion', 2, { type: 'restore_stamina', value: POTION_CONSTANTS.STAMINA_RESTORE }),

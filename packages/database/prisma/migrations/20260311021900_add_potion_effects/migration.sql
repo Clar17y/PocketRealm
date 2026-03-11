@@ -1,5 +1,6 @@
 -- Data migration: update existing placeholder potion templates with their effects
 -- These UPDATEs are safe to run on empty databases (WHERE conditions won't match)
+-- Values must match BUFF_POTION_CONSTANTS in gameConstants.ts
 
 DO $$
 BEGIN
