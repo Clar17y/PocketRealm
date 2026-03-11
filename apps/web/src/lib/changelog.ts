@@ -18,7 +18,7 @@ export const changelog: ChangelogEntry[] = [
     date: '2026-03-11',
     title: 'Guild Expeditions',
     summary:
-      'Guilds can now launch multi-room dungeon expeditions. Sign up with your guildmates (or let bots fill empty slots), then fight through themed rooms of increasing difficulty. Four Tier 1 themes are available at launch: Webwood Hollow, Fungal Depths, Verdant Ruins, and Ember Caverns, each with their own mob roster and flavour. Rooms scale in size and danger, ending with a boss encounter. Loot is distributed at the end based on contribution. Expedition bots bring their own combat templates and potions so runs stay competitive even with a small guild.',
+      'Guilds can now launch multi-room dungeon expeditions. Sign up with your guildmates, then fight through themed rooms of increasing difficulty. Four Tier 1 themes are available at launch: Webwood Hollow, Fungal Depths, Verdant Ruins, and Ember Caverns, each with their own mob roster and flavour. Rooms scale in size and danger, ending with a boss encounter. Loot is distributed at the end based on contribution.',
   },
   {
     version: '0.33',
