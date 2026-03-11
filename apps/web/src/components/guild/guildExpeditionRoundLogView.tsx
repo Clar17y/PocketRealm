@@ -72,6 +72,17 @@ export function RoundLogAttackRow({
     );
   }
 
+  if (attack.entryType === 'defensive') {
+    const isMe = attack.playerId === currentPlayerId;
+    return (
+      <div className={`text-xs ml-2 ${isMe ? 'mb-0.5 p-1 rounded bg-[var(--rpg-surface)]' : 'text-[var(--rpg-text-secondary)]'}`}>
+        <span className={isMe ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-text-primary)]'}>{attack.username}</span>
+        {': '}
+        {attack.actionLabel}
+      </div>
+    );
+  }
+
   const formattedAttack = formatRoundLogAttackRow(attack, currentPlayerId);
 
   if (formattedAttack.isCurrentPlayer) {
