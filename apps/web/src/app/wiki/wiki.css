@@ -200,14 +200,47 @@
 
 /* ── Section heading ── */
 
-.wiki-section-heading {
+.wiki-section-heading,
+.wiki-content h2 {
   font-family: var(--font-almendra), Georgia, serif;
   font-size: 1.3rem;
   font-weight: 600;
   color: var(--rpg-text-primary);
   border-bottom: 1px solid color-mix(in srgb, var(--rpg-border) 50%, transparent);
   padding-bottom: 6px;
-  margin: 32px 0 16px;
+  margin: 36px 0 16px;
+}
+
+.wiki-content h3 {
+  font-family: var(--font-almendra), Georgia, serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--rpg-text-primary);
+  margin: 28px 0 12px;
+}
+
+/* ── Prose elements ── */
+
+.wiki-content p {
+  color: var(--wiki-text-body);
+  line-height: 1.7;
+  margin: 0 0 16px;
+}
+
+.wiki-content ul,
+.wiki-content ol {
+  color: var(--wiki-text-body);
+  line-height: 1.7;
+  margin: 0 0 16px;
+  padding-left: 24px;
+}
+
+.wiki-content li {
+  margin-bottom: 8px;
+}
+
+.wiki-content li strong {
+  color: var(--rpg-text-primary);
 }
 
 /* ── Explanation text ── */
