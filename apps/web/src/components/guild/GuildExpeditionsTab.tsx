@@ -13,6 +13,7 @@ import {
   signUpForExpedition,
   forceStartExpedition,
   forceNextRound,
+  autoResolveRoom,
   recoverFromExpeditionKO,
   setExpeditionTarget,
   setExpeditionHealTarget,
@@ -327,6 +328,40 @@ export function GuildExpeditionsTab({
     }
   };
 
+  const handleAutoResolve = async () => {
+    if (!expedition) return;
+    if (!confirm('Auto-resolve this room? Your current templates will be locked and all rounds resolved instantly. You earn +25% bonus tokens on success.')) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await autoResolveRoom(expedition.id);
+      if (res.error) { setError(res.error.message); return; }
+      void loadExpedition();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to auto-resolve');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Auto-advance: fires force-round every 10s when toggled on
+  const [autoAdvance, setAutoAdvance] = useState(false);
+  const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (autoAdvance && expedition?.status === 'in_progress') {
+      autoAdvanceRef.current = setInterval(() => {
+        void forceNextRound(expedition.id).then(() => void loadExpedition());
+      }, 10_000);
+    }
+    return () => {
+      if (autoAdvanceRef.current) {
+        clearInterval(autoAdvanceRef.current);
+        autoAdvanceRef.current = null;
+      }
+    };
+  }, [autoAdvance, expedition?.id, expedition?.status, loadExpedition]);
+
   const handleRecover = async () => {
     if (!expedition) return;
     setActionLoading(true);
@@ -449,6 +484,9 @@ export function GuildExpeditionsTab({
             isOfficer={isOfficer}
             onRecover={handleRecover}
             onForceRound={handleForceRound}
+            onAutoResolve={handleAutoResolve}
+            autoAdvance={autoAdvance}
+            onToggleAutoAdvance={() => setAutoAdvance(prev => !prev)}
             onSetTarget={handleSetTarget}
             onSetHealTarget={handleSetHealTarget}
             onAbandon={handleAbandon}
@@ -680,6 +718,9 @@ function InProgressView({
   isOfficer,
   onRecover,
   onForceRound,
+  onAutoResolve,
+  autoAdvance,
+  onToggleAutoAdvance,
   onSetTarget,
   onSetHealTarget,
   onAbandon,
@@ -693,6 +734,9 @@ function InProgressView({
   isOfficer: boolean;
   onRecover: () => void;
   onForceRound: () => void;
+  onAutoResolve: () => void;
+  autoAdvance: boolean;
+  onToggleAutoAdvance: () => void;
   onSetTarget: (targetMobId: string | null) => void;
   onSetHealTarget: (healTargetPlayerId: string | null) => void;
   onAbandon: () => void;
@@ -769,6 +813,20 @@ function InProgressView({
           <PixelButton size="sm" onClick={onRefresh}>
             Refresh
           </PixelButton>
+          {isOfficer && expedition.roundNumber === 0 && expedition.nextRoundAt && (
+            <div>
+              <PixelButton
+                size="sm"
+                onClick={onAutoResolve}
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Resolving...' : 'Auto-Resolve (+25%)'}
+              </PixelButton>
+              <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-1">
+                Instant clear — templates locked
+              </p>
+            </div>
+          )}
           {isOfficer && expedition.nextRoundAt && (
             <div>
               <PixelButton
@@ -781,6 +839,20 @@ function InProgressView({
               </PixelButton>
               <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-1">
                 Skip wait — resolve next round now
+              </p>
+            </div>
+          )}
+          {isOfficer && expedition.roundNumber > 0 && (
+            <div>
+              <PixelButton
+                size="sm"
+                variant={autoAdvance ? 'primary' : 'secondary'}
+                onClick={onToggleAutoAdvance}
+              >
+                {autoAdvance ? 'Auto: ON (10s)' : 'Auto: OFF'}
+              </PixelButton>
+              <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-1">
+                Auto-fire rounds every 10s
               </p>
             </div>
           )}
