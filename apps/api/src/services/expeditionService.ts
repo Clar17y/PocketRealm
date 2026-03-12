@@ -562,6 +562,36 @@ async function buildSummonPool(themeId: string | null): Promise<ExpeditionMobSta
   }));
 }
 
+async function recordExpeditionKills(
+  themeId: string,
+  playerIds: string[],
+  mobsBefore: ExpeditionMobState[],
+  mobsAfter: ExpeditionMobState[],
+): Promise<void> {
+  const afterIds = new Set(mobsAfter.filter(m => m.hp > 0).map(m => m.id));
+  const killedMobs = mobsBefore.filter(m => m.hp > 0 && !afterIds.has(m.id));
+  if (killedMobs.length === 0) return;
+
+  const killCounts = new Map<string, number>();
+  for (const mob of killedMobs) {
+    killCounts.set(mob.mobTemplateId, (killCounts.get(mob.mobTemplateId) ?? 0) + 1);
+  }
+
+  const upserts = [];
+  for (const playerId of playerIds) {
+    for (const [mobTemplateId, count] of killCounts) {
+      upserts.push(
+        prisma.playerExpeditionBestiary.upsert({
+          where: { playerId_mobTemplateId: { playerId, mobTemplateId } },
+          create: { playerId, mobTemplateId, theme: themeId, killCount: count },
+          update: { killCount: { increment: count } },
+        }),
+      );
+    }
+  }
+  await Promise.all(upserts);
+}
+
 function buildUpdatedRoomMobs(
   currentRoomDef: ExpeditionRoomDefinition,
   mobsAfter: ExpeditionMobState[],
@@ -866,6 +896,12 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
     }
   }
 
+  // Record expedition bestiary kills for all alive participants
+  if (expedition.themeId) {
+    const participantIds = aliveMembers.map(m => m.playerId);
+    await recordExpeditionKills(expedition.themeId, participantIds, survivingMobs, result.mobsAfter);
+  }
+
   // Handle post-round transitions (room clear / wipe)
   if (result.roomCleared) {
     await handleRoomCleared(expeditionId);
@@ -993,6 +1029,13 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
     allRoundLogs.push({ ...result.roundLog, roomIndex: expedition.currentRoom });
 
     if (result.roomCleared || result.allPlayersDead) break;
+  }
+
+  // Record expedition bestiary kills (compare initial room mobs to final state)
+  if (expedition.themeId) {
+    const initialMobs = currentRoomDef.mobs.filter(m => m.hp > 0);
+    const participantIds = aliveMembers.map(m => m.playerId);
+    await recordExpeditionKills(expedition.themeId, participantIds, initialMobs, mobs);
   }
 
   // Determine outcome
