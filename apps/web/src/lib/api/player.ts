@@ -186,6 +186,37 @@ export async function getBestiary() {
   }>('/api/v1/bestiary');
 }
 
+export async function getExpeditionBestiary() {
+  return fetchApi<{
+    themes: Array<{
+      theme: string;
+      themeName: string;
+      attempted: boolean;
+      mobs: Array<{
+        mobTemplateId: string;
+        name: string;
+        role: 'trash' | 'elite' | 'caster' | 'add' | 'mini_boss' | 'final_boss';
+        killCount: number;
+        stats: { hp: number; attack: number; defence: number } | null;
+        rotation: Array<{ round: number; actionName: string; targetMode: string }> | null;
+      }>;
+    }>;
+  }>('/api/v1/bestiary/expeditions');
+}
+
+export async function getWorldBossBestiary() {
+  return fetchApi<{
+    bosses: Array<{
+      bossTemplateId: string;
+      name: string;
+      defeatCount: number;
+      hpPerParticipant: number | null;
+      stats: { accuracy: number; defence: number } | null;
+      rotation: Array<{ round: number; actionName: string; targetMode: string; isTelegraphed: boolean }> | null;
+    }>;
+  }>('/api/v1/bestiary/bosses');
+}
+
 export async function getTurns() {
   return fetchApi<{
     currentTurns: number;
