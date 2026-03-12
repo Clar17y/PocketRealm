@@ -2,6 +2,7 @@ import { fetchApi } from './core';
 import type {
   ExpeditionData,
   ExpeditionMemberData,
+  ExpeditionRoundLog,
   ExpeditionShopItem,
   ExpeditionCooldownInfo,
 } from '@pocketrealm/shared';
@@ -78,6 +79,21 @@ export async function forceStartExpedition(id: string) {
 export async function forceNextRound(id: string) {
   return fetchApi<{ success: boolean; status: string; currentRoom: number; roundNumber: number }>(
     `/api/v1/expedition/${id}/force-round`,
+    { method: 'POST' },
+  );
+}
+
+export interface AutoResolveResponse {
+  success: boolean;
+  outcome: 'cleared' | 'wiped';
+  roundsResolved: number;
+  tokensAwarded: number;
+  roundLogs: ExpeditionRoundLog[];
+}
+
+export async function autoResolveRoom(id: string) {
+  return fetchApi<AutoResolveResponse>(
+    `/api/v1/expedition/${id}/auto-resolve`,
     { method: 'POST' },
   );
 }

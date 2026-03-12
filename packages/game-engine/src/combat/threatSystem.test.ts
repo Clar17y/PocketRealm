@@ -102,6 +102,44 @@ describe('threatSystem', () => {
       tickTaunts(table);
       expect(table[0].tauntRoundsRemaining).toBe(0);
     });
+
+    it('removes flat threat bonus when taunt expires', () => {
+      const table = initThreatTable(['p1']);
+      addDamageThreat(table, 'p1', 100); // 100 threat from damage
+      applyTaunt(table, 'p1', 2); // +500 bonus → 600 total
+      expect(table[0].threat).toBe(600);
+
+      tickTaunts(table); // round 1: still taunting
+      expect(table[0].tauntRoundsRemaining).toBe(1);
+      expect(table[0].threat).toBe(600); // bonus still applied
+
+      tickTaunts(table); // round 2: taunt expires, bonus removed
+      expect(table[0].tauntRoundsRemaining).toBe(0);
+      expect(table[0].threat).toBe(100); // back to damage-only threat
+    });
+
+    it('threat does not go negative when bonus removed', () => {
+      const table = initThreatTable(['p1']);
+      applyTaunt(table, 'p1', 1); // +500 bonus, 0 base damage
+      expect(table[0].threat).toBe(500);
+
+      tickTaunts(table); // taunt expires, bonus removed
+      expect(table[0].threat).toBe(0); // clamped to 0
+    });
+
+    it('only removes bonus from the expiring player', () => {
+      const table = initThreatTable(['p1', 'p2']);
+      addDamageThreat(table, 'p1', 200);
+      addDamageThreat(table, 'p2', 50);
+      applyTaunt(table, 'p1', 1); // expires next tick
+      applyTaunt(table, 'p2', 3); // still active after tick
+
+      tickTaunts(table);
+      expect(table[0].threat).toBe(200); // p1: bonus removed, base remains
+      expect(table[0].tauntRoundsRemaining).toBe(0);
+      expect(table[1].threat).toBe(550); // p2: bonus still applied
+      expect(table[1].tauntRoundsRemaining).toBe(2);
+    });
   });
 
   describe('boss switches target when tank dies', () => {

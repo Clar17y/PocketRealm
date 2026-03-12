@@ -13,6 +13,7 @@ import {
   signUpForExpedition,
   forceStartExpedition,
   forceNextRound,
+  autoResolveRoom,
   recoverFromExpeditionKO,
   setExpeditionTarget,
   setExpeditionHealTarget,
@@ -23,6 +24,7 @@ import type {
   ExpeditionDetailResponse,
 } from '@/lib/api/expedition';
 import type {
+  ExpeditionAttemptLog,
   ExpeditionData,
   ExpeditionMemberData,
   ExpeditionRoomType,
@@ -313,7 +315,6 @@ export function GuildExpeditionsTab({
 
   const handleForceRound = async () => {
     if (!expedition) return;
-    if (!confirm('Skip the round timer and resolve the next round immediately?')) return;
     setActionLoading(true);
     setError(null);
     try {
@@ -326,6 +327,48 @@ export function GuildExpeditionsTab({
       setActionLoading(false);
     }
   };
+
+  const handleAutoResolve = async () => {
+    if (!expedition) return;
+    if (!confirm('Auto-resolve this room? Templates are locked and all rounds resolve instantly.')) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await autoResolveRoom(expedition.id);
+      if (res.error) { setError(res.error.message); return; }
+      void loadExpedition();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to auto-resolve');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Auto-advance: fires force-round every 10s when toggled on
+  const [autoAdvance, setAutoAdvance] = useState(false);
+  const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const roundInFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (autoAdvance && expedition?.status === 'in_progress') {
+      autoAdvanceRef.current = setInterval(async () => {
+        if (roundInFlightRef.current) return;
+        roundInFlightRef.current = true;
+        try {
+          await forceNextRound(expedition.id);
+          await loadExpedition();
+        } finally {
+          roundInFlightRef.current = false;
+        }
+      }, 10_000);
+    }
+    return () => {
+      if (autoAdvanceRef.current) {
+        clearInterval(autoAdvanceRef.current);
+        autoAdvanceRef.current = null;
+      }
+    };
+  }, [autoAdvance, expedition?.id, expedition?.status, loadExpedition]);
 
   const handleRecover = async () => {
     if (!expedition) return;
@@ -449,6 +492,9 @@ export function GuildExpeditionsTab({
             isOfficer={isOfficer}
             onRecover={handleRecover}
             onForceRound={handleForceRound}
+            onAutoResolve={handleAutoResolve}
+            autoAdvance={autoAdvance}
+            onToggleAutoAdvance={() => setAutoAdvance(prev => !prev)}
             onSetTarget={handleSetTarget}
             onSetHealTarget={handleSetHealTarget}
             onAbandon={handleAbandon}
@@ -664,6 +710,10 @@ function RecruitingView({
       {members.length > 0 && (
         <MemberList members={members} />
       )}
+
+      {expedition.attemptLogs.length > 0 && (
+        <PreviousAttemptsSection attemptLogs={expedition.attemptLogs} playerId={playerId} />
+      )}
     </div>
   );
 }
@@ -680,6 +730,9 @@ function InProgressView({
   isOfficer,
   onRecover,
   onForceRound,
+  onAutoResolve,
+  autoAdvance,
+  onToggleAutoAdvance,
   onSetTarget,
   onSetHealTarget,
   onAbandon,
@@ -693,6 +746,9 @@ function InProgressView({
   isOfficer: boolean;
   onRecover: () => void;
   onForceRound: () => void;
+  onAutoResolve: () => void;
+  autoAdvance: boolean;
+  onToggleAutoAdvance: () => void;
   onSetTarget: (targetMobId: string | null) => void;
   onSetHealTarget: (healTargetPlayerId: string | null) => void;
   onAbandon: () => void;
@@ -769,6 +825,20 @@ function InProgressView({
           <PixelButton size="sm" onClick={onRefresh}>
             Refresh
           </PixelButton>
+          {isOfficer && expedition.roundNumber === 0 && expedition.nextRoundAt && (
+            <div>
+              <PixelButton
+                size="sm"
+                onClick={onAutoResolve}
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Resolving...' : 'Auto-Resolve'}
+              </PixelButton>
+              <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-1">
+                Instant clear — templates locked
+              </p>
+            </div>
+          )}
           {isOfficer && expedition.nextRoundAt && (
             <div>
               <PixelButton
@@ -781,6 +851,20 @@ function InProgressView({
               </PixelButton>
               <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-1">
                 Skip wait — resolve next round now
+              </p>
+            </div>
+          )}
+          {isOfficer && expedition.roundNumber > 0 && (
+            <div>
+              <PixelButton
+                size="sm"
+                variant={autoAdvance ? 'primary' : 'secondary'}
+                onClick={onToggleAutoAdvance}
+              >
+                {autoAdvance ? 'Auto: ON (10s)' : 'Auto: OFF'}
+              </PixelButton>
+              <p className="text-[10px] text-[var(--rpg-text-secondary)] mt-1">
+                Auto-fire rounds every 10s
               </p>
             </div>
           )}
@@ -887,6 +971,11 @@ function InProgressView({
           logs={expedition.roundLogs.slice(0, -1)}
           playerId={playerId}
         />
+      )}
+
+      {/* Previous Attempt Logs (from wipes) */}
+      {expedition.attemptLogs.length > 0 && (
+        <PreviousAttemptsSection attemptLogs={expedition.attemptLogs} playerId={playerId} />
       )}
     </div>
   );
@@ -1277,40 +1366,7 @@ function HistoryView({ guildId, playerId }: { guildId: string; playerId: string 
           </button>
 
           {expandedId === exp.id && expandedDetail && (
-            <div className="mt-3 pt-2 border-t border-[var(--rpg-border)] space-y-3">
-              {/* Contributions */}
-              {expandedDetail.members.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
-                  <div className="space-y-0.5">
-                    {[...expandedDetail.members]
-                      .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
-                      .map((m, i) => (
-                        <div key={m.playerId} className="flex justify-between text-xs">
-                          <span className="text-[var(--rpg-text-secondary)]">
-                            <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
-                            {m.username ?? m.playerId.slice(0, 8)}
-                          </span>
-                          <div className="flex gap-2 text-[10px]">
-                            <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
-                            {m.totalHealing > 0 && (
-                              <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
-                            )}
-                            {m.tokensEarned > 0 && (
-                              <span className="text-[var(--rpg-gold)]">{formatNumber(m.tokensEarned)} tokens</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Round logs */}
-              {expandedDetail.expedition.roundLogs.length > 0 && (
-                <RoundLogList logs={expandedDetail.expedition.roundLogs} playerId={playerId} />
-              )}
-            </div>
+            <HistoryDetailPanel expedition={expandedDetail.expedition} members={expandedDetail.members} playerId={playerId} />
           )}
         </PixelCard>
       ))}
@@ -1328,6 +1384,199 @@ function HistoryView({ guildId, playerId }: { guildId: string; playerId: string 
             Next
           </PixelButton>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Previous Attempts Section (shown during active expeditions after wipes)
+// ---------------------------------------------------------------------------
+
+function PreviousAttemptsSection({
+  attemptLogs,
+  playerId,
+}: {
+  attemptLogs: ExpeditionAttemptLog[];
+  playerId: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [selectedAttempt, setSelectedAttempt] = useState(0);
+  const attempt = attemptLogs[selectedAttempt];
+
+  return (
+    <PixelCard>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex justify-between items-center text-xs"
+      >
+        <span className="font-bold text-[var(--rpg-text-secondary)]">
+          Previous Attempts ({attemptLogs.length})
+        </span>
+        <span className="text-[var(--rpg-text-secondary)]">{expanded ? '▲' : '▼'}</span>
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {attemptLogs.length > 1 && (
+            <div className="flex gap-1 flex-wrap">
+              {attemptLogs.map((a, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSelectedAttempt(i)}
+                  className={`px-2 py-0.5 text-[10px] rounded ${
+                    selectedAttempt === i
+                      ? 'bg-[var(--rpg-gold)] text-[var(--rpg-bg)] font-bold'
+                      : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                  }`}
+                >
+                  Attempt {a.attempt}
+                </button>
+              ))}
+            </div>
+          )}
+          {attempt && (
+            <>
+              <div className="text-[10px] text-[var(--rpg-text-secondary)]">
+                Reached room {attempt.roomReached + 1} · {attempt.roundLogs.length} round{attempt.roundLogs.length !== 1 ? 's' : ''}
+              </div>
+              {attempt.participants && attempt.participants.length > 0 && (
+                <div className="space-y-0.5">
+                  {[...attempt.participants]
+                    .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
+                    .map((m, i) => (
+                      <div key={m.playerId} className="flex justify-between text-xs">
+                        <span className="text-[var(--rpg-text-secondary)]">
+                          <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
+                          {m.username ?? m.playerId.slice(0, 8)}
+                        </span>
+                        <div className="flex gap-2 text-[10px]">
+                          <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
+                          {m.totalHealing > 0 && (
+                            <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+              {attempt.roundLogs.length > 0 && (
+                <RoundLogList logs={attempt.roundLogs} playerId={playerId} />
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </PixelCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// History Detail Panel — Per-Attempt View
+// ---------------------------------------------------------------------------
+
+function HistoryDetailPanel({
+  expedition,
+  members,
+  playerId,
+}: {
+  expedition: ExpeditionData;
+  members: ExpeditionMemberData[];
+  playerId: string | null;
+}) {
+  const attempts = expedition.attemptLogs;
+  const [selectedAttempt, setSelectedAttempt] = useState(attempts.length > 0 ? attempts.length - 1 : 0);
+
+  const attempt = attempts[selectedAttempt];
+
+  return (
+    <div className="mt-3 pt-2 border-t border-[var(--rpg-border)] space-y-3">
+      {/* Attempt tabs (only if multiple attempts) */}
+      {attempts.length > 1 && (
+        <div className="flex gap-1 flex-wrap">
+          {attempts.map((a, i) => {
+            const isSuccess = 'outcome' in a && (a as Record<string, unknown>).outcome === 'completed';
+            return (
+              <button
+                key={i}
+                onClick={() => setSelectedAttempt(i)}
+                className={`px-2 py-0.5 text-[10px] rounded ${
+                  selectedAttempt === i
+                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-bg)] font-bold'
+                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                }`}
+              >
+                Attempt {a.attempt}{isSuccess ? ' ✓' : ''}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {attempt ? (
+        <>
+          <div className="text-[10px] text-[var(--rpg-text-secondary)]">
+            Reached room {attempt.roomReached + 1} · {attempt.roundLogs.length} round{attempt.roundLogs.length !== 1 ? 's' : ''}
+          </div>
+
+          {/* Per-attempt contributions */}
+          {attempt.participants && attempt.participants.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
+              <div className="space-y-0.5">
+                {[...attempt.participants]
+                  .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
+                  .map((m, i) => (
+                    <div key={m.playerId} className="flex justify-between text-xs">
+                      <span className="text-[var(--rpg-text-secondary)]">
+                        <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
+                        {m.username ?? m.playerId.slice(0, 8)}
+                      </span>
+                      <div className="flex gap-2 text-[10px]">
+                        <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
+                        {m.totalHealing > 0 && (
+                          <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {attempt.roundLogs.length > 0 && (
+            <RoundLogList logs={attempt.roundLogs} playerId={playerId} />
+          )}
+        </>
+      ) : (
+        <>
+          {/* Fallback for old expeditions without attempt logs */}
+          {members.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
+              <div className="space-y-0.5">
+                {[...members]
+                  .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
+                  .map((m, i) => (
+                    <div key={m.playerId} className="flex justify-between text-xs">
+                      <span className="text-[var(--rpg-text-secondary)]">
+                        <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
+                        {m.username ?? m.playerId.slice(0, 8)}
+                      </span>
+                      <div className="flex gap-2 text-[10px]">
+                        <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
+                        {m.totalHealing > 0 && (
+                          <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+          {expedition.roundLogs.length > 0 && (
+            <RoundLogList logs={expedition.roundLogs} playerId={playerId} />
+          )}
+        </>
       )}
     </div>
   );

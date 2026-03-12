@@ -42,6 +42,12 @@ export function getSingleTarget(table: ThreatEntry[], alivePlayerIds: Set<string
 
 export function tickTaunts(table: ThreatEntry[]): void {
   for (const entry of table) {
-    if (entry.tauntRoundsRemaining > 0) entry.tauntRoundsRemaining--;
+    if (entry.tauntRoundsRemaining > 0) {
+      entry.tauntRoundsRemaining--;
+      // Remove the flat threat bonus when taunt expires
+      if (entry.tauntRoundsRemaining === 0) {
+        entry.threat = Math.max(0, entry.threat - BOSS_ENCOUNTER_CONSTANTS.TAUNT_THREAT_BONUS);
+      }
+    }
   }
 }
