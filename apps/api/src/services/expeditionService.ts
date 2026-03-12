@@ -945,6 +945,7 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
   const potionsByPlayer = new Map<string, PotionConsumed[]>();
   const damageByPlayer = new Map<string, number>();
   const healingByPlayer = new Map<string, number>();
+  const isDeadByPlayer = new Map<string, boolean>();
   let roundNumber = 0;
 
   // Run rounds until room clear, wipe, or max rounds
@@ -992,9 +993,10 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
         potionsByPlayer.set(pr.playerId, existing);
       }
 
-      // Accumulate damage/healing
+      // Accumulate damage/healing and track dead state
       damageByPlayer.set(pr.playerId, (damageByPlayer.get(pr.playerId) ?? 0) + pr.damageDealt);
       healingByPlayer.set(pr.playerId, (healingByPlayer.get(pr.playerId) ?? 0) + pr.healingDone);
+      isDeadByPlayer.set(pr.playerId, pr.isDead);
     }
 
     // Carry forward mob state and threat table
@@ -1024,9 +1026,9 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
   }
   updatedRooms[expedition.currentRoom] = { ...currentRoomDef, mobs: updatedMobs };
 
-  // Persist final state
-  await prisma.guildExpedition.update({
-    where: { id: expeditionId },
+  // Persist final state (optimistic lock: only if still at round 0)
+  const updated = await prisma.guildExpedition.updateMany({
+    where: { id: expeditionId, roundNumber: 0 },
     data: {
       roundNumber,
       roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),
@@ -1034,6 +1036,9 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
       nextRoundAt: null,
     },
   });
+  if (updated.count === 0) {
+    throw new AppError(409, 'Room was modified by another process', 'CONCURRENT_MODIFICATION');
+  }
 
   // Update member records
   await Promise.all(
@@ -1052,8 +1057,8 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
           totalHealing: { increment: totalHealing },
           roomDamage: { increment: totalDamage },
           roomHealing: { increment: totalHealing },
-          isKnockedOut: p.hp <= 0,
-          ...(p.hp <= 0 ? { targetMobId: null } : {}),
+          isKnockedOut: isDeadByPlayer.get(p.playerId) ?? p.hp <= 0,
+          ...(isDeadByPlayer.get(p.playerId) ?? p.hp <= 0 ? { targetMobId: null } : {}),
           templateRound: p.templateRound,
           activeEffects: JSON.parse(JSON.stringify(p.activeEffects)),
           threatValue: threatEntry?.threat ?? 0,
