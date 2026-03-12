@@ -13,6 +13,7 @@ import {
   forceStartExpedition,
   checkAndResolveExpeditionRounds,
   resolveExpeditionRound,
+  autoResolveRoom,
   setTargetMob,
   setHealTarget,
   abandonExpedition,
@@ -245,6 +246,44 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
     status: updated?.status,
     currentRoom: updated?.currentRoom,
     roundNumber: updated?.roundNumber,
+  });
+}));
+
+// POST /:id/auto-resolve
+expeditionRouter.post('/:id/auto-resolve', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { id } = expeditionIdSchema.parse(req.params);
+
+  const expedition = await prisma.guildExpedition.findUnique({
+    where: { id },
+    select: { id: true, guildId: true, status: true, roundNumber: true },
+  });
+  if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
+  if (expedition.status !== 'in_progress') {
+    throw new AppError(400, 'Expedition is not active', 'NOT_ACTIVE');
+  }
+  if (expedition.roundNumber !== 0) {
+    throw new AppError(400, 'Room already has rounds resolved', 'ROUND_IN_PROGRESS');
+  }
+
+  const membership = await prisma.guildMember.findUnique({
+    where: { playerId },
+    select: { guildId: true, role: true },
+  });
+  if (!membership || membership.guildId !== expedition.guildId) {
+    throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
+  }
+  if (membership.role === 'member') {
+    throw new AppError(403, 'Officer or leader role required', 'INSUFFICIENT_ROLE');
+  }
+
+  const result = await autoResolveRoom(id);
+
+  res.json({
+    success: true,
+    outcome: result.outcome,
+    roundsResolved: result.roundsResolved,
+    tokensAwarded: result.tokensAwarded,
   });
 }));
 

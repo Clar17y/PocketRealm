@@ -82,6 +82,13 @@ export async function forceNextRound(id: string) {
   );
 }
 
+export async function autoResolveRoom(id: string) {
+  return fetchApi<{ success: boolean; outcome: 'cleared' | 'wiped'; roundsResolved: number; tokensAwarded: number }>(
+    `/api/v1/expedition/${id}/auto-resolve`,
+    { method: 'POST' },
+  );
+}
+
 export async function recoverFromExpeditionKO(id: string) {
   return fetchApi<{ member: ExpeditionMemberData }>(`/api/v1/expedition/${id}/recover`, {
     method: 'POST',
