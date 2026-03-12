@@ -116,6 +116,7 @@ import {
   getExpeditionStatus,
   checkAndResolveExpeditionRounds,
   resolveExpeditionRound,
+  autoResolveRoom,
   handleRoomCleared,
   handleWipe,
   completeExpedition,
@@ -789,6 +790,179 @@ describe('expeditionService', () => {
       await expect(recoverFromKO(EXPEDITION_ID, PLAYER_ID)).rejects.toThrow(
         'Expedition is not in progress',
       );
+    });
+  });
+
+  // =========================================================================
+  // autoResolveRoom
+  // =========================================================================
+
+  describe('autoResolveRoom', () => {
+    const fullRoomDefs = [
+      {
+        roomIndex: 0, roomType: 'trash', environmentalDotPercent: 0,
+        mobs: [{
+          id: 'mob-0-0', mobTemplateId: 'tmpl-1', name: 'Goblin', prefix: null,
+          hp: 100, maxHp: 100,
+          stats: { hp: 100, maxHp: 100, attack: 10, accuracy: 10, defence: 5, magicDefence: 3, dodge: 2, evasion: 0, damageMin: 5, damageMax: 10, speed: 0, damageType: 'physical' },
+          actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+          activeEffects: [],
+        }],
+      },
+      { roomIndex: 1, roomType: 'elite', environmentalDotPercent: 0, mobs: [] },
+      { roomIndex: 2, roomType: 'final_boss', environmentalDotPercent: 0, mobs: [] },
+    ];
+
+    const inProgressExpedition = (overrides: Record<string, unknown> = {}) =>
+      makeExpeditionRow({
+        status: 'in_progress',
+        roundNumber: 0,
+        roomDefinitions: fullRoomDefs,
+        members: [makeMemberRow()],
+        ...overrides,
+      });
+
+    it('rejects when expedition is not in_progress', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({ status: 'recruiting', members: [makeMemberRow()] }),
+      );
+
+      await expect(autoResolveRoom(EXPEDITION_ID)).rejects.toThrow('Expedition is not active');
+    });
+
+    it('rejects when roundNumber is not 0', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        inProgressExpedition({ roundNumber: 3 }),
+      );
+
+      await expect(autoResolveRoom(EXPEDITION_ID)).rejects.toThrow('Room already has rounds resolved');
+    });
+
+    it('resolves room clear with bonus tokens', async () => {
+      // Mock resolveRaidRound to clear room on first call
+      vi.mocked(resolveRaidRound).mockReturnValueOnce({
+        mobsAfter: [{ id: 'mob-0-0', hp: 0, maxHp: 100, activeEffects: [], actionTemplate: [] }],
+        participantResults: [{
+          playerId: PLAYER_ID, actionId: 'normal_attack', targetMobId: 'mob-0-0',
+          wasExhausted: false, damageDealt: 100, healingDone: 0, damageTaken: 5,
+          hpAfter: 95, staminaAfter: 70, manaAfter: 45,
+          templateRoundAfter: 2, isDead: false, hit: true, isCritical: false,
+          activeEffectsAfter: [], potionsConsumed: [],
+        }],
+        mobActionResults: [],
+        threatTableAfter: [{ playerId: PLAYER_ID, threat: 100, tauntRoundsRemaining: 0 }],
+        roomCleared: true,
+        allPlayersDead: false,
+        roundLog: { round: 1, roomIndex: 0, phases: { playerAttacks: [], healing: [], mobActions: [], dots: [], outcome: { mobsKilled: 1, playersKnockedOut: 0, roomCleared: true, wipe: false } } },
+        allPotionsConsumed: [],
+      } as any);
+
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(inProgressExpedition());
+      mockPrisma.guildExpedition.update.mockResolvedValue({});
+      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildExpeditionMember.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildExpeditionMember.findMany.mockResolvedValue([makeMemberRow()]);
+      mockPrisma.guildExpeditionMember.update.mockResolvedValue(makeMemberRow());
+      mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guild.update.mockResolvedValue({});
+      mockPrisma.guildLog.create.mockResolvedValue({});
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
+
+      const result = await autoResolveRoom(EXPEDITION_ID);
+
+      expect(result.outcome).toBe('cleared');
+      expect(result.roundsResolved).toBe(1);
+      expect(result.roundLogs).toHaveLength(1);
+      // Bonus tokens: base 5 * tier_mult 1 * 0.25 = 1
+      expect(result.tokensAwarded).toBe(6); // 5 base + 1 bonus
+
+      // Verify optimistic lock used roundNumber: 0
+      expect(mockPrisma.guildExpedition.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: EXPEDITION_ID, roundNumber: 0 },
+        }),
+      );
+    });
+
+    it('resolves wipe when all players die', async () => {
+      vi.mocked(resolveRaidRound).mockReturnValueOnce({
+        mobsAfter: [{ id: 'mob-0-0', hp: 80, maxHp: 100, activeEffects: [], actionTemplate: [] }],
+        participantResults: [{
+          playerId: PLAYER_ID, actionId: 'normal_attack', targetMobId: 'mob-0-0',
+          wasExhausted: false, damageDealt: 20, healingDone: 0, damageTaken: 100,
+          hpAfter: 0, staminaAfter: 70, manaAfter: 45,
+          templateRoundAfter: 2, isDead: true, hit: true, isCritical: false,
+          activeEffectsAfter: [], potionsConsumed: [],
+        }],
+        mobActionResults: [],
+        threatTableAfter: [{ playerId: PLAYER_ID, threat: 20, tauntRoundsRemaining: 0 }],
+        roomCleared: false,
+        allPlayersDead: true,
+        roundLog: { round: 1, roomIndex: 0, phases: { playerAttacks: [], healing: [], mobActions: [], dots: [], outcome: { mobsKilled: 0, playersKnockedOut: 1, roomCleared: false, wipe: true } } },
+        allPotionsConsumed: [],
+      } as any);
+
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(inProgressExpedition({ wipeCount: 0, expeditionAttemptLogs: [] }));
+      mockPrisma.guildExpedition.update.mockResolvedValue({});
+      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildExpeditionMember.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildExpeditionMember.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildLog.create.mockResolvedValue({});
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
+
+      const result = await autoResolveRoom(EXPEDITION_ID);
+
+      expect(result.outcome).toBe('wiped');
+      expect(result.roundsResolved).toBe(1);
+      expect(result.tokensAwarded).toBe(0);
+    });
+
+    it('returns early wipe when no alive members', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        inProgressExpedition({
+          members: [makeMemberRow({ isKnockedOut: true, currentHp: 0 })],
+          wipeCount: 0,
+          expeditionAttemptLogs: [],
+        }),
+      );
+      mockPrisma.guildExpedition.update.mockResolvedValue({});
+      mockPrisma.guildExpeditionMember.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildLog.create.mockResolvedValue({});
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
+
+      const result = await autoResolveRoom(EXPEDITION_ID);
+
+      expect(result.outcome).toBe('wiped');
+      expect(result.roundsResolved).toBe(0);
+      expect(result.roundLogs).toHaveLength(0);
+      // resolveRaidRound should not have been called
+      expect(resolveRaidRound).not.toHaveBeenCalled();
+    });
+
+    it('throws on concurrent modification (optimistic lock fails)', async () => {
+      vi.mocked(resolveRaidRound).mockReturnValueOnce({
+        mobsAfter: [{ id: 'mob-0-0', hp: 0, maxHp: 100, activeEffects: [], actionTemplate: [] }],
+        participantResults: [{
+          playerId: PLAYER_ID, actionId: 'normal_attack', targetMobId: 'mob-0-0',
+          wasExhausted: false, damageDealt: 100, healingDone: 0, damageTaken: 0,
+          hpAfter: 100, staminaAfter: 80, manaAfter: 50,
+          templateRoundAfter: 2, isDead: false, hit: true, isCritical: false,
+          activeEffectsAfter: [], potionsConsumed: [],
+        }],
+        mobActionResults: [],
+        threatTableAfter: [{ playerId: PLAYER_ID, threat: 100, tauntRoundsRemaining: 0 }],
+        roomCleared: true,
+        allPlayersDead: false,
+        roundLog: { round: 1, roomIndex: 0, phases: { playerAttacks: [], healing: [], mobActions: [], dots: [], outcome: { mobsKilled: 1, playersKnockedOut: 0, roomCleared: true, wipe: false } } },
+        allPotionsConsumed: [],
+      } as any);
+
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(inProgressExpedition());
+      mockPrisma.guildExpedition.update.mockResolvedValue({});
+      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 0 }); // Lock failed
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
+
+      await expect(autoResolveRoom(EXPEDITION_ID)).rejects.toThrow('Room was modified by another process');
     });
   });
 });
