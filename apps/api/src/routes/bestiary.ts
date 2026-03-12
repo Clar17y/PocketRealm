@@ -6,6 +6,8 @@ import { authenticate } from '../middleware/auth';
 import { prismaAny } from '../utils/prismaAny.js';
 import { calculateExplorationPercent } from '../services/zoneExplorationService';
 import { asyncHandler } from '../utils/asyncHandler';
+import { getExpeditionBestiary } from '../services/expeditionBestiaryService';
+import { getWorldBossBestiary } from '../services/bossBestiaryService';
 
 export const bestiaryRouter = Router();
 
@@ -145,4 +147,16 @@ bestiaryRouter.get('/', asyncHandler(async (req, res) => {
       discovered: (prefixTotals.get(p.key) ?? 0) > 0,
     })),
   });
+}));
+
+bestiaryRouter.get('/expeditions', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const result = await getExpeditionBestiary(playerId);
+  res.json(result);
+}));
+
+bestiaryRouter.get('/bosses', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const result = await getWorldBossBestiary(playerId);
+  res.json(result);
 }));
