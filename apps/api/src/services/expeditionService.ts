@@ -6,6 +6,7 @@ import {
   ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
   type ActionDefinition,
+  type ExpeditionAttemptLog,
   type ExpeditionData,
   type ExpeditionMemberData,
   type ExpeditionStatus,
@@ -61,6 +62,7 @@ interface GuildExpeditionRow {
   completedAt: Date | null;
   launchedBy: string;
   wipeCount?: number;
+  expeditionAttemptLogs?: unknown;
   themeId?: string | null;
   _count?: { members: number };
 }
@@ -102,6 +104,9 @@ function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
       activeEffects: m.activeEffects ?? [],
     })),
     roundLogs,
+    attemptLogs: (Array.isArray(exp.expeditionAttemptLogs)
+      ? exp.expeditionAttemptLogs
+      : []) as unknown as ExpeditionAttemptLog[],
     themeId: exp.themeId ?? null,
     themeName: EXPEDITION_THEMES_BY_ID.get(exp.themeId ?? '')?.name ?? null,
   };
@@ -1375,9 +1380,12 @@ export async function recoverFromKO(
 export async function completeExpedition(expeditionId: string): Promise<void> {
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id: expeditionId },
-    include: { members: true },
+    include: { members: { include: { player: { select: { username: true } } } } },
   });
   if (!expedition) return;
+
+  // Archive final successful attempt's logs alongside previous wipe attempts
+  const finalAttemptLogs = buildUpdatedAttemptLogs(expedition, { outcome: 'completed' });
 
   // Set status completed
   await prisma.guildExpedition.update({
@@ -1386,6 +1394,7 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
       status: 'completed',
       completedAt: new Date(),
       nextRoundAt: null,
+      expeditionAttemptLogs: JSON.parse(JSON.stringify(finalAttemptLogs)),
     },
   });
 

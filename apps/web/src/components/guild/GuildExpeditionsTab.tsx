@@ -1425,40 +1425,7 @@ function HistoryView({ guildId, playerId }: { guildId: string; playerId: string 
           </button>
 
           {expandedId === exp.id && expandedDetail && (
-            <div className="mt-3 pt-2 border-t border-[var(--rpg-border)] space-y-3">
-              {/* Contributions */}
-              {expandedDetail.members.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
-                  <div className="space-y-0.5">
-                    {[...expandedDetail.members]
-                      .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
-                      .map((m, i) => (
-                        <div key={m.playerId} className="flex justify-between text-xs">
-                          <span className="text-[var(--rpg-text-secondary)]">
-                            <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
-                            {m.username ?? m.playerId.slice(0, 8)}
-                          </span>
-                          <div className="flex gap-2 text-[10px]">
-                            <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
-                            {m.totalHealing > 0 && (
-                              <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
-                            )}
-                            {m.tokensEarned > 0 && (
-                              <span className="text-[var(--rpg-gold)]">{formatNumber(m.tokensEarned)} tokens</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Round logs */}
-              {expandedDetail.expedition.roundLogs.length > 0 && (
-                <RoundLogList logs={expandedDetail.expedition.roundLogs} playerId={playerId} />
-              )}
-            </div>
+            <HistoryDetailPanel expedition={expandedDetail.expedition} members={expandedDetail.members} playerId={playerId} />
           )}
         </PixelCard>
       ))}
@@ -1476,6 +1443,143 @@ function HistoryView({ guildId, playerId }: { guildId: string; playerId: string 
             Next
           </PixelButton>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// History Detail Panel — Per-Attempt View
+// ---------------------------------------------------------------------------
+
+function HistoryDetailPanel({
+  expedition,
+  members,
+  playerId,
+}: {
+  expedition: ExpeditionData;
+  members: ExpeditionMemberData[];
+  playerId: string | null;
+}) {
+  const attempts = expedition.attemptLogs;
+  const [selectedAttempt, setSelectedAttempt] = useState(attempts.length > 0 ? attempts.length - 1 : 0);
+  const hasMultipleAttempts = attempts.length > 1;
+
+  // Current attempt data
+  const attempt = attempts[selectedAttempt];
+
+  return (
+    <div className="mt-3 pt-2 border-t border-[var(--rpg-border)] space-y-3">
+      {/* Attempt tabs */}
+      {hasMultipleAttempts && (
+        <div className="flex gap-1 flex-wrap">
+          {attempts.map((a, i) => {
+            const isSuccess = 'outcome' in a && (a as Record<string, unknown>).outcome === 'completed';
+            return (
+              <button
+                key={i}
+                onClick={() => setSelectedAttempt(i)}
+                className={`px-2 py-0.5 text-[10px] rounded ${
+                  selectedAttempt === i
+                    ? 'bg-[var(--rpg-gold)] text-[var(--rpg-bg)] font-bold'
+                    : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                }`}
+              >
+                Attempt {a.attempt}{isSuccess ? ' ✓' : ''}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {attempt && (
+        <>
+          <div className="text-[10px] text-[var(--rpg-text-secondary)]">
+            Reached room {attempt.roomReached + 1} · {attempt.roundLogs.length} round{attempt.roundLogs.length !== 1 ? 's' : ''}
+          </div>
+
+          {/* Per-attempt contributions */}
+          {attempt.participants && attempt.participants.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
+              <div className="space-y-0.5">
+                {[...attempt.participants]
+                  .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
+                  .map((m, i) => (
+                    <div key={m.playerId} className="flex justify-between text-xs">
+                      <span className="text-[var(--rpg-text-secondary)]">
+                        <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
+                        {m.username ?? m.playerId.slice(0, 8)}
+                      </span>
+                      <span className="text-[10px] text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Fallback: show overall member contributions if no per-attempt data */}
+          {!attempt.participants && members.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions (overall)</h4>
+              <div className="space-y-0.5">
+                {[...members]
+                  .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
+                  .map((m, i) => (
+                    <div key={m.playerId} className="flex justify-between text-xs">
+                      <span className="text-[var(--rpg-text-secondary)]">
+                        <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
+                        {m.username ?? m.playerId.slice(0, 8)}
+                      </span>
+                      <div className="flex gap-2 text-[10px]">
+                        <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
+                        {m.totalHealing > 0 && (
+                          <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Round logs for this attempt */}
+          {attempt.roundLogs.length > 0 && (
+            <RoundLogList logs={attempt.roundLogs} playerId={playerId} />
+          )}
+        </>
+      )}
+
+      {/* Fallback for no attempt logs (old expeditions before this feature) */}
+      {attempts.length === 0 && (
+        <>
+          {members.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
+              <div className="space-y-0.5">
+                {[...members]
+                  .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
+                  .map((m, i) => (
+                    <div key={m.playerId} className="flex justify-between text-xs">
+                      <span className="text-[var(--rpg-text-secondary)]">
+                        <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
+                        {m.username ?? m.playerId.slice(0, 8)}
+                      </span>
+                      <div className="flex gap-2 text-[10px]">
+                        <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
+                        {m.totalHealing > 0 && (
+                          <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+          {expedition.roundLogs.length > 0 && (
+            <RoundLogList logs={expedition.roundLogs} playerId={playerId} />
+          )}
+        </>
       )}
     </div>
   );

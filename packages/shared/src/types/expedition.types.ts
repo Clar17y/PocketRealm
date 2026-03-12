@@ -125,6 +125,18 @@ export interface ExpeditionMobInfo {
   activeEffects: BossActiveEffect[];
 }
 
+export interface ExpeditionAttemptLog {
+  attempt: number;
+  roomReached: number;
+  roundLogs: ExpeditionRoundLog[];
+  participants?: Array<{
+    playerId: string;
+    username?: string;
+    totalDamage: number;
+    totalHealing: number;
+  }>;
+}
+
 export interface ExpeditionData {
   id: string;
   guildId: string;
@@ -145,6 +157,7 @@ export interface ExpeditionData {
   mobsRemaining: number;
   currentRoomMobs: ExpeditionMobInfo[];
   roundLogs: ExpeditionRoundLog[];
+  attemptLogs: ExpeditionAttemptLog[];
   themeId?: string | null;
   themeName?: string | null;
 }
