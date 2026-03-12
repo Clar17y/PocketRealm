@@ -33,6 +33,7 @@ export default function Home() {
           <div className="flex gap-4 justify-center flex-wrap">
             <a href="/register" className={linkPrimary}>Play Free</a>
             <a href="#features" className={linkSecondary}>Learn More</a>
+            <a href="/wiki" className={linkSecondary}>Game Wiki</a>
           </div>
         </div>
       </section>
@@ -211,9 +212,14 @@ export default function Home() {
             <a href="/register" className={linkPrimary}>Play Free</a>
             <a href="/register" className={linkGold}>Become Champion</a>
           </div>
-          <a href="/login" className="text-sm font-crimson text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors">
-            Already playing? Log in
-          </a>
+          <div className="flex gap-6 justify-center text-sm font-crimson">
+            <a href="/login" className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors">
+              Already playing? Log in
+            </a>
+            <a href="/wiki" className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)] transition-colors">
+              📜 Game Wiki
+            </a>
+          </div>
         </div>
       </section>
     </main>
