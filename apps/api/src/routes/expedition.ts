@@ -280,6 +280,7 @@ expeditionRouter.post('/:id/auto-resolve', asyncHandler(async (req, res) => {
     outcome: result.outcome,
     roundsResolved: result.roundsResolved,
     tokensAwarded: result.tokensAwarded,
+    roundLogs: result.roundLogs,
   });
 }));
 
