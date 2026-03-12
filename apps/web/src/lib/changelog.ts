@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.38',
+    date: '2026-06-10',
+    title: 'Game Wiki',
+    summary:
+      'A comprehensive public wiki is now available at /wiki with 31 pages covering every game mechanic in full detail. All formulas, constants, and calculations are pulled directly from the source code, so the wiki is always accurate and up to date. Sections cover Combat (damage, hit chance, crits, actions, buffs, defensive mechanics, mob prefixes), Bosses and Expeditions (encounters, threat, contribution, raids), PvP (combat differences, ELO rating), Progression (XP curves, efficiency caps, skill points), Resources (HP, stamina, mana, flee mechanics), Items (rarity, drop tables, forge, durability, inventory), Crafting (crit system, gathering, salvage), and Exploration (probability model, room generation, mob tiers, zone progression). The wiki uses the same RPG art style and pixel art as the game itself.',
+  },
+  {
     version: '0.37',
     date: '2026-03-12',
     title: 'Expedition Auto-Resolve & Attempt History',
