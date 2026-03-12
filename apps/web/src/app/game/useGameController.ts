@@ -250,7 +250,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [lastCombat, setLastCombat] = useState<LastCombat | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
+  const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, expeditionThemes, worldBosses, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
   const [staminaState, setStaminaState] = useState<ResourceState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 });
   const [manaState, setManaState] = useState<ResourceState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5 });
@@ -1600,6 +1600,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     bestiaryLoading,
     bestiaryError,
     bestiaryPrefixSummary,
+    expeditionThemes,
+    worldBosses,
     hpState,
     setHpState,
     staminaState,

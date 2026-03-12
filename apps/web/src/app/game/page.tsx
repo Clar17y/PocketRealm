@@ -159,6 +159,8 @@ export default function GamePage() {
     bestiaryLoading,
     bestiaryError,
     bestiaryPrefixSummary,
+    expeditionThemes,
+    worldBosses,
     hpState,
     setHpState,
     staminaState,
@@ -751,6 +753,8 @@ export default function GamePage() {
               })),
             }))}
             prefixSummary={bestiaryPrefixSummary}
+            expeditionThemes={expeditionThemes}
+            worldBosses={worldBosses}
           />
         );
       case 'crafting':
