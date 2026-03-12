@@ -1,0 +1,370 @@
+/* Wiki-specific styles */
+
+.wiki-layout {
+  --wiki-gold-dim: #806820;
+  --wiki-gold-mid: #a08030;
+  --wiki-bg-deep: #0d0a04;
+  --wiki-text-body: #c8c0a0;
+
+  display: flex;
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--rpg-background) 0%, var(--wiki-bg-deep) 100%);
+}
+
+/* ── Sidebar ── */
+
+.wiki-sidebar {
+  width: 280px;
+  background: var(--wiki-bg-deep);
+  border-right: 1px solid color-mix(in srgb, var(--rpg-gold) 20%, transparent);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.wiki-sidebar-title {
+  color: var(--rpg-gold);
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--rpg-gold) 15%, transparent);
+}
+
+.wiki-sidebar-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--wiki-gold-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 12px 16px 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.wiki-sidebar-section-label:hover {
+  color: var(--rpg-gold);
+}
+
+.wiki-sidebar-link {
+  display: block;
+  color: var(--wiki-gold-mid);
+  font-size: 0.85rem;
+  padding: 6px 16px 6px 32px;
+  text-decoration: none;
+  border-right: 2px solid transparent;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.wiki-sidebar-link:hover {
+  color: var(--rpg-text-primary);
+  background: color-mix(in srgb, var(--rpg-gold) 5%, transparent);
+}
+
+.wiki-sidebar-link[data-active='true'] {
+  color: var(--rpg-gold);
+  border-right-color: var(--rpg-gold);
+  background: color-mix(in srgb, var(--rpg-gold) 8%, transparent);
+}
+
+/* ── Content ── */
+
+.wiki-content {
+  flex: 1;
+  max-width: 860px;
+  padding: 32px 48px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+/* ── Breadcrumb ── */
+
+.wiki-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--wiki-gold-dim);
+  margin-bottom: 16px;
+}
+
+.wiki-breadcrumb a {
+  color: var(--wiki-gold-dim);
+  text-decoration: none;
+}
+
+.wiki-breadcrumb a:hover {
+  color: var(--rpg-gold);
+}
+
+/* ── Page header ── */
+
+.wiki-page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--rpg-gold);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--rpg-gold) 30%, transparent);
+  margin-bottom: 8px;
+}
+
+.wiki-page-summary {
+  color: var(--wiki-gold-mid);
+  font-size: 0.95rem;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+/* ── Formula block ── */
+
+.wiki-formula {
+  background: var(--wiki-bg-deep);
+  border: 1px solid color-mix(in srgb, var(--rpg-gold) 20%, transparent);
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin: 16px 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9rem;
+  overflow-x: auto;
+  line-height: 1.7;
+}
+
+.wiki-formula .var-output {
+  color: var(--rpg-green-light);
+  font-weight: 600;
+}
+
+.wiki-formula .var-player {
+  color: var(--rpg-gold);
+}
+
+.wiki-formula .var-enemy {
+  color: var(--rpg-red);
+}
+
+.wiki-formula .var-constant {
+  color: #ffa657;
+}
+
+.wiki-formula .var-operator {
+  color: var(--wiki-gold-dim);
+}
+
+.wiki-formula .var-comment {
+  color: #5a4a20;
+  font-style: italic;
+}
+
+/* ── Table ── */
+
+.wiki-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.wiki-table th {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--rpg-gold);
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--rpg-gold) 20%, transparent);
+}
+
+.wiki-table td {
+  color: var(--rpg-text-primary);
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--rpg-border) 40%, transparent);
+}
+
+.wiki-table tr:hover td {
+  background: color-mix(in srgb, var(--rpg-gold) 4%, transparent);
+}
+
+.wiki-table code {
+  background: color-mix(in srgb, var(--rpg-gold) 10%, transparent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: var(--rpg-gold);
+}
+
+/* ── Section heading ── */
+
+.wiki-section-heading {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--rpg-text-primary);
+  border-bottom: 1px solid color-mix(in srgb, var(--rpg-border) 50%, transparent);
+  padding-bottom: 6px;
+  margin: 32px 0 16px;
+}
+
+/* ── Explanation text ── */
+
+.wiki-explanation {
+  color: var(--wiki-text-body);
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+
+/* ── Note callout ── */
+
+.wiki-note {
+  border-left: 3px solid var(--rpg-gold);
+  color: var(--wiki-gold-mid);
+  background: color-mix(in srgb, var(--rpg-gold) 4%, transparent);
+  padding: 12px 16px;
+  margin: 16px 0;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* ── Related pages ── */
+
+.wiki-related {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid color-mix(in srgb, var(--rpg-gold) 15%, transparent);
+}
+
+.wiki-related h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--wiki-gold-dim);
+  margin-bottom: 12px;
+}
+
+.wiki-related-link {
+  display: inline-block;
+  color: var(--rpg-gold);
+  background: color-mix(in srgb, var(--rpg-gold) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--rpg-gold) 20%, transparent);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 0.82rem;
+  text-decoration: none;
+  margin: 0 6px 6px 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.wiki-related-link:hover {
+  background: color-mix(in srgb, var(--rpg-gold) 15%, transparent);
+  border-color: color-mix(in srgb, var(--rpg-gold) 40%, transparent);
+}
+
+/* ── Index grid ── */
+
+.wiki-index-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.wiki-index-card {
+  display: block;
+  background: var(--wiki-bg-deep);
+  border: 1px solid color-mix(in srgb, var(--rpg-gold) 15%, transparent);
+  border-radius: 8px;
+  padding: 20px;
+  text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.wiki-index-card:hover {
+  border-color: color-mix(in srgb, var(--rpg-gold) 40%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--rpg-gold) 10%, transparent);
+  transform: translateY(-2px);
+}
+
+.wiki-index-card-icon {
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+.wiki-index-card-title {
+  color: var(--rpg-gold);
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin-bottom: 6px;
+}
+
+.wiki-index-card-desc {
+  color: var(--wiki-gold-mid);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.wiki-index-card-count {
+  color: var(--wiki-gold-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Mobile ── */
+
+.wiki-mobile-toggle {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 50;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--rpg-surface);
+  border: 1px solid color-mix(in srgb, var(--rpg-gold) 30%, transparent);
+  color: var(--rpg-gold);
+  font-size: 1.3rem;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  align-items: center;
+  justify-content: center;
+}
+
+.wiki-mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 767px) {
+  .wiki-content {
+    padding: 20px 16px;
+  }
+
+  .wiki-mobile-toggle {
+    display: flex;
+  }
+
+  .wiki-mobile-overlay[data-open='true'] {
+    display: block;
+  }
+
+  .wiki-sidebar--mobile {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 45;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  .wiki-sidebar--mobile[data-open='true'] {
+    transform: translateX(0);
+  }
+}
