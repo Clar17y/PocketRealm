@@ -577,19 +577,17 @@ async function recordExpeditionKills(
     killCounts.set(mob.mobTemplateId, (killCounts.get(mob.mobTemplateId) ?? 0) + 1);
   }
 
-  const upserts = [];
-  for (const playerId of playerIds) {
-    for (const [mobTemplateId, count] of killCounts) {
-      upserts.push(
+  await prisma.$transaction(
+    playerIds.flatMap(playerId =>
+      [...killCounts].map(([mobTemplateId, count]) =>
         prisma.playerExpeditionBestiary.upsert({
           where: { playerId_mobTemplateId: { playerId, mobTemplateId } },
           create: { playerId, mobTemplateId, theme: themeId, killCount: count },
           update: { killCount: { increment: count } },
         }),
-      );
-    }
-  }
-  await Promise.all(upserts);
+      ),
+    ),
+  );
 }
 
 function buildUpdatedRoomMobs(

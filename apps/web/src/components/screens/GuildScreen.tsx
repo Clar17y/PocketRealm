@@ -20,13 +20,13 @@ import { ScreenContainer } from '../common/ScreenContainer';
 
 type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'projects' | 'expeditions' | 'shop' | 'specialization' | 'log' | 'settings';
 
-import type { ExpeditionBackgroundContext } from '@/components/guild/GuildExpeditionsTab';
+import type { ExpeditionContext } from '@/lib/assets';
 
 interface GuildScreenProps {
   playerId: string | null;
   characterLevel: number;
   onTurnsChanged: () => void;
-  onExpeditionContextChange?: (ctx: ExpeditionBackgroundContext | null) => void;
+  onExpeditionContextChange?: (ctx: ExpeditionContext | null) => void;
 }
 
 export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpeditionContextChange }: GuildScreenProps) {

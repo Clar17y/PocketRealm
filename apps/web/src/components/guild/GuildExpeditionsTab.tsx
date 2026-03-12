@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Shield } from 'lucide-react';
 import Image from 'next/image';
-import { monsterImageSrc } from '@/lib/assets';
+import { monsterImageSrc, type ExpeditionContext } from '@/lib/assets';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
@@ -76,11 +76,6 @@ function AttemptBadge({ attemptNumber }: { attemptNumber: number }) {
 // Props
 // ---------------------------------------------------------------------------
 
-export interface ExpeditionBackgroundContext {
-  theme: string;
-  isBossRoom: boolean;
-}
-
 interface GuildExpeditionsTabProps {
   guildId: string;
   playerId: string | null;
@@ -89,7 +84,7 @@ interface GuildExpeditionsTabProps {
   setError: (msg: string | null) => void;
   onTurnsChanged?: () => void;
   onRefresh?: () => void;
-  onExpeditionContextChange?: (ctx: ExpeditionBackgroundContext | null) => void;
+  onExpeditionContextChange?: (ctx: ExpeditionContext | null) => void;
 }
 
 // ---------------------------------------------------------------------------
