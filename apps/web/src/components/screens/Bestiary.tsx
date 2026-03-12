@@ -5,9 +5,10 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { BookOpen, X, MapPin, Sword, Shield, Heart, Lock } from 'lucide-react';
 import Image from 'next/image';
-import { uiIconSrc } from '@/lib/assets';
+import { monsterImageSrc, uiIconSrc } from '@/lib/assets';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { getMobPrefixDefinition, getTierName } from '@pocketrealm/shared';
+import type { ExpeditionBestiaryTheme, WorldBossEntry } from '@/app/game/hooks/useBestiary';
 import { StatBar } from '@/components/StatBar';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
@@ -60,6 +61,8 @@ interface PrefixSummaryEntry {
 interface BestiaryProps {
   monsters: Monster[];
   prefixSummary: PrefixSummaryEntry[];
+  expeditionThemes: ExpeditionBestiaryTheme[];
+  worldBosses: WorldBossEntry[];
 }
 
 const PREFIX_ORDER = ['weak', 'frail', 'tough', 'gigantic', 'swift', 'ferocious', 'shaman', 'venomous', 'ancient', 'spectral'];
@@ -173,9 +176,298 @@ function PrefixEncyclopedia({ prefixSummary }: { prefixSummary: PrefixSummaryEnt
   );
 }
 
-export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
+const ROLE_LABELS: Record<string, string> = {
+  trash: 'Trash',
+  elite: 'Elite',
+  caster: 'Caster',
+  add: 'Add',
+  mini_boss: 'Mini-Boss',
+  final_boss: 'Final Boss',
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  trash: 'text-[var(--rpg-text-secondary)]',
+  elite: 'text-[var(--rpg-blue-light)]',
+  caster: 'text-[var(--rpg-purple)]',
+  add: 'text-[var(--rpg-text-secondary)]',
+  mini_boss: 'text-[var(--rpg-purple)]',
+  final_boss: 'text-[var(--rpg-gold)]',
+};
+
+function ExpeditionBestiaryTab({ themes }: { themes: ExpeditionBestiaryTheme[] }) {
+  const [selectedMob, setSelectedMob] = useState<ExpeditionBestiaryTheme['mobs'][number] | null>(null);
+
+  const attemptedThemes = themes.filter(t => t.attempted);
+  const unattemptedThemes = themes.filter(t => !t.attempted);
+
+  return (
+    <div className="space-y-4">
+      {attemptedThemes.map(theme => {
+        const discovered = theme.mobs.filter(m => m.killCount > 0).length;
+        return (
+          <div key={theme.theme}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)]">{theme.themeName}</h3>
+              <span className="text-xs text-[var(--rpg-text-secondary)]">{discovered}/{theme.mobs.length}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {theme.mobs.map(mob => {
+                const isDiscovered = mob.killCount > 0;
+                return (
+                  <button
+                    key={mob.mobTemplateId}
+                    onClick={() => isDiscovered && setSelectedMob(mob)}
+                    disabled={!isDiscovered}
+                    className="aspect-square"
+                  >
+                    <div className={`w-full h-full rounded-lg border-2 flex flex-col items-center justify-center p-1 ${
+                      isDiscovered
+                        ? 'bg-[var(--rpg-surface)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
+                        : 'bg-[var(--rpg-background)] border-[var(--rpg-border)] border-dashed'
+                    }`}>
+                      {isDiscovered ? (
+                        <>
+                          <Image
+                            src={monsterImageSrc(mob.name)}
+                            alt={mob.name}
+                            width={40}
+                            height={40}
+                            className="image-rendering-pixelated mb-0.5"
+                          />
+                          <span className="text-[9px] text-[var(--rpg-text-secondary)] text-center leading-tight line-clamp-1">{mob.name}</span>
+                          <span className={`text-[8px] ${ROLE_COLORS[mob.role]}`}>{ROLE_LABELS[mob.role]}</span>
+                          <span className="text-[8px] text-[var(--rpg-gold)] font-pixel">x{mob.killCount}</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-10 h-10 bg-[var(--rpg-surface)] rounded-lg mb-0.5 flex items-center justify-center">
+                            <span className="text-xs text-[var(--rpg-text-secondary)]">???</span>
+                          </div>
+                          <span className={`text-[8px] ${ROLE_COLORS[mob.role]}`}>{ROLE_LABELS[mob.role]}</span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {unattemptedThemes.length > 0 && (
+        <div className="opacity-40">
+          <h3 className="text-xs font-bold text-[var(--rpg-text-secondary)] mb-2 uppercase">Undiscovered Themes</h3>
+          {unattemptedThemes.map(theme => (
+            <div key={theme.theme} className="rounded-lg border-2 border-dashed border-[var(--rpg-border)] p-3 mb-2">
+              <span className="text-sm text-[var(--rpg-text-secondary)]">{theme.themeName}</span>
+              <span className="text-xs text-[var(--rpg-text-secondary)] ml-2">({theme.mobs.length} mobs)</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {selectedMob && (
+        <ModalOverlay opacity={80} onClose={() => setSelectedMob(null)}>
+          <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto">
+            <PixelCard>
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-3">
+                  <Image
+                    src={monsterImageSrc(selectedMob.name)}
+                    alt={selectedMob.name}
+                    width={56}
+                    height={56}
+                    className="image-rendering-pixelated"
+                  />
+                  <div>
+                    <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedMob.name}</h3>
+                    <span className={`text-xs ${ROLE_COLORS[selectedMob.role]}`}>{ROLE_LABELS[selectedMob.role]}</span>
+                    <div className="text-xs text-[var(--rpg-gold)] mt-1 font-pixel">x{selectedMob.killCount} defeated</div>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedMob(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {selectedMob.stats ? (
+                <div className="mb-3 space-y-1">
+                  <h4 className="text-sm font-semibold text-[var(--rpg-text-primary)]">Stats</h4>
+                  <div className="flex items-center gap-3">
+                    <Heart size={14} color="var(--rpg-green-light)" />
+                    <span className="text-xs text-[var(--rpg-text-primary)]">HP: <span className="font-pixel text-[8px] text-[var(--rpg-green-light)]">{selectedMob.stats.hp}</span></span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Sword size={14} color="var(--rpg-red)" />
+                    <span className="text-xs text-[var(--rpg-text-primary)]">ATK: <span className="font-pixel text-[8px] text-[var(--rpg-red)]">{selectedMob.stats.attack}</span></span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Shield size={14} color="var(--rpg-blue-light)" />
+                    <span className="text-xs text-[var(--rpg-text-primary)]">DEF: <span className="font-pixel text-[8px] text-[var(--rpg-blue-light)]">{selectedMob.stats.defence}</span></span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {3 - selectedMob.killCount} more to reveal stats.</div>
+              )}
+
+              {selectedMob.rotation ? (
+                <div className="mb-3">
+                  <h4 className="text-sm font-semibold text-[var(--rpg-text-primary)] mb-1">Rotation</h4>
+                  <div className="space-y-1">
+                    {selectedMob.rotation.map(a => (
+                      <div key={a.round} className="flex items-center gap-2 text-xs">
+                        <span className="text-[var(--rpg-text-secondary)] w-8">R{a.round}</span>
+                        <span className="text-[var(--rpg-text-primary)]">{a.actionName}</span>
+                        <span className="text-[var(--rpg-text-secondary)]">({a.targetMode === 'aoe' ? 'AoE' : 'Single'})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : selectedMob.stats ? (
+                <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {5 - selectedMob.killCount} more to reveal rotation.</div>
+              ) : null}
+
+              <PixelButton variant="secondary" className="w-full" onClick={() => setSelectedMob(null)}>Close</PixelButton>
+            </PixelCard>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
+  );
+}
+
+function WorldBossBestiaryTab({ bosses }: { bosses: WorldBossEntry[] }) {
+  const [selectedBoss, setSelectedBoss] = useState<WorldBossEntry | null>(null);
+
+  const encountered = bosses.filter(b => b.defeatCount > 0);
+  const unencountered = bosses.filter(b => b.defeatCount === 0);
+
+  return (
+    <div className="space-y-3">
+      {encountered.map(boss => (
+        <button
+          key={boss.bossTemplateId}
+          onClick={() => setSelectedBoss(boss)}
+          className="w-full rounded-lg border-2 bg-[var(--rpg-surface)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)] p-3 text-left transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Image
+              src={monsterImageSrc(boss.name)}
+              alt={boss.name}
+              width={48}
+              height={48}
+              className="image-rendering-pixelated"
+            />
+            <div className="flex-1">
+              <h3 className="text-sm font-bold text-[var(--rpg-text-primary)]">{boss.name}</h3>
+              <div className="text-xs text-[var(--rpg-gold)] font-pixel">x{boss.defeatCount} defeated</div>
+              {boss.hpPerParticipant !== null && (
+                <div className="text-xs text-[var(--rpg-text-secondary)]">{boss.hpPerParticipant} HP / participant</div>
+              )}
+            </div>
+            <div className="text-right">
+              <StatBar current={Math.min(boss.defeatCount, 5)} max={5} color="xp" size="sm" showNumbers={false} />
+              <span className="text-[8px] text-[var(--rpg-text-secondary)]">{Math.min(boss.defeatCount, 5)}/5</span>
+            </div>
+          </div>
+        </button>
+      ))}
+
+      {unencountered.map(boss => (
+        <div
+          key={boss.bossTemplateId}
+          className="rounded-lg border-2 border-dashed border-[var(--rpg-border)] p-3 opacity-40"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-[var(--rpg-surface)] rounded-lg flex items-center justify-center">
+              <span className="text-lg text-[var(--rpg-text-secondary)]">???</span>
+            </div>
+            <span className="text-sm text-[var(--rpg-text-secondary)]">{boss.name}</span>
+          </div>
+        </div>
+      ))}
+
+      {bosses.length === 0 && (
+        <div className="text-center text-sm text-[var(--rpg-text-secondary)] py-8">
+          No world bosses available yet.
+        </div>
+      )}
+
+      {/* Boss Detail Modal */}
+      {selectedBoss && (
+        <ModalOverlay opacity={80} onClose={() => setSelectedBoss(null)}>
+          <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto">
+            <PixelCard>
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-3">
+                  <Image
+                    src={monsterImageSrc(selectedBoss.name)}
+                    alt={selectedBoss.name}
+                    width={56}
+                    height={56}
+                    className="image-rendering-pixelated"
+                  />
+                  <div>
+                    <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedBoss.name}</h3>
+                    <div className="text-xs text-[var(--rpg-gold)] font-pixel">x{selectedBoss.defeatCount} defeated</div>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedBoss(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {selectedBoss.hpPerParticipant !== null && (
+                <div className="mb-2 text-xs text-[var(--rpg-text-secondary)]">{selectedBoss.hpPerParticipant} HP / participant</div>
+              )}
+
+              {selectedBoss.stats ? (
+                <div className="mb-3 space-y-1">
+                  <h4 className="text-sm font-semibold text-[var(--rpg-text-primary)]">Stats</h4>
+                  <div className="flex items-center gap-3">
+                    <Sword size={14} color="var(--rpg-red)" />
+                    <span className="text-xs text-[var(--rpg-text-primary)]">ACC: <span className="font-pixel text-[8px] text-[var(--rpg-red)]">{selectedBoss.stats.accuracy}</span></span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Shield size={14} color="var(--rpg-blue-light)" />
+                    <span className="text-xs text-[var(--rpg-text-primary)]">DEF: <span className="font-pixel text-[8px] text-[var(--rpg-blue-light)]">{selectedBoss.stats.defence}</span></span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {3 - selectedBoss.defeatCount} more to reveal stats.</div>
+              )}
+
+              {selectedBoss.rotation ? (
+                <div className="mb-3">
+                  <h4 className="text-sm font-semibold text-[var(--rpg-text-primary)] mb-1">Rotation</h4>
+                  <div className="space-y-1">
+                    {selectedBoss.rotation.map(a => (
+                      <div key={a.round} className="flex items-center gap-2 text-xs">
+                        <span className="text-[var(--rpg-text-secondary)] w-8">R{a.round}</span>
+                        <span className={a.isTelegraphed ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text-primary)]'}>{a.actionName}</span>
+                        <span className="text-[var(--rpg-text-secondary)]">({a.targetMode === 'aoe' ? 'AoE' : 'Single'})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : selectedBoss.stats ? (
+                <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {5 - selectedBoss.defeatCount} more to reveal rotation.</div>
+              ) : null}
+
+              <PixelButton variant="secondary" className="w-full" onClick={() => setSelectedBoss(null)}>Close</PixelButton>
+            </PixelCard>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
+  );
+}
+
+export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosses }: BestiaryProps) {
   const [selectedMonster, setSelectedMonster] = useState<Monster | null>(null);
-  const [activeView, setActiveView] = useState<'monsters' | 'prefixes'>('monsters');
+  const [activeView, setActiveView] = useState<'monsters' | 'expeditions' | 'bosses' | 'prefixes'>('monsters');
   const sortedMonsters = [...monsters].sort((a, b) => Number(b.isDiscovered) - Number(a.isDiscovered));
 
   const discoveredCount = monsters.filter((m) => m.isDiscovered).length;
@@ -212,24 +504,31 @@ export function Bestiary({ monsters, prefixSummary }: BestiaryProps) {
           <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Bestiary</h2>
           <BookOpen size={20} color="var(--rpg-gold)" />
         </div>
-        <div className="flex gap-1">
-          {(['monsters', 'prefixes'] as const).map((view) => (
+        <div className="flex gap-1 flex-wrap">
+          {(['monsters', 'expeditions', 'bosses', 'prefixes'] as const).map((view) => (
             <button
               key={view}
               onClick={() => setActiveView(view)}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${
+              className={`px-2 py-1 text-xs rounded-md transition-colors ${
                 activeView === view
                   ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] font-bold'
                   : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
               }`}
             >
-              {view === 'monsters' ? `Monsters ${discoveredCount}/${totalCount}` : 'Prefixes'}
+              {view === 'monsters' ? `Monsters ${discoveredCount}/${totalCount}`
+                : view === 'expeditions' ? 'Expeditions'
+                : view === 'bosses' ? 'World Bosses'
+                : 'Prefixes'}
             </button>
           ))}
         </div>
       </div>
 
-      {activeView === 'monsters' ? (
+      {activeView === 'expeditions' ? (
+        <ExpeditionBestiaryTab themes={expeditionThemes} />
+      ) : activeView === 'bosses' ? (
+        <WorldBossBestiaryTab bosses={worldBosses} />
+      ) : activeView === 'monsters' ? (
         <>
           {/* Monster Grid */}
           <div className="grid grid-cols-3 gap-3">
