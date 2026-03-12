@@ -25,6 +25,7 @@ import type {
   AutoResolveResponse,
 } from '@/lib/api/expedition';
 import type {
+  ExpeditionAttemptLog,
   ExpeditionData,
   ExpeditionMemberData,
   ExpeditionRoomType,
@@ -778,6 +779,10 @@ function RecruitingView({
       {members.length > 0 && (
         <MemberList members={members} />
       )}
+
+      {expedition.attemptLogs.length > 0 && (
+        <PreviousAttemptsSection attemptLogs={expedition.attemptLogs} playerId={playerId} />
+      )}
     </div>
   );
 }
@@ -1035,6 +1040,11 @@ function InProgressView({
           logs={expedition.roundLogs.slice(0, -1)}
           playerId={playerId}
         />
+      )}
+
+      {/* Previous Attempt Logs (from wipes) */}
+      {expedition.attemptLogs.length > 0 && (
+        <PreviousAttemptsSection attemptLogs={expedition.attemptLogs} playerId={playerId} />
       )}
     </div>
   );
@@ -1449,6 +1459,87 @@ function HistoryView({ guildId, playerId }: { guildId: string; playerId: string 
 }
 
 // ---------------------------------------------------------------------------
+// Previous Attempts Section (shown during active expeditions after wipes)
+// ---------------------------------------------------------------------------
+
+function PreviousAttemptsSection({
+  attemptLogs,
+  playerId,
+}: {
+  attemptLogs: ExpeditionAttemptLog[];
+  playerId: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [selectedAttempt, setSelectedAttempt] = useState(0);
+  const attempt = attemptLogs[selectedAttempt];
+
+  return (
+    <PixelCard>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex justify-between items-center text-xs"
+      >
+        <span className="font-bold text-[var(--rpg-text-secondary)]">
+          Previous Attempts ({attemptLogs.length})
+        </span>
+        <span className="text-[var(--rpg-text-secondary)]">{expanded ? '▲' : '▼'}</span>
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {attemptLogs.length > 1 && (
+            <div className="flex gap-1 flex-wrap">
+              {attemptLogs.map((a, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSelectedAttempt(i)}
+                  className={`px-2 py-0.5 text-[10px] rounded ${
+                    selectedAttempt === i
+                      ? 'bg-[var(--rpg-gold)] text-[var(--rpg-bg)] font-bold'
+                      : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]'
+                  }`}
+                >
+                  Attempt {a.attempt}
+                </button>
+              ))}
+            </div>
+          )}
+          {attempt && (
+            <>
+              <div className="text-[10px] text-[var(--rpg-text-secondary)]">
+                Reached room {attempt.roomReached + 1} · {attempt.roundLogs.length} round{attempt.roundLogs.length !== 1 ? 's' : ''}
+              </div>
+              {attempt.participants && attempt.participants.length > 0 && (
+                <div className="space-y-0.5">
+                  {[...attempt.participants]
+                    .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
+                    .map((m, i) => (
+                      <div key={m.playerId} className="flex justify-between text-xs">
+                        <span className="text-[var(--rpg-text-secondary)]">
+                          <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
+                          {m.username ?? m.playerId.slice(0, 8)}
+                        </span>
+                        <div className="flex gap-2 text-[10px]">
+                          <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
+                          {m.totalHealing > 0 && (
+                            <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+              {attempt.roundLogs.length > 0 && (
+                <RoundLogList logs={attempt.roundLogs} playerId={playerId} />
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </PixelCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // History Detail Panel — Per-Attempt View
 // ---------------------------------------------------------------------------
 
@@ -1463,15 +1554,13 @@ function HistoryDetailPanel({
 }) {
   const attempts = expedition.attemptLogs;
   const [selectedAttempt, setSelectedAttempt] = useState(attempts.length > 0 ? attempts.length - 1 : 0);
-  const hasMultipleAttempts = attempts.length > 1;
 
-  // Current attempt data
   const attempt = attempts[selectedAttempt];
 
   return (
     <div className="mt-3 pt-2 border-t border-[var(--rpg-border)] space-y-3">
-      {/* Attempt tabs */}
-      {hasMultipleAttempts && (
+      {/* Attempt tabs (only if multiple attempts) */}
+      {attempts.length > 1 && (
         <div className="flex gap-1 flex-wrap">
           {attempts.map((a, i) => {
             const isSuccess = 'outcome' in a && (a as Record<string, unknown>).outcome === 'completed';
@@ -1492,7 +1581,7 @@ function HistoryDetailPanel({
         </div>
       )}
 
-      {attempt && (
+      {attempt ? (
         <>
           <div className="text-[10px] text-[var(--rpg-text-secondary)]">
             Reached room {attempt.roomReached + 1} · {attempt.roundLogs.length} round{attempt.roundLogs.length !== 1 ? 's' : ''}
@@ -1504,26 +1593,6 @@ function HistoryDetailPanel({
               <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
               <div className="space-y-0.5">
                 {[...attempt.participants]
-                  .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
-                  .map((m, i) => (
-                    <div key={m.playerId} className="flex justify-between text-xs">
-                      <span className="text-[var(--rpg-text-secondary)]">
-                        <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
-                        {m.username ?? m.playerId.slice(0, 8)}
-                      </span>
-                      <span className="text-[10px] text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* Fallback: show overall member contributions if no per-attempt data */}
-          {!attempt.participants && members.length > 0 && (
-            <div>
-              <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions (overall)</h4>
-              <div className="space-y-0.5">
-                {[...members]
                   .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
                   .map((m, i) => (
                     <div key={m.playerId} className="flex justify-between text-xs">
@@ -1543,16 +1612,13 @@ function HistoryDetailPanel({
             </div>
           )}
 
-          {/* Round logs for this attempt */}
           {attempt.roundLogs.length > 0 && (
             <RoundLogList logs={attempt.roundLogs} playerId={playerId} />
           )}
         </>
-      )}
-
-      {/* Fallback for no attempt logs (old expeditions before this feature) */}
-      {attempts.length === 0 && (
+      ) : (
         <>
+          {/* Fallback for old expeditions without attempt logs */}
           {members.length > 0 && (
             <div>
               <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>

@@ -1201,7 +1201,7 @@ function buildUpdatedAttemptLogs(
 export async function handleWipe(expeditionId: string): Promise<void> {
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id: expeditionId },
-    include: { members: { select: { playerId: true, totalDamage: true, totalHealing: true } } },
+    include: { members: { include: { player: { select: { username: true } } } } },
   });
   if (!expedition) return;
 
