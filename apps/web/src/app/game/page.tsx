@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { itemImageSrc, monsterImageSrc, resourceImageSrc, screenBackgroundSrc, skillIconSrc, zoneImageSrc } from '@/lib/assets';
+import { itemImageSrc, monsterImageSrc, resourceImageSrc, screenBackgroundSrc, skillIconSrc, zoneImageSrc, type ExpeditionContext } from '@/lib/assets';
 import { AppShell } from '@/components/AppShell';
 import { ChangelogModal } from '@/components/common/ChangelogModal';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
@@ -287,6 +287,7 @@ export default function GamePage() {
   } = useGameController({ isAuthenticated });
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
+  const [expeditionContext, setExpeditionContext] = useState<ExpeditionContext | null>(null);
   const chat = useChat({ isAuthenticated, currentZoneId: activeZoneId });
   const casinoSocket = useCasinoSocket(activeScreen === 'casino', player?.id ?? null);
   const lastDealerCountRef = useRef(0);
@@ -1063,6 +1064,7 @@ export default function GamePage() {
             playerId={player?.id ?? null}
             characterLevel={characterProgression.characterLevel}
             onTurnsChanged={() => void loadTurnsAndHp()}
+            onExpeditionContextChange={setExpeditionContext}
           />
         );
       case 'friends':
@@ -1186,7 +1188,7 @@ export default function GamePage() {
   onWhatsNew={openChangelog}
   hasUnseenChangelog={showChangelog}
   backgroundSrc={
-    screenBackgroundSrc(activeScreen, activeCraftingSkill)
+    screenBackgroundSrc(activeScreen, activeCraftingSkill, expeditionContext ?? undefined)
     ?? (['home', 'explore', 'combat', 'gathering', 'rest'].includes(activeScreen) && currentZone?.name && currentZone.name !== '???'
       ? zoneImageSrc(currentZone.name)
       : undefined)

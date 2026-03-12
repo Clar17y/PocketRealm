@@ -74,6 +74,11 @@ function AttemptBadge({ attemptNumber }: { attemptNumber: number }) {
 // Props
 // ---------------------------------------------------------------------------
 
+export interface ExpeditionBackgroundContext {
+  theme: string;
+  isBossRoom: boolean;
+}
+
 interface GuildExpeditionsTabProps {
   guildId: string;
   playerId: string | null;
@@ -82,6 +87,7 @@ interface GuildExpeditionsTabProps {
   setError: (msg: string | null) => void;
   onTurnsChanged?: () => void;
   onRefresh?: () => void;
+  onExpeditionContextChange?: (ctx: ExpeditionBackgroundContext | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -210,6 +216,7 @@ export function GuildExpeditionsTab({
   setError,
   onTurnsChanged,
   onRefresh,
+  onExpeditionContextChange,
 }: GuildExpeditionsTabProps) {
   const [subTab, setSubTab] = useState<'active' | 'history'>('active');
   const [loading, setLoading] = useState(true);
@@ -219,6 +226,19 @@ export function GuildExpeditionsTab({
   const [cooldowns, setCooldowns] = useState<ExpeditionCooldownInfo | null>(null);
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
+
+  // Propagate expedition background context to parent for screen backgrounds
+  useEffect(() => {
+    if (!onExpeditionContextChange) return;
+    if (expedition && expedition.status === 'in_progress' && expedition.themeId) {
+      onExpeditionContextChange({
+        theme: expedition.themeId,
+        isBossRoom: expedition.currentRoomType === 'final_boss',
+      });
+    } else {
+      onExpeditionContextChange(null);
+    }
+  }, [expedition, onExpeditionContextChange]);
 
   const loadExpedition = useCallback(async (showSpinner = false) => {
     if (showSpinner) {

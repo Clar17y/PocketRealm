@@ -74,7 +74,20 @@ const CRAFTING_SKILLS = new Set([
   'alchemy', 'refining', 'tanning', 'weaving', 'jewelcrafting',
 ]);
 
-export function screenBackgroundSrc(screen: string, activeCraftingSkill?: string): string | undefined {
+export interface ExpeditionContext {
+  theme: string;
+  isBossRoom: boolean;
+}
+
+export function screenBackgroundSrc(
+  screen: string,
+  activeCraftingSkill?: string,
+  expeditionContext?: ExpeditionContext,
+): string | undefined {
+  if (screen === 'guild' && expeditionContext) {
+    const suffix = expeditionContext.isBossRoom ? '_boss' : '';
+    return `/assets/screens/screen_expedition_${expeditionContext.theme}${suffix}.webp`;
+  }
   if (screen === 'crafting' && activeCraftingSkill && CRAFTING_SKILLS.has(activeCraftingSkill)) {
     return `/assets/screens/screen_${activeCraftingSkill}.webp`;
   }

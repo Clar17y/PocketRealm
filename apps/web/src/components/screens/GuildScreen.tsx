@@ -20,13 +20,16 @@ import { ScreenContainer } from '../common/ScreenContainer';
 
 type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'projects' | 'expeditions' | 'shop' | 'specialization' | 'log' | 'settings';
 
+import type { ExpeditionBackgroundContext } from '@/components/guild/GuildExpeditionsTab';
+
 interface GuildScreenProps {
   playerId: string | null;
   characterLevel: number;
   onTurnsChanged: () => void;
+  onExpeditionContextChange?: (ctx: ExpeditionBackgroundContext | null) => void;
 }
 
-export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildScreenProps) {
+export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpeditionContextChange }: GuildScreenProps) {
   const [guildData, setGuildData] = useState<PlayerGuildResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +147,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged }: GuildS
           setError={setError}
           onTurnsChanged={onTurnsChanged}
           onRefresh={loadGuild}
+          onExpeditionContextChange={onExpeditionContextChange}
         />
       )}
       {activeTab === 'shop' && (
