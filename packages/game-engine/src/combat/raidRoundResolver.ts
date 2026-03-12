@@ -2,7 +2,9 @@ import type {
   ActionDefinition,
   BossActiveEffect,
   RaidRoundInput,
+  RaidParticipant,
   RaidParticipantResult,
+  RaidThreatEntry,
   MobActionResult,
   RaidRoundResult,
   ExpeditionMobState,
@@ -15,10 +17,12 @@ import type {
   MobTelegraphEntry,
   EffectTickEntry,
   ExpeditionRoundLog,
+  CombatantStats,
   CombatPotion,
   PotionConsumed,
 } from '@pocketrealm/shared';
 import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, EXPEDITION_CONSTANTS, BOSS_ACTION_DEFINITIONS, mobDisplayName } from '@pocketrealm/shared';
+import type { CombatParticipantState } from './combatHelpers';
 import {
   resolveParticipantActions,
   resolveSupportiveActions,
@@ -76,6 +80,129 @@ function getEffectiveStatValue(baseStat: number, effects: BossActiveEffect[], st
     .filter(e => e.stat === statName && e.roundsRemaining > 0)
     .reduce((sum, e) => sum + e.modifier, 0);
   return Math.max(0, baseStat + modifier);
+}
+
+// --- Shared offensive attack resolution ---
+
+interface OffensiveAttackContext {
+  combatMode: CombatMode;
+  roll: RaidRoundRng;
+  mobState: { id: string; hp: number; maxHp: number; stats: CombatantStats; activeEffects: BossActiveEffect[]; name: string; prefix: string | null }[];
+  playerActionDefs: Record<string, ActionDefinition>;
+  getUsername: (id: string) => string;
+}
+
+/**
+ * Resolve a player's offensive attack against mobs. Handles target selection,
+ * hit resolution, damage, debuff/DoT application, and log generation.
+ * Used by both Step 4 (primary offensive) and Step 5c (potion fallback).
+ */
+function resolvePlayerOffensive(
+  p: RaidParticipant,
+  s: CombatParticipantState & { hit: boolean; isCritical: boolean; targetMobId: string | null; damageDealt: number },
+  def: ActionDefinition,
+  threatTable: RaidThreatEntry[],
+  ctx: OffensiveAttackContext,
+): PlayerAttackEntry[] {
+  const entries: PlayerAttackEntry[] = [];
+  const aliveMobs = ctx.mobState.filter(m => m.hp > 0);
+  if (aliveMobs.length === 0) return entries;
+
+  const isAoe = AOE_ACTION_IDS.has(s.actionId);
+  let targets: typeof aliveMobs;
+  if (isAoe) {
+    targets = aliveMobs;
+  } else if (p.targetMobId) {
+    const preferred = aliveMobs.find(m => m.id === p.targetMobId);
+    targets = [preferred ?? aliveMobs.reduce((lowest, m) => m.hp < lowest.hp ? m : lowest)];
+  } else {
+    targets = [aliveMobs.reduce((lowest, m) => m.hp < lowest.hp ? m : lowest)];
+  }
+
+  s.targetMobId = isAoe ? null : targets[0].id;
+
+  let totalDamageDealt = 0;
+  const effectiveAccuracy = getEffectiveStatValue(p.stats.accuracy, p.activeEffects, 'accuracy');
+  const hitScore = effectiveAccuracy + (def.accuracyModifier ?? 0);
+
+  for (const target of targets) {
+    const avoidScore = calculateAvoidScore(target.stats);
+    const hitResolution = def.alwaysHits
+      ? guaranteedHitResult(hitScore, avoidScore)
+      : resolveHitCheck({
+          combatMode: ctx.combatMode,
+          hitScore,
+          avoidScore,
+          hitRollValue: ctx.roll.rollHitChance(),
+        });
+
+    const hits = hitResolution.didHit;
+    const baseEntry = {
+      entryType: 'attack' as const,
+      playerId: p.playerId,
+      username: ctx.getUsername(p.playerId),
+      actionId: s.actionId,
+      actionLabel: actionLabel(s.actionId, ctx.playerActionDefs),
+      targetMobId: target.id,
+      targetMobName: mobDisplayName(target),
+      hitChance: hitResolution.hitChance,
+      hitRollValue: hitResolution.hitRollValue,
+      attackerHitScore: hitResolution.hitScore,
+      defenderAvoidScore: hitResolution.avoidScore,
+      staminaCost: def.cost.stamina,
+      manaCost: def.cost.mana,
+    };
+
+    if (!hits) {
+      if (def.effect?.alwaysApplies && def.effect.isDebuff && target.hp > 0) {
+        target.activeEffects.push({
+          name: def.effect.name,
+          stat: def.effect.stat,
+          modifier: def.effect.modifier,
+          roundsRemaining: def.effect.duration,
+        });
+      }
+      entries.push({ ...baseEntry, hit: false, crit: false });
+      continue;
+    }
+
+    s.hit = true;
+    const rawDmg = ctx.roll.rollDamage(p.stats.damageMin, p.stats.damageMax);
+    const scaledDmg = Math.floor(rawDmg * (def.damageMultiplier ?? 1.0));
+    const crit = ctx.roll.rollCrit(p.stats.critChance ?? 0);
+    if (crit) s.isCritical = true;
+
+    const isMagicAttack = def.damageType === 'magic' || p.stats.damageType === 'magic';
+    const effectiveDefence = isMagicAttack
+      ? getEffectiveStatValue(target.stats.magicDefence, target.activeEffects, 'magicDefence')
+      : getEffectiveStatValue(target.stats.defence, target.activeEffects, 'defence');
+    const { damage } = calculateFinalDamage(scaledDmg, effectiveDefence, crit, p.stats.critDamage ?? 0);
+
+    target.hp = Math.max(0, target.hp - damage);
+    totalDamageDealt += damage;
+
+    if (def.effect?.isDebuff && target.hp > 0) {
+      const dotFlat = def.effect.damagePerRound ?? 0;
+      const dotPct = def.effect.damagePerRoundPercent ?? 0;
+      const resolvedDot = dotFlat + Math.floor((dotPct / 100) * damage);
+      target.activeEffects.push({
+        name: def.effect.name,
+        stat: def.effect.stat,
+        modifier: def.effect.modifier,
+        roundsRemaining: def.effect.duration,
+        ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
+      });
+    }
+
+    entries.push({ ...baseEntry, hit: true, crit, damageRoll: rawDmg, totalDamage: damage });
+  }
+
+  s.damageDealt = totalDamageDealt;
+  if (totalDamageDealt > 0) {
+    addDamageThreat(threatTable, s.playerId, totalDamageDealt);
+  }
+
+  return entries;
 }
 
 // --- Resolver ---
@@ -137,6 +264,7 @@ export function resolveRaidRound(
     intendedActionDef: null as ActionDefinition | null,
     exhaustedReason: null as import('@pocketrealm/shared').ExhaustedActionReason | null,
     healTargetPlayerId: null as string | null,
+    alternateActionDef: null as ActionDefinition | null,
   }));
 
   // Round log collectors
@@ -220,6 +348,8 @@ export function resolveRaidRound(
   }
 
   // --- Step 4: Player offensive phase ---
+  const offensiveCtx: OffensiveAttackContext = { combatMode, roll, mobState, playerActionDefs, getUsername };
+
   for (let i = 0; i < input.participants.length; i++) {
     const p = input.participants[i];
     const s = pState[i];
@@ -227,107 +357,8 @@ export function resolveRaidRound(
     if (s.hp <= 0) continue;
     if (!def || def.category !== 'offensive' || (def.damageMultiplier ?? 0) <= 0) continue;
 
-    const isAoe = AOE_ACTION_IDS.has(s.actionId);
-    const aliveMobs = mobState.filter(m => m.hp > 0);
-    if (aliveMobs.length === 0) continue;
-
-    // Per-player targeting: use targetMobId if set and mob is alive, else lowest HP
-    let targets: typeof mobState;
-    if (isAoe) {
-      targets = aliveMobs;
-    } else if (p.targetMobId) {
-      const preferred = aliveMobs.find(m => m.id === p.targetMobId);
-      targets = [preferred ?? aliveMobs.reduce((lowest, m) => m.hp < lowest.hp ? m : lowest)];
-    } else {
-      targets = [aliveMobs.reduce((lowest, m) => m.hp < lowest.hp ? m : lowest)];
-    }
-
-    s.targetMobId = isAoe ? null : targets[0].id;
-
-    let totalDamageDealt = 0;
-    const effectiveAccuracy = getEffectiveStatValue(p.stats.accuracy, p.activeEffects, 'accuracy');
-    const hitScore = effectiveAccuracy + (def.accuracyModifier ?? 0);
-
-    for (const target of targets) {
-      const avoidScore = calculateAvoidScore(target.stats);
-
-      const hitResolution = def.alwaysHits
-        ? guaranteedHitResult(hitScore, avoidScore)
-        : resolveHitCheck({
-            combatMode,
-            hitScore,
-            avoidScore,
-            hitRollValue: roll.rollHitChance(),
-          });
-
-      const hits = hitResolution.didHit;
-
-      const baseEntry = {
-        entryType: 'attack' as const,
-        playerId: p.playerId,
-        username: getUsername(p.playerId),
-        actionId: s.actionId,
-        actionLabel: actionLabel(s.actionId, playerActionDefs),
-        targetMobId: target.id,
-        targetMobName: mobDisplayName(target),
-        hitChance: hitResolution.hitChance,
-        hitRollValue: hitResolution.hitRollValue,
-        attackerHitScore: hitResolution.hitScore,
-        defenderAvoidScore: hitResolution.avoidScore,
-        staminaCost: def.cost.stamina,
-        manaCost: def.cost.mana,
-      };
-
-      if (!hits) {
-        // Even on miss, apply alwaysApplies effects (debuffs that bypass evasion)
-        if (def.effect?.alwaysApplies && def.effect.isDebuff && target.hp > 0) {
-          target.activeEffects.push({
-            name: def.effect.name,
-            stat: def.effect.stat,
-            modifier: def.effect.modifier,
-            roundsRemaining: def.effect.duration,
-          });
-        }
-        logPlayerAttacks.push({ ...baseEntry, hit: false, crit: false });
-        continue;
-      }
-
-      s.hit = true;
-      const rawDmg = roll.rollDamage(p.stats.damageMin, p.stats.damageMax);
-      const scaledDmg = Math.floor(rawDmg * (def.damageMultiplier ?? 1.0));
-      const crit = roll.rollCrit(p.stats.critChance ?? 0);
-      if (crit) s.isCritical = true;
-
-      const isMagicAttack = def.damageType === 'magic' || p.stats.damageType === 'magic';
-      const effectiveDefence = isMagicAttack
-        ? getEffectiveStatValue(target.stats.magicDefence, target.activeEffects, 'magicDefence')
-        : getEffectiveStatValue(target.stats.defence, target.activeEffects, 'defence');
-      const { damage } = calculateFinalDamage(scaledDmg, effectiveDefence, crit, p.stats.critDamage ?? 0);
-
-      target.hp = Math.max(0, target.hp - damage);
-      totalDamageDealt += damage;
-
-      // Apply debuff/DoT effect to mob on hit
-      if (def.effect?.isDebuff && target.hp > 0) {
-        const dotFlat = def.effect.damagePerRound ?? 0;
-        const dotPct = def.effect.damagePerRoundPercent ?? 0;
-        const resolvedDot = dotFlat + Math.floor((dotPct / 100) * damage);
-        target.activeEffects.push({
-          name: def.effect.name,
-          stat: def.effect.stat,
-          modifier: def.effect.modifier,
-          roundsRemaining: def.effect.duration,
-          ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
-        });
-      }
-
-      logPlayerAttacks.push({ ...baseEntry, hit: true, crit, damageRoll: rawDmg, totalDamage: damage });
-    }
-
-    s.damageDealt = totalDamageDealt;
-    if (totalDamageDealt > 0) {
-      addDamageThreat(input.threatTable, s.playerId, totalDamageDealt);
-    }
+    const entries = resolvePlayerOffensive(p, s, def, input.threatTable, offensiveCtx);
+    logPlayerAttacks.push(...entries);
   }
 
   // --- Step 4b: Phase transitions ---
@@ -364,61 +395,266 @@ export function resolveRaidRound(
   const potionSicknessToApply: { participantIndex: number }[] = [];
   // Track consumed potion indices per participant to avoid mutating input
   const consumedPotionIndices: Map<number, Set<number>> = new Map();
+  // Cleanse results: debuffs and DoTs to remove per participant (applied in effect assembly)
+  const cleanseResults: Map<number, { debuffNames: Set<string>; dotNamesToRemove: Set<string> }> = new Map();
+  // Buff potion results: buff effects to apply per participant (applied in effect assembly)
+  const buffPotionResults: Map<number, BossActiveEffect[]> = new Map();
+
+  // Participants whose potion action failed and should fall back to alternate action
+  const potionFallbackIndices: number[] = [];
 
   for (let i = 0; i < pState.length; i++) {
     const s = pState[i];
     const p = input.participants[i];
     const def = s.actionDef;
     if (s.hp <= 0) continue;
-    if (!def || def.actionType !== 'use_potion') continue;
+    if (!def) continue;
 
-    const potionType = def.potionType ?? 'hp';
-    const potions = p.availablePotions ?? [];
+    const isPotionAction = def.actionType === 'use_potion'
+      || def.actionType === 'use_cleanse_potion'
+      || def.actionType === 'use_buff_potion';
+    if (!isPotionAction) continue;
 
-    // Check potion sickness
+    // Check potion sickness — fall back to alternate action (else branch)
     const hasSickness = (p.activeEffects ?? []).some(
       (e: { stat: string }) => e.stat === 'potionSickness',
     );
-    if (hasSickness) continue;
-
-    // Find matching potion, skipping already-consumed indices
-    const usedIndices = consumedPotionIndices.get(i);
-    const potionIndex = potions.findIndex((pt: CombatPotion, idx: number) =>
-      pt.potionType === potionType && (!usedIndices || !usedIndices.has(idx)),
-    );
-    if (potionIndex === -1) continue;
-
-    const potion = potions[potionIndex];
-    let actualRestore = 0;
-
-    if (potionType === 'hp') {
-      actualRestore = Math.min(potion.healAmount, p.maxHp - s.hp);
-      s.hp += actualRestore;
-      s.healingDone = actualRestore;
-    } else if (potionType === 'stamina') {
-      actualRestore = Math.min(potion.healAmount, p.maxStamina - s.stamina);
-      s.stamina += actualRestore;
-    } else {
-      actualRestore = Math.min(potion.healAmount, p.maxMana - s.mana);
-      s.mana += actualRestore;
+    if (hasSickness) {
+      if (s.alternateActionDef) potionFallbackIndices.push(i);
+      continue;
     }
 
-    if (!consumedPotionIndices.has(i)) consumedPotionIndices.set(i, new Set());
-    consumedPotionIndices.get(i)!.add(potionIndex);
-    const consumed: PotionConsumed = { templateId: potion.templateId, name: potion.name, healAmount: actualRestore, round: input.roundNumber };
-    allPotionsConsumed.push(consumed);
-    if (!perParticipantPotions.has(i)) perParticipantPotions.set(i, []);
-    perParticipantPotions.get(i)!.push(consumed);
-    potionSicknessToApply.push({ participantIndex: i });
+    const potions = p.availablePotions ?? [];
+    const usedIndices = consumedPotionIndices.get(i);
 
-    if (potionType === 'hp' && actualRestore > 0) {
+    // --- Resource potions (hp/stamina/mana) ---
+    if (def.actionType === 'use_potion') {
+      const potionType = def.potionType ?? 'hp';
+      const potionIndex = potions.findIndex((pt: CombatPotion, idx: number) =>
+        pt.potionType === potionType && (!usedIndices || !usedIndices.has(idx)),
+      );
+      if (potionIndex === -1) {
+        if (s.alternateActionDef) potionFallbackIndices.push(i);
+        continue;
+      }
+
+      const potion = potions[potionIndex];
+      let actualRestore = 0;
+
+      if (potionType === 'hp') {
+        actualRestore = Math.min(potion.healAmount, p.maxHp - s.hp);
+        s.hp += actualRestore;
+        s.healingDone = actualRestore;
+      } else if (potionType === 'stamina') {
+        actualRestore = Math.min(potion.healAmount, p.maxStamina - s.stamina);
+        s.stamina += actualRestore;
+      } else {
+        actualRestore = Math.min(potion.healAmount, p.maxMana - s.mana);
+        s.mana += actualRestore;
+      }
+
+      if (!consumedPotionIndices.has(i)) consumedPotionIndices.set(i, new Set());
+      consumedPotionIndices.get(i)!.add(potionIndex);
+      const consumed: PotionConsumed = { templateId: potion.templateId, name: potion.name, healAmount: actualRestore, round: input.roundNumber };
+      allPotionsConsumed.push(consumed);
+      if (!perParticipantPotions.has(i)) perParticipantPotions.set(i, []);
+      perParticipantPotions.get(i)!.push(consumed);
+      potionSicknessToApply.push({ participantIndex: i });
+
+      if (potionType === 'hp' && actualRestore > 0) {
+        logHealing.push({
+          playerId: s.playerId,
+          username: getUsername(s.playerId),
+          actionLabel: potion.name,
+          amountHealed: actualRestore,
+          targetPlayerId: s.playerId,
+          targetUsername: getUsername(s.playerId),
+        });
+      }
+      continue;
+    }
+
+    // --- Cleanse potion ---
+    if (def.actionType === 'use_cleanse_potion') {
+      const potionIndex = potions.findIndex((pt: CombatPotion, idx: number) =>
+        pt.potionType === 'cleanse' && (!usedIndices || !usedIndices.has(idx)),
+      );
+      if (potionIndex === -1) {
+        if (s.alternateActionDef) potionFallbackIndices.push(i);
+        continue;
+      }
+
+      const effects = p.activeEffects ?? [];
+      // Find stat debuffs (negative modifier, not potion sickness, no DoT)
+      const statDebuffs = effects.filter(
+        (e: BossActiveEffect) => e.stat !== 'potionSickness' && e.modifier < 0 && !e.damagePerRound,
+      );
+      // Find magic DoTs
+      const magicDots = effects.filter(
+        (e: BossActiveEffect) => e.damagePerRound && e.damagePerRound > 0 && e.dotDamageType === 'magic',
+      );
+      if (statDebuffs.length === 0 && magicDots.length === 0) {
+        if (s.alternateActionDef) potionFallbackIndices.push(i);
+        continue;
+      }
+
+      const potion = potions[potionIndex];
+      const cleansedNames: string[] = [];
+
+      // Remove all stat debuffs
+      const debuffNames = new Set(statDebuffs.map((e: BossActiveEffect) => e.name));
+      for (const name of debuffNames) {
+        const count = statDebuffs.filter((e: BossActiveEffect) => e.name === name).length;
+        cleansedNames.push(`${count}x ${name}`);
+      }
+
+      // Remove N worst magic DoT groups (N = potion's buffValue, 0 = all)
+      const dotGroupsToClear = potion.buffValue ?? 1;
+      const dotNamesToRemove = new Set<string>();
+      if (magicDots.length > 0) {
+        const groups = new Map<string, { totalDmg: number; count: number }>();
+        for (const dot of magicDots) {
+          const g = groups.get(dot.name) ?? { totalDmg: 0, count: 0 };
+          g.totalDmg += dot.damagePerRound!;
+          g.count++;
+          groups.set(dot.name, g);
+        }
+        const sorted = [...groups.entries()].sort((a, b) => b[1].totalDmg - a[1].totalDmg);
+        const toRemove = dotGroupsToClear === 0 ? sorted : sorted.slice(0, dotGroupsToClear);
+        for (const [name, g] of toRemove) {
+          dotNamesToRemove.add(name);
+          cleansedNames.push(`${g.count}x ${name}`);
+        }
+      }
+
+      // Build cleansed effect list for this participant (applied in Step 8)
+      if (!cleanseResults.has(i)) cleanseResults.set(i, { debuffNames, dotNamesToRemove });
+
+      if (!consumedPotionIndices.has(i)) consumedPotionIndices.set(i, new Set());
+      consumedPotionIndices.get(i)!.add(potionIndex);
+      const consumed: PotionConsumed = { templateId: potion.templateId, name: potion.name, healAmount: 0, round: input.roundNumber };
+      allPotionsConsumed.push(consumed);
+      if (!perParticipantPotions.has(i)) perParticipantPotions.set(i, []);
+      perParticipantPotions.get(i)!.push(consumed);
+      potionSicknessToApply.push({ participantIndex: i });
+
       logHealing.push({
         playerId: s.playerId,
         username: getUsername(s.playerId),
-        actionLabel: potion.name,
-        amountHealed: actualRestore,
+        actionLabel: `${potion.name} (cleanse ${cleansedNames.join(', ')})`,
+        amountHealed: 0,
         targetPlayerId: s.playerId,
         targetUsername: getUsername(s.playerId),
+      });
+      continue;
+    }
+
+    // --- Buff potion (attack / defence) ---
+    if (def.actionType === 'use_buff_potion') {
+      const potionType = def.potionType as 'buff_attack' | 'buff_defence';
+      const potionIndex = potions.findIndex((pt: CombatPotion, idx: number) =>
+        pt.potionType === potionType && (!usedIndices || !usedIndices.has(idx)),
+      );
+      if (potionIndex === -1) {
+        if (s.alternateActionDef) potionFallbackIndices.push(i);
+        continue;
+      }
+
+      const potion = potions[potionIndex];
+      const duration = potion.buffDuration ?? 5;
+      const value = potion.buffValue ?? 0;
+
+      const buffsToApply: BossActiveEffect[] = [];
+      if (potionType === 'buff_attack') {
+        buffsToApply.push({
+          name: 'Elixir of Power',
+          stat: 'attackPercent',
+          modifier: value,
+          roundsRemaining: duration,
+        });
+      } else {
+        buffsToApply.push({
+          name: 'Resist Potion',
+          stat: 'defence',
+          modifier: value,
+          roundsRemaining: duration,
+        });
+        buffsToApply.push({
+          name: 'Resist Potion (Magic)',
+          stat: 'magicDefence',
+          modifier: value,
+          roundsRemaining: duration,
+        });
+      }
+
+      if (!buffPotionResults.has(i)) buffPotionResults.set(i, []);
+      buffPotionResults.get(i)!.push(...buffsToApply);
+
+      if (!consumedPotionIndices.has(i)) consumedPotionIndices.set(i, new Set());
+      consumedPotionIndices.get(i)!.add(potionIndex);
+      const consumed: PotionConsumed = { templateId: potion.templateId, name: potion.name, healAmount: 0, round: input.roundNumber };
+      allPotionsConsumed.push(consumed);
+      if (!perParticipantPotions.has(i)) perParticipantPotions.set(i, []);
+      perParticipantPotions.get(i)!.push(consumed);
+      potionSicknessToApply.push({ participantIndex: i });
+
+      const buffDesc = buffsToApply.map(b => `${b.stat} +${b.modifier} (${b.roundsRemaining} rds)`).join(', ');
+      logHealing.push({
+        playerId: s.playerId,
+        username: getUsername(s.playerId),
+        actionLabel: `${potion.name} (${buffDesc})`,
+        amountHealed: 0,
+        targetPlayerId: s.playerId,
+        targetUsername: getUsername(s.playerId),
+      });
+      continue;
+    }
+  }
+
+
+  // --- Step 5c: Potion fallback — run alternate actions for participants whose potion couldn't fire ---
+  for (const i of potionFallbackIndices) {
+    const s = pState[i];
+    const p = input.participants[i];
+    const altDef = s.alternateActionDef!;
+
+    // Swap to the alternate action
+    s.actionDef = altDef;
+    s.actionId = altDef.id;
+
+    // Deduct resource cost and apply regen (matching applyResourceCosts logic)
+    s.stamina -= altDef.cost.stamina;
+    s.mana -= altDef.cost.mana;
+    s.stamina = Math.min(p.maxStamina, s.stamina + p.staminaRegenPerRound);
+    s.mana = Math.min(p.maxMana, s.mana + p.manaRegenPerRound);
+
+    // If it's an offensive action, resolve attack against mob (reuses Step 4 helper)
+    if (altDef.category === 'offensive' && s.hp > 0) {
+      const entries = resolvePlayerOffensive(p, s, altDef, input.threatTable, offensiveCtx);
+      logPlayerAttacks.push(...entries);
+    } else if (altDef.actionType === 'heal_self' || altDef.actionType === 'heal_ally') {
+      // Supportive fallback — run through heal logic then log
+      resolveSupportiveActions([p], [s], input.threatTable);
+      if (s.healingDone > 0) {
+        const healTargetId = (altDef.actionType === 'heal_ally' && s.healTargetPlayerId)
+          ? s.healTargetPlayerId
+          : s.playerId;
+        logHealing.push({
+          playerId: s.playerId,
+          username: getUsername(s.playerId),
+          actionLabel: actionLabel(s.actionId, playerActionDefs),
+          amountHealed: s.healingDone,
+          targetPlayerId: healTargetId,
+          targetUsername: getUsername(healTargetId),
+        });
+      }
+    } else if (altDef.category === 'defensive') {
+      logDefences.push({
+        entryType: 'defensive' as const,
+        playerId: p.playerId,
+        username: getUsername(p.playerId),
+        actionId: altDef.id,
+        actionLabel: actionLabel(altDef.id, playerActionDefs),
       });
     }
   }
@@ -742,11 +978,27 @@ export function resolveRaidRound(
   const sicknessByParticipant = new Set(potionSicknessToApply.map(p => p.participantIndex));
 
   const participantEffectsAfter: BossActiveEffect[][] = input.participants.map((p, idx) => {
-    const effects = [...(p.activeEffects ?? [])];
+    let effects = [...(p.activeEffects ?? [])];
     // Merge new effects applied by mob actions this round
     const mobAppliedEffects = newPlayerEffects.get(idx);
     if (mobAppliedEffects) {
       effects.push(...mobAppliedEffects);
+    }
+    // Apply cleanse: remove stat debuffs and magic DoTs
+    const cleanse = cleanseResults.get(idx);
+    if (cleanse) {
+      effects = effects.filter(e => {
+        // Remove stat debuffs by name
+        if (cleanse.debuffNames.has(e.name) && e.stat !== 'potionSickness' && e.modifier < 0 && !e.damagePerRound) return false;
+        // Remove magic DoTs by name
+        if (cleanse.dotNamesToRemove.has(e.name) && e.damagePerRound && e.damagePerRound > 0 && e.dotDamageType === 'magic') return false;
+        return true;
+      });
+    }
+    // Apply buff potion effects
+    const buffs = buffPotionResults.get(idx);
+    if (buffs) {
+      effects.push(...buffs);
     }
     // Add potion sickness if this participant consumed a potion
     if (sicknessByParticipant.has(idx)) {

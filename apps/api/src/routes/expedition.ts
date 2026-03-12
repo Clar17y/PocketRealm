@@ -24,6 +24,7 @@ import {
 } from '../services/expeditionShopService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { paginationSchema, buildPagination } from '../utils/routeHelpers';
+import { EXPEDITION_THEMES } from '@pocketrealm/shared';
 
 export const expeditionRouter = Router();
 expeditionRouter.use(authenticate);
@@ -102,6 +103,9 @@ expeditionRouter.get('/history', asyncHandler(async (req, res) => {
   });
   const usernameMap = new Map(launchers.map(p => [p.id, p.username]));
 
+  // Resolve theme names
+  const themeMap = new Map(EXPEDITION_THEMES.map(t => [t.id, t.name]));
+
   res.json({
     expeditions: expeditions.map(e => ({
       id: e.id,
@@ -114,6 +118,9 @@ expeditionRouter.get('/history', asyncHandler(async (req, res) => {
       launchedBy: e.launchedBy,
       launchedByUsername: usernameMap.get(e.launchedBy) ?? null,
       participantCount: e._count.members,
+      wipeCount: e.wipeCount ?? 0,
+      themeId: e.themeId,
+      themeName: e.themeId ? themeMap.get(e.themeId) ?? null : null,
     })),
     pagination: buildPagination(page, pageSize, total),
   });

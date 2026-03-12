@@ -166,6 +166,7 @@ export interface ExpeditionMemberData {
   targetMobId: string | null;
   activeEffects: BossActiveEffect[];
   healTargetPlayerId: string | null;
+  threatValue: number;
   tokensEarned: number;
   signedUpAt: string;
 }
