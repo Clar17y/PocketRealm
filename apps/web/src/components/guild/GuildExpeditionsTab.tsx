@@ -20,6 +20,7 @@ import {
   abandonExpedition,
   getExpeditionCooldowns,
 } from '@/lib/api/expedition';
+import { getTemplates, activateTemplate } from '@/lib/api/templates';
 import type {
   ExpeditionDetailResponse,
 } from '@/lib/api/expedition';
@@ -32,6 +33,7 @@ import type {
   ExpeditionRoundLog,
   ExpeditionCooldownInfo,
   BossActiveEffect,
+  CombatTemplateData,
 } from '@pocketrealm/shared';
 import { EXPEDITION_CONSTANTS, EXPEDITION_THEMES, mobDisplayName } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
@@ -217,8 +219,16 @@ export function GuildExpeditionsTab({
   const [expedition, setExpedition] = useState<ExpeditionData | null>(null);
   const [members, setMembers] = useState<ExpeditionMemberData[]>([]);
   const [cooldowns, setCooldowns] = useState<ExpeditionCooldownInfo | null>(null);
+  const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
+
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await getTemplates();
+      if (res.data) setTemplates(res.data.templates);
+    } catch { /* ignore */ }
+  }, []);
 
   const loadExpedition = useCallback(async (showSpinner = false) => {
     if (showSpinner) {
@@ -255,7 +265,14 @@ export function GuildExpeditionsTab({
     }
   }, [setError]);
 
-  useEffect(() => { void loadExpedition(true); }, [loadExpedition]);
+  useEffect(() => { void loadExpedition(true); void loadTemplates(); }, [loadExpedition, loadTemplates]);
+
+  const handleActivateTemplate = useCallback(async (templateId: string) => {
+    try {
+      await activateTemplate(templateId);
+      await loadTemplates();
+    } catch { /* ignore */ }
+  }, [loadTemplates]);
 
   // Auto-refresh every 30s when expedition is active
   useEffect(() => {
@@ -500,6 +517,8 @@ export function GuildExpeditionsTab({
             onAbandon={handleAbandon}
             onRefresh={loadExpedition}
             onExpired={loadExpedition}
+            templates={templates}
+            onActivateTemplate={handleActivateTemplate}
           />
         );
       default:
@@ -738,6 +757,8 @@ function InProgressView({
   onAbandon,
   onRefresh,
   onExpired,
+  templates,
+  onActivateTemplate,
 }: {
   expedition: ExpeditionData;
   members: ExpeditionMemberData[];
@@ -754,6 +775,8 @@ function InProgressView({
   onAbandon: () => void;
   onRefresh: () => void;
   onExpired: () => void;
+  templates: CombatTemplateData[];
+  onActivateTemplate: (templateId: string) => void;
 }) {
   const roomBadge = roomTypeBadge(expedition.currentRoomType);
   const roomPct = expedition.totalRooms > 0
@@ -875,6 +898,22 @@ function InProgressView({
           )}
         </div>
       </PixelCard>
+
+      {/* Template quick-switch */}
+      {myMember && templates.length > 1 && (
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-[var(--rpg-text-secondary)] whitespace-nowrap">Template</label>
+          <select
+            className="flex-1 text-xs px-2 py-1.5 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] outline-none"
+            value={templates.find(t => t.isActive)?.id ?? ''}
+            onChange={(e) => onActivateTemplate(e.target.value)}
+          >
+            {templates.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Current Room Mobs */}
       {expedition.currentRoomMobs.length > 0 && (
