@@ -53,6 +53,8 @@ Every turn-spending action is validated: positive integer, sufficient balance, g
 | Training | `TRAINING_CONSTANTS.TURN_COST` |
 | Stamina/Mana Rest | Variable by amount restored |
 | Zone Travel | `ZONE_CONSTANTS.TRAVEL_COST` * terrain multiplier |
+| Expedition Signup | `EXPEDITION_CONSTANTS.SIGNUP_TURN_COST` per player |
+| Expedition KO Recovery | 500 turns (between rooms) |
 
 ## Combat Flow & Cascading Effects
 
@@ -205,7 +207,7 @@ WAITING ──(scheduled start)──→ ACTIVE ──(all rounds resolved)─�
 ## Item Special Properties
 
 - **Soulbound**: certain boss/cache recipes marked `soulbound: true` — cannot be sold/traded
-- **Consumables**: items with `consumableEffect` (heal_flat, heal_percent, restore_stamina, restore_mana)
+- **Consumables**: items with `consumableEffect` (heal_flat, heal_percent, restore_stamina, restore_mana, cleanse_magic_dot, buff_attack, buff_defence)
 - **Rarity progression**: common → uncommon → rare → epic → legendary
 - **Gem crit bonuses**: gems provide crit chance/damage bonuses per `GEM_CRIT_CONSTANTS`
 
@@ -223,6 +225,143 @@ WAITING ──(scheduled start)──→ ACTIVE ──(all rounds resolved)─�
 - Prefix variants require having encountered that specific prefix
 - Cooldown after each training fight (Redis-stored, `TRAINING_CONSTANTS.COOLDOWN_SECONDS`)
 - No loot/XP — practice only
+
+## Combat Templates
+
+Ordered action slot lists defining a player's combat rotation for auto-resolved combat (encounters, expeditions, bosses).
+
+- Max 10 templates per player
+- Must have at least one slot; first created template is auto-activated
+- Active template cannot be deleted
+- Each slot references an action ID (must be in `ALWAYS_AVAILABLE_ACTION_IDS` or unlocked via skill points)
+- Default action when no template exists: `light_attack`
+- **Cycling**: round counter increments each round; resolver picks slot at `templateRound % slots.length`
+
+### Conditional Slots
+- Each slot has a default `actionId` plus an optional `condition` + `thenActionId`
+- Condition types: `resource_below`, `resource_above`, `has_buff`, `has_debuff`, `no_buff`, `no_debuff`, `any_debuff`, `any_magic_dot`
+- Resource conditions specify `resource` (hp/stamina/mana) and `threshold` (0–100%)
+- Buff/debuff conditions specify `effectName`
+- When condition is true, `thenActionId` executes instead of the default
+
+## Hit Resolution (Mode-Aware)
+
+Hit chance uses a sigmoid curve: `1 / (1 + ((avoidScore + bias) / hitScore) ^ exponent)`, clamped between min/max.
+
+| Mode | Min Hit | Max Hit | Bias | Exponent |
+|---|---|---|---|---|
+| `pvp` | 10% | 95% | 5 | 2.4 |
+| `pve_open_world` | 25% | 95% | 10 | 1.5 |
+| `pve_expedition` | 20% | 95% | 8 | 1.8 |
+| `pve_boss` | 35% | 98% | 12 | 1.35 |
+
+- PvP: most punishing (lowest floor, steepest curve) — evasion matters most
+- Boss: most forgiving (35% floor, 98% cap) — few total misses
+- Used for both player-vs-mob and mob-vs-player unless action has `alwaysHits: true`
+
+## Threat System
+
+Applies to boss encounters and guild expeditions (raid round resolver).
+
+- Each player has a threat value, initialized to 0 at room/encounter start
+- Damage adds threat: `damage * BOSS_ENCOUNTER_CONSTANTS.THREAT_PER_DAMAGE`
+- Healing adds threat: `healAmount * BOSS_ENCOUNTER_CONSTANTS.THREAT_PER_HEAL`
+- Taunt action: adds `TAUNT_THREAT_BONUS` flat threat, sets taunt timer to action's duration
+- **Single-target** mob attacks choose highest-threat alive player; taunters evaluated first
+- **AoE** mob attacks hit all alive players regardless of threat
+- Taunt timers tick down by 1 each round after mob actions
+- Threat persists across rounds within a room but **resets to 0** between rooms
+
+## Potion System (Cleanse & Buff)
+
+Six potion types: `hp`, `stamina`, `mana`, `cleanse`, `buff_attack`, `buff_defence`
+
+- Auto-used during combat via template actions (`use_cleanse_potion`, `use_resist_potion`, `use_elixir_of_power`)
+- Each costs 5 stamina
+- **Potion sickness**: after using any potion, a `potionSickness` debuff applies for N rounds; while active, potion actions fail
+- On failure (no potion, sickness, nothing to cleanse): falls back to the slot's `thenActionId`
+- **Cleanse**: removes all stat debuffs plus up to N worst magic DoT groups (ranked by total damage); N = potion's `buffValue` (0 = all)
+- **Buff attack**: 25% attack boost for 5 rounds
+- **Buff defence**: +15 defence and +15 magic defence for 5 rounds
+- Potions consumed from inventory after each round
+
+## Guild Expeditions
+
+### State Machine
+
+```
+recruiting ──(signup window ends + min players)──→ in_progress ──(all rooms cleared)──→ completed
+    │                                                  │
+    │                                                  ├──(all players dead)──→ wipe
+    │                                                  │                         │
+    │                                                  │    (wipeCount < 3)──→ recruiting (re-open)
+    │                                                  │    (wipeCount >= 3)──→ failed
+    │                                                  │
+    │                                                  └──(officer abandons)──→ failed
+    └──(not enough players)──→ failed
+```
+
+### Lifecycle
+- Officers/leaders launch expedition (tier 1–3), deducts treasury cost
+- 10-minute signup window; guild members spend 300 turns to join
+- Level requirements: tier 1 = 10, tier 2 = 16, tier 3 = 23; min players: 5/8/12
+- Officers can force-start early
+- Room-by-room dungeon: 5/6/8 rooms by tier; types: `trash`, `elite`, `mini_boss`, `event`, `final_boss`
+- Rounds resolve on background timer (2–3 min intervals by room type)
+- Each round: players act via combat template, mobs act via scripted template, damage/healing/threat tracked
+
+### Room Transitions
+- On room clear: 5-min rest phase; HP/stamina/mana regen (20%/30%/30% of max); KO'd players un-KO; all active effects cleared
+- On wipe (all dead): increment wipe count; if < 3, reset to `recruiting` with regenerated rooms (same theme); if >= 3, auto-fail
+
+### Cross-System Lockouts
+- Active expedition blocks: combat (encounter sites), exploration, zone travel
+- Cannot sign up while in recovery state
+- KO'd members can recover between rooms (500 turns, 30% max HP)
+
+### Economy
+- Token currency (`expeditionTokens`); awarded per room (flat, type-based, tier-multiplied)
+- Completion bonus = 100% of total room token value
+- Loot per room weighted by contribution (damage + healing); loot multiplier varies by room type (1x–3x)
+- Guild XP: 25 per room cleared, 100 bonus on completion
+
+### Cooldowns
+- Weekly cooldown per tier (7 days from completion)
+- Between-expedition cooldown (18 hours from any completion/failure)
+- One active expedition per guild at a time
+
+### Themes
+- Pre-defined mob rosters per tier; random theme chosen at launch, persists across wipe retries
+- Boss has HP threshold phases at 50% and 25%
+- Boss can summon adds (up to 8 total); summoned mobs do NOT act the round they spawn
+
+## Tutorial System
+
+Linear 9-step tutorial tracked by `tutorialStep` on Player (default 0).
+
+Steps: 0 Welcome → 1 Explore → 2 Combat → 3 Gather → 4 Travel → 5 Refine → 6 Craft → 7 Equip → 8 Done → 9 Completed
+
+- Active when `0 <= step < 9`; step -1 = skipped
+- Each step has a banner, dialog, optional tab pulse, and optional screen navigation
+- Advancement via `PATCH /player/tutorial`
+- Tutorial is client-driven; no server-side action guards based on step
+
+## Player Preferences
+
+Per-player settings stored as columns on the Player model.
+
+| Setting | Type | Range | Default |
+|---|---|---|---|
+| `combatLogSpeedMs` | int | 100–1000 (step 100) | 800 |
+| `explorationSpeedMs` | int | 100–1000 (step 100) | 800 |
+| `autoSkipKnownCombat` | bool | — | false |
+| `defaultExploreTurns` | int | 10–10000 (step 10) | 100 |
+| `quickRestHealPercent` | int | 25–100 (step 25) | 100 |
+| `defaultRefiningMax` | bool | — | false |
+
+- Updated via `PATCH /player/settings` (any subset, at least one field required)
+- Validated via Zod at the route layer
+- Purely client-side UX hints; no effect on server-side game logic
 
 ## Casino
 

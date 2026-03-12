@@ -199,7 +199,8 @@ Typechecking note: root `tsconfig.json` intentionally excludes `apps/web`; use `
 - Manual testing notes: `docs/testing/phase-4.md`
 - Manual testing notes: `docs/testing/phase-5.md`
 - Manual testing notes: `docs/testing/phase-6.md`
-- Feature/design plans: `docs/plans/`
+- Design specs: `docs/superpowers/specs/`
+- Implementation plans: `docs/superpowers/plans/`
 
 ## License
 

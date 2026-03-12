@@ -16,7 +16,7 @@ Phase 4 is backend-complete (API endpoints + DB writes). UI wiring is planned la
 
 ## What’s Not Covered Yet (By Design)
 
-- No dedicated Exploration/Combat screens in the web app yet (see Phase 7 and Phase 8 in `docs/plans/mvp-implementation-plan.md`).
+- No dedicated Exploration/Combat screens in the web app yet (see Phase 7 and Phase 8 in `docs/superpowers/plans/mvp-implementation-plan.md`).
 - No inventory/equipment UI or equip/unequip endpoints yet (Phase 5).
 - Combat stats are still “MVP-simple”: equipment stats are summed from `item_templates.base_stats` and used by the placeholder `buildPlayerCombatStats`.
 - Durability loss/repair isn’t implemented yet (Phase 5.3).

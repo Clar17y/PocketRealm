@@ -773,13 +773,13 @@ npm run test:e2e       # Playwright E2E tests
 | **E2E Testing** | `playwright-e2e-testing-design`, `playwright-e2e-implementation` | `tests/e2e/` |
 | **Quests (planned)** | `quest-system-design`, `quest-system-plan` | Not yet implemented |
 
-All plan docs are in `docs/plans/` with `2026-MM-DD-` prefix. Design docs describe intent; implementation/plan docs describe execution steps.
+Design/spec docs are in `docs/superpowers/specs/` and plan/implementation docs are in `docs/superpowers/plans/`, both with `2026-MM-DD-` prefix. Design docs describe intent; implementation/plan docs describe execution steps.
 
 **Note:** Plan docs capture design-time intent and may not reflect current implementation. Always verify against actual source code. `docs/business-rules.md` reflects current behavior.
 
 ## Reference Docs
 
-- Game Design: `docs/plans/2026-01-31-game-design.md`
+- Game Design: `docs/superpowers/plans/2026-01-31-game-design.md`
 - Business Rules: `docs/business-rules.md`
 - Asset Workflow: `docs/assets/stable-diffusion-workflow.md`
 - Color Palette: `docs/assets/color-palette.md`
