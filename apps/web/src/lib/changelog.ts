@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.37',
+    date: '2026-03-12',
+    title: 'Expedition Auto-Resolve & Attempt History',
+    summary:
+      'Officers and leaders can now auto-resolve an expedition room instantly before the first round fires. Your templates are locked for the duration, but you earn a 25% token bonus on a successful clear. An auto-advance toggle lets you fire rounds every 10 seconds without clicking. Expedition history now shows per-attempt logs: after a wipe, you can review the full round-by-round combat log for each attempt while the expedition is still active, not just after it ends. The taunt action now correctly drops its threat bonus when the 2-round duration expires instead of holding aggro permanently.',
+  },
+  {
     version: '0.36',
     date: '2026-03-12',
     title: 'Potions, Threat & Expedition UX',
