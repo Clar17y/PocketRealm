@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Shield } from 'lucide-react';
+import Image from 'next/image';
+import { monsterImageSrc } from '@/lib/assets';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
@@ -928,7 +930,14 @@ function InProgressView({
                   }`}
                 >
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-[var(--rpg-text-primary)] font-bold">
+                    <span className="text-xs text-[var(--rpg-text-primary)] font-bold flex items-center gap-1.5">
+                      <Image
+                        src={monsterImageSrc(mob.name)}
+                        alt={mob.name}
+                        width={24}
+                        height={24}
+                        className="image-rendering-pixelated"
+                      />
                       {mobDisplayName(mob)}
                     </span>
                     <div className="flex gap-1 items-center">
