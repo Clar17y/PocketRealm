@@ -14,7 +14,7 @@ export const wikiNavigation: WikiNavSection[] = [
   {
     label: 'Combat',
     slug: 'combat',
-    icon: '\u2694\uFE0F',
+    icon: '/assets/ui/ui_attack-pixelated-128.webp',
     items: [
       { label: 'Damage Calculation', href: '/wiki/combat/damage' },
       { label: 'Hit Chance', href: '/wiki/combat/hit-chance' },
@@ -28,7 +28,7 @@ export const wikiNavigation: WikiNavSection[] = [
   {
     label: 'Bosses',
     slug: 'bosses',
-    icon: '\uD83D\uDC80',
+    icon: '/assets/monsters/monster_crystal_titan-pixelated-128.webp',
     items: [
       { label: 'Boss Encounters', href: '/wiki/bosses/encounters' },
       { label: 'Threat & Contribution', href: '/wiki/bosses/threat' },
@@ -38,7 +38,7 @@ export const wikiNavigation: WikiNavSection[] = [
   {
     label: 'PvP',
     slug: 'pvp',
-    icon: '\uD83C\uDFDF\uFE0F',
+    icon: '/assets/ui/ui_guild-pixelated-128.webp',
     items: [
       { label: 'PvP Combat', href: '/wiki/pvp/combat' },
       { label: 'ELO & Matchmaking', href: '/wiki/pvp/elo' },
@@ -47,7 +47,7 @@ export const wikiNavigation: WikiNavSection[] = [
   {
     label: 'Progression',
     slug: 'progression',
-    icon: '\uD83D\uDCC8',
+    icon: '/assets/ui/ui_xp-pixelated-128.webp',
     items: [
       { label: 'XP & Leveling', href: '/wiki/progression/xp-leveling' },
       { label: 'Efficiency & Caps', href: '/wiki/progression/efficiency' },
@@ -57,7 +57,7 @@ export const wikiNavigation: WikiNavSection[] = [
   {
     label: 'Resources',
     slug: 'resources',
-    icon: '\u2764\uFE0F',
+    icon: '/assets/ui/ui_hp-pixelated-128.webp',
     items: [
       { label: 'Health', href: '/wiki/resources/health' },
       { label: 'Stamina', href: '/wiki/resources/stamina' },
@@ -68,7 +68,7 @@ export const wikiNavigation: WikiNavSection[] = [
   {
     label: 'Items & Equipment',
     slug: 'items',
-    icon: '\uD83D\uDDE1\uFE0F',
+    icon: '/assets/ui/ui_inventory-pixelated-128.webp',
     items: [
       { label: 'Rarity System', href: '/wiki/items/rarity' },
       { label: 'Drop Tables', href: '/wiki/items/drops' },
@@ -80,7 +80,7 @@ export const wikiNavigation: WikiNavSection[] = [
   {
     label: 'Crafting & Gathering',
     slug: 'crafting',
-    icon: '\uD83D\uDD28',
+    icon: '/assets/ui/ui_scroll-pixelated-128.webp',
     items: [
       { label: 'Crafting Crits', href: '/wiki/crafting/crits' },
       { label: 'Gathering & Gems', href: '/wiki/crafting/gathering' },
@@ -90,7 +90,7 @@ export const wikiNavigation: WikiNavSection[] = [
   {
     label: 'Exploration & Zones',
     slug: 'exploration',
-    icon: '\uD83D\uDDFA\uFE0F',
+    icon: '/assets/ui/ui_explore-pixelated-128.webp',
     items: [
       { label: 'Probability Model', href: '/wiki/exploration/probability' },
       { label: 'Room Generation', href: '/wiki/exploration/rooms' },

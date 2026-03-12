@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { wikiNavigation } from '@/app/wiki/wikiNavigation';
 
 interface WikiSidebarProps {
@@ -45,7 +46,7 @@ export function WikiSidebar({ open, onClose, mobile }: WikiSidebarProps) {
                 style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'inherit', textDecoration: 'none', flex: 1 }}
                 data-section-active={isActive}
               >
-                <span>{section.icon}</span>
+                <Image src={section.icon} alt="" width={18} height={18} className="image-rendering-pixelated" />
                 <span>{section.label}</span>
               </Link>
               <button
