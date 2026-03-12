@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.36',
+    date: '2026-03-12',
+    title: 'Potions, Threat & Expedition UX',
+    summary:
+      'Three new potion types work in both solo combat and expeditions: Cleansing Potion removes stat debuffs and magic DOTs, Resist Potion buffs defence and magic defence, and Elixir of Power boosts attack damage. All potions trigger potion sickness. Conditional templates now fall back to the else-branch when a potion can\'t fire (sickness, empty stock, or nothing to cleanse) instead of wasting your turn. A new threat meter on boss encounters and expeditions shows who has aggro. Expedition round logs now show only the latest round between the enemy status and your party, with previous rounds collapsed below. No more scrolling past 30 rounds of history to see your team.',
+  },
+  {
     version: '0.35',
     date: '2026-03-11',
     title: 'Expedition Combat Polish',

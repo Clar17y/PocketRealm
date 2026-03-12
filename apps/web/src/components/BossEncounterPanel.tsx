@@ -131,6 +131,31 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
     return map;
   }, [roundGroups]);
 
+  // Compute current threat standings from latest available round data
+  const threatStandings = useMemo(() => {
+    if (!encounter || encounter.status === 'defeated' || encounter.status === 'expired') return [];
+    // Prefer next-round signups (carry-forward threat), fall back to last completed round
+    const nextRound = encounter.roundNumber + 1;
+    const latestRound = roundGroups.find(([r]) => r === nextRound)?.[1]
+      ?? roundGroups.find(([r]) => r === encounter.roundNumber)?.[1]
+      ?? [];
+    if (latestRound.length === 0) return [];
+    const maxThreat = Math.max(...latestRound.map((p) => p.threat), 1);
+    return latestRound
+      .map((p) => ({
+        playerId: p.playerId,
+        name: usernameMap.get(p.playerId) ?? p.playerId.slice(0, 8) + '...',
+        threat: p.threat,
+        percent: (p.threat / maxThreat) * 100,
+        status: p.status,
+      }))
+      .sort((a, b) => b.threat - a.threat);
+  }, [encounter, roundGroups, usernameMap]);
+
+  const aggroPlayerId = threatStandings.length > 0 && threatStandings[0].threat > 0
+    ? threatStandings[0].playerId
+    : null;
+
   // Compute top contributors for defeated summary
   const topContributors = useMemo(() => {
     if (encounter?.status !== 'defeated') return [];
@@ -223,6 +248,51 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
               )}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* Threat Meter */}
+      {!isOver && threatStandings.length > 0 && (
+        <div className="border-t border-white/10 pt-3">
+          <p className="text-xs font-semibold mb-1.5 flex items-center gap-1">
+            <Shield size={12} style={{ color: 'var(--rpg-red)' }} />
+            Threat
+            {aggroPlayerId && (
+              <span className="font-normal opacity-70 ml-1">
+                — {displayName(aggroPlayerId)} has aggro
+              </span>
+            )}
+          </p>
+          <div className="space-y-1">
+            {threatStandings.map((t) => {
+              const isAggro = t.playerId === aggroPlayerId;
+              return (
+                <div key={t.playerId} className="flex items-center gap-2 text-xs">
+                  <span
+                    className="w-20 truncate"
+                    style={{ color: isAggro ? 'var(--rpg-red)' : undefined }}
+                  >
+                    {t.name}
+                  </span>
+                  <div className="flex-1 h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.max(t.percent, t.threat > 0 ? 2 : 0)}%`,
+                        background: isAggro ? 'var(--rpg-red)' : 'rgba(255,255,255,0.25)',
+                      }}
+                    />
+                  </div>
+                  <span
+                    className="w-8 text-right tabular-nums"
+                    style={{ color: isAggro ? 'var(--rpg-red)' : 'var(--rpg-text-secondary)' }}
+                  >
+                    {t.threat}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

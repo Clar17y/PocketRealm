@@ -1742,4 +1742,210 @@ describe('runTemplateCombat', () => {
       }
     });
   });
+
+  describe('cleanse potion', () => {
+    it('falls back to defend when no debuffs are active', () => {
+      const spy = mockCombatRandom({ initA: 0.9, initB: 0.1, attackRoll: 0.85, damageRoll: 0.0, critRoll: 0.99 });
+
+      const a = makeCombatant('Hero', {
+        template: templateOf('use_cleanse_potion'),
+      });
+      const b = makeCombatant('Spider', {
+        template: templateOf('light_attack'),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Cleansing Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse', buffValue: 1 },
+        ],
+      });
+
+      // canUsePotionAction returns false (no debuffs), so cleanse falls back to Defend
+      const defendLog = result.log.find(l => l.actor === 'combatantA' && l.action === 'defend');
+      expect(defendLog).toBeDefined();
+      expect(result.potionsConsumed).toHaveLength(0);
+
+      spy.mockRestore();
+    });
+
+    it('removes poison stacks when active', () => {
+      const spy = mockCombatRandom({ initA: 0.9, initB: 0.1, attackRoll: 0.85, damageRoll: 0.0, critRoll: 0.99 });
+
+      // B uses venomous_strike round 1, A cleanses round 2
+      const a = makeCombatant('Hero', {
+        template: [
+          { id: 'slot-0', sortOrder: 0, actionId: 'defend' },
+          { id: 'slot-1', sortOrder: 1, actionId: 'use_cleanse_potion' },
+        ],
+      });
+      const b = makeCombatant('Spider', {
+        stats: makeStats({ damageMin: 5, damageMax: 5 }),
+        template: templateOf('venomous_strike'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Cleansing Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse', buffValue: 1 },
+        ],
+      });
+
+      const cleanseLog = result.log.find(l => l.message.includes('Cleanses'));
+      expect(cleanseLog).toBeDefined();
+      expect(result.potionsConsumed).toHaveLength(1);
+      expect(result.potionsConsumed[0].templateId).toBe('tmpl-av');
+
+      spy.mockRestore();
+    });
+
+    it('cleanses stat debuffs even without magic DOTs', () => {
+      const spy = mockCombatRandom({ initA: 0.9, initB: 0.1, attackRoll: 0.85, damageRoll: 0.0, critRoll: 0.99 });
+
+      // B uses crippling_shot (speed debuff) round 1, A cleanses round 2
+      const a = makeCombatant('Hero', {
+        template: [
+          { id: 'slot-0', sortOrder: 0, actionId: 'defend' },
+          { id: 'slot-1', sortOrder: 1, actionId: 'use_cleanse_potion' },
+        ],
+      });
+      const b = makeCombatant('Archer', {
+        stats: makeStats({ damageMin: 5, damageMax: 5 }),
+        template: templateOf('crippling_shot'),
+        actionDefinitions: BASE_ACTION_DEFINITIONS,
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Cleansing Potion', healAmount: 0, templateId: 'tmpl-av', potionType: 'cleanse', buffValue: 1 },
+        ],
+      });
+
+      const cleanseLog = result.log.find(l => l.message.includes('Cleanses') && l.message.includes('Crippled'));
+      expect(cleanseLog).toBeDefined();
+      expect(result.potionsConsumed).toHaveLength(1);
+
+      spy.mockRestore();
+    });
+  });
+
+  describe('buff potions', () => {
+    it('elixir of power applies attackPercent buff', () => {
+      const spy = mockCombatRandom({ initA: 0.9, initB: 0.1, attackRoll: 0.85, damageRoll: 0.0, critRoll: 0.99 });
+
+      const a = makeCombatant('Hero', {
+        template: templateOf('use_elixir_of_power'),
+      });
+      const b = makeCombatant('Mob', {
+        stats: makeStats({ hp: 500, maxHp: 500 }),
+        template: templateOf('light_attack'),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Elixir of Power', healAmount: 0, templateId: 'tmpl-elixir', potionType: 'buff_attack', buffDuration: 5, buffValue: 0.25 },
+        ],
+      });
+
+      const buffLog = result.log.find(l => l.message.includes('Elixir of Power'));
+      expect(buffLog).toBeDefined();
+      expect(result.potionsConsumed).toHaveLength(1);
+
+      spy.mockRestore();
+    });
+
+    it('resist potion applies defence and magicDefence buffs', () => {
+      const spy = mockCombatRandom({ initA: 0.9, initB: 0.1, attackRoll: 0.85, damageRoll: 0.0, critRoll: 0.99 });
+
+      const a = makeCombatant('Hero', {
+        template: templateOf('use_resist_potion'),
+      });
+      const b = makeCombatant('Mob', {
+        stats: makeStats({ hp: 500, maxHp: 500 }),
+        template: templateOf('light_attack'),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Resist Potion', healAmount: 0, templateId: 'tmpl-resist', potionType: 'buff_defence', buffDuration: 5, buffValue: 15 },
+        ],
+      });
+
+      const buffLog = result.log.find(l => l.message.includes('Resist Potion'));
+      expect(buffLog).toBeDefined();
+      expect(result.potionsConsumed).toHaveLength(1);
+
+      spy.mockRestore();
+    });
+
+    it('buff potions trigger potion sickness (blocks next potion use)', () => {
+      const spy = mockCombatRandom({ initA: 0.9, initB: 0.1, attackRoll: 0.85, damageRoll: 0.0, critRoll: 0.99 });
+
+      const a = makeCombatant('Hero', {
+        template: [
+          { id: 'slot-0', sortOrder: 0, actionId: 'use_elixir_of_power' },
+          { id: 'slot-1', sortOrder: 1, actionId: 'use_hp_potion' },
+        ],
+      });
+      const b = makeCombatant('Mob', {
+        stats: makeStats({ hp: 500, maxHp: 500 }),
+        template: templateOf('light_attack'),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Elixir of Power', healAmount: 0, templateId: 'tmpl-elixir', potionType: 'buff_attack', buffDuration: 5, buffValue: 0.25 },
+          { name: 'Health Potion', healAmount: 150, templateId: 'tmpl-hp', potionType: 'hp' },
+        ],
+      });
+
+      // Elixir consumed on round 1
+      expect(result.potionsConsumed[0].templateId).toBe('tmpl-elixir');
+      expect(result.potionsConsumed[0].round).toBe(1);
+
+      // HP potion is blocked by sickness on round 2 (falls back to Defend),
+      // but may be consumed later when sickness wears off.
+      // Verify the HP potion was NOT consumed on round 2.
+      const hpConsumedOnRound2 = result.potionsConsumed.find(
+        p => p.templateId === 'tmpl-hp' && p.round === 2,
+      );
+      expect(hpConsumedOnRound2).toBeUndefined();
+
+      spy.mockRestore();
+    });
+
+    it('respects MAX_ACTIVE_BUFFS cap', () => {
+      const spy = mockCombatRandom({ initA: 0.9, initB: 0.1, attackRoll: 0.85, damageRoll: 0.0, critRoll: 0.99 });
+
+      const a = makeCombatant('Hero', {
+        template: [
+          { id: 'slot-0', sortOrder: 0, actionId: 'battle_cry' },
+          { id: 'slot-1', sortOrder: 1, actionId: 'eagle_eye' },
+          { id: 'slot-2', sortOrder: 2, actionId: 'fortify' },
+          { id: 'slot-3', sortOrder: 3, actionId: 'use_elixir_of_power' },
+        ],
+        stamina: 200,
+        maxStamina: 200,
+        mana: 200,
+        maxMana: 200,
+      });
+      const b = makeCombatant('Mob', {
+        stats: makeStats({ hp: 2000, maxHp: 2000 }),
+        template: templateOf('light_attack'),
+      });
+
+      const result = runTemplateCombat(a, b, {
+        potions: [
+          { name: 'Elixir of Power', healAmount: 0, templateId: 'tmpl-elixir', potionType: 'buff_attack', buffDuration: 5, buffValue: 0.25 },
+        ],
+      });
+
+      // Round 4: elixir should log "buff cap reached" since 3 buffs are already active
+      const capLog = result.log.find(l => l.message.includes('buff cap reached'));
+      expect(capLog).toBeDefined();
+      // Potion should still be consumed even if buff failed
+      expect(result.potionsConsumed).toHaveLength(1);
+
+      spy.mockRestore();
+    });
+  });
 });

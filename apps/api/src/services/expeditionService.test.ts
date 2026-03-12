@@ -572,11 +572,11 @@ describe('expeditionService', () => {
       await resolveExpeditionRound(EXPEDITION_ID, null);
 
       expect(vi.mocked(resolveRaidRound)).toHaveBeenCalled();
-      // Optimistic lock update
+      // Atomic optimistic-locked update (roundNumber + roundSummaries + roomDefinitions)
       expect(mockPrisma.guildExpedition.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: EXPEDITION_ID, roundNumber: 0 },
-          data: { roundNumber: 1 },
+          data: expect.objectContaining({ roundNumber: 1 }),
         }),
       );
       // Member HP updated

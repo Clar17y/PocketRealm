@@ -122,6 +122,7 @@ interface GuildExpeditionMemberRow {
   targetMobId: string | null;
   healTargetPlayerId?: string | null;
   activeEffects?: unknown;
+  threatValue: number;
   tokensEarned: number;
   signedUpAt: Date;
   player?: { username: string };
@@ -145,6 +146,7 @@ function toExpeditionMemberData(m: GuildExpeditionMemberRow): ExpeditionMemberDa
     targetMobId: m.targetMobId,
     activeEffects: (Array.isArray(m.activeEffects) ? m.activeEffects : []) as ExpeditionMemberData['activeEffects'],
     healTargetPlayerId: m.healTargetPlayerId ?? null,
+    threatValue: m.threatValue,
     tokensEarned: m.tokensEarned,
     signedUpAt: m.signedUpAt.toISOString(),
   };
@@ -772,11 +774,52 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
 
   const result = resolveRaidRound(input);
 
-  // Optimistic locking: only update if roundNumber hasn't changed
+  // --- Prepare all expedition-level data BEFORE the atomic write ---
+
+  // Build updated room mob state
+  const updatedRooms = [...rooms];
+  const existingMobIds = new Set(currentRoomDef.mobs.map(m => m.id));
+  const updatedMobs = currentRoomDef.mobs.map(mob => {
+    const afterMob = result.mobsAfter.find(m => m.id === mob.id);
+    if (afterMob) {
+      return { ...mob, hp: afterMob.hp, activeEffects: afterMob.activeEffects, actionTemplate: afterMob.actionTemplate };
+    }
+    return { ...mob, hp: 0 };
+  });
+  for (const afterMob of result.mobsAfter) {
+    if (!existingMobIds.has(afterMob.id)) {
+      updatedMobs.push(afterMob);
+    }
+  }
+  updatedRooms[expedition.currentRoom] = {
+    ...currentRoomDef,
+    mobs: updatedMobs,
+  };
+
+  // Build round log from engine result
+  const roundLog: ExpeditionRoundLog = {
+    ...result.roundLog,
+    roomIndex: expedition.currentRoom,
+  };
+  const existingLogs = (Array.isArray(expedition.roundSummaries)
+    ? expedition.roundSummaries
+    : []) as unknown as ExpeditionRoundLog[];
+  const newSummaries = [...existingLogs, roundLog];
+
+  // Compute nextRoundAt for the normal (non-cleared, non-wipe) case
+  const nextRoundAt = result.roomCleared || result.allPlayersDead
+    ? null
+    : new Date(Date.now() + getRoundInterval(rooms, expedition.currentRoom));
+
+  // --- Atomic optimistic-locked write: roundNumber + roundSummaries + roomDefinitions ---
+  // This prevents the race where a fast subsequent round overwrites this round's log.
   const updated = await prisma.guildExpedition.updateMany({
     where: { id: expeditionId, roundNumber: expedition.roundNumber },
     data: {
       roundNumber: nextRound,
+      roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),
+      roundSummaries: JSON.parse(JSON.stringify(newSummaries)),
+      nextRoundAt,
     },
   });
   if (updated.count === 0) return; // Another process resolved this round
@@ -812,67 +855,11 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
     }
   }
 
-  // Update room mob state in roomDefinitions JSON
-  const updatedRooms = [...rooms];
-  const existingMobIds = new Set(currentRoomDef.mobs.map(m => m.id));
-  const updatedMobs = currentRoomDef.mobs.map(mob => {
-    const afterMob = result.mobsAfter.find(m => m.id === mob.id);
-    if (afterMob) {
-      return { ...mob, hp: afterMob.hp, activeEffects: afterMob.activeEffects, actionTemplate: afterMob.actionTemplate };
-    }
-    // Mob was killed
-    return { ...mob, hp: 0 };
-  });
-  // Persist spawned mobs (summons) that weren't in the original room definition
-  for (const afterMob of result.mobsAfter) {
-    if (!existingMobIds.has(afterMob.id)) {
-      updatedMobs.push(afterMob);
-    }
-  }
-  updatedRooms[expedition.currentRoom] = {
-    ...currentRoomDef,
-    mobs: updatedMobs,
-  };
-
-  // Build round log from engine result
-  const roundLog: ExpeditionRoundLog = {
-    ...result.roundLog,
-    roomIndex: expedition.currentRoom,
-  };
-  const existingLogs = (Array.isArray(expedition.roundSummaries)
-    ? expedition.roundSummaries
-    : []) as unknown as ExpeditionRoundLog[];
-  const newSummaries = [...existingLogs, roundLog];
-
+  // Handle post-round transitions (room clear / wipe)
   if (result.roomCleared) {
-    await prisma.guildExpedition.update({
-      where: { id: expeditionId },
-      data: {
-        roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),
-        roundSummaries: JSON.parse(JSON.stringify(newSummaries)),
-        nextRoundAt: null,
-      },
-    });
     await handleRoomCleared(expeditionId);
   } else if (result.allPlayersDead) {
-    await prisma.guildExpedition.update({
-      where: { id: expeditionId },
-      data: {
-        roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),
-        roundSummaries: JSON.parse(JSON.stringify(newSummaries)),
-        nextRoundAt: null,
-      },
-    });
     await handleWipe(expeditionId);
-  } else {
-    await prisma.guildExpedition.update({
-      where: { id: expeditionId },
-      data: {
-        roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),
-        roundSummaries: JSON.parse(JSON.stringify(newSummaries)),
-        nextRoundAt: new Date(Date.now() + getRoundInterval(rooms, expedition.currentRoom)),
-      },
-    });
   }
 }
 

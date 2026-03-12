@@ -899,6 +899,229 @@ describe('resolveRaidRound', () => {
     });
   });
 
+  describe('cleanse potion in raid', () => {
+    it('use_cleanse_potion removes stat debuffs and magic DoTs, consumes potion, applies sickness', () => {
+      const cleansePotion = makePotion({
+        potionType: 'cleanse', name: 'Cleansing Potion', templateId: 'potion-cleanse-1',
+        healAmount: 0, buffValue: 1,
+      });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 60, maxHp: 100,
+        template: [{ actionId: 'use_cleanse_potion', sortOrder: 0 }],
+        availablePotions: [cleansePotion],
+        activeEffects: [
+          { name: 'Wither', stat: 'defence', modifier: -5, roundsRemaining: 3 },
+          { name: 'Poison', stat: 'dot', modifier: 0, roundsRemaining: 4, damagePerRound: 8, dotDamageType: 'magic' as const },
+        ],
+      });
+      const mob1 = makeMob({
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      const pr = result.participantResults[0];
+      // Potion consumed
+      expect(pr.potionsConsumed).toHaveLength(1);
+      expect(pr.potionsConsumed[0].templateId).toBe('potion-cleanse-1');
+      expect(result.allPotionsConsumed).toHaveLength(1);
+      // Sickness applied
+      const sickness = pr.activeEffectsAfter.find(e => e.stat === 'potionSickness');
+      expect(sickness).toBeDefined();
+      // Debuffs removed
+      const wither = pr.activeEffectsAfter.find(e => e.name === 'Wither');
+      expect(wither).toBeUndefined();
+      // Magic DoT removed (buffValue=1 clears 1 worst group)
+      const poison = pr.activeEffectsAfter.find(e => e.name === 'Poison');
+      expect(poison).toBeUndefined();
+    });
+
+    it('use_cleanse_potion with no debuffs does nothing, no potion consumed', () => {
+      const cleansePotion = makePotion({
+        potionType: 'cleanse', name: 'Cleansing Potion', templateId: 'potion-cleanse-1',
+        healAmount: 0, buffValue: 1,
+      });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 100, maxHp: 100,
+        template: [{ actionId: 'use_cleanse_potion', sortOrder: 0 }],
+        availablePotions: [cleansePotion],
+        activeEffects: [],
+      });
+      const mob1 = makeMob({
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      expect(result.allPotionsConsumed).toHaveLength(0);
+      const pr = result.participantResults[0];
+      expect(pr.potionsConsumed).toHaveLength(0);
+      const sickness = pr.activeEffectsAfter.find(e => e.stat === 'potionSickness');
+      expect(sickness).toBeUndefined();
+    });
+  });
+
+  describe('buff potion in raid', () => {
+    it('use_elixir_of_power applies attack buff, consumes potion, applies sickness', () => {
+      const buffPotion = makePotion({
+        potionType: 'buff_attack', name: 'Elixir of Power', templateId: 'potion-buff-atk-1',
+        healAmount: 0, buffValue: 15, buffDuration: 5,
+      });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        template: [{ actionId: 'use_elixir_of_power', sortOrder: 0 }],
+        availablePotions: [buffPotion],
+      });
+      const mob1 = makeMob({
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      const pr = result.participantResults[0];
+      expect(pr.potionsConsumed).toHaveLength(1);
+      expect(pr.potionsConsumed[0].templateId).toBe('potion-buff-atk-1');
+      // Buff applied
+      const buff = pr.activeEffectsAfter.find(e => e.stat === 'attackPercent');
+      expect(buff).toBeDefined();
+      expect(buff!.modifier).toBe(15);
+      expect(buff!.roundsRemaining).toBeGreaterThan(0);
+      // Sickness applied
+      const sickness = pr.activeEffectsAfter.find(e => e.stat === 'potionSickness');
+      expect(sickness).toBeDefined();
+    });
+
+    it('use_resist_potion applies defence + magicDefence buffs', () => {
+      const resistPotion = makePotion({
+        potionType: 'buff_defence', name: 'Resist Potion', templateId: 'potion-resist-1',
+        healAmount: 0, buffValue: 10, buffDuration: 5,
+      });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        template: [{ actionId: 'use_resist_potion', sortOrder: 0 }],
+        availablePotions: [resistPotion],
+      });
+      const mob1 = makeMob({
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      const pr = result.participantResults[0];
+      expect(pr.potionsConsumed).toHaveLength(1);
+      const defBuff = pr.activeEffectsAfter.find(e => e.stat === 'defence' && e.modifier > 0);
+      expect(defBuff).toBeDefined();
+      expect(defBuff!.modifier).toBe(10);
+      const mdefBuff = pr.activeEffectsAfter.find(e => e.stat === 'magicDefence' && e.modifier > 0);
+      expect(mdefBuff).toBeDefined();
+      expect(mdefBuff!.modifier).toBe(10);
+    });
+  });
+
+  describe('potion fallback to alternate action', () => {
+    it('falls back to else-branch attack when potion sickness blocks HP potion', () => {
+      const potion = makePotion({ healAmount: 40 });
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 40, maxHp: 100,
+        template: [{
+          actionId: 'normal_attack', sortOrder: 0,
+          condition: { type: 'hp_below', value: 50 },
+          thenActionId: 'use_hp_potion',
+        }],
+        availablePotions: [potion],
+        activeEffects: [
+          { name: 'Potion Sickness', stat: 'potionSickness', modifier: 0, roundsRemaining: 2 },
+        ],
+      });
+      const mob1 = makeMob({
+        hp: 200, maxHp: 200,
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      const pr = result.participantResults[0];
+      // Should NOT have consumed a potion
+      expect(pr.potionsConsumed).toHaveLength(0);
+      // Should have dealt damage (fell back to normal_attack)
+      expect(pr.damageDealt).toBeGreaterThan(0);
+      // HP should not have changed from healing (only mob damage if any)
+      expect(pr.healingDone).toBe(0);
+      // Attack should appear in round log
+      const attackEntries = result.roundLog.phases.playerAttacks.filter(
+        e => e.entryType === 'attack' && e.playerId === 'p1',
+      );
+      expect(attackEntries.length).toBeGreaterThan(0);
+    });
+
+    it('falls back to else-branch attack when no potions in inventory', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 40, maxHp: 100,
+        template: [{
+          actionId: 'normal_attack', sortOrder: 0,
+          condition: { type: 'hp_below', value: 50 },
+          thenActionId: 'use_hp_potion',
+        }],
+        availablePotions: [], // no potions
+      });
+      const mob1 = makeMob({
+        hp: 200, maxHp: 200,
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      const pr = result.participantResults[0];
+      expect(pr.potionsConsumed).toHaveLength(0);
+      expect(pr.damageDealt).toBeGreaterThan(0);
+    });
+
+    it('does nothing (no fallback) when potion blocked and no conditional else branch', () => {
+      const p1 = makeParticipant({
+        playerId: 'p1',
+        hp: 40, maxHp: 100,
+        template: [{ actionId: 'use_hp_potion', sortOrder: 0 }], // unconditional potion, no else
+        availablePotions: [],
+      });
+      const mob1 = makeMob({
+        hp: 200, maxHp: 200,
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p1], mobs: [mob1] }),
+        alwaysHitRng,
+      );
+
+      const pr = result.participantResults[0];
+      expect(pr.potionsConsumed).toHaveLength(0);
+      expect(pr.damageDealt).toBe(0);
+      expect(pr.healingDone).toBe(0);
+    });
+  });
+
   describe('rooted effect', () => {
     it('rooted participant is forced to defend', () => {
       const p1 = makeParticipant({

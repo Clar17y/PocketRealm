@@ -41,6 +41,7 @@ export interface CombatParticipantState {
   intendedActionDef?: ActionDefinition | null;
   exhaustedReason?: ExhaustedActionReason | null;
   healTargetPlayerId?: string | null;
+  alternateActionDef?: ActionDefinition | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +93,7 @@ export function resolveParticipantActions(
     s.intendedActionId = resolved.intendedActionId ?? resolved.action.id;
     s.intendedActionDef = resolved.intendedAction ?? resolved.action;
     s.exhaustedReason = resolved.exhaustedReason ?? null;
+    s.alternateActionDef = resolved.alternateAction ?? null;
   }
 }
 

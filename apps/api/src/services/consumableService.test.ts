@@ -132,6 +132,32 @@ describe('useConsumable', () => {
     expect(result.remainingQuantity).toBe(2);
   });
 
+  it('rejects cleanse potions outside combat', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue({
+      id: 'item-1',
+      ownerId: 'p1',
+      template: { itemType: 'consumable', consumableEffect: { type: 'cleanse_magic_dot', value: 0 } },
+    });
+
+    await expect(useConsumable('p1', 'item-1', now)).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'COMBAT_ONLY',
+    });
+  });
+
+  it('rejects buff potions outside combat', async () => {
+    mockPrisma.item.findUnique.mockResolvedValue({
+      id: 'item-1',
+      ownerId: 'p1',
+      template: { itemType: 'consumable', consumableEffect: { type: 'buff_attack', value: 0.25, duration: 5 } },
+    });
+
+    await expect(useConsumable('p1', 'item-1', now)).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'COMBAT_ONLY',
+    });
+  });
+
   it('heals with percentage healing', async () => {
     mockPrisma.item.findUnique.mockResolvedValue({
       id: 'item-1',

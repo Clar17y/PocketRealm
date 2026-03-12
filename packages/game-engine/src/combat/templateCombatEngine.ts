@@ -323,10 +323,46 @@ function hasPotionSickness(state: TemplateCombatState, actor: CombatActor): bool
   );
 }
 
+export function isStatDebuff(e: ActiveEffect, actor: CombatActor): boolean {
+  return e.target === actor && e.stat !== 'potionSickness' && e.modifier < 0 && !e.resolvedDamagePerRound;
+}
+
+export function isMagicDot(e: ActiveEffect, actor: CombatActor): boolean {
+  return e.target === actor && e.resolvedDamagePerRound != null && e.resolvedDamagePerRound > 0 && e.dotDamageType === 'magic';
+}
+
+function consumePotionAndApplySickness(
+  state: TemplateCombatState,
+  actorKey: CombatActor,
+  availablePotions: CombatPotion[],
+  potionIndex: number,
+  potionsConsumed: PotionConsumed[],
+  healAmount: number,
+): CombatPotion {
+  const potion = availablePotions[potionIndex];
+  availablePotions.splice(potionIndex, 1);
+  potionsConsumed.push({
+    templateId: potion.templateId,
+    name: potion.name,
+    healAmount,
+    round: state.round,
+  });
+  state.activeEffects.push({
+    name: 'Potion Sickness',
+    target: actorKey,
+    stat: 'potionSickness',
+    modifier: 0,
+    remainingRounds: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS,
+  });
+  return potion;
+}
+
 function actionToCombatAction(action: ActionDefinition): CombatAction {
   if (action.category === 'offensive') return 'attack';
   if (action.category === 'defensive') return 'defend';
   if (action.actionType === 'use_potion') return 'potion';
+  if (action.actionType === 'use_cleanse_potion') return 'cleanse';
+  if (action.actionType === 'use_buff_potion') return 'potion';
   return 'spell';
 }
 
@@ -596,9 +632,21 @@ function executeSupportiveAction(
   availablePotions: CombatPotion[],
   potionsConsumed: PotionConsumed[],
 ): void {
-  // Potion use
+  // Resource potion use (hp/stamina/mana)
   if (action.actionType === 'use_potion') {
     executePotionAction(state, actorKey, action, actorName, ctx, availablePotions, potionsConsumed);
+    return;
+  }
+
+  // Cleanse potion
+  if (action.actionType === 'use_cleanse_potion') {
+    executeCleanseAction(state, actorKey, actorName, ctx, availablePotions, potionsConsumed);
+    return;
+  }
+
+  // Buff potion (resist / elixir)
+  if (action.actionType === 'use_buff_potion') {
+    executeBuffPotionAction(state, actorKey, action, actorName, ctx, availablePotions, potionsConsumed);
     return;
   }
 
@@ -654,7 +702,7 @@ function executePotionAction(
   availablePotions: CombatPotion[],
   potionsConsumed: PotionConsumed[],
 ): void {
-  const potionType = action.potionType ?? 'hp';
+  const potionType = (action.potionType ?? 'hp') as 'hp' | 'stamina' | 'mana';
 
   // Check potion sickness
   if (hasPotionSickness(state, actorKey)) {
@@ -679,47 +727,28 @@ function executePotionAction(
     return;
   }
 
-  const potion = availablePotions[potionIndex];
   const c = state.combatants[actorKey];
   let actualRestore = 0;
   let resourceLabel: string;
 
   if (potionType === 'hp') {
     const hpBefore = c.hp;
-    c.hp = Math.min(c.maxHp, c.hp + potion.healAmount);
+    c.hp = Math.min(c.maxHp, c.hp + availablePotions[potionIndex].healAmount);
     actualRestore = Math.round(c.hp - hpBefore);
     resourceLabel = 'HP';
   } else if (potionType === 'stamina') {
     const before = c.stamina;
-    c.stamina = Math.min(c.maxStamina, c.stamina + potion.healAmount);
+    c.stamina = Math.min(c.maxStamina, c.stamina + availablePotions[potionIndex].healAmount);
     actualRestore = Math.round(c.stamina - before);
     resourceLabel = 'Stamina';
   } else {
     const before = c.mana;
-    c.mana = Math.min(c.maxMana, c.mana + potion.healAmount);
+    c.mana = Math.min(c.maxMana, c.mana + availablePotions[potionIndex].healAmount);
     actualRestore = Math.round(c.mana - before);
     resourceLabel = 'Mana';
   }
 
-  // Remove from pool
-  availablePotions.splice(potionIndex, 1);
-
-  // Record consumption
-  potionsConsumed.push({
-    templateId: potion.templateId,
-    name: potion.name,
-    healAmount: actualRestore,
-    round: state.round,
-  });
-
-  // Apply potion sickness (shared across all potion types)
-  state.activeEffects.push({
-    name: 'Potion Sickness',
-    target: actorKey,
-    stat: 'potionSickness',
-    modifier: 0,
-    remainingRounds: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS,
-  });
+  const potion = consumePotionAndApplySickness(state, actorKey, availablePotions, potionIndex, potionsConsumed, actualRestore);
 
   state.log.push(buildLogEntry(state, ctx, {
     actor: actorKey,
@@ -736,6 +765,215 @@ function executePotionAction(
     }],
     message: `${actorName} drinks a ${potion.name}! +${actualRestore} ${resourceLabel}`,
   }));
+}
+
+function executeCleanseAction(
+  state: TemplateCombatState,
+  actorKey: CombatActor,
+  actorName: string,
+  ctx: RoundContext,
+  availablePotions: CombatPotion[],
+  potionsConsumed: PotionConsumed[],
+): void {
+  if (hasPotionSickness(state, actorKey)) {
+    state.log.push(buildLogEntry(state, ctx, {
+      actor: actorKey,
+      actorName,
+      action: 'cleanse',
+      message: `${actorName} tries to drink a potion but is still sick!`,
+    }));
+    return;
+  }
+
+  const potionIndex = availablePotions.findIndex(p => p.potionType === 'cleanse');
+  if (potionIndex === -1) {
+    state.log.push(buildLogEntry(state, ctx, {
+      actor: actorKey,
+      actorName,
+      action: 'cleanse',
+      message: `${actorName} tries to drink a cleanse potion but has none left!`,
+    }));
+    return;
+  }
+
+  // Find all stat debuffs and magic DOTs
+  const statDebuffs = state.activeEffects.filter(e => isStatDebuff(e, actorKey));
+  const magicDots = state.activeEffects.filter(e => isMagicDot(e, actorKey));
+
+  if (statDebuffs.length === 0 && magicDots.length === 0) {
+    state.log.push(buildLogEntry(state, ctx, {
+      actor: actorKey,
+      actorName,
+      action: 'cleanse',
+      message: `${actorName} tries to cleanse but has no debuffs to remove!`,
+    }));
+    return;
+  }
+
+  const cleansedEntries: Array<{ name: string; target: CombatActor; stacksRemoved: number }> = [];
+  const cleansedNames: string[] = [];
+
+  // Always clear ALL stat debuffs
+  if (statDebuffs.length > 0) {
+    const debuffNames = new Set(statDebuffs.map(e => e.name));
+    state.activeEffects = state.activeEffects.filter(e => !isStatDebuff(e, actorKey));
+    for (const name of debuffNames) {
+      const count = statDebuffs.filter(e => e.name === name).length;
+      cleansedEntries.push({ name, target: actorKey, stacksRemoved: count });
+      cleansedNames.push(`${count}x ${name}`);
+    }
+  }
+
+  // Clear N worst magic DOT groups (N = potion's buffValue, 0 = all)
+  const dotGroupsToClear = availablePotions[potionIndex].buffValue ?? 1;
+
+  if (magicDots.length > 0) {
+    // Group by name, sum damage per group
+    const groups = new Map<string, { totalDamage: number; count: number }>();
+    for (const dot of magicDots) {
+      const existing = groups.get(dot.name) ?? { totalDamage: 0, count: 0 };
+      existing.totalDamage += dot.resolvedDamagePerRound!;
+      existing.count++;
+      groups.set(dot.name, existing);
+    }
+
+    // Sort groups by total damage descending
+    const sortedGroups = [...groups.entries()].sort((a, b) => b[1].totalDamage - a[1].totalDamage);
+
+    // Clear N groups (0 = all)
+    const groupsToRemove = dotGroupsToClear === 0 ? sortedGroups : sortedGroups.slice(0, dotGroupsToClear);
+    const namesToRemove = new Set(groupsToRemove.map(([name]) => name));
+
+    state.activeEffects = state.activeEffects.filter(
+      e => !(isMagicDot(e, actorKey) && namesToRemove.has(e.name)),
+    );
+
+    for (const [name, group] of groupsToRemove) {
+      cleansedEntries.push({ name, target: actorKey, stacksRemoved: group.count });
+      cleansedNames.push(`${group.count}x ${name}`);
+    }
+  }
+
+  const potion = consumePotionAndApplySickness(state, actorKey, availablePotions, potionIndex, potionsConsumed, 0);
+
+  state.log.push(buildLogEntry(state, ctx, {
+    actor: actorKey,
+    actorName,
+    action: 'cleanse',
+    spellName: potion.name,
+    effectsCleansed: cleansedEntries,
+    effectsApplied: [{
+      stat: 'potionSickness',
+      modifier: 0,
+      duration: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS,
+      target: actorKey,
+    }],
+    message: `${actorName} drinks ${potion.name}! Cleanses ${cleansedNames.join(', ')}!`,
+  }));
+}
+
+function executeBuffPotionAction(
+  state: TemplateCombatState,
+  actorKey: CombatActor,
+  action: ActionDefinition,
+  actorName: string,
+  ctx: RoundContext,
+  availablePotions: CombatPotion[],
+  potionsConsumed: PotionConsumed[],
+): void {
+  const potionType = action.potionType as 'buff_attack' | 'buff_defence';
+
+  if (hasPotionSickness(state, actorKey)) {
+    state.log.push(buildLogEntry(state, ctx, {
+      actor: actorKey,
+      actorName,
+      action: 'potion',
+      message: `${actorName} tries to drink a potion but is still sick!`,
+    }));
+    return;
+  }
+
+  const potionIndex = availablePotions.findIndex(p => p.potionType === potionType);
+  if (potionIndex === -1) {
+    state.log.push(buildLogEntry(state, ctx, {
+      actor: actorKey,
+      actorName,
+      action: 'potion',
+      message: `${actorName} tries to drink a buff potion but has none left!`,
+    }));
+    return;
+  }
+
+  const potion = availablePotions[potionIndex];
+  const duration = potion.buffDuration ?? 5;
+  const value = potion.buffValue ?? 0;
+
+  const appliedEffects: CombatLogEntry['effectsApplied'] = [];
+
+  if (potionType === 'buff_attack') {
+    const applied = applyActionEffect(state, {
+      name: 'Elixir of Power',
+      stat: 'attackPercent',
+      modifier: value,
+      duration,
+      isDebuff: false,
+    }, actorKey);
+    if (applied) appliedEffects.push(...applied);
+  } else {
+    const defApplied = applyActionEffect(state, {
+      name: 'Resist Potion',
+      stat: 'defence',
+      modifier: value,
+      duration,
+      isDebuff: false,
+    }, actorKey);
+    if (defApplied) appliedEffects.push(...defApplied);
+
+    const mdefApplied = applyActionEffect(state, {
+      name: 'Resist Potion (Magic)',
+      stat: 'magicDefence',
+      modifier: value,
+      duration,
+      isDebuff: false,
+    }, actorKey);
+    if (mdefApplied) appliedEffects.push(...mdefApplied);
+  }
+
+  consumePotionAndApplySickness(state, actorKey, availablePotions, potionIndex, potionsConsumed, 0);
+
+  const buffDesc = appliedEffects.length > 0
+    ? appliedEffects.map(e => `${e.stat} ${e.modifier > 0 ? '+' : ''}${e.modifier} (${e.duration} rds)`).join(', ')
+    : 'buff cap reached';
+
+  state.log.push(buildLogEntry(state, ctx, {
+    actor: actorKey,
+    actorName,
+    action: 'potion',
+    spellName: potion.name,
+    effectsApplied: [
+      ...(appliedEffects.length > 0 ? appliedEffects : []),
+      { stat: 'potionSickness', modifier: 0, duration: COMBAT_ACTION_CONSTANTS.POTION_SICKNESS_ROUNDS, target: actorKey },
+    ],
+    message: `${actorName} drinks ${potion.name}! ${buffDesc}`,
+  }));
+}
+
+function canUsePotionAction(
+  state: TemplateCombatState,
+  actorKey: CombatActor,
+  action: ActionDefinition,
+  availablePotions: CombatPotion[],
+): boolean {
+  if (!action.potionType) return true;
+  if (hasPotionSickness(state, actorKey)) return false;
+
+  if (action.potionType === 'cleanse') {
+    const hasPotion = availablePotions.some(p => p.potionType === 'cleanse');
+    const hasDebuff = state.activeEffects.some(e => isStatDebuff(e, actorKey) || isMagicDot(e, actorKey));
+    return hasPotion && hasDebuff;
+  }
+
+  return availablePotions.some(p => p.potionType === action.potionType);
 }
 
 function executeDefensiveAction(
@@ -852,20 +1090,16 @@ export function runTemplateCombat(
       combatantB.actionDefinitions,
     );
 
-    // When a potion action can't fire (sick or empty), try the other branch first, then Defend
+    // When a potion action can't fire (sick, empty, or no valid target), try the other branch first, then Defend
     if (resolvedA.action.potionType) {
-      const canUsePotion = !hasPotionSickness(state, 'combatantA') &&
-        availablePotions.some(p => p.potionType === resolvedA.action.potionType);
-      if (!canUsePotion) {
+      if (!canUsePotionAction(state, 'combatantA', resolvedA.action, availablePotions)) {
         resolvedA = resolvedA.alternateAction
           ? { action: resolvedA.alternateAction, wasExhausted: false }
           : { action: DEFEND_FALLBACK, wasExhausted: true };
       }
     }
     if (resolvedB.action.potionType) {
-      const canUsePotion = !hasPotionSickness(state, 'combatantB') &&
-        availablePotions.some(p => p.potionType === resolvedB.action.potionType);
-      if (!canUsePotion) {
+      if (!canUsePotionAction(state, 'combatantB', resolvedB.action, availablePotions)) {
         resolvedB = resolvedB.alternateAction
           ? { action: resolvedB.alternateAction, wasExhausted: false }
           : { action: DEFEND_FALLBACK, wasExhausted: true };

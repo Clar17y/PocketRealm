@@ -108,9 +108,14 @@ export interface CombatLogEntry {
     name: string;
     target: CombatActor;
   }>;
+  effectsCleansed?: Array<{
+    name: string;
+    target: CombatActor;
+    stacksRemoved: number;
+  }>;
 }
 
-export type CombatAction = 'attack' | 'spell' | 'defend' | 'counter' | 'ward' | 'flee' | 'potion' | 'heal' | 'regen';
+export type CombatAction = 'attack' | 'spell' | 'defend' | 'counter' | 'ward' | 'flee' | 'potion' | 'cleanse' | 'heal' | 'regen';
 
 export type CombatOutcome = 'victory' | 'defeat' | 'fled' | 'draw';
 
@@ -134,9 +139,14 @@ export interface DurabilityLoss {
 
 export interface CombatPotion {
   name: string;
+  /** Heal/restore amount for resource potions; 0 for cleanse/buff potions */
   healAmount: number;
   templateId: string;
-  potionType: 'hp' | 'stamina' | 'mana';
+  potionType: 'hp' | 'stamina' | 'mana' | 'cleanse' | 'buff_attack' | 'buff_defence';
+  /** Duration in rounds (buff potions only) */
+  buffDuration?: number;
+  /** Buff value — percent for buff_attack, flat for buff_defence */
+  buffValue?: number;
 }
 
 export interface CombatOptions {

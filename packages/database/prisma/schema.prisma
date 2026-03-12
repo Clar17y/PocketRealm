@@ -1055,6 +1055,8 @@ enum ConditionType {
   has_debuff
   no_buff
   no_debuff
+  any_debuff
+  any_magic_dot
 }
 
 enum ResourceType {

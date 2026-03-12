@@ -70,6 +70,76 @@ describe('potionService', () => {
       expect(result).toEqual([]);
     });
 
+    it('builds cleanse potions from cleanse_magic_dot consumables', async () => {
+      mockPrisma.item.findMany.mockResolvedValue([
+        {
+          quantity: 3,
+          template: {
+            id: 'tmpl-antivenom',
+            name: 'Cleansing Potion',
+            consumableEffect: { type: 'cleanse_magic_dot' },
+          },
+        },
+      ]);
+
+      const result = await buildPotionPool('player-1', 200);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({
+        name: 'Cleansing Potion',
+        healAmount: 0,
+        templateId: 'tmpl-antivenom',
+        potionType: 'cleanse',
+      });
+    });
+
+    it('builds buff_attack potions with duration and value', async () => {
+      mockPrisma.item.findMany.mockResolvedValue([
+        {
+          quantity: 1,
+          template: {
+            id: 'tmpl-elixir',
+            name: 'Elixir of Power',
+            consumableEffect: { type: 'buff_attack', value: 0.25, duration: 5 },
+          },
+        },
+      ]);
+
+      const result = await buildPotionPool('player-1', 200);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        name: 'Elixir of Power',
+        healAmount: 0,
+        templateId: 'tmpl-elixir',
+        potionType: 'buff_attack',
+        buffDuration: 5,
+        buffValue: 0.25,
+      });
+    });
+
+    it('builds buff_defence potions with duration and value', async () => {
+      mockPrisma.item.findMany.mockResolvedValue([
+        {
+          quantity: 2,
+          template: {
+            id: 'tmpl-resist',
+            name: 'Resist Potion',
+            consumableEffect: { type: 'buff_defence', value: 15, duration: 5 },
+          },
+        },
+      ]);
+
+      const result = await buildPotionPool('player-1', 200);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        name: 'Resist Potion',
+        healAmount: 0,
+        templateId: 'tmpl-resist',
+        potionType: 'buff_defence',
+        buffDuration: 5,
+        buffValue: 15,
+      });
+    });
+
     it('expands quantity into individual potion entries', async () => {
       mockPrisma.item.findMany.mockResolvedValue([
         {

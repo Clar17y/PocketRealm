@@ -1,13 +1,16 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import type { CombatPotion, CombatTemplateSlotData, ConsumableEffect, ConsumableEffectType, PotionConsumed } from '@pocketrealm/shared';
 
-const POTION_ACTION_IDS = new Set(['use_hp_potion', 'use_stamina_potion', 'use_mana_potion']);
+const POTION_ACTION_IDS = new Set([
+  'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
+  'use_cleanse_potion', 'use_resist_potion', 'use_elixir_of_power',
+]);
 
 export function templateHasPotionActions(slots: CombatTemplateSlotData[]): boolean {
   return slots.some(s => POTION_ACTION_IDS.has(s.actionId) || (s.thenActionId && POTION_ACTION_IDS.has(s.thenActionId)));
 }
 
-function getEffectPotionType(effectType: ConsumableEffectType): 'hp' | 'stamina' | 'mana' {
+function getEffectPotionType(effectType: ConsumableEffectType): CombatPotion['potionType'] {
   switch (effectType) {
     case 'heal_flat':
     case 'heal_percent':
@@ -16,6 +19,12 @@ function getEffectPotionType(effectType: ConsumableEffectType): 'hp' | 'stamina'
       return 'stamina';
     case 'restore_mana':
       return 'mana';
+    case 'cleanse_magic_dot':
+      return 'cleanse';
+    case 'buff_attack':
+      return 'buff_attack';
+    case 'buff_defence':
+      return 'buff_defence';
   }
 }
 
@@ -33,19 +42,29 @@ export async function buildPotionPool(playerId: string, maxHp: number): Promise<
     const effect = item.template.consumableEffect as ConsumableEffect | null;
     if (!effect) continue;
 
-    const healAmount = effect.type === 'heal_flat'
-      ? effect.value
-      : effect.type === 'heal_percent'
-        ? Math.floor(maxHp * effect.value)
-        : effect.value;
+    const potionType = getEffectPotionType(effect.type);
+    const isResource = potionType === 'hp' || potionType === 'stamina' || potionType === 'mana';
+
+    const healAmount = isResource
+      ? (effect.type === 'heal_flat'
+          ? effect.value
+          : effect.type === 'heal_percent'
+            ? Math.floor(maxHp * effect.value)
+            : effect.value)
+      : 0;
 
     for (let i = 0; i < item.quantity; i++) {
-      potions.push({
+      const potion: CombatPotion = {
         name: item.template.name,
         healAmount,
         templateId: item.template.id,
-        potionType: getEffectPotionType(effect.type),
-      });
+        potionType,
+      };
+
+      if (effect.duration != null) potion.buffDuration = effect.duration;
+      if (!isResource && effect.value != null) potion.buffValue = effect.value;
+
+      potions.push(potion);
     }
   }
   return potions;
