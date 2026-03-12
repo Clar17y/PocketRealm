@@ -315,7 +315,6 @@ export function GuildExpeditionsTab({
 
   const handleForceRound = async () => {
     if (!expedition) return;
-    if (!confirm('Skip the round timer and resolve the next round immediately?')) return;
     setActionLoading(true);
     setError(null);
     try {
