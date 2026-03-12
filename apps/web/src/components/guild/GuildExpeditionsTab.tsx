@@ -347,11 +347,19 @@ export function GuildExpeditionsTab({
   // Auto-advance: fires force-round every 10s when toggled on
   const [autoAdvance, setAutoAdvance] = useState(false);
   const autoAdvanceRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const roundInFlightRef = useRef(false);
 
   useEffect(() => {
     if (autoAdvance && expedition?.status === 'in_progress') {
-      autoAdvanceRef.current = setInterval(() => {
-        void forceNextRound(expedition.id).then(() => void loadExpedition());
+      autoAdvanceRef.current = setInterval(async () => {
+        if (roundInFlightRef.current) return;
+        roundInFlightRef.current = true;
+        try {
+          await forceNextRound(expedition.id);
+          await loadExpedition();
+        } finally {
+          roundInFlightRef.current = false;
+        }
       }, 10_000);
     }
     return () => {

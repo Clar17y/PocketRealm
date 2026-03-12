@@ -249,22 +249,17 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
   });
 }));
 
-// POST /:id/auto-resolve
+// POST /:id/auto-resolve (same auth pattern as force-round)
 expeditionRouter.post('/:id/auto-resolve', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { id } = expeditionIdSchema.parse(req.params);
 
+  // Verify guild membership + officer/leader role
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id },
-    select: { id: true, guildId: true, status: true, roundNumber: true },
+    select: { guildId: true },
   });
   if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
-  if (expedition.status !== 'in_progress') {
-    throw new AppError(400, 'Expedition is not active', 'NOT_ACTIVE');
-  }
-  if (expedition.roundNumber !== 0) {
-    throw new AppError(400, 'Room already has rounds resolved', 'ROUND_IN_PROGRESS');
-  }
 
   const membership = await prisma.guildMember.findUnique({
     where: { playerId },
@@ -277,6 +272,7 @@ expeditionRouter.post('/:id/auto-resolve', asyncHandler(async (req, res) => {
     throw new AppError(403, 'Officer or leader role required', 'INSUFFICIENT_ROLE');
   }
 
+  // Service validates status + roundNumber and does full fetch
   const result = await autoResolveRoom(id);
 
   res.json({
