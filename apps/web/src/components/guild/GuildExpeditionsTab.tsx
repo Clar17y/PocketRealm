@@ -22,7 +22,6 @@ import {
 } from '@/lib/api/expedition';
 import type {
   ExpeditionDetailResponse,
-  AutoResolveResponse,
 } from '@/lib/api/expedition';
 import type {
   ExpeditionAttemptLog,
@@ -218,7 +217,6 @@ export function GuildExpeditionsTab({
   const [expedition, setExpedition] = useState<ExpeditionData | null>(null);
   const [members, setMembers] = useState<ExpeditionMemberData[]>([]);
   const [cooldowns, setCooldowns] = useState<ExpeditionCooldownInfo | null>(null);
-  const [lastAutoResolve, setLastAutoResolve] = useState<AutoResolveResponse | null>(null);
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
 
@@ -336,11 +334,9 @@ export function GuildExpeditionsTab({
     if (!confirm('Auto-resolve this room? Templates are locked and all rounds resolve instantly.')) return;
     setActionLoading(true);
     setError(null);
-    setLastAutoResolve(null);
     try {
       const res = await autoResolveRoom(expedition.id);
       if (res.error) { setError(res.error.message); return; }
-      if (res.data) setLastAutoResolve(res.data);
       void loadExpedition();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to auto-resolve');
@@ -515,72 +511,8 @@ export function GuildExpeditionsTab({
   return (
     <>
       {tabBar}
-      {lastAutoResolve && (
-        <AutoResolveResultCard
-          result={lastAutoResolve}
-          playerId={playerId}
-          onDismiss={() => setLastAutoResolve(null)}
-        />
-      )}
       {activeContent}
     </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Auto-Resolve Result Card (persists across status transitions)
-// ---------------------------------------------------------------------------
-
-function AutoResolveResultCard({
-  result,
-  playerId,
-  onDismiss,
-}: {
-  result: AutoResolveResponse;
-  playerId: string | null;
-  onDismiss: () => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <PixelCard>
-      <div className="flex justify-between items-center">
-        <h4 className="text-xs font-bold text-[var(--rpg-text-primary)]">
-          Auto-Resolve: {result.outcome === 'cleared' ? (
-            <span className="text-[var(--rpg-green-light)]">Room Cleared</span>
-          ) : (
-            <span className="text-[var(--rpg-red)]">Wipe</span>
-          )}
-          <span className="text-[var(--rpg-text-secondary)] font-normal ml-2">
-            {result.roundsResolved} round{result.roundsResolved !== 1 ? 's' : ''}
-            {result.outcome === 'cleared' && result.tokensAwarded > 0 && (
-              <> · {result.tokensAwarded} tokens</>
-            )}
-          </span>
-        </h4>
-        <div className="flex gap-2">
-          {result.roundLogs.length > 0 && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="text-[10px] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] underline"
-            >
-              {expanded ? 'Hide logs' : 'View logs'}
-            </button>
-          )}
-          <button
-            onClick={onDismiss}
-            className="text-[10px] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-      {expanded && result.roundLogs.length > 0 && (
-        <div className="mt-2">
-          <RoundLogList logs={result.roundLogs} playerId={playerId} />
-        </div>
-      )}
-    </PixelCard>
   );
 }
 
