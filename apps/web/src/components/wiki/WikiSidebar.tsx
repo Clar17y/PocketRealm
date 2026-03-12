@@ -34,19 +34,28 @@ export function WikiSidebar({ open, onClose, mobile }: WikiSidebarProps) {
 
       {wikiNavigation.map((section) => {
         const isCollapsed = collapsed[section.slug] ?? false;
+        const isActive = pathname.startsWith(`/wiki/${section.slug}`);
+        const firstHref = section.items[0]?.href ?? `/wiki/${section.slug}`;
         return (
           <div key={section.slug}>
-            <button
-              className="wiki-sidebar-section-label"
-              onClick={() => toggle(section.slug)}
-              aria-expanded={!isCollapsed}
-            >
-              <span>{section.icon}</span>
-              <span>{section.label}</span>
-              <span style={{ marginLeft: 'auto', fontSize: '0.6rem' }}>
+            <div className="wiki-sidebar-section-label">
+              <Link
+                href={firstHref}
+                onClick={onClose}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'inherit', textDecoration: 'none', flex: 1 }}
+                data-section-active={isActive}
+              >
+                <span>{section.icon}</span>
+                <span>{section.label}</span>
+              </Link>
+              <button
+                onClick={() => toggle(section.slug)}
+                aria-expanded={!isCollapsed}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '0.6rem', padding: '0 4px' }}
+              >
                 {isCollapsed ? '\u25B6' : '\u25BC'}
-              </span>
-            </button>
+              </button>
+            </div>
 
             {!isCollapsed && (
               <div>

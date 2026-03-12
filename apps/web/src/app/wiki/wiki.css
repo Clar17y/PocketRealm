@@ -23,6 +23,7 @@
 
 .wiki-sidebar-title {
   color: var(--rpg-gold);
+  font-family: var(--font-almendra), Georgia, serif;
   font-weight: 700;
   font-size: 1.1rem;
   padding: 20px 16px 16px;
@@ -79,6 +80,7 @@
   padding: 32px 48px;
   margin: 0 auto;
   min-width: 0;
+  font-family: var(--font-crimson), Georgia, serif;
 }
 
 /* ── Breadcrumb ── */
@@ -104,6 +106,7 @@
 /* ── Page header ── */
 
 .wiki-page-title {
+  font-family: var(--font-almendra), Georgia, serif;
   font-size: 2rem;
   font-weight: 700;
   color: var(--rpg-gold);
@@ -198,6 +201,7 @@
 /* ── Section heading ── */
 
 .wiki-section-heading {
+  font-family: var(--font-almendra), Georgia, serif;
   font-size: 1.3rem;
   font-weight: 600;
   color: var(--rpg-text-primary);
@@ -292,6 +296,7 @@
 }
 
 .wiki-index-card-title {
+  font-family: var(--font-almendra), Georgia, serif;
   color: var(--rpg-gold);
   font-weight: 600;
   font-size: 1.05rem;
