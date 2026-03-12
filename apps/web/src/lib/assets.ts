@@ -41,6 +41,7 @@ export function resourceImageSrc(resourceType: string): string {
 const itemNameOverrides: Record<string, string> = {
   // Seeded / common names that don't have 1:1 assets
   'leather_cap': 'iron_helmet',
+  'cleansing_potion': 'antivenom_potion',
 };
 
 export function itemImageSrc(itemName: string, itemType: string): string {
