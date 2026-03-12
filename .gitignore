@@ -70,3 +70,6 @@ tests/e2e/test-results/
 tests/e2e/dist/
 git.exe.stackdump
 .claude/worktrees/
+
+# Superpowers brainstorm
+.superpowers/brainstorm
