@@ -15,7 +15,6 @@ export {
   getExpeditionBestiary,
   getWorldBossBestiary,
   getTurns,
-  spendTurns,
   getHpState,
   restEstimate,
   rest,

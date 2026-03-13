@@ -225,17 +225,6 @@ export async function getTurns() {
   }>('/api/v1/turns');
 }
 
-export async function spendTurns(amount: number, reason?: string) {
-  return fetchApi<{
-    previousTurns: number;
-    spent: number;
-    currentTurns: number;
-  }>('/api/v1/turns/spend', {
-    method: 'POST',
-    body: JSON.stringify({ amount, reason }),
-  });
-}
-
 export async function getHpState() {
   return fetchApi<{
     currentHp: number;
