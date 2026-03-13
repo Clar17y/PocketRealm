@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
+import rateLimit from 'express-rate-limit';
 import { prisma } from '@pocketrealm/database';
 import { TURN_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
@@ -13,6 +14,15 @@ import {
 import { ensureEquipmentSlots } from '../services/equipmentService';
 import { ensureStarterDiscoveries, ensureStarterEncounterAndNodes } from '../services/zoneDiscoveryService';
 import { asyncHandler } from '../utils/asyncHandler';
+
+// Strict rate limiter for login: 10 attempts per 15 minutes per IP
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again later', code: 'RATE_LIMITED' },
+});
 
 export const authRouter = Router();
 
@@ -144,7 +154,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   });
 }));
 
-authRouter.post('/login', asyncHandler(async (req, res) => {
+authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
   const body = loginSchema.parse(req.body);
   const now = new Date();
 
