@@ -30,7 +30,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 17 | DONE | Shop purchase token race — duplicate items | `2026-03-13-034049-expedition-system.md` | `security/fix-17-shop-token-race` |
 | 18 | DONE | Travel refund includes tax inflation | `2026-03-13-025034-zones-hp-rest.md` | `security/fix-18-travel-refund-tax` |
 | 19 | DONE | No login rate limiting | `2026-03-13-023041-auth-system.md` | `security/fix-19-login-rate-limit` |
-| 20 | TODO | Unlimited bets per roulette round | `2026-03-13-031041-casino-chat-socket.md` | |
+| 20 | DONE | Unlimited bets per roulette round | `2026-03-13-031041-casino-chat-socket.md` | `security/fix-20-roulette-bet-limit` |
 | 21 | TODO | Zone chat switch has no validation | `2026-03-13-031041-casino-chat-socket.md` | |
 | 22 | TODO | Chat/mail not sanitized — XSS risk | `2026-03-13-031041-casino-chat-socket.md` | |
 | 23 | TODO | Craft quantity has no upper bound | `2026-03-13-015113-crafting-system.md` | |
