@@ -34,7 +34,7 @@ function groupActions(): ActionGroup[] {
   const ranged: ActionDefinition[] = [];
   const magic: ActionDefinition[] = [];
   const crossType: ActionDefinition[] = [];
-  const general: ActionDefinition[] = [];
+  const survival: ActionDefinition[] = [];
 
   for (const action of allActions) {
     const isBase = ALWAYS_AVAILABLE_ACTION_IDS.has(action.id);
@@ -47,7 +47,7 @@ function groupActions(): ActionGroup[] {
 
     const scaling = action.scalingStat ?? 'weapon';
     if (scaling === 'weapon') {
-      general.push(action);
+      survival.push(action);
     } else if (scaling === 'melee') {
       // Distinguish cross-type (uses mana + stamina, or magic damage type on melee)
       const isCross = (action.cost.mana > 0 && action.cost.stamina > 0)
@@ -76,7 +76,7 @@ function groupActions(): ActionGroup[] {
     { label: 'Ranged Talents', actions: ranged },
     { label: 'Magic Talents', actions: magic },
     { label: 'Cross-Type Talents', actions: crossType },
-    { label: 'General Talents', actions: general },
+    { label: 'Survival Talents', actions: survival },
   ].filter((g) => g.actions.length > 0);
 }
 

@@ -151,8 +151,7 @@ describe('resolveRaidRound', () => {
 
   describe('AoE hits all mobs', () => {
     it('an AoE action damages all surviving mobs', () => {
-      // chain_lightning is a magic AoE-style attack (we treat actions without explicit AoE flag as single-target;
-      // need to verify which actions are AoE — volley, cleave, chain_lightning, meteor_strike)
+      // AoE actions: cleave, scatter_shot, volley, frost_nova, blizzard, whirlwind, meteor_strike
       // For the test, let's use a custom AoE action
       const aoeAction: ActionDefinition = {
         id: 'test_aoe',
@@ -168,7 +167,7 @@ describe('resolveRaidRound', () => {
         // Let me check: "Single-target: find mob with lowest HP"
         // "AoE: target all surviving mobs"
         // The choice between single/AoE depends on the action definition.
-        // In the existing system, cleave/volley/chain_lightning/meteor_strike are AoE.
+        // AoE is determined by action IDs in AOE_ACTION_IDS set.
         // But there's no explicit isAoe flag on ActionDefinition.
         // I'll use the convention that certain actionTypes or specific IDs are AoE.
       };
