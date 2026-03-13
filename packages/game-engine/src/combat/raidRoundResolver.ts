@@ -389,6 +389,39 @@ export function resolveRaidRound(
     });
   }
 
+  // --- Step 5a: Rally group buff ---
+  for (const s of pState) {
+    if (s.hp <= 0) continue;
+    if (s.actionId === 'rally' && s.actionDef?.effect) {
+      const effect = s.actionDef.effect;
+      for (const ally of pState) {
+        if (ally.hp <= 0) continue;
+        const p = input.participants[pState.indexOf(ally)];
+        if (!p) continue;
+        // Rally buff is tracked via participantEffectsAfter (built in Step 9)
+        // We add to the participant's activeEffects so it's visible in Step 9
+        const allyParticipant = input.participants[pState.indexOf(ally)];
+        if (allyParticipant) {
+          allyParticipant.activeEffects = allyParticipant.activeEffects ?? [];
+          allyParticipant.activeEffects.push({
+            name: effect.name,
+            stat: effect.stat,
+            modifier: effect.modifier,
+            roundsRemaining: effect.duration,
+          });
+        }
+      }
+      logHealing.push({
+        playerId: s.playerId,
+        username: getUsername(s.playerId),
+        actionLabel: actionLabel(s.actionId, playerActionDefs),
+        amountHealed: 0,
+        targetPlayerId: s.playerId,
+        targetUsername: getUsername(s.playerId),
+      });
+    }
+  }
+
   // --- Step 5b: Potion actions ---
   const allPotionsConsumed: PotionConsumed[] = [];
   const perParticipantPotions: Map<number, PotionConsumed[]> = new Map();
@@ -666,6 +699,12 @@ export function resolveRaidRound(
 
   for (const mob of mobState) {
     if (mob.hp <= 0) continue;
+
+    // Pinned mobs skip their attack (forced defend)
+    const isPinned = mob.activeEffects.some(
+      e => e.stat === 'pinned' && e.roundsRemaining > 0,
+    );
+    if (isPinned) continue;
 
     const actionIndex = (input.roundNumber - 1) % mob.actionTemplate.length;
     const templateAction = mob.actionTemplate[actionIndex];
