@@ -4,7 +4,10 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@pocketrealm/database';
 import { AppError } from './errorHandler';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error('JWT_SECRET env var must be set and at least 32 characters');
+}
+export const JWT_SECRET = process.env.JWT_SECRET;
 const ACCESS_TOKEN_TTL_MINUTES = Number.parseInt(process.env.ACCESS_TOKEN_TTL_MINUTES || '15', 10);
 const REFRESH_TOKEN_TTL_DAYS = Number.parseInt(process.env.REFRESH_TOKEN_TTL_DAYS || '30', 10);
 const SESSION_INACTIVITY_WINDOW_HOURS = Number.parseInt(process.env.SESSION_INACTIVITY_WINDOW_HOURS || '24', 10);

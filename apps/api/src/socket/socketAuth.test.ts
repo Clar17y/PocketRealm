@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { authenticateSocket } from './socketAuth';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+import { JWT_SECRET } from '../middleware/auth';
 
 function makeSocket(auth: Record<string, unknown> = {}) {
   return {

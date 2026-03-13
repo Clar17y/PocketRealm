@@ -1,8 +1,6 @@
 import jwt from 'jsonwebtoken';
 import type { Socket } from 'socket.io';
-import type { AuthPayload } from '../middleware/auth';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+import { type AuthPayload, JWT_SECRET } from '../middleware/auth';
 
 export interface SocketPlayerData {
   playerId: string;

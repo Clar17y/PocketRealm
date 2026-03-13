@@ -12,5 +12,8 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     exclude: ['dist/**', 'node_modules/**'],
+    env: {
+      JWT_SECRET: 'test-secret-at-least-thirty-two-characters-long',
+    },
   },
 });
