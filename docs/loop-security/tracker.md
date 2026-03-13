@@ -22,7 +22,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 9 | DONE | Gathering uses client-provided zone ID | `2026-03-13-032031-gathering-turns-resources.md` | `security/fix-09-gathering-zone` |
 | 10 | DONE | Refresh token reuse via activity window bypass | `2026-03-13-023041-auth-system.md` | `security/fix-10-refresh-token-reuse` |
 | 11 | DONE | Guild creation: turn spend outside transaction | `2026-03-13-020038-guild-system.md` | `security/fix-11-guild-create-tx` |
-| 12 | TODO | Skill point allocation not atomic — double-spend | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | |
+| 12 | DONE | Skill point allocation not atomic — double-spend | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | `security/fix-12-skillpoint-atomic` |
 | 13 | TODO | Achievement claim race — double rewards | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | |
 | 14 | TODO | XP buff fetched outside transaction — double boost | `2026-03-13-043032-shared-services-xp-durability-events.md` | |
 | 15 | TODO | Attribute points absolute write — silent loss | `2026-03-13-043032-shared-services-xp-durability-events.md` | |
