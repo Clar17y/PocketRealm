@@ -719,7 +719,6 @@ const rally: ActionDefinition = {
     stamina: COMBAT_ACTION_CONSTANTS.RALLY_STAMINA,
     mana: COMBAT_ACTION_CONSTANTS.RALLY_MANA,
   },
-  damageMultiplier: 0,
   effect: {
     name: 'Rally',
     stat: 'defence',
