@@ -1,36 +1,36 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./systemMessageService', () => ({
+vi.mock('./systemMessageService.js', () => ({
   emitSystemMessage: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('./turnBankService', () => ({
+vi.mock('./turnBankService.js', () => ({
   spendPlayerTurnsTx: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('./equipmentService', () => ({
+vi.mock('./equipmentService.js', () => ({
   getEquipmentStats: vi.fn().mockResolvedValue({
     attack: 10, rangedPower: 0, magicPower: 0, armor: 10,
     magicDefence: 5, health: 50, dodge: 5, accuracy: 5,
     critChance: 0.05, critDamage: 1.5, speed: 5,
   }),
 }));
-vi.mock('./attributesService', () => ({
+vi.mock('./attributesService.js', () => ({
   getPlayerProgressionState: vi.fn().mockResolvedValue({
     attributes: { vitality: 5, strength: 5, dexterity: 5, intelligence: 5, luck: 5, evasion: 5 },
   }),
 }));
-vi.mock('./combatStatsService', () => ({
+vi.mock('./combatStatsService.js', () => ({
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
   getSkillLevel: vi.fn().mockResolvedValue(10),
 }));
-vi.mock('./hpService', () => ({
+vi.mock('./hpService.js', () => ({
   getHpState: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
   setHp: vi.fn().mockResolvedValue(undefined),
   enterRecoveringState: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('./bossLootService', () => ({
+vi.mock('./bossLootService.js', () => ({
   distributeBossLoot: vi.fn().mockResolvedValue({}),
 }));
-vi.mock('./combatTemplateService', () => ({
+vi.mock('./combatTemplateService.js', () => ({
   getActiveTemplate: vi.fn().mockResolvedValue([{ actionId: 'normal_attack' }]),
 }));
 vi.mock('../utils/routeHelpers.js', () => ({
@@ -741,7 +741,7 @@ describe('bossEncounterService', () => {
     });
 
     it('silently skips auto-signup when player has insufficient turns', async () => {
-      const { spendPlayerTurnsTx } = await import('./turnBankService');
+      const { spendPlayerTurnsTx } = await import('./turnBankService.js');
       vi.mocked(spendPlayerTurnsTx).mockRejectedValueOnce(new Error('Insufficient turns'));
 
       const signups = [makeParticipantRow({ autoSignUp: true })];

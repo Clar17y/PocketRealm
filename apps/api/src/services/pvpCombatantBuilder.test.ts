@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SkillType } from '@pocketrealm/shared';
 import { mockPrisma } from '../__test__/setup';
 
 // ── Mocks ────────────────────────────────────────────────────────────
@@ -313,7 +314,7 @@ describe('pvpCombatantBuilder', () => {
       mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
         if (skill === 'melee') return 10;
         if (skill === 'ranged') return 20;
-        if (skill === 'evasion') return 15;
+        if (skill === ('evasion' as SkillType)) return 15;
         if (skill === 'magic') return 25;
         return 1;
       });
@@ -335,7 +336,7 @@ describe('pvpCombatantBuilder', () => {
       mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
         if (skill === 'melee') return 10;
         if (skill === 'ranged') return 20;
-        if (skill === 'evasion') return 15;
+        if (skill === ('evasion' as SkillType)) return 15;
         if (skill === 'magic') return 25;
         return 1;
       });
@@ -356,7 +357,7 @@ describe('pvpCombatantBuilder', () => {
       mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
         if (skill === 'melee') return 10;
         if (skill === 'ranged') return 20;
-        if (skill === 'evasion') return 15;
+        if (skill === ('evasion' as SkillType)) return 15;
         if (skill === 'magic') return 25;
         return 1;
       });
@@ -389,7 +390,7 @@ describe('pvpCombatantBuilder', () => {
       mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
         if (skill === 'melee') return 10;
         if (skill === 'ranged') return 20;
-        if (skill === 'evasion') return 15;
+        if (skill === ('evasion' as SkillType)) return 15;
         if (skill === 'magic') return 25;
         return 1;
       });
@@ -556,7 +557,7 @@ describe('pvpCombatantBuilder', () => {
       mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
         if (skill === 'melee') return 12;
         if (skill === 'ranged') return 18;
-        if (skill === 'evasion') return 9;
+        if (skill === ('evasion' as SkillType)) return 9;
         if (skill === 'magic') return 30;
         return 1;
       });
@@ -570,7 +571,7 @@ describe('pvpCombatantBuilder', () => {
       mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
         if (skill === 'melee') return 12;
         if (skill === 'ranged') return 18;
-        if (skill === 'evasion') return 9;
+        if (skill === ('evasion' as SkillType)) return 9;
         if (skill === 'magic') return 30;
         return 1;
       });

@@ -73,7 +73,7 @@ function makeStats(overrides?: Partial<CombatantStats>): CombatantStats {
     defence: 8, magicDefence: 6,
     dodge: 2, evasion: 3,
     damageMin: 5, damageMax: 15,
-    speed: 10, damageType: 'melee',
+    speed: 10, damageType: 'physical',
     ...overrides,
   };
 }

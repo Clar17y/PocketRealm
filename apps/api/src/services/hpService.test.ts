@@ -101,7 +101,7 @@ describe('getHpState', () => {
     vi.mocked(getEquipmentStats).mockResolvedValueOnce({
       attack: 0, rangedPower: 0, magicPower: 0, accuracy: 0,
       armor: 0, magicDefence: 0, health: 20, dodge: 0, luck: 0,
-      critChance: 0, critDamage: 0,
+      critChance: 0, critDamage: 0, inventorySlots: 0,
     });
 
     const result = await getHpState('p1', now);
@@ -160,7 +160,7 @@ describe('getHpState', () => {
     vi.mocked(getEquipmentStats).mockResolvedValueOnce({
       attack: 0, rangedPower: 0, magicPower: 0, accuracy: 0,
       armor: 0, magicDefence: 0, health: 15, dodge: 0, luck: 0,
-      critChance: 0, critDamage: 0,
+      critChance: 0, critDamage: 0, inventorySlots: 0,
     });
 
     const result = await getHpState('p1', now);
@@ -428,7 +428,7 @@ describe('recover', () => {
     vi.mocked(getEquipmentStats).mockResolvedValueOnce({
       attack: 0, rangedPower: 0, magicPower: 0, accuracy: 0,
       armor: 0, magicDefence: 0, health: 50, dodge: 0, luck: 0,
-      critChance: 0, critDamage: 0,
+      critChance: 0, critDamage: 0, inventorySlots: 0,
     });
 
     const result = await recover('p1', now);

@@ -19,9 +19,20 @@ interface TemplateCombatFields {
   interactionResult?: string;
 }
 
-export function mapTemplateCombatLog<T extends TemplateCombatFields>(log: T[]): T[] {
+export interface MappedCombatFields {
+  actionId?: string;
+  actionName?: string;
+  staminaAfter?: number;
+  manaAfter?: number;
+  staminaCost?: number;
+  manaCost?: number;
+  wasExhausted?: boolean;
+  interactionResult?: string;
+}
+
+export function mapTemplateCombatLog<T extends TemplateCombatFields>(log: T[]): (T & MappedCombatFields)[] {
   return log.map(entry => {
-    if (!entry.combatantAAction && !entry.combatantBAction) return entry;
+    if (!entry.combatantAAction && !entry.combatantBAction) return entry as T & MappedCombatFields;
 
     const isA = entry.actor === 'combatantA';
     const actionId = isA ? entry.combatantAAction : entry.combatantBAction;

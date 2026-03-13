@@ -71,7 +71,7 @@ vi.mock('./pvpCombatantBuilder', () => ({
   }),
 }));
 vi.mock('@pocketrealm/game-engine', () => ({
-  calculateFleeResult: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 }),
+  calculateFleeResult: vi.fn().mockReturnValue({ outcome: 'clean_escape', remainingHp: 1, goldLost: 0, recoveryCost: null }),
   runTemplateCombat: vi.fn().mockReturnValue({
     outcome: 'victory',
     log: [],
@@ -97,7 +97,7 @@ vi.mock('../utils/routeHelpers.js', async (importOriginal) => {
   return {
     ...actual,
     trackAchievements: vi.fn().mockResolvedValue(undefined),
-    calculateFleeWithGold: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 }),
+    calculateFleeWithGold: vi.fn().mockReturnValue({ outcome: 'clean_escape', remainingHp: 1, goldLost: 0, recoveryCost: null }),
   };
 });
 
@@ -632,13 +632,13 @@ describe('pvpService', () => {
         potionsConsumed: [],
         totalRounds: 10,
       } as any);
-      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'escape', remainingHp: 1, goldLost: 0 });
+      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'clean_escape', remainingHp: 1, goldLost: 0, recoveryCost: null });
       setupChallengeMocks();
 
       const result = await challenge('p1', 'Attacker', 'p2');
 
       expect(setAllResources).toHaveBeenCalledWith('p1', 0, 20, 10);
-      expect(result.fleeOutcome).toBe('escape');
+      expect(result.fleeOutcome).toBe('clean_escape');
     });
 
     it('creates pvpMatch and upserts cooldown in transaction', async () => {
@@ -744,7 +744,7 @@ describe('pvpService', () => {
         potionsConsumed: [],
         totalRounds: 10,
       } as any);
-      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'knockout', remainingHp: 0, goldLost: 50 });
+      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'knockout', remainingHp: 0, goldLost: 50, recoveryCost: 100 });
       setupChallengeMocks();
 
       const result = await challenge('p1', 'Attacker', 'p2');
@@ -770,13 +770,13 @@ describe('pvpService', () => {
         potionsConsumed: [],
         totalRounds: 10,
       } as any);
-      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'escape', remainingHp: 5, goldLost: 0 });
+      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'clean_escape', remainingHp: 5, goldLost: 0, recoveryCost: null });
       setupChallengeMocks();
 
       const result = await challenge('p1', 'Attacker', 'p2');
 
       expect(result.attackerKnockedOut).toBe(false);
-      expect(result.fleeOutcome).toBe('escape');
+      expect(result.fleeOutcome).toBe('clean_escape');
       expect(setHp).toHaveBeenCalledWith('p1', 5);
       expect(enterRecoveringState).not.toHaveBeenCalled();
     });
@@ -830,7 +830,7 @@ describe('pvpService', () => {
         potionsConsumed: [],
         totalRounds: 8,
       } as any);
-      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'escape', remainingHp: 1, goldLost: 0 });
+      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'clean_escape', remainingHp: 1, goldLost: 0, recoveryCost: null });
       setupChallengeMocks();
 
       const result = await challenge('p1', 'Attacker', 'p2');
