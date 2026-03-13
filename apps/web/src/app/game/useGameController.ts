@@ -876,7 +876,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       // Store pending loot session ID for activation after playback
       combatPendingLootRef.current = data.pendingLootSessionId ?? null;
 
-      await Promise.all([loadAll(), loadBestiary()]);
+      await Promise.all([loadAll(), loadBestiary(false)]);
     });
   };
 
