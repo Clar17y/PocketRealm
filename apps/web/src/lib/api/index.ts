@@ -12,6 +12,8 @@ export {
   getSkills,
   getEquipment,
   getBestiary,
+  getExpeditionBestiary,
+  getWorldBossBestiary,
   getTurns,
   spendTurns,
   getHpState,

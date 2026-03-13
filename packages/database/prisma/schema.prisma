@@ -108,9 +108,10 @@ model Player {
   friendMailsReceived FriendMail[]  @relation("FriendMailRecipient")
 
   // Expeditions
-  expeditionTokens      Int                    @default(0) @map("expedition_tokens")
-  expeditionsLaunched   GuildExpedition[]       @relation("ExpeditionLauncher")
-  expeditionMemberships GuildExpeditionMember[]
+  expeditionTokens          Int                        @default(0) @map("expedition_tokens")
+  expeditionsLaunched       GuildExpedition[]           @relation("ExpeditionLauncher")
+  expeditionMemberships     GuildExpeditionMember[]
+  expeditionBestiaryEntries PlayerExpeditionBestiary[]
 
   @@map("players")
 }
@@ -379,6 +380,19 @@ model PlayerBestiaryPrefix {
 
   @@id([playerId, mobTemplateId, prefix])
   @@map("player_bestiary_prefixes")
+}
+
+model PlayerExpeditionBestiary {
+  playerId           String   @map("player_id")
+  mobTemplateId      String   @map("mob_template_id") @db.VarChar(64)
+  theme              String   @db.VarChar(32)
+  killCount          Int      @default(0) @map("kill_count")
+  firstEncounteredAt DateTime @default(now()) @map("first_encountered_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@id([playerId, mobTemplateId])
+  @@map("player_expedition_bestiary")
 }
 
 // =============================================================================

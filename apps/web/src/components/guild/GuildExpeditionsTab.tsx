@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Shield } from 'lucide-react';
+import Image from 'next/image';
+import { monsterImageSrc, type ExpeditionContext } from '@/lib/assets';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
@@ -84,6 +86,7 @@ interface GuildExpeditionsTabProps {
   setError: (msg: string | null) => void;
   onTurnsChanged?: () => void;
   onRefresh?: () => void;
+  onExpeditionContextChange?: (ctx: ExpeditionContext | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +215,7 @@ export function GuildExpeditionsTab({
   setError,
   onTurnsChanged,
   onRefresh,
+  onExpeditionContextChange,
 }: GuildExpeditionsTabProps) {
   const [subTab, setSubTab] = useState<'active' | 'history'>('active');
   const [loading, setLoading] = useState(true);
@@ -222,6 +226,18 @@ export function GuildExpeditionsTab({
   const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
+
+  // Propagate expedition background context to parent for screen backgrounds
+  const expThemeId = expedition?.status === 'in_progress' ? expedition.themeId : null;
+  const expIsBossRoom = expedition?.currentRoomType === 'final_boss';
+  useEffect(() => {
+    if (!onExpeditionContextChange) return;
+    if (expThemeId) {
+      onExpeditionContextChange({ theme: expThemeId, isBossRoom: expIsBossRoom });
+    } else {
+      onExpeditionContextChange(null);
+    }
+  }, [expThemeId, expIsBossRoom, onExpeditionContextChange]);
 
   const loadTemplates = useCallback(async () => {
     try {
@@ -947,7 +963,14 @@ function InProgressView({
                   }`}
                 >
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-[var(--rpg-text-primary)] font-bold">
+                    <span className="text-xs text-[var(--rpg-text-primary)] font-bold flex items-center gap-1.5">
+                      <Image
+                        src={monsterImageSrc(mob.name)}
+                        alt={mob.name}
+                        width={24}
+                        height={24}
+                        className="image-rendering-pixelated"
+                      />
                       {mobDisplayName(mob)}
                     </span>
                     <div className="flex gap-1 items-center">
