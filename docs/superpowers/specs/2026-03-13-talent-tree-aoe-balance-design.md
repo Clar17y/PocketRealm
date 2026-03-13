@@ -6,7 +6,7 @@ Melee dominates guild expeditions at level 15+ because Cleave (tier 2) is the on
 
 Secondary issues discovered during design:
 - Magic has 5 nodes at tier 2 (others have 4) with two near-identical low-damage debuffs
-- Ranged has 15 total nodes vs 16 for melee/magic
+- Node counts are inconsistent: melee 17, ranged 17, magic 18, general 14
 - The Crippled debuff (-20 speed) is a no-op — speed only determines 1v1 initiative (rolled once before any debuffs apply) and is unused in raid combat
 - The general tree mixes essential combat survivability with weak crafting/gathering passives that nobody would take over combat talents
 
@@ -64,7 +64,7 @@ Normal attack baseline: 1.0x damage, 20 stamina.
 
 ## Complete Talent Trees
 
-### Melee Tree (20 nodes)
+### Melee Tree (18 nodes)
 
 **Tier 1** (skill level: none, cost: 5 pts)
 | Node | Type | Effect |
@@ -104,7 +104,7 @@ Normal attack baseline: 1.0x damage, 20 stamina.
 | Titan's Wrath | Action | 2.5x melee, 50 stam, channeling |
 | Champion's Resolve | Passive | +25% stamina regen + pool |
 
-### Ranged Tree (20 nodes)
+### Ranged Tree (18 nodes)
 
 **Tier 1** (skill level: none, cost: 5 pts)
 | Node | Type | Effect |
@@ -144,7 +144,7 @@ Normal attack baseline: 1.0x damage, 20 stamina.
 | Death Mark | Action | 2.5x ranged + Death Mark debuff (-40 def, DoT 5/rd, 4 rds), 45 stam |
 | Windwalker | Passive | +25% dodge + evasion |
 
-### Magic Tree (20 nodes)
+### Magic Tree (18 nodes)
 
 **Tier 1** (skill level: none, cost: 5 pts)
 | Node | Type | Effect |
@@ -184,7 +184,7 @@ Normal attack baseline: 1.0x damage, 20 stamina.
 | Meteor Strike | AoE Action | 1.3x magic, 50 mana, channeling, hits all |
 | Archmage | Passive | +25% mana regen + pool |
 
-### Survival Tree (15 nodes, formerly "General")
+### Survival Tree (14 nodes, formerly "General")
 
 **Tier 1** (skill level: none, cost: 5 pts)
 | Node | Type | Effect |
@@ -223,11 +223,11 @@ Normal attack baseline: 1.0x damage, 20 stamina.
 ## Changes from Current Implementation
 
 ### Node Movements
-| Node | From | To | Reason |
-|------|------|----|--------|
-| Rending Slash | Melee T3 | Melee T1 | Early DoT option for all combat trees |
-| Barbed Arrow | Ranged T2 | Ranged T1 | Early DoT option for all combat trees |
-| Enfeeble | Magic T2 | Magic T1 | Early utility debuff, reduces magic T2 from 5→4 nodes |
+| Node | From | To | Slot Replaced By | Reason |
+|------|------|----|-----------------|--------|
+| Rending Slash | Melee T3 | Melee T1 | Whirlwind (new) fills T3 slot | Early DoT option |
+| Barbed Arrow | Ranged T2 | Ranged T1 | Scatter Shot (new) fills T2 slot | Early DoT option |
+| Enfeeble | Magic T2 | Magic T1 | N/A (T2 drops from 5→4 nodes) | Early utility debuff |
 
 ### Reworked Abilities
 | Ability | Before | After |
@@ -237,7 +237,9 @@ Normal attack baseline: 1.0x damage, 20 stamina.
 | Chain Lightning | 1.5x, 30 mana, AoE | Renamed Blizzard, 1.0x, 40 mana, AoE + Frozen 3 rds |
 | Meteor Strike | 2.5x, 50 mana, AoE, channeling | 1.3x, 50 mana, AoE, channeling |
 | Crippling Shot | 0.8x + Crippled (-20 speed, useless) | 0.8x + Pinned (forced defend, no bosses/mini-bosses) |
-| Curse | 0.5x + -20 magic def, 15 mana | 0.8x + -20 magic def, 20 mana |
+| Curse | 0.5x + -20 magic def 4 rds, 20 mana | 0.8x + -20 magic def 3 rds, 20 mana (damage buffed, duration reduced) |
+| Rending Slash | 1.1x, 30 stam, T3 | 1.1x, 25 stam, T1 (cost reduced for T1 accessibility) |
+| Enfeeble | 0.5x, 20 mana, -20 attack 4 rds, T2 | 0.5x, 15 mana, -20 attack 3 rds, T1 (cost and duration reduced for T1) |
 | Volley | 0.7x, 30 stam, AoE | 0.9x + Suppressed (-15 acc, 3 rds), 40 stam, AoE |
 
 ### New Abilities
@@ -281,6 +283,22 @@ The forced-defend mechanic already exists for mobs applying it to players. Imple
 
 ### Suppressed Debuff
 New debuff type. Follows existing debuff pattern (stat modifier on `accuracy` for duration). No special handling needed beyond adding the debuff definition and wiring it into Scatter Shot and Volley action definitions.
+
+### New Action Definitions
+| Action ID | actionType | scalingStat | damageType | Cost |
+|-----------|-----------|-------------|------------|------|
+| `whirlwind` | `skill_attack` | `melee` | physical | 40 stam |
+| `scatter_shot` | `skill_attack` | `ranged` | physical | 30 stam |
+| `blizzard` | `damage_spell` | `magic` | magic | 40 mana |
+
+### Berserker Rage Discrepancy (pre-existing bug)
+The talent node description says "+30% attack but -15% defence" but the action definition only applies +30% attack with no defence penalty. This spec does not change Berserker Rage's behavior — the bug should be addressed separately (either add the defence penalty to match the description, or fix the description to match the code).
+
+### TalentTree Type Rename
+The `TalentTree` type currently uses `'general'`. This should be renamed to `'survival'` in the type definition and all references. Since no player data references the tree type string directly (skill point allocations reference individual node IDs, not tree names), this is a code-only change with no data migration needed.
+
+### Sniper's Mark Description Discrepancy (pre-existing bug)
+The talent node description says "Mark a target to take +20% damage" but the action definition applies -20 evasion. The action definition is authoritative — the talent description should be fixed to match.
 
 ## Future Work: Tradeskill Turn-Sink System
 
