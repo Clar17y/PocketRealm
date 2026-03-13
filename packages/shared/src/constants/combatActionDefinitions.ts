@@ -659,6 +659,81 @@ const fortify: ActionDefinition = {
   effect: { name: 'Fortified', stat: 'defence', modifier: 30, duration: 3, isDebuff: false },
 };
 
+// --- New AoE / Support Talent Actions ---
+
+const whirlwind: ActionDefinition = {
+  id: 'whirlwind',
+  name: 'Whirlwind',
+  description: 'A spinning strike hitting all enemies in raids.',
+  actionType: 'skill_attack',
+  category: 'offensive',
+  scalingStat: 'melee',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.WHIRLWIND_STAMINA, mana: 0 },
+  damageMultiplier: 1.0,
+  accuracyModifier: 0,
+};
+
+const scatterShot: ActionDefinition = {
+  id: 'scatter_shot',
+  name: 'Scatter Shot',
+  description: 'A spread of arrows hitting all enemies and reducing their accuracy in raids.',
+  actionType: 'skill_attack',
+  category: 'offensive',
+  scalingStat: 'ranged',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.SCATTER_SHOT_STAMINA, mana: 0 },
+  damageMultiplier: 0.7,
+  accuracyModifier: 0,
+  effect: {
+    name: 'Suppressed',
+    stat: 'accuracy',
+    modifier: -15,
+    duration: 2,
+    isDebuff: true,
+  },
+};
+
+const blizzard: ActionDefinition = {
+  id: 'blizzard',
+  name: 'Blizzard',
+  description: 'A storm of ice hitting all enemies and freezing them in raids.',
+  actionType: 'damage_spell',
+  category: 'offensive',
+  scalingStat: 'magic',
+  cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.BLIZZARD_MANA },
+  damageMultiplier: 1.0,
+  damageType: 'magic',
+  accuracyModifier: 0,
+  effect: {
+    name: 'Frozen',
+    stat: 'evasion',
+    modifier: -15,
+    duration: 3,
+    isDebuff: true,
+    alwaysApplies: true,
+  },
+};
+
+const rally: ActionDefinition = {
+  id: 'rally',
+  name: 'Rally',
+  description: 'Rally allies, granting +15 defence to the whole group for 3 rounds.',
+  actionType: 'buff',
+  category: 'supportive',
+  scalingStat: 'weapon',
+  cost: {
+    stamina: COMBAT_ACTION_CONSTANTS.RALLY_STAMINA,
+    mana: COMBAT_ACTION_CONSTANTS.RALLY_MANA,
+  },
+  damageMultiplier: 0,
+  effect: {
+    name: 'Rally',
+    stat: 'defence',
+    modifier: 15,
+    duration: 3,
+    isDebuff: false,
+  },
+};
+
 // --- Registry ---
 
 /** The 9 base actions available to all players without talent unlocks */
@@ -720,7 +795,12 @@ export const BASE_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   life_drain: lifeDrain,
   curse,
   enfeeble,
-  // General talents
+  // New AoE / support talents
+  whirlwind,
+  scatter_shot: scatterShot,
+  blizzard,
+  rally,
+  // Survival talents
   taunt,
   fortify,
 };
