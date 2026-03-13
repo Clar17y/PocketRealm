@@ -7,6 +7,8 @@ import {
 import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { emitAchievementNotifications } from './achievementService';
+import { checkExpeditionLockout } from './expeditionLockoutService';
+import { getHpState } from './hpService';
 import { getWeekStart, getLevelBracket } from '../utils/dateHelpers';
 import { randomIntInclusive } from '../utils/random';
 
@@ -259,6 +261,13 @@ async function applyTeleport(tx: any, playerId: string, targetZoneId?: string) {
     throw new AppError(400, 'Target zone required', 'MISSING_TARGET_ZONE');
   }
 
+  // Enforce same travel restrictions as normal zone travel
+  const hpState = await getHpState(playerId);
+  if (hpState.isRecovering || hpState.currentHp <= 0) {
+    throw new AppError(400, 'Cannot teleport while recovering', 'IS_RECOVERING');
+  }
+  await checkExpeditionLockout(playerId);
+
   const zone = await tx.zone.findUnique({ where: { id: targetZoneId } });
   if (!zone) throw new AppError(404, 'Zone not found', 'ZONE_NOT_FOUND');
 
@@ -267,18 +276,31 @@ async function applyTeleport(tx: any, playerId: string, targetZoneId?: string) {
   });
   if (!discovery) throw new AppError(400, 'Zone not discovered', 'ZONE_NOT_DISCOVERED');
 
+  // Track origin zone for breadcrumb return, not the destination
+  const player = await tx.player.findUnique({
+    where: { id: playerId },
+    select: { currentZoneId: true },
+  });
+
   await tx.player.update({
     where: { id: playerId },
-    data: { currentZoneId: targetZoneId, lastTravelledFromZoneId: targetZoneId },
+    data: { currentZoneId: targetZoneId, lastTravelledFromZoneId: player?.currentZoneId ?? targetZoneId },
   });
 
   return { type: 'teleport', zoneId: targetZoneId, zoneName: zone.name };
 }
 
 async function applyHearthstone(tx: any, playerId: string) {
+  // Enforce same travel restrictions as normal zone travel
+  const hpState = await getHpState(playerId);
+  if (hpState.isRecovering || hpState.currentHp <= 0) {
+    throw new AppError(400, 'Cannot use hearthstone while recovering', 'IS_RECOVERING');
+  }
+  await checkExpeditionLockout(playerId);
+
   const player = await tx.player.findUnique({
     where: { id: playerId },
-    select: { homeTownId: true },
+    select: { homeTownId: true, currentZoneId: true },
   });
   if (!player?.homeTownId) {
     throw new AppError(400, 'No home town set', 'NO_HOME_TOWN');
@@ -286,7 +308,7 @@ async function applyHearthstone(tx: any, playerId: string) {
 
   await tx.player.update({
     where: { id: playerId },
-    data: { currentZoneId: player.homeTownId, lastTravelledFromZoneId: player.homeTownId },
+    data: { currentZoneId: player.homeTownId, lastTravelledFromZoneId: player.currentZoneId ?? player.homeTownId },
   });
 
   return { type: 'hearthstone', zoneId: player.homeTownId };

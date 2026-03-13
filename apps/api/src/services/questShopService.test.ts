@@ -15,6 +15,14 @@ vi.mock('../utils/random', () => ({
   randomIntInclusive: vi.fn().mockReturnValue(0),
 }));
 
+vi.mock('./hpService', () => ({
+  getHpState: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
+}));
+
+vi.mock('./expeditionLockoutService', () => ({
+  checkExpeditionLockout: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { emitAchievementNotifications } from './achievementService';
 import { randomIntInclusive } from '../utils/random';
 
