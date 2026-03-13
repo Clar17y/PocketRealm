@@ -1,5 +1,6 @@
 import type {
   ActionDefinition,
+  BossActiveEffect,
   CombatTemplateSlotData,
   ExhaustedActionReason,
 } from '@pocketrealm/shared';
@@ -162,7 +163,70 @@ export function resolveSupportiveActions(
 }
 
 // ---------------------------------------------------------------------------
-// 3. Apply resource costs (stamina/mana deduction + regen + template advance)
+// 3. Sum stat modifiers from active effects
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the effective value of a stat after applying active effect modifiers.
+ * Result is floored at 0.
+ */
+export function getEffectiveStatValue(
+  baseStat: number,
+  effects: BossActiveEffect[],
+  statName: string,
+): number {
+  const modifier = effects
+    .filter(e => e.stat === statName && e.roundsRemaining > 0)
+    .reduce((sum, e) => sum + e.modifier, 0);
+  return Math.max(0, baseStat + modifier);
+}
+
+// ---------------------------------------------------------------------------
+// 4. Resolve player buff actions (self-buff + group rally)
+// ---------------------------------------------------------------------------
+
+export interface BuffResult {
+  participantIndex: number;
+  effect: BossActiveEffect;
+}
+
+/**
+ * Collect buff effects from players using buff-type actions.
+ * Returns a flat list of (participantIndex, effect) pairs — does NOT
+ * mutate input. Callers merge these into their effect assembly phase.
+ */
+export function resolvePlayerBuffActions(
+  pState: CombatParticipantState[],
+): BuffResult[] {
+  const results: BuffResult[] = [];
+  for (let i = 0; i < pState.length; i++) {
+    const s = pState[i];
+    if (s.hp <= 0) continue;
+    const def = s.actionDef;
+    if (!def || def.actionType !== 'buff' || !def.effect) continue;
+
+    const effect: BossActiveEffect = {
+      name: def.effect.name,
+      stat: def.effect.stat,
+      modifier: def.effect.modifier,
+      roundsRemaining: def.effect.duration,
+    };
+    const isGroupBuff = s.actionId === 'rally';
+
+    if (isGroupBuff) {
+      for (let j = 0; j < pState.length; j++) {
+        if (pState[j].hp <= 0) continue;
+        results.push({ participantIndex: j, effect: { ...effect } });
+      }
+    } else {
+      results.push({ participantIndex: i, effect });
+    }
+  }
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// 5. Apply resource costs (stamina/mana deduction + regen + template advance)
 // ---------------------------------------------------------------------------
 
 /**

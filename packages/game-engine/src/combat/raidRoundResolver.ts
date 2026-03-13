@@ -27,6 +27,8 @@ import {
   resolveParticipantActions,
   resolveSupportiveActions,
   applyResourceCosts,
+  getEffectiveStatValue,
+  resolvePlayerBuffActions,
 } from './combatHelpers';
 import {
   addDamageThreat,
@@ -72,14 +74,6 @@ function checkPhaseTransition(mob: ExpeditionMobState): void {
 
 function actionLabel(actionId: string, defs: Record<string, ActionDefinition>): string {
   return defs[actionId]?.name ?? actionId.replace(/_/g, ' ');
-}
-
-// Sum stat modifiers from active effects for a given stat name
-function getEffectiveStatValue(baseStat: number, effects: BossActiveEffect[], statName: string): number {
-  const modifier = effects
-    .filter(e => e.stat === statName && e.roundsRemaining > 0)
-    .reduce((sum, e) => sum + e.modifier, 0);
-  return Math.max(0, baseStat + modifier);
 }
 
 // --- Shared offensive attack resolution ---
@@ -390,39 +384,16 @@ export function resolveRaidRound(
   }
 
   // --- Step 5a: Player buff actions (self-buff + group rally) ---
-  for (let i = 0; i < pState.length; i++) {
-    const s = pState[i];
+  // Collect into side-map (not mutating input) — merged in effect assembly
+  const buffActionResults: Map<number, BossActiveEffect[]> = new Map();
+  for (const { participantIndex, effect } of resolvePlayerBuffActions(pState)) {
+    if (!buffActionResults.has(participantIndex)) buffActionResults.set(participantIndex, []);
+    buffActionResults.get(participantIndex)!.push(effect);
+  }
+  for (const s of pState) {
     if (s.hp <= 0) continue;
     const def = s.actionDef;
     if (!def || def.actionType !== 'buff' || !def.effect) continue;
-
-    const effect = def.effect;
-    const isGroupBuff = s.actionId === 'rally';
-
-    if (isGroupBuff) {
-      // Rally: apply to all alive participants
-      for (let j = 0; j < pState.length; j++) {
-        if (pState[j].hp <= 0) continue;
-        const allyParticipant = input.participants[j];
-        if (!allyParticipant) continue;
-        allyParticipant.activeEffects = allyParticipant.activeEffects ?? [];
-        allyParticipant.activeEffects.push({
-          name: effect.name, stat: effect.stat,
-          modifier: effect.modifier, roundsRemaining: effect.duration,
-        });
-      }
-    } else {
-      // Self-buff: apply to caster only
-      const participant = input.participants[i];
-      if (participant) {
-        participant.activeEffects = participant.activeEffects ?? [];
-        participant.activeEffects.push({
-          name: effect.name, stat: effect.stat,
-          modifier: effect.modifier, roundsRemaining: effect.duration,
-        });
-      }
-    }
-
     logHealing.push({
       playerId: s.playerId,
       username: getUsername(s.playerId),
@@ -887,6 +858,7 @@ export function resolveRaidRound(
         const combinedTargetEffects = [
           ...(targetParticipant.activeEffects ?? []),
           ...(targetIdx >= 0 ? (newPlayerEffects.get(targetIdx) ?? []) : []),
+          ...(targetIdx >= 0 ? (buffActionResults.get(targetIdx) ?? []) : []),
         ];
 
         // Execution strike + marked_for_death combo: 3x damage (before defence)
@@ -1053,6 +1025,11 @@ export function resolveRaidRound(
     if (mobAppliedEffects) {
       effects.push(...mobAppliedEffects);
     }
+    // Merge buff action effects (rally, fortify, etc.)
+    const buffEffects = buffActionResults.get(idx);
+    if (buffEffects) {
+      effects.push(...buffEffects);
+    }
     // Apply cleanse: remove stat debuffs and magic DoTs
     const cleanse = cleanseResults.get(idx);
     if (cleanse) {
@@ -1154,7 +1131,6 @@ export function resolveRaidRound(
     const nextIndex = input.roundNumber % mob.actionTemplate.length;
     const nextAction = mob.actionTemplate[nextIndex];
     if (nextAction?.isTelegraphed) {
-      const nextDef = mobActionDefs[nextAction.actionId];
       telegraphs.push({
         mobId: mob.id,
         mobName: mobDisplayName(mob),
