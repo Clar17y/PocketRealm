@@ -4,7 +4,7 @@ import {
   type GuildRecruitmentMode, type GuildRole, type GuildSpecialization,
 } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
-import { spendPlayerTurns } from './turnBankService';
+import { spendPlayerTurnsTx } from './turnBankService';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';
 
 // ---------------------------------------------------------------------------
@@ -141,18 +141,18 @@ export async function createGuild(
     throw new AppError(400, `Character level ${GUILD_CONSTANTS.CREATION_MIN_LEVEL} required to create a guild`, 'LEVEL_TOO_LOW');
   }
 
-  const existing = await prisma.guildMember.findUnique({ where: { playerId } });
-  if (existing) throw new AppError(400, 'Already in a guild', 'ALREADY_IN_GUILD');
-
-  const nameTaken = await prisma.guild.findFirst({
-    where: { OR: [{ name: { equals: name, mode: 'insensitive' } }, { tag: { equals: tag, mode: 'insensitive' } }] },
-  });
-  if (nameTaken) throw new AppError(400, 'Guild name or tag already taken', 'NAME_TAKEN');
-
-  // Spend turns
-  await spendPlayerTurns(playerId, GUILD_CONSTANTS.CREATION_TURN_COST);
-
+  // All race-sensitive checks and turn spend inside a single transaction
   const guild = await prisma.$transaction(async (tx: any) => {
+    const existing = await tx.guildMember.findUnique({ where: { playerId } });
+    if (existing) throw new AppError(400, 'Already in a guild', 'ALREADY_IN_GUILD');
+
+    const nameTaken = await tx.guild.findFirst({
+      where: { OR: [{ name: { equals: name, mode: 'insensitive' } }, { tag: { equals: tag, mode: 'insensitive' } }] },
+    });
+    if (nameTaken) throw new AppError(400, 'Guild name or tag already taken', 'NAME_TAKEN');
+
+    await spendPlayerTurnsTx(tx, playerId, GUILD_CONSTANTS.CREATION_TURN_COST);
+
     const created = await tx.guild.create({
       data: {
         name,
