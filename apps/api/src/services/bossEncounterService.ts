@@ -180,7 +180,7 @@ export async function createBossEncounter(
 export async function signUpForBossRound(
   encounterId: string,
   playerId: string,
-  playerMaxHp: number,
+  playerCurrentHp: number,
   autoSignUp = false,
 ): Promise<BossParticipantData> {
   const turnCost = WORLD_EVENT_CONSTANTS.BOSS_SIGNUP_TURN_COST;
@@ -226,7 +226,7 @@ export async function signUpForBossRound(
           playerId,
           roundNumber: nextRound,
           turnsCommitted: turnCost,
-          currentHp: playerMaxHp,
+          currentHp: playerCurrentHp,
           currentStamina: maxStamina,
           currentMana: maxMana,
           status: 'alive',

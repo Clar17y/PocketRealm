@@ -174,7 +174,7 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
     const participant = await signUpForBossRound(
       id,
       playerId,
-      hpState.maxHp,
+      hpState.currentHp,
       body.autoSignUp ?? false,
     );
 
