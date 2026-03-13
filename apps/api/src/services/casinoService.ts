@@ -318,6 +318,12 @@ export async function placeBet(
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    // Enforce per-player per-round bet limit
+    const existingBets = await tx.rouletteBet.count({ where: { roundId, playerId } });
+    if (existingBets >= CASINO_CONSTANTS.MAX_BETS_PER_ROUND) {
+      throw new AppError(400, 'Maximum bets per round reached', 'BET_LIMIT');
+    }
+
     const player = await tx.player.findUnique({
       where: { id: playerId },
       select: { gold: true, username: true },
