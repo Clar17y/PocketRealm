@@ -90,6 +90,11 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '100kb' }));
 
+// Trust the first proxy hop (e.g. nginx/Caddy) so Express resolves req.ip
+// to the real client IP rather than the reverse proxy's address.  Without
+// this the rate limiter would bucket every user under the same proxy IP.
+app.set('trust proxy', 1);
+
 // Global rate limiter: 120 requests per minute per IP
 app.use('/api/v1/', rateLimit({
   windowMs: 60_000,
