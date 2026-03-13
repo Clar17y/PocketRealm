@@ -214,11 +214,15 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
 
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id },
-    select: { id: true, guildId: true, status: true },
+    select: { id: true, guildId: true, status: true, nextRoundAt: true },
   });
   if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
   if (expedition.status !== 'in_progress') {
     throw new AppError(400, 'Expedition is not active', 'NOT_ACTIVE');
+  }
+  // Enforce round timing to prevent rapid-fire resolution
+  if (expedition.nextRoundAt && expedition.nextRoundAt > new Date()) {
+    throw new AppError(400, 'Round is not ready yet', 'ROUND_NOT_READY');
   }
 
   const membership = await prisma.guildMember.findUnique({
@@ -257,9 +261,13 @@ expeditionRouter.post('/:id/auto-resolve', asyncHandler(async (req, res) => {
   // Verify guild membership + officer/leader role
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id },
-    select: { guildId: true },
+    select: { guildId: true, nextRoundAt: true },
   });
   if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
+  // Enforce round timing to prevent instant room clears
+  if (expedition.nextRoundAt && expedition.nextRoundAt > new Date()) {
+    throw new AppError(400, 'Round is not ready yet', 'ROUND_NOT_READY');
+  }
 
   const membership = await prisma.guildMember.findUnique({
     where: { playerId },
