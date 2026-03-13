@@ -299,7 +299,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
   let travelPendingLootSessionId: string | null = null;
 
   if (!isTownDeparture) {
-    const ambushes = simulateTravelAmbushes(travelCost);
+    const ambushes = simulateTravelAmbushes(guildReducedCost);
 
     if (ambushes.length > 0) {
       const allPotionsConsumed: PotionConsumed[] = [];
