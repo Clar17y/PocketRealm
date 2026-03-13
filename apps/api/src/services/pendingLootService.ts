@@ -62,8 +62,10 @@ export async function claimPendingLoot(
   selectedIndices: number[]
 ): Promise<void> {
   const key = lootKey(playerId, sessionId);
-  const data = await redis.get(key);
-  if (!data) throw new AppError(404, 'Pending loot expired or not found', 'LOOT_EXPIRED');
+
+  // Atomically read-and-delete to prevent double-claim race condition
+  const data = await redis.getdel(key);
+  if (!data) throw new AppError(404, 'Pending loot expired or already claimed', 'LOOT_EXPIRED');
 
   const items: PendingLootItem[] = JSON.parse(data);
   const { usedSlots, capacity } = await getInventoryState(playerId);
@@ -92,6 +94,4 @@ export async function claimPendingLoot(
       slotsUsed++;
     }
   });
-
-  await redis.del(key);
 }

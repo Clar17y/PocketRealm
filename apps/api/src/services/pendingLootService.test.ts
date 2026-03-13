@@ -5,6 +5,7 @@ vi.mock('../redis', () => ({
     set: vi.fn(),
     get: vi.fn(),
     del: vi.fn(),
+    getdel: vi.fn(),
   },
 }));
 
@@ -87,13 +88,13 @@ describe('getPendingLoot', () => {
 });
 
 describe('claimPendingLoot', () => {
-  it('creates items in inventory and deletes Redis key', async () => {
-    mockRedis.get.mockResolvedValue(JSON.stringify(sampleLoot));
-    mockRedis.del.mockResolvedValue(1);
+  it('creates items in inventory using atomic getdel', async () => {
+    mockRedis.getdel.mockResolvedValue(JSON.stringify(sampleLoot));
     mockPrisma.item.create.mockResolvedValue({});
 
     await claimPendingLoot('p1', 'session-1', [0, 1]);
 
+    expect(mockRedis.getdel).toHaveBeenCalledWith('pending_loot:p1:session-1');
     expect(mockPrisma.item.create).toHaveBeenCalledTimes(2);
     expect(mockPrisma.item.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -102,21 +103,19 @@ describe('claimPendingLoot', () => {
         rarity: 'common',
       }),
     });
-    expect(mockRedis.del).toHaveBeenCalledWith('pending_loot:p1:session-1');
   });
 
-  it('throws when loot session expired', async () => {
-    mockRedis.get.mockResolvedValue(null);
+  it('throws when loot session expired or already claimed', async () => {
+    mockRedis.getdel.mockResolvedValue(null);
 
     await expect(claimPendingLoot('p1', 'expired', [0])).rejects.toThrow(
-      'Pending loot expired or not found'
+      'Pending loot expired or already claimed'
     );
   });
 
   it('respects capacity limit', async () => {
     mockGetInventoryState.mockResolvedValue({ usedSlots: 23, capacity: 24, availableSlots: 1 });
-    mockRedis.get.mockResolvedValue(JSON.stringify(sampleLoot));
-    mockRedis.del.mockResolvedValue(1);
+    mockRedis.getdel.mockResolvedValue(JSON.stringify(sampleLoot));
     mockPrisma.item.create.mockResolvedValue({});
 
     await claimPendingLoot('p1', 'session-1', [0, 1]);
@@ -126,8 +125,7 @@ describe('claimPendingLoot', () => {
   });
 
   it('skips invalid indices', async () => {
-    mockRedis.get.mockResolvedValue(JSON.stringify(sampleLoot));
-    mockRedis.del.mockResolvedValue(1);
+    mockRedis.getdel.mockResolvedValue(JSON.stringify(sampleLoot));
     mockPrisma.item.create.mockResolvedValue({});
 
     await claimPendingLoot('p1', 'session-1', [-1, 99, 0]);
@@ -138,13 +136,13 @@ describe('claimPendingLoot', () => {
     });
   });
 
-  it('deletes Redis key even when no items selected', async () => {
-    mockRedis.get.mockResolvedValue(JSON.stringify(sampleLoot));
-    mockRedis.del.mockResolvedValue(1);
+  it('atomically removes Redis key preventing double-claim', async () => {
+    mockRedis.getdel.mockResolvedValue(JSON.stringify(sampleLoot));
 
     await claimPendingLoot('p1', 'session-1', []);
 
     expect(mockPrisma.item.create).not.toHaveBeenCalled();
-    expect(mockRedis.del).toHaveBeenCalledWith('pending_loot:p1:session-1');
+    // getdel atomically reads and deletes — no separate del call needed
+    expect(mockRedis.getdel).toHaveBeenCalledWith('pending_loot:p1:session-1');
   });
 });
