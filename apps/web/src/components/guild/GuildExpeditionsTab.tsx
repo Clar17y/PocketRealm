@@ -225,17 +225,16 @@ export function GuildExpeditionsTab({
   const isOfficer = myRole === 'leader' || myRole === 'officer';
 
   // Propagate expedition background context to parent for screen backgrounds
+  const expThemeId = expedition?.status === 'in_progress' ? expedition.themeId : null;
+  const expIsBossRoom = expedition?.currentRoomType === 'final_boss';
   useEffect(() => {
     if (!onExpeditionContextChange) return;
-    if (expedition && expedition.status === 'in_progress' && expedition.themeId) {
-      onExpeditionContextChange({
-        theme: expedition.themeId,
-        isBossRoom: expedition.currentRoomType === 'final_boss',
-      });
+    if (expThemeId) {
+      onExpeditionContextChange({ theme: expThemeId, isBossRoom: expIsBossRoom });
     } else {
       onExpeditionContextChange(null);
     }
-  }, [expedition, onExpeditionContextChange]);
+  }, [expThemeId, expIsBossRoom, onExpeditionContextChange]);
 
   const loadExpedition = useCallback(async (showSpinner = false) => {
     if (showSpinner) {

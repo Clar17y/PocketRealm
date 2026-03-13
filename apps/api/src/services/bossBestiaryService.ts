@@ -1,9 +1,7 @@
 import { prisma } from '@pocketrealm/database';
-import { BOSS_TEMPLATES } from '@pocketrealm/shared';
+import { BOSS_TEMPLATES, BESTIARY_UNLOCK_CONSTANTS } from '@pocketrealm/shared';
 
-const HP_THRESHOLD = 1;
-const STATS_THRESHOLD = 3;
-const ROTATION_THRESHOLD = 5;
+const { DISCOVERED_THRESHOLD: HP_THRESHOLD, STATS_THRESHOLD, ROTATION_THRESHOLD } = BESTIARY_UNLOCK_CONSTANTS;
 
 interface BossBestiaryEntry {
   bossTemplateId: string;

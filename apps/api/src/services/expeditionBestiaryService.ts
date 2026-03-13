@@ -1,5 +1,5 @@
 import { prisma } from '@pocketrealm/database';
-import { EXPEDITION_THEMES } from '@pocketrealm/shared';
+import { EXPEDITION_THEMES, BESTIARY_UNLOCK_CONSTANTS } from '@pocketrealm/shared';
 import type { ExpeditionTheme, ExpeditionThemeMob } from '@pocketrealm/shared';
 
 type MobRole = 'trash' | 'elite' | 'caster' | 'add' | 'mini_boss' | 'final_boss';
@@ -24,8 +24,7 @@ export interface ExpeditionBestiaryResponse {
   themes: ExpeditionBestiaryTheme[];
 }
 
-const STATS_THRESHOLD = 3;
-const ROTATION_THRESHOLD = 5;
+const { STATS_THRESHOLD, ROTATION_THRESHOLD } = BESTIARY_UNLOCK_CONSTANTS;
 
 function getRotation(
   mob: ExpeditionThemeMob,

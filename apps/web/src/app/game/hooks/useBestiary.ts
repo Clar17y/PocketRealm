@@ -71,23 +71,24 @@ export function useBestiary(isAuthenticated: boolean, activeScreen: Screen) {
   const [expeditionThemes, setExpeditionThemes] = useState<ExpeditionBestiaryTheme[]>([]);
   const [worldBosses, setWorldBosses] = useState<WorldBossEntry[]>([]);
 
-  const loadBestiary = useCallback(async () => {
+  const loadBestiary = useCallback(async (includeExtras: boolean) => {
     setBestiaryError(null);
     setBestiaryLoading(true);
     try {
-      const [bestiaryRes, expRes, bossRes] = await Promise.all([
+      const fetches: [ReturnType<typeof getBestiary>, ReturnType<typeof getExpeditionBestiary> | null, ReturnType<typeof getWorldBossBestiary> | null] = [
         getBestiary(),
-        getExpeditionBestiary(),
-        getWorldBossBestiary(),
-      ]);
+        includeExtras ? getExpeditionBestiary() : null,
+        includeExtras ? getWorldBossBestiary() : null,
+      ];
+      const [bestiaryRes, expRes, bossRes] = await Promise.all(fetches);
       if (bestiaryRes.data) {
         setBestiaryMobs(bestiaryRes.data.mobs);
         setBestiaryPrefixSummary(bestiaryRes.data.prefixSummary);
       } else {
         setBestiaryError(bestiaryRes.error?.message ?? 'Failed to load bestiary');
       }
-      if (expRes.data) setExpeditionThemes(expRes.data.themes);
-      if (bossRes.data) setWorldBosses(bossRes.data.bosses);
+      if (expRes?.data) setExpeditionThemes(expRes.data.themes);
+      if (bossRes?.data) setWorldBosses(bossRes.data.bosses);
     } finally {
       setBestiaryLoading(false);
     }
@@ -95,7 +96,7 @@ export function useBestiary(isAuthenticated: boolean, activeScreen: Screen) {
 
   useEffect(() => {
     if (isAuthenticated && (activeScreen === 'bestiary' || activeScreen === 'combat')) {
-      void loadBestiary();
+      void loadBestiary(activeScreen === 'bestiary');
     }
   }, [isAuthenticated, activeScreen, loadBestiary]);
 

@@ -112,4 +112,18 @@ describe('screenBackgroundSrc', () => {
     expect(screenBackgroundSrc('gathering')).toBeUndefined();
     expect(screenBackgroundSrc('rest')).toBeUndefined();
   });
+
+  it('returns expedition theme background when context provided', () => {
+    expect(screenBackgroundSrc('guild', undefined, { theme: 'spider_nest', isBossRoom: false }))
+      .toBe('/assets/screens/screen_expedition_spider_nest.webp');
+  });
+
+  it('returns expedition boss background for boss room', () => {
+    expect(screenBackgroundSrc('guild', undefined, { theme: 'wolf_pack', isBossRoom: true }))
+      .toBe('/assets/screens/screen_expedition_wolf_pack_boss.webp');
+  });
+
+  it('returns default guild background when no expedition context', () => {
+    expect(screenBackgroundSrc('guild')).toBe('/assets/screens/screen_guild.webp');
+  });
 });
