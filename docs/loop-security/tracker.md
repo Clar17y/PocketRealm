@@ -33,7 +33,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 20 | DONE | Unlimited bets per roulette round | `2026-03-13-031041-casino-chat-socket.md` | `security/fix-20-roulette-bet-limit` |
 | 21 | DONE | Zone chat switch has no validation | `2026-03-13-031041-casino-chat-socket.md` | `security/fix-21-zone-chat-validation` |
 | 22 | DONE | Chat/mail not sanitized — XSS risk | `2026-03-13-031041-casino-chat-socket.md` | `security/fix-22-chat-sanitize` |
-| 23 | TODO | Craft quantity has no upper bound | `2026-03-13-015113-crafting-system.md` | |
+| 23 | DONE | Craft quantity has no upper bound | `2026-03-13-015113-crafting-system.md` | `security/fix-23-craft-quantity-cap` |
 | 24 | TODO | Boss signup gives full HP regardless | `2026-03-13-022037-boss-encounters.md` | |
 | 25 | TODO | Efficiency reset doubles XP capacity | `2026-03-13-035034-quests-shop.md` | |
 | 26 | TODO | Guild log readable by any player | `2026-03-13-020038-guild-system.md` | |
