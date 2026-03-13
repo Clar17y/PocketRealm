@@ -166,12 +166,12 @@ const powerStrike: ActionDefinition = {
 const cleave: ActionDefinition = {
   id: 'cleave',
   name: 'Cleave',
-  description: 'A wide swing dealing 1.1x damage. Hits additional enemies in raids.',
+  description: 'A wide swing dealing 0.8x damage. Hits all enemies in raids.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.CLEAVE_STAMINA, mana: 0 },
-  damageMultiplier: 1.1,
+  damageMultiplier: 0.8,
   accuracyModifier: 0,
 };
 
@@ -252,14 +252,14 @@ const aimedShot: ActionDefinition = {
 const cripplingShot: ActionDefinition = {
   id: 'crippling_shot',
   name: 'Crippling Shot',
-  description: 'A debilitating shot that reduces target speed for 3 rounds.',
+  description: 'A precise shot that pins the target, forcing them to defend next turn.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.CRIPPLING_SHOT_STAMINA, mana: 0 },
   damageMultiplier: 0.8,
   accuracyModifier: 0,
-  effect: { name: 'Crippled', stat: 'speed', modifier: -20, duration: 3, isDebuff: true },
+  effect: { name: 'Pinned', stat: 'pinned', modifier: 0, duration: 1, isDebuff: true },
 };
 
 const eagleEye: ActionDefinition = {
@@ -276,19 +276,26 @@ const eagleEye: ActionDefinition = {
 const volley: ActionDefinition = {
   id: 'volley',
   name: 'Volley',
-  description: 'A rain of arrows hitting all enemies in raids.',
+  description: 'A rain of arrows dealing 0.9x damage and suppressing all enemies in raids.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.VOLLEY_STAMINA, mana: 0 },
-  damageMultiplier: 0.7,
+  damageMultiplier: 0.9,
   accuracyModifier: 0,
+  effect: {
+    name: 'Suppressed',
+    stat: 'accuracy',
+    modifier: -15,
+    duration: 3,
+    isDebuff: true,
+  },
 };
 
 const snipersMark: ActionDefinition = {
   id: 'snipers_mark',
   name: "Sniper's Mark",
-  description: 'Mark a target, reducing evasion for 3 rounds and setting up follow-up shots.',
+  description: 'Reduce target evasion by 20 for 3 rounds. Always hits.',
   actionType: 'debuff_spell',
   category: 'supportive',
   scalingStat: 'ranged',
@@ -352,14 +359,14 @@ const minorHeal: ActionDefinition = {
 const frostNova: ActionDefinition = {
   id: 'frost_nova',
   name: 'Frost Nova',
-  description: 'Blast of frost dealing magic damage and reducing target evasion for 3 rounds.',
+  description: 'A blast of frost dealing 0.7x damage and freezing all enemies for 2 rounds in raids.',
   actionType: 'damage_spell',
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.FROST_NOVA_MANA },
-  damageMultiplier: 0.9,
+  damageMultiplier: 0.7,
   damageType: 'magic',
-  effect: { name: 'Frozen', stat: 'evasion', modifier: -15, duration: 3, isDebuff: true, alwaysApplies: true },
+  effect: { name: 'Frozen', stat: 'evasion', modifier: -15, duration: 2, isDebuff: true, alwaysApplies: true },
 };
 
 const enhancedFortitude: ActionDefinition = {
@@ -371,18 +378,6 @@ const enhancedFortitude: ActionDefinition = {
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.ENHANCED_FORTITUDE_MANA },
   effect: { name: 'Fortitude', stat: 'defence', modifier: 20, duration: 4, isDebuff: false },
-};
-
-const chainLightning: ActionDefinition = {
-  id: 'chain_lightning',
-  name: 'Chain Lightning',
-  description: 'Lightning arcs between enemies in raids.',
-  actionType: 'damage_spell',
-  category: 'offensive',
-  scalingStat: 'magic',
-  cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.CHAIN_LIGHTNING_MANA },
-  damageMultiplier: 1.5,
-  damageType: 'magic',
 };
 
 const healAlly: ActionDefinition = {
@@ -424,12 +419,12 @@ const regeneration: ActionDefinition = {
 const meteorStrike: ActionDefinition = {
   id: 'meteor_strike',
   name: 'Meteor Strike',
-  description: 'Call down a meteor dealing 2.5x magic AoE damage.',
+  description: 'Call down a meteor dealing 1.3x magic AoE damage.',
   actionType: 'damage_spell',
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.METEOR_STRIKE_MANA },
-  damageMultiplier: 2.5,
+  damageMultiplier: 1.3,
   damageType: 'magic',
   isChanneling: true,
 };
@@ -600,18 +595,18 @@ const lifeDrain: ActionDefinition = {
 const curse: ActionDefinition = {
   id: 'curse',
   name: 'Curse',
-  description: "Weaken the target's magical resistance.",
+  description: 'Curse the target, dealing 0.8x damage and reducing magic defence by 20 for 3 rounds.',
   actionType: 'debuff_spell',
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.CURSE_MANA },
-  damageMultiplier: 0.5,
+  damageMultiplier: 0.8,
   damageType: 'magic',
   effect: {
     name: 'Curse',
     stat: 'magicDefence',
     modifier: -20,
-    duration: 4,
+    duration: 3,
     isDebuff: true,
   },
 };
@@ -630,7 +625,7 @@ const enfeeble: ActionDefinition = {
     name: 'Enfeeble',
     stat: 'attack',
     modifier: -20,
-    duration: 4,
+    duration: 3,
     isDebuff: true,
   },
 };
@@ -779,7 +774,6 @@ export const BASE_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   minor_heal: minorHeal,
   frost_nova: frostNova,
   enhanced_fortitude: enhancedFortitude,
-  chain_lightning: chainLightning,
   heal_ally: healAlly,
   arcane_blast: arcaneBlast,
   regeneration,
