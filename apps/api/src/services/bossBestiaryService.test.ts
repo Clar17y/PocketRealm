@@ -72,6 +72,21 @@ describe('getWorldBossBestiary', () => {
     expect(boss!.rotation).toBeNull();
   });
 
+  it('deduplicates multi-round participations for the same encounter', async () => {
+    // 3 rounds in the same encounter should count as 1 defeat
+    mockPrisma.bossParticipant.findMany.mockResolvedValue(
+      Array.from({ length: 3 }, (_, i) => ({
+        encounterId: 'enc1', playerId: 'player1', roundNumber: i + 1,
+        encounter: { mobTemplateId: 'gorrath', status: 'defeated', baseHp: 400 },
+      })),
+    );
+
+    const result = await getWorldBossBestiary('player1');
+    const boss = result.bosses.find(b => b.bossTemplateId === 'gorrath');
+
+    expect(boss!.defeatCount).toBe(1);
+  });
+
   it('reveals rotation for bosses with known templates', async () => {
     const stoneColossus = {
       id: 'stone-colossus', name: 'Stone Colossus',

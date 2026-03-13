@@ -31,18 +31,20 @@ export async function getWorldBossBestiary(playerId: string): Promise<WorldBossB
     },
   });
 
-  const defeatsByBoss = new Map<string, number>();
+  const defeatedEncountersByBoss = new Map<string, Set<string>>();
   const baseHpByBoss = new Map<string, number>();
   for (const p of participations) {
     if (p.encounter.status === 'defeated') {
       const id = p.encounter.mobTemplateId;
-      defeatsByBoss.set(id, (defeatsByBoss.get(id) ?? 0) + 1);
+      const set = defeatedEncountersByBoss.get(id) ?? new Set();
+      set.add(p.encounterId);
+      defeatedEncountersByBoss.set(id, set);
       if (!baseHpByBoss.has(id)) baseHpByBoss.set(id, p.encounter.baseHp);
     }
   }
 
   const bosses: BossBestiaryEntry[] = bossMobTemplates.map(mob => {
-    const defeats = defeatsByBoss.get(mob.id) ?? 0;
+    const defeats = defeatedEncountersByBoss.get(mob.id)?.size ?? 0;
 
     // hpPerParticipant from encounter data or mob template
     const hpPerParticipant = baseHpByBoss.get(mob.id) ?? mob.bossBaseHp ?? mob.hp;

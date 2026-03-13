@@ -1030,10 +1030,13 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
   }
 
   // Record expedition bestiary kills (compare initial room mobs to final state)
+  // Only credit players who survived the room — dead players miss later kills
   if (expedition.themeId) {
     const initialMobs = currentRoomDef.mobs.filter(m => m.hp > 0);
-    const participantIds = aliveMembers.map(m => m.playerId);
-    await recordExpeditionKills(expedition.themeId, participantIds, initialMobs, mobs);
+    const survivorIds = aliveMembers
+      .filter(m => !isDeadByPlayer.get(m.playerId))
+      .map(m => m.playerId);
+    await recordExpeditionKills(expedition.themeId, survivorIds, initialMobs, mobs);
   }
 
   // Determine outcome
