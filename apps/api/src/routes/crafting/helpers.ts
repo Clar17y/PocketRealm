@@ -235,7 +235,7 @@ export async function getValidatedSacrificialItem(params: {
 
 export const craftSchema = z.object({
   recipeId: z.string().uuid(),
-  quantity: z.number().int().positive().default(1),
+  quantity: z.number().int().positive().max(CRAFTING_CONSTANTS.MAX_CRAFT_QUANTITY).default(1),
 });
 
 export const salvageSchema = z.object({
