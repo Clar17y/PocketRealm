@@ -5,6 +5,7 @@ import {
   getAllMobPrefixes,
 } from '@pocketrealm/shared';
 import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
+import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { emitAchievementNotifications } from './achievementService';
 import { assertNotOverEncumbered } from './inventoryService';
@@ -248,6 +249,15 @@ async function applyTalentReset(tx: any, playerId: string) {
 }
 
 async function applyEfficiencyReset(tx: any, playerId: string) {
+  // Only allow reset if the XP window has naturally expired to prevent mid-window XP doubling
+  const skill = await tx.playerSkill.findFirst({
+    where: { playerId },
+    select: { lastXpResetAt: true },
+  });
+  if (skill?.lastXpResetAt && !shouldResetWindowCap(skill.lastXpResetAt)) {
+    throw new AppError(400, 'XP efficiency window is still active', 'WINDOW_NOT_EXPIRED');
+  }
+
   await tx.playerSkill.updateMany({
     where: { playerId },
     data: { dailyXpGained: 0 },
