@@ -24,7 +24,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 11 | DONE | Guild creation: turn spend outside transaction | `2026-03-13-020038-guild-system.md` | `security/fix-11-guild-create-tx` |
 | 12 | DONE | Skill point allocation not atomic — double-spend | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | `security/fix-12-skillpoint-atomic` |
 | 13 | DONE | Achievement claim race — double rewards | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | `security/fix-13-achievement-claim-race` |
-| 14 | TODO | XP buff fetched outside transaction — double boost | `2026-03-13-043032-shared-services-xp-durability-events.md` | |
+| 14 | DONE | XP buff fetched outside transaction — double boost | `2026-03-13-043032-shared-services-xp-durability-events.md` | `security/fix-14-xp-buff-race` |
 | 15 | TODO | Attribute points absolute write — silent loss | `2026-03-13-043032-shared-services-xp-durability-events.md` | |
 | 16 | TODO | Expedition force-round bypasses timing | `2026-03-13-034049-expedition-system.md` | |
 | 17 | TODO | Shop purchase token race — duplicate items | `2026-03-13-034049-expedition-system.md` | |
