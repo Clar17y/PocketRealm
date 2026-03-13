@@ -11,7 +11,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 3 | DONE | No zone presence validation (exploration + combat) | `2026-03-13-024036-exploration-combat-start.md` | `security/fix-03-zone-presence` |
 | 4 | DONE | POST /turns/spend publicly exposed | `2026-03-13-032031-gathering-turns-resources.md` | `security/fix-04-turns-spend` |
 | 5 | DONE | No global rate limiting | `2026-03-13-042037-cross-cutting-infrastructure.md` | `security/fix-05-rate-limiting` |
-| 6 | TODO | Admin role not re-verified from DB | `2026-03-13-023041-auth-system.md` | |
+| 6 | DONE | Admin role not re-verified from DB | `2026-03-13-023041-auth-system.md` | `security/fix-06-admin-db-check` |
 
 ## Medium Priority
 
