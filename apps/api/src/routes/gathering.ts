@@ -203,7 +203,6 @@ gatheringRouter.get('/nodes', asyncHandler(async (req, res) => {
 const mineSchema = z.object({
   playerNodeId: z.string().uuid(),
   turns: z.number().int().positive(),
-  currentZoneId: z.string().uuid(),
 });
 
 function toResourceTemplateKey(name: string): string {
@@ -271,8 +270,12 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     throw new AppError(400, 'Node is depleted', 'NODE_DEPLETED');
   }
 
-  // Validate player is in the correct zone
-  if (template.zoneId !== body.currentZoneId) {
+  // Validate player is actually in the node's zone (server-side check, not client-provided)
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { currentZoneId: true },
+  });
+  if (template.zoneId !== player?.currentZoneId) {
     throw new AppError(400, 'You must travel to this zone to gather this resource', 'WRONG_ZONE');
   }
 
