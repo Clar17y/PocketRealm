@@ -28,7 +28,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 15 | DONE | Attribute points absolute write — silent loss | `2026-03-13-043032-shared-services-xp-durability-events.md` | `security/fix-15-attr-points-increment` |
 | 16 | DONE | Expedition force-round bypasses timing | `2026-03-13-034049-expedition-system.md` | `security/fix-16-expedition-force-timing` |
 | 17 | DONE | Shop purchase token race — duplicate items | `2026-03-13-034049-expedition-system.md` | `security/fix-17-shop-token-race` |
-| 18 | TODO | Travel refund includes tax inflation | `2026-03-13-025034-zones-hp-rest.md` | |
+| 18 | DONE | Travel refund includes tax inflation | `2026-03-13-025034-zones-hp-rest.md` | `security/fix-18-travel-refund-tax` |
 | 19 | TODO | No login rate limiting | `2026-03-13-023041-auth-system.md` | |
 | 20 | TODO | Unlimited bets per roulette round | `2026-03-13-031041-casino-chat-socket.md` | |
 | 21 | TODO | Zone chat switch has no validation | `2026-03-13-031041-casino-chat-socket.md` | |
