@@ -179,7 +179,7 @@ export interface CombatResourceState {
 }
 
 // --- Skill Points ---
-export type TalentTree = 'melee' | 'ranged' | 'magic' | 'general';
+export type TalentTree = 'melee' | 'ranged' | 'magic' | 'survival';
 
 export interface TalentNodeDefinition {
   id: string;

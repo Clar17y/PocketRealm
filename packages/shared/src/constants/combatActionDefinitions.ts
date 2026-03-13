@@ -154,7 +154,7 @@ const useElixirOfPower: ActionDefinition = {
 const powerStrike: ActionDefinition = {
   id: 'power_strike',
   name: 'Power Strike',
-  description: 'A focused physical strike dealing 1.3x weapon damage.',
+  description: 'A focused strike with extra force behind it.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
@@ -166,19 +166,19 @@ const powerStrike: ActionDefinition = {
 const cleave: ActionDefinition = {
   id: 'cleave',
   name: 'Cleave',
-  description: 'A wide swing dealing 1.1x damage. Hits additional enemies in raids.',
+  description: 'A wide swing that hits all enemies in raids.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.CLEAVE_STAMINA, mana: 0 },
-  damageMultiplier: 1.1,
+  damageMultiplier: 0.8,
   accuracyModifier: 0,
 };
 
 const battleCry: ActionDefinition = {
   id: 'battle_cry',
   name: 'Battle Cry',
-  description: 'War cry that boosts attack power for 4 rounds.',
+  description: 'A war cry that boosts attack power.',
   actionType: 'buff',
   category: 'supportive',
   scalingStat: 'melee',
@@ -189,7 +189,7 @@ const battleCry: ActionDefinition = {
 const devastatingBlow: ActionDefinition = {
   id: 'devastating_blow',
   name: 'Devastating Blow',
-  description: 'A devastating strike dealing 2.0x weapon damage. Heavy stamina cost.',
+  description: 'A devastating overhead strike. Leaves you open.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
@@ -202,7 +202,7 @@ const devastatingBlow: ActionDefinition = {
 const berserkerRage: ActionDefinition = {
   id: 'berserker_rage',
   name: 'Berserker Rage',
-  description: 'Enter a frenzy: +30% attack for 5 rounds.',
+  description: 'Enter a frenzy, greatly boosting attack power.',
   actionType: 'buff',
   category: 'supportive',
   scalingStat: 'melee',
@@ -213,7 +213,7 @@ const berserkerRage: ActionDefinition = {
 const execute: ActionDefinition = {
   id: 'execute',
   name: 'Execute',
-  description: 'Finishing strike that deals bonus damage when target is below 30% HP.',
+  description: 'A finishing strike that deals bonus damage to wounded targets.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
@@ -225,7 +225,7 @@ const execute: ActionDefinition = {
 const titansWrath: ActionDefinition = {
   id: 'titans_wrath',
   name: "Titan's Wrath",
-  description: 'Ultimate melee strike dealing 2.5x weapon damage.',
+  description: 'Ultimate melee strike of devastating power. Leaves you open.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
@@ -240,7 +240,7 @@ const titansWrath: ActionDefinition = {
 const aimedShot: ActionDefinition = {
   id: 'aimed_shot',
   name: 'Aimed Shot',
-  description: 'A carefully aimed shot dealing 1.3x ranged damage.',
+  description: 'A carefully aimed shot with increased damage.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
@@ -252,20 +252,20 @@ const aimedShot: ActionDefinition = {
 const cripplingShot: ActionDefinition = {
   id: 'crippling_shot',
   name: 'Crippling Shot',
-  description: 'A debilitating shot that reduces target speed for 3 rounds.',
+  description: 'A precise shot that pins the target, forcing them to defend next turn.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.CRIPPLING_SHOT_STAMINA, mana: 0 },
   damageMultiplier: 0.8,
   accuracyModifier: 0,
-  effect: { name: 'Crippled', stat: 'speed', modifier: -20, duration: 3, isDebuff: true },
+  effect: { name: 'Pinned', stat: 'pinned', modifier: 0, duration: 1, isDebuff: true },
 };
 
 const eagleEye: ActionDefinition = {
   id: 'eagle_eye',
   name: 'Eagle Eye',
-  description: 'Intense focus grants massive accuracy boost for 3 rounds.',
+  description: 'Intense focus grants a massive accuracy boost.',
   actionType: 'buff',
   category: 'supportive',
   scalingStat: 'ranged',
@@ -276,19 +276,26 @@ const eagleEye: ActionDefinition = {
 const volley: ActionDefinition = {
   id: 'volley',
   name: 'Volley',
-  description: 'A rain of arrows hitting all enemies in raids.',
+  description: 'A rain of arrows that suppresses all enemies in raids.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.VOLLEY_STAMINA, mana: 0 },
-  damageMultiplier: 0.7,
+  damageMultiplier: 0.9,
   accuracyModifier: 0,
+  effect: {
+    name: 'Suppressed',
+    stat: 'accuracy',
+    modifier: -15,
+    duration: 3,
+    isDebuff: true,
+  },
 };
 
 const snipersMark: ActionDefinition = {
   id: 'snipers_mark',
   name: "Sniper's Mark",
-  description: 'Mark a target, reducing evasion for 3 rounds and setting up follow-up shots.',
+  description: 'Mark a target, reducing their evasion. Always hits.',
   actionType: 'debuff_spell',
   category: 'supportive',
   scalingStat: 'ranged',
@@ -300,7 +307,7 @@ const snipersMark: ActionDefinition = {
 const piercingShot: ActionDefinition = {
   id: 'piercing_shot',
   name: 'Piercing Shot',
-  description: 'An armor-piercing shot that ignores 50% of target defence.',
+  description: 'An armour-piercing shot that punches through defences.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
@@ -313,7 +320,7 @@ const piercingShot: ActionDefinition = {
 const deathMark: ActionDefinition = {
   id: 'death_mark',
   name: 'Death Mark',
-  description: 'Ultimate ranged shot dealing 2.5x damage and applying vulnerable debuff.',
+  description: 'Ultimate ranged shot that marks the target for death.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
@@ -352,37 +359,25 @@ const minorHeal: ActionDefinition = {
 const frostNova: ActionDefinition = {
   id: 'frost_nova',
   name: 'Frost Nova',
-  description: 'Blast of frost dealing magic damage and reducing target evasion for 3 rounds.',
+  description: 'A blast of frost that freezes all enemies in raids.',
   actionType: 'damage_spell',
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.FROST_NOVA_MANA },
-  damageMultiplier: 0.9,
+  damageMultiplier: 0.7,
   damageType: 'magic',
-  effect: { name: 'Frozen', stat: 'evasion', modifier: -15, duration: 3, isDebuff: true, alwaysApplies: true },
+  effect: { name: 'Frozen', stat: 'evasion', modifier: -15, duration: 2, isDebuff: true, alwaysApplies: true },
 };
 
 const enhancedFortitude: ActionDefinition = {
   id: 'enhanced_fortitude',
   name: 'Enhanced Fortitude',
-  description: 'Magical barrier boosting defence for 4 rounds.',
+  description: 'A magical barrier that boosts defence.',
   actionType: 'buff',
   category: 'defensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.ENHANCED_FORTITUDE_MANA },
   effect: { name: 'Fortitude', stat: 'defence', modifier: 20, duration: 4, isDebuff: false },
-};
-
-const chainLightning: ActionDefinition = {
-  id: 'chain_lightning',
-  name: 'Chain Lightning',
-  description: 'Lightning arcs between enemies in raids.',
-  actionType: 'damage_spell',
-  category: 'offensive',
-  scalingStat: 'magic',
-  cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.CHAIN_LIGHTNING_MANA },
-  damageMultiplier: 1.5,
-  damageType: 'magic',
 };
 
 const healAlly: ActionDefinition = {
@@ -400,7 +395,7 @@ const healAlly: ActionDefinition = {
 const arcaneBlast: ActionDefinition = {
   id: 'arcane_blast',
   name: 'Arcane Blast',
-  description: 'Concentrated arcane energy dealing 2.0x magic damage.',
+  description: 'Concentrated arcane energy dealing heavy magic damage.',
   actionType: 'damage_spell',
   category: 'offensive',
   scalingStat: 'magic',
@@ -413,7 +408,7 @@ const arcaneBlast: ActionDefinition = {
 const regeneration: ActionDefinition = {
   id: 'regeneration',
   name: 'Regeneration',
-  description: 'Healing over time restoring 5% max HP per round for 4 rounds.',
+  description: 'Healing magic that restores HP over time.',
   actionType: 'heal_self',
   category: 'supportive',
   scalingStat: 'magic',
@@ -424,12 +419,12 @@ const regeneration: ActionDefinition = {
 const meteorStrike: ActionDefinition = {
   id: 'meteor_strike',
   name: 'Meteor Strike',
-  description: 'Call down a meteor dealing 2.5x magic AoE damage.',
+  description: 'Call down a meteor dealing massive AoE magic damage. Leaves you open.',
   actionType: 'damage_spell',
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.METEOR_STRIKE_MANA },
-  damageMultiplier: 2.5,
+  damageMultiplier: 1.3,
   damageType: 'magic',
   isChanneling: true,
 };
@@ -600,18 +595,18 @@ const lifeDrain: ActionDefinition = {
 const curse: ActionDefinition = {
   id: 'curse',
   name: 'Curse',
-  description: "Weaken the target's magical resistance.",
+  description: 'Curse the target, weakening their magical defences.',
   actionType: 'debuff_spell',
   category: 'offensive',
   scalingStat: 'magic',
   cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.CURSE_MANA },
-  damageMultiplier: 0.5,
+  damageMultiplier: 0.8,
   damageType: 'magic',
   effect: {
     name: 'Curse',
     stat: 'magicDefence',
     modifier: -20,
-    duration: 4,
+    duration: 3,
     isDebuff: true,
   },
 };
@@ -630,17 +625,17 @@ const enfeeble: ActionDefinition = {
     name: 'Enfeeble',
     stat: 'attack',
     modifier: -20,
-    duration: 4,
+    duration: 3,
     isDebuff: true,
   },
 };
 
-// --- General Talent Actions ---
+// --- Survival Talent Actions ---
 
 const taunt: ActionDefinition = {
   id: 'taunt',
   name: 'Taunt',
-  description: 'Force a boss to target you for 2 rounds. Raid only.',
+  description: 'Force a boss to target you. Raid only.',
   actionType: 'taunt',
   category: 'defensive',
   scalingStat: 'weapon',
@@ -651,12 +646,86 @@ const taunt: ActionDefinition = {
 const fortify: ActionDefinition = {
   id: 'fortify',
   name: 'Fortify',
-  description: 'Magical fortification boosting defence and magic defence for 3 rounds.',
+  description: 'Magical fortification that boosts defence and magic defence.',
   actionType: 'buff',
   category: 'defensive',
   scalingStat: 'weapon',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.FORTIFY_STAMINA, mana: COMBAT_ACTION_CONSTANTS.FORTIFY_MANA },
   effect: { name: 'Fortified', stat: 'defence', modifier: 30, duration: 3, isDebuff: false },
+};
+
+// --- New AoE / Support Talent Actions ---
+
+const whirlwind: ActionDefinition = {
+  id: 'whirlwind',
+  name: 'Whirlwind',
+  description: 'A spinning strike hitting all enemies in raids.',
+  actionType: 'skill_attack',
+  category: 'offensive',
+  scalingStat: 'melee',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.WHIRLWIND_STAMINA, mana: 0 },
+  damageMultiplier: 1.0,
+  accuracyModifier: 0,
+};
+
+const scatterShot: ActionDefinition = {
+  id: 'scatter_shot',
+  name: 'Scatter Shot',
+  description: 'A spread of arrows hitting all enemies and reducing their accuracy in raids.',
+  actionType: 'skill_attack',
+  category: 'offensive',
+  scalingStat: 'ranged',
+  cost: { stamina: COMBAT_ACTION_CONSTANTS.SCATTER_SHOT_STAMINA, mana: 0 },
+  damageMultiplier: 0.7,
+  accuracyModifier: 0,
+  effect: {
+    name: 'Suppressed',
+    stat: 'accuracy',
+    modifier: -15,
+    duration: 2,
+    isDebuff: true,
+  },
+};
+
+const blizzard: ActionDefinition = {
+  id: 'blizzard',
+  name: 'Blizzard',
+  description: 'A storm of ice hitting all enemies and freezing them in raids.',
+  actionType: 'damage_spell',
+  category: 'offensive',
+  scalingStat: 'magic',
+  cost: { stamina: 0, mana: COMBAT_ACTION_CONSTANTS.BLIZZARD_MANA },
+  damageMultiplier: 1.0,
+  damageType: 'magic',
+  accuracyModifier: 0,
+  effect: {
+    name: 'Frozen',
+    stat: 'evasion',
+    modifier: -15,
+    duration: 3,
+    isDebuff: true,
+    alwaysApplies: true,
+  },
+};
+
+const rally: ActionDefinition = {
+  id: 'rally',
+  name: 'Rally',
+  description: 'Rally allies, boosting the whole group\'s defence.',
+  actionType: 'buff',
+  category: 'supportive',
+  scalingStat: 'weapon',
+  cost: {
+    stamina: COMBAT_ACTION_CONSTANTS.RALLY_STAMINA,
+    mana: COMBAT_ACTION_CONSTANTS.RALLY_MANA,
+  },
+  effect: {
+    name: 'Rally',
+    stat: 'defence',
+    modifier: 15,
+    duration: 3,
+    isDebuff: false,
+  },
 };
 
 // --- Registry ---
@@ -704,7 +773,6 @@ export const BASE_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   minor_heal: minorHeal,
   frost_nova: frostNova,
   enhanced_fortitude: enhancedFortitude,
-  chain_lightning: chainLightning,
   heal_ally: healAlly,
   arcane_blast: arcaneBlast,
   regeneration,
@@ -720,7 +788,12 @@ export const BASE_ACTION_DEFINITIONS: Record<string, ActionDefinition> = {
   life_drain: lifeDrain,
   curse,
   enfeeble,
-  // General talents
+  // New AoE / support talents
+  whirlwind,
+  scatter_shot: scatterShot,
+  blizzard,
+  rally,
+  // Survival talents
   taunt,
   fortify,
 };

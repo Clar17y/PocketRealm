@@ -27,6 +27,8 @@ import {
   resolveParticipantActions,
   resolveSupportiveActions,
   applyResourceCosts,
+  getEffectiveStatValue,
+  resolvePlayerBuffActions,
 } from './combatHelpers';
 import {
   addDamageThreat,
@@ -55,7 +57,7 @@ export interface RaidRoundRng {
 
 // AoE player actions — these target all surviving mobs instead of one
 const AOE_ACTION_IDS = new Set([
-  'cleave', 'volley', 'chain_lightning', 'meteor_strike',
+  'cleave', 'scatter_shot', 'volley', 'frost_nova', 'blizzard', 'whirlwind', 'meteor_strike',
 ]);
 
 // --- Phase Transition ---
@@ -72,14 +74,6 @@ function checkPhaseTransition(mob: ExpeditionMobState): void {
 
 function actionLabel(actionId: string, defs: Record<string, ActionDefinition>): string {
   return defs[actionId]?.name ?? actionId.replace(/_/g, ' ');
-}
-
-// Sum stat modifiers from active effects for a given stat name
-function getEffectiveStatValue(baseStat: number, effects: BossActiveEffect[], statName: string): number {
-  const modifier = effects
-    .filter(e => e.stat === statName && e.roundsRemaining > 0)
-    .reduce((sum, e) => sum + e.modifier, 0);
-  return Math.max(0, baseStat + modifier);
 }
 
 // --- Shared offensive attack resolution ---
@@ -389,6 +383,27 @@ export function resolveRaidRound(
     });
   }
 
+  // --- Step 5a: Player buff actions (self-buff + group rally) ---
+  // Collect into side-map (not mutating input) — merged in effect assembly
+  const buffActionResults: Map<number, BossActiveEffect[]> = new Map();
+  for (const { participantIndex, effect } of resolvePlayerBuffActions(pState)) {
+    if (!buffActionResults.has(participantIndex)) buffActionResults.set(participantIndex, []);
+    buffActionResults.get(participantIndex)!.push(effect);
+  }
+  for (const s of pState) {
+    if (s.hp <= 0) continue;
+    const def = s.actionDef;
+    if (!def || def.actionType !== 'buff' || !def.effect) continue;
+    logHealing.push({
+      playerId: s.playerId,
+      username: getUsername(s.playerId),
+      actionLabel: actionLabel(s.actionId, playerActionDefs),
+      amountHealed: 0,
+      targetPlayerId: s.playerId,
+      targetUsername: getUsername(s.playerId),
+    });
+  }
+
   // --- Step 5b: Potion actions ---
   const allPotionsConsumed: PotionConsumed[] = [];
   const perParticipantPotions: Map<number, PotionConsumed[]> = new Map();
@@ -667,6 +682,31 @@ export function resolveRaidRound(
   for (const mob of mobState) {
     if (mob.hp <= 0) continue;
 
+    // Pinned mobs skip their attack (forced defend)
+    const isPinned = mob.activeEffects.some(
+      e => e.stat === 'pinned' && e.roundsRemaining > 0,
+    );
+    if (isPinned) {
+      logMobActions.push({
+        mobId: mob.id,
+        mobName: mobDisplayName(mob),
+        actionId: 'pinned',
+        actionLabel: 'Pinned',
+        targetMode: 'single_target',
+        wasTelegraphed: false,
+        targets: [],
+      });
+      mobActionResults.push({
+        mobId: mob.id,
+        actionId: 'pinned',
+        targetMode: 'single_target',
+        targetPlayerIds: [],
+        damageDealt: 0,
+        healingDone: 0,
+      });
+      continue;
+    }
+
     const actionIndex = (input.roundNumber - 1) % mob.actionTemplate.length;
     const templateAction = mob.actionTemplate[actionIndex];
     const mActionDef = mobActionDefs[templateAction.actionId];
@@ -818,6 +858,7 @@ export function resolveRaidRound(
         const combinedTargetEffects = [
           ...(targetParticipant.activeEffects ?? []),
           ...(targetIdx >= 0 ? (newPlayerEffects.get(targetIdx) ?? []) : []),
+          ...(targetIdx >= 0 ? (buffActionResults.get(targetIdx) ?? []) : []),
         ];
 
         // Execution strike + marked_for_death combo: 3x damage (before defence)
@@ -984,6 +1025,11 @@ export function resolveRaidRound(
     if (mobAppliedEffects) {
       effects.push(...mobAppliedEffects);
     }
+    // Merge buff action effects (rally, fortify, etc.)
+    const buffEffects = buffActionResults.get(idx);
+    if (buffEffects) {
+      effects.push(...buffEffects);
+    }
     // Apply cleanse: remove stat debuffs and magic DoTs
     const cleanse = cleanseResults.get(idx);
     if (cleanse) {
@@ -1085,7 +1131,6 @@ export function resolveRaidRound(
     const nextIndex = input.roundNumber % mob.actionTemplate.length;
     const nextAction = mob.actionTemplate[nextIndex];
     if (nextAction?.isTelegraphed) {
-      const nextDef = mobActionDefs[nextAction.actionId];
       telegraphs.push({
         mobId: mob.id,
         mobName: mobDisplayName(mob),
