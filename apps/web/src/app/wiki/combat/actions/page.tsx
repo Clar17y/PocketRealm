@@ -97,7 +97,16 @@ function formatSpecial(action: ActionDefinition): string {
   if (action.defenceReduction) tags.push(`-${action.defenceReduction}% def`);
   if (action.lifeLeechPercent) tags.push(`${action.lifeLeechPercent}% leech`);
   if (action.healPercent) tags.push(`Heal ${(action.healPercent * 100).toFixed(0)}% HP`);
-  if (action.effect) tags.push(`Effect: ${action.effect.name}`);
+  if (action.effect) {
+    const e = action.effect;
+    const parts: string[] = [];
+    if (e.modifier !== 0) parts.push(`${e.modifier > 0 ? '+' : ''}${e.modifier} ${e.stat}`);
+    if ('damagePerRound' in e && e.damagePerRound) parts.push(`${e.damagePerRound} dmg/r`);
+    if ('damagePerRoundPercent' in e && e.damagePerRoundPercent) parts.push(`+${e.damagePerRoundPercent}% dmg/r`);
+    if ('healPerRound' in e && e.healPerRound) parts.push(`${e.healPerRound} heal/r`);
+    parts.push(`${e.duration}r`);
+    tags.push(`${e.name} (${parts.join(', ')})`);
+  }
   if (action.damageReductionPercent) tags.push(`-${(action.damageReductionPercent * 100).toFixed(0)}% dmg taken`);
   if (action.potionType) tags.push(`Potion: ${action.potionType}`);
   if (action.tauntDuration) tags.push(`Taunt ${action.tauntDuration}r`);

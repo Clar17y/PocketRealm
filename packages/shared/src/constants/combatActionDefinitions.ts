@@ -154,7 +154,7 @@ const useElixirOfPower: ActionDefinition = {
 const powerStrike: ActionDefinition = {
   id: 'power_strike',
   name: 'Power Strike',
-  description: 'A focused physical strike dealing 1.3x weapon damage.',
+  description: 'A focused strike with extra force behind it.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
@@ -166,7 +166,7 @@ const powerStrike: ActionDefinition = {
 const cleave: ActionDefinition = {
   id: 'cleave',
   name: 'Cleave',
-  description: 'A wide swing dealing 0.8x damage. Hits all enemies in raids.',
+  description: 'A wide swing that hits all enemies in raids.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
@@ -178,7 +178,7 @@ const cleave: ActionDefinition = {
 const battleCry: ActionDefinition = {
   id: 'battle_cry',
   name: 'Battle Cry',
-  description: 'War cry that boosts attack power for 4 rounds.',
+  description: 'A war cry that boosts attack power.',
   actionType: 'buff',
   category: 'supportive',
   scalingStat: 'melee',
@@ -189,7 +189,7 @@ const battleCry: ActionDefinition = {
 const devastatingBlow: ActionDefinition = {
   id: 'devastating_blow',
   name: 'Devastating Blow',
-  description: 'A devastating strike dealing 2.0x weapon damage. Heavy stamina cost.',
+  description: 'A devastating overhead strike. Leaves you open.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
@@ -202,7 +202,7 @@ const devastatingBlow: ActionDefinition = {
 const berserkerRage: ActionDefinition = {
   id: 'berserker_rage',
   name: 'Berserker Rage',
-  description: 'Enter a frenzy: +30% attack for 5 rounds.',
+  description: 'Enter a frenzy, greatly boosting attack power.',
   actionType: 'buff',
   category: 'supportive',
   scalingStat: 'melee',
@@ -213,7 +213,7 @@ const berserkerRage: ActionDefinition = {
 const execute: ActionDefinition = {
   id: 'execute',
   name: 'Execute',
-  description: 'Finishing strike that deals bonus damage when target is below 30% HP.',
+  description: 'A finishing strike that deals bonus damage to wounded targets.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
@@ -225,7 +225,7 @@ const execute: ActionDefinition = {
 const titansWrath: ActionDefinition = {
   id: 'titans_wrath',
   name: "Titan's Wrath",
-  description: 'Ultimate melee strike dealing 2.5x weapon damage.',
+  description: 'Ultimate melee strike of devastating power. Leaves you open.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'melee',
@@ -240,7 +240,7 @@ const titansWrath: ActionDefinition = {
 const aimedShot: ActionDefinition = {
   id: 'aimed_shot',
   name: 'Aimed Shot',
-  description: 'A carefully aimed shot dealing 1.3x ranged damage.',
+  description: 'A carefully aimed shot with increased damage.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
@@ -265,7 +265,7 @@ const cripplingShot: ActionDefinition = {
 const eagleEye: ActionDefinition = {
   id: 'eagle_eye',
   name: 'Eagle Eye',
-  description: 'Intense focus grants massive accuracy boost for 3 rounds.',
+  description: 'Intense focus grants a massive accuracy boost.',
   actionType: 'buff',
   category: 'supportive',
   scalingStat: 'ranged',
@@ -276,7 +276,7 @@ const eagleEye: ActionDefinition = {
 const volley: ActionDefinition = {
   id: 'volley',
   name: 'Volley',
-  description: 'A rain of arrows dealing 0.9x damage and suppressing all enemies in raids.',
+  description: 'A rain of arrows that suppresses all enemies in raids.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
@@ -295,7 +295,7 @@ const volley: ActionDefinition = {
 const snipersMark: ActionDefinition = {
   id: 'snipers_mark',
   name: "Sniper's Mark",
-  description: 'Reduce target evasion by 20 for 3 rounds. Always hits.',
+  description: 'Mark a target, reducing their evasion. Always hits.',
   actionType: 'debuff_spell',
   category: 'supportive',
   scalingStat: 'ranged',
@@ -307,7 +307,7 @@ const snipersMark: ActionDefinition = {
 const piercingShot: ActionDefinition = {
   id: 'piercing_shot',
   name: 'Piercing Shot',
-  description: 'An armor-piercing shot that ignores 50% of target defence.',
+  description: 'An armour-piercing shot that punches through defences.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
@@ -320,7 +320,7 @@ const piercingShot: ActionDefinition = {
 const deathMark: ActionDefinition = {
   id: 'death_mark',
   name: 'Death Mark',
-  description: 'Ultimate ranged shot dealing 2.5x damage and applying vulnerable debuff.',
+  description: 'Ultimate ranged shot that marks the target for death.',
   actionType: 'skill_attack',
   category: 'offensive',
   scalingStat: 'ranged',
@@ -359,7 +359,7 @@ const minorHeal: ActionDefinition = {
 const frostNova: ActionDefinition = {
   id: 'frost_nova',
   name: 'Frost Nova',
-  description: 'A blast of frost dealing 0.7x damage and freezing all enemies for 2 rounds in raids.',
+  description: 'A blast of frost that freezes all enemies in raids.',
   actionType: 'damage_spell',
   category: 'offensive',
   scalingStat: 'magic',
@@ -372,7 +372,7 @@ const frostNova: ActionDefinition = {
 const enhancedFortitude: ActionDefinition = {
   id: 'enhanced_fortitude',
   name: 'Enhanced Fortitude',
-  description: 'Magical barrier boosting defence for 4 rounds.',
+  description: 'A magical barrier that boosts defence.',
   actionType: 'buff',
   category: 'defensive',
   scalingStat: 'magic',
@@ -395,7 +395,7 @@ const healAlly: ActionDefinition = {
 const arcaneBlast: ActionDefinition = {
   id: 'arcane_blast',
   name: 'Arcane Blast',
-  description: 'Concentrated arcane energy dealing 2.0x magic damage.',
+  description: 'Concentrated arcane energy dealing heavy magic damage.',
   actionType: 'damage_spell',
   category: 'offensive',
   scalingStat: 'magic',
@@ -408,7 +408,7 @@ const arcaneBlast: ActionDefinition = {
 const regeneration: ActionDefinition = {
   id: 'regeneration',
   name: 'Regeneration',
-  description: 'Healing over time restoring 5% max HP per round for 4 rounds.',
+  description: 'Healing magic that restores HP over time.',
   actionType: 'heal_self',
   category: 'supportive',
   scalingStat: 'magic',
@@ -419,7 +419,7 @@ const regeneration: ActionDefinition = {
 const meteorStrike: ActionDefinition = {
   id: 'meteor_strike',
   name: 'Meteor Strike',
-  description: 'Call down a meteor dealing 1.3x magic AoE damage.',
+  description: 'Call down a meteor dealing massive AoE magic damage. Leaves you open.',
   actionType: 'damage_spell',
   category: 'offensive',
   scalingStat: 'magic',
@@ -595,7 +595,7 @@ const lifeDrain: ActionDefinition = {
 const curse: ActionDefinition = {
   id: 'curse',
   name: 'Curse',
-  description: 'Curse the target, dealing 0.8x damage and reducing magic defence by 20 for 3 rounds.',
+  description: 'Curse the target, weakening their magical defences.',
   actionType: 'debuff_spell',
   category: 'offensive',
   scalingStat: 'magic',
@@ -635,7 +635,7 @@ const enfeeble: ActionDefinition = {
 const taunt: ActionDefinition = {
   id: 'taunt',
   name: 'Taunt',
-  description: 'Force a boss to target you for 2 rounds. Raid only.',
+  description: 'Force a boss to target you. Raid only.',
   actionType: 'taunt',
   category: 'defensive',
   scalingStat: 'weapon',
@@ -646,7 +646,7 @@ const taunt: ActionDefinition = {
 const fortify: ActionDefinition = {
   id: 'fortify',
   name: 'Fortify',
-  description: 'Magical fortification boosting defence and magic defence for 3 rounds.',
+  description: 'Magical fortification that boosts defence and magic defence.',
   actionType: 'buff',
   category: 'defensive',
   scalingStat: 'weapon',
@@ -711,7 +711,7 @@ const blizzard: ActionDefinition = {
 const rally: ActionDefinition = {
   id: 'rally',
   name: 'Rally',
-  description: 'Rally allies, granting +15 defence to the whole group for 3 rounds.',
+  description: 'Rally allies, boosting the whole group\'s defence.',
   actionType: 'buff',
   category: 'supportive',
   scalingStat: 'weapon',
