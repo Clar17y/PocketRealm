@@ -55,7 +55,7 @@ export interface RaidRoundRng {
 
 // AoE player actions — these target all surviving mobs instead of one
 const AOE_ACTION_IDS = new Set([
-  'cleave', 'volley', 'chain_lightning', 'meteor_strike',
+  'cleave', 'scatter_shot', 'volley', 'frost_nova', 'blizzard', 'whirlwind', 'meteor_strike',
 ]);
 
 // --- Phase Transition ---
