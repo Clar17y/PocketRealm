@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.39',
+    date: '2026-06-13',
+    title: 'Talent Tree Rebalance & AoE Actions',
+    summary:
+      'The General talent tree has been reworked into the Survival tree, focused on combat durability instead of crafting bonuses. Every combat tree now unlocks an AoE action at Tier 2 (Cleave, Scatter Shot, Frost Nova) with stronger AoE upgrades at Tier 3 (Whirlwind, Volley, Blizzard). New mechanics: Crippling Shot pins enemies so they skip their next attack, Scatter Shot and Volley suppress enemy accuracy, and Rally grants a group-wide defence buff in raids. AoE damage multipliers have been reduced across the board to balance multi-target power. Chain Lightning has been removed and replaced by Blizzard. Survival tree highlights include Brace and Thick Skin for damage reduction, Second Wind for low-HP regeneration, Rally as a group support action, and the Bulwark capstone for combined HP and defence bonuses. The wiki combat actions page now shows full effect details (stat, modifier, duration) in the table.',
+  },
+  {
     version: '0.38',
     date: '2026-06-10',
     title: 'Game Wiki',
@@ -81,7 +88,7 @@ export const changelog: ChangelogEntry[] = [
     date: '2026-03-06',
     title: 'Daily & Weekly Quests',
     summary:
-      'A new quest system gives you a reason to log in every day. Three daily quests and one weekly quest are randomly assigned from 16 templates across combat, exploration, crafting, gathering, PvP, and casino. Targets scale with your level. Complete quests to earn Quest Tokens — a new currency for an upcoming exclusive shop. Finish all three dailies for a bonus payout. Don\'t like a quest? Use your free daily reroll to swap it. Progress toasts pop up in real-time as you fight, craft, gather, and explore. Quest availability respects game progression: PvP quests only appear once you\'ve unlocked the arena, prefix hunts require bestiary experience. All combat victories now count toward guild contracts and quests, including exploration and travel ambushes.',
+      'A new quest system gives you a reason to log in every day. Three daily quests and one weekly quest are randomly assigned from 16 templates across combat, exploration, crafting, gathering, PvP, and casino. Targets scale with your level. Complete quests to earn Quest Tokens - a new currency for an upcoming exclusive shop. Finish all three dailies for a bonus payout. Don\'t like a quest? Use your free daily reroll to swap it. Progress toasts pop up in real-time as you fight, craft, gather, and explore. Quest availability respects game progression: PvP quests only appear once you\'ve unlocked the arena, prefix hunts require bestiary experience. All combat victories now count toward guild contracts and quests, including exploration and travel ambushes.',
   },
   {
     version: '0.27',
