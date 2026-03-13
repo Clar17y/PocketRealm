@@ -1,11 +1,11 @@
 import type { TalentNodeDefinition, TalentTree } from '../types/combatAction.types';
 
 // =============================================================================
-// MELEE TREE (~15 nodes)
+// MELEE TREE (18 nodes: 4×T1-T4 + 2×T5)
 // =============================================================================
 
 const meleeNodes: TalentNodeDefinition[] = [
-  // Tier 1 (5-10 pts)
+  // Tier 1
   {
     id: 'melee_power_strike',
     tree: 'melee',
@@ -15,6 +15,16 @@ const meleeNodes: TalentNodeDefinition[] = [
     pointCost: 5,
     prerequisites: [],
     unlocksAction: 'power_strike',
+  },
+  {
+    id: 'melee_rending_slash',
+    tree: 'melee',
+    tier: 1,
+    name: 'Rending Slash',
+    description: 'A brutal slash that causes deep bleeding.',
+    pointCost: 5,
+    prerequisites: [],
+    unlocksAction: 'rending_slash',
   },
   {
     id: 'melee_iron_skin',
@@ -36,17 +46,28 @@ const meleeNodes: TalentNodeDefinition[] = [
     prerequisites: [],
     passiveBonus: { stat: 'maxStamina', value: 10, isPercent: true, description: '+10% stamina pool' },
   },
-  // Tier 2 (10-15 pts, requires melee 15)
+  // Tier 2 (requires melee 15)
   {
     id: 'melee_cleave',
     tree: 'melee',
     tier: 2,
     name: 'Cleave',
-    description: 'A wide swing dealing 1.1x damage. Hits additional enemies in raids.',
+    description: 'A wide swing dealing 0.8x damage. Hits all enemies in raids.',
     pointCost: 10,
     skillLevelGate: { skill: 'melee', level: 15 },
     prerequisites: ['melee_power_strike'],
     unlocksAction: 'cleave',
+  },
+  {
+    id: 'melee_venomous_strike',
+    tree: 'melee',
+    tier: 2,
+    name: 'Venomous Strike',
+    description: 'Coat your weapon in poison, applying a lingering toxin.',
+    pointCost: 10,
+    skillLevelGate: { skill: 'melee', level: 15 },
+    prerequisites: ['melee_rending_slash'],
+    unlocksAction: 'venomous_strike',
   },
   {
     id: 'melee_battle_cry',
@@ -70,18 +91,7 @@ const meleeNodes: TalentNodeDefinition[] = [
     prerequisites: ['melee_endurance_training'],
     passiveBonus: { stat: 'staminaRegen', value: 15, isPercent: true, description: '+15% stamina regen' },
   },
-  {
-    id: 'melee_venomous_strike',
-    tree: 'melee',
-    tier: 2,
-    name: 'Venomous Strike',
-    description: 'Coat your weapon in poison, applying a lingering toxin.',
-    pointCost: 10,
-    skillLevelGate: { skill: 'melee', level: 15 },
-    prerequisites: ['melee_endurance_training'],
-    unlocksAction: 'venomous_strike',
-  },
-  // Tier 3 (20-30 pts, requires melee 35)
+  // Tier 3 (requires melee 35)
   {
     id: 'melee_devastating_blow',
     tree: 'melee',
@@ -94,11 +104,22 @@ const meleeNodes: TalentNodeDefinition[] = [
     unlocksAction: 'devastating_blow',
   },
   {
+    id: 'melee_whirlwind',
+    tree: 'melee',
+    tier: 3,
+    name: 'Whirlwind',
+    description: 'A spinning strike hitting all enemies in raids.',
+    pointCost: 20,
+    skillLevelGate: { skill: 'melee', level: 35 },
+    prerequisites: ['melee_cleave'],
+    unlocksAction: 'whirlwind',
+  },
+  {
     id: 'melee_berserker_rage',
     tree: 'melee',
     tier: 3,
     name: 'Berserker Rage',
-    description: 'Enter a frenzy: +30% attack but -15% defence for 5 rounds.',
+    description: 'Enter a frenzy: +30% attack for 5 rounds.',
     pointCost: 20,
     skillLevelGate: { skill: 'melee', level: 35 },
     prerequisites: ['melee_battle_cry'],
@@ -115,18 +136,7 @@ const meleeNodes: TalentNodeDefinition[] = [
     prerequisites: ['melee_stamina_surge'],
     passiveBonus: { stat: 'weaponDamage', value: 10, isPercent: true, description: '+10% weapon damage' },
   },
-  {
-    id: 'melee_rending_slash',
-    tree: 'melee',
-    tier: 3,
-    name: 'Rending Slash',
-    description: 'A brutal slash that causes deep bleeding.',
-    pointCost: 20,
-    skillLevelGate: { skill: 'melee', level: 35 },
-    prerequisites: ['melee_stamina_surge'],
-    unlocksAction: 'rending_slash',
-  },
-  // Tier 4 (35-50 pts, requires melee 60)
+  // Tier 4 (requires melee 60)
   {
     id: 'melee_execute',
     tree: 'melee',
@@ -137,6 +147,17 @@ const meleeNodes: TalentNodeDefinition[] = [
     skillLevelGate: { skill: 'melee', level: 60 },
     prerequisites: ['melee_devastating_blow'],
     unlocksAction: 'execute',
+  },
+  {
+    id: 'melee_flame_sword',
+    tree: 'melee',
+    tier: 4,
+    name: 'Flame Sword',
+    description: 'Engulf your blade in fire, dealing magic damage that bypasses physical armour.',
+    pointCost: 35,
+    skillLevelGate: { skill: 'melee', level: 60 },
+    prerequisites: ['melee_weapon_mastery'],
+    unlocksAction: 'flame_sword',
   },
   {
     id: 'melee_unbreakable',
@@ -160,18 +181,7 @@ const meleeNodes: TalentNodeDefinition[] = [
     prerequisites: ['melee_weapon_mastery'],
     passiveBonus: { stat: 'debuffDuration', value: -1, description: 'Reduce debuff duration by 1 round' },
   },
-  {
-    id: 'melee_flame_sword',
-    tree: 'melee',
-    tier: 4,
-    name: 'Flame Sword',
-    description: 'Engulf your blade in fire, dealing magic damage that bypasses physical armour.',
-    pointCost: 35,
-    skillLevelGate: { skill: 'melee', level: 60 },
-    prerequisites: ['melee_weapon_mastery'],
-    unlocksAction: 'flame_sword',
-  },
-  // Tier 5 (50-75 pts, requires melee 85)
+  // Tier 5 (requires melee 85)
   {
     id: 'melee_titans_wrath',
     tree: 'melee',
@@ -197,7 +207,7 @@ const meleeNodes: TalentNodeDefinition[] = [
 ];
 
 // =============================================================================
-// RANGED TREE (~15 nodes)
+// RANGED TREE (18 nodes: 4×T1-T4 + 2×T5)
 // =============================================================================
 
 const rangedNodes: TalentNodeDefinition[] = [
@@ -211,6 +221,16 @@ const rangedNodes: TalentNodeDefinition[] = [
     pointCost: 5,
     prerequisites: [],
     unlocksAction: 'aimed_shot',
+  },
+  {
+    id: 'ranged_barbed_arrow',
+    tree: 'ranged',
+    tier: 1,
+    name: 'Barbed Arrow',
+    description: 'A serrated arrowhead tears flesh, causing deep bleeding.',
+    pointCost: 5,
+    prerequisites: [],
+    unlocksAction: 'barbed_arrow',
   },
   {
     id: 'ranged_quick_draw',
@@ -234,14 +254,25 @@ const rangedNodes: TalentNodeDefinition[] = [
   },
   // Tier 2 (requires ranged 15)
   {
+    id: 'ranged_scatter_shot',
+    tree: 'ranged',
+    tier: 2,
+    name: 'Scatter Shot',
+    description: 'A spread of arrows hitting all enemies and reducing their accuracy in raids.',
+    pointCost: 10,
+    skillLevelGate: { skill: 'ranged', level: 15 },
+    prerequisites: ['ranged_aimed_shot'],
+    unlocksAction: 'scatter_shot',
+  },
+  {
     id: 'ranged_crippling_shot',
     tree: 'ranged',
     tier: 2,
     name: 'Crippling Shot',
-    description: 'A debilitating shot that reduces target speed for 3 rounds.',
+    description: 'A precise shot that pins the target, forcing them to defend next turn.',
     pointCost: 10,
     skillLevelGate: { skill: 'ranged', level: 15 },
-    prerequisites: ['ranged_aimed_shot'],
+    prerequisites: ['ranged_barbed_arrow'],
     unlocksAction: 'crippling_shot',
   },
   {
@@ -266,27 +297,16 @@ const rangedNodes: TalentNodeDefinition[] = [
     prerequisites: ['ranged_quick_draw'],
     passiveBonus: { stat: 'critDamage', value: 15, isPercent: true, description: '+15% crit damage' },
   },
-  {
-    id: 'ranged_barbed_arrow',
-    tree: 'ranged',
-    tier: 2,
-    name: 'Barbed Arrow',
-    description: 'A serrated arrowhead tears flesh, causing deep bleeding.',
-    pointCost: 10,
-    skillLevelGate: { skill: 'ranged', level: 15 },
-    prerequisites: ['ranged_aimed_shot'],
-    unlocksAction: 'barbed_arrow',
-  },
   // Tier 3 (requires ranged 35)
   {
     id: 'ranged_volley',
     tree: 'ranged',
     tier: 3,
     name: 'Volley',
-    description: 'A rain of arrows hitting all enemies in raids.',
+    description: 'A rain of arrows dealing 0.9x damage and suppressing all enemies in raids.',
     pointCost: 20,
     skillLevelGate: { skill: 'ranged', level: 35 },
-    prerequisites: ['ranged_crippling_shot'],
+    prerequisites: ['ranged_scatter_shot'],
     unlocksAction: 'volley',
   },
   {
@@ -294,22 +314,11 @@ const rangedNodes: TalentNodeDefinition[] = [
     tree: 'ranged',
     tier: 3,
     name: "Sniper's Mark",
-    description: 'Mark a target to take +20% damage for 3 rounds.',
+    description: 'Reduce target evasion by 20 for 3 rounds. Always hits.',
     pointCost: 20,
     skillLevelGate: { skill: 'ranged', level: 35 },
     prerequisites: ['ranged_eagle_eye'],
     unlocksAction: 'snipers_mark',
-  },
-  {
-    id: 'ranged_evasive_maneuver',
-    tree: 'ranged',
-    tier: 3,
-    name: 'Evasive Maneuver',
-    description: 'Combat agility increases dodge chance.',
-    pointCost: 20,
-    skillLevelGate: { skill: 'ranged', level: 35 },
-    prerequisites: ['ranged_steady_hands'],
-    passiveBonus: { stat: 'dodge', value: 10, isPercent: true, description: '+10% dodge' },
   },
   {
     id: 'ranged_flame_arrow',
@@ -322,6 +331,17 @@ const rangedNodes: TalentNodeDefinition[] = [
     prerequisites: ['ranged_steady_hands'],
     unlocksAction: 'flame_arrow',
   },
+  {
+    id: 'ranged_evasive_maneuver',
+    tree: 'ranged',
+    tier: 3,
+    name: 'Evasive Maneuver',
+    description: 'Combat agility increases dodge chance.',
+    pointCost: 20,
+    skillLevelGate: { skill: 'ranged', level: 35 },
+    prerequisites: ['ranged_steady_hands'],
+    passiveBonus: { stat: 'dodge', value: 10, isPercent: true, description: '+10% dodge' },
+  },
   // Tier 4 (requires ranged 60)
   {
     id: 'ranged_piercing_shot',
@@ -333,6 +353,17 @@ const rangedNodes: TalentNodeDefinition[] = [
     skillLevelGate: { skill: 'ranged', level: 60 },
     prerequisites: ['ranged_volley'],
     unlocksAction: 'piercing_shot',
+  },
+  {
+    id: 'ranged_shadow_arrow',
+    tree: 'ranged',
+    tier: 4,
+    name: 'Shadow Arrow',
+    description: 'An arrow infused with dark energy that siphons life on impact.',
+    pointCost: 35,
+    skillLevelGate: { skill: 'ranged', level: 60 },
+    prerequisites: ['ranged_flame_arrow'],
+    unlocksAction: 'shadow_arrow',
   },
   {
     id: 'ranged_quick_reflexes',
@@ -355,17 +386,6 @@ const rangedNodes: TalentNodeDefinition[] = [
     skillLevelGate: { skill: 'ranged', level: 60 },
     prerequisites: ['ranged_evasive_maneuver'],
     passiveBonus: { stat: 'evasion', value: 15, isPercent: true, description: '+15% evasion' },
-  },
-  {
-    id: 'ranged_shadow_arrow',
-    tree: 'ranged',
-    tier: 4,
-    name: 'Shadow Arrow',
-    description: 'An arrow infused with dark energy that siphons life on impact.',
-    pointCost: 35,
-    skillLevelGate: { skill: 'ranged', level: 60 },
-    prerequisites: ['ranged_flame_arrow'],
-    unlocksAction: 'shadow_arrow',
   },
   // Tier 5 (requires ranged 85)
   {
@@ -393,7 +413,7 @@ const rangedNodes: TalentNodeDefinition[] = [
 ];
 
 // =============================================================================
-// MAGIC TREE (~15 nodes)
+// MAGIC TREE (18 nodes: 4×T1-T4 + 2×T5)
 // =============================================================================
 
 const magicNodes: TalentNodeDefinition[] = [
@@ -407,6 +427,16 @@ const magicNodes: TalentNodeDefinition[] = [
     pointCost: 5,
     prerequisites: [],
     unlocksAction: 'fire_bolt',
+  },
+  {
+    id: 'magic_enfeeble',
+    tree: 'magic',
+    tier: 1,
+    name: 'Enfeeble',
+    description: "Sap the target's strength, reducing their attack power.",
+    pointCost: 5,
+    prerequisites: [],
+    unlocksAction: 'enfeeble',
   },
   {
     id: 'magic_minor_heal',
@@ -434,11 +464,22 @@ const magicNodes: TalentNodeDefinition[] = [
     tree: 'magic',
     tier: 2,
     name: 'Frost Nova',
-    description: 'Blast of frost dealing magic damage and slowing target for 3 rounds.',
+    description: 'A blast of frost dealing 0.7x damage and freezing all enemies for 2 rounds in raids.',
     pointCost: 10,
     skillLevelGate: { skill: 'magic', level: 15 },
     prerequisites: ['magic_fire_bolt'],
     unlocksAction: 'frost_nova',
+  },
+  {
+    id: 'magic_curse',
+    tree: 'magic',
+    tier: 2,
+    name: 'Curse',
+    description: 'Curse the target, dealing 0.8x damage and reducing magic defence by 20 for 3 rounds.',
+    pointCost: 10,
+    skillLevelGate: { skill: 'magic', level: 15 },
+    prerequisites: ['magic_enfeeble'],
+    unlocksAction: 'curse',
   },
   {
     id: 'magic_enhanced_fortitude',
@@ -462,39 +503,28 @@ const magicNodes: TalentNodeDefinition[] = [
     prerequisites: ['magic_arcane_focus'],
     passiveBonus: { stat: 'manaRegen', value: 15, isPercent: true, description: '+15% mana regen' },
   },
-  {
-    id: 'magic_enfeeble',
-    tree: 'magic',
-    tier: 2,
-    name: 'Enfeeble',
-    description: "Sap the target's strength, reducing their attack power.",
-    pointCost: 10,
-    skillLevelGate: { skill: 'magic', level: 15 },
-    prerequisites: ['magic_fire_bolt'],
-    unlocksAction: 'enfeeble',
-  },
-  {
-    id: 'magic_curse',
-    tree: 'magic',
-    tier: 2,
-    name: 'Curse',
-    description: "Weaken the target's magical resistance.",
-    pointCost: 10,
-    skillLevelGate: { skill: 'magic', level: 15 },
-    prerequisites: ['magic_arcane_focus'],
-    unlocksAction: 'curse',
-  },
   // Tier 3 (requires magic 35)
   {
-    id: 'magic_chain_lightning',
+    id: 'magic_blizzard',
     tree: 'magic',
     tier: 3,
-    name: 'Chain Lightning',
-    description: 'Lightning arcs between enemies in raids.',
+    name: 'Blizzard',
+    description: 'A storm of ice hitting all enemies and freezing them in raids.',
     pointCost: 20,
     skillLevelGate: { skill: 'magic', level: 35 },
     prerequisites: ['magic_frost_nova'],
-    unlocksAction: 'chain_lightning',
+    unlocksAction: 'blizzard',
+  },
+  {
+    id: 'magic_earth_spikes',
+    tree: 'magic',
+    tier: 3,
+    name: 'Earth Spikes',
+    description: 'Conjure jagged stone that pierces armour, dealing physical damage.',
+    pointCost: 20,
+    skillLevelGate: { skill: 'magic', level: 35 },
+    prerequisites: ['magic_mana_flow'],
+    unlocksAction: 'earth_spikes',
   },
   {
     id: 'magic_heal_ally',
@@ -518,17 +548,6 @@ const magicNodes: TalentNodeDefinition[] = [
     prerequisites: ['magic_mana_flow'],
     passiveBonus: { stat: 'magicPenetration', value: 15, isPercent: true, description: 'Ignore 15% magic defence' },
   },
-  {
-    id: 'magic_earth_spikes',
-    tree: 'magic',
-    tier: 3,
-    name: 'Earth Spikes',
-    description: 'Conjure jagged stone that pierces armour, dealing physical damage.',
-    pointCost: 20,
-    skillLevelGate: { skill: 'magic', level: 35 },
-    prerequisites: ['magic_mana_flow'],
-    unlocksAction: 'earth_spikes',
-  },
   // Tier 4 (requires magic 60)
   {
     id: 'magic_arcane_blast',
@@ -538,8 +557,19 @@ const magicNodes: TalentNodeDefinition[] = [
     description: 'Concentrated arcane energy dealing 2.0x magic damage.',
     pointCost: 35,
     skillLevelGate: { skill: 'magic', level: 60 },
-    prerequisites: ['magic_chain_lightning'],
+    prerequisites: ['magic_blizzard'],
     unlocksAction: 'arcane_blast',
+  },
+  {
+    id: 'magic_life_drain',
+    tree: 'magic',
+    tier: 4,
+    name: 'Life Drain',
+    description: "Siphon the target's life force to heal yourself.",
+    pointCost: 35,
+    skillLevelGate: { skill: 'magic', level: 60 },
+    prerequisites: ['magic_spell_penetration'],
+    unlocksAction: 'life_drain',
   },
   {
     id: 'magic_regeneration',
@@ -563,24 +593,13 @@ const magicNodes: TalentNodeDefinition[] = [
     prerequisites: ['magic_spell_penetration'],
     passiveBonus: { stat: 'wardCost', value: -10, description: 'Ward costs -10 mana' },
   },
-  {
-    id: 'magic_life_drain',
-    tree: 'magic',
-    tier: 4,
-    name: 'Life Drain',
-    description: "Siphon the target's life force to heal yourself.",
-    pointCost: 35,
-    skillLevelGate: { skill: 'magic', level: 60 },
-    prerequisites: ['magic_spell_penetration'],
-    unlocksAction: 'life_drain',
-  },
   // Tier 5 (requires magic 85)
   {
     id: 'magic_meteor_strike',
     tree: 'magic',
     tier: 5,
     name: 'Meteor Strike',
-    description: 'Call down a meteor dealing 2.5x magic AoE damage.',
+    description: 'Call down a meteor dealing 1.3x magic AoE damage.',
     pointCost: 50,
     skillLevelGate: { skill: 'magic', level: 85 },
     prerequisites: ['magic_arcane_blast'],
@@ -600,10 +619,10 @@ const magicNodes: TalentNodeDefinition[] = [
 ];
 
 // =============================================================================
-// GENERAL TREE (~15 nodes)
+// SURVIVAL TREE (14 nodes: 3×T1-T4 + 2×T5)
 // =============================================================================
 
-const generalNodes: TalentNodeDefinition[] = [
+const survivalNodes: TalentNodeDefinition[] = [
   // Tier 1
   {
     id: 'survival_improved_defend',
@@ -678,24 +697,24 @@ const generalNodes: TalentNodeDefinition[] = [
     unlocksAction: 'fortify',
   },
   {
-    id: 'survival_efficient_mining',
+    id: 'survival_brace',
     tree: 'survival',
     tier: 3,
-    name: 'Efficient Mining',
-    description: 'Improved gathering technique increases mining yield.',
-    pointCost: 15,
+    name: 'Brace',
+    description: 'Brace for impact, reducing physical damage taken.',
+    pointCost: 20,
     prerequisites: ['survival_quick_recovery'],
-    passiveBonus: { stat: 'miningYield', value: 10, isPercent: true, description: '+10% mining yield' },
+    passiveBonus: { stat: 'physicalDamageReduction', value: 10, isPercent: true, description: '+10% physical damage reduction' },
   },
   {
-    id: 'survival_cheaper_repairs',
+    id: 'survival_second_wind',
     tree: 'survival',
     tier: 3,
-    name: 'Cheaper Repairs',
-    description: 'Equipment maintenance knowledge reduces repair costs.',
-    pointCost: 15,
+    name: 'Second Wind',
+    description: 'Regenerate HP when health is critical.',
+    pointCost: 20,
     prerequisites: ['survival_quick_recovery'],
-    passiveBonus: { stat: 'repairCost', value: -15, isPercent: true, description: '-15% repair cost' },
+    passiveBonus: { stat: 'lowHpRegen', value: 3, isPercent: true, description: 'Regen 3% max HP/rd when below 40% HP' },
   },
   // Tier 4
   {
@@ -709,24 +728,24 @@ const generalNodes: TalentNodeDefinition[] = [
     passiveBonus: { stat: 'lastStand', value: 1, description: 'Trigger +30% defence at low HP (once per fight)' },
   },
   {
-    id: 'survival_salvage_expert',
+    id: 'survival_rally',
     tree: 'survival',
     tier: 4,
-    name: 'Salvage Expert',
-    description: 'Expert salvaging returns more materials.',
-    pointCost: 25,
-    prerequisites: ['survival_efficient_mining', 'survival_cheaper_repairs'],
-    passiveBonus: { stat: 'salvageReturns', value: 15, isPercent: true, description: '+15% salvage returns' },
+    name: 'Rally',
+    description: 'Rally allies, granting +15 defence to the whole group for 3 rounds.',
+    pointCost: 35,
+    prerequisites: ['survival_brace'],
+    unlocksAction: 'rally',
   },
   {
-    id: 'survival_master_crafter',
+    id: 'survival_thick_skin',
     tree: 'survival',
     tier: 4,
-    name: 'Master Crafter',
-    description: 'Crafting expertise increases critical craft chance.',
-    pointCost: 25,
-    prerequisites: ['survival_efficient_mining', 'survival_cheaper_repairs'],
-    passiveBonus: { stat: 'craftingCrit', value: 10, isPercent: true, description: '+10% crafting crit' },
+    name: 'Thick Skin',
+    description: 'Toughened hide reduces magic damage taken.',
+    pointCost: 35,
+    prerequisites: ['survival_second_wind'],
+    passiveBonus: { stat: 'magicDamageReduction', value: 10, isPercent: true, description: '+10% magic damage reduction' },
   },
   // Tier 5
   {
@@ -740,14 +759,14 @@ const generalNodes: TalentNodeDefinition[] = [
     passiveBonus: { stat: 'undying', value: 1, description: 'Survive lethal hit once per fight with 1 HP' },
   },
   {
-    id: 'survival_grandmaster',
+    id: 'survival_bulwark',
     tree: 'survival',
     tier: 5,
-    name: 'Grandmaster',
-    description: 'Mastery of all disciplines increases skill XP gain.',
+    name: 'Bulwark',
+    description: 'An immovable fortress — increased HP and defence.',
     pointCost: 50,
-    prerequisites: ['survival_salvage_expert', 'survival_master_crafter'],
-    passiveBonus: { stat: 'allSkillXp', value: 15, isPercent: true, description: '+15% all skill XP' },
+    prerequisites: ['survival_rally', 'survival_thick_skin'],
+    passiveBonus: { stat: 'bulwark', value: 1, description: '+15% max HP, +10% defence' },
   },
 ];
 
@@ -759,7 +778,7 @@ export const TALENT_TREE_DEFINITIONS: Record<TalentTree, TalentNodeDefinition[]>
   melee: meleeNodes,
   ranged: rangedNodes,
   magic: magicNodes,
-  survival: generalNodes,
+  survival: survivalNodes,
 };
 
 export function getAllTalentNodes(): TalentNodeDefinition[] {
@@ -767,7 +786,7 @@ export function getAllTalentNodes(): TalentNodeDefinition[] {
     ...meleeNodes,
     ...rangedNodes,
     ...magicNodes,
-    ...generalNodes, // survival tree (variable rename happens in Task 6)
+    ...survivalNodes,
   ];
 }
 
