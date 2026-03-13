@@ -394,22 +394,18 @@ export function resolveRaidRound(
     if (s.hp <= 0) continue;
     if (s.actionId === 'rally' && s.actionDef?.effect) {
       const effect = s.actionDef.effect;
-      for (const ally of pState) {
+      for (let i = 0; i < pState.length; i++) {
+        const ally = pState[i];
         if (ally.hp <= 0) continue;
-        const p = input.participants[pState.indexOf(ally)];
-        if (!p) continue;
-        // Rally buff is tracked via participantEffectsAfter (built in Step 9)
-        // We add to the participant's activeEffects so it's visible in Step 9
-        const allyParticipant = input.participants[pState.indexOf(ally)];
-        if (allyParticipant) {
-          allyParticipant.activeEffects = allyParticipant.activeEffects ?? [];
-          allyParticipant.activeEffects.push({
-            name: effect.name,
-            stat: effect.stat,
-            modifier: effect.modifier,
-            roundsRemaining: effect.duration,
-          });
-        }
+        const allyParticipant = input.participants[i];
+        if (!allyParticipant) continue;
+        allyParticipant.activeEffects = allyParticipant.activeEffects ?? [];
+        allyParticipant.activeEffects.push({
+          name: effect.name,
+          stat: effect.stat,
+          modifier: effect.modifier,
+          roundsRemaining: effect.duration,
+        });
       }
       logHealing.push({
         playerId: s.playerId,
@@ -704,7 +700,26 @@ export function resolveRaidRound(
     const isPinned = mob.activeEffects.some(
       e => e.stat === 'pinned' && e.roundsRemaining > 0,
     );
-    if (isPinned) continue;
+    if (isPinned) {
+      logMobActions.push({
+        mobId: mob.id,
+        mobName: mobDisplayName(mob),
+        actionId: 'pinned',
+        actionLabel: 'Pinned',
+        targetMode: 'single_target',
+        wasTelegraphed: false,
+        targets: [],
+      });
+      mobActionResults.push({
+        mobId: mob.id,
+        actionId: 'pinned',
+        targetMode: 'single_target',
+        targetPlayerIds: [],
+        damageDealt: 0,
+        healingDone: 0,
+      });
+      continue;
+    }
 
     const actionIndex = (input.roundNumber - 1) % mob.actionTemplate.length;
     const templateAction = mob.actionTemplate[actionIndex];

@@ -630,7 +630,7 @@ const enfeeble: ActionDefinition = {
   },
 };
 
-// --- General Talent Actions ---
+// --- Survival Talent Actions ---
 
 const taunt: ActionDefinition = {
   id: 'taunt',
