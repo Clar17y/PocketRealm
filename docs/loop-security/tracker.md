@@ -17,7 +17,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 
 | # | Status | Finding | Source File | Branch |
 |---|--------|---------|-------------|--------|
-| 7 | TODO | Teleport scroll bypasses travel restrictions | `2026-03-13-035034-quests-shop.md` | |
+| 7 | DONE | Teleport scroll bypasses travel restrictions | `2026-03-13-035034-quests-shop.md` | `security/fix-07-teleport-checks` |
 | 8 | TODO | Boss HP scaling corruption — write before optimistic lock | `2026-03-13-022037-boss-encounters.md` | |
 | 9 | TODO | Gathering uses client-provided zone ID | `2026-03-13-032031-gathering-turns-resources.md` | |
 | 10 | TODO | Refresh token reuse via activity window bypass | `2026-03-13-023041-auth-system.md` | |
