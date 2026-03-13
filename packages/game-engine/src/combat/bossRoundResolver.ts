@@ -221,6 +221,39 @@ export function resolveBossRound(
   // --- Step 6: Supportive actions ---
   resolveSupportiveActions(input.participants, pState, input.threatTable);
 
+  // --- Step 6b: Player buff actions (self-buff + group rally) ---
+  for (let i = 0; i < pState.length; i++) {
+    const s = pState[i];
+    if (s.hp <= 0) continue;
+    const def = s.actionDef;
+    if (!def || def.actionType !== 'buff' || !def.effect) continue;
+
+    const effect = def.effect;
+    const isGroupBuff = s.actionId === 'rally';
+
+    if (isGroupBuff) {
+      for (let j = 0; j < pState.length; j++) {
+        if (pState[j].hp <= 0) continue;
+        const ally = input.participants[j];
+        if (!ally) continue;
+        ally.activeEffects = ally.activeEffects ?? [];
+        ally.activeEffects.push({
+          name: effect.name, stat: effect.stat,
+          modifier: effect.modifier, roundsRemaining: effect.duration,
+        });
+      }
+    } else {
+      const participant = input.participants[i];
+      if (participant) {
+        participant.activeEffects = participant.activeEffects ?? [];
+        participant.activeEffects.push({
+          name: effect.name, stat: effect.stat,
+          modifier: effect.modifier, roundsRemaining: effect.duration,
+        });
+      }
+    }
+  }
+
   // --- Step 7: Boss action resolves against target(s) ---
   const bossTargetPlayerIds: string[] = [];
 

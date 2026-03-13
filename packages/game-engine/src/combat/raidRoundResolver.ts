@@ -389,33 +389,48 @@ export function resolveRaidRound(
     });
   }
 
-  // --- Step 5a: Rally group buff ---
-  for (const s of pState) {
+  // --- Step 5a: Player buff actions (self-buff + group rally) ---
+  for (let i = 0; i < pState.length; i++) {
+    const s = pState[i];
     if (s.hp <= 0) continue;
-    if (s.actionId === 'rally' && s.actionDef?.effect) {
-      const effect = s.actionDef.effect;
-      for (let i = 0; i < pState.length; i++) {
-        const ally = pState[i];
-        if (ally.hp <= 0) continue;
-        const allyParticipant = input.participants[i];
+    const def = s.actionDef;
+    if (!def || def.actionType !== 'buff' || !def.effect) continue;
+
+    const effect = def.effect;
+    const isGroupBuff = s.actionId === 'rally';
+
+    if (isGroupBuff) {
+      // Rally: apply to all alive participants
+      for (let j = 0; j < pState.length; j++) {
+        if (pState[j].hp <= 0) continue;
+        const allyParticipant = input.participants[j];
         if (!allyParticipant) continue;
         allyParticipant.activeEffects = allyParticipant.activeEffects ?? [];
         allyParticipant.activeEffects.push({
-          name: effect.name,
-          stat: effect.stat,
-          modifier: effect.modifier,
-          roundsRemaining: effect.duration,
+          name: effect.name, stat: effect.stat,
+          modifier: effect.modifier, roundsRemaining: effect.duration,
         });
       }
-      logHealing.push({
-        playerId: s.playerId,
-        username: getUsername(s.playerId),
-        actionLabel: actionLabel(s.actionId, playerActionDefs),
-        amountHealed: 0,
-        targetPlayerId: s.playerId,
-        targetUsername: getUsername(s.playerId),
-      });
+    } else {
+      // Self-buff: apply to caster only
+      const participant = input.participants[i];
+      if (participant) {
+        participant.activeEffects = participant.activeEffects ?? [];
+        participant.activeEffects.push({
+          name: effect.name, stat: effect.stat,
+          modifier: effect.modifier, roundsRemaining: effect.duration,
+        });
+      }
     }
+
+    logHealing.push({
+      playerId: s.playerId,
+      username: getUsername(s.playerId),
+      actionLabel: actionLabel(s.actionId, playerActionDefs),
+      amountHealed: 0,
+      targetPlayerId: s.playerId,
+      targetUsername: getUsername(s.playerId),
+    });
   }
 
   // --- Step 5b: Potion actions ---

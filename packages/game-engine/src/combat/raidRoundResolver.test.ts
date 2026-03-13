@@ -2443,4 +2443,58 @@ describe('resolveRaidRound', () => {
       }
     });
   });
+
+  describe('self-buff actions in raids', () => {
+    it('battle_cry applies attack buff to the caster', () => {
+      const input = makeInput({
+        participants: [makeParticipant({
+          template: [{ actionId: 'battle_cry', sortOrder: 0 }],
+          stamina: 100, maxStamina: 100,
+        })],
+        mobs: [makeMob({ hp: 500, maxHp: 500, stats: makeStats({ hp: 500, maxHp: 500 }) })],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      const buff = result.participantResults[0].activeEffectsAfter.find(e => e.name === 'Battle Cry');
+      expect(buff).toBeDefined();
+      expect(buff!.stat).toBe('attack');
+      expect(buff!.modifier).toBe(15);
+    });
+
+    it('enhanced_fortitude applies defence buff to the caster', () => {
+      const input = makeInput({
+        participants: [makeParticipant({
+          template: [{ actionId: 'enhanced_fortitude', sortOrder: 0 }],
+          mana: 100, maxMana: 100,
+        })],
+        mobs: [makeMob({ hp: 500, maxHp: 500, stats: makeStats({ hp: 500, maxHp: 500 }) })],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      const buff = result.participantResults[0].activeEffectsAfter.find(e => e.name === 'Fortitude');
+      expect(buff).toBeDefined();
+      expect(buff!.stat).toBe('defence');
+      expect(buff!.modifier).toBe(20);
+    });
+
+    it('self-buff does not apply to other participants', () => {
+      const input = makeInput({
+        participants: [
+          makeParticipant({
+            playerId: 'p1',
+            template: [{ actionId: 'battle_cry', sortOrder: 0 }],
+            stamina: 100, maxStamina: 100,
+          }),
+          makeParticipant({
+            playerId: 'p2',
+            template: [{ actionId: 'normal_attack', sortOrder: 0 }],
+          }),
+        ],
+        mobs: [makeMob({ hp: 500, maxHp: 500, stats: makeStats({ hp: 500, maxHp: 500 }) })],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      const p1Buff = result.participantResults[0].activeEffectsAfter.find(e => e.name === 'Battle Cry');
+      const p2Buff = result.participantResults[1].activeEffectsAfter.find(e => e.name === 'Battle Cry');
+      expect(p1Buff).toBeDefined();
+      expect(p2Buff).toBeUndefined();
+    });
+  });
 });
