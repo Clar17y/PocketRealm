@@ -55,50 +55,65 @@ export async function getSkillPoints(playerId: string): Promise<SkillPointAlloca
   };
 }
 
-/** Allocate points to a talent node. */
+/** Allocate points to a talent node (atomic transaction to prevent double-spend). */
 export async function allocatePoints(playerId: string, nodeId: string): Promise<SkillPointAllocationData> {
   const node = getTalentNode(nodeId);
   if (!node) throw new AppError(404, `Talent node '${nodeId}' not found`, 'NODE_NOT_FOUND');
 
-  const state = await getSkillPoints(playerId);
-
-  if (state.allocations[nodeId]) {
-    throw new AppError(400, `Node '${nodeId}' is already unlocked`, 'ALREADY_ALLOCATED');
-  }
-
-  if (state.availablePoints < node.pointCost) {
-    throw new AppError(
-      400,
-      `Not enough skill points (need ${node.pointCost}, have ${state.availablePoints})`,
-      'INSUFFICIENT_POINTS',
-    );
-  }
-
-  for (const prereq of node.prerequisites) {
-    if (!state.allocations[prereq]) {
-      throw new AppError(400, `Prerequisite '${prereq}' not unlocked`, 'PREREQUISITE_NOT_MET');
-    }
-  }
-
-  if (node.skillLevelGate) {
-    const skill = await prisma.playerSkill.findFirst({
-      where: { playerId, skillType: node.skillLevelGate.skill },
+  await prisma.$transaction(async (tx: any) => {
+    // Read state inside transaction for consistent snapshot
+    const skills = await tx.playerSkill.findMany({
+      where: { playerId },
       select: { level: true },
     });
-    const level = skill?.level ?? 1;
-    if (level < node.skillLevelGate.level) {
+    const totalPointsEarned = skills.reduce((sum: number, s: { level: number }) => sum + (s.level - 1), 0) * SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL;
+
+    const record = await tx.skillPointAllocation.findUnique({ where: { playerId } });
+    const allocations: Record<string, number> = record
+      ? ((record.allocations as Record<string, number>) ?? {})
+      : ((await tx.skillPointAllocation.create({ data: { playerId, allocations: {} } })).allocations as Record<string, number>) ?? {};
+
+    const totalPointsSpent = Object.values(allocations).reduce((sum: number, v: number) => sum + v, 0);
+    const availablePoints = totalPointsEarned - totalPointsSpent;
+
+    if (allocations[nodeId]) {
+      throw new AppError(400, `Node '${nodeId}' is already unlocked`, 'ALREADY_ALLOCATED');
+    }
+
+    if (availablePoints < node.pointCost) {
       throw new AppError(
         400,
-        `Requires ${node.skillLevelGate.skill} level ${node.skillLevelGate.level} (current: ${level})`,
-        'SKILL_GATE_NOT_MET',
+        `Not enough skill points (need ${node.pointCost}, have ${availablePoints})`,
+        'INSUFFICIENT_POINTS',
       );
     }
-  }
 
-  const newAllocations = { ...state.allocations, [nodeId]: node.pointCost };
-  await prisma.skillPointAllocation.update({
-    where: { playerId },
-    data: { allocations: newAllocations as any },
+    for (const prereq of node.prerequisites) {
+      if (!allocations[prereq]) {
+        throw new AppError(400, `Prerequisite '${prereq}' not unlocked`, 'PREREQUISITE_NOT_MET');
+      }
+    }
+
+    if (node.skillLevelGate) {
+      const skill = await tx.playerSkill.findFirst({
+        where: { playerId, skillType: node.skillLevelGate.skill },
+        select: { level: true },
+      });
+      const level = skill?.level ?? 1;
+      if (level < node.skillLevelGate.level) {
+        throw new AppError(
+          400,
+          `Requires ${node.skillLevelGate.skill} level ${node.skillLevelGate.level} (current: ${level})`,
+          'SKILL_GATE_NOT_MET',
+        );
+      }
+    }
+
+    const newAllocations = { ...allocations, [nodeId]: node.pointCost };
+    await tx.skillPointAllocation.update({
+      where: { playerId },
+      data: { allocations: newAllocations as any },
+    });
   });
 
   return getSkillPoints(playerId);
