@@ -25,7 +25,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 12 | DONE | Skill point allocation not atomic — double-spend | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | `security/fix-12-skillpoint-atomic` |
 | 13 | DONE | Achievement claim race — double rewards | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | `security/fix-13-achievement-claim-race` |
 | 14 | DONE | XP buff fetched outside transaction — double boost | `2026-03-13-043032-shared-services-xp-durability-events.md` | `security/fix-14-xp-buff-race` |
-| 15 | TODO | Attribute points absolute write — silent loss | `2026-03-13-043032-shared-services-xp-durability-events.md` | |
+| 15 | DONE | Attribute points absolute write — silent loss | `2026-03-13-043032-shared-services-xp-durability-events.md` | `security/fix-15-attr-points-increment` |
 | 16 | TODO | Expedition force-round bypasses timing | `2026-03-13-034049-expedition-system.md` | |
 | 17 | TODO | Shop purchase token race — duplicate items | `2026-03-13-034049-expedition-system.md` | |
 | 18 | TODO | Travel refund includes tax inflation | `2026-03-13-025034-zones-hp-rest.md` | |
