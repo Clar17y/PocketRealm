@@ -4,6 +4,7 @@ import cors from 'cors';
 import 'dotenv/config';
 import compression from 'compression';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { authRouter } from './routes/auth';
 import { turnsRouter } from './routes/turns';
 import { playerRouter } from './routes/player';
@@ -87,7 +88,16 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
+
+// Global rate limiter: 120 requests per minute per IP
+app.use('/api/v1/', rateLimit({
+  windowMs: 60_000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later', code: 'RATE_LIMITED' },
+}));
 
 // Health check
 app.get('/health', (_req, res) => {
