@@ -77,9 +77,16 @@ export async function purchaseShopItem(
   const durability = template.maxDurability * EXPEDITION_CONSTANTS.SOULBOUND_DURABILITY_MULTIPLIER;
 
   const result = await prisma.$transaction(async (tx) => {
-    const updatedPlayer = await tx.player.update({
-      where: { id: playerId },
+    // Optimistic lock: only deduct if player still has enough tokens (prevents double-spend race)
+    const deducted = await tx.player.updateMany({
+      where: { id: playerId, expeditionTokens: { gte: shopItem.tokenCost } },
       data: { expeditionTokens: { decrement: shopItem.tokenCost } },
+    });
+    if (deducted.count === 0) {
+      throw new AppError(400, 'Insufficient expedition tokens', 'INSUFFICIENT_TOKENS');
+    }
+    const updatedPlayer = await tx.player.findUniqueOrThrow({
+      where: { id: playerId },
       select: { expeditionTokens: true },
     });
 
