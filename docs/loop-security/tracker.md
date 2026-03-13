@@ -7,7 +7,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | # | Status | Finding | Source File | Branch |
 |---|--------|---------|-------------|--------|
 | 1 | DONE | Hardcoded JWT secret fallback | `2026-03-13-023041-auth-system.md` | `security/fix-01-jwt-fallback` |
-| 2 | TODO | Pending loot double-claim — item duplication | `2026-03-13-021034-inventory-equipment.md` | |
+| 2 | DONE | Pending loot double-claim — item duplication | `2026-03-13-021034-inventory-equipment.md` | `security/fix-02-loot-double-claim` |
 | 3 | TODO | No zone presence validation (exploration + combat) | `2026-03-13-024036-exploration-combat-start.md` | |
 | 4 | TODO | POST /turns/spend publicly exposed | `2026-03-13-032031-gathering-turns-resources.md` | |
 | 5 | TODO | No global rate limiting | `2026-03-13-042037-cross-cutting-infrastructure.md` | |
