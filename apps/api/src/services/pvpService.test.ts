@@ -71,7 +71,7 @@ vi.mock('./pvpCombatantBuilder', () => ({
   }),
 }));
 vi.mock('@pocketrealm/game-engine', () => ({
-  calculateFleeResult: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1 }),
+  calculateFleeResult: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 }),
   runTemplateCombat: vi.fn().mockReturnValue({
     outcome: 'victory',
     log: [],
@@ -89,11 +89,27 @@ vi.mock('@pocketrealm/game-engine', () => ({
   calculateMaxStamina: vi.fn().mockReturnValue(100),
   calculateMaxMana: vi.fn().mockReturnValue(50),
 }));
+vi.mock('./combatLogMapper', () => ({
+  mapTemplateCombatLog: vi.fn().mockImplementation((log: unknown[]) => log),
+}));
+vi.mock('../utils/routeHelpers.js', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    trackAchievements: vi.fn().mockResolvedValue(undefined),
+    calculateFleeWithGold: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 }),
+  };
+});
 
 import { mockPrisma } from '../__test__/setup';
-import { getHpState } from './hpService';
+import { getHpState, enterRecoveringState, setHp } from './hpService';
 import { setAllResources } from './resourceService';
 import { runTemplateCombat } from '@pocketrealm/game-engine';
+import { calculateEloChange } from './eloService';
+import { degradeEquippedDurability } from './durabilityService';
+import { spendPlayerTurnsTx } from './turnBankService';
+import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
+import { PVP_CONSTANTS } from '@pocketrealm/shared';
 import {
   getOrCreateRating,
   getLadder,
@@ -102,32 +118,52 @@ import {
   getHistory,
   getMatchDetail,
   getNotificationCount,
+  getNotifications,
   markNotificationsRead,
   getScoutNotificationCount,
   getScoutNotifications,
   markScoutNotificationsRead,
 } from './pvpService';
 
-function setupChallengeMocks() {
+function setupChallengeMocks(overrides?: {
+  attackerRole?: string;
+  targetRole?: string;
+  attackerLevel?: number;
+  targetLevel?: number;
+  attackerRating?: number;
+  defenderRating?: number;
+  isBot?: boolean;
+}) {
+  const aRole = overrides?.attackerRole ?? 'player';
+  const tRole = overrides?.targetRole ?? 'player';
+  const aLevel = overrides?.attackerLevel ?? 10;
+  const tLevel = overrides?.targetLevel ?? 10;
+  const aRating = overrides?.attackerRating ?? 1000;
+  const dRating = overrides?.defenderRating ?? 1000;
+  const isBot = overrides?.isBot ?? false;
+
   mockPrisma.player.findUnique
-    .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' } })
-    .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, username: 'Target', isBot: false });
+    .mockResolvedValueOnce({ characterLevel: aLevel, attributes: {}, role: aRole, currentZone: { id: 'z1', zoneType: 'town' } })
+    .mockResolvedValueOnce({ characterLevel: tLevel, attributes: {}, username: 'Target', isBot, role: tRole });
   mockPrisma.pvpRating.upsert
-    .mockResolvedValueOnce({ playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: 1000 })
-    .mockResolvedValueOnce({ playerId: 'p2', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: 1000 });
+    .mockResolvedValueOnce({ playerId: 'p1', rating: aRating, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: aRating })
+    .mockResolvedValueOnce({ playerId: 'p2', rating: dRating, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: dRating });
   mockPrisma.pvpCooldown.findUnique.mockResolvedValue(null);
   mockPrisma.pvpMatch.findFirst.mockResolvedValue(null);
   mockPrisma.playerEquipment.findUnique.mockResolvedValue(null);
   mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
   mockPrisma.playerSkill.findUnique.mockResolvedValue({ level: 10 });
   mockPrisma.playerSkill.findMany.mockResolvedValue([{ level: 10 }]);
-  mockPrisma.pvpRating.findUnique.mockResolvedValue({ rating: 1000 });
+  mockPrisma.pvpRating.findUnique
+    .mockResolvedValueOnce({ rating: aRating })
+    .mockResolvedValueOnce({ rating: dRating });
   mockPrisma.pvpRating.update.mockResolvedValue({});
   mockPrisma.pvpMatch.create.mockResolvedValue({ id: 'match-1' });
   mockPrisma.pvpCooldown.upsert.mockResolvedValue({});
-  // Template combat needs combatTemplate mock
   mockPrisma.combatTemplate.findFirst.mockResolvedValue(null);
   mockPrisma.skillPointAllocation.findUnique.mockResolvedValue(null);
+  // For calculateFleeWithGold mock
+  mockPrisma.player.findUnique.mockResolvedValue({ gold: 500 });
 }
 
 describe('pvpService', () => {
@@ -141,16 +177,14 @@ describe('pvpService', () => {
 
   describe('getOrCreateRating', () => {
     it('calls prisma.pvpRating.upsert with starting rating', async () => {
-      const expected = { playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0 };
-      mockPrisma.pvpRating.upsert.mockResolvedValue(expected);
+      mockPrisma.pvpRating.upsert.mockResolvedValue({ playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0 });
 
-      const result = await getOrCreateRating('p1');
+      await getOrCreateRating('p1');
 
-      expect(result).toEqual(expected);
       expect(mockPrisma.pvpRating.upsert).toHaveBeenCalledWith({
         where: { playerId: 'p1' },
         update: {},
-        create: { playerId: 'p1', rating: 1000, bestRating: 1000 },
+        create: { playerId: 'p1', rating: PVP_CONSTANTS.STARTING_RATING, bestRating: PVP_CONSTANTS.STARTING_RATING },
       });
     });
   });
@@ -164,11 +198,12 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 5, losses: 3, draws: 1, winStreak: 2, bestRating: 1050,
       });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
       mockPrisma.pvpRating.findMany.mockResolvedValue([
         {
           playerId: 'p2', rating: 950,
-          player: { username: 'Rival', characterLevel: 15, activeTitle: null },
+          player: { username: 'Rival', characterLevel: 15, role: 'player', activeTitle: null },
         },
       ]);
 
@@ -184,15 +219,16 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([{ defenderId: 'p2' }]);
       mockPrisma.pvpRating.findMany.mockResolvedValue([
         {
           playerId: 'p2', rating: 950,
-          player: { username: 'CooldownGuy', characterLevel: 12, activeTitle: null },
+          player: { username: 'CooldownGuy', characterLevel: 12, role: 'player', activeTitle: null },
         },
         {
           playerId: 'p3', rating: 1020,
-          player: { username: 'Available', characterLevel: 14, activeTitle: null },
+          player: { username: 'Available', characterLevel: 14, role: 'player', activeTitle: null },
         },
       ]);
 
@@ -200,6 +236,84 @@ describe('pvpService', () => {
 
       expect(result.opponents).toHaveLength(1);
       expect(result.opponents[0].playerId).toBe('p3');
+    });
+
+    it('admin bypasses cooldown checks', async () => {
+      mockPrisma.pvpRating.upsert.mockResolvedValue({
+        playerId: 'admin1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
+      });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'admin' });
+      mockPrisma.pvpRating.findMany.mockResolvedValue([
+        {
+          playerId: 'p2', rating: 950,
+          player: { username: 'Target', characterLevel: 12, role: 'player', activeTitle: null },
+        },
+      ]);
+
+      const result = await getLadder('admin1');
+
+      // No pvpCooldown.findMany should be called for admins
+      expect(mockPrisma.pvpCooldown.findMany).not.toHaveBeenCalled();
+      expect(result.opponents).toHaveLength(1);
+    });
+
+    it('resolves title from activeTitle achievement', async () => {
+      mockPrisma.pvpRating.upsert.mockResolvedValue({
+        playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
+      });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
+      mockPrisma.pvpRating.findMany.mockResolvedValue([
+        {
+          playerId: 'p2', rating: 1000,
+          // Player has no active title
+          player: { username: 'NoTitle', characterLevel: 10, role: 'player', activeTitle: null },
+        },
+      ]);
+
+      const result = await getLadder('p1');
+
+      expect(result.opponents[0].title).toBeUndefined();
+      expect(result.opponents[0].titleTier).toBeUndefined();
+    });
+
+    it('returns isAdmin flag on opponents', async () => {
+      mockPrisma.pvpRating.upsert.mockResolvedValue({
+        playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
+      });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
+      mockPrisma.pvpRating.findMany.mockResolvedValue([
+        {
+          playerId: 'admin2', rating: 1000,
+          player: { username: 'AdminGuy', characterLevel: 10, role: 'admin', activeTitle: null },
+        },
+      ]);
+
+      const result = await getLadder('p1');
+
+      expect(result.opponents[0].isAdmin).toBe(true);
+    });
+
+    it('queries bracket range correctly', async () => {
+      mockPrisma.pvpRating.upsert.mockResolvedValue({
+        playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
+      });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
+      mockPrisma.pvpRating.findMany.mockResolvedValue([]);
+
+      await getLadder('p1');
+
+      const expectedLower = Math.floor(1000 * (1 - PVP_CONSTANTS.BRACKET_RANGE));
+      const expectedUpper = Math.ceil(1000 * (1 + PVP_CONSTANTS.BRACKET_RANGE));
+      expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            rating: { gte: expectedLower, lte: expectedUpper },
+          }),
+        }),
+      );
     });
   });
 
@@ -269,6 +383,114 @@ describe('pvpService', () => {
         data: { scouterId: 'p1', targetId: 'p2' },
       });
     });
+
+    it('spends SCOUT_TURN_COST turns after validation', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ currentZone: { zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 12, attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} });
+      mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+      mockPrisma.pvpScoutLog.create.mockResolvedValue({});
+
+      await scoutOpponent('p1', 'p2');
+
+      expect(spendPlayerTurnsTx).toHaveBeenCalledWith(
+        expect.anything(), 'p1', PVP_CONSTANTS.SCOUT_TURN_COST,
+      );
+    });
+
+    it('detects ranged attack style from main hand weapon', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ currentZone: { zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 12, attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} });
+      mockPrisma.playerEquipment.findMany.mockResolvedValue([
+        { slot: 'main_hand', item: { template: { requiredSkill: 'ranged' } } },
+      ]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+      mockPrisma.pvpScoutLog.create.mockResolvedValue({});
+
+      const result = await scoutOpponent('p1', 'p2');
+
+      expect(result.attackStyle).toBe('ranged');
+    });
+
+    it('detects magic attack style from main hand weapon', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ currentZone: { zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 12, attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} });
+      mockPrisma.playerEquipment.findMany.mockResolvedValue([
+        { slot: 'main_hand', item: { template: { requiredSkill: 'magic' } } },
+      ]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+      mockPrisma.pvpScoutLog.create.mockResolvedValue({});
+
+      const result = await scoutOpponent('p1', 'p2');
+
+      expect(result.attackStyle).toBe('magic');
+    });
+
+    it('defaults to melee with no main hand weapon', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ currentZone: { zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 12, attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} });
+      mockPrisma.playerEquipment.findMany.mockResolvedValue([
+        { slot: 'chest', item: { template: { requiredSkill: null } } },
+      ]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+      mockPrisma.pvpScoutLog.create.mockResolvedValue({});
+
+      const result = await scoutOpponent('p1', 'p2');
+
+      expect(result.attackStyle).toBe('melee');
+    });
+
+    it('detects armor class from chest piece', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ currentZone: { zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 12, attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} });
+      mockPrisma.playerEquipment.findMany.mockResolvedValue([
+        { slot: 'chest', item: { template: { weightClass: 'heavy' } } },
+      ]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+      mockPrisma.pvpScoutLog.create.mockResolvedValue({});
+
+      const result = await scoutOpponent('p1', 'p2');
+
+      expect(result.armorClass).toBe('heavy');
+    });
+
+    it('armorClass defaults to none with no chest piece', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ currentZone: { zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 12, attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} })
+        .mockResolvedValueOnce({ attributes: {} });
+      mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+      mockPrisma.pvpScoutLog.create.mockResolvedValue({});
+
+      const result = await scoutOpponent('p1', 'p2');
+
+      expect(result.armorClass).toBe('none');
+    });
+
+    it('throws when attacker zone is null', async () => {
+      mockPrisma.player.findUnique.mockResolvedValue({
+        currentZone: null,
+      });
+
+      await expect(scoutOpponent('p1', 'p2')).rejects.toThrow('Must be in a town to scout');
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -294,10 +516,80 @@ describe('pvpService', () => {
 
     it('throws if attacker is not in a town', async () => {
       mockPrisma.player.findUnique.mockResolvedValue({
-        characterLevel: 10, attributes: {}, currentZone: { id: 'z1', zoneType: 'wild' },
+        characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'wild' },
       });
 
       await expect(challenge('p1', 'Attacker', 'p2')).rejects.toThrow('Must be in a town to challenge');
+    });
+
+    it('throws if attacker not found', async () => {
+      mockPrisma.player.findUnique.mockResolvedValue(null);
+
+      await expect(challenge('p1', 'Attacker', 'p2')).rejects.toThrow('Player not found');
+    });
+
+    it('throws if attacker below minimum character level', async () => {
+      mockPrisma.player.findUnique.mockResolvedValue({
+        characterLevel: PVP_CONSTANTS.MIN_CHARACTER_LEVEL - 1,
+        attributes: {},
+        role: 'player',
+        currentZone: { id: 'z1', zoneType: 'town' },
+      });
+
+      await expect(challenge('p1', 'Attacker', 'p2')).rejects.toThrow(
+        `Must be character level ${PVP_CONSTANTS.MIN_CHARACTER_LEVEL}+`,
+      );
+    });
+
+    it('throws if on cooldown (non-admin)', async () => {
+      mockPrisma.player.findUnique.mockResolvedValue({
+        characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' },
+      });
+      mockPrisma.pvpCooldown.findUnique.mockResolvedValue({
+        expiresAt: new Date(Date.now() + 3_600_000), // 1 hour in the future
+      });
+
+      await expect(challenge('p1', 'Attacker', 'p2')).rejects.toThrow('Opponent is on cooldown');
+    });
+
+    it('admin bypasses cooldown', async () => {
+      setupChallengeMocks({ attackerRole: 'admin' });
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(mockPrisma.pvpCooldown.findUnique).not.toHaveBeenCalled();
+      expect(result.matchId).toBe('match-1');
+    });
+
+    it('throws if target not found', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' } })
+        .mockResolvedValueOnce(null);
+      mockPrisma.pvpCooldown.findUnique.mockResolvedValue(null);
+
+      await expect(challenge('p1', 'Attacker', 'p2')).rejects.toThrow('Target not found');
+    });
+
+    it('throws if target below minimum level', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: PVP_CONSTANTS.MIN_CHARACTER_LEVEL - 1, attributes: {}, username: 'LowLevel', isBot: false, role: 'player' });
+      mockPrisma.pvpCooldown.findUnique.mockResolvedValue(null);
+
+      await expect(challenge('p1', 'Attacker', 'p2')).rejects.toThrow('Target below minimum level');
+    });
+
+    it('throws if target is outside rating bracket', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, username: 'FarAway', isBot: false, role: 'player' });
+      mockPrisma.pvpCooldown.findUnique.mockResolvedValue(null);
+      // Attacker at 1000, defender at 2000 — outside 25% bracket
+      mockPrisma.pvpRating.upsert
+        .mockResolvedValueOnce({ playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: 1000 })
+        .mockResolvedValueOnce({ playerId: 'p2', rating: 2000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: 2000 });
+
+      await expect(challenge('p1', 'Attacker', 'p2')).rejects.toThrow('Target is outside your rating bracket');
     });
 
     it('uses runTemplateCombat and returns match result', async () => {
@@ -340,6 +632,7 @@ describe('pvpService', () => {
         potionsConsumed: [],
         totalRounds: 10,
       } as any);
+      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'escape', remainingHp: 1, goldLost: 0 });
       setupChallengeMocks();
 
       const result = await challenge('p1', 'Attacker', 'p2');
@@ -356,6 +649,219 @@ describe('pvpService', () => {
       expect(mockPrisma.pvpMatch.create).toHaveBeenCalled();
       expect(mockPrisma.pvpCooldown.upsert).toHaveBeenCalled();
       expect(mockPrisma.pvpRating.update).toHaveBeenCalledTimes(2);
+    });
+
+    it('detects revenge match and uses reduced turn cost', async () => {
+      setupChallengeMocks();
+      // Override: there was a recent match where target attacked us
+      mockPrisma.pvpMatch.findFirst.mockResolvedValue({
+        attackerId: 'p2',
+        defenderId: 'p1',
+        createdAt: new Date(), // recent
+      });
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(result.isRevenge).toBe(true);
+      expect(result.turnsSpent).toBe(PVP_CONSTANTS.REVENGE_TURN_COST);
+      // spendPlayerTurnsTx called with revenge cost
+      expect(spendPlayerTurnsTx).toHaveBeenCalledWith(
+        expect.anything(), 'p1', PVP_CONSTANTS.REVENGE_TURN_COST, expect.any(Date),
+      );
+    });
+
+    it('uses normal turn cost when not revenge', async () => {
+      setupChallengeMocks();
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(result.isRevenge).toBe(false);
+      expect(result.turnsSpent).toBe(PVP_CONSTANTS.CHALLENGE_TURN_COST);
+    });
+
+    it('handles draw outcome correctly', async () => {
+      vi.mocked(runTemplateCombat).mockReturnValueOnce({
+        outcome: 'draw',
+        log: [],
+        combatantAMaxHp: 100,
+        combatantBMaxHp: 100,
+        combatantAHpRemaining: 50,
+        combatantBHpRemaining: 50,
+        combatantAStaminaRemaining: 60,
+        combatantBStaminaRemaining: 60,
+        combatantAManaRemaining: 30,
+        combatantBManaRemaining: 30,
+        potionsConsumed: [],
+        totalRounds: 100,
+      } as any);
+      vi.mocked(calculateEloChange).mockReturnValueOnce({ deltaA: 0, deltaB: 0 });
+      setupChallengeMocks();
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(result.isDraw).toBe(true);
+      expect(result.winnerId).toBeNull();
+    });
+
+    it('zeroes ELO changes when attacker is admin', async () => {
+      setupChallengeMocks({ attackerRole: 'admin' });
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(result.attackerRatingChange).toBe(0);
+      expect(result.defenderRatingChange).toBe(0);
+    });
+
+    it('zeroes ELO changes when defender is admin', async () => {
+      setupChallengeMocks({ targetRole: 'admin' });
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(result.attackerRatingChange).toBe(0);
+      expect(result.defenderRatingChange).toBe(0);
+    });
+
+    it('admin does not get cooldown upserted', async () => {
+      setupChallengeMocks({ attackerRole: 'admin' });
+
+      await challenge('p1', 'Attacker', 'p2');
+
+      expect(mockPrisma.pvpCooldown.upsert).not.toHaveBeenCalled();
+    });
+
+    it('enters knockout state when flee result is knockout', async () => {
+      vi.mocked(runTemplateCombat).mockReturnValueOnce({
+        outcome: 'defeat',
+        log: [],
+        combatantAMaxHp: 100,
+        combatantBMaxHp: 100,
+        combatantAHpRemaining: 0,
+        combatantBHpRemaining: 50,
+        combatantAStaminaRemaining: 0,
+        combatantBStaminaRemaining: 100,
+        combatantAManaRemaining: 0,
+        combatantBManaRemaining: 50,
+        potionsConsumed: [],
+        totalRounds: 10,
+      } as any);
+      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'knockout', remainingHp: 0, goldLost: 50 });
+      setupChallengeMocks();
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(result.attackerKnockedOut).toBe(true);
+      expect(result.fleeOutcome).toBe('knockout');
+      expect(enterRecoveringState).toHaveBeenCalledWith('p1', 100);
+      expect(trackAchievements).toHaveBeenCalledWith('p1', { totalDeaths: 1 });
+    });
+
+    it('sets HP on escape (not knockout) after defeat', async () => {
+      vi.mocked(runTemplateCombat).mockReturnValueOnce({
+        outcome: 'defeat',
+        log: [],
+        combatantAMaxHp: 100,
+        combatantBMaxHp: 100,
+        combatantAHpRemaining: 0,
+        combatantBHpRemaining: 50,
+        combatantAStaminaRemaining: 0,
+        combatantBStaminaRemaining: 100,
+        combatantAManaRemaining: 0,
+        combatantBManaRemaining: 50,
+        potionsConsumed: [],
+        totalRounds: 10,
+      } as any);
+      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'escape', remainingHp: 5, goldLost: 0 });
+      setupChallengeMocks();
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(result.attackerKnockedOut).toBe(false);
+      expect(result.fleeOutcome).toBe('escape');
+      expect(setHp).toHaveBeenCalledWith('p1', 5);
+      expect(enterRecoveringState).not.toHaveBeenCalled();
+    });
+
+    it('skips durability degradation for bot defenders', async () => {
+      setupChallengeMocks({ isBot: true });
+
+      await challenge('p1', 'Attacker', 'p2');
+
+      // degradeEquippedDurability should only be called once (attacker), not for bot
+      expect(degradeEquippedDurability).toHaveBeenCalledTimes(1);
+      expect(degradeEquippedDurability).toHaveBeenCalledWith('p1', expect.any(Array), 'combatantA');
+    });
+
+    it('degrades durability for both human players', async () => {
+      setupChallengeMocks({ isBot: false });
+
+      await challenge('p1', 'Attacker', 'p2');
+
+      expect(degradeEquippedDurability).toHaveBeenCalledTimes(2);
+      expect(degradeEquippedDurability).toHaveBeenCalledWith('p1', expect.any(Array), 'combatantA');
+      expect(degradeEquippedDurability).toHaveBeenCalledWith('p2', expect.any(Array), 'combatantB');
+    });
+
+    it('returns durability info for both attacker and defender', async () => {
+      const attackerDur = [{ itemId: 'item1', newDurability: 95 }];
+      const defenderDur = [{ itemId: 'item2', newDurability: 90 }];
+      vi.mocked(degradeEquippedDurability)
+        .mockResolvedValueOnce(attackerDur as any)
+        .mockResolvedValueOnce(defenderDur as any);
+      setupChallengeMocks();
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(result.durability.attacker).toEqual(attackerDur);
+      expect(result.durability.defender).toEqual(defenderDur);
+    });
+
+    it('winner is target when attacker loses', async () => {
+      vi.mocked(runTemplateCombat).mockReturnValueOnce({
+        outcome: 'defeat',
+        log: [],
+        combatantAMaxHp: 100,
+        combatantBMaxHp: 100,
+        combatantAHpRemaining: 0,
+        combatantBHpRemaining: 80,
+        combatantAStaminaRemaining: 0,
+        combatantBStaminaRemaining: 100,
+        combatantAManaRemaining: 0,
+        combatantBManaRemaining: 50,
+        potionsConsumed: [],
+        totalRounds: 8,
+      } as any);
+      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'escape', remainingHp: 1, goldLost: 0 });
+      setupChallengeMocks();
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(result.winnerId).toBe('p2');
+    });
+
+    it('expired cooldown does not block challenge', async () => {
+      mockPrisma.player.findUnique
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, username: 'Target', isBot: false, role: 'player' });
+      mockPrisma.pvpCooldown.findUnique.mockResolvedValue({
+        expiresAt: new Date(Date.now() - 1000), // expired
+      });
+      mockPrisma.pvpRating.upsert
+        .mockResolvedValueOnce({ playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: 1000 })
+        .mockResolvedValueOnce({ playerId: 'p2', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: 1000 });
+      mockPrisma.pvpMatch.findFirst.mockResolvedValue(null);
+      mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
+      mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+      mockPrisma.pvpRating.findUnique
+        .mockResolvedValueOnce({ rating: 1000 })
+        .mockResolvedValueOnce({ rating: 1000 });
+      mockPrisma.pvpRating.update.mockResolvedValue({});
+      mockPrisma.pvpMatch.create.mockResolvedValue({ id: 'match-2' });
+      mockPrisma.pvpCooldown.upsert.mockResolvedValue({});
+      mockPrisma.player.findUnique.mockResolvedValue({ gold: 0 });
+
+      const result = await challenge('p1', 'Attacker', 'p2');
+
+      expect(result.matchId).toBe('match-2');
     });
   });
 
@@ -404,6 +910,46 @@ describe('pvpService', () => {
       expect(result.pagination.hasNext).toBe(true);
       expect(result.pagination.hasPrevious).toBe(true);
     });
+
+    it('queries for matches as attacker OR defender', async () => {
+      mockPrisma.pvpMatch.findMany.mockResolvedValue([]);
+      mockPrisma.pvpMatch.count.mockResolvedValue(0);
+
+      await getHistory('p1', 1, 10);
+
+      expect(mockPrisma.pvpMatch.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { OR: [{ attackerId: 'p1' }, { defenderId: 'p1' }] },
+        }),
+      );
+    });
+
+    it('serializes createdAt to ISO string', async () => {
+      const date = new Date('2026-03-01T09:30:00Z');
+      mockPrisma.pvpMatch.findMany.mockResolvedValue([{
+        id: 'm1', attackerId: 'p1', defenderId: 'p2', winnerId: 'p1',
+        attacker: { username: 'A' }, defender: { username: 'B' },
+        attackerRating: 1000, defenderRating: 900,
+        attackerRatingChange: 10, defenderRatingChange: -10,
+        attackerStyle: 'melee', defenderStyle: 'ranged',
+        isRevenge: false, turnsSpent: 500,
+        createdAt: date,
+      }]);
+      mockPrisma.pvpMatch.count.mockResolvedValue(1);
+
+      const result = await getHistory('p1', 1, 10);
+
+      expect(result.matches[0].createdAt).toBe('2026-03-01T09:30:00.000Z');
+    });
+
+    it('returns empty matches array for no results', async () => {
+      mockPrisma.pvpMatch.findMany.mockResolvedValue([]);
+      mockPrisma.pvpMatch.count.mockResolvedValue(0);
+
+      const result = await getHistory('p1', 1, 10);
+
+      expect(result.matches).toEqual([]);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -429,7 +975,7 @@ describe('pvpService', () => {
       await expect(getMatchDetail('p1', 'm1')).rejects.toThrow('Not authorized to view this match');
     });
 
-    it('returns match detail for participant', async () => {
+    it('returns match detail for attacker', async () => {
       mockPrisma.pvpMatch.findUnique.mockResolvedValue({
         id: 'm1',
         attackerId: 'p1',
@@ -455,6 +1001,33 @@ describe('pvpService', () => {
       expect(result.attackerName).toBe('Attacker');
       expect(result.combatLog).toEqual({ log: [] });
     });
+
+    it('allows defender to view match', async () => {
+      mockPrisma.pvpMatch.findUnique.mockResolvedValue({
+        id: 'm1',
+        attackerId: 'p1',
+        defenderId: 'p2',
+        winnerId: 'p1',
+        attacker: { username: 'Attacker' },
+        defender: { username: 'Defender' },
+        attackerRating: 1000,
+        defenderRating: 980,
+        attackerRatingChange: 16,
+        defenderRatingChange: -16,
+        attackerStyle: 'melee',
+        defenderStyle: 'melee',
+        isRevenge: true,
+        turnsSpent: 250,
+        createdAt: new Date('2026-02-01T12:00:00Z'),
+        combatLog: { log: [{ action: 'attack' }] },
+      });
+
+      const result = await getMatchDetail('p2', 'm1');
+
+      expect(result.matchId).toBe('m1');
+      expect(result.isRevenge).toBe(true);
+    });
+
   });
 
   // -------------------------------------------------------------------------
@@ -470,6 +1043,62 @@ describe('pvpService', () => {
       expect(result).toBe(3);
       expect(mockPrisma.pvpMatch.count).toHaveBeenCalledWith({
         where: { defenderId: 'p1', defenderRead: false },
+      });
+    });
+
+    it('returns 0 when no unread notifications', async () => {
+      mockPrisma.pvpMatch.count.mockResolvedValue(0);
+
+      const result = await getNotificationCount('p1');
+
+      expect(result).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getNotifications
+  // -------------------------------------------------------------------------
+
+  describe('getNotifications', () => {
+    it('returns unread matches as defender with attacker info', async () => {
+      const matches = [
+        {
+          id: 'm1', attackerId: 'p2', defenderId: 'p1', defenderRead: false,
+          createdAt: new Date(), winnerId: 'p2',
+          attacker: { username: 'Rival1' },
+        },
+        {
+          id: 'm2', attackerId: 'p3', defenderId: 'p1', defenderRead: false,
+          createdAt: new Date(), winnerId: 'p1',
+          attacker: { username: 'Rival2' },
+        },
+      ];
+      mockPrisma.pvpMatch.findMany.mockResolvedValue(matches);
+
+      const result = await getNotifications('p1');
+
+      expect(result).toHaveLength(2);
+      expect(result[0].attacker.username).toBe('Rival1');
+      expect(result[1].attacker.username).toBe('Rival2');
+    });
+
+    it('returns empty array when no unread notifications', async () => {
+      mockPrisma.pvpMatch.findMany.mockResolvedValue([]);
+
+      const result = await getNotifications('p1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('queries with correct where clause and ordering', async () => {
+      mockPrisma.pvpMatch.findMany.mockResolvedValue([]);
+
+      await getNotifications('p1');
+
+      expect(mockPrisma.pvpMatch.findMany).toHaveBeenCalledWith({
+        where: { defenderId: 'p1', defenderRead: false },
+        include: { attacker: { select: { username: true } } },
+        orderBy: { createdAt: 'desc' },
       });
     });
   });
@@ -517,6 +1146,14 @@ describe('pvpService', () => {
         where: { targetId: 'p1', isRead: false },
       });
     });
+
+    it('returns 0 when no unread scouts', async () => {
+      mockPrisma.pvpScoutLog.count.mockResolvedValue(0);
+
+      const result = await getScoutNotificationCount('p1');
+
+      expect(result).toBe(0);
+    });
   });
 
   describe('getScoutNotifications', () => {
@@ -532,6 +1169,14 @@ describe('pvpService', () => {
       expect(result[0].id).toBe('s1');
       expect(result[0].scouterName).toBe('Scout1');
       expect(result[0].createdAt).toBe('2026-03-01T12:00:00.000Z');
+    });
+
+    it('returns empty array when no unread scouts', async () => {
+      mockPrisma.pvpScoutLog.findMany.mockResolvedValue([]);
+
+      const result = await getScoutNotifications('p1');
+
+      expect(result).toEqual([]);
     });
   });
 
