@@ -20,7 +20,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 7 | DONE | Teleport scroll bypasses travel restrictions | `2026-03-13-035034-quests-shop.md` | `security/fix-07-teleport-checks` |
 | 8 | DONE | Boss HP scaling corruption — write before optimistic lock | `2026-03-13-022037-boss-encounters.md` | `security/fix-08-boss-hp-race` |
 | 9 | DONE | Gathering uses client-provided zone ID | `2026-03-13-032031-gathering-turns-resources.md` | `security/fix-09-gathering-zone` |
-| 10 | TODO | Refresh token reuse via activity window bypass | `2026-03-13-023041-auth-system.md` | |
+| 10 | DONE | Refresh token reuse via activity window bypass | `2026-03-13-023041-auth-system.md` | `security/fix-10-refresh-token-reuse` |
 | 11 | TODO | Guild creation: turn spend outside transaction | `2026-03-13-020038-guild-system.md` | |
 | 12 | TODO | Skill point allocation not atomic — double-spend | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | |
 | 13 | TODO | Achievement claim race — double rewards | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | |
