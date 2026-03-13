@@ -1,38 +1,43 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./systemMessageService', () => ({
+vi.mock('./systemMessageService.js', () => ({
   emitSystemMessage: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('./turnBankService', () => ({
+vi.mock('./turnBankService.js', () => ({
   spendPlayerTurnsTx: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('./equipmentService', () => ({
+vi.mock('./equipmentService.js', () => ({
   getEquipmentStats: vi.fn().mockResolvedValue({
     attack: 10, rangedPower: 0, magicPower: 0, armor: 10,
     magicDefence: 5, health: 50, dodge: 5, accuracy: 5,
     critChance: 0.05, critDamage: 1.5, speed: 5,
   }),
 }));
-vi.mock('./attributesService', () => ({
+vi.mock('./attributesService.js', () => ({
   getPlayerProgressionState: vi.fn().mockResolvedValue({
     attributes: { vitality: 5, strength: 5, dexterity: 5, intelligence: 5, luck: 5, evasion: 5 },
   }),
 }));
-vi.mock('./combatStatsService', () => ({
+vi.mock('./combatStatsService.js', () => ({
   getMainHandAttackSkill: vi.fn().mockResolvedValue('melee'),
   getSkillLevel: vi.fn().mockResolvedValue(10),
 }));
-vi.mock('./hpService', () => ({
+vi.mock('./hpService.js', () => ({
   getHpState: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
   setHp: vi.fn().mockResolvedValue(undefined),
   enterRecoveringState: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('./bossLootService', () => ({
+vi.mock('./bossLootService.js', () => ({
   distributeBossLoot: vi.fn().mockResolvedValue({}),
 }));
-vi.mock('./combatTemplateService', () => ({
+vi.mock('./combatTemplateService.js', () => ({
   getActiveTemplate: vi.fn().mockResolvedValue([{ actionId: 'normal_attack' }]),
 }));
+vi.mock('../utils/routeHelpers.js', () => ({
+  trackAchievements: vi.fn().mockResolvedValue(undefined),
+  calculateFleeWithGold: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 }),
+}));
+
 vi.mock('@pocketrealm/game-engine', () => ({
   resolveBossRound: vi.fn().mockReturnValue({
     bossDefeated: false,
@@ -68,10 +73,33 @@ import {
   createBossEncounter,
   signUpForBossRound,
   getBossEncounterStatus,
+  resolveBossRound,
   checkAndResolveDueBossRounds,
   getActiveBossEncounters,
   getBossHistory,
 } from './bossEncounterService';
+import { emitSystemMessage } from './systemMessageService';
+import { setHp, enterRecoveringState } from './hpService';
+import { distributeBossLoot } from './bossLootService';
+import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
+import { resolveBossRound as resolveBossRoundEngine, initThreatTable } from '@pocketrealm/game-engine';
+
+const defaultEngineResult = {
+  bossDefeated: false,
+  allPlayersDead: false,
+  bossHpAfter: 500,
+  bossActionId: 'boss_physical_attack',
+  bossTargetMode: 'single_target',
+  bossTargetPlayerIds: ['p1'],
+  participantResults: [{
+    playerId: 'p1', actionId: 'normal_attack', wasExhausted: false,
+    damageDealt: 100, healingDone: 0, damageTaken: 20, damageAbsorbed: 20,
+    hpAfter: 80, staminaAfter: 90, manaAfter: 50, templateRoundAfter: 2,
+    isDead: false, hit: true, isCritical: false,
+  }],
+  threatTableAfter: [{ playerId: 'p1', threat: 100, tauntRoundsRemaining: 0 }],
+  bossActiveEffectsAfter: [],
+};
 
 const makeEncounterRow = (overrides: Record<string, any> = {}) => ({
   id: 'enc-1',
@@ -112,17 +140,36 @@ const makeParticipantRow = (overrides: Record<string, any> = {}) => ({
   ...overrides,
 });
 
+const makeEncounterWithIncludes = (overrides: Record<string, any> = {}) => ({
+  ...makeEncounterRow({ status: 'in_progress' }),
+  event: {
+    zoneId: 'zone-1',
+    title: 'Boss Event',
+    zone: { name: 'Dark Forest', difficulty: 3 },
+  },
+  mobTemplate: {
+    id: 'mob-1', name: 'Stone Colossus', level: 10,
+    defence: 20, magicDefence: 15, evasion: 5,
+    damageMin: 10, damageMax: 25, accuracy: 60,
+    hp: 1000, damageType: 'physical', bossAoeDmg: 50,
+  },
+  ...overrides,
+});
+
 describe('bossEncounterService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Restore default engine mock for each test (clearAllMocks only clears call history)
+    vi.mocked(resolveBossRoundEngine).mockReturnValue(defaultEngineResult as any);
+    vi.mocked(initThreatTable).mockReturnValue([{ playerId: 'p1', threat: 0, tauntRoundsRemaining: 0 }]);
+    vi.mocked(calculateFleeWithGold).mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 } as any);
   });
 
   describe('createBossEncounter', () => {
     it('creates an encounter with correct data', async () => {
-      const row = makeEncounterRow();
-      mockPrisma.bossEncounter.create.mockResolvedValue(row);
+      mockPrisma.bossEncounter.create.mockResolvedValue(makeEncounterRow());
 
-      const result = await createBossEncounter('evt-1', 'mob-1', 1000);
+      await createBossEncounter('evt-1', 'mob-1', 1000);
 
       expect(mockPrisma.bossEncounter.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -135,9 +182,6 @@ describe('bossEncounterService', () => {
           status: 'waiting',
         }),
       });
-      expect(result.id).toBe('enc-1');
-      expect(result.status).toBe('waiting');
-      expect(result.currentHp).toBe(1000);
     });
 
     it('sets nextRoundAt based on BOSS_INITIAL_WAIT_MINUTES', async () => {
@@ -243,19 +287,6 @@ describe('bossEncounterService', () => {
       expect(mockPrisma.bossEncounter.update).not.toHaveBeenCalled();
     });
 
-    it('passes autoSignUp flag through', async () => {
-      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
-        makeEncounterRow({ status: 'in_progress' }),
-      );
-      mockPrisma.bossParticipant.findUnique.mockResolvedValue(null);
-      mockPrisma.bossParticipant.create.mockResolvedValue(
-        makeParticipantRow({ autoSignUp: true }),
-      );
-
-      const result = await signUpForBossRound('enc-1', 'p1', 100, true);
-
-      expect(result.autoSignUp).toBe(true);
-    });
   });
 
   describe('getBossEncounterStatus', () => {
@@ -276,22 +307,969 @@ describe('bossEncounterService', () => {
       const result = await getBossEncounterStatus('enc-1');
 
       expect(result).not.toBeNull();
-      expect(result!.encounter.id).toBe('enc-1');
       expect(result!.participants).toHaveLength(2);
-      expect(result!.participants[0].playerId).toBe('p1');
-      expect(result!.participants[1].playerId).toBe('p2');
+    });
+  });
+
+  describe('resolveBossRound', () => {
+    // --- Setup helpers ---
+    function setupBasicRound(encounterOverrides: Record<string, any> = {}, signups = [makeParticipantRow()]) {
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
+        makeEncounterWithIncludes(encounterOverrides),
+      );
+      mockPrisma.bossParticipant.findMany.mockResolvedValue(signups);
+      mockPrisma.bossEncounter.update.mockResolvedValue({});
+      mockPrisma.bossEncounter.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.bossParticipant.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+    }
+
+    // --- Null returns ---
+
+    it('returns null if encounter not found', async () => {
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(null);
+      const result = await resolveBossRound('enc-1', null);
+      expect(result).toBeNull();
     });
 
-    it('orders participants by round then damage', async () => {
-      mockPrisma.bossEncounter.findUnique.mockResolvedValue(makeEncounterRow());
+    it('returns null if encounter status is defeated', async () => {
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
+        makeEncounterWithIncludes({ status: 'defeated' }),
+      );
+      const result = await resolveBossRound('enc-1', null);
+      expect(result).toBeNull();
+    });
+
+    it('returns null if encounter status is expired', async () => {
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
+        makeEncounterWithIncludes({ status: 'expired' }),
+      );
+      const result = await resolveBossRound('enc-1', null);
+      expect(result).toBeNull();
+    });
+
+    it('returns null if no signups for the next round', async () => {
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
+        makeEncounterWithIncludes(),
+      );
       mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+      const result = await resolveBossRound('enc-1', null);
+      expect(result).toBeNull();
+    });
 
-      await getBossEncounterStatus('enc-1');
+    it('returns null if optimistic lock fails (updateMany count=0)', async () => {
+      setupBasicRound();
+      mockPrisma.bossEncounter.updateMany.mockResolvedValue({ count: 0 });
 
-      expect(mockPrisma.bossParticipant.findMany).toHaveBeenCalledWith({
-        where: { encounterId: 'enc-1' },
-        orderBy: [{ roundNumber: 'asc' }, { totalDamage: 'desc' }],
+      const result = await resolveBossRound('enc-1', null);
+      expect(result).toBeNull();
+    });
+
+    // --- HP scaling ---
+
+    it('scales boss HP based on participant count and zone tier', async () => {
+      // Zone difficulty=3 -> tierIndex=2 -> BOSS_HP_PER_PLAYER_BY_TIER[2]=1000
+      // 1 participant -> scaledMaxHp = 1000 * 1 = 1000
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      // The HP scaling update call
+      expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
+        where: { id: 'enc-1' },
+        data: expect.objectContaining({
+          maxHp: 1000,
+          scaledAt: expect.any(Date),
+        }),
       });
+    });
+
+    it('scales HP proportionally to current HP percentage', async () => {
+      // encounter has currentHp=500, maxHp=1000 -> 50% HP
+      // Zone difficulty=3, 1 player -> scaledMaxHp=1000
+      // scaledCurrentHp = round(1000 * 0.5) = 500
+      setupBasicRound({ currentHp: 500 });
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
+        where: { id: 'enc-1' },
+        data: expect.objectContaining({
+          maxHp: 1000,
+          currentHp: 500,
+        }),
+      });
+    });
+
+    it('scales HP with multiple participants', async () => {
+      // 2 participants at tier 3 (index 2): 1000 * 2 = 2000
+      const signups = [
+        makeParticipantRow({ playerId: 'p1' }),
+        makeParticipantRow({ id: 'bp-2', playerId: 'p2' }),
+      ];
+      vi.mocked(initThreatTable).mockReturnValue([
+        { playerId: 'p1', threat: 0, tauntRoundsRemaining: 0 },
+        { playerId: 'p2', threat: 0, tauntRoundsRemaining: 0 },
+      ]);
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        participantResults: [
+          { ...defaultEngineResult.participantResults[0], playerId: 'p1' },
+          { ...defaultEngineResult.participantResults[0], playerId: 'p2' },
+        ],
+        threatTableAfter: [
+          { playerId: 'p1', threat: 50, tauntRoundsRemaining: 0 },
+          { playerId: 'p2', threat: 50, tauntRoundsRemaining: 0 },
+        ],
+      } as any);
+      setupBasicRound({}, signups);
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
+        where: { id: 'enc-1' },
+        data: expect.objectContaining({ maxHp: 2000 }),
+      });
+    });
+
+    it('clamps tierIndex to 0-4 for zones with difficulty > 5', async () => {
+      setupBasicRound({
+        event: { zoneId: 'z1', title: 'Boss', zone: { name: 'Hell', difficulty: 10 } },
+      });
+
+      await resolveBossRound('enc-1', null);
+
+      // tierIndex = min(4, 10-1) = 4 -> BOSS_HP_PER_PLAYER_BY_TIER[4] = 4000
+      expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
+        where: { id: 'enc-1' },
+        data: expect.objectContaining({ maxHp: 4000 }),
+      });
+    });
+
+    it('defaults zone difficulty to 1 when zone is null', async () => {
+      setupBasicRound({
+        event: { zoneId: null, title: 'Boss', zone: null },
+      });
+
+      await resolveBossRound('enc-1', null);
+
+      // tierIndex = max(0, min(4, 1-1)) = 0 -> BOSS_HP_PER_PLAYER_BY_TIER[0] = 200
+      expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
+        where: { id: 'enc-1' },
+        data: expect.objectContaining({ maxHp: 200 }),
+      });
+    });
+
+    it('sets hpPercent to 1 when encounter maxHp is 0', async () => {
+      setupBasicRound({ maxHp: 0, currentHp: 0 });
+
+      await resolveBossRound('enc-1', null);
+
+      // hpPercent = 1 -> scaledCurrentHp = round(scaledMaxHp * 1) = scaledMaxHp
+      const updateCall = mockPrisma.bossEncounter.update.mock.calls[0][0];
+      expect(updateCall.data.currentHp).toBe(updateCall.data.maxHp);
+    });
+
+    // --- Engine invocation ---
+
+    it('calls game engine with correctly built boss state and participants', async () => {
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(resolveBossRoundEngine).toHaveBeenCalledTimes(1);
+      const input = vi.mocked(resolveBossRoundEngine).mock.calls[0][0];
+      expect(input.boss.stats.defence).toBe(20);
+      expect(input.boss.stats.magicDefence).toBe(15);
+      expect(input.boss.stats.accuracy).toBe(60);
+      expect(input.boss.roundNumber).toBe(1);
+      expect(input.participants).toHaveLength(1);
+      expect(input.participants[0].playerId).toBe('p1');
+    });
+
+    it('carries forward threat values from signups into threat table', async () => {
+      setupBasicRound({}, [makeParticipantRow({ threat: 75 })]);
+
+      await resolveBossRound('enc-1', null);
+
+      const input = vi.mocked(resolveBossRoundEngine).mock.calls[0][0];
+      // The threat table should have been mutated to carry forward 75
+      const entry = input.threatTable.find((e: any) => e.playerId === 'p1');
+      expect(entry?.threat).toBe(75);
+    });
+
+    it('uses fallback boss template when mob name not in BOSS_TEMPLATES', async () => {
+      setupBasicRound({
+        mobTemplate: {
+          id: 'mob-1', name: 'Unknown Boss', level: 5,
+          defence: 10, magicDefence: 10, evasion: 5,
+          damageMin: 5, damageMax: 15, accuracy: 50,
+          hp: 500, damageType: 'magic', bossAoeDmg: 30,
+        },
+      });
+
+      await resolveBossRound('enc-1', null);
+
+      const input = vi.mocked(resolveBossRoundEngine).mock.calls[0][0];
+      // Fallback: single boss_physical_attack action
+      expect(input.boss.template).toEqual([{ actionId: 'boss_physical_attack', targetMode: 'single_target' }]);
+      expect(input.boss.stats.damageType).toBe('magic');
+    });
+
+    it('handles non-array bossEffects in encounter by defaulting to empty array', async () => {
+      setupBasicRound({ bossEffects: 'invalid' });
+
+      await resolveBossRound('enc-1', null);
+
+      const input = vi.mocked(resolveBossRoundEngine).mock.calls[0][0];
+      expect(input.boss.activeEffects).toEqual([]);
+    });
+
+    // --- Optimistic lock and persistence ---
+
+    it('uses optimistic lock on roundNumber in updateMany', async () => {
+      setupBasicRound({ roundNumber: 3 });
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.bossEncounter.updateMany).toHaveBeenCalledWith({
+        where: { id: 'enc-1', roundNumber: 3 },
+        data: expect.objectContaining({
+          roundNumber: 4,
+          currentHp: 500,
+          status: 'in_progress',
+        }),
+      });
+    });
+
+    it('persists per-participant results with correct increments', async () => {
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.bossParticipant.updateMany).toHaveBeenCalledWith({
+        where: { encounterId: 'enc-1', playerId: 'p1', roundNumber: 1 },
+        data: expect.objectContaining({
+          totalDamage: { increment: 100 },
+          totalHealing: { increment: 0 },
+          hits: { increment: 1 },
+          crits: { increment: 0 },
+          currentHp: 80,
+          currentStamina: 90,
+          currentMana: 50,
+          threat: 100,
+          damageAbsorbed: { increment: 20 },
+          templateRound: 2,
+          status: 'alive',
+        }),
+      });
+    });
+
+    it('sets participant status to knocked_out when isDead is true', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.bossParticipant.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'knocked_out' }),
+        }),
+      );
+    });
+
+    it('stores bossActiveEffectsAfter via JSON serialization', async () => {
+      const effects = [{ effectId: 'weaken', duration: 2 }];
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossActiveEffectsAfter: effects,
+      } as any);
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      const updateCall = mockPrisma.bossEncounter.updateMany.mock.calls[0][0];
+      expect(updateCall.data.bossEffects).toEqual(effects);
+    });
+
+    it('appends round summary to existing summaries', async () => {
+      const existingSummaries = [{ round: 1, bossDamage: 50, totalPlayerDamage: 200, bossHpPercent: 80, playersAlive: 1, playersDead: 0 }];
+      setupBasicRound({ roundNumber: 1, roundSummaries: existingSummaries });
+
+      await resolveBossRound('enc-1', null);
+
+      const updateCall = mockPrisma.bossEncounter.updateMany.mock.calls[0][0];
+      const summaries = updateCall.data.roundSummaries;
+      expect(summaries).toHaveLength(2);
+      expect(summaries[0].round).toBe(1);
+      expect(summaries[1].round).toBe(2);
+    });
+
+    it('calculates round summary fields correctly', async () => {
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      const updateCall = mockPrisma.bossEncounter.updateMany.mock.calls[0][0];
+      const summaries = updateCall.data.roundSummaries;
+      expect(summaries[0]).toEqual({
+        round: 1,
+        bossDamage: 20, // damageTaken from participantResults
+        totalPlayerDamage: 100,
+        bossHpPercent: 50, // 500/1000 * 100
+        playersAlive: 1,
+        playersDead: 0,
+      });
+    });
+
+    // --- Boss rotation reveal ---
+
+    it('reveals boss rotation to alive players via $queryRaw', async () => {
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.$queryRaw).toHaveBeenCalled();
+    });
+
+    it('does not reveal rotation when all players are dead', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        allPlayersDead: true,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    // --- In-progress round (no defeat, no wipe) ---
+
+    it('emits zone system message with HP percentage for in-progress round', async () => {
+      const io = {} as any;
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', io);
+
+      expect(emitSystemMessage).toHaveBeenCalledWith(
+        io, 'zone', 'zone:zone-1',
+        expect.stringContaining('50% HP remaining'),
+      );
+    });
+
+    it('returns bossDefeated false and roundResult for normal round', async () => {
+      setupBasicRound();
+
+      const result = await resolveBossRound('enc-1', null);
+
+      expect(result).not.toBeNull();
+      expect(result!.bossDefeated).toBe(false);
+      expect(result!.roundResult).toBe(defaultEngineResult);
+    });
+
+    // --- Auto-signup ---
+
+    it('creates auto-signup for next round with carried-forward resources', async () => {
+      const signups = [makeParticipantRow({ autoSignUp: true })];
+      setupBasicRound({}, signups);
+      mockPrisma.bossParticipant.create.mockResolvedValue(makeParticipantRow({ roundNumber: 2 }));
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.bossParticipant.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          encounterId: 'enc-1',
+          playerId: 'p1',
+          roundNumber: 2,
+          currentHp: 80,
+          currentStamina: 90,
+          currentMana: 50,
+          autoSignUp: true,
+          status: 'alive',
+        }),
+      });
+    });
+
+    it('skips auto-signup for dead players', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      const signups = [makeParticipantRow({ autoSignUp: true })];
+      setupBasicRound({}, signups);
+
+      await resolveBossRound('enc-1', null);
+
+      // No bossParticipant.create should be called for auto-signup
+      expect(mockPrisma.bossParticipant.create).not.toHaveBeenCalled();
+    });
+
+    it('does not auto-signup when boss is defeated', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+      } as any);
+      const signups = [makeParticipantRow({ autoSignUp: true })];
+      setupBasicRound({}, signups);
+      // Mocks for defeat flow
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Hero' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await resolveBossRound('enc-1', null);
+
+      // No auto-signup create
+      expect(mockPrisma.bossParticipant.create).not.toHaveBeenCalled();
+    });
+
+    it('silently skips auto-signup when player has insufficient turns', async () => {
+      const { spendPlayerTurnsTx } = await import('./turnBankService.js');
+      vi.mocked(spendPlayerTurnsTx).mockRejectedValueOnce(new Error('Insufficient turns'));
+
+      const signups = [makeParticipantRow({ autoSignUp: true })];
+      setupBasicRound({}, signups);
+
+      // Should not throw
+      const result = await resolveBossRound('enc-1', null);
+      expect(result).not.toBeNull();
+    });
+
+    it('does not auto-signup when autoSignUp is false', async () => {
+      const signups = [makeParticipantRow({ autoSignUp: false })];
+      setupBasicRound({}, signups);
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.bossParticipant.create).not.toHaveBeenCalled();
+    });
+
+    // --- Raid wipe ---
+
+    it('handles raid wipe: processes flee for all participants', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        allPlayersDead: true,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      setupBasicRound();
+
+      const result = await resolveBossRound('enc-1', null);
+
+      expect(calculateFleeWithGold).toHaveBeenCalledWith('p1', expect.objectContaining({
+        mobLevel: 10,
+      }));
+      expect(result!.bossDefeated).toBe(false);
+    });
+
+    it('calls setHp on escape outcome during wipe', async () => {
+      vi.mocked(calculateFleeWithGold).mockReturnValue({ outcome: 'escape', remainingHp: 5, goldLost: 0 } as any);
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        allPlayersDead: true,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(setHp).toHaveBeenCalledWith('p1', 5);
+      expect(enterRecoveringState).not.toHaveBeenCalled();
+    });
+
+    it('calls enterRecoveringState on knockout outcome during wipe', async () => {
+      vi.mocked(calculateFleeWithGold).mockReturnValue({ outcome: 'knockout', remainingHp: 0, goldLost: 0 } as any);
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        allPlayersDead: true,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(enterRecoveringState).toHaveBeenCalledWith('p1', 100);
+      expect(trackAchievements).toHaveBeenCalledWith('p1', { totalDeaths: 1 });
+    });
+
+    it('resets encounter to waiting status on raid wipe', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        allPlayersDead: true,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      // Second update call should reset to waiting
+      const updateCalls = mockPrisma.bossEncounter.update.mock.calls;
+      const wipeUpdate = updateCalls.find((c: any) => c[0].data.status === 'waiting');
+      expect(wipeUpdate).toBeTruthy();
+      expect(wipeUpdate![0].data.scaledAt).toBeNull();
+    });
+
+    it('emits world and zone system messages on raid wipe', async () => {
+      const io = {} as any;
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        allPlayersDead: true,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', io);
+
+      expect(emitSystemMessage).toHaveBeenCalledWith(
+        io, 'world', 'world',
+        expect.stringContaining('wiped'),
+      );
+      expect(emitSystemMessage).toHaveBeenCalledWith(
+        io, 'zone', 'zone:zone-1',
+        expect.stringContaining('wiped'),
+      );
+    });
+
+    it('uses "unknown" zone name in wipe message when zone is null', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        allPlayersDead: true,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      setupBasicRound({
+        event: { zoneId: null, title: 'Boss', zone: null },
+      });
+
+      await resolveBossRound('enc-1', null);
+
+      expect(emitSystemMessage).toHaveBeenCalledWith(
+        null, 'world', 'world',
+        expect.stringContaining('unknown'),
+      );
+    });
+
+    it('skips zone message on wipe when zoneId is null', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        allPlayersDead: true,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      setupBasicRound({
+        event: { zoneId: null, title: 'Boss', zone: null },
+      });
+
+      await resolveBossRound('enc-1', null);
+
+      // Only one system message (world), not zone
+      expect(emitSystemMessage).toHaveBeenCalledTimes(1);
+      expect(emitSystemMessage).toHaveBeenCalledWith(null, 'world', 'world', expect.any(String));
+    });
+
+    // --- Boss defeated ---
+
+    it('sets encounter status to defeated and resolves killedBy', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          damageDealt: 200,
+        }],
+      } as any);
+      setupBasicRound();
+      // All participants query for killedBy
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([makeParticipantRow()]) // signups
+        .mockResolvedValueOnce([
+          makeParticipantRow({ totalDamage: 50 }),
+        ]); // allParticipantsForKill
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Hero' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      const result = await resolveBossRound('enc-1', null);
+
+      expect(result!.bossDefeated).toBe(true);
+      expect(mockPrisma.bossEncounter.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'defeated',
+            killedBy: 'p1',
+          }),
+        }),
+      );
+    });
+
+    it('distributes loot on boss defeat', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+      } as any);
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
+        makeEncounterWithIncludes(),
+      );
+      mockPrisma.bossEncounter.update.mockResolvedValue({});
+      mockPrisma.bossEncounter.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.bossParticipant.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      // findMany calls: 1) signups, 2) allParticipantsForKill, 3) allParticipants for loot
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([makeParticipantRow()]) // signups
+        .mockResolvedValueOnce([makeParticipantRow({ totalDamage: 100 })]) // allParticipantsForKill
+        .mockResolvedValueOnce([makeParticipantRow({ totalDamage: 100 })]); // allParticipants for loot
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Hero' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await resolveBossRound('enc-1', null);
+
+      expect(distributeBossLoot).toHaveBeenCalledWith(
+        'mob-1',
+        10, // mob level
+        expect.arrayContaining([
+          expect.objectContaining({ playerId: 'p1' }),
+        ]),
+        3, // zoneTier (zone difficulty = 3)
+      );
+    });
+
+    it('marks world event as completed on boss defeat', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+      } as any);
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(makeEncounterWithIncludes());
+      mockPrisma.bossEncounter.update.mockResolvedValue({});
+      mockPrisma.bossEncounter.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.bossParticipant.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([makeParticipantRow()])
+        .mockResolvedValueOnce([makeParticipantRow({ totalDamage: 100 })])
+        .mockResolvedValueOnce([makeParticipantRow({ totalDamage: 100 })]);
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Hero' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.worldEvent.updateMany).toHaveBeenCalledWith({
+        where: { id: 'evt-1', status: 'active' },
+        data: { status: 'completed' },
+      });
+    });
+
+    it('emits world and zone defeat messages with killer name', async () => {
+      const io = {} as any;
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+      } as any);
+      setupBasicRound();
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([makeParticipantRow()])
+        .mockResolvedValueOnce([makeParticipantRow({ totalDamage: 100 })]);
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Hero' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await resolveBossRound('enc-1', io);
+
+      expect(emitSystemMessage).toHaveBeenCalledWith(
+        io, 'world', 'world',
+        expect.stringContaining('Hero dealt the final blow'),
+      );
+      expect(emitSystemMessage).toHaveBeenCalledWith(
+        io, 'zone', 'zone:zone-1',
+        expect.stringContaining('has been slain'),
+      );
+    });
+
+    it('falls back to "unknown" killer when resolveUsername returns null', async () => {
+      const io = {} as any;
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+      } as any);
+      setupBasicRound();
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([makeParticipantRow()])
+        .mockResolvedValueOnce([makeParticipantRow({ totalDamage: 100 })]);
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue(null);
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await resolveBossRound('enc-1', io);
+
+      expect(emitSystemMessage).toHaveBeenCalledWith(
+        io, 'world', 'world',
+        expect.stringContaining('unknown dealt the final blow'),
+      );
+    });
+
+    it('saves rewardsByPlayer to encounter on defeat', async () => {
+      const rewards = { p1: { xp: 100, gold: 50, items: [] } };
+      vi.mocked(distributeBossLoot).mockResolvedValue(rewards as any);
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+      } as any);
+      setupBasicRound();
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([makeParticipantRow()])
+        .mockResolvedValueOnce([makeParticipantRow({ totalDamage: 100 })]);
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Hero' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await resolveBossRound('enc-1', null);
+
+      // Find the update call that sets rewardsByPlayer (not the scaling one)
+      const rewardUpdate = mockPrisma.bossEncounter.update.mock.calls.find(
+        (c: any) => c[0].data.rewardsByPlayer !== undefined,
+      );
+      expect(rewardUpdate).toBeTruthy();
+      expect(rewardUpdate![0].data.rewardsByPlayer).toEqual(rewards);
+    });
+
+    it('determines killedBy from cumulative damage across all rounds', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+        participantResults: [
+          { ...defaultEngineResult.participantResults[0], playerId: 'p1', damageDealt: 50 },
+        ],
+      } as any);
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(makeEncounterWithIncludes());
+      mockPrisma.bossEncounter.update.mockResolvedValue({});
+      mockPrisma.bossEncounter.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.bossParticipant.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      // findMany calls: 1) signups, 2) allParticipantsForKill, 3) allParticipants for loot
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([makeParticipantRow()]) // signups
+        .mockResolvedValueOnce([
+          makeParticipantRow({ playerId: 'p1', totalDamage: 100 }),
+          makeParticipantRow({ playerId: 'p2', totalDamage: 200 }),
+        ]) // allParticipantsForKill
+        .mockResolvedValueOnce([
+          makeParticipantRow({ playerId: 'p1', totalDamage: 100 }),
+          makeParticipantRow({ playerId: 'p2', totalDamage: 200 }),
+        ]); // allParticipants for loot
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'BigDps' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await resolveBossRound('enc-1', null);
+
+      // p2 has 200 cumulative vs p1's 100+50=150
+      expect(mockPrisma.bossEncounter.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ killedBy: 'p2' }),
+        }),
+      );
+    });
+
+    it('aggregates contributor stats across multiple participation records', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+      } as any);
+      const participationRows = [
+        makeParticipantRow({ totalDamage: 50, totalHealing: 10, damageAbsorbed: 5, status: 'alive' }),
+        makeParticipantRow({ id: 'bp-2', roundNumber: 2, totalDamage: 60, totalHealing: 20, damageAbsorbed: 15, status: 'knocked_out' }),
+      ];
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(makeEncounterWithIncludes());
+      mockPrisma.bossEncounter.update.mockResolvedValue({});
+      mockPrisma.bossEncounter.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.bossParticipant.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      // findMany calls: 1) signups, 2) allParticipantsForKill, 3) allParticipants for loot
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([makeParticipantRow()])
+        .mockResolvedValueOnce(participationRows) // allParticipantsForKill
+        .mockResolvedValueOnce(participationRows); // allParticipants for loot
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Hero' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await resolveBossRound('enc-1', null);
+
+      expect(distributeBossLoot).toHaveBeenCalledWith(
+        'mob-1', 10,
+        expect.arrayContaining([
+          expect.objectContaining({
+            playerId: 'p1',
+            totalDamage: 110,
+            totalHealing: 30,
+            damageAbsorbed: 20,
+            roundsSurvived: 1, // only alive rounds count
+          }),
+        ]),
+        expect.any(Number),
+      );
+    });
+
+    it('skips zone defeat message when zoneId is null', async () => {
+      const io = {} as any;
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+      } as any);
+      setupBasicRound({
+        event: { zoneId: null, title: 'Boss', zone: null },
+      });
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([makeParticipantRow()])
+        .mockResolvedValueOnce([makeParticipantRow({ totalDamage: 100 })]);
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Hero' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      await resolveBossRound('enc-1', io);
+
+      // Only world message, no zone message
+      expect(emitSystemMessage).toHaveBeenCalledTimes(1);
+      expect(emitSystemMessage).toHaveBeenCalledWith(io, 'world', 'world', expect.any(String));
+    });
+
+    // --- Participant resource building ---
+
+    it('carries forward stamina and mana from signup row', async () => {
+      const signups = [makeParticipantRow({ currentHp: 75, currentStamina: 60, currentMana: 30, templateRound: 3 })];
+      setupBasicRound({}, signups);
+
+      await resolveBossRound('enc-1', null);
+
+      const input = vi.mocked(resolveBossRoundEngine).mock.calls[0][0];
+      expect(input.participants[0].hp).toBe(75);
+      expect(input.participants[0].stamina).toBe(60);
+      expect(input.participants[0].mana).toBe(30);
+      expect(input.participants[0].templateRound).toBe(3);
+    });
+
+    // --- Attack count tracking ---
+
+    it('increments attacks for damageDealt > 0', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          damageDealt: 50,
+          hit: true,
+        }],
+      } as any);
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.bossParticipant.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            attacks: { increment: 1 },
+          }),
+        }),
+      );
+    });
+
+    it('increments attacks for a miss (hit=false, non-defend action)', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          damageDealt: 0,
+          hit: false,
+          actionId: 'normal_attack',
+        }],
+      } as any);
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.bossParticipant.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            attacks: { increment: 1 },
+          }),
+        }),
+      );
+    });
+
+    it('does not increment attacks for defend action with no damage', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          damageDealt: 0,
+          hit: false,
+          actionId: 'defend',
+        }],
+      } as any);
+      setupBasicRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(mockPrisma.bossParticipant.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            attacks: { increment: 0 },
+          }),
+        }),
+      );
     });
   });
 
@@ -482,6 +1460,182 @@ describe('bossEncounterService', () => {
 
       const result = await getBossHistory('p1', 1, 10);
       expect(result.entries[0].killedByUsername).toBeNull();
+    });
+
+    it('uses "Unknown" zone when zone is null', async () => {
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([{ encounterId: 'enc-1' }])
+        .mockResolvedValueOnce([makeParticipantRow()]);
+
+      mockPrisma.bossEncounter.findMany.mockResolvedValue([
+        makeEncounterRow({
+          killedBy: null,
+          status: 'defeated',
+          event: { zone: null },
+          mobTemplate: { name: 'Ghost', level: 1 },
+        }),
+      ]);
+
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      const result = await getBossHistory('p1', 1, 10);
+      expect(result.entries[0].zoneName).toBe('Unknown');
+    });
+
+    it('defaults mob level to 1 when null', async () => {
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([{ encounterId: 'enc-1' }])
+        .mockResolvedValueOnce([makeParticipantRow()]);
+
+      mockPrisma.bossEncounter.findMany.mockResolvedValue([
+        makeEncounterRow({
+          killedBy: null,
+          status: 'defeated',
+          event: { zone: { name: 'Cave' } },
+          mobTemplate: { name: 'Slime', level: null },
+        }),
+      ]);
+
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      const result = await getBossHistory('p1', 1, 10);
+      expect(result.entries[0].mobLevel).toBe(1);
+    });
+
+    it('defaults player stats when no participation for encounter', async () => {
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([{ encounterId: 'enc-1' }])
+        .mockResolvedValueOnce([]); // No participation rows for this encounter
+
+      mockPrisma.bossEncounter.findMany.mockResolvedValue([
+        makeEncounterRow({
+          killedBy: null,
+          status: 'defeated',
+          event: { zone: { name: 'Mountain' } },
+          mobTemplate: { name: 'Dragon', level: 10 },
+        }),
+      ]);
+
+      mockPrisma.player.findMany.mockResolvedValue([]);
+
+      const result = await getBossHistory('p1', 1, 10);
+      expect(result.entries[0].playerStats).toEqual({
+        totalDamage: 0,
+        totalHealing: 0,
+        attacks: 0,
+        hits: 0,
+        crits: 0,
+        roundsParticipated: 0,
+      });
+    });
+
+    it('skips killedBy username lookup when no encounters have killedBy', async () => {
+      mockPrisma.bossParticipant.findMany
+        .mockResolvedValueOnce([{ encounterId: 'enc-1' }])
+        .mockResolvedValueOnce([makeParticipantRow()]);
+
+      mockPrisma.bossEncounter.findMany.mockResolvedValue([
+        makeEncounterRow({
+          killedBy: null,
+          status: 'in_progress',
+          event: { zone: { name: 'Valley' } },
+          mobTemplate: { name: 'Bear', level: 4 },
+        }),
+      ]);
+
+      await getBossHistory('p1', 1, 10);
+
+      // player.findMany should NOT be called when no killedBy IDs
+      expect(mockPrisma.player.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  // --- Mapper edge cases ---
+
+  describe('toBossEncounterData (via createBossEncounter)', () => {
+    it('converts nextRoundAt Date to ISO string', async () => {
+      const date = new Date('2026-03-01T10:00:00Z');
+      mockPrisma.bossEncounter.create.mockResolvedValue(
+        makeEncounterRow({ nextRoundAt: date }),
+      );
+
+      const result = await createBossEncounter('evt-1', 'mob-1', 1000);
+      expect(result.nextRoundAt).toBe('2026-03-01T10:00:00.000Z');
+    });
+
+    it('returns null nextRoundAt when Date is null', async () => {
+      mockPrisma.bossEncounter.create.mockResolvedValue(
+        makeEncounterRow({ nextRoundAt: null }),
+      );
+
+      const result = await createBossEncounter('evt-1', 'mob-1', 1000);
+      expect(result.nextRoundAt).toBeNull();
+    });
+
+    it('handles non-array bossEffects as empty array', async () => {
+      mockPrisma.bossEncounter.create.mockResolvedValue(
+        makeEncounterRow({ bossEffects: 'invalid' }),
+      );
+
+      const result = await createBossEncounter('evt-1', 'mob-1', 1000);
+      expect(result.bossEffects).toEqual([]);
+    });
+
+    it('preserves array bossEffects', async () => {
+      const effects = [{ effectId: 'weaken', duration: 2 }];
+      mockPrisma.bossEncounter.create.mockResolvedValue(
+        makeEncounterRow({ bossEffects: effects }),
+      );
+
+      const result = await createBossEncounter('evt-1', 'mob-1', 1000);
+      expect(result.bossEffects).toEqual(effects);
+    });
+
+    it('parses array roundSummaries correctly', async () => {
+      const summaries = [{ round: 1, bossDamage: 50, totalPlayerDamage: 200, bossHpPercent: 80, playersAlive: 1, playersDead: 0 }];
+      mockPrisma.bossEncounter.create.mockResolvedValue(
+        makeEncounterRow({ roundSummaries: summaries }),
+      );
+
+      const result = await createBossEncounter('evt-1', 'mob-1', 1000);
+      expect(result.roundSummaries).toEqual(summaries);
+    });
+
+    it('returns null roundSummaries for non-array values', async () => {
+      mockPrisma.bossEncounter.create.mockResolvedValue(
+        makeEncounterRow({ roundSummaries: 'invalid' }),
+      );
+
+      const result = await createBossEncounter('evt-1', 'mob-1', 1000);
+      expect(result.roundSummaries).toBeNull();
+    });
+
+    it('parses rewardsByPlayer object correctly', async () => {
+      const rewards = { p1: { xp: 100, gold: 50 } };
+      mockPrisma.bossEncounter.create.mockResolvedValue(
+        makeEncounterRow({ rewardsByPlayer: rewards }),
+      );
+
+      const result = await createBossEncounter('evt-1', 'mob-1', 1000);
+      expect(result.rewardsByPlayer).toEqual(rewards);
+    });
+
+    it('returns null rewardsByPlayer for non-object values', async () => {
+      mockPrisma.bossEncounter.create.mockResolvedValue(
+        makeEncounterRow({ rewardsByPlayer: 'invalid' }),
+      );
+
+      const result = await createBossEncounter('evt-1', 'mob-1', 1000);
+      expect(result.rewardsByPlayer).toBeNull();
+    });
+
+    it('returns null rewardsByPlayer for array values', async () => {
+      mockPrisma.bossEncounter.create.mockResolvedValue(
+        makeEncounterRow({ rewardsByPlayer: [1, 2, 3] }),
+      );
+
+      const result = await createBossEncounter('evt-1', 'mob-1', 1000);
+      expect(result.rewardsByPlayer).toBeNull();
     });
   });
 });

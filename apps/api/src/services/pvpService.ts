@@ -255,7 +255,7 @@ function computeTemplateCategoryBreakdown(
 function computeTalentInvestment(
   allocations: Record<string, number>,
 ): Record<string, number> {
-  const investment: Record<string, number> = { melee: 0, ranged: 0, magic: 0, general: 0 };
+  const investment: Record<string, number> = { melee: 0, ranged: 0, magic: 0, survival: 0 };
   for (const nodeId of Object.keys(allocations)) {
     for (const [tree, nodes] of Object.entries(TALENT_TREE_DEFINITIONS)) {
       const node = nodes.find(n => n.id === nodeId);

@@ -24,7 +24,7 @@ const TREE_TABS: { id: TalentTreeName; label: string; color: string }[] = [
   { id: 'melee', label: 'Melee', color: 'var(--rpg-red)' },
   { id: 'ranged', label: 'Ranged', color: 'var(--rpg-green-light)' },
   { id: 'magic', label: 'Magic', color: 'var(--rpg-purple)' },
-  { id: 'general', label: 'General', color: 'var(--rpg-gold)' },
+  { id: 'survival', label: 'Survival', color: 'var(--rpg-gold)' },
 ];
 
 const RESPEC_TURN_COST = SKILL_POINT_CONSTANTS.RESPEC_TURN_COST;

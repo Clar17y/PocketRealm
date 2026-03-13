@@ -151,8 +151,7 @@ describe('resolveRaidRound', () => {
 
   describe('AoE hits all mobs', () => {
     it('an AoE action damages all surviving mobs', () => {
-      // chain_lightning is a magic AoE-style attack (we treat actions without explicit AoE flag as single-target;
-      // need to verify which actions are AoE — volley, cleave, chain_lightning, meteor_strike)
+      // AoE actions: cleave, scatter_shot, volley, frost_nova, blizzard, whirlwind, meteor_strike
       // For the test, let's use a custom AoE action
       const aoeAction: ActionDefinition = {
         id: 'test_aoe',
@@ -168,7 +167,7 @@ describe('resolveRaidRound', () => {
         // Let me check: "Single-target: find mob with lowest HP"
         // "AoE: target all surviving mobs"
         // The choice between single/AoE depends on the action definition.
-        // In the existing system, cleave/volley/chain_lightning/meteor_strike are AoE.
+        // AoE is determined by action IDs in AOE_ACTION_IDS set.
         // But there's no explicit isAoe flag on ActionDefinition.
         // I'll use the convention that certain actionTypes or specific IDs are AoE.
       };
@@ -2309,6 +2308,193 @@ describe('resolveRaidRound', () => {
       const withered = effects.find(e => e.stat === 'defence');
       expect(withered).toBeDefined();
       expect(withered!.modifier).toBe(-8);
+    });
+  });
+
+  describe('pinned effect', () => {
+    it('mob with pinned effect skips its attack', () => {
+      const startHp = 200;
+      const input = makeInput({
+        participants: [makeParticipant({
+          hp: startHp, maxHp: startHp,
+          stats: makeStats({ hp: startHp, maxHp: startHp }),
+          template: [{ actionId: 'normal_attack', sortOrder: 0 }],
+        })],
+        mobs: [
+          makeMob({
+            hp: 500, maxHp: 500,
+            stats: makeStats({ damageMin: 50, damageMax: 50, hp: 500, maxHp: 500 }),
+            activeEffects: [{ name: 'Pinned', stat: 'pinned', modifier: 0, roundsRemaining: 1 }],
+          }),
+        ],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      // Player should take no damage from the pinned mob
+      expect(result.participantResults[0].hpAfter).toBe(startHp);
+    });
+
+    it('mob without pinned effect attacks normally', () => {
+      const startHp = 200;
+      const input = makeInput({
+        participants: [makeParticipant({
+          hp: startHp, maxHp: startHp,
+          stats: makeStats({ hp: startHp, maxHp: startHp }),
+          template: [{ actionId: 'normal_attack', sortOrder: 0 }],
+        })],
+        mobs: [makeMob({
+          hp: 500, maxHp: 500,
+          stats: makeStats({ damageMin: 50, damageMax: 50, hp: 500, maxHp: 500 }),
+        })],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      expect(result.participantResults[0].hpAfter).toBeLessThan(startHp);
+    });
+
+    it('pinned effect is consumed after one round', () => {
+      const input = makeInput({
+        participants: [makeParticipant({
+          template: [{ actionId: 'normal_attack', sortOrder: 0 }],
+        })],
+        mobs: [
+          makeMob({
+            hp: 500, maxHp: 500,
+            stats: makeStats({ hp: 500, maxHp: 500 }),
+            activeEffects: [{ name: 'Pinned', stat: 'pinned', modifier: 0, roundsRemaining: 1 }],
+          }),
+        ],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      const mob = result.mobsAfter[0];
+      const pinnedEffect = mob?.activeEffects.find(e => e.stat === 'pinned');
+      expect(pinnedEffect).toBeUndefined();
+    });
+  });
+
+  describe('new AoE actions', () => {
+    const aoeActions = ['scatter_shot', 'frost_nova', 'blizzard', 'whirlwind'];
+
+    for (const actionId of aoeActions) {
+      it(`${actionId} hits all alive mobs`, () => {
+        const mobHp = 500;
+        const input = makeInput({
+          participants: [makeParticipant({
+            template: [{ actionId, sortOrder: 0 }],
+            mana: 200, maxMana: 200,
+          })],
+          mobs: [
+            makeMob({ id: 'mob1', hp: mobHp, maxHp: mobHp, stats: makeStats({ hp: mobHp, maxHp: mobHp }) }),
+            makeMob({ id: 'mob2', hp: mobHp, maxHp: mobHp, stats: makeStats({ hp: mobHp, maxHp: mobHp }) }),
+            makeMob({ id: 'mob3', hp: mobHp, maxHp: mobHp, stats: makeStats({ hp: mobHp, maxHp: mobHp }) }),
+          ],
+        });
+        const result = resolveRaidRound(input, alwaysHitRng);
+        for (const mob of result.mobsAfter) {
+          expect(mob.hp).toBeLessThan(mobHp);
+        }
+      });
+    }
+  });
+
+  describe('suppressed debuff', () => {
+    it('scatter_shot applies Suppressed to all targets', () => {
+      const input = makeInput({
+        participants: [makeParticipant({
+          template: [{ actionId: 'scatter_shot', sortOrder: 0 }],
+        })],
+        mobs: [
+          makeMob({ id: 'mob1', hp: 500, maxHp: 500, stats: makeStats({ hp: 500, maxHp: 500 }) }),
+          makeMob({ id: 'mob2', hp: 500, maxHp: 500, stats: makeStats({ hp: 500, maxHp: 500 }) }),
+        ],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      for (const mob of result.mobsAfter) {
+        const suppressed = mob.activeEffects.find(e => e.name === 'Suppressed');
+        expect(suppressed).toBeDefined();
+        expect(suppressed!.stat).toBe('accuracy');
+        expect(suppressed!.modifier).toBe(-15);
+      }
+    });
+  });
+
+  describe('rally group buff', () => {
+    it('rally applies defence buff to all alive participants', () => {
+      const input = makeInput({
+        participants: [
+          makeParticipant({
+            playerId: 'p1',
+            template: [{ actionId: 'rally', sortOrder: 0 }],
+            stamina: 100, maxStamina: 100,
+            mana: 100, maxMana: 100,
+          }),
+          makeParticipant({
+            playerId: 'p2',
+            template: [{ actionId: 'normal_attack', sortOrder: 0 }],
+          }),
+        ],
+        mobs: [makeMob({ hp: 500, maxHp: 500, stats: makeStats({ hp: 500, maxHp: 500 }) })],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      // Both participants should have the Rally buff
+      for (const p of result.participantResults) {
+        const rallyBuff = p.activeEffectsAfter.find(e => e.name === 'Rally');
+        expect(rallyBuff).toBeDefined();
+        expect(rallyBuff!.stat).toBe('defence');
+        expect(rallyBuff!.modifier).toBe(15);
+      }
+    });
+  });
+
+  describe('self-buff actions in raids', () => {
+    it('battle_cry applies attack buff to the caster', () => {
+      const input = makeInput({
+        participants: [makeParticipant({
+          template: [{ actionId: 'battle_cry', sortOrder: 0 }],
+          stamina: 100, maxStamina: 100,
+        })],
+        mobs: [makeMob({ hp: 500, maxHp: 500, stats: makeStats({ hp: 500, maxHp: 500 }) })],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      const buff = result.participantResults[0].activeEffectsAfter.find(e => e.name === 'Battle Cry');
+      expect(buff).toBeDefined();
+      expect(buff!.stat).toBe('attack');
+      expect(buff!.modifier).toBe(15);
+    });
+
+    it('enhanced_fortitude applies defence buff to the caster', () => {
+      const input = makeInput({
+        participants: [makeParticipant({
+          template: [{ actionId: 'enhanced_fortitude', sortOrder: 0 }],
+          mana: 100, maxMana: 100,
+        })],
+        mobs: [makeMob({ hp: 500, maxHp: 500, stats: makeStats({ hp: 500, maxHp: 500 }) })],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      const buff = result.participantResults[0].activeEffectsAfter.find(e => e.name === 'Fortitude');
+      expect(buff).toBeDefined();
+      expect(buff!.stat).toBe('defence');
+      expect(buff!.modifier).toBe(20);
+    });
+
+    it('self-buff does not apply to other participants', () => {
+      const input = makeInput({
+        participants: [
+          makeParticipant({
+            playerId: 'p1',
+            template: [{ actionId: 'battle_cry', sortOrder: 0 }],
+            stamina: 100, maxStamina: 100,
+          }),
+          makeParticipant({
+            playerId: 'p2',
+            template: [{ actionId: 'normal_attack', sortOrder: 0 }],
+          }),
+        ],
+        mobs: [makeMob({ hp: 500, maxHp: 500, stats: makeStats({ hp: 500, maxHp: 500 }) })],
+      });
+      const result = resolveRaidRound(input, alwaysHitRng);
+      const p1Buff = result.participantResults[0].activeEffectsAfter.find(e => e.name === 'Battle Cry');
+      const p2Buff = result.participantResults[1].activeEffectsAfter.find(e => e.name === 'Battle Cry');
+      expect(p1Buff).toBeDefined();
+      expect(p2Buff).toBeUndefined();
     });
   });
 });

@@ -1801,16 +1801,16 @@ describe('runTemplateCombat', () => {
     it('cleanses stat debuffs even without magic DOTs', () => {
       const spy = mockCombatRandom({ initA: 0.9, initB: 0.1, attackRoll: 0.85, damageRoll: 0.0, critRoll: 0.99 });
 
-      // B uses crippling_shot (speed debuff) round 1, A cleanses round 2
+      // B uses enfeeble (attack debuff) round 1, A cleanses round 2
       const a = makeCombatant('Hero', {
         template: [
           { id: 'slot-0', sortOrder: 0, actionId: 'defend' },
           { id: 'slot-1', sortOrder: 1, actionId: 'use_cleanse_potion' },
         ],
       });
-      const b = makeCombatant('Archer', {
+      const b = makeCombatant('Mage', {
         stats: makeStats({ damageMin: 5, damageMax: 5 }),
-        template: templateOf('crippling_shot'),
+        template: templateOf('enfeeble'),
         actionDefinitions: BASE_ACTION_DEFINITIONS,
       });
 
@@ -1820,7 +1820,7 @@ describe('runTemplateCombat', () => {
         ],
       });
 
-      const cleanseLog = result.log.find(l => l.message.includes('Cleanses') && l.message.includes('Crippled'));
+      const cleanseLog = result.log.find(l => l.message.includes('Cleanses') && l.message.includes('Enfeeble'));
       expect(cleanseLog).toBeDefined();
       expect(result.potionsConsumed).toHaveLength(1);
 
