@@ -62,18 +62,16 @@ export async function consumeBuff(tx: any, playerId: string, buffType: string): 
 export async function consumeBuffIfActive(tx: any, playerId: string, buffType: string): Promise<number> {
   const buff = await tx.playerBuff.findUnique({
     where: { playerId_buffType: { playerId, buffType } },
-    select: { bonusValue: true, remainingUses: true, id: true },
+    select: { bonusValue: true, id: true },
   });
   if (!buff) return 0;
 
-  const newUses = buff.remainingUses - 1;
-  if (newUses <= 0) {
+  const updated = await tx.playerBuff.update({
+    where: { id: buff.id },
+    data: { remainingUses: { decrement: 1 } },
+  });
+  if (updated.remainingUses <= 0) {
     await tx.playerBuff.delete({ where: { id: buff.id } });
-  } else {
-    await tx.playerBuff.update({
-      where: { id: buff.id },
-      data: { remainingUses: newUses },
-    });
   }
   return buff.bonusValue;
 }
