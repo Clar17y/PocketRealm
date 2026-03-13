@@ -35,6 +35,7 @@ import { getHpState, setHp, enterRecoveringState } from './hpService';
 import { getActiveTemplate } from './combatTemplateService';
 import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { distributeBossLoot } from './bossLootService';
+import { redis } from '../redis';
 
 // --- Mappers ---
 
@@ -266,6 +267,21 @@ export async function getBossEncounterStatus(encounterId: string): Promise<{
 }
 
 export async function resolveBossRound(
+  encounterId: string,
+  io: SocketServer | null,
+): Promise<{ bossDefeated: boolean; roundResult: BossRoundResult } | null> {
+  // Distributed lock to prevent concurrent resolution corrupting boss HP
+  const lockKey = `boss_resolve:${encounterId}`;
+  const acquired = await redis.set(lockKey, '1', 'EX', 30, 'NX');
+  if (!acquired) return null;
+  try {
+    return await resolveBossRoundInner(encounterId, io);
+  } finally {
+    await redis.del(lockKey);
+  }
+}
+
+async function resolveBossRoundInner(
   encounterId: string,
   io: SocketServer | null,
 ): Promise<{ bossDefeated: boolean; roundResult: BossRoundResult } | null> {
