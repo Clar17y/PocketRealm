@@ -11,6 +11,8 @@ import {
   resolveParticipantActions,
   resolveSupportiveActions,
   applyResourceCosts,
+  getEffectiveStatValue,
+  resolvePlayerBuffActions,
 } from './combatHelpers';
 import {
   addDamageThreat,
@@ -221,6 +223,16 @@ export function resolveBossRound(
   // --- Step 6: Supportive actions ---
   resolveSupportiveActions(input.participants, pState, input.threatTable);
 
+  // --- Step 6b: Player buff actions (self-buff + group rally) ---
+  // Push onto input.participants so the boss attack phase can read them via getEffectiveStatValue.
+  // Boss resolver has no effect assembly phase — the service layer reads these back from input.
+  for (const { participantIndex, effect } of resolvePlayerBuffActions(pState)) {
+    const p = input.participants[participantIndex];
+    if (!p) continue;
+    p.activeEffects = p.activeEffects ?? [];
+    p.activeEffects.push(effect);
+  }
+
   // --- Step 7: Boss action resolves against target(s) ---
   const bossTargetPlayerIds: string[] = [];
 
@@ -259,8 +271,8 @@ export function resolveBossRound(
         const bossDmgRaw = roll.rollDamage(bossStats.damageMin, bossStats.damageMax);
         const scaledBossDmg = Math.floor(bossDmgRaw * (bossActionDef.damageMultiplier ?? 1.0));
         const effectivePlayerDefence = bossIsMagic
-          ? targetParticipant.stats.magicDefence
-          : targetParticipant.stats.defence;
+          ? getEffectiveStatValue(targetParticipant.stats.magicDefence, targetParticipant.activeEffects ?? [], 'magicDefence')
+          : getEffectiveStatValue(targetParticipant.stats.defence, targetParticipant.activeEffects ?? [], 'defence');
 
         let damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, scaledBossDmg - effectivePlayerDefence);
 

@@ -40,7 +40,7 @@ export default function WikiIndexPage() {
             key={section.slug}
             title={section.label}
             description={sectionDescriptions[section.slug] ?? ''}
-            href={`/wiki/${section.slug}`}
+            href={section.items[0]?.href ?? `/wiki/${section.slug}`}
             icon={section.icon}
             count={section.items.length}
           />
