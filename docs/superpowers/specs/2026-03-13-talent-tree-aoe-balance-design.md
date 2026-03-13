@@ -233,7 +233,7 @@ Normal attack baseline: 1.0x damage, 20 stamina.
 | Ability | Before | After |
 |---------|--------|-------|
 | Cleave | 1.1x, 25 stam, AoE | 0.8x, 30 stam, AoE |
-| Frost Nova | 0.9x, 20 mana, single-target + Frozen | 0.7x, 30 mana, AoE + Frozen |
+| Frost Nova | 0.9x, 20 mana, single-target + Frozen 3 rds | 0.7x, 30 mana, AoE + Frozen 2 rds |
 | Chain Lightning | 1.5x, 30 mana, AoE | Renamed Blizzard, 1.0x, 40 mana, AoE + Frozen 3 rds |
 | Meteor Strike | 2.5x, 50 mana, AoE, channeling | 1.3x, 50 mana, AoE, channeling |
 | Crippling Shot | 0.8x + Crippled (-20 speed, useless) | 0.8x + Pinned (forced defend, no bosses/mini-bosses) |
