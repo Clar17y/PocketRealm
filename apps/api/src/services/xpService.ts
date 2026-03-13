@@ -110,7 +110,8 @@ export async function grantSkillXp(
       data: {
         characterXp: BigInt(characterXpAfter),
         characterLevel: characterLevelAfter,
-        attributePoints: attributePointsAfter,
+        // Use atomic increment to prevent concurrent XP grants from overwriting each other's attribute points
+        attributePoints: levelUps > 0 ? { increment: levelUps } : undefined,
       },
     });
 

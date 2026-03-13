@@ -432,7 +432,7 @@ describe('grantSkillXp', () => {
       expect(updateCall.data.characterXp).toBe(BigInt(result.characterXpAfter));
     });
 
-    it('updates player with characterLevel and attributePoints', async () => {
+    it('updates player with characterLevel and attributePoints increment', async () => {
       setupBasicMocks(
         makeSkill(),
         makePlayer({ characterXp: BigInt(0), characterLevel: 1, attributePoints: 2 }),
@@ -441,7 +441,12 @@ describe('grantSkillXp', () => {
 
       const updateCall = mockPrisma.player.update.mock.calls[0][0];
       expect(updateCall.data.characterLevel).toBe(result.characterLevelAfter);
-      expect(updateCall.data.attributePoints).toBe(result.attributePointsAfter);
+      const levelUps = result.characterLevelAfter - result.characterLevelBefore;
+      if (levelUps > 0) {
+        expect(updateCall.data.attributePoints).toEqual({ increment: levelUps });
+      } else {
+        expect(updateCall.data.attributePoints).toBeUndefined();
+      }
       expect(updateCall.where).toEqual({ id: 'p1' });
     });
 
