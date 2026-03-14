@@ -388,12 +388,12 @@ export async function setActiveTitle(achievementId: string | null) {
 
 export interface LeaderboardEntry {
   rank: number;
-  playerId: string;
+  playerId?: string;
   username: string;
   characterLevel: number;
   score: number;
   isBot: boolean;
-  isAdmin: boolean;
+  isAdmin?: boolean;
   title?: string;
   titleTier?: number;
 }
