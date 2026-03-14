@@ -127,62 +127,25 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       }
     }
 
-    const baseTurnCost = recipe.turnCost * quantity;
-    const { turnSpend, taxResult } = await prisma.$transaction(async (tx) => {
-      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, baseTurnCost);
-
-      for (const mat of materials) {
-        await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * quantity);
-      }
-
-      return { turnSpend: spent, taxResult: tax };
-    });
-
-    // Fetch shop crafting crit buff (consumed after crafting)
+    // Fetch shop crafting crit buff before transaction (read-only)
     const shopCraftingCrit = await getBuffValue(playerId, 'crafting_crit');
 
-    // Create result items (stack where possible)
-    const craftedItemIds: string[] = [];
-    const craftedItemDetails: Array<{
-      id: string;
-      isCrit: boolean;
-      rarity: ItemRarity;
-      bonusStats?: Record<string, number>;
-    }> = [];
+    // Pre-compute item properties outside transaction (pure RNG, no DB)
     const needsDurability = recipe.resultTemplate.itemType === 'weapon' || recipe.resultTemplate.itemType === 'armor';
     const levelBuckets = Math.floor((skillLevel - recipe.requiredLevel) / 10);
     const durabilityBonusPct = levelBuckets * CRAFTING_CONSTANTS.DURABILITY_BONUS_PER_10_LEVELS;
     const baseMax = recipe.resultTemplate.maxDurability;
     const craftedMax = needsDurability ? Math.floor(baseMax * (1 + durabilityBonusPct / 100)) : null;
 
-    if (recipe.resultTemplate.stackable) {
-      const existing = await prisma.item.findFirst({
-        where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
-        select: { id: true, quantity: true },
-      });
+    // Pre-roll crit results for non-stackable items (pure functions, safe outside tx)
+    let preRolledItems: Array<{
+      rarity: ItemRarity;
+      bonusStats: Prisma.InputJsonObject | undefined;
+      isCrit: boolean;
+      bonusEntries: [string, number][];
+    }> | null = null;
 
-      if (existing) {
-        const updated = await prisma.item.update({
-          where: { id: existing.id },
-          data: { quantity: existing.quantity + quantity },
-          select: { id: true },
-        });
-        craftedItemIds.push(updated.id);
-      } else {
-        const created = await prisma.item.create({
-          data: {
-            ownerId: playerId,
-            templateId: recipe.resultTemplateId,
-            rarity: 'common',
-            quantity,
-            maxDurability: craftedMax,
-            currentDurability: craftedMax,
-          } as any,
-          select: { id: true },
-        });
-        craftedItemIds.push(created.id);
-      }
-    } else {
+    if (!recipe.resultTemplate.stackable) {
       const itemType: ItemType = isItemType(recipe.resultTemplate.itemType)
         ? recipe.resultTemplate.itemType
         : 'resource';
@@ -193,8 +156,9 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         ? equipStats.luck + Math.floor(combinedCritBonus / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
         : equipStats.luck;
       const templateBaseStats = recipe.resultTemplate.baseStats as ItemStats | null | undefined;
-
       const templateSlot = (recipe.resultTemplate.slot as EquipmentSlot | null) ?? undefined;
+
+      preRolledItems = [];
       for (let i = 0; i < quantity; i++) {
         const critResult = calculateCraftingCrit({
           skillLevel,
@@ -216,32 +180,84 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
           : undefined;
         const bonusEntries = Object.entries(rolledBonusStats ?? {})
           .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]));
-
-        const created = await prisma.item.create({
-          data: {
-            ownerId: playerId,
-            templateId: recipe.resultTemplateId,
-            rarity,
-            quantity: 1,
-            maxDurability: craftedMax,
-            currentDurability: craftedMax,
-            bonusStats,
-          } as any,
-          select: { id: true },
-        });
-        craftedItemIds.push(created.id);
-        if (critResult.isCrit && bonusEntries.length > 0) {
-          craftedItemDetails.push({
-            id: created.id,
-            isCrit: true,
-            rarity,
-            bonusStats: Object.fromEntries(bonusEntries),
-          });
-        } else {
-          craftedItemDetails.push({ id: created.id, isCrit: false, rarity });
-        }
+        preRolledItems.push({ rarity, bonusStats, isCrit: critResult.isCrit, bonusEntries });
       }
     }
+
+    // Single transaction: spend turns + consume materials + create items
+    const baseTurnCost = recipe.turnCost * quantity;
+    const { turnSpend, taxResult, craftedItemIds, craftedItemDetails } = await prisma.$transaction(async (tx) => {
+      const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, baseTurnCost);
+
+      for (const mat of materials) {
+        await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * quantity);
+      }
+
+      const itemIds: string[] = [];
+      const itemDetails: Array<{
+        id: string;
+        isCrit: boolean;
+        rarity: ItemRarity;
+        bonusStats?: Record<string, number>;
+      }> = [];
+
+      if (recipe.resultTemplate.stackable) {
+        const existing = await tx.item.findFirst({
+          where: { ownerId: playerId, templateId: recipe.resultTemplateId, inStash: false },
+          select: { id: true, quantity: true },
+        });
+
+        if (existing) {
+          const updated = await tx.item.update({
+            where: { id: existing.id },
+            data: { quantity: existing.quantity + quantity },
+            select: { id: true },
+          });
+          itemIds.push(updated.id);
+        } else {
+          const created = await (tx as any).item.create({
+            data: {
+              ownerId: playerId,
+              templateId: recipe.resultTemplateId,
+              rarity: 'common',
+              quantity,
+              maxDurability: craftedMax,
+              currentDurability: craftedMax,
+            } as any,
+            select: { id: true },
+          });
+          itemIds.push(created.id);
+        }
+      } else {
+        for (const rolled of preRolledItems!) {
+          const created = await (tx as any).item.create({
+            data: {
+              ownerId: playerId,
+              templateId: recipe.resultTemplateId,
+              rarity: rolled.rarity,
+              quantity: 1,
+              maxDurability: craftedMax,
+              currentDurability: craftedMax,
+              bonusStats: rolled.bonusStats,
+            } as any,
+            select: { id: true },
+          });
+          itemIds.push(created.id);
+          if (rolled.isCrit && rolled.bonusEntries.length > 0) {
+            itemDetails.push({
+              id: created.id,
+              isCrit: true,
+              rarity: rolled.rarity,
+              bonusStats: Object.fromEntries(rolled.bonusEntries),
+            });
+          } else {
+            itemDetails.push({ id: created.id, isCrit: false, rarity: rolled.rarity });
+          }
+        }
+      }
+
+      return { turnSpend: spent, taxResult: tax, craftedItemIds: itemIds, craftedItemDetails: itemDetails };
+    });
 
     // Consume shop crafting crit buff (one use per craft action)
     if (shopCraftingCrit > 0) await consumeBuffStandalone(playerId, 'crafting_crit');
