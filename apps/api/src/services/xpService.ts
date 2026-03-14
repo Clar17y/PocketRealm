@@ -1,6 +1,6 @@
 import { prisma } from '@pocketrealm/database';
 import type { SkillType, SkillXpResult } from '@pocketrealm/shared';
-import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
+import { SKILL_CONSTANTS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { getPlayerGuildModifiers } from './guildUpgradeService';
 import { consumeBuffIfActive } from './buffService';
@@ -42,7 +42,7 @@ export async function grantSkillXp(
     // concurrent actions from double-applying a single-use buff
     const shopXpBoost = await consumeBuffIfActive(txAny, playerId, 'xp_boost');
 
-    const totalXpBoost = xpBoost + shopXpBoost;
+    const totalXpBoost = Math.min(xpBoost + shopXpBoost, SKILL_CONSTANTS.MAX_XP_BOOST);
     const boostedXpGain = totalXpBoost > 0
       ? Math.floor(rawXpGain * (1 + totalXpBoost))
       : rawXpGain;
@@ -78,16 +78,22 @@ export async function grantSkillXp(
       currentXp,
       skill.level,
       currentWindowXpGained,
-      boostedXpGain,
+      rawXpGain,
       skillType
     );
+
+    // Apply boost AFTER efficiency so boosts give a genuine percentage increase
+    const boostedXpAfterEfficiency = totalXpBoost > 0
+      ? Math.floor(xpResult.xpAfterEfficiency * (1 + totalXpBoost))
+      : xpResult.xpAfterEfficiency;
 
     const skillLeveledUp = xpResult.newLevel > skill.level;
     const skillPointsGained = skillLeveledUp
       ? (xpResult.newLevel - skill.level) * SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL
       : 0;
 
-    const newTotalXp = currentXp + xpResult.xpAfterEfficiency;
+    const newTotalXp = currentXp + boostedXpAfterEfficiency;
+    // Use unboosted value for window cap so boosts don't accelerate hitting the wall
     const newDailyXpGained = currentWindowXpGained + xpResult.xpAfterEfficiency;
 
     await tx.playerSkill.update({
@@ -102,7 +108,7 @@ export async function grantSkillXp(
       },
     });
 
-    const characterXpGain = calculateCharacterXpGain(xpResult.xpAfterEfficiency);
+    const characterXpGain = calculateCharacterXpGain(boostedXpAfterEfficiency);
     const characterXpBefore = Number(player.characterXp);
     const characterXpAfter = characterXpBefore + characterXpGain;
     const characterLevelBefore = player.characterLevel;
