@@ -14,7 +14,7 @@ import {
 import type { PotionConsumed } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
-import { spendPlayerTurns, refundPlayerTurns } from '../services/turnBankService';
+import { refundPlayerTurns } from '../services/turnBankService';
 import { getHpState, enterRecoveringState, setHp } from '../services/hpService';
 import { storePendingLoot, type PendingLootItem } from '../services/pendingLootService';
 import { serializeXpGrant, toMobTemplate, trackAchievements, calculateFleeWithGold, buildPveCombatOptions } from '../utils/routeHelpers.js';
@@ -34,7 +34,7 @@ import { mapTemplateCombatLog } from '../services/combatLogMapper';
 import { calculateExplorationPercent, getExplorationPercent } from '../services/zoneExplorationService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { assertNotOverEncumbered } from '../services/inventoryService';
-import { applyGuildTax, getPlayerTaxRate, calculateInflatedCost, taxInfoFromResult } from '../services/guildTaxService';
+import { spendWithTaxTx, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 import { trackProgress } from '../services/progressService';
@@ -282,11 +282,11 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     ? Math.max(1, Math.round(baseTravelCost * (1 - guildMods.travelCostReduction)))
     : baseTravelCost;
 
-  // 9. Inflate by guild tax, spend, route tax to treasury
-  const { taxRate } = await getPlayerTaxRate(playerId);
-  const travelCost = calculateInflatedCost(guildReducedCost, taxRate);
-  await spendPlayerTurns(playerId, travelCost);
-  const taxResult = await applyGuildTax(playerId, travelCost);
+  // 9. Atomically inflate by guild tax, spend turns, and route tax to treasury
+  const { turnSpend: travelTurnSpend, taxResult } = await prisma.$transaction(
+    async (tx) => spendWithTaxTx(tx, playerId, guildReducedCost),
+  );
+  const travelCost = travelTurnSpend.spent;
 
   const events: TravelEvent[] = [];
 
