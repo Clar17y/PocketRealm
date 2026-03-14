@@ -131,11 +131,11 @@ export default function BossEncountersPage() {
 
       <h2>Spawning</h2>
       <p>
-        Boss encounters have a{' '}
-        <Const>{(WORLD_EVENT_CONSTANTS.BOSS_SPAWN_CHANCE * 100).toFixed(0)}%</Const>{' '}
-        spawn chance and a{' '}
+        Boss encounters spawn on a dedicated{' '}
+        <Const>{WORLD_EVENT_CONSTANTS.BOSS_SPAWN_INTERVAL_HOURS}</Const>-hour
+        timer, independent of zone events. They also have a{' '}
         <Const>{(WORLD_EVENT_CONSTANTS.BOSS_DISCOVERY_CHANCE * 100).toFixed(0)}%</Const>{' '}
-        discovery chance. At most{' '}
+        discovery chance while exploring. At most{' '}
         <Const>{WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS}</Const> boss
         encounter can be active at a time.
       </p>
