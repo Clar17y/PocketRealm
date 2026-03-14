@@ -31,6 +31,11 @@ export async function grantSkillXp(
   const xpBoost = guildXpBoost ?? (await getPlayerGuildModifiers(playerId)).xpBoost;
 
   return prisma.$transaction(async (tx) => {
+    // Lock the player row to serialize concurrent XP grants for the same player.
+    // Without this, two concurrent transactions could both read the same characterLevel,
+    // both compute a level-up, and both increment attributePoints — doubling the reward.
+    await tx.$queryRaw`SELECT id FROM "Player" WHERE id = ${playerId}::uuid FOR UPDATE`;
+
     const txAny = tx as unknown as any;
 
     // Atomically read + consume shop XP buff inside the transaction to prevent
