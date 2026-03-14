@@ -285,6 +285,9 @@ export const CRAFTING_CONSTANTS = {
 
   /** Max items per batch salvage request */
   SALVAGE_BATCH_LIMIT: 50,
+
+  /** Max quantity per craft request */
+  MAX_CRAFT_QUANTITY: 100,
 } as const;
 
 // =============================================================================
