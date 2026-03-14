@@ -613,12 +613,12 @@ export const POTION_CONSTANTS = {
   STAMINA_RESTORE: 60,
   GREATER_STAMINA_RESTORE: 100,
 
-  // Mana potions
-  MINOR_MANA_RESTORE: 25,
-  MANA_RESTORE_T2: 45,
-  MANA_RESTORE_T3: 65,
-  MANA_RESTORE: 80,
-  GREATER_MANA_RESTORE: 100,
+  // Mana potions (T1–T5; T1/T4/T5 names are pre-existing and referenced externally)
+  MINOR_MANA_RESTORE: 25,  // T1
+  MANA_RESTORE_T2: 45,     // T2
+  MANA_RESTORE_T3: 65,     // T3
+  MANA_RESTORE: 80,        // T4
+  GREATER_MANA_RESTORE: 100, // T5
 } as const;
 
 export const BUFF_POTION_CONSTANTS = {
