@@ -13,7 +13,7 @@ vi.mock('./systemMessageService', () => ({
 }));
 
 import { mockPrisma } from '../__test__/setup';
-import { checkAndSpawnEvents } from './eventSchedulerService';
+import { checkAndSpawnEvents, _resetBossSpawnTimer } from './eventSchedulerService';
 import { expireStaleEvents, spawnWorldEvent } from './worldEventService';
 import { createBossEncounter, checkAndResolveDueBossRounds } from './bossEncounterService';
 import { emitSystemMessage } from './systemMessageService';
@@ -38,6 +38,9 @@ describe('eventSchedulerService', () => {
 
     // Block boss spawn timer by default (boss-specific tests override)
     mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
+
+    // Reset in-memory boss spawn debounce so each test starts fresh
+    _resetBossSpawnTimer();
   });
 
   afterEach(() => {

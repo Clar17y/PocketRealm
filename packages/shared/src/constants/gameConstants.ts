@@ -686,6 +686,7 @@ export const WORLD_EVENT_CONSTANTS = {
   BOSS_SIGNUP_TURN_COST: 200,
 
   // Boss spawning
+  /** @deprecated Boss spawning now uses BOSS_SPAWN_INTERVAL_HOURS timer */
   BOSS_SPAWN_CHANCE: 0.10,
   BOSS_DISCOVERY_CHANCE: 0.05,
   MAX_BOSS_ENCOUNTERS: 1,

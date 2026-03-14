@@ -11,7 +11,13 @@ import { emitSystemMessage } from './systemMessageService';
 import { pickWeighted } from '../utils/pickWeighted.js';
 
 let lastRunAt = 0;
+let lastBossSpawnAt = 0;
 const MIN_INTERVAL_MS = 60_000;
+
+/** Reset in-memory boss spawn timer — for testing only. */
+export function _resetBossSpawnTimer(): void {
+  lastBossSpawnAt = 0;
+}
 
 function pickRandom<T>(arr: T[]): T | undefined {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -246,6 +252,11 @@ async function trySpawnBoss(io: SocketServer | null, zoneId: string, zoneName: s
 
 /** Dedicated boss spawn timer — independent of zone event cooldowns. */
 export async function checkAndSpawnBoss(io: SocketServer | null): Promise<void> {
+  const now = Date.now();
+  const intervalMs = WORLD_EVENT_CONSTANTS.BOSS_SPAWN_INTERVAL_HOURS * 60 * 60 * 1000;
+  if (now - lastBossSpawnAt < intervalMs) return;
+  lastBossSpawnAt = now;
+
   // Active boss cap
   const activeBosses = await prisma.bossEncounter.count({
     where: { status: { in: ['waiting', 'in_progress'] } },
@@ -253,8 +264,7 @@ export async function checkAndSpawnBoss(io: SocketServer | null): Promise<void> 
   if (activeBosses >= WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS) return;
 
   // DB-based cooldown (survives server restarts)
-  const intervalMs = WORLD_EVENT_CONSTANTS.BOSS_SPAWN_INTERVAL_HOURS * 60 * 60 * 1000;
-  const cooldownCutoff = new Date(Date.now() - intervalMs);
+  const cooldownCutoff = new Date(now - intervalMs);
   const recentBoss = await prisma.bossEncounter.findFirst({
     where: { event: { startedAt: { gte: cooldownCutoff } } },
     select: { id: true },
