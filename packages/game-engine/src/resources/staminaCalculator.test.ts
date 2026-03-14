@@ -6,6 +6,7 @@ import {
   calculateStaminaRegenPerRound,
   calculateCurrentStamina,
   calculateStaminaRestHealing,
+  calculateStaminaRestHealPerTurn,
 } from './staminaCalculator';
 
 describe('calculateMaxStamina', () => {
@@ -73,9 +74,17 @@ describe('calculateMaxStamina', () => {
 });
 
 describe('calculateStaminaRegenPerSecond', () => {
-  it('returns the passive regen constant', () => {
-    expect(calculateStaminaRegenPerSecond()).toBe(
+  it('returns base regen at zero skill levels', () => {
+    expect(calculateStaminaRegenPerSecond(0, 0, 0)).toBe(
       STAMINA_CONSTANTS.PASSIVE_REGEN_PER_SECOND
+    );
+  });
+
+  it('scales with average skill level', () => {
+    // avg of (30, 30, 30) = 30
+    expect(calculateStaminaRegenPerSecond(30, 30, 30)).toBeCloseTo(
+      STAMINA_CONSTANTS.PASSIVE_REGEN_PER_SECOND +
+        30 * STAMINA_CONSTANTS.PASSIVE_REGEN_PER_SKILL_LEVEL
     );
   });
 });
@@ -135,18 +144,34 @@ describe('calculateCurrentStamina', () => {
   });
 });
 
+describe('calculateStaminaRestHealPerTurn', () => {
+  it('returns base heal at zero skill levels', () => {
+    expect(calculateStaminaRestHealPerTurn(0, 0, 0)).toBe(
+      STAMINA_CONSTANTS.REST_HEAL_PER_TURN
+    );
+  });
+
+  it('scales with average skill level', () => {
+    // avg of (30, 30, 30) = 30
+    expect(calculateStaminaRestHealPerTurn(30, 30, 30)).toBeCloseTo(
+      STAMINA_CONSTANTS.REST_HEAL_PER_TURN +
+        30 * STAMINA_CONSTANTS.REST_HEAL_PER_SKILL_LEVEL
+    );
+  });
+});
+
 describe('calculateStaminaRestHealing', () => {
   const healPerTurn = STAMINA_CONSTANTS.REST_HEAL_PER_TURN;
 
   it('heals to full when enough turns', () => {
-    const result = calculateStaminaRestHealing(50, 100, 100);
+    const result = calculateStaminaRestHealing(50, 100, 100, healPerTurn);
     expect(result.newStamina).toBe(100);
     expect(result.healedAmount).toBe(50);
     expect(result.turnsUsed).toBe(Math.ceil(50 / healPerTurn));
   });
 
   it('partially heals when not enough turns', () => {
-    const result = calculateStaminaRestHealing(50, 100, 5);
+    const result = calculateStaminaRestHealing(50, 100, 5, healPerTurn);
     const expectedHeal = healPerTurn * 5;
     expect(result.healedAmount).toBe(Math.min(50, expectedHeal));
     expect(result.newStamina).toBe(50 + result.healedAmount);
@@ -154,19 +179,33 @@ describe('calculateStaminaRestHealing', () => {
   });
 
   it('uses at least 1 turn if turns > 0', () => {
-    const result = calculateStaminaRestHealing(100, 100, 10);
+    const result = calculateStaminaRestHealing(100, 100, 10, healPerTurn);
     expect(result.turnsUsed).toBeGreaterThanOrEqual(1);
   });
 
   it('heals 0 when already at max', () => {
-    const result = calculateStaminaRestHealing(100, 100, 10);
+    const result = calculateStaminaRestHealing(100, 100, 10, healPerTurn);
     expect(result.healedAmount).toBe(0);
     expect(result.newStamina).toBe(100);
   });
 
   it('uses 0 turns when turnsToSpend is 0', () => {
-    const result = calculateStaminaRestHealing(50, 100, 0);
+    const result = calculateStaminaRestHealing(50, 100, 0, healPerTurn);
     expect(result.turnsUsed).toBe(0);
     expect(result.healedAmount).toBe(0);
+  });
+
+  it('heals faster with higher heal-per-turn rate', () => {
+    const scaledHealPerTurn = calculateStaminaRestHealPerTurn(50, 50, 50);
+    const resultLow = calculateStaminaRestHealing(0, 100, 10, healPerTurn);
+    const resultHigh = calculateStaminaRestHealing(0, 100, 10, scaledHealPerTurn);
+    expect(resultHigh.healedAmount).toBeGreaterThan(resultLow.healedAmount);
+  });
+
+  it('floors fractional heal amounts', () => {
+    // healPerTurn = 5.3 → 2 turns = floor(10.6) = 10
+    const result = calculateStaminaRestHealing(50, 100, 2, 5.3);
+    expect(result.healedAmount).toBe(10);
+    expect(result.newStamina).toBe(60);
   });
 });

@@ -170,6 +170,7 @@ export interface ResourceState {
   max: number;
   regenPerRound: number;
   regenPerSecond: number;
+  restHealPerTurn: number;
 }
 
 export interface CombatResourceState {

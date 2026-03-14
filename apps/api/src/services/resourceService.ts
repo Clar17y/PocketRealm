@@ -5,11 +5,13 @@ import {
   calculateStaminaRegenPerRound,
   calculateCurrentStamina,
   calculateStaminaRestHealing,
+  calculateStaminaRestHealPerTurn,
   calculateMaxMana,
   calculateManaRegenPerSecond,
   calculateManaRegenPerRound,
   calculateCurrentMana,
   calculateManaRestHealing,
+  calculateManaRestHealPerTurn,
 } from '@pocketrealm/game-engine';
 import type { ResourceState } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
@@ -82,7 +84,7 @@ export async function getResourceState(
     evasionLevel: skills.evasion,
     equipmentStaminaBonus: 0, // no equipment stamina bonus yet
   });
-  const staminaRegenPerSecond = calculateStaminaRegenPerSecond();
+  const staminaRegenPerSecond = calculateStaminaRegenPerSecond(skills.melee, skills.ranged, skills.evasion);
   const currentStamina = calculateCurrentStamina(
     player.currentStamina,
     player.lastStaminaRegenAt,
@@ -101,7 +103,7 @@ export async function getResourceState(
     magicLevel: skills.magic,
     equipmentManaBonus: 0, // no equipment mana bonus yet
   });
-  const manaRegenPerSecond = calculateManaRegenPerSecond();
+  const manaRegenPerSecond = calculateManaRegenPerSecond(skills.magic);
   const currentMana = calculateCurrentMana(
     player.currentMana,
     player.lastManaRegenAt,
@@ -117,12 +119,14 @@ export async function getResourceState(
       max: maxStamina,
       regenPerRound: staminaRegenPerRound,
       regenPerSecond: staminaRegenPerSecond,
+      restHealPerTurn: calculateStaminaRestHealPerTurn(skills.melee, skills.ranged, skills.evasion),
     },
     mana: {
       current: currentMana,
       max: maxMana,
       regenPerRound: manaRegenPerRound,
       regenPerSecond: manaRegenPerSecond,
+      restHealPerTurn: calculateManaRestHealPerTurn(skills.magic),
     },
   };
 }
@@ -163,6 +167,7 @@ export async function restStamina(
       state.stamina.current,
       state.stamina.max,
       effectiveTurns,
+      state.stamina.restHealPerTurn,
     );
 
     const actualTurnsToDeduct = calculateInflatedCost(innerHealing.turnsUsed, taxRate);
@@ -211,6 +216,7 @@ export async function restMana(
       state.mana.current,
       state.mana.max,
       effectiveTurns,
+      state.mana.restHealPerTurn,
     );
 
     const actualTurnsToDeduct = calculateInflatedCost(innerHealing.turnsUsed, taxRate);

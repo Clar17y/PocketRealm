@@ -301,7 +301,6 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const levelsAbove = Math.max(0, level - template.levelRequired);
   const yieldMultiplier = 1 + levelsAbove * GATHERING_CONSTANTS.YIELD_MULTIPLIER_PER_LEVEL;
   const baseYield = Math.max(template.baseYield, GATHERING_CONSTANTS.BASE_YIELD);
-  const baseYieldPerAction = Math.floor(baseYield * yieldMultiplier);
 
   // Apply world event resource modifiers + guild gathering yield — fetch events once
   const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
@@ -313,11 +312,14 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const guildMods = await getPlayerGuildModifiers(playerId);
   const shopGatheringYield = await getBuffValue(playerId, 'gathering_yield');
 
-  // Guild + shop buff bonus applies per action
+  // Apply level + guild/shop multipliers to batch total, not per-action
+  // (fixes dead zone where Math.floor discards fractional multipliers every action)
   const combinedYieldBonus = guildMods.gatheringYield + shopGatheringYield;
-  const guildYieldPerAction = combinedYieldBonus > 0
-    ? Math.max(1, Math.floor(baseYieldPerAction * (1 + combinedYieldBonus)))
-    : baseYieldPerAction;
+  const totalMultiplier = yieldMultiplier * (1 + combinedYieldBonus);
+  // Unrounded effective yield for capacity planning
+  const effectiveYieldPerAction = baseYield * totalMultiplier;
+  // Display value for yieldBreakdown (rounded for display only)
+  const baseYieldPerAction = Math.floor(baseYield * yieldMultiplier);
 
   // yield_down → increase turn cost (so players still collect the full amount)
   // yield_up  → bonus yield (applied after raw yield calculation)
@@ -339,7 +341,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     const effectiveTurns = calculateEffectiveTurns(body.turns, taxRate);
 
     const maxActionsByTurns = Math.floor(effectiveTurns / turnCostPerAction);
-    const maxActionsByCapacity = Math.ceil(effectiveCapacity / guildYieldPerAction);
+    const maxActionsByCapacity = Math.ceil(effectiveCapacity / effectiveYieldPerAction);
     const innerActions = Math.min(maxActionsByTurns, maxActionsByCapacity);
 
     if (innerActions <= 0) {
@@ -349,8 +351,8 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     const baseTurns = innerActions * turnCostPerAction;
     const actualTurns = calculateInflatedCost(baseTurns, taxRate);
 
-    // yield_up: apply bonus multiplier; yield_down: already penalised via turn cost
-    const innerRawYield = Math.min(innerActions * guildYieldPerAction, effectiveCapacity);
+    // Batch-level floor: apply multipliers to total, not per-action (fixes fractional dead zone)
+    const innerRawYield = Math.min(Math.max(1, Math.floor(innerActions * effectiveYieldPerAction)), effectiveCapacity);
     const innerTotalYield = eventMultiplier > 1
       ? Math.max(1, Math.floor(innerRawYield * eventMultiplier))
       : innerRawYield;
