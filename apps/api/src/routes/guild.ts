@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { prisma } from '@pocketrealm/database';
 import { authenticate } from '../middleware/auth';
+import { AppError } from '../middleware/errorHandler';
 import {
   createGuild, getPlayerGuild, getGuild, searchGuilds,
   updateSettings, getGuildLog,
@@ -160,8 +162,17 @@ guildRouter.post('/:id/transfer', asyncHandler(async (req, res) => {
 
 // GET /:id/log
 guildRouter.get('/:id/log', asyncHandler(async (req, res) => {
+  const guildId = req.params.id;
+  const playerId = req.player!.playerId;
+
+  // Only guild members can read their guild's activity log
+  const membership = await prisma.guildMember.findUnique({ where: { playerId } });
+  if (!membership || membership.guildId !== guildId) {
+    throw new AppError(403, 'Not a member of this guild', 'NOT_IN_GUILD');
+  }
+
   const { page } = logQuerySchema.parse(req.query);
-  const result = await getGuildLog(req.params.id, page);
+  const result = await getGuildLog(guildId, page);
   res.json(result);
 }));
 

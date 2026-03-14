@@ -79,7 +79,7 @@ export function getWindowsPerDay(): number {
 
 /**
  * Get per-window XP cap for a skill type.
- * Daily cap divided by number of windows (4 for 6-hour windows).
+ * Daily cap divided by number of windows (2 for 12-hour windows).
  */
 export function getWindowCap(skillType: SkillType): number {
   const windowsPerDay = getWindowsPerDay();

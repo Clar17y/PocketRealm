@@ -130,11 +130,11 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 
 ### Ready to Implement (plans written)
 
-1. [XP System Rebalance](plans/01-xp-system-rebalance.md) — #3, #8, #9
-2. [PvP Fixes](plans/02-pvp-fixes.md) — #5, #17, #18, #55
-3. [Combat & Flee Tweaks](plans/03-combat-flee-tweaks.md) — #25, #50, #63
-4. [Resource Regen Scaling](plans/04-resource-regen-scaling.md) — #23, #34, #88
-5. [Potion Rebalance](plans/05-potion-rebalance.md) — #29, #72
+1. [XP System Rebalance](plans/01-xp-system-rebalance.md) — #3, #8, #9 — [PR #128](https://github.com/Clar17y/Adventure/pull/128)
+2. [PvP Fixes](plans/02-pvp-fixes.md) — #5, #17, #18, #55 — [PR #135](https://github.com/Clar17y/Adventure/pull/135)
+3. [Combat & Flee Tweaks](plans/03-combat-flee-tweaks.md) — #25, #50, #63 — [PR #137](https://github.com/Clar17y/Adventure/pull/137)
+4. [Resource Regen Scaling](plans/04-resource-regen-scaling.md) — #23, #34, #88 — [PR #140](https://github.com/Clar17y/Adventure/pull/140)
+5. [Potion Rebalance](plans/05-potion-rebalance.md) — #29, #72 — [PR #141](https://github.com/Clar17y/Adventure/pull/141)
 6. [World Boss & Events](plans/06-world-boss-events.md) — #22, #33, #82
 7. [Quick Fixes Batch](plans/07-quick-fixes-batch.md) — #10, #15, #26, #32, #36, #38, #59, #60, #68, #70, #71, #80, #81, #89, #90
 

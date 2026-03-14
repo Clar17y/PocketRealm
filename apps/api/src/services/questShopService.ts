@@ -5,8 +5,10 @@ import {
   getAllMobPrefixes,
 } from '@pocketrealm/shared';
 import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
+import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { emitAchievementNotifications } from './achievementService';
+import { assertNotOverEncumbered } from './inventoryService';
 import { getWeekStart, getLevelBracket } from '../utils/dateHelpers';
 import { randomIntInclusive } from '../utils/random';
 
@@ -247,6 +249,16 @@ async function applyTalentReset(tx: any, playerId: string) {
 }
 
 async function applyEfficiencyReset(tx: any, playerId: string) {
+  // Only allow reset if the XP window has naturally expired to prevent mid-window XP doubling
+  const skill = await tx.playerSkill.findFirst({
+    where: { playerId },
+    orderBy: { lastXpResetAt: 'desc' },
+    select: { lastXpResetAt: true },
+  });
+  if (skill?.lastXpResetAt && !shouldResetWindowCap(skill.lastXpResetAt)) {
+    throw new AppError(400, 'XP efficiency window is still active', 'WINDOW_NOT_EXPIRED');
+  }
+
   await tx.playerSkill.updateMany({
     where: { playerId },
     data: { dailyXpGained: 0 },
@@ -259,6 +271,26 @@ async function applyTeleport(tx: any, playerId: string, targetZoneId?: string) {
     throw new AppError(400, 'Target zone required', 'MISSING_TARGET_ZONE');
   }
 
+  // Enforce same travel restrictions as normal zone travel (use tx for TOCTOU safety)
+  const player = await tx.player.findUnique({
+    where: { id: playerId },
+    select: { isRecovering: true, currentHp: true, currentZoneId: true },
+  });
+  if (!player) throw new AppError(404, 'Player not found', 'PLAYER_NOT_FOUND');
+  if (player.isRecovering || player.currentHp <= 0) {
+    throw new AppError(400, 'Cannot teleport while recovering', 'IS_RECOVERING');
+  }
+
+  const activeMembership = await tx.guildExpeditionMember.findFirst({
+    where: { playerId, expedition: { status: 'in_progress' } },
+    select: { expeditionId: true },
+  });
+  if (activeMembership) {
+    throw new AppError(400, 'Cannot perform this action while on an active expedition', 'EXPEDITION_LOCKED');
+  }
+
+  await assertNotOverEncumbered(playerId);
+
   const zone = await tx.zone.findUnique({ where: { id: targetZoneId } });
   if (!zone) throw new AppError(404, 'Zone not found', 'ZONE_NOT_FOUND');
 
@@ -269,24 +301,40 @@ async function applyTeleport(tx: any, playerId: string, targetZoneId?: string) {
 
   await tx.player.update({
     where: { id: playerId },
-    data: { currentZoneId: targetZoneId, lastTravelledFromZoneId: targetZoneId },
+    data: { currentZoneId: targetZoneId, lastTravelledFromZoneId: player.currentZoneId ?? targetZoneId },
   });
 
   return { type: 'teleport', zoneId: targetZoneId, zoneName: zone.name };
 }
 
 async function applyHearthstone(tx: any, playerId: string) {
+  // Enforce same travel restrictions as normal zone travel (use tx for TOCTOU safety)
   const player = await tx.player.findUnique({
     where: { id: playerId },
-    select: { homeTownId: true },
+    select: { isRecovering: true, currentHp: true, homeTownId: true, currentZoneId: true },
   });
-  if (!player?.homeTownId) {
+  if (!player) throw new AppError(404, 'Player not found', 'PLAYER_NOT_FOUND');
+  if (player.isRecovering || player.currentHp <= 0) {
+    throw new AppError(400, 'Cannot use hearthstone while recovering', 'IS_RECOVERING');
+  }
+
+  const activeMembership = await tx.guildExpeditionMember.findFirst({
+    where: { playerId, expedition: { status: 'in_progress' } },
+    select: { expeditionId: true },
+  });
+  if (activeMembership) {
+    throw new AppError(400, 'Cannot perform this action while on an active expedition', 'EXPEDITION_LOCKED');
+  }
+
+  await assertNotOverEncumbered(playerId);
+
+  if (!player.homeTownId) {
     throw new AppError(400, 'No home town set', 'NO_HOME_TOWN');
   }
 
   await tx.player.update({
     where: { id: playerId },
-    data: { currentZoneId: player.homeTownId, lastTravelledFromZoneId: player.homeTownId },
+    data: { currentZoneId: player.homeTownId, lastTravelledFromZoneId: player.currentZoneId ?? player.homeTownId },
   });
 
   return { type: 'hearthstone', zoneId: player.homeTownId };

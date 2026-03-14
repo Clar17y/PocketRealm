@@ -3,6 +3,7 @@ import { prisma } from '@pocketrealm/database';
 import { ACHIEVEMENTS_BY_ID, CHAT_CONSTANTS } from '@pocketrealm/shared';
 import type { ChatChannelType, ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@pocketrealm/shared';
 import { checkRateLimit, saveMessage } from '../services/chatService';
+import { sanitizeUserText } from '../utils/sanitize';
 
 // In-memory pinned messages keyed by channelId (ephemeral, lost on server restart)
 const pinnedMessages = new Map<string, ChatPinnedMessageEvent>();
@@ -84,7 +85,7 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
       return;
     }
 
-    const trimmed = message.trim();
+    const trimmed = sanitizeUserText(message.trim());
     if (!trimmed || trimmed.length > CHAT_CONSTANTS.MAX_MESSAGE_LENGTH) return;
 
     // Guild chat: verify membership
@@ -131,10 +132,17 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
   });
 
   // Handle zone switching (when player travels)
-  socket.on('chat:switch-zone', (payload: unknown) => {
+  socket.on('chat:switch-zone', async (payload: unknown) => {
     if (!payload || typeof payload !== 'object') return;
     const { zoneId } = payload as Record<string, unknown>;
     if (typeof zoneId !== 'string') return;
+
+    // Validate the player is actually in the requested zone
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { currentZoneId: true },
+    });
+    if (player?.currentZoneId !== zoneId) return;
 
     // Leave all current zone rooms
     for (const room of socket.rooms) {

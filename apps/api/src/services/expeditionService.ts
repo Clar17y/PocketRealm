@@ -44,6 +44,22 @@ import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrche
 import { buildPotionPool, templateHasPotionActions, deductConsumedPotions } from './potionService';
 
 // ---------------------------------------------------------------------------
+// Bot Cleanup — delete bot players created by admin /expedition/fill
+// ---------------------------------------------------------------------------
+
+async function cleanupExpeditionBots(expeditionId: string): Promise<void> {
+  const botMembers = await prisma.guildExpeditionMember.findMany({
+    where: { expeditionId, player: { isBot: true } },
+    select: { playerId: true },
+  });
+  if (botMembers.length === 0) return;
+  // Cascade deletes clean up GuildMember, TurnBank, Skills, Items, etc.
+  await prisma.player.deleteMany({
+    where: { id: { in: botMembers.map((m) => m.playerId) } },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Data Transformation
 // ---------------------------------------------------------------------------
 
@@ -749,6 +765,8 @@ export async function checkAndResolveExpeditionRounds(io: unknown): Promise<void
           `Tier ${exp.tier} expedition failed - not enough participants (${memberCount}/${minParticipants})`,
           { expeditionId: exp.id },
         );
+
+        await cleanupExpeditionBots(exp.id);
       }
     } else if (exp.status === 'in_progress') {
       await resolveExpeditionRound(exp.id, io);
@@ -1270,6 +1288,7 @@ export async function handleWipe(expeditionId: string): Promise<void> {
       `Expedition failed after ${newWipeCount} attempts`,
       { expeditionId, wipeCount: newWipeCount },
     );
+    await cleanupExpeditionBots(expeditionId);
     return;
   }
 
@@ -1280,6 +1299,12 @@ export async function handleWipe(expeditionId: string): Promise<void> {
   }
   const wipeTemplateIdMap = await buildTemplateIdMap(wipeTheme);
   const rooms = generateExpeditionRooms(expedition.tier - 1, wipeTheme, Math.random, wipeTemplateIdMap);
+
+  // Collect bot player IDs before the transaction deletes GuildExpeditionMember rows
+  const botMembers = await prisma.guildExpeditionMember.findMany({
+    where: { expeditionId, player: { isBot: true } },
+    select: { playerId: true },
+  });
 
   await prisma.$transaction(async (tx) => {
     await tx.guildExpeditionMember.deleteMany({ where: { expeditionId } });
@@ -1300,6 +1325,13 @@ export async function handleWipe(expeditionId: string): Promise<void> {
       },
     });
   });
+
+  // Delete bot Player records after members are removed
+  if (botMembers.length > 0) {
+    await prisma.player.deleteMany({
+      where: { id: { in: botMembers.map((m) => m.playerId) } },
+    });
+  }
 
   await addGuildLog(
     expedition.guildId,
@@ -1355,6 +1387,8 @@ export async function abandonExpedition(expeditionId: string, playerId: string):
     'Expedition abandoned by officer',
     { expeditionId },
   );
+
+  await cleanupExpeditionBots(expeditionId);
 }
 
 // ---------------------------------------------------------------------------
@@ -1459,6 +1493,8 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
     `Tier ${expedition.tier} expedition completed!`,
     { expeditionId },
   );
+
+  await cleanupExpeditionBots(expeditionId);
 }
 
 // ---------------------------------------------------------------------------

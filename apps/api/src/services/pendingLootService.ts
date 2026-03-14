@@ -62,8 +62,10 @@ export async function claimPendingLoot(
   selectedIndices: number[]
 ): Promise<void> {
   const key = lootKey(playerId, sessionId);
-  const data = await redis.get(key);
-  if (!data) throw new AppError(404, 'Pending loot expired or not found', 'LOOT_EXPIRED');
+
+  // Atomically read-and-delete to prevent double-claim race condition
+  const data = await redis.getdel(key);
+  if (!data) throw new AppError(404, 'Pending loot expired or already claimed', 'LOOT_EXPIRED');
 
   const items: PendingLootItem[] = JSON.parse(data);
   const { usedSlots, capacity } = await getInventoryState(playerId);
@@ -72,26 +74,30 @@ export async function claimPendingLoot(
 
   const uniqueIndices = [...new Set(selectedIndices)];
 
-  await prisma.$transaction(async (tx) => {
-    for (const idx of uniqueIndices) {
-      if (idx < 0 || idx >= items.length) continue;
-      if (slotsUsed >= capacity) break;
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const idx of uniqueIndices) {
+        if (idx < 0 || idx >= items.length) continue;
+        if (slotsUsed >= capacity) break;
 
-      const lootItem = items[idx];
-      await tx.item.create({
-        data: {
-          ownerId: playerId,
-          templateId: lootItem.templateId,
-          rarity: lootItem.rarity,
-          quantity: lootItem.quantity,
-          bonusStats: lootItem.bonusStats ?? undefined,
-          currentDurability: lootItem.currentDurability,
-          maxDurability: lootItem.maxDurability,
-        } as any,
-      });
-      slotsUsed++;
-    }
-  });
-
-  await redis.del(key);
+        const lootItem = items[idx];
+        await tx.item.create({
+          data: {
+            ownerId: playerId,
+            templateId: lootItem.templateId,
+            rarity: lootItem.rarity,
+            quantity: lootItem.quantity,
+            bonusStats: lootItem.bonusStats ?? undefined,
+            currentDurability: lootItem.currentDurability,
+            maxDurability: lootItem.maxDurability,
+          } as any,
+        });
+        slotsUsed++;
+      }
+    });
+  } catch (err) {
+    // Restore the Redis key so the player can retry — prevents loot loss on DB failure
+    await redis.set(key, data, 'EX', INVENTORY_CONSTANTS.PENDING_LOOT_TTL_SECONDS);
+    throw err;
+  }
 }

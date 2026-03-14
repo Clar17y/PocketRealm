@@ -252,7 +252,7 @@ describe('getWindowIndex', () => {
   });
 
   it('returns correct index for different hours', () => {
-    const windowHours = SKILL_CONSTANTS.XP_WINDOW_HOURS; // 6
+    const windowHours = SKILL_CONSTANTS.XP_WINDOW_HOURS; // 12
     expect(getWindowIndex(new Date(2026, 1, 4, 5, 0, 0))).toBe(
       Math.floor(5 / windowHours),
     );
@@ -266,15 +266,15 @@ describe('getWindowIndex', () => {
 });
 
 describe('shouldResetWindowCap', () => {
-  it('does not reset within the rolling 6-hour window', () => {
+  it('does not reset within the rolling 12-hour window', () => {
     const lastResetAt = new Date(2026, 1, 4, 1, 0, 0);
-    const now = new Date(2026, 1, 4, 6, 59, 59);
+    const now = new Date(2026, 1, 4, 12, 59, 59);
     expect(shouldResetWindowCap(lastResetAt, now)).toBe(false);
   });
 
-  it('resets when the rolling 6-hour window duration elapses', () => {
+  it('resets when the rolling 12-hour window duration elapses', () => {
     const lastResetAt = new Date(2026, 1, 4, 1, 0, 0);
-    const now = new Date(2026, 1, 4, 7, 0, 0);
+    const now = new Date(2026, 1, 4, 13, 0, 0);
     expect(shouldResetWindowCap(lastResetAt, now)).toBe(true);
   });
 

@@ -252,8 +252,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [actionError, setActionError] = useState<string | null>(null);
   const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, expeditionThemes, worldBosses, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
-  const [staminaState, setStaminaState] = useState<ResourceState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 });
-  const [manaState, setManaState] = useState<ResourceState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5 });
+  const [staminaState, setStaminaState] = useState<ResourceState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 5 });
+  const [manaState, setManaState] = useState<ResourceState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5, restHealPerTurn: 3 });
   const [skillPointState, setSkillPointState] = useState<SkillPointState | null>(null);
   const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
@@ -932,7 +932,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (!activeZoneId) return;
 
     await runAction('gathering', async () => {
-      const res = await mine(playerNodeId, turnSpend, activeZoneId);
+      const res = await mine(playerNodeId, turnSpend);
       const data = res.data;
       if (!data) {
         setActionError(res.error?.message ?? 'Gathering failed');

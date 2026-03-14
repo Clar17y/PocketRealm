@@ -13,7 +13,9 @@ vi.mock('./inventoryService', () => ({
 vi.mock('./xpService', () => ({
   grantSkillXp: vi.fn().mockResolvedValue({
     xpResult: { xpAfterEfficiency: 100, leveledUp: false },
+    boostedXpAfterEfficiency: 100,
     newLevel: 5,
+    skillLeveledUp: false,
   }),
 }));
 vi.mock('./achievementService', () => ({

@@ -30,7 +30,7 @@ import { applyGuildTaxTx, taxInfoFromResult } from '../../services/guildTaxServi
 import { trackProgress } from '../../services/progressService';
 import { type GrantXpResult } from '../../services/xpService';
 import { degradeEquippedDurability } from '../../services/durabilityService';
-import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, calculateFleeWithGold, buildPveCombatOptions } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertCanAct, assertInZone, trackAchievements, calculateFleeWithGold, buildPveCombatOptions } from '../../utils/routeHelpers.js';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../../services/combatOrchestrationService';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { setAllResources } from '../../services/resourceService';
@@ -85,6 +85,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     if (hpState.currentHp <= 0) {
       throw new AppError(400, 'Cannot explore with 0 HP. Rest before exploring.', 'NO_HP');
     }
+
+    await assertInZone(playerId, body.zoneId);
 
     const validation = validateExplorationTurns(body.turns);
     if (!validation.valid) {
@@ -393,7 +395,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           }
           allQuestProgress.push(...rewards.questProgress);
           xpGrants = rewards.xpGrants;
-          xpGain = xpGrants.reduce((sum, g) => sum + g.xpResult.xpAfterEfficiency, 0);
+          xpGain = xpGrants.reduce((sum, g) => sum + g.boostedXpAfterEfficiency, 0);
 
           pendingCombatLogs.push({
             turnsSpent: 0,

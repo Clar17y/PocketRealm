@@ -1,9 +1,11 @@
 import http from 'http';
+import { randomUUID } from 'crypto';
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 import compression from 'compression';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { authRouter } from './routes/auth';
 import { turnsRouter } from './routes/turns';
 import { playerRouter } from './routes/player';
@@ -87,7 +89,32 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
+
+// Request ID: use client-provided header only if it is a valid UUID,
+// otherwise generate a fresh one to prevent log injection attacks.
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+app.use((req, res, next) => {
+  const clientId = req.headers['x-request-id'] as string | undefined;
+  const id = (clientId && UUID_REGEX.test(clientId)) ? clientId : randomUUID();
+  req.requestId = id;
+  res.setHeader('x-request-id', id);
+  next();
+});
+
+// Trust the first proxy hop (e.g. nginx/Caddy) so Express resolves req.ip
+// to the real client IP rather than the reverse proxy's address.  Without
+// this the rate limiter would bucket every user under the same proxy IP.
+app.set('trust proxy', 1);
+
+// Global rate limiter: 120 requests per minute per IP
+app.use('/api/v1/', rateLimit({
+  windowMs: 60_000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later', code: 'RATE_LIMITED' },
+}));
 
 // Health check
 app.get('/health', (_req, res) => {

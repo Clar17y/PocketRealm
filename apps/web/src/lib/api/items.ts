@@ -166,7 +166,7 @@ export async function getGatheringNodes(query: GatheringNodesQuery = {}) {
   return fetchApi<GatheringNodesResponse>(`/api/v1/gathering/nodes${suffix ? `?${suffix}` : ''}`);
 }
 
-export async function mine(playerNodeId: string, turns: number, currentZoneId: string) {
+export async function mine(playerNodeId: string, turns: number) {
   return fetchApi<{
     logId: string;
     turns: TurnStateResponse;
@@ -211,7 +211,7 @@ export async function mine(playerNodeId: string, turns: number, currentZoneId: s
     questProgress?: QuestProgressUpdate[];
   }>('/api/v1/gathering/mine', {
     method: 'POST',
-    body: JSON.stringify({ playerNodeId, turns, currentZoneId }),
+    body: JSON.stringify({ playerNodeId, turns }),
   });
 }
 

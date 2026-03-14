@@ -13,17 +13,19 @@ export class AppError extends Error {
 
 export function errorHandler(
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
-  console.error('Error:', err);
+  const requestId = req.requestId;
+  console.error(`Error [${requestId}]:`, err);
 
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       error: {
         message: err.message,
         code: err.code,
+        requestId,
       },
     });
     return;
@@ -34,6 +36,7 @@ export function errorHandler(
     error: {
       message: 'Internal server error',
       code: 'INTERNAL_ERROR',
+      requestId,
     },
   });
 }

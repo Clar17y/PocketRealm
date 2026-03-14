@@ -61,7 +61,8 @@ describe('purchaseShopItem', () => {
       name: sampleItem.name,
       maxDurability: 100,
     });
-    mockPrisma.player.update.mockResolvedValue({ expeditionTokens: 120 });
+    mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({ expeditionTokens: 120 });
     mockPrisma.item.create.mockResolvedValue({
       id: 'item-1',
       templateId: 'tmpl-1',
@@ -80,11 +81,11 @@ describe('purchaseShopItem', () => {
     expect(result.item.rarity).toBe('epic');
     expect(result.tokensRemaining).toBe(120);
 
-    // Token deduction
-    expect(mockPrisma.player.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'p1' },
+    // Token deduction via optimistic lock (race-condition safe)
+    expect(mockPrisma.player.updateMany).toHaveBeenCalledWith({
+      where: { id: 'p1', expeditionTokens: { gte: sampleItem.tokenCost } },
       data: { expeditionTokens: { decrement: sampleItem.tokenCost } },
-    }));
+    });
 
     // Item created with soulbound flag and doubled durability
     expect(mockPrisma.item.create).toHaveBeenCalledWith({

@@ -1,5 +1,6 @@
 import { prisma } from '@pocketrealm/database';
 import { createActivityLog } from './activityLogService';
+import { refundPlayerTurnsTx } from './turnBankService';
 import {
   ALL_ACHIEVEMENTS,
   ACHIEVEMENTS_BY_STAT_KEY,
@@ -171,10 +172,14 @@ export async function claimReward(playerId: string, achievementId: string) {
   const rewards = def.rewards ?? [];
 
   await prisma.$transaction(async (tx) => {
-    await tx.playerAchievement.update({
-      where: { playerId_achievementId: { playerId, achievementId } },
+    // Optimistic lock: only claim if not already claimed (prevents double-reward race)
+    const updated = await tx.playerAchievement.updateMany({
+      where: { playerId, achievementId, rewardClaimed: false },
       data: { rewardClaimed: true },
     });
+    if (updated.count === 0) {
+      throw new AppError(400, 'Reward already claimed', 'ALREADY_CLAIMED');
+    }
 
     for (const reward of rewards) {
       switch (reward.type) {
@@ -185,10 +190,7 @@ export async function claimReward(playerId: string, achievementId: string) {
           });
           break;
         case 'turns':
-          await tx.turnBank.update({
-            where: { playerId },
-            data: { currentTurns: { increment: reward.amount } },
-          });
+          await refundPlayerTurnsTx(tx, playerId, reward.amount);
           break;
         case 'item':
           if (reward.itemTemplateId) {

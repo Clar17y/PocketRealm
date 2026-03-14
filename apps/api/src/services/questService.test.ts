@@ -109,7 +109,7 @@ describe('incrementQuestProgress', () => {
     expect(db.playerQuest.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'q1' },
-        data: expect.objectContaining({ currentValue: 8 }),
+        data: { currentValue: { increment: 3 } },
       }),
     );
   });
@@ -134,24 +134,28 @@ describe('incrementQuestProgress', () => {
     ]);
     db.playerQuest.update.mockResolvedValue({
       id: 'q1',
-      currentValue: 10,
+      currentValue: 13, // 8 + 5 via atomic increment
       targetValue: 10,
-      status: 'completed',
+      status: 'active',
     });
+    db.playerQuest.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await incrementQuestProgress(PLAYER_ID, 'kill_count', 5);
     expect(result).toHaveLength(1);
     expect(result[0].completed).toBe(true);
-    expect(result[0].current).toBe(10);
+    expect(result[0].current).toBe(10); // clamped to target
+    // First call: atomic increment
     expect(db.playerQuest.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          currentValue: 10,
-          status: 'completed',
-          completedAt: expect.any(Date),
-        }),
+        where: { id: 'q1' },
+        data: { currentValue: { increment: 5 } },
       }),
     );
+    // Second call: atomic status transition with guard
+    expect(db.playerQuest.updateMany).toHaveBeenCalledWith({
+      where: { id: 'q1', status: 'active' },
+      data: { currentValue: 10, status: 'completed', completedAt: expect.any(Date) },
+    });
   });
 
   it('returns empty array when no matching quests', async () => {
@@ -289,7 +293,8 @@ describe('claimDailyBonus', () => {
     db.playerQuest.count.mockResolvedValueOnce(3); // claimedDailies
     // Player level 10 → bonus = DAILY_BONUS_BASE + floor(10 * DAILY_BONUS_PER_LEVEL) = 5 + 5 = 10
     db.player.findUnique.mockResolvedValue({ characterLevel: 10 });
-    db.playerQuestState.update.mockResolvedValue({
+    db.playerQuestState.updateMany.mockResolvedValue({ count: 1 });
+    db.playerQuestState.findUniqueOrThrow.mockResolvedValue({
       ...state,
       questTokens: 20,
       dailyBonusClaimed: true,
@@ -298,15 +303,13 @@ describe('claimDailyBonus', () => {
     const result = await claimDailyBonus(PLAYER_ID, NOW);
     expect(result.tokensAwarded).toBeGreaterThan(0);
     expect(result.newBalance).toBe(20);
-    expect(db.playerQuestState.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { playerId: PLAYER_ID },
-        data: expect.objectContaining({
-          dailyBonusClaimed: true,
-          questTokens: expect.objectContaining({ increment: expect.any(Number) }),
-        }),
-      }),
-    );
+    expect(db.playerQuestState.updateMany).toHaveBeenCalledWith({
+      where: { playerId: PLAYER_ID, dailyBonusClaimed: false },
+      data: {
+        dailyBonusClaimed: true,
+        questTokens: { increment: expect.any(Number) },
+      },
+    });
   });
 
   it('throws if already claimed today', async () => {

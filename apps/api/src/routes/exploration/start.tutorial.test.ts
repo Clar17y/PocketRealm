@@ -153,6 +153,7 @@ vi.mock('../../utils/routeHelpers.js', () => ({
   })),
   assertNotRecovering: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
   assertCanAct: vi.fn().mockResolvedValue({ currentHp: 100, maxHp: 100, isRecovering: false }),
+  assertInZone: vi.fn().mockResolvedValue(undefined),
   recordBestiaryKill: vi.fn().mockResolvedValue(undefined),
   trackAchievements: vi.fn().mockResolvedValue(undefined),
   buildPveCombatOptions: vi.fn((potionPool: any[]) => ({

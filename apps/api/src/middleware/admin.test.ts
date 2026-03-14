@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mockPrisma } from '../__test__/setup';
 import { requireAdmin } from './admin';
 import { AppError } from './errorHandler';
 
@@ -10,29 +11,41 @@ function mockRes() {
 }
 
 describe('requireAdmin', () => {
-  it('calls next() when player has admin role', () => {
+  it('calls next() without error when DB confirms admin role', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ role: 'admin' });
     const req = { player: { playerId: 'p1', username: 'admin', role: 'admin' } } as any;
     const next = vi.fn();
-    requireAdmin(req, mockRes(), next);
-    expect(next).toHaveBeenCalledOnce();
+    await requireAdmin(req, mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+    expect(mockPrisma.player.findUnique).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      select: { role: true },
+    });
   });
 
-  it('throws 403 when player role is not admin', () => {
-    const req = { player: { playerId: 'p1', username: 'user', role: 'player' } } as any;
-    expect(() => requireAdmin(req, mockRes(), vi.fn())).toThrow(AppError);
-    try { requireAdmin(req, mockRes(), vi.fn()); } catch (e: any) {
-      expect(e.statusCode).toBe(403);
-      expect(e.code).toBe('FORBIDDEN');
-    }
+  it('passes 403 error to next when DB role is not admin despite JWT claiming admin', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+    const req = { player: { playerId: 'p1', username: 'user', role: 'admin' } } as any;
+    const next = vi.fn();
+    await requireAdmin(req, mockRes(), next);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    const err = next.mock.calls[0][0] as AppError;
+    expect(err.statusCode).toBe(403);
+    expect(err.code).toBe('FORBIDDEN');
   });
 
-  it('throws 403 when req.player is undefined', () => {
+  it('passes 403 error to next when req.player is undefined', async () => {
     const req = {} as any;
-    expect(() => requireAdmin(req, mockRes(), vi.fn())).toThrow(AppError);
+    const next = vi.fn();
+    await requireAdmin(req, mockRes(), next);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
   });
 
-  it('throws 403 when role is missing', () => {
-    const req = { player: { playerId: 'p1', username: 'user' } } as any;
-    expect(() => requireAdmin(req, mockRes(), vi.fn())).toThrow(AppError);
+  it('passes 403 error to next when player not found in DB', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue(null);
+    const req = { player: { playerId: 'p1', username: 'user', role: 'admin' } } as any;
+    const next = vi.fn();
+    await requireAdmin(req, mockRes(), next);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
   });
 });

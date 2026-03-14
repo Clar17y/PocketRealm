@@ -73,13 +73,15 @@ describe('getResourceState', () => {
     // maxStamina = BASE_POOL(100) + avgLevel(1) * PER_LEVEL(3) = 103
     expect(result.stamina.current).toBe(80);
     expect(result.stamina.max).toBe(103);
-    expect(result.stamina.regenPerSecond).toBe(1.0);
+    // regenPerSecond = 1.0 + avg(1,1,1)*0.02 = 1.02
+    expect(result.stamina.regenPerSecond).toBeCloseTo(1.02);
     expect(result.stamina.regenPerRound).toBeGreaterThan(0);
 
     // maxMana = BASE_POOL(50) + magicLevel(1) * PER_LEVEL(3) = 53
     expect(result.mana.current).toBe(30);
     expect(result.mana.max).toBe(53);
-    expect(result.mana.regenPerSecond).toBe(0.5);
+    // regenPerSecond = 0.5 + 1*0.015 = 0.515
+    expect(result.mana.regenPerSecond).toBeCloseTo(0.515);
     expect(result.mana.regenPerRound).toBeGreaterThan(0);
   });
 
@@ -168,7 +170,8 @@ describe('restStamina', () => {
 
   it('partially restores stamina when insufficient turns', async () => {
     // currentStamina = 80, max = 103, need = 23
-    // turnsToSpend = 2 → effectiveTurns = 2, heal = 2*5 = 10
+    // healPerTurn = 5 + avg(1,1,1)*0.3 = 5.3
+    // turnsToSpend = 2 → effectiveTurns = 2, heal = floor(2*5.3) = floor(10.6) = 10
     mockPrisma.player.update.mockResolvedValue({});
 
     const result = await restStamina('p1', 2, now);
@@ -242,7 +245,8 @@ describe('restMana', () => {
 
   it('partially restores mana when insufficient turns', async () => {
     // currentMana = 30, max = 53, need = 23
-    // turnsToSpend = 2 → heal = 2*3 = 6
+    // healPerTurn = 3 + 1*0.2 = 3.2
+    // turnsToSpend = 2 → heal = floor(2*3.2) = floor(6.4) = 6
     mockPrisma.player.update.mockResolvedValue({});
 
     const result = await restMana('p1', 2, now);

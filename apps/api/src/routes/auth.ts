@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
+import rateLimit from 'express-rate-limit';
 import { prisma } from '@pocketrealm/database';
 import { TURN_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
@@ -8,12 +9,20 @@ import {
   generateAccessToken,
   generateRefreshToken,
   refreshTokenExpiresAt,
-  sessionInactivityCutoff,
   verifyRefreshToken,
 } from '../middleware/auth';
 import { ensureEquipmentSlots } from '../services/equipmentService';
 import { ensureStarterDiscoveries, ensureStarterEncounterAndNodes } from '../services/zoneDiscoveryService';
 import { asyncHandler } from '../utils/asyncHandler';
+
+// Strict rate limiter for login: 10 attempts per 15 minutes per IP
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again later', code: 'RATE_LIMITED' },
+});
 
 export const authRouter = Router();
 
@@ -28,11 +37,6 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-
-function isRecentlyActive(lastActiveAt: Date | null, nowMs = Date.now()): boolean {
-  if (!lastActiveAt) return false;
-  return lastActiveAt >= sessionInactivityCutoff(nowMs);
-}
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
@@ -150,7 +154,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   });
 }));
 
-authRouter.post('/login', asyncHandler(async (req, res) => {
+authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
   const body = loginSchema.parse(req.body);
   const now = new Date();
 
@@ -214,14 +218,14 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
   // Verify token
   const payload = verifyRefreshToken(refreshToken);
 
-  // Check if token exists in DB and player has remained recently active.
+  // Require token to exist in DB and not be expired (no activity-window bypass)
   const [storedToken, player] = await Promise.all([
     prisma.refreshToken.findUnique({
       where: { token: refreshToken },
     }),
     prisma.player.findUnique({
       where: { id: payload.playerId },
-      select: { id: true, lastActiveAt: true, role: true },
+      select: { id: true, role: true },
     }),
   ]);
 
@@ -229,10 +233,7 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
     throw new AppError(401, 'Invalid or expired refresh token', 'INVALID_TOKEN');
   }
 
-  const storedTokenValid = Boolean(storedToken && storedToken.expiresAt >= now);
-  const activeWithinWindow = isRecentlyActive(player.lastActiveAt, now.getTime());
-
-  if (!storedTokenValid && !activeWithinWindow) {
+  if (!storedToken || storedToken.expiresAt < now) {
     throw new AppError(401, 'Invalid or expired refresh token', 'INVALID_TOKEN');
   }
 

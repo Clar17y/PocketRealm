@@ -297,16 +297,22 @@ export async function incrementQuestProgress(
       if (!metadata?.prefix || metadata.prefix !== quest.filterValue) continue;
     }
 
-    const newValue = Math.min(quest.currentValue + amount, quest.targetValue);
-    const completed = newValue >= quest.targetValue;
-
+    // Atomic increment prevents stale-read data loss from concurrent requests
     const updated = await prisma.playerQuest.update({
       where: { id: quest.id },
-      data: {
-        currentValue: newValue,
-        ...(completed ? { status: 'completed', completedAt: new Date() } : {}),
-      },
+      data: { currentValue: { increment: amount } },
     });
+
+    const newValue = Math.min(updated.currentValue, quest.targetValue);
+    const completed = updated.currentValue >= quest.targetValue;
+
+    if (completed) {
+      // Atomic status transition — updateMany guard prevents duplicate completion
+      await prisma.playerQuest.updateMany({
+        where: { id: quest.id, status: 'active' },
+        data: { currentValue: quest.targetValue, status: 'completed', completedAt: new Date() },
+      });
+    }
 
     updates.push({
       questId: quest.id,
@@ -394,15 +400,19 @@ export async function claimDailyBonus(
   const { DAILY_BONUS_BASE, DAILY_BONUS_PER_LEVEL } = QUEST_CONSTANTS;
   const bonusTokens = DAILY_BONUS_BASE + Math.floor(level * DAILY_BONUS_PER_LEVEL);
 
-  // Award bonus
-  const updated = await prisma.playerQuestState.update({
-    where: { playerId },
+  // Atomic claim — updateMany with dailyBonusClaimed guard prevents double claim via TOCTOU
+  const { count } = await prisma.playerQuestState.updateMany({
+    where: { playerId, dailyBonusClaimed: false },
     data: {
       dailyBonusClaimed: true,
       questTokens: { increment: bonusTokens },
     },
   });
+  if (count === 0) {
+    throw new AppError(400, 'Daily bonus already claimed', 'ALREADY_CLAIMED');
+  }
 
+  const updated = await prisma.playerQuestState.findUniqueOrThrow({ where: { playerId } });
   return { tokensAwarded: bonusTokens, newBalance: updated.questTokens };
 }
 

@@ -126,12 +126,12 @@ describe('createTemplate', () => {
     ).rejects.toThrow(`Maximum ${SKILL_POINT_CONSTANTS.MAX_TEMPLATES} templates allowed`);
   });
 
-  it('rejects unavailable action IDs', async () => {
+  it('rejects unknown action IDs', async () => {
     mockPrisma.combatTemplate.count.mockResolvedValue(0);
 
     await expect(
       createTemplate(PLAYER_ID, 'Bad', [{ actionId: 'nonexistent_action' }]),
-    ).rejects.toThrow("Action 'nonexistent_action' is not available");
+    ).rejects.toThrow("Unknown action 'nonexistent_action'");
   });
 });
 
@@ -310,16 +310,32 @@ describe('validateTemplateSlots', () => {
   it('accepts unlocked talent actions', () => {
     expect(() =>
       validateTemplateSlots(
-        [{ actionId: 'talent_fireball' }],
-        ['talent_fireball'],
+        [{ actionId: 'fire_bolt' }],
+        ['fire_bolt'],
       ),
     ).not.toThrow();
   });
 
-  it('rejects unavailable actionId', () => {
+  it('rejects unknown actionId', () => {
     expect(() =>
       validateTemplateSlots([{ actionId: 'nonexistent' }]),
-    ).toThrow("Action 'nonexistent' is not available");
+    ).toThrow("Unknown action 'nonexistent'");
+  });
+
+  it('rejects valid action not unlocked by player', () => {
+    expect(() =>
+      validateTemplateSlots([{ actionId: 'fire_bolt' }]),
+    ).toThrow("Action 'fire_bolt' is not available");
+  });
+
+  it('validates thenActionId against definition registry', () => {
+    expect(() =>
+      validateTemplateSlots([{
+        actionId: 'light_attack',
+        condition: { type: 'resource_below', resource: 'hp', threshold: 50 },
+        thenActionId: 'unavailable_action',
+      }]),
+    ).toThrow("Unknown action 'unavailable_action'");
   });
 
   it('validates thenActionId against available actions', () => {
@@ -327,9 +343,9 @@ describe('validateTemplateSlots', () => {
       validateTemplateSlots([{
         actionId: 'light_attack',
         condition: { type: 'resource_below', resource: 'hp', threshold: 50 },
-        thenActionId: 'unavailable_action',
+        thenActionId: 'fire_bolt',
       }]),
-    ).toThrow("Action 'unavailable_action' is not available");
+    ).toThrow("Action 'fire_bolt' is not available");
   });
 
   // Condition field consistency (resource/threshold, effectName, thenActionId pairing)
@@ -350,8 +366,8 @@ describe('validateTemplateSlots', () => {
       validateTemplateSlots([{
         actionId: 'normal_attack',
         condition: { type: 'has_debuff', effectName: 'poison' },
-        thenActionId: 'heal_self',
-      }], ['heal_self']),
+        thenActionId: 'minor_heal',
+      }], ['minor_heal']),
     ).not.toThrow();
   });
 });

@@ -410,11 +410,7 @@ describe('achievementService', () => {
         achievementId: 'combat_kills_1000',
         rewardClaimed: false,
       });
-      mockPrisma.playerAchievement.update.mockResolvedValue({
-        playerId: 'p1',
-        achievementId: 'combat_kills_1000',
-        rewardClaimed: true,
-      });
+      mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.player.update.mockResolvedValue({});
 
       const result = await claimReward('p1', 'combat_kills_1000');
@@ -491,7 +487,7 @@ describe('achievementService', () => {
         achievementId: 'combat_kills_1000',
         rewardClaimed: false,
       });
-      mockPrisma.playerAchievement.update.mockResolvedValue({});
+      mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.player.update.mockResolvedValue({});
 
       await claimReward('p1', 'combat_kills_1000');
@@ -502,22 +498,27 @@ describe('achievementService', () => {
       });
     });
 
-    it('grants turns reward via turnBank.update increment', async () => {
+    it('grants turns reward via refundPlayerTurnsTx (respects bank cap)', async () => {
       // explore_zones_3 has reward: { type: 'turns', amount: 1000 }
       mockPrisma.playerAchievement.findUnique.mockResolvedValue({
         playerId: 'p1',
         achievementId: 'explore_zones_3',
         rewardClaimed: false,
       });
-      mockPrisma.playerAchievement.update.mockResolvedValue({});
-      mockPrisma.turnBank.update.mockResolvedValue({});
+      mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.turnBank.findUnique.mockResolvedValue({
+        playerId: 'p1',
+        currentTurns: 50000,
+        lastRegenAt: new Date(),
+      });
+      mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
 
       await claimReward('p1', 'explore_zones_3');
 
-      expect(mockPrisma.turnBank.update).toHaveBeenCalledWith({
+      expect(mockPrisma.turnBank.findUnique).toHaveBeenCalledWith({
         where: { playerId: 'p1' },
-        data: { currentTurns: { increment: 1000 } },
       });
+      expect(mockPrisma.turnBank.updateMany).toHaveBeenCalled();
     });
 
     it('grants item reward when template exists', async () => {
@@ -527,7 +528,7 @@ describe('achievementService', () => {
         achievementId: 'family_vermin_5000',
         rewardClaimed: false,
       });
-      mockPrisma.playerAchievement.update.mockResolvedValue({});
+      mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.itemTemplate.findUnique.mockResolvedValue({ id: 'achievement_vermin_gloves', name: 'Vermin Gloves' });
       mockPrisma.item.create.mockResolvedValue({});
 
@@ -552,7 +553,7 @@ describe('achievementService', () => {
         achievementId: 'family_vermin_5000',
         rewardClaimed: false,
       });
-      mockPrisma.playerAchievement.update.mockResolvedValue({});
+      mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.itemTemplate.findUnique.mockResolvedValue(null);
 
       await claimReward('p1', 'family_vermin_5000');
@@ -567,7 +568,7 @@ describe('achievementService', () => {
         achievementId: 'combat_kills_100',
         rewardClaimed: false,
       });
-      mockPrisma.playerAchievement.update.mockResolvedValue({});
+      mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await claimReward('p1', 'combat_kills_100');
       expect(result.success).toBe(true);
@@ -578,18 +579,18 @@ describe('achievementService', () => {
       expect(mockPrisma.item.create).not.toHaveBeenCalled();
     });
 
-    it('marks rewardClaimed=true in playerAchievement update', async () => {
+    it('marks rewardClaimed=true via optimistic lock updateMany', async () => {
       mockPrisma.playerAchievement.findUnique.mockResolvedValue({
         playerId: 'p1',
         achievementId: 'combat_kills_100',
         rewardClaimed: false,
       });
-      mockPrisma.playerAchievement.update.mockResolvedValue({});
+      mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
 
       await claimReward('p1', 'combat_kills_100');
 
-      expect(mockPrisma.playerAchievement.update).toHaveBeenCalledWith({
-        where: { playerId_achievementId: { playerId: 'p1', achievementId: 'combat_kills_100' } },
+      expect(mockPrisma.playerAchievement.updateMany).toHaveBeenCalledWith({
+        where: { playerId: 'p1', achievementId: 'combat_kills_100', rewardClaimed: false },
         data: { rewardClaimed: true },
       });
     });

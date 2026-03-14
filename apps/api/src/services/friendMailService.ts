@@ -2,6 +2,7 @@ import { prisma } from '@pocketrealm/database';
 import { MAIL_CONSTANTS, type FriendMailEntry } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { isBlocked } from './blockService';
+import { sanitizeUserText } from '../utils/sanitize';
 
 interface MailRow {
   id: string;
@@ -70,8 +71,8 @@ export async function sendMail(
     throw new AppError(400, 'Cannot send mail to this player', 'BLOCKED');
   }
 
-  const truncatedSubject = subject.slice(0, MAIL_CONSTANTS.MAX_SUBJECT_LENGTH);
-  const truncatedBody = body.slice(0, MAIL_CONSTANTS.MAX_BODY_LENGTH);
+  const truncatedSubject = sanitizeUserText(subject).slice(0, MAIL_CONSTANTS.MAX_SUBJECT_LENGTH);
+  const truncatedBody = sanitizeUserText(body).slice(0, MAIL_CONSTANTS.MAX_BODY_LENGTH);
 
   const mail = await prisma.$transaction(async (tx) => {
     // Atomic gold deduction — only decrements if balance is sufficient
@@ -146,8 +147,8 @@ export async function sendSystemMail(
   subject: string,
   body: string,
 ): Promise<FriendMailEntry> {
-  const truncatedSubject = subject.slice(0, MAIL_CONSTANTS.MAX_SUBJECT_LENGTH);
-  const truncatedBody = body.slice(0, MAIL_CONSTANTS.MAX_BODY_LENGTH);
+  const truncatedSubject = sanitizeUserText(subject).slice(0, MAIL_CONSTANTS.MAX_SUBJECT_LENGTH);
+  const truncatedBody = sanitizeUserText(body).slice(0, MAIL_CONSTANTS.MAX_BODY_LENGTH);
 
   const mail = await prisma.friendMail.create({
     data: {

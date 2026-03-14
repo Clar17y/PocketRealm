@@ -53,7 +53,7 @@ import type { AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
-import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, handleCombatDefeat, buildPveCombatOptions } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertCanAct, assertInZone, trackAchievements, handleCombatDefeat, buildPveCombatOptions } from '../../utils/routeHelpers.js';
 import { getCombatBuffs, getCombatBuffsWithUses, applyCombatBuffs, consumeCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges } from '../../services/buffService';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
@@ -89,6 +89,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   });
   if (!site) throw new AppError(404, 'Encounter site not found', 'NOT_FOUND');
   if (!site.clearStrategy) throw new AppError(400, 'Select a clearing strategy before fighting', 'STRATEGY_NOT_SET');
+
+  await assertInZone(playerId, site.zoneId as string);
 
   const decayed = await applyEncounterSiteDecayAndPersist({
     id: site.id,
@@ -171,10 +173,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   // Quest shop combat buffs — track remaining uses locally for per-mob consumption
   const { buffs: combatBuffs, uses: buffUsesLeft } = await getCombatBuffsWithUses(playerId);
 
-  // Apply room carry HP
+  // Apply room carry HP — use the lower of carry HP and current HP to prevent free heals
   let currentPlayerHp = hpState.currentHp;
   if (site.roomCarryHp !== null && site.roomCarryHp !== undefined) {
-    currentPlayerHp = site.roomCarryHp;
+    currentPlayerHp = Math.min(site.roomCarryHp, hpState.currentHp);
     await setHp(playerId, currentPlayerHp);
   }
   const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
@@ -325,8 +327,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   const txResult = await prisma.$transaction(async (tx) => {
     const txAny = tx as unknown as any;
-    const spent = await spendPlayerTurnsTx(tx, playerId, totalTurnCost);
 
+    // Re-fetch site and apply decay BEFORE spending turns to detect stale state
     const freshSite = await txAny.encounterSite.findFirst({
       where: { id: encounterSiteId, playerId },
       select: { id: true, playerId: true, mobFamilyId: true, size: true, discoveredAt: true, mobs: true },
@@ -335,6 +337,17 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
     const freshDecayed = applyEncounterSiteDecayInMemory(parseEncounterSiteMobs(freshSite.mobs), freshSite.discoveredAt, new Date());
     const mobs = freshDecayed.mobs.map(m => ({ ...m }));
+
+    // Validate that all fought mobs are still alive in fresh data before spending turns
+    for (const slot of defeatedSlots) {
+      const target = mobs.find(m => m.slot === slot);
+      if (!target || target.status !== 'alive') {
+        throw new AppError(409, 'Encounter site state changed during combat — please retry', 'ENCOUNTER_SITE_STALE');
+      }
+    }
+
+    // Now safe to spend turns — site state is validated
+    const spent = await spendPlayerTurnsTx(tx, playerId, totalTurnCost);
 
     // Mark defeated mobs
     for (const slot of defeatedSlots) {
@@ -697,6 +710,8 @@ export function registerStartRoutes(router: Router): void {
       if (!zoneId) {
         throw new AppError(400, 'zoneId is required', 'INVALID_REQUEST');
       }
+
+      await assertInZone(playerId, zoneId);
 
       const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
       if (!zone) {

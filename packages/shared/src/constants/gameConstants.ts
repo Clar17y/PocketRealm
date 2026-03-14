@@ -92,28 +92,31 @@ export const SKILL_CONSTANTS = {
   XP_BASE: 100,
 
   /** Exponent for XP curve: xp_for_level = base * (level ^ exponent) */
-  XP_EXPONENT: 1.8,
+  XP_EXPONENT: 2.0,
 
   /** Maximum level */
   MAX_LEVEL: 100,
 
   /** XP window duration in hours (efficiency resets each window) */
-  XP_WINDOW_HOURS: 6,
+  XP_WINDOW_HOURS: 12,
 
-  /** Daily XP cap for combat skills (divided by 4 windows = per-window cap) */
+  /** Daily XP cap for combat skills (divided by 2 windows = per-window cap) */
   DAILY_CAP_COMBAT: 14_000,
 
-  /** Daily XP cap for gathering skills (divided by 4 windows = per-window cap) */
-  DAILY_CAP_GATHERING: 30_000,
+  /** Daily XP cap for gathering skills (divided by 2 windows = per-window cap) */
+  DAILY_CAP_GATHERING: 20_000,
 
-  /** Daily XP cap for processing skills (divided by 4 windows = per-window cap) */
-  DAILY_CAP_PROCESSING: 30_000,
+  /** Daily XP cap for processing skills (divided by 2 windows = per-window cap) */
+  DAILY_CAP_PROCESSING: 20_000,
 
-  /** Daily XP cap for crafting skills (divided by 4 windows = per-window cap) */
-  DAILY_CAP_CRAFTING: 30_000,
+  /** Daily XP cap for crafting skills (divided by 2 windows = per-window cap) */
+  DAILY_CAP_CRAFTING: 20_000,
 
   /** Power for diminishing returns curve: efficiency = max(0, 1 - (xp/cap)^power) */
   EFFICIENCY_DECAY_POWER: 2,
+
+  /** Maximum combined XP boost multiplier (guild + shop + future sources) */
+  MAX_XP_BOOST: 0.50,
 } as const;
 
 export const CHARACTER_CONSTANTS = {
@@ -285,6 +288,9 @@ export const CRAFTING_CONSTANTS = {
 
   /** Max items per batch salvage request */
   SALVAGE_BATCH_LIMIT: 50,
+
+  /** Max quantity per craft request */
+  MAX_CRAFT_QUANTITY: 100,
 } as const;
 
 // =============================================================================
@@ -407,10 +413,10 @@ export const HP_CONSTANTS = {
 
 export const FLEE_CONSTANTS = {
   /** Base chance to flee when evasion equals mob level */
-  BASE_FLEE_CHANCE: 0.3,
+  BASE_FLEE_CHANCE: 0.5,
 
   /** Flee chance adjustment per level difference (evasion - mobLevel) */
-  FLEE_CHANCE_PER_LEVEL_DIFF: 0.02,
+  FLEE_CHANCE_PER_LEVEL_DIFF: 0.03,
 
   /** Minimum flee chance (even against much higher level mobs) */
   MIN_FLEE_CHANCE: 0.05,
@@ -452,8 +458,12 @@ export const STAMINA_CONSTANTS = {
   REGEN_PER_SKILL_LEVEL: 0.2,
   /** Out-of-combat regen rate (per second, like HP) */
   PASSIVE_REGEN_PER_SECOND: 1.0,
+  /** Additional passive regen per avg(melee, ranged, evasion) level */
+  PASSIVE_REGEN_PER_SKILL_LEVEL: 0.02,
   /** Heal per turn when resting */
   REST_HEAL_PER_TURN: 5,
+  /** Additional rest heal per avg(melee, ranged, evasion) level */
+  REST_HEAL_PER_SKILL_LEVEL: 0.3,
 } as const;
 
 // =============================================================================
@@ -471,8 +481,12 @@ export const MANA_CONSTANTS = {
   REGEN_PER_MAGIC_LEVEL: 0.15,
   /** Out-of-combat regen rate (per second) */
   PASSIVE_REGEN_PER_SECOND: 0.5,
+  /** Additional passive regen per magic skill level */
+  PASSIVE_REGEN_PER_MAGIC_LEVEL: 0.015,
   /** Heal per turn when resting */
   REST_HEAL_PER_TURN: 3,
+  /** Additional rest heal per magic skill level */
+  REST_HEAL_PER_MAGIC_LEVEL: 0.2,
 } as const;
 
 // =============================================================================
@@ -488,7 +502,7 @@ export const COMBAT_ACTION_CONSTANTS = {
   /** Light attack: stamina-neutral (cost = base regen) */
   LIGHT_ATTACK_STAMINA: 10,
   NORMAL_ATTACK_STAMINA: 20,
-  HEAVY_ATTACK_STAMINA: 40,
+  HEAVY_ATTACK_STAMINA: 35,
   /** Spell base stamina cost (all actions cost stamina) */
   SPELL_BASE_STAMINA: 15,
   /** Use potion stamina cost */
@@ -652,11 +666,14 @@ export const PVP_CONSTANTS = {
   STARTING_RATING: 1000,
   K_FACTOR: 32,
   BRACKET_RANGE: 0.25,
+  MIN_BRACKET_HALF_WIDTH: 100,
   CHALLENGE_TURN_COST: 500,
   SCOUT_TURN_COST: 100,
   REVENGE_TURN_COST: 250,
   COOLDOWN_HOURS: 6,
   MIN_OPPONENTS_SHOWN: 10,
+  BRACKET_WIDEN_STEP: 50,
+  BRACKET_MAX_WIDEN_ITERATIONS: 10,
   MIN_CHARACTER_LEVEL: 10,
 } as const;
 
@@ -1293,6 +1310,7 @@ export const CASINO_CONSTANTS = {
   ROUND_DURATION_SECONDS: 60,
   BETTING_WINDOW_SECONDS: 50,
   BIG_WIN_THRESHOLD: 500,
+  MAX_BETS_PER_ROUND: 5,
 } as const;
 
 // =============================================================================

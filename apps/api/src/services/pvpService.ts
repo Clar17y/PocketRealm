@@ -2,20 +2,21 @@ import { Prisma, prisma } from '@pocketrealm/database';
 import {
   calculateMaxStamina, calculateMaxMana,
   runTemplateCombat,
+  calculateFleeChance,
 } from '@pocketrealm/game-engine';
 import {
   PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, BASE_ACTION_DEFINITIONS,
-  TALENT_TREE_DEFINITIONS,
-  type ActionDefinition,
+  TALENT_TREE_DEFINITIONS, FLEE_CONSTANTS,
+  type ActionDefinition, type FleeOutcome,
 } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
-import { buildPagination, trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
+import { buildPagination, trackAchievements } from '../utils/routeHelpers.js';
 import { calculateEloChange } from './eloService';
 import { getEquipmentStats } from './equipmentService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { degradeEquippedDurability } from './durabilityService';
 import { normalizePlayerAttributes } from './attributesService';
-import { getHpState, setHp, enterRecoveringState } from './hpService';
+import { getHpState } from './hpService';
 import { getActiveTemplate } from './combatTemplateService';
 import { setAllResources } from './resourceService';
 import { getSkillPoints } from './skillPointService';
@@ -23,6 +24,15 @@ import { mapTemplateCombatLog } from './combatLogMapper';
 import { getAttackStyle, buildPvpCombatant } from './pvpCombatantBuilder';
 
 const REVENGE_WINDOW_DAYS = 7;
+
+export function computeBracketBounds(rating: number): { lower: number; upper: number } {
+  const percentLower = Math.floor(rating * (1 - PVP_CONSTANTS.BRACKET_RANGE));
+  const percentUpper = Math.ceil(rating * (1 + PVP_CONSTANTS.BRACKET_RANGE));
+  return {
+    lower: Math.max(0, Math.min(percentLower, rating - PVP_CONSTANTS.MIN_BRACKET_HALF_WIDTH)),
+    upper: Math.max(percentUpper, rating + PVP_CONSTANTS.MIN_BRACKET_HALF_WIDTH),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // getOrCreateRating
@@ -46,8 +56,7 @@ export async function getOrCreateRating(playerId: string) {
 
 export async function getLadder(playerId: string) {
   const myRating = await getOrCreateRating(playerId);
-  const lowerBound = Math.floor(myRating.rating * (1 - PVP_CONSTANTS.BRACKET_RANGE));
-  const upperBound = Math.ceil(myRating.rating * (1 + PVP_CONSTANTS.BRACKET_RANGE));
+  const { lower: lowerBound, upper: upperBound } = computeBracketBounds(myRating.rating);
 
   // Admins bypass cooldowns for testing
   const isAdmin = (await prisma.player.findUnique({ where: { id: playerId }, select: { role: true } }))?.role === 'admin';
@@ -58,11 +67,15 @@ export async function getLadder(playerId: string) {
   });
   const cooldownIds = new Set(cooldowns.map((c) => c.defenderId));
 
-  // Find opponents in bracket
+  // Fetch with max-widened bounds in a single query, then filter client-side
+  const maxExpansion = PVP_CONSTANTS.BRACKET_WIDEN_STEP * PVP_CONSTANTS.BRACKET_MAX_WIDEN_ITERATIONS;
+  const widestLower = Math.max(0, lowerBound - maxExpansion);
+  const widestUpper = upperBound + maxExpansion;
+
   const candidates = await prisma.pvpRating.findMany({
     where: {
       playerId: { not: playerId },
-      rating: { gte: lowerBound, lte: upperBound },
+      rating: { gte: widestLower, lte: widestUpper },
       player: { characterLevel: { gte: PVP_CONSTANTS.MIN_CHARACTER_LEVEL } },
     },
     include: {
@@ -71,7 +84,7 @@ export async function getLadder(playerId: string) {
     orderBy: { rating: 'desc' },
   });
 
-  const opponents = candidates
+  const allEligible = candidates
     .filter((c) => !cooldownIds.has(c.playerId))
     .map((c) => {
       const titleDef = c.player.activeTitle ? ACHIEVEMENTS_BY_ID.get(c.player.activeTitle) : null;
@@ -85,6 +98,19 @@ export async function getLadder(playerId: string) {
         titleTier: titleDef?.tier,
       };
     });
+
+  // Progressively widen from the initial bracket until enough opponents found
+  let currentLower = lowerBound;
+  let currentUpper = upperBound;
+  let opponents = allEligible.filter((o) => o.rating >= currentLower && o.rating <= currentUpper);
+
+  let widenCount = 0;
+  while (opponents.length < PVP_CONSTANTS.MIN_OPPONENTS_SHOWN && widenCount < PVP_CONSTANTS.BRACKET_MAX_WIDEN_ITERATIONS) {
+    widenCount++;
+    currentLower = Math.max(0, currentLower - PVP_CONSTANTS.BRACKET_WIDEN_STEP);
+    currentUpper = currentUpper + PVP_CONSTANTS.BRACKET_WIDEN_STEP;
+    opponents = allEligible.filter((o) => o.rating >= currentLower && o.rating <= currentUpper);
+  }
 
   return {
     myRating: {
@@ -335,8 +361,7 @@ export async function challenge(
   // Check bracket range
   const attackerRating = await getOrCreateRating(attackerId);
   const defenderRating = await getOrCreateRating(targetId);
-  const lowerBound = Math.floor(attackerRating.rating * (1 - PVP_CONSTANTS.BRACKET_RANGE));
-  const upperBound = Math.ceil(attackerRating.rating * (1 + PVP_CONSTANTS.BRACKET_RANGE));
+  const { lower: lowerBound, upper: upperBound } = computeBracketBounds(attackerRating.rating);
   if (defenderRating.rating < lowerBound || defenderRating.rating > upperBound) {
     throw new AppError(400, 'Target is outside your rating bracket', 'OUT_OF_BRACKET');
   }
@@ -394,8 +419,7 @@ export async function challenge(
     const freshAttackerRating = await tx.pvpRating.findUnique({ where: { playerId: attackerId } });
     const freshDefenderRating = await tx.pvpRating.findUnique({ where: { playerId: targetId } });
     if (freshAttackerRating && freshDefenderRating) {
-      const freshLower = Math.floor(freshAttackerRating.rating * (1 - PVP_CONSTANTS.BRACKET_RANGE));
-      const freshUpper = Math.ceil(freshAttackerRating.rating * (1 + PVP_CONSTANTS.BRACKET_RANGE));
+      const { lower: freshLower, upper: freshUpper } = computeBracketBounds(freshAttackerRating.rating);
       if (freshDefenderRating.rating < freshLower || freshDefenderRating.rating > freshUpper) {
         throw new AppError(409, 'Target moved outside your rating bracket', 'OUT_OF_BRACKET');
       }
@@ -476,28 +500,30 @@ export async function challenge(
   ]);
 
   // Persist attacker resources after combat
-  let attackerKnockedOut = false;
-  let fleeOutcome: string | null = null;
+  const attackerKnockedOut = false;
+  let fleeOutcome: FleeOutcome | null = null;
   if (combatResult.combatantAHpRemaining <= 0) {
+    // PvP loss: guaranteed escape, no knockout, no gold loss
+    const fleeChance = calculateFleeChance(attackerAttributes.evasion, target.characterLevel);
+    const roll = Math.random();
+    // Higher evasion → higher fleeChance → lower threshold → more likely clean escape
+    const escapeThreshold = FLEE_CONSTANTS.HIGH_SUCCESS_THRESHOLD * (1 - fleeChance);
+
+    let remainingHp: number;
+    if (roll >= escapeThreshold) {
+      fleeOutcome = 'clean_escape';
+      remainingHp = Math.max(1, Math.floor(attackerMaxHp * FLEE_CONSTANTS.HIGH_SUCCESS_HP_PERCENT));
+    } else {
+      fleeOutcome = 'wounded_escape';
+      remainingHp = FLEE_CONSTANTS.PARTIAL_SUCCESS_HP;
+    }
+
     await setAllResources(
       attackerId,
-      combatResult.combatantAHpRemaining,
+      remainingHp,
       combatResult.combatantAStaminaRemaining,
       combatResult.combatantAManaRemaining,
     );
-    const fleeResult = await calculateFleeWithGold(attackerId, {
-      evasionLevel: attackerAttributes.evasion,
-      mobLevel: target.characterLevel,
-      maxHp: attackerMaxHp,
-    });
-    fleeOutcome = fleeResult.outcome;
-    if (fleeResult.outcome === 'knockout') {
-      await enterRecoveringState(attackerId, attackerMaxHp);
-      attackerKnockedOut = true;
-      await trackAchievements(attackerId, { totalDeaths: 1 });
-    } else {
-      await setHp(attackerId, fleeResult.remainingHp);
-    }
   } else {
     await setAllResources(
       attackerId,
