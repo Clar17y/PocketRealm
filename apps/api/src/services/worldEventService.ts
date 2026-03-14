@@ -292,7 +292,7 @@ export async function spawnWorldEvent(params: {
       },
       include: ZONE_INCLUDE,
     });
-  });
+  }, { isolationLevel: 'Serializable' });
 
   return row ? toWorldEventData(row) : null;
 }
