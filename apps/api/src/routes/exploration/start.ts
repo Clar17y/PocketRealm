@@ -396,7 +396,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           }
           allQuestProgress.push(...rewards.questProgress);
           xpGrants = rewards.xpGrants;
-          xpGain = xpGrants.reduce((sum, g) => sum + g.xpResult.xpAfterEfficiency, 0);
+          xpGain = xpGrants.reduce((sum, g) => sum + g.boostedXpAfterEfficiency, 0);
 
           pendingCombatLogs.push({
             turnsSpent: 0,

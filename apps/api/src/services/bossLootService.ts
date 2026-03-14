@@ -147,7 +147,7 @@ export async function distributeBossLoot(
     const xpReward: BossPlayerReward['xp'] = {
       skillType,
       rawXp: scaledXp,
-      xpAfterEfficiency: xpResult.xpResult.xpAfterEfficiency,
+      xpAfterEfficiency: xpResult.boostedXpAfterEfficiency,
       leveledUp: xpResult.xpResult.leveledUp,
       newLevel: xpResult.newLevel,
     };

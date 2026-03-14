@@ -411,7 +411,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           });
           const loot = rewards.loot;
           allTravelOverflow.push(...rewards.overflow);
-          const xpGain = rewards.xpGrants.reduce((sum, g) => sum + g.xpResult.xpAfterEfficiency, 0);
+          const xpGain = rewards.xpGrants.reduce((sum, g) => sum + g.boostedXpAfterEfficiency, 0);
           await setHp(playerId, currentHp);
 
           // Track ambush kill for achievement checks

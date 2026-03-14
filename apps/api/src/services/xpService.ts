@@ -1,13 +1,15 @@
 import { prisma } from '@pocketrealm/database';
 import type { SkillType, SkillXpResult } from '@pocketrealm/shared';
 import { SKILL_CONSTANTS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
-import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, shouldResetWindowCap } from '@pocketrealm/game-engine';
+import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, levelFromXp, shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { getPlayerGuildModifiers } from './guildUpgradeService';
 import { consumeBuffIfActive } from './buffService';
 
 export interface GrantXpResult {
   skillType: SkillType;
   xpResult: SkillXpResult;
+  /** XP after efficiency with boost applied (what the player actually receives) */
+  boostedXpAfterEfficiency: number;
   newTotalXp: number;
   newDailyXpGained: number;
   newLevel: number;
@@ -87,12 +89,14 @@ export async function grantSkillXp(
       ? Math.floor(xpResult.xpAfterEfficiency * (1 + totalXpBoost))
       : xpResult.xpAfterEfficiency;
 
-    const skillLeveledUp = xpResult.newLevel > skill.level;
+    const newTotalXp = currentXp + boostedXpAfterEfficiency;
+    // Recalculate level from boosted total so boosts can trigger level-ups
+    const newLevel = levelFromXp(newTotalXp);
+    const skillLeveledUp = newLevel > skill.level;
     const skillPointsGained = skillLeveledUp
-      ? (xpResult.newLevel - skill.level) * SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL
+      ? (newLevel - skill.level) * SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL
       : 0;
 
-    const newTotalXp = currentXp + boostedXpAfterEfficiency;
     // Use unboosted value for window cap so boosts don't accelerate hitting the wall
     const newDailyXpGained = currentWindowXpGained + xpResult.xpAfterEfficiency;
 
@@ -102,7 +106,7 @@ export async function grantSkillXp(
       },
       data: {
         xp: BigInt(newTotalXp),
-        level: xpResult.newLevel,
+        level: newLevel,
         dailyXpGained: newDailyXpGained,
         ...(needsReset ? { lastXpResetAt: now } : {}),
       },
@@ -130,9 +134,10 @@ export async function grantSkillXp(
     return {
       skillType,
       xpResult,
+      boostedXpAfterEfficiency,
       newTotalXp,
       newDailyXpGained,
-      newLevel: xpResult.newLevel,
+      newLevel,
       characterXpGain,
       characterXpAfter,
       characterLevelBefore,
