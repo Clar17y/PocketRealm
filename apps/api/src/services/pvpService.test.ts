@@ -71,7 +71,7 @@ vi.mock('./pvpCombatantBuilder', () => ({
   }),
 }));
 vi.mock('@pocketrealm/game-engine', () => ({
-  calculateFleeResult: vi.fn().mockReturnValue({ outcome: 'clean_escape', remainingHp: 1, goldLost: 0, recoveryCost: null }),
+  calculateFleeChance: vi.fn().mockReturnValue(0.3),
   runTemplateCombat: vi.fn().mockReturnValue({
     outcome: 'victory',
     log: [],
@@ -97,7 +97,6 @@ vi.mock('../utils/routeHelpers.js', async (importOriginal) => {
   return {
     ...actual,
     trackAchievements: vi.fn().mockResolvedValue(undefined),
-    calculateFleeWithGold: vi.fn().mockReturnValue({ outcome: 'clean_escape', remainingHp: 1, goldLost: 0, recoveryCost: null }),
   };
 });
 
@@ -108,13 +107,14 @@ import { runTemplateCombat } from '@pocketrealm/game-engine';
 import { calculateEloChange } from './eloService';
 import { degradeEquippedDurability } from './durabilityService';
 import { spendPlayerTurnsTx } from './turnBankService';
-import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
-import { PVP_CONSTANTS } from '@pocketrealm/shared';
+import { trackAchievements } from '../utils/routeHelpers.js';
+import { PVP_CONSTANTS, FLEE_CONSTANTS } from '@pocketrealm/shared';
 import {
   getOrCreateRating,
   getLadder,
   scoutOpponent,
   challenge,
+  computeBracketBounds,
   getHistory,
   getMatchDetail,
   getNotificationCount,
@@ -162,8 +162,6 @@ function setupChallengeMocks(overrides?: {
   mockPrisma.pvpCooldown.upsert.mockResolvedValue({});
   mockPrisma.combatTemplate.findFirst.mockResolvedValue(null);
   mockPrisma.skillPointAllocation.findUnique.mockResolvedValue(null);
-  // For calculateFleeWithGold mock
-  mockPrisma.player.findUnique.mockResolvedValue({ gold: 500 });
 }
 
 describe('pvpService', () => {
@@ -617,7 +615,7 @@ describe('pvpService', () => {
       expect(setAllResources).toHaveBeenCalledWith('p1', 80, 60, 30);
     });
 
-    it('persists attacker resources and handles flee on defeat', async () => {
+    it('persists attacker resources with escape HP on defeat', async () => {
       vi.mocked(runTemplateCombat).mockReturnValueOnce({
         outcome: 'defeat',
         log: [],
@@ -632,13 +630,18 @@ describe('pvpService', () => {
         potionsConsumed: [],
         totalRounds: 10,
       } as any);
-      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'clean_escape', remainingHp: 1, goldLost: 0, recoveryCost: null });
       setupChallengeMocks();
 
       const result = await challenge('p1', 'Attacker', 'p2');
 
-      expect(setAllResources).toHaveBeenCalledWith('p1', 0, 20, 10);
-      expect(result.fleeOutcome).toBe('clean_escape');
+      // Should always escape — either clean (15% maxHp) or wounded (1 HP)
+      expect(result.fleeOutcome).toMatch(/^(clean_escape|wounded_escape)$/);
+      expect(result.attackerKnockedOut).toBe(false);
+      expect(enterRecoveringState).not.toHaveBeenCalled();
+      // setAllResources is called with escape HP, not 0
+      const setAllResourcesCalls = vi.mocked(setAllResources).mock.calls;
+      const hpArg = setAllResourcesCalls[0][1];
+      expect(hpArg).toBeGreaterThanOrEqual(1);
     });
 
     it('creates pvpMatch and upserts cooldown in transaction', async () => {
@@ -729,7 +732,7 @@ describe('pvpService', () => {
       expect(mockPrisma.pvpCooldown.upsert).not.toHaveBeenCalled();
     });
 
-    it('enters knockout state when flee result is knockout', async () => {
+    it('PvP defeat never triggers knockout or gold loss', async () => {
       vi.mocked(runTemplateCombat).mockReturnValueOnce({
         outcome: 'defeat',
         log: [],
@@ -744,18 +747,20 @@ describe('pvpService', () => {
         potionsConsumed: [],
         totalRounds: 10,
       } as any);
-      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'knockout', remainingHp: 0, goldLost: 50, recoveryCost: 100 });
       setupChallengeMocks();
 
       const result = await challenge('p1', 'Attacker', 'p2');
 
-      expect(result.attackerKnockedOut).toBe(true);
-      expect(result.fleeOutcome).toBe('knockout');
-      expect(enterRecoveringState).toHaveBeenCalledWith('p1', 100);
-      expect(trackAchievements).toHaveBeenCalledWith('p1', { totalDeaths: 1 });
+      // Never knockout in PvP
+      expect(result.attackerKnockedOut).toBe(false);
+      expect(result.fleeOutcome).toMatch(/^(clean_escape|wounded_escape)$/);
+      expect(enterRecoveringState).not.toHaveBeenCalled();
+      expect(trackAchievements).not.toHaveBeenCalledWith('p1', { totalDeaths: 1 });
+      // No gold deduction — player.findUnique should NOT be called for gold lookup
+      // (no calculateFleeWithGold call)
     });
 
-    it('sets HP on escape (not knockout) after defeat', async () => {
+    it('PvP defeat sets HP to escape value via setHp', async () => {
       vi.mocked(runTemplateCombat).mockReturnValueOnce({
         outcome: 'defeat',
         log: [],
@@ -770,15 +775,15 @@ describe('pvpService', () => {
         potionsConsumed: [],
         totalRounds: 10,
       } as any);
-      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'clean_escape', remainingHp: 5, goldLost: 0, recoveryCost: null });
       setupChallengeMocks();
 
-      const result = await challenge('p1', 'Attacker', 'p2');
+      await challenge('p1', 'Attacker', 'p2');
 
-      expect(result.attackerKnockedOut).toBe(false);
-      expect(result.fleeOutcome).toBe('clean_escape');
-      expect(setHp).toHaveBeenCalledWith('p1', 5);
-      expect(enterRecoveringState).not.toHaveBeenCalled();
+      // setHp should be called with either 1 (wounded) or 15% maxHp (clean)
+      expect(setHp).toHaveBeenCalled();
+      const hpArg = vi.mocked(setHp).mock.calls[0][1];
+      const cleanEscapeHp = Math.max(1, Math.floor(100 * FLEE_CONSTANTS.HIGH_SUCCESS_HP_PERCENT));
+      expect([FLEE_CONSTANTS.PARTIAL_SUCCESS_HP, cleanEscapeHp]).toContain(hpArg);
     });
 
     it('skips durability degradation for bot defenders', async () => {
@@ -830,7 +835,6 @@ describe('pvpService', () => {
         potionsConsumed: [],
         totalRounds: 8,
       } as any);
-      vi.mocked(calculateFleeWithGold).mockResolvedValueOnce({ outcome: 'clean_escape', remainingHp: 1, goldLost: 0, recoveryCost: null });
       setupChallengeMocks();
 
       const result = await challenge('p1', 'Attacker', 'p2');
@@ -857,7 +861,8 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.update.mockResolvedValue({});
       mockPrisma.pvpMatch.create.mockResolvedValue({ id: 'match-2' });
       mockPrisma.pvpCooldown.upsert.mockResolvedValue({});
-      mockPrisma.player.findUnique.mockResolvedValue({ gold: 0 });
+      mockPrisma.combatTemplate.findFirst.mockResolvedValue(null);
+      mockPrisma.skillPointAllocation.findUnique.mockResolvedValue(null);
 
       const result = await challenge('p1', 'Attacker', 'p2');
 
@@ -1201,6 +1206,105 @@ describe('pvpService', () => {
         where: { targetId: 'p1', isRead: false },
         data: { isRead: true },
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // computeBracketBounds
+  // -------------------------------------------------------------------------
+
+  describe('computeBracketBounds', () => {
+    it('rating 0 produces bracket [0, 100] (not [0, 0])', () => {
+      const bounds = computeBracketBounds(0);
+      expect(bounds.lower).toBe(0);
+      expect(bounds.upper).toBe(100);
+    });
+
+    it('rating 400 uses min half-width since 400*0.25 = 100 equals MIN_BRACKET_HALF_WIDTH', () => {
+      const bounds = computeBracketBounds(400);
+      // percentLower = floor(400 * 0.75) = 300, min(300, 400-100=300) = 300
+      // percentUpper = ceil(400 * 1.25) = 500, max(500, 400+100=500) = 500
+      expect(bounds.lower).toBe(300);
+      expect(bounds.upper).toBe(500);
+    });
+
+    it('rating 1000 uses percentage-based bracket [750, 1250]', () => {
+      const bounds = computeBracketBounds(1000);
+      expect(bounds.lower).toBe(750);
+      expect(bounds.upper).toBe(1250);
+    });
+
+    it('low rating (50) gets minimum width protection', () => {
+      const bounds = computeBracketBounds(50);
+      // percentLower = floor(50 * 0.75) = 37, min(37, 50-100=-50) → max(0, -50) = 0
+      // percentUpper = ceil(50 * 1.25) = 63, max(63, 50+100=150) = 150
+      expect(bounds.lower).toBe(0);
+      expect(bounds.upper).toBe(150);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getLadder bracket widening
+  // -------------------------------------------------------------------------
+
+  describe('getLadder bracket widening', () => {
+    it('widens bracket when fewer than MIN_OPPONENTS_SHOWN', async () => {
+      mockPrisma.pvpRating.upsert.mockResolvedValue({
+        playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
+      });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
+
+      // First call returns too few, second returns enough
+      mockPrisma.pvpRating.findMany
+        .mockResolvedValueOnce([
+          { playerId: 'p2', rating: 950, player: { username: 'A', characterLevel: 12, role: 'player', activeTitle: null } },
+        ])
+        .mockResolvedValueOnce(
+          Array.from({ length: 10 }, (_, i) => ({
+            playerId: `p${i + 2}`, rating: 950 + i, player: { username: `Player${i}`, characterLevel: 12, role: 'player', activeTitle: null },
+          })),
+        );
+
+      const result = await getLadder('p1');
+
+      expect(result.opponents.length).toBe(10);
+      // findMany called at least twice (initial + 1 widen)
+      expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledTimes(2);
+    });
+
+    it('stops widening after MAX_WIDEN_ITERATIONS (10)', async () => {
+      mockPrisma.pvpRating.upsert.mockResolvedValue({
+        playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
+      });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
+      // Always return too few opponents
+      mockPrisma.pvpRating.findMany.mockResolvedValue([]);
+
+      const result = await getLadder('p1');
+
+      expect(result.opponents.length).toBe(0);
+      // 1 initial + 10 widen iterations
+      expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledTimes(11);
+    });
+
+    it('does not widen when enough opponents in initial bracket', async () => {
+      mockPrisma.pvpRating.upsert.mockResolvedValue({
+        playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
+      });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
+      mockPrisma.pvpRating.findMany.mockResolvedValue(
+        Array.from({ length: 12 }, (_, i) => ({
+          playerId: `p${i + 2}`, rating: 950 + i, player: { username: `Player${i}`, characterLevel: 12, role: 'player', activeTitle: null },
+        })),
+      );
+
+      const result = await getLadder('p1');
+
+      expect(result.opponents.length).toBe(12);
+      expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledTimes(1);
     });
   });
 });
