@@ -174,10 +174,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   // Quest shop combat buffs — track remaining uses locally for per-mob consumption
   const { buffs: combatBuffs, uses: buffUsesLeft } = await getCombatBuffsWithUses(playerId);
 
-  // Apply room carry HP
+  // Apply room carry HP — use the lower of carry HP and current HP to prevent free heals
   let currentPlayerHp = hpState.currentHp;
   if (site.roomCarryHp !== null && site.roomCarryHp !== undefined) {
-    currentPlayerHp = site.roomCarryHp;
+    currentPlayerHp = Math.min(site.roomCarryHp, hpState.currentHp);
     await setHp(playerId, currentPlayerHp);
   }
   const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
