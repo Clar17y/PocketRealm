@@ -75,7 +75,7 @@ describe('distributeBossLoot', () => {
     await distributeBossLoot('mob-1', 10, contributors, 1);
 
     const baseXp = WORLD_EVENT_CONSTANTS.BOSS_BASE_XP_REWARD_BY_TIER[0]!;
-    // Solo contributor → ratio = 1, scaledXp = baseXp * max(0.5, min(2, 1*1)) = baseXp
+    // Solo contributor → ratio = 1, scaledXp = baseXp * max(0.25, min(2, 1*1)) = baseXp
     expect(grantSkillXp).toHaveBeenCalledWith('p1', 'magic', baseXp);
   });
 
@@ -127,11 +127,11 @@ describe('distributeBossLoot', () => {
     const rarityBonus = WORLD_EVENT_CONSTANTS.BOSS_RARITY_BONUS;
 
     // p1: score=300, p2: score=100, total=400
-    // p1: ratio = 300/400 = 0.75, multiplier = max(0.5, min(2, 0.75*2)) = 1.5
+    // p1: ratio = 300/400 = 0.75, multiplier = max(0.25, min(2, 0.75*2)) = 1.5
     expect(rollAndGrantLoot).toHaveBeenCalledWith('p1', 'mob-1', 10 + rarityBonus, 1.5);
     expect(grantSkillXp).toHaveBeenCalledWith('p1', 'magic', Math.round(baseXp * 1.5));
 
-    // p2: ratio = 100/400 = 0.25, multiplier = max(0.5, min(2, 0.25*2)) = 0.5
+    // p2: ratio = 100/400 = 0.25, multiplier = max(0.25, min(2, 0.25*2)) = 0.5
     expect(rollAndGrantLoot).toHaveBeenCalledWith('p2', 'mob-1', 10 + rarityBonus, 0.5);
     expect(grantSkillXp).toHaveBeenCalledWith('p2', 'magic', Math.round(baseXp * 0.5));
   });

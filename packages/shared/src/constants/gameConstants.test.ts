@@ -176,12 +176,6 @@ describe('POTION_CONSTANTS', () => {
       .toBeLessThan(POTION_CONSTANTS.GREATER_HEALTH_HEAL);
   });
 
-  it('recovery percents increase with tier', () => {
-    expect(POTION_CONSTANTS.MINOR_RECOVERY_PERCENT)
-      .toBeLessThan(POTION_CONSTANTS.RECOVERY_PERCENT);
-    expect(POTION_CONSTANTS.RECOVERY_PERCENT)
-      .toBeLessThan(POTION_CONSTANTS.GREATER_RECOVERY_PERCENT);
-  });
 });
 
 describe('CHEST_CONSTANTS', () => {

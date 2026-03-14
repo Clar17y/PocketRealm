@@ -152,7 +152,7 @@ export function rollInitiative(speed: number): number {
 
 export function calculateDefenceReduction(defence: number): number {
   const safeDefence = Math.max(0, Number.isFinite(defence) ? defence : 0);
-  return safeDefence / (safeDefence + 100);
+  return safeDefence / (safeDefence + COMBAT_CONSTANTS.DEFENCE_SCALING_FACTOR);
 }
 
 /**

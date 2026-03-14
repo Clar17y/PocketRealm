@@ -56,7 +56,7 @@ const ATTRIBUTE_META = {
   strength: { label: 'Strength', description: 'Melee damage + accuracy', icon: Sword, color: 'var(--rpg-red)' },
   dexterity: { label: 'Dexterity', description: 'Ranged damage + accuracy', icon: Crosshair, color: 'var(--rpg-blue-light)' },
   intelligence: { label: 'Intelligence', description: 'Magic damage + accuracy', icon: Sparkles, color: 'var(--rpg-purple)' },
-  luck: { label: 'Luck', description: 'Crits and drops', icon: Dice5, color: 'var(--rpg-gold)' },
+  luck: { label: 'Luck', description: 'Crafting, gathering, and forging (no combat effect)', icon: Dice5, color: 'var(--rpg-gold)' },
   evasion: { label: 'Evasion', description: 'Dodge chance', icon: Wind, color: 'var(--rpg-blue-light)' },
 } as const;
 

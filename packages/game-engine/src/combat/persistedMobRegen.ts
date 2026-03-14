@@ -13,6 +13,6 @@ export function calculatePersistedMobHp(
   const elapsedMs = Math.max(0, now.getTime() - damagedAt.getTime());
   const elapsedMinutes = elapsedMs / 60_000;
   const regenPercent = elapsedMinutes * WORLD_EVENT_CONSTANTS.PERSISTED_MOB_REGEN_PERCENT_PER_MINUTE;
-  const regenAmount = Math.floor(maxHp * regenPercent / 100);
+  const regenAmount = Math.ceil(maxHp * regenPercent / 100);
   return Math.min(maxHp, savedHp + regenAmount);
 }

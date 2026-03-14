@@ -13,7 +13,7 @@ describe('calculatePersistedMobHp', () => {
   it('regenerates 1% of maxHp per minute by default', () => {
     const oneMinLater = new Date(baseTime.getTime() + 60_000);
     const regenPct = WORLD_EVENT_CONSTANTS.PERSISTED_MOB_REGEN_PERCENT_PER_MINUTE;
-    const expectedRegen = Math.floor(maxHp * regenPct / 100);
+    const expectedRegen = Math.ceil(maxHp * regenPct / 100);
     expect(calculatePersistedMobHp(500, maxHp, baseTime, oneMinLater)).toBe(
       500 + expectedRegen,
     );
@@ -36,11 +36,11 @@ describe('calculatePersistedMobHp', () => {
     expect(calculatePersistedMobHp(maxHp, maxHp, baseTime, later)).toBe(maxHp);
   });
 
-  it('floors regen amount', () => {
-    // Small maxHp so regen is fractional
+  it('ceils regen amount so low-HP mobs still regenerate', () => {
+    // Small maxHp so regen is fractional — ceil ensures at least 1 HP per tick
     const smallMaxHp = 3;
     const oneMinLater = new Date(baseTime.getTime() + 60_000);
     const result = calculatePersistedMobHp(1, smallMaxHp, baseTime, oneMinLater);
-    expect(result).toBe(1); // floor(3 * 1 / 100) = 0, so 1 + 0 = 1
+    expect(result).toBe(2); // ceil(3 * 1 / 100) = 1, so 1 + 1 = 2
   });
 });
