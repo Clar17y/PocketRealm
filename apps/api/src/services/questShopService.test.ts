@@ -65,6 +65,7 @@ function makeTx() {
     guildLog: mockModel(),
     shopItem: mockModel(),
     playerAchievement: mockModel(),
+    guildExpeditionMember: mockModel(),
   };
 }
 
@@ -483,6 +484,8 @@ describe('purchaseItem — teleport_scroll', () => {
     const targetZoneId = 'zone-42';
 
     const tx = setupTx(item);
+    tx.player.findUnique.mockResolvedValue({ isRecovering: false, currentHp: 100, currentZoneId: 'zone-1' });
+    tx.guildExpeditionMember.findFirst.mockResolvedValue(null);
     tx.zone.findUnique.mockResolvedValue({ id: targetZoneId, name: 'Darkwood Forest' });
     tx.playerZoneDiscovery.findFirst.mockResolvedValue({ id: 'd1' });
     tx.player.update.mockResolvedValue({});
@@ -492,7 +495,7 @@ describe('purchaseItem — teleport_scroll', () => {
     expect(result.effect).toEqual({ type: 'teleport', zoneId: targetZoneId, zoneName: 'Darkwood Forest' });
     expect(tx.player.update).toHaveBeenCalledWith({
       where: { id: PLAYER_ID },
-      data: { currentZoneId: targetZoneId, lastTravelledFromZoneId: targetZoneId },
+      data: { currentZoneId: targetZoneId, lastTravelledFromZoneId: 'zone-1' },
     });
   });
 
@@ -506,6 +509,8 @@ describe('purchaseItem — teleport_scroll', () => {
   it('throws when zone not found', async () => {
     const item = makeItem({ key: 'teleport_scroll', cost: 6 });
     const tx = setupTx(item);
+    tx.player.findUnique.mockResolvedValue({ isRecovering: false, currentHp: 100, currentZoneId: 'zone-1' });
+    tx.guildExpeditionMember.findFirst.mockResolvedValue(null);
     tx.zone.findUnique.mockResolvedValue(null);
 
     await expect(purchaseItem(PLAYER_ID, SHOP_ITEM_ID, { targetZoneId: 'bad' })).rejects.toThrow('Zone not found');
@@ -514,6 +519,8 @@ describe('purchaseItem — teleport_scroll', () => {
   it('throws when zone not discovered', async () => {
     const item = makeItem({ key: 'teleport_scroll', cost: 6 });
     const tx = setupTx(item);
+    tx.player.findUnique.mockResolvedValue({ isRecovering: false, currentHp: 100, currentZoneId: 'zone-1' });
+    tx.guildExpeditionMember.findFirst.mockResolvedValue(null);
     tx.zone.findUnique.mockResolvedValue({ id: 'zone-42', name: 'Secret Place' });
     tx.playerZoneDiscovery.findFirst.mockResolvedValue(null);
 
@@ -529,7 +536,8 @@ describe('purchaseItem — hearthstone', () => {
     const item = makeItem({ key: 'hearthstone', cost: 4, category: 'utility' });
 
     const tx = setupTx(item);
-    tx.player.findUnique.mockResolvedValue({ homeTownId: 'town-1' });
+    tx.player.findUnique.mockResolvedValue({ isRecovering: false, currentHp: 100, homeTownId: 'town-1', currentZoneId: 'zone-1' });
+    tx.guildExpeditionMember.findFirst.mockResolvedValue(null);
     tx.player.update.mockResolvedValue({});
 
     const result = await purchaseItem(PLAYER_ID, SHOP_ITEM_ID);
@@ -537,7 +545,7 @@ describe('purchaseItem — hearthstone', () => {
     expect(result.effect).toEqual({ type: 'hearthstone', zoneId: 'town-1' });
     expect(tx.player.update).toHaveBeenCalledWith({
       where: { id: PLAYER_ID },
-      data: { currentZoneId: 'town-1', lastTravelledFromZoneId: 'town-1' },
+      data: { currentZoneId: 'town-1', lastTravelledFromZoneId: 'zone-1' },
     });
   });
 
@@ -545,7 +553,8 @@ describe('purchaseItem — hearthstone', () => {
     const item = makeItem({ key: 'hearthstone', cost: 4 });
 
     const tx = setupTx(item);
-    tx.player.findUnique.mockResolvedValue({ homeTownId: null });
+    tx.player.findUnique.mockResolvedValue({ isRecovering: false, currentHp: 100, homeTownId: null, currentZoneId: 'zone-1' });
+    tx.guildExpeditionMember.findFirst.mockResolvedValue(null);
 
     await expect(purchaseItem(PLAYER_ID, SHOP_ITEM_ID)).rejects.toThrow('No home town set');
   });
@@ -556,7 +565,7 @@ describe('purchaseItem — hearthstone', () => {
     const tx = setupTx(item);
     tx.player.findUnique.mockResolvedValue(null);
 
-    await expect(purchaseItem(PLAYER_ID, SHOP_ITEM_ID)).rejects.toThrow('No home town set');
+    await expect(purchaseItem(PLAYER_ID, SHOP_ITEM_ID)).rejects.toThrow('Player not found');
   });
 });
 
