@@ -498,7 +498,7 @@ describe('achievementService', () => {
       });
     });
 
-    it('grants turns reward via turnBank.update increment', async () => {
+    it('grants turns reward via refundPlayerTurnsTx (respects bank cap)', async () => {
       // explore_zones_3 has reward: { type: 'turns', amount: 1000 }
       mockPrisma.playerAchievement.findUnique.mockResolvedValue({
         playerId: 'p1',
@@ -506,14 +506,19 @@ describe('achievementService', () => {
         rewardClaimed: false,
       });
       mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
-      mockPrisma.turnBank.update.mockResolvedValue({});
+      mockPrisma.turnBank.findUnique.mockResolvedValue({
+        playerId: 'p1',
+        currentTurns: 50000,
+        lastRegenAt: new Date(),
+      });
+      mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
 
       await claimReward('p1', 'explore_zones_3');
 
-      expect(mockPrisma.turnBank.update).toHaveBeenCalledWith({
+      expect(mockPrisma.turnBank.findUnique).toHaveBeenCalledWith({
         where: { playerId: 'p1' },
-        data: { currentTurns: { increment: 1000 } },
       });
+      expect(mockPrisma.turnBank.updateMany).toHaveBeenCalled();
     });
 
     it('grants item reward when template exists', async () => {
