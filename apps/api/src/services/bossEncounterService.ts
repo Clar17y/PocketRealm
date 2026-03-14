@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import type { Server as SocketServer } from 'socket.io';
 import { prisma } from '@pocketrealm/database';
 import {
@@ -270,14 +271,20 @@ export async function resolveBossRound(
   encounterId: string,
   io: SocketServer | null,
 ): Promise<{ bossDefeated: boolean; roundResult: BossRoundResult } | null> {
-  // Distributed lock to prevent concurrent resolution corrupting boss HP
+  // Distributed lock to prevent concurrent resolution corrupting boss HP.
+  // A unique token is stored so the finally block can only release the lock
+  // it owns — guarding against the case where the 30s TTL expires mid-execution
+  // and a second caller acquires a fresh lock before this caller's finally runs.
   const lockKey = `boss_resolve:${encounterId}`;
-  const acquired = await redis.set(lockKey, '1', 'EX', 30, 'NX');
+  const lockToken = randomUUID();
+  const acquired = await redis.set(lockKey, lockToken, 'EX', 30, 'NX');
   if (!acquired) return null;
   try {
     return await resolveBossRoundInner(encounterId, io);
   } finally {
-    await redis.del(lockKey);
+    // Lua compare-and-delete: only delete if we still own the lock
+    const luaScript = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
+    await redis.eval(luaScript, 1, lockKey, lockToken);
   }
 }
 
