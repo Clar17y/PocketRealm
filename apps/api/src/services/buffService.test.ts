@@ -129,7 +129,7 @@ describe('consumeBuffIfActive', () => {
     const mockTx = {
       playerBuff: {
         findUnique: vi.fn().mockResolvedValue({ id: 'b1', bonusValue: 0.15, remainingUses: 10 }),
-        update: vi.fn().mockResolvedValue({}),
+        update: vi.fn().mockResolvedValue({ remainingUses: 9 }),
         delete: vi.fn(),
       },
     };
@@ -137,7 +137,7 @@ describe('consumeBuffIfActive', () => {
     expect(value).toBe(0.15);
     expect(mockTx.playerBuff.update).toHaveBeenCalledWith({
       where: { id: 'b1' },
-      data: { remainingUses: 9 },
+      data: { remainingUses: { decrement: 1 } },
     });
   });
 
@@ -154,13 +154,16 @@ describe('consumeBuffIfActive', () => {
       playerBuff: {
         findUnique: vi.fn().mockResolvedValue({ id: 'b1', bonusValue: 0.10, remainingUses: 1 }),
         delete: vi.fn().mockResolvedValue({}),
-        update: vi.fn(),
+        update: vi.fn().mockResolvedValue({ id: 'b1', remainingUses: 0 }),
       },
     };
     const value = await consumeBuffIfActive(mockTx, PLAYER_ID, 'xp_boost');
     expect(value).toBe(0.10);
+    expect(mockTx.playerBuff.update).toHaveBeenCalledWith({
+      where: { id: 'b1' },
+      data: { remainingUses: { decrement: 1 } },
+    });
     expect(mockTx.playerBuff.delete).toHaveBeenCalledWith({ where: { id: 'b1' } });
-    expect(mockTx.playerBuff.update).not.toHaveBeenCalled();
   });
 
   it('does not call update or delete when buff not found', async () => {
@@ -318,7 +321,7 @@ describe('consumeBuffChargesPerMob', () => {
     return {
       playerBuff: {
         findUnique: vi.fn(),
-        update: vi.fn().mockResolvedValue({}),
+        update: vi.fn().mockResolvedValue({ remainingUses: 1 }),
         delete: vi.fn().mockResolvedValue({}),
       },
     };
@@ -479,7 +482,7 @@ describe('consumeCombatBuffs', () => {
     return {
       playerBuff: {
         findUnique: vi.fn(),
-        update: vi.fn().mockResolvedValue({}),
+        update: vi.fn().mockResolvedValue({ remainingUses: 1 }),
         delete: vi.fn().mockResolvedValue({}),
       },
     };
@@ -551,7 +554,7 @@ describe('consumeBuffStandalone', () => {
   it('wraps consumeBuffIfActive in a $transaction', async () => {
     // The mock $transaction executes the callback with the mock prisma as tx
     db.playerBuff.findUnique.mockResolvedValue({ id: 'b1', bonusValue: 0.10, remainingUses: 5 });
-    db.playerBuff.update.mockResolvedValue({});
+    db.playerBuff.update.mockResolvedValue({ remainingUses: 4 });
 
     await consumeBuffStandalone(PLAYER_ID, 'xp_boost');
 
@@ -571,12 +574,16 @@ describe('consumeBuffStandalone', () => {
 
   it('deletes buff when last use consumed via standalone', async () => {
     db.playerBuff.findUnique.mockResolvedValue({ id: 'b1', bonusValue: 0.10, remainingUses: 1 });
+    db.playerBuff.update.mockResolvedValue({ id: 'b1', remainingUses: 0 });
     db.playerBuff.delete.mockResolvedValue({});
 
     await consumeBuffStandalone(PLAYER_ID, 'xp_boost');
 
+    expect(db.playerBuff.update).toHaveBeenCalledWith({
+      where: { id: 'b1' },
+      data: { remainingUses: { decrement: 1 } },
+    });
     expect(db.playerBuff.delete).toHaveBeenCalledWith({ where: { id: 'b1' } });
-    expect(db.playerBuff.update).not.toHaveBeenCalled();
   });
 });
 

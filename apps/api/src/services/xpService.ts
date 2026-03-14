@@ -3,7 +3,7 @@ import type { SkillType, SkillXpResult } from '@pocketrealm/shared';
 import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 import { applyXpGain, calculateCharacterXpGain, characterLevelFromXp, shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { getPlayerGuildModifiers } from './guildUpgradeService';
-import { getBuffValue, consumeBuff } from './buffService';
+import { consumeBuffIfActive } from './buffService';
 
 export interface GrantXpResult {
   skillType: SkillType;
@@ -27,16 +27,21 @@ export async function grantSkillXp(
   now: Date = new Date(),
   guildXpBoost?: number,
 ): Promise<GrantXpResult> {
-  // Apply guild XP boost if active (use pre-resolved value if provided)
+  // Guild XP boost can be fetched outside the transaction (not consumed, no race)
   const xpBoost = guildXpBoost ?? (await getPlayerGuildModifiers(playerId)).xpBoost;
-  const shopXpBoost = await getBuffValue(playerId, 'xp_boost');
-  const totalXpBoost = xpBoost + shopXpBoost;
-  const boostedXpGain = totalXpBoost > 0
-    ? Math.floor(rawXpGain * (1 + totalXpBoost))
-    : rawXpGain;
 
   return prisma.$transaction(async (tx) => {
     const txAny = tx as unknown as any;
+
+    // Atomically read + consume shop XP buff inside the transaction to prevent
+    // concurrent actions from double-applying a single-use buff
+    const shopXpBoost = await consumeBuffIfActive(txAny, playerId, 'xp_boost');
+
+    const totalXpBoost = xpBoost + shopXpBoost;
+    const boostedXpGain = totalXpBoost > 0
+      ? Math.floor(rawXpGain * (1 + totalXpBoost))
+      : rawXpGain;
+
     const [skill, player] = await Promise.all([
       tx.playerSkill.findUnique({
         where: {
@@ -108,10 +113,6 @@ export async function grantSkillXp(
         attributePoints: attributePointsAfter,
       },
     });
-
-    if (shopXpBoost > 0) {
-      await consumeBuff(tx, playerId, 'xp_boost');
-    }
 
     return {
       skillType,

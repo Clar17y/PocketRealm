@@ -13,17 +13,15 @@ vi.mock('./guildUpgradeService', () => ({
   getPlayerGuildModifiers: vi.fn(),
 }));
 vi.mock('./buffService', () => ({
-  getBuffValue: vi.fn(),
-  consumeBuff: vi.fn(),
+  consumeBuffIfActive: vi.fn(),
 }));
 
 import { grantSkillXp } from './xpService';
 import { getPlayerGuildModifiers } from './guildUpgradeService';
-import { getBuffValue, consumeBuff } from './buffService';
+import { consumeBuffIfActive } from './buffService';
 
 const mockedGetPlayerGuildModifiers = getPlayerGuildModifiers as ReturnType<typeof vi.fn>;
-const mockedGetBuffValue = getBuffValue as ReturnType<typeof vi.fn>;
-const mockedConsumeBuff = consumeBuff as ReturnType<typeof vi.fn>;
+const mockedConsumeBuffIfActive = consumeBuffIfActive as ReturnType<typeof vi.fn>;
 
 const now = new Date('2025-06-01T12:00:00Z');
 
@@ -64,8 +62,7 @@ function setupBasicMocks(
   mockedGetPlayerGuildModifiers.mockResolvedValue({
     xpBoost: 0, damageBoost: 0, defenceBoost: 0,
   });
-  mockedGetBuffValue.mockResolvedValue(0);
-  mockedConsumeBuff.mockResolvedValue(undefined);
+  mockedConsumeBuffIfActive.mockResolvedValue(0);
 }
 
 beforeEach(() => {
@@ -189,42 +186,32 @@ describe('grantSkillXp', () => {
 
   // ── Shop XP boost (buff) ──────────────────────────────────────────
   describe('shop XP boost', () => {
-    it('fetches buff value for xp_boost', async () => {
+    it('calls consumeBuffIfActive for xp_boost inside transaction', async () => {
       setupBasicMocks();
       await grantSkillXp('p1', 'melee', 100, now);
 
-      expect(mockedGetBuffValue).toHaveBeenCalledWith('p1', 'xp_boost');
+      expect(mockedConsumeBuffIfActive).toHaveBeenCalledWith(
+        expect.anything(), 'p1', 'xp_boost',
+      );
     });
 
     it('applies shop XP boost to raw XP', async () => {
       setupBasicMocks();
-      mockedGetBuffValue.mockResolvedValue(0.25); // 25% shop boost
+      mockedConsumeBuffIfActive.mockResolvedValue(0.25); // 25% shop boost
 
       const result = await grantSkillXp('p1', 'melee', 100, now, 0);
       // floor(100 * (1 + 0 + 0.25)) = floor(100 * 1.25) = 125
       expect(result.xpResult.xpGained).toBe(125);
     });
 
-    it('consumes buff when shopXpBoost > 0', async () => {
+    it('consumeBuffIfActive is always called (handles no-buff internally)', async () => {
       setupBasicMocks();
-      mockedGetBuffValue.mockResolvedValue(0.1);
+      mockedConsumeBuffIfActive.mockResolvedValue(0);
 
       await grantSkillXp('p1', 'melee', 100, now);
 
-      expect(mockedConsumeBuff).toHaveBeenCalledTimes(1);
-      // consumeBuff receives the transaction (which is mockPrisma in tests), playerId, buffType
-      expect(mockedConsumeBuff).toHaveBeenCalledWith(
-        expect.anything(), 'p1', 'xp_boost',
-      );
-    });
-
-    it('does NOT consume buff when shopXpBoost is 0', async () => {
-      setupBasicMocks();
-      mockedGetBuffValue.mockResolvedValue(0);
-
-      await grantSkillXp('p1', 'melee', 100, now);
-
-      expect(mockedConsumeBuff).not.toHaveBeenCalled();
+      // consumeBuffIfActive is always called; it returns 0 when no buff exists
+      expect(mockedConsumeBuffIfActive).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -232,7 +219,7 @@ describe('grantSkillXp', () => {
   describe('combined guild + shop XP boost', () => {
     it('sums guild and shop boosts', async () => {
       setupBasicMocks();
-      mockedGetBuffValue.mockResolvedValue(0.1); // 10% shop
+      mockedConsumeBuffIfActive.mockResolvedValue(0.1); // 10% shop
 
       const result = await grantSkillXp('p1', 'melee', 100, now, 0.2); // 20% guild
       // totalBoost = 0.2 + 0.1 = 0.3 -> floor(100 * 1.3) = 130
@@ -241,7 +228,7 @@ describe('grantSkillXp', () => {
 
     it('no boost applied when both are 0', async () => {
       setupBasicMocks();
-      mockedGetBuffValue.mockResolvedValue(0);
+      mockedConsumeBuffIfActive.mockResolvedValue(0);
 
       const result = await grantSkillXp('p1', 'melee', 100, now, 0);
       expect(result.xpResult.xpGained).toBe(100);
@@ -249,7 +236,7 @@ describe('grantSkillXp', () => {
 
     it('floors the boosted XP amount', async () => {
       setupBasicMocks();
-      mockedGetBuffValue.mockResolvedValue(0.1); // 10% shop
+      mockedConsumeBuffIfActive.mockResolvedValue(0.1); // 10% shop
 
       // 33 * 1.1 = 36.3 -> floor = 36
       const result = await grantSkillXp('p1', 'melee', 33, now, 0);
@@ -579,18 +566,22 @@ describe('grantSkillXp', () => {
     });
   });
 
-  // ── XP boost before transaction ────────────────────────────────────
-  describe('boost resolution before transaction', () => {
-    it('resolves guild and shop boosts before entering transaction', async () => {
+  // ── Buff consumed inside transaction ────────────────────────────────
+  describe('buff consumed inside transaction', () => {
+    it('consumes shop buff inside the transaction', async () => {
       setupBasicMocks();
-      mockedGetBuffValue.mockResolvedValue(0.1);
+      mockedConsumeBuffIfActive.mockResolvedValue(0.1);
 
-      await grantSkillXp('p1', 'melee', 100, now, 0.05);
+      const result = await grantSkillXp('p1', 'melee', 100, now, 0.05);
 
-      // getBuffValue should be called before the transaction body
-      // We verify it was called and the combined boost was applied
-      expect(mockedGetBuffValue).toHaveBeenCalledWith('p1', 'xp_boost');
-      // 5% guild + 10% shop = 15% -> floor(100 * 1.15) = 115
+      // consumeBuffIfActive is called inside the transaction with the tx client
+      expect(mockedConsumeBuffIfActive).toHaveBeenCalledWith(
+        expect.anything(), 'p1', 'xp_boost',
+      );
+      // 5% guild + 10% shop = 15% -> floor(100 * (1 + 0.05 + 0.1))
+      // Due to floating-point: 0.05 + 0.1 = 0.15000000000000002
+      // 100 * 1.15000000000000002 = 114.99999999999999 -> floor = 114
+      expect(result.xpResult.xpGained).toBe(114);
     });
   });
 });
