@@ -214,13 +214,11 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
 
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id },
-    select: { id: true, guildId: true, status: true },
+    select: { id: true, guildId: true, status: true, nextRoundAt: true },
   });
   if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
-  if (expedition.status !== 'in_progress') {
-    throw new AppError(400, 'Expedition is not active', 'NOT_ACTIVE');
-  }
 
+  // Verify guild membership + role before exposing any expedition state
   const membership = await prisma.guildMember.findUnique({
     where: { playerId },
     select: { guildId: true, role: true },
@@ -230,6 +228,14 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
   }
   if (membership.role === 'member') {
     throw new AppError(403, 'Officer or leader role required', 'INSUFFICIENT_ROLE');
+  }
+
+  if (expedition.status !== 'in_progress') {
+    throw new AppError(400, 'Expedition is not active', 'NOT_ACTIVE');
+  }
+  // Enforce round timing to prevent rapid-fire resolution
+  if (expedition.nextRoundAt && expedition.nextRoundAt > new Date()) {
+    throw new AppError(400, 'Round is not ready yet', 'ROUND_NOT_READY');
   }
 
   // Resolve this expedition's round directly (not the global scheduler)
@@ -254,13 +260,13 @@ expeditionRouter.post('/:id/auto-resolve', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { id } = expeditionIdSchema.parse(req.params);
 
-  // Verify guild membership + officer/leader role
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id },
-    select: { guildId: true },
+    select: { guildId: true, nextRoundAt: true },
   });
   if (!expedition) throw new AppError(404, 'Expedition not found', 'NOT_FOUND');
 
+  // Verify guild membership + role before exposing any expedition state
   const membership = await prisma.guildMember.findUnique({
     where: { playerId },
     select: { guildId: true, role: true },
@@ -270,6 +276,11 @@ expeditionRouter.post('/:id/auto-resolve', asyncHandler(async (req, res) => {
   }
   if (membership.role === 'member') {
     throw new AppError(403, 'Officer or leader role required', 'INSUFFICIENT_ROLE');
+  }
+
+  // Enforce round timing to prevent instant room clears
+  if (expedition.nextRoundAt && expedition.nextRoundAt > new Date()) {
+    throw new AppError(400, 'Round is not ready yet', 'ROUND_NOT_READY');
   }
 
   // Service validates status + roundNumber and does full fetch
