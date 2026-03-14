@@ -270,15 +270,6 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     throw new AppError(400, 'Node is depleted', 'NODE_DEPLETED');
   }
 
-  // Validate player is actually in the node's zone (server-side check, not client-provided)
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { currentZoneId: true },
-  });
-  if (template.zoneId !== player?.currentZoneId) {
-    throw new AppError(400, 'You must travel to this zone to gather this resource', 'WRONG_ZONE');
-  }
-
   const skillRequired = template.skillRequired as SkillType;
   const level = await getSkillLevel(playerId, skillRequired);
   if (level < template.levelRequired) {
@@ -334,6 +325,15 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const turnCostPerAction = computeEventTurnCost(eventMultiplier);
 
   const { turnSpend, taxResult, actions, totalYield, rawTotalYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
+    // Validate player is actually in the node's zone inside the transaction to prevent TOCTOU race
+    const playerForZone = await tx.player.findUnique({
+      where: { id: playerId },
+      select: { currentZoneId: true },
+    });
+    if (template.zoneId !== playerForZone?.currentZoneId) {
+      throw new AppError(400, 'You must travel to this zone to gather this resource', 'WRONG_ZONE');
+    }
+
     // Look up tax rate to calculate effective turns
     const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
     const effectiveTurns = calculateEffectiveTurns(body.turns, taxRate);
