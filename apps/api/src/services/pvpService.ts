@@ -16,7 +16,7 @@ import { getEquipmentStats } from './equipmentService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { degradeEquippedDurability } from './durabilityService';
 import { normalizePlayerAttributes } from './attributesService';
-import { getHpState, setHp } from './hpService';
+import { getHpState } from './hpService';
 import { getActiveTemplate } from './combatTemplateService';
 import { setAllResources } from './resourceService';
 import { getSkillPoints } from './skillPointService';
@@ -68,8 +68,6 @@ export async function getLadder(playerId: string) {
   const cooldownIds = new Set(cooldowns.map((c) => c.defenderId));
 
   // Find opponents in bracket, widening if too few results
-  const WIDEN_STEP = 50;
-  const MAX_WIDEN_ITERATIONS = 10;
   let currentLower = lowerBound;
   let currentUpper = upperBound;
 
@@ -104,10 +102,10 @@ export async function getLadder(playerId: string) {
   let opponents = await findAndFilter(currentLower, currentUpper);
 
   let widenCount = 0;
-  while (opponents.length < PVP_CONSTANTS.MIN_OPPONENTS_SHOWN && widenCount < MAX_WIDEN_ITERATIONS) {
+  while (opponents.length < PVP_CONSTANTS.MIN_OPPONENTS_SHOWN && widenCount < PVP_CONSTANTS.BRACKET_MAX_WIDEN_ITERATIONS) {
     widenCount++;
-    currentLower = Math.max(0, currentLower - WIDEN_STEP);
-    currentUpper = currentUpper + WIDEN_STEP;
+    currentLower = Math.max(0, currentLower - PVP_CONSTANTS.BRACKET_WIDEN_STEP);
+    currentUpper = currentUpper + PVP_CONSTANTS.BRACKET_WIDEN_STEP;
     opponents = await findAndFilter(currentLower, currentUpper);
   }
 
@@ -505,10 +503,11 @@ export async function challenge(
     // PvP loss: guaranteed escape, no knockout, no gold loss
     const fleeChance = calculateFleeChance(attackerAttributes.evasion, target.characterLevel);
     const roll = Math.random();
-    const normalizedRoll = roll / Math.max(fleeChance, 0.01);
+    // Higher evasion → higher fleeChance → lower threshold → more likely clean escape
+    const escapeThreshold = FLEE_CONSTANTS.HIGH_SUCCESS_THRESHOLD * (1 - fleeChance);
 
     let remainingHp: number;
-    if (normalizedRoll >= FLEE_CONSTANTS.HIGH_SUCCESS_THRESHOLD) {
+    if (roll >= escapeThreshold) {
       fleeOutcome = 'clean_escape';
       remainingHp = Math.max(1, Math.floor(attackerMaxHp * FLEE_CONSTANTS.HIGH_SUCCESS_HP_PERCENT));
     } else {
@@ -522,7 +521,6 @@ export async function challenge(
       combatResult.combatantAStaminaRemaining,
       combatResult.combatantAManaRemaining,
     );
-    await setHp(attackerId, remainingHp);
   } else {
     await setAllResources(
       attackerId,

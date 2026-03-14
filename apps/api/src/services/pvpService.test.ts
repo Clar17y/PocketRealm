@@ -760,7 +760,7 @@ describe('pvpService', () => {
       // (no calculateFleeWithGold call)
     });
 
-    it('PvP defeat sets HP to escape value via setHp', async () => {
+    it('PvP defeat sets HP to escape value via setAllResources', async () => {
       vi.mocked(runTemplateCombat).mockReturnValueOnce({
         outcome: 'defeat',
         log: [],
@@ -779,11 +779,12 @@ describe('pvpService', () => {
 
       await challenge('p1', 'Attacker', 'p2');
 
-      // setHp should be called with either 1 (wounded) or 15% maxHp (clean)
-      expect(setHp).toHaveBeenCalled();
-      const hpArg = vi.mocked(setHp).mock.calls[0][1];
+      // setAllResources called with escape HP (either 1 or 15% maxHp), not 0
+      const hpArg = vi.mocked(setAllResources).mock.calls[0][1];
       const cleanEscapeHp = Math.max(1, Math.floor(100 * FLEE_CONSTANTS.HIGH_SUCCESS_HP_PERCENT));
       expect([FLEE_CONSTANTS.PARTIAL_SUCCESS_HP, cleanEscapeHp]).toContain(hpArg);
+      // setHp should NOT be called separately (setAllResources handles it)
+      expect(setHp).not.toHaveBeenCalled();
     });
 
     it('skips durability degradation for bot defenders', async () => {
