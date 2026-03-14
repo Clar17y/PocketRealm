@@ -25,6 +25,7 @@ interface EquippedItem {
   imageSrc?: string;
   rarity: Rarity;
   weightClass?: 'heavy' | 'medium' | 'light' | null;
+  tier: number;
   durability: number;
   maxDurability: number;
   baseStats?: Record<string, unknown>;
@@ -118,12 +119,17 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [inventoryItems, activeSlotId]);
 
+  const repairCost = (item: EquippedItem) => {
+    const baseCost = (DURABILITY_CONSTANTS.REPAIR_TURN_COST_BY_TIER as Record<number, number>)[item.tier] ?? 100;
+    return item.durability <= 0 ? Math.ceil(baseCost * DURABILITY_CONSTANTS.BROKEN_REPAIR_MULTIPLIER) : baseCost;
+  };
+
   const repairableItems = useMemo(() => {
     return slots
       .filter((s) => s.item && s.item.durability < s.item.maxDurability)
       .map((s) => {
         const item = s.item!;
-        const turnCost = item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST;
+        const turnCost = repairCost(item);
         return { slotId: s.id, slotName: s.name, item, turnCost };
       });
   }, [slots]);
@@ -613,7 +619,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                         <PixelButton
                           variant="secondary"
                           size="sm"
-                          disabled={busy || turns === undefined || turns < (slot.item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST)}
+                          disabled={busy || turns === undefined || turns < repairCost(slot.item)}
                           onClick={async () => {
                             if (!slot.item) return;
                             setBusy(true);
@@ -626,7 +632,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                             }
                           }}
                         >
-                          Repair ({slot.item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST})
+                          Repair ({repairCost(slot.item)})
                         </PixelButton>
                       )}
                       <span className="text-xs text-[var(--rpg-text-secondary)] capitalize">{slot.name}</span>
