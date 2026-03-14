@@ -63,7 +63,7 @@ export async function allocatePoints(playerId: string, nodeId: string): Promise<
   await prisma.$transaction(async (tx: any) => {
     // Lock the allocation row so concurrent requests block until this transaction commits,
     // preventing double-spend under READ COMMITTED isolation.
-    await tx.$queryRaw`SELECT id FROM "SkillPointAllocation" WHERE "playerId" = ${playerId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM "skill_point_allocations" WHERE "player_id" = ${playerId} FOR UPDATE`;
 
     // Read state inside transaction for consistent snapshot
     const skills = await tx.playerSkill.findMany({
