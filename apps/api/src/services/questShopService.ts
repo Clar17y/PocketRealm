@@ -252,6 +252,7 @@ async function applyEfficiencyReset(tx: any, playerId: string) {
   // Only allow reset if the XP window has naturally expired to prevent mid-window XP doubling
   const skill = await tx.playerSkill.findFirst({
     where: { playerId },
+    orderBy: { lastXpResetAt: 'desc' },
     select: { lastXpResetAt: true },
   });
   if (skill?.lastXpResetAt && !shouldResetWindowCap(skill.lastXpResetAt)) {
