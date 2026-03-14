@@ -250,48 +250,51 @@ export async function spawnWorldEvent(params: {
   durationHours: number;
   createdBy?: 'system' | 'player_discovery';
 }): Promise<WorldEventData | null> {
-  // Per-zone total cap (applies to all spawn paths)
-  if (params.zoneId) {
-    const activeInZone = await prisma.worldEvent.count({
-      where: { zoneId: params.zoneId, status: 'active' },
-    });
-    if (activeInZone >= WORLD_EVENT_CONSTANTS.MAX_ZONE_EVENTS) return null;
-  }
-
-  // Slot check: zone events — no duplicate effectType in the same zone
-  if (params.zoneId) {
-    const existing = await prisma.worldEvent.findFirst({
-      where: {
-        zoneId: params.zoneId,
-        effectType: params.effectType,
-        status: 'active',
-      },
-    });
-    if (existing) return null;
-  }
-
   const now = new Date();
   const expiresAt = new Date(now.getTime() + params.durationHours * 60 * 60 * 1000);
 
-  const row = await prisma.worldEvent.create({
-    data: {
-      type: params.type,
-      zoneId: params.zoneId,
-      title: params.title,
-      description: params.description,
-      effectType: params.effectType,
-      effectValue: params.effectValue,
-      targetMobId: params.targetMobId ?? null,
-      targetFamily: params.targetFamily ?? null,
-      targetResource: params.targetResource ?? null,
-      expiresAt,
-      status: 'active',
-      createdBy: params.createdBy ?? 'system',
-    },
-    include: ZONE_INCLUDE,
+  // Wrap check+create in a transaction to prevent duplicate events from concurrent spawns
+  const row = await prisma.$transaction(async (tx) => {
+    // Per-zone total cap (applies to all spawn paths)
+    if (params.zoneId) {
+      const activeInZone = await tx.worldEvent.count({
+        where: { zoneId: params.zoneId, status: 'active' },
+      });
+      if (activeInZone >= WORLD_EVENT_CONSTANTS.MAX_ZONE_EVENTS) return null;
+    }
+
+    // Slot check: zone events — no duplicate effectType in the same zone
+    if (params.zoneId) {
+      const existing = await tx.worldEvent.findFirst({
+        where: {
+          zoneId: params.zoneId,
+          effectType: params.effectType,
+          status: 'active',
+        },
+      });
+      if (existing) return null;
+    }
+
+    return tx.worldEvent.create({
+      data: {
+        type: params.type,
+        zoneId: params.zoneId,
+        title: params.title,
+        description: params.description,
+        effectType: params.effectType,
+        effectValue: params.effectValue,
+        targetMobId: params.targetMobId ?? null,
+        targetFamily: params.targetFamily ?? null,
+        targetResource: params.targetResource ?? null,
+        expiresAt,
+        status: 'active',
+        createdBy: params.createdBy ?? 'system',
+      },
+      include: ZONE_INCLUDE,
+    });
   });
 
-  return toWorldEventData(row);
+  return row ? toWorldEventData(row) : null;
 }
 
 export async function expireStaleEvents(): Promise<WorldEventData[]> {
