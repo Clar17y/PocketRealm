@@ -154,10 +154,7 @@ export async function restStamina(
     throw new AppError(400, 'Turns must be a positive integer', 'INVALID_TURNS');
   }
 
-  const [state, skills] = await Promise.all([
-    getResourceState(playerId, now),
-    getSkillLevels(playerId),
-  ]);
+  const state = await getResourceState(playerId, now);
   if (state.stamina.current >= state.stamina.max) {
     throw new AppError(400, 'Stamina is already full', 'RESOURCE_FULL');
   }
@@ -170,9 +167,7 @@ export async function restStamina(
       state.stamina.current,
       state.stamina.max,
       effectiveTurns,
-      skills.melee,
-      skills.ranged,
-      skills.evasion,
+      state.stamina.restHealPerTurn,
     );
 
     const actualTurnsToDeduct = calculateInflatedCost(innerHealing.turnsUsed, taxRate);
@@ -208,10 +203,7 @@ export async function restMana(
     throw new AppError(400, 'Turns must be a positive integer', 'INVALID_TURNS');
   }
 
-  const [state, skills] = await Promise.all([
-    getResourceState(playerId, now),
-    getSkillLevels(playerId),
-  ]);
+  const state = await getResourceState(playerId, now);
   if (state.mana.current >= state.mana.max) {
     throw new AppError(400, 'Mana is already full', 'RESOURCE_FULL');
   }
@@ -224,7 +216,7 @@ export async function restMana(
       state.mana.current,
       state.mana.max,
       effectiveTurns,
-      skills.magic,
+      state.mana.restHealPerTurn,
     );
 
     const actualTurnsToDeduct = calculateInflatedCost(innerHealing.turnsUsed, taxRate);

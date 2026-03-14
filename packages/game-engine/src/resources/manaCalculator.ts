@@ -46,12 +46,11 @@ export function calculateManaRestHealing(
   currentMana: number,
   maxMana: number,
   turnsToSpend: number,
-  magicLevel: number,
+  healPerTurn: number,
 ): { turnsUsed: number; healedAmount: number; newMana: number } {
-  const healPerTurn = calculateManaRestHealPerTurn(magicLevel);
   const needed = maxMana - currentMana;
   const maxHealAmount = healPerTurn * turnsToSpend;
-  const actualHealAmount = Math.min(needed, maxHealAmount);
+  const actualHealAmount = Math.floor(Math.min(needed, maxHealAmount));
   const turnsUsed = Math.ceil(actualHealAmount / healPerTurn);
 
   return {

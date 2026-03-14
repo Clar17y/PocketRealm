@@ -66,14 +66,11 @@ export function calculateStaminaRestHealing(
   currentStamina: number,
   maxStamina: number,
   turnsToSpend: number,
-  meleeLevel: number,
-  rangedLevel: number,
-  evasionLevel: number,
+  healPerTurn: number,
 ): { turnsUsed: number; healedAmount: number; newStamina: number } {
-  const healPerTurn = calculateStaminaRestHealPerTurn(meleeLevel, rangedLevel, evasionLevel);
   const needed = maxStamina - currentStamina;
   const maxHealAmount = healPerTurn * turnsToSpend;
-  const actualHealAmount = Math.min(needed, maxHealAmount);
+  const actualHealAmount = Math.floor(Math.min(needed, maxHealAmount));
   const turnsUsed = Math.ceil(actualHealAmount / healPerTurn);
 
   return {
