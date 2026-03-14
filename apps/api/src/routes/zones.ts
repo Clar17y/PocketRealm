@@ -299,7 +299,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
   let travelPendingLootSessionId: string | null = null;
 
   if (!isTownDeparture) {
-    const ambushes = simulateTravelAmbushes(travelCost);
+    const ambushes = simulateTravelAmbushes(guildReducedCost);
 
     if (ambushes.length > 0) {
       const allPotionsConsumed: PotionConsumed[] = [];
@@ -504,7 +504,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
               },
             });
 
-            const refundAmount = travelCost - ambush.turnOccurred;
+            // Use pre-tax cost for refund to prevent turn inflation from guild tax
+            const refundAmount = guildReducedCost - ambush.turnOccurred;
             if (refundAmount > 0) {
               await refundPlayerTurns(playerId, refundAmount);
             }
@@ -566,7 +567,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
               },
             });
 
-            const refundAmount = travelCost - ambush.turnOccurred;
+            // Use pre-tax cost for refund to prevent turn inflation from guild tax
+            const refundAmount = guildReducedCost - ambush.turnOccurred;
             if (refundAmount > 0) {
               await refundPlayerTurns(playerId, refundAmount);
             }
