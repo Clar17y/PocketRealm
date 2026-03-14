@@ -15,8 +15,6 @@ import { trackAchievements } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getActiveBuffs } from '../services/buffService';
 
-import { prismaAny } from '../utils/prismaAny.js';
-
 export const playerRouter = Router();
 
 playerRouter.use(authenticate);
@@ -28,7 +26,7 @@ playerRouter.use(authenticate);
 playerRouter.get('/', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
 
-  const player = await prismaAny.player.findUnique({
+  const player = await prisma.player.findUnique({
     where: { id: playerId },
     select: {
       id: true,
@@ -163,14 +161,14 @@ playerRouter.patch('/settings', asyncHandler(async (req, res) => {
   const body = settingsSchema.parse(req.body);
 
   if (body.homeTownId) {
-    const player = await prismaAny.player.findUniqueOrThrow({
+    const player = await prisma.player.findUniqueOrThrow({
       where: { id: playerId },
       select: { currentZoneId: true },
     });
     if (player.currentZoneId !== body.homeTownId) {
       throw new AppError(400, 'Must be in the town to set it as home', 'NOT_IN_ZONE');
     }
-    const zone = await prismaAny.zone.findUniqueOrThrow({
+    const zone = await prisma.zone.findUniqueOrThrow({
       where: { id: body.homeTownId },
       select: { zoneType: true },
     });
@@ -179,7 +177,7 @@ playerRouter.patch('/settings', asyncHandler(async (req, res) => {
     }
   }
 
-  const updated = await prismaAny.player.update({
+  const updated = await prisma.player.update({
     where: { id: playerId },
     data: body,
     select: Object.fromEntries(SETTINGS_FIELDS.map(f => [f, true])),
@@ -200,7 +198,7 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = tutorialSchema.parse(req.body);
 
-  const player = await prismaAny.player.findUnique({
+  const player = await prisma.player.findUnique({
     where: { id: playerId },
     select: { tutorialStep: true },
   });
@@ -220,7 +218,7 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
     throw new AppError(400, 'Tutorial already completed', 'TUTORIAL_COMPLETE');
   }
 
-  await prismaAny.player.update({
+  await prisma.player.update({
     where: { id: playerId },
     data: { tutorialStep: body.step },
   });

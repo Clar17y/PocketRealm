@@ -1,14 +1,11 @@
 import { z } from 'zod';
-import { Prisma } from '@pocketrealm/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 import type { PotionConsumed, EncounterSiteSize, EncounterMobRole, EncounterMobStatus, EncounterMobSlot } from '@pocketrealm/shared';
 import { degradeEquippedDurability } from '../../services/durabilityService';
 import { grantSkillXp } from '../../services/xpService';
 import type { LootDropWithName } from '../../services/lootService';
 import { paginationSchema } from '../../utils/routeHelpers.js';
-
-import { prismaAny } from '../../utils/prismaAny.js';
-export { prismaAny };
 
 export const attackSkillSchema = z.enum(['melee', 'ranged', 'magic']);
 
@@ -196,7 +193,7 @@ export async function applyEncounterSiteDecayAndPersist(
 } | null> {
   const parsed = parseEncounterSiteMobs(site.mobs);
   if (parsed.length === 0) {
-    await prismaAny.encounterSite.deleteMany({ where: { id: site.id, playerId: site.playerId } });
+    await prisma.encounterSite.deleteMany({ where: { id: site.id, playerId: site.playerId } });
     return null;
   }
 
@@ -204,11 +201,11 @@ export async function applyEncounterSiteDecayAndPersist(
   if (decayed.changed) {
     const postDecay = countEncounterSiteState(decayed.mobs);
     if (postDecay.alive <= 0) {
-      await prismaAny.encounterSite.deleteMany({ where: { id: site.id, playerId: site.playerId } });
+      await prisma.encounterSite.deleteMany({ where: { id: site.id, playerId: site.playerId } });
       return null;
     }
 
-    await prismaAny.encounterSite.update({
+    await prisma.encounterSite.update({
       where: { id: site.id },
       data: { mobs: serializeEncounterSiteMobs(decayed.mobs) },
     });
@@ -216,7 +213,7 @@ export async function applyEncounterSiteDecayAndPersist(
 
   const state = countEncounterSiteState(decayed.mobs);
   if (state.alive <= 0) {
-    await prismaAny.encounterSite.deleteMany({ where: { id: site.id, playerId: site.playerId } });
+    await prisma.encounterSite.deleteMany({ where: { id: site.id, playerId: site.playerId } });
     return null;
   }
 

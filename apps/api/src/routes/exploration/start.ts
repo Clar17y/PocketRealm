@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { Prisma, prisma } from '@pocketrealm/database';
-import { prismaAny } from '../../utils/prismaAny.js';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
   applyMobEventModifiers,
@@ -105,7 +104,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const [mobTemplates, resourceNodes, zoneFamilies, progression, equipmentStats, mainHandAttackSkill] = await Promise.all([
       prisma.mobTemplate.findMany({ where: { zoneId: body.zoneId } }),
       prisma.resourceNode.findMany({ where: { zoneId: body.zoneId } }),
-      prismaAny.zoneMobFamily.findMany({
+      prisma.zoneMobFamily.findMany({
         where: { zoneId: body.zoneId },
         include: {
           mobFamily: {
@@ -183,7 +182,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     }
 
     // Tutorial detection
-    const playerRecord = await prismaAny.player.findUnique({
+    const playerRecord = await prisma.player.findUnique({
       where: { id: playerId },
       select: { tutorialStep: true },
     });

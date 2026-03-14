@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
 import type { MobTemplate, CombatOptions, CombatPotion } from '@pocketrealm/shared';
 import { calculateFleeResult } from '@pocketrealm/game-engine';
-import { prismaAny } from './prismaAny.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { getHpState, setHp, enterRecoveringState } from '../services/hpService.js';
 import { assertNotOverEncumbered } from '../services/inventoryService.js';
@@ -106,7 +105,7 @@ export async function recordBestiaryKill(
     update: { kills: { increment: 1 } },
   });
   if (mobPrefix) {
-    await prismaAny.playerBestiaryPrefix.upsert({
+    await prisma.playerBestiaryPrefix.upsert({
       where: { playerId_mobTemplateId_prefix: { playerId, mobTemplateId, prefix: mobPrefix } },
       create: { playerId, mobTemplateId, prefix: mobPrefix, kills: 1 },
       update: { kills: { increment: 1 } },
@@ -147,7 +146,7 @@ export async function getOwnedItem(
   itemId: string,
   opts: OwnedItemOptions = {},
 ) {
-  const item = await prismaAny.item.findUnique({
+  const item = await prisma.item.findUnique({
     where: { id: itemId },
     include: { template: true },
   });

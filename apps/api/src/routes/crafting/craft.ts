@@ -26,7 +26,6 @@ import { getBuffValue, consumeBuffStandalone } from '../../services/buffService'
 import { trackProgress } from '../../services/progressService';
 import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
 import {
-  prismaAny,
   isSkillType,
   isItemType,
   getSkillLevel,
@@ -53,7 +52,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);
 
-    const recipe = await prismaAny.craftingRecipe.findUnique({
+    const recipe = await prisma.craftingRecipe.findUnique({
       where: { id: body.recipeId },
       include: { resultTemplate: true },
     }) as (null | {
@@ -83,7 +82,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     }
     assertZoneAllowsRecipeLevel(zone, recipe.requiredLevel);
     if (recipe.isAdvanced) {
-      const unlocked = await prismaAny.playerRecipe.findUnique({
+      const unlocked = await prisma.playerRecipe.findUnique({
         where: {
           playerId_recipeId: {
             playerId,

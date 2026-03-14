@@ -1,5 +1,4 @@
 import { prisma } from '@pocketrealm/database';
-import { prismaAny } from '../utils/prismaAny.js';
 import { WORLD_EVENT_CONSTANTS, type BossPlayerReward, type SkillType } from '@pocketrealm/shared';
 import { calculateContributionScore } from '@pocketrealm/game-engine';
 import { randomIntInclusive } from '../utils/random';
@@ -22,7 +21,7 @@ async function rollBossRecipeDrop(
   mobFamilyId: string,
 ): Promise<BossPlayerReward['recipeUnlocked'] | undefined> {
 
-  const advancedRecipes = (await prismaAny.craftingRecipe.findMany({
+  const advancedRecipes = (await prisma.craftingRecipe.findMany({
     where: { isAdvanced: true, mobFamilyId },
     select: {
       id: true,
@@ -40,7 +39,7 @@ async function rollBossRecipeDrop(
 
   if (advancedRecipes.length === 0) return undefined;
 
-  const known = (await prismaAny.playerRecipe.findMany({
+  const known = (await prisma.playerRecipe.findMany({
     where: {
       playerId,
       recipeId: { in: advancedRecipes.map((r) => r.id) },
@@ -53,7 +52,7 @@ async function rollBossRecipeDrop(
   if (unknown.length === 0) return undefined;
 
   const picked = unknown[randomIntInclusive(0, unknown.length - 1)]!;
-  await prismaAny.playerRecipe.create({
+  await prisma.playerRecipe.create({
     data: { playerId, recipeId: picked.id },
   });
 

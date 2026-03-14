@@ -13,8 +13,6 @@ import { calculateCraftingTurnDiscount } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
 import { getSkillLevel } from '../../services/combatStatsService.js';
 
-export { prismaAny } from '../../utils/prismaAny.js';
-
 // ── Type guards ──────────────────────────────────────────────────────
 
 export function isSkillType(value: string): value is SkillType {
