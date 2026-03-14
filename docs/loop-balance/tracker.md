@@ -132,7 +132,7 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 
 1. [XP System Rebalance](plans/01-xp-system-rebalance.md) — #3, #8, #9 — [PR #128](https://github.com/Clar17y/Adventure/pull/128)
 2. [PvP Fixes](plans/02-pvp-fixes.md) — #5, #17, #18, #55 — [PR #135](https://github.com/Clar17y/Adventure/pull/135)
-3. [Combat & Flee Tweaks](plans/03-combat-flee-tweaks.md) — #25, #50, #63
+3. [Combat & Flee Tweaks](plans/03-combat-flee-tweaks.md) — #25, #50, #63 — [PR #137](https://github.com/Clar17y/Adventure/pull/137)
 4. [Resource Regen Scaling](plans/04-resource-regen-scaling.md) — #23, #34, #88
 5. [Potion Rebalance](plans/05-potion-rebalance.md) — #29, #72
 6. [World Boss & Events](plans/06-world-boss-events.md) — #22, #33, #82
