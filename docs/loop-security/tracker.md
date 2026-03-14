@@ -37,7 +37,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 24 | DONE | Boss signup gives full HP regardless | `2026-03-13-022037-boss-encounters.md` | `security/fix-24-boss-signup-hp` |
 | 25 | DONE | Efficiency reset doubles XP capacity | `2026-03-13-035034-quests-shop.md` | `security/fix-25-efficiency-reset-guard` |
 | 26 | DONE | Guild log readable by any player | `2026-03-13-020038-guild-system.md` | `security/fix-26-guild-log-auth` |
-| 27 | TODO | Leaderboard exposes player UUIDs + isAdmin publicly | `2026-03-13-044029-leaderboard-bestiary.md` | |
+| 27 | DONE | Leaderboard exposes player UUIDs + isAdmin publicly | `2026-03-13-044029-leaderboard-bestiary.md` | `security/fix-27-leaderboard-uuid` |
 
 ## Low Priority
 
