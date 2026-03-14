@@ -37,6 +37,57 @@ export function rollRarityWithLuck(luck: number): 'common' | 'uncommon' | 'rare'
   return 'legendary';
 }
 
+type SoulboundRecipe = {
+  resultTemplateId: string;
+  resultTemplate: { name: string; itemType: string; stackable: boolean; maxDurability: number };
+};
+
+/** Pick a random soulbound recipe, roll rarity, grant (or overflow) the item. */
+async function grantSoulboundFromRecipes(
+  tx: Prisma.TransactionClient,
+  recipes: SoulboundRecipe[],
+  playerId: string,
+  luck: number,
+  remainingSlots: number,
+  overflow: PendingLootItem[],
+): Promise<{ soulboundItem: CacheLootResult['soulboundItem']; slotsUsed: number }> {
+  const picked = recipes[randomIntInclusive(0, recipes.length - 1)]!;
+  const rarity = rollRarityWithLuck(luck);
+  const isEquipment = picked.resultTemplate.itemType === 'weapon' || picked.resultTemplate.itemType === 'armor';
+  const maxDurability = isEquipment ? picked.resultTemplate.maxDurability : null;
+
+  if (remainingSlots > 0) {
+    await tx.item.create({
+      data: {
+        ownerId: playerId,
+        templateId: picked.resultTemplateId,
+        rarity,
+        quantity: 1,
+        maxDurability,
+        currentDurability: maxDurability,
+      } as any,
+    });
+    return {
+      soulboundItem: { itemTemplateId: picked.resultTemplateId, name: picked.resultTemplate.name, rarity },
+      slotsUsed: 1,
+    };
+  }
+
+  overflow.push({
+    templateId: picked.resultTemplateId,
+    templateName: picked.resultTemplate.name,
+    rarity,
+    quantity: 1,
+    bonusStats: null,
+    currentDurability: maxDurability,
+    maxDurability,
+  });
+  return {
+    soulboundItem: { itemTemplateId: picked.resultTemplateId, name: picked.resultTemplate.name, rarity },
+    slotsUsed: 0,
+  };
+}
+
 export async function grantCacheLootTx(
   tx: Prisma.TransactionClient,
   params: {
@@ -162,121 +213,38 @@ export async function grantCacheLootTx(
   // --- Soulbound item roll (uses mob family) ---
   let soulboundItem: CacheLootResult['soulboundItem'] = null;
 
+  const soulboundRecipeSelect = {
+    resultTemplateId: true,
+    resultTemplate: { select: { name: true, itemType: true, stackable: true, maxDurability: true } },
+  } as const;
+
   if (Math.random() < SOULBOUND_DROP_CHANCE) {
     const soulboundRecipes = (await (txAny as any).craftingRecipe.findMany({
-      where: {
-        soulbound: true,
-        mobFamilyId: params.mobFamilyId,
-      },
-      select: {
-        resultTemplateId: true,
-        resultTemplate: { select: { name: true, itemType: true, stackable: true, maxDurability: true } },
-      },
-    })) as Array<{
-      resultTemplateId: string;
-      resultTemplate: { name: string; itemType: string; stackable: boolean; maxDurability: number };
-    }>;
+      where: { soulbound: true, mobFamilyId: params.mobFamilyId },
+      select: soulboundRecipeSelect,
+    })) as SoulboundRecipe[];
 
     if (soulboundRecipes.length > 0) {
-      const picked = soulboundRecipes[randomIntInclusive(0, soulboundRecipes.length - 1)]!;
-      const rarity = rollRarityWithLuck(params.luck);
-
-      const isEquipment = picked.resultTemplate.itemType === 'weapon' || picked.resultTemplate.itemType === 'armor';
-      const maxDurability = isEquipment ? picked.resultTemplate.maxDurability : null;
-
-      if (remainingSlots > 0) {
-        remainingSlots--;
-        await tx.item.create({
-          data: {
-            ownerId: params.playerId,
-            templateId: picked.resultTemplateId,
-            rarity,
-            quantity: 1,
-            maxDurability,
-            currentDurability: maxDurability,
-          } as any,
-        });
-
-        soulboundItem = {
-          itemTemplateId: picked.resultTemplateId,
-          name: picked.resultTemplate.name,
-          rarity,
-        };
-      } else {
-        // Soulbound overflow
-        overflow.push({
-          templateId: picked.resultTemplateId,
-          templateName: picked.resultTemplate.name,
-          rarity,
-          quantity: 1,
-          bonusStats: null,
-          currentDurability: maxDurability,
-          maxDurability,
-        });
-
-        soulboundItem = {
-          itemTemplateId: picked.resultTemplateId,
-          name: picked.resultTemplate.name,
-          rarity,
-        };
-      }
+      const grant = await grantSoulboundFromRecipes(tx, soulboundRecipes, params.playerId, params.luck, remainingSlots, overflow);
+      soulboundItem = grant.soulboundItem;
+      remainingSlots -= grant.slotsUsed;
     }
   }
 
   // --- Fallback: if cache would be empty, grant a soulbound item from zone mob families ---
   if (materials.length === 0 && soulboundItem === null) {
-    // Find soulbound recipes tied to mob families that spawn in this zone
     const fallbackRecipes = (await (txAny as any).craftingRecipe.findMany({
       where: {
         soulbound: true,
-        mobFamily: {
-          zoneMappings: { some: { zoneId: params.zoneId } },
-        },
+        mobFamily: { zoneMappings: { some: { zoneId: params.zoneId } } },
       },
-      select: {
-        resultTemplateId: true,
-        resultTemplate: { select: { name: true, itemType: true, stackable: true, maxDurability: true } },
-      },
-    })) as Array<{
-      resultTemplateId: string;
-      resultTemplate: { name: string; itemType: string; stackable: boolean; maxDurability: number };
-    }>;
+      select: soulboundRecipeSelect,
+    })) as SoulboundRecipe[];
 
     if (fallbackRecipes.length > 0) {
-      const picked = fallbackRecipes[randomIntInclusive(0, fallbackRecipes.length - 1)]!;
-      const rarity = rollRarityWithLuck(params.luck);
-      const isEquipment = picked.resultTemplate.itemType === 'weapon' || picked.resultTemplate.itemType === 'armor';
-      const maxDurability = isEquipment ? picked.resultTemplate.maxDurability : null;
-
-      if (remainingSlots > 0) {
-        remainingSlots--;
-        await tx.item.create({
-          data: {
-            ownerId: params.playerId,
-            templateId: picked.resultTemplateId,
-            rarity,
-            quantity: 1,
-            maxDurability,
-            currentDurability: maxDurability,
-          } as any,
-        });
-      } else {
-        overflow.push({
-          templateId: picked.resultTemplateId,
-          templateName: picked.resultTemplate.name,
-          rarity,
-          quantity: 1,
-          bonusStats: null,
-          currentDurability: maxDurability,
-          maxDurability,
-        });
-      }
-
-      soulboundItem = {
-        itemTemplateId: picked.resultTemplateId,
-        name: picked.resultTemplate.name,
-        rarity,
-      };
+      const grant = await grantSoulboundFromRecipes(tx, fallbackRecipes, params.playerId, params.luck, remainingSlots, overflow);
+      soulboundItem = grant.soulboundItem;
+      remainingSlots -= grant.slotsUsed;
     }
   }
 

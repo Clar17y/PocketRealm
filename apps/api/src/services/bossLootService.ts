@@ -140,7 +140,7 @@ export async function distributeBossLoot(
     }
 
     // 2. XP scaled by contribution
-    const scaledXp = Math.round(baseXp * Math.max(WORLD_EVENT_CONSTANTS.BOSS_CONTRIBUTION_FLOOR, Math.min(2, ratio * contributors.length)));
+    const scaledXp = Math.round(baseXp * dropMultiplier);
     const skillType = (contributor.attackSkill ?? 'magic') as SkillType;
     const xpResult = await grantSkillXp(contributor.playerId, skillType, scaledXp);
 
