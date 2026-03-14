@@ -12,7 +12,6 @@ vi.mock('../middleware/auth', () => ({
   generateAccessToken: vi.fn(() => 'access-token'),
   generateRefreshToken: vi.fn(() => 'refresh-token'),
   refreshTokenExpiresAt: vi.fn(() => new Date('2026-03-10T12:00:00.000Z')),
-  sessionInactivityCutoff: vi.fn(),
   verifyRefreshToken: vi.fn(),
 }));
 

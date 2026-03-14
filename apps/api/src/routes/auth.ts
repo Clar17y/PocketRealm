@@ -8,7 +8,6 @@ import {
   generateAccessToken,
   generateRefreshToken,
   refreshTokenExpiresAt,
-  sessionInactivityCutoff,
   verifyRefreshToken,
 } from '../middleware/auth';
 import { ensureEquipmentSlots } from '../services/equipmentService';
@@ -28,11 +27,6 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-
-function isRecentlyActive(lastActiveAt: Date | null, nowMs = Date.now()): boolean {
-  if (!lastActiveAt) return false;
-  return lastActiveAt >= sessionInactivityCutoff(nowMs);
-}
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
@@ -214,14 +208,14 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
   // Verify token
   const payload = verifyRefreshToken(refreshToken);
 
-  // Check if token exists in DB and player has remained recently active.
+  // Require token to exist in DB and not be expired (no activity-window bypass)
   const [storedToken, player] = await Promise.all([
     prisma.refreshToken.findUnique({
       where: { token: refreshToken },
     }),
     prisma.player.findUnique({
       where: { id: payload.playerId },
-      select: { id: true, lastActiveAt: true, role: true },
+      select: { id: true, role: true },
     }),
   ]);
 
@@ -229,10 +223,7 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
     throw new AppError(401, 'Invalid or expired refresh token', 'INVALID_TOKEN');
   }
 
-  const storedTokenValid = Boolean(storedToken && storedToken.expiresAt >= now);
-  const activeWithinWindow = isRecentlyActive(player.lastActiveAt, now.getTime());
-
-  if (!storedTokenValid && !activeWithinWindow) {
+  if (!storedToken || storedToken.expiresAt < now) {
     throw new AppError(401, 'Invalid or expired refresh token', 'INVALID_TOKEN');
   }
 
