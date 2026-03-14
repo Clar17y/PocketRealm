@@ -57,5 +57,5 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 39 | DONE | Template action validation doesn't check definition registry | `2026-03-13-040053-templates-training-friends-events.md` | `security/fix-39-template-action-check` |
 | 40 | DONE | Quest progress not atomic — stale reads | `2026-03-13-035034-quests-shop.md` | `security/fix-40-quest-progress-atomic` |
 | 41 | DONE | Daily bonus TOCTOU — double claim | `2026-03-13-035034-quests-shop.md` | `security/fix-41-daily-bonus-toctou` |
-| 42 | TODO | World event spawn no duplicate prevention | `2026-03-13-043032-shared-services-xp-durability-events.md` | |
+| 42 | DONE | World event spawn no duplicate prevention | `2026-03-13-043032-shared-services-xp-durability-events.md` | `security/fix-42-event-spawn-dup` |
 | 43 | TODO | No request ID tracking | `2026-03-13-042037-cross-cutting-infrastructure.md` | |
