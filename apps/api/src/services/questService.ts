@@ -400,15 +400,19 @@ export async function claimDailyBonus(
   const { DAILY_BONUS_BASE, DAILY_BONUS_PER_LEVEL } = QUEST_CONSTANTS;
   const bonusTokens = DAILY_BONUS_BASE + Math.floor(level * DAILY_BONUS_PER_LEVEL);
 
-  // Award bonus
-  const updated = await prisma.playerQuestState.update({
-    where: { playerId },
+  // Atomic claim — updateMany with dailyBonusClaimed guard prevents double claim via TOCTOU
+  const { count } = await prisma.playerQuestState.updateMany({
+    where: { playerId, dailyBonusClaimed: false },
     data: {
       dailyBonusClaimed: true,
       questTokens: { increment: bonusTokens },
     },
   });
+  if (count === 0) {
+    throw new AppError(400, 'Daily bonus already claimed', 'ALREADY_CLAIMED');
+  }
 
+  const updated = await prisma.playerQuestState.findUniqueOrThrow({ where: { playerId } });
   return { tokensAwarded: bonusTokens, newBalance: updated.questTokens };
 }
 
