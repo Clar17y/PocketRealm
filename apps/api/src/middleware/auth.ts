@@ -63,6 +63,7 @@ declare global {
   namespace Express {
     interface Request {
       player?: AuthPayload;
+      requestId?: string;
     }
   }
 }
