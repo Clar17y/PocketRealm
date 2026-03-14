@@ -2,10 +2,7 @@ import type { Metadata } from 'next';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
-import {
-  BOSS_ENCOUNTER_CONSTANTS,
-  WORLD_EVENT_CONSTANTS,
-} from '@pocketrealm/shared';
+import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 
 const { Const, Comment } = FormulaBlock;
 
@@ -83,7 +80,6 @@ export default function BossEncountersPage() {
             <th>HP / Player</th>
             <th>AoE / Player</th>
             <th>Defence</th>
-            <th>Single-Target Damage</th>
           </tr>
         </thead>
         <tbody>
@@ -93,7 +89,6 @@ export default function BossEncountersPage() {
               <td>{WORLD_EVENT_CONSTANTS.BOSS_HP_PER_PLAYER_BY_TIER[i]}</td>
               <td>{WORLD_EVENT_CONSTANTS.BOSS_AOE_PER_PLAYER_BY_TIER[i]}</td>
               <td>{WORLD_EVENT_CONSTANTS.BOSS_DEFENCE_BY_TIER[i]}</td>
-              <td>{BOSS_ENCOUNTER_CONSTANTS.BOSS_SINGLE_TARGET_DAMAGE_BY_TIER[i]}</td>
             </tr>
           ))}
         </tbody>
