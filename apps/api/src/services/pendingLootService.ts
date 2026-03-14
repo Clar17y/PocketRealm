@@ -74,24 +74,30 @@ export async function claimPendingLoot(
 
   const uniqueIndices = [...new Set(selectedIndices)];
 
-  await prisma.$transaction(async (tx) => {
-    for (const idx of uniqueIndices) {
-      if (idx < 0 || idx >= items.length) continue;
-      if (slotsUsed >= capacity) break;
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const idx of uniqueIndices) {
+        if (idx < 0 || idx >= items.length) continue;
+        if (slotsUsed >= capacity) break;
 
-      const lootItem = items[idx];
-      await tx.item.create({
-        data: {
-          ownerId: playerId,
-          templateId: lootItem.templateId,
-          rarity: lootItem.rarity,
-          quantity: lootItem.quantity,
-          bonusStats: lootItem.bonusStats ?? undefined,
-          currentDurability: lootItem.currentDurability,
-          maxDurability: lootItem.maxDurability,
-        } as any,
-      });
-      slotsUsed++;
-    }
-  });
+        const lootItem = items[idx];
+        await tx.item.create({
+          data: {
+            ownerId: playerId,
+            templateId: lootItem.templateId,
+            rarity: lootItem.rarity,
+            quantity: lootItem.quantity,
+            bonusStats: lootItem.bonusStats ?? undefined,
+            currentDurability: lootItem.currentDurability,
+            maxDurability: lootItem.maxDurability,
+          } as any,
+        });
+        slotsUsed++;
+      }
+    });
+  } catch (err) {
+    // Restore the Redis key so the player can retry — prevents loot loss on DB failure
+    await redis.set(key, data, 'EX', INVENTORY_CONSTANTS.PENDING_LOOT_TTL_SECONDS);
+    throw err;
+  }
 }
