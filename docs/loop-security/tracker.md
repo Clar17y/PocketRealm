@@ -58,4 +58,4 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 40 | DONE | Quest progress not atomic — stale reads | `2026-03-13-035034-quests-shop.md` | `security/fix-40-quest-progress-atomic` |
 | 41 | DONE | Daily bonus TOCTOU — double claim | `2026-03-13-035034-quests-shop.md` | `security/fix-41-daily-bonus-toctou` |
 | 42 | DONE | World event spawn no duplicate prevention | `2026-03-13-043032-shared-services-xp-durability-events.md` | `security/fix-42-event-spawn-dup` |
-| 43 | TODO | No request ID tracking | `2026-03-13-042037-cross-cutting-infrastructure.md` | |
+| 43 | DONE | No request ID tracking | `2026-03-13-042037-cross-cutting-infrastructure.md` | `security/fix-43-request-id` |
