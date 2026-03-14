@@ -80,7 +80,7 @@ resourcesRouter.get('/estimate', asyncHandler(async (req, res) => {
 
   const needed = resource.max - resource.current;
   const maxHealAmount = healPerTurn * effectiveTurns;
-  const actualHealAmount = Math.min(needed, maxHealAmount);
+  const actualHealAmount = Math.floor(Math.min(needed, maxHealAmount));
   const turnsNeeded = Math.ceil(actualHealAmount / healPerTurn);
 
   res.json({
