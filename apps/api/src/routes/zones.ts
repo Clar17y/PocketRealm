@@ -18,7 +18,7 @@ import { refundPlayerTurns } from '../services/turnBankService';
 import { getHpState, enterRecoveringState, setHp } from '../services/hpService';
 import { storePendingLoot, type PendingLootItem } from '../services/pendingLootService';
 import { serializeXpGrant, toMobTemplate, trackAchievements, calculateFleeWithGold, buildPveCombatOptions } from '../utils/routeHelpers.js';
-import { preparePlayerForCombat, buildPlayerTemplateCombatant, processCombatVictoryRewards, buildCombatLogResult } from '../services/combatOrchestrationService';
+import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards, buildCombatLogResult } from '../services/combatOrchestrationService';
 import { prismaAny } from '../utils/prismaAny.js';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import { degradeEquippedDurability } from '../services/durabilityService';
@@ -363,6 +363,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           },
           equipmentStats,
         );
+        applyGuildCombatModifiers(playerStats, guildMods);
 
         const combatantA = buildPlayerTemplateCombatant({
           playerId,
