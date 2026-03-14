@@ -17,8 +17,8 @@ export interface FleeCalculationResult {
 
 /**
  * Calculate flee chance based on evasion vs mob level.
- * When evasion equals mob level, you get BASE_FLEE_CHANCE (30%).
- * Each level difference adjusts by FLEE_CHANCE_PER_LEVEL_DIFF (2%).
+ * When evasion equals mob level, you get BASE_FLEE_CHANCE (50%).
+ * Each level difference adjusts by FLEE_CHANCE_PER_LEVEL_DIFF (3%).
  */
 export function calculateFleeChance(evasionLevel: number, mobLevel: number): number {
   const levelDiff = evasionLevel - mobLevel;
