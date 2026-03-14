@@ -1,5 +1,4 @@
 import { prisma } from '@pocketrealm/database';
-import { prismaAny } from '../utils/prismaAny.js';
 import {
   ATTRIBUTE_TYPES,
   DEFAULT_PLAYER_ATTRIBUTES,
@@ -33,7 +32,7 @@ export interface PlayerProgressionState {
 }
 
 export async function getPlayerProgressionState(playerId: string): Promise<PlayerProgressionState> {
-  const player = await prismaAny.player.findUnique({
+  const player = await prisma.player.findUnique({
     where: { id: playerId },
     select: {
       characterXp: true,

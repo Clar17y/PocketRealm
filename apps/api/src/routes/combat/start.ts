@@ -58,7 +58,6 @@ import { getCombatBuffs, getCombatBuffsWithUses, applyCombatBuffs, consumeCombat
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
 import {
-  prismaAny,
   startSchema,
   pickWeighted,
   toEncounterSiteSize,
@@ -84,7 +83,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     throw new AppError(400, 'Cannot fight with 0 HP. Rest to recover health.', 'NO_HP');
   }
 
-  const site = await prismaAny.encounterSite.findFirst({
+  const site = await prisma.encounterSite.findFirst({
     where: { id: encounterSiteId, playerId },
     include: { mobFamily: { select: { name: true } } },
   });
@@ -115,7 +114,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         currentRoom = r;
         roomMobs = candidate;
         advanced = true;
-        await prismaAny.encounterSite.update({
+        await prisma.encounterSite.update({
           where: { id: site.id },
           data: { currentRoom: r },
         });
@@ -430,10 +429,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     respawnedTo = defeatResult.respawnedTo;
 
     // Defeat in room: downgrade full_clear or reset room
-    const siteForReset = await prismaAny.encounterSite.findFirst({ where: { id: encounterSiteId, playerId } });
+    const siteForReset = await prisma.encounterSite.findFirst({ where: { id: encounterSiteId, playerId } });
     if (siteForReset) {
       if (siteStrategy === 'full_clear' && siteFullClearActive) {
-        await prismaAny.encounterSite.update({
+        await prisma.encounterSite.update({
           where: { id: encounterSiteId },
           data: { clearStrategy: 'room_by_room', fullClearActive: false, roomCarryHp: null },
         });
@@ -442,7 +441,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         const resetMobs = siteMobs.map(m =>
           m.room === defeatedInRoom && m.status === 'defeated' ? { ...m, status: 'alive' as const } : m
         );
-        await prismaAny.encounterSite.update({
+        await prisma.encounterSite.update({
           where: { id: encounterSiteId },
           data: { mobs: serializeEncounterSiteMobs(resetMobs), roomCarryHp: null },
         });
@@ -763,7 +762,7 @@ export function registerStartRoutes(router: Router): void {
         preparePlayerForCombat(playerId, { requestedAttackSkill, maxHp: hpState.maxHp }),
         getActiveEventsForZone(zoneId),
         getActiveWorldWideEvents(),
-        prismaAny.mobFamilyMember.findFirst({
+        prisma.mobFamilyMember.findFirst({
           where: { mobTemplateId: baseMob.id },
           select: { mobFamilyId: true },
         }),
@@ -902,7 +901,7 @@ export function registerStartRoutes(router: Router): void {
       });
 
       if (mobPrefix) {
-        await prismaAny.playerBestiaryPrefix.upsert({
+        await prisma.playerBestiaryPrefix.upsert({
           where: { playerId_mobTemplateId_prefix: { playerId, mobTemplateId: prefixedMob.id, prefix: mobPrefix } },
           create: { playerId, mobTemplateId: prefixedMob.id, prefix: mobPrefix, kills: combatResult.outcome === 'victory' ? 1 : 0 },
           update: combatResult.outcome === 'victory' ? { kills: { increment: 1 } } : {},

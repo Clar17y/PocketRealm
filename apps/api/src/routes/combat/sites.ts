@@ -7,7 +7,6 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { buildPagination } from '../../utils/routeHelpers.js';
 import { getEventModifiersForEntity, type EventModifierBadge } from '../../services/worldEventService';
 import {
-  prismaAny,
   listEncounterSitesQuerySchema,
   applyEncounterSiteDecayAndPersist,
 } from './helpers';
@@ -40,7 +39,7 @@ export function registerSiteRoutes(router: Router): void {
       const query = parsedQuery.data;
       const now = new Date();
 
-      const sites = await prismaAny.encounterSite.findMany({
+      const sites = await prisma.encounterSite.findMany({
         where: {
           playerId,
           ...(query.zoneId ? { zoneId: query.zoneId } : {}),
@@ -200,7 +199,7 @@ export function registerSiteRoutes(router: Router): void {
       const playerId = req.player!.playerId;
       const body = abandonSchema.parse(req.body ?? {});
 
-      const result = await prismaAny.encounterSite.deleteMany({
+      const result = await prisma.encounterSite.deleteMany({
         where: {
           playerId,
           ...(body.zoneId ? { zoneId: body.zoneId } : {}),
@@ -219,7 +218,7 @@ export function registerSiteRoutes(router: Router): void {
       const siteId = z.string().uuid().parse(req.params.id);
       const body = strategySchema.parse(req.body);
 
-      const site = await prismaAny.encounterSite.findFirst({
+      const site = await prisma.encounterSite.findFirst({
         where: { id: siteId, playerId },
       });
 
@@ -231,7 +230,7 @@ export function registerSiteRoutes(router: Router): void {
         throw new AppError(400, 'Strategy already selected for this site', 'STRATEGY_ALREADY_SET');
       }
 
-      await prismaAny.encounterSite.update({
+      await prisma.encounterSite.update({
         where: { id: siteId },
         data: {
           clearStrategy: body.strategy,

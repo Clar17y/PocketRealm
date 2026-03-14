@@ -1,6 +1,4 @@
 import { prisma } from '@pocketrealm/database';
-import { prismaAny } from '../utils/prismaAny.js';
-
 
 export function calculateExplorationPercent(turnsExplored: number, turnsToExplore: number | null): number {
   if (!turnsToExplore || turnsToExplore <= 0) return 100;
@@ -12,7 +10,7 @@ export async function getExplorationPercent(
   zoneId: string,
 ): Promise<{ turnsExplored: number; percent: number; turnsToExplore: number | null }> {
   const [record, zone] = await Promise.all([
-    prismaAny.playerZoneExploration.findUnique({
+    prisma.playerZoneExploration.findUnique({
       where: { playerId_zoneId: { playerId, zoneId } },
       select: { turnsExplored: true },
     }),
@@ -56,7 +54,7 @@ export async function addExplorationTurns(
     if (opts?.currentTurnsExplored !== undefined) {
       current = opts.currentTurnsExplored;
     } else {
-      const record = await prismaAny.playerZoneExploration.findUnique({
+      const record = await prisma.playerZoneExploration.findUnique({
         where: { playerId_zoneId: { playerId, zoneId } },
         select: { turnsExplored: true },
       });
@@ -66,7 +64,7 @@ export async function addExplorationTurns(
     if (clampedTurns <= 0) return;
   }
 
-  await prismaAny.playerZoneExploration.upsert({
+  await prisma.playerZoneExploration.upsert({
     where: { playerId_zoneId: { playerId, zoneId } },
     create: { playerId, zoneId, turnsExplored: clampedTurns },
     update: { turnsExplored: { increment: clampedTurns } },

@@ -3,7 +3,6 @@ import { prisma } from '@pocketrealm/database';
 import { getAllMobPrefixes, BOSS_TEMPLATES } from '@pocketrealm/shared';
 import type { BossRotationReveal } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
-import { prismaAny } from '../utils/prismaAny.js';
 import { calculateExplorationPercent } from '../services/zoneExplorationService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getExpeditionBestiary } from '../services/expeditionBestiaryService';
@@ -44,11 +43,11 @@ bestiaryRouter.get('/', asyncHandler(async (req, res) => {
       where: { playerId },
       select: { mobTemplateId: true, kills: true },
     }),
-    prismaAny.playerBestiaryPrefix.findMany({
+    prisma.playerBestiaryPrefix.findMany({
       where: { playerId },
       select: { mobTemplateId: true, prefix: true, kills: true },
     }),
-    prismaAny.playerZoneExploration.findMany({
+    prisma.playerZoneExploration.findMany({
       where: { playerId },
       select: { zoneId: true, turnsExplored: true },
     }),
