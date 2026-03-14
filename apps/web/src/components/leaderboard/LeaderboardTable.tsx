@@ -75,10 +75,10 @@ export function LeaderboardTable({
       {/* Entries */}
       <div className="space-y-1">
         {entries.map((entry) => {
-          const isMe = entry.playerId === currentPlayerId;
+          const isMe = !!(myRank && entry.rank === myRank.rank);
           return (
             <div
-              key={entry.playerId}
+              key={entry.rank}
               className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm ${
                 isMe
                   ? 'bg-[var(--rpg-gold)]/15 border border-[var(--rpg-gold)]/40'
@@ -100,7 +100,7 @@ export function LeaderboardTable({
                       </span>
                     )}
                     {entry.isBot && <Bot className="w-3.5 h-3.5 text-[var(--rpg-text-secondary)] shrink-0" />}
-                    {entry.isAdmin && <Shield className="w-3.5 h-3.5 text-[var(--rpg-gold)] shrink-0" />}
+                    {entry.isAdmin === true && <Shield className="w-3.5 h-3.5 text-[var(--rpg-gold)] shrink-0" />}
                   </div>
                   <span className="text-xs text-[var(--rpg-text-secondary)]">Lv.<span className="font-pixel text-[8px]">{entry.characterLevel}</span></span>
                 </div>
@@ -124,7 +124,7 @@ export function LeaderboardTable({
       )}
 
       {/* Pinned "Your rank" bar (shown when viewing top N, not around_me) */}
-      {!showAroundMe && myRank && !entries.some((e) => e.playerId === currentPlayerId) && (
+      {!showAroundMe && myRank && !entries.some((e) => e.rank === myRank.rank) && (
         <div className="mt-2 border-t border-[var(--rpg-border)] pt-2">
           <div className="flex items-center justify-between px-3 py-2 rounded-lg text-sm bg-[var(--rpg-gold)]/15 border border-[var(--rpg-gold)]/40">
             <div className="flex items-center gap-3 min-w-0">

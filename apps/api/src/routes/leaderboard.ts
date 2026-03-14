@@ -17,5 +17,10 @@ leaderboardRouter.get('/:category', asyncHandler(async (req, res) => {
   const playerId = req.player?.playerId;
 
   const result = await getLeaderboard(category, playerId, aroundMe);
-  res.json(result);
+
+  // Strip playerId and isAdmin from public entries to prevent UUID enumeration
+  res.json({
+    ...result,
+    entries: result.entries.map(({ playerId: _pid, isAdmin: _adm, ...rest }) => rest),
+  });
 }));
