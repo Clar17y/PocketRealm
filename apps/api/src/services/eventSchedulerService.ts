@@ -255,7 +255,6 @@ export async function checkAndSpawnBoss(io: SocketServer | null): Promise<void> 
   const now = Date.now();
   const intervalMs = WORLD_EVENT_CONSTANTS.BOSS_SPAWN_INTERVAL_HOURS * 60 * 60 * 1000;
   if (now - lastBossSpawnAt < intervalMs) return;
-  lastBossSpawnAt = now;
 
   // Active boss cap
   const activeBosses = await prisma.bossEncounter.count({
@@ -281,6 +280,7 @@ export async function checkAndSpawnBoss(io: SocketServer | null): Promise<void> 
   const zone = pickRandom(wildZones);
   if (!zone) return;
 
+  lastBossSpawnAt = now;
   await trySpawnBoss(io, zone.id, zone.name);
 }
 
