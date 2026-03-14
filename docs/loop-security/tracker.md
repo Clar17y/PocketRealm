@@ -35,7 +35,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 22 | DONE | Chat/mail not sanitized — XSS risk | `2026-03-13-031041-casino-chat-socket.md` | `security/fix-22-chat-sanitize` |
 | 23 | DONE | Craft quantity has no upper bound | `2026-03-13-015113-crafting-system.md` | `security/fix-23-craft-quantity-cap` |
 | 24 | DONE | Boss signup gives full HP regardless | `2026-03-13-022037-boss-encounters.md` | `security/fix-24-boss-signup-hp` |
-| 25 | TODO | Efficiency reset doubles XP capacity | `2026-03-13-035034-quests-shop.md` | |
+| 25 | DONE | Efficiency reset doubles XP capacity | `2026-03-13-035034-quests-shop.md` | `security/fix-25-efficiency-reset-guard` |
 | 26 | TODO | Guild log readable by any player | `2026-03-13-020038-guild-system.md` | |
 | 27 | TODO | Leaderboard exposes player UUIDs + isAdmin publicly | `2026-03-13-044029-leaderboard-bestiary.md` | |
 
