@@ -1293,6 +1293,7 @@ export const CASINO_CONSTANTS = {
   ROUND_DURATION_SECONDS: 60,
   BETTING_WINDOW_SECONDS: 50,
   BIG_WIN_THRESHOLD: 500,
+  MAX_BETS_PER_ROUND: 5,
 } as const;
 
 // =============================================================================

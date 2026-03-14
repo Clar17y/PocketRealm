@@ -326,6 +326,13 @@ export async function placeBet(
       throw new AppError(400, 'Insufficient gold', 'INSUFFICIENT_GOLD');
     }
 
+    // Enforce per-player per-round bet limit — checked AFTER the player row lock
+    // to prevent two concurrent requests both reading count=N and both inserting
+    const existingBets = await tx.rouletteBet.count({ where: { roundId, playerId } });
+    if (existingBets >= CASINO_CONSTANTS.MAX_BETS_PER_ROUND) {
+      throw new AppError(400, 'Maximum bets per round reached', 'BET_LIMIT');
+    }
+
     await tx.player.update({
       where: { id: playerId },
       data: { gold: { decrement: amount } },
