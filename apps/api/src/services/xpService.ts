@@ -108,7 +108,8 @@ export async function grantSkillXp(
     await txAny.player.update({
       where: { id: playerId },
       data: {
-        characterXp: BigInt(characterXpAfter),
+        // Use atomic increment to prevent concurrent XP grants from racing on characterXp
+        characterXp: { increment: BigInt(characterXpGain) },
         characterLevel: characterLevelAfter,
         // Use atomic increment to prevent concurrent XP grants from overwriting each other's attribute points
         attributePoints: levelUps > 0 ? { increment: levelUps } : undefined,
