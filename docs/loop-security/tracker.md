@@ -49,7 +49,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 31 | DONE | Travel ambushes missing guild combat modifiers | `2026-03-13-025034-zones-hp-rest.md` | `security/fix-31-ambush-guild-mods` |
 | 32 | SKIPPED | Admin ops target only admin's own account | `2026-03-13-030020-admin-panel.md` | Design limitation/feature request, not a vulnerability. Requires changes across ~12 endpoints — needs manual attention |
 | 33 | DONE | No audit logging for admin actions | `2026-03-13-030020-admin-panel.md` | `security/fix-33-admin-audit-log` |
-| 34 | TODO | Bot creation creates permanent player records | `2026-03-13-030020-admin-panel.md` | |
+| 34 | DONE | Bot creation creates permanent player records | `2026-03-13-030020-admin-panel.md` | `security/fix-34-bot-cleanup` |
 | 35 | TODO | Achievement turn reward bypasses bank cap | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | |
 | 36 | TODO | Room carry HP can override current HP | `2026-03-13-024036-exploration-combat-start.md` | |
 | 37 | TODO | Encounter site decay check outside transaction | `2026-03-13-024036-exploration-combat-start.md` | |
