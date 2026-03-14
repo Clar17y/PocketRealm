@@ -18,11 +18,26 @@ Transform encounter sites from sequential 1v1 mob grinds into multi-mob room fig
 
 ## Multi-Mob Room Combat
 
-Every room in an encounter site is a single raid-style fight: party of 1 vs all alive mobs in the room, resolved by the existing raid resolver (`resolveRaidRound`).
+Every room in an encounter site is a single raid-style fight: party of 1 vs all alive mobs in the room, resolved by the existing raid resolver (`resolveRaidRound` in `packages/game-engine/src/combat/raidRoundResolver.ts`).
+
+### Mob Conversion
+
+Encounter sites store mobs as `EncounterMobSlot` (slot, mobTemplateId, role, prefix, status, room). The raid resolver expects `ExpeditionMobState`. A new converter function `buildEncounterRaidMob(slot, template): ExpeditionMobState` maps between them:
+
+- `hp` / `maxHp`: from `MobTemplate.hp`
+- `stats`: from `MobTemplate` stat fields (attack, defence, accuracy, evasion, etc.)
+- `actionTemplate`: from `MobTemplate.actionTemplate` (same template combat system used by 1v1)
+- `phaseTemplates`: `null` — encounter mobs do not have phase transitions
+- `activeEffects`: empty array at fight start
+- `name` / `prefix`: from slot fields
+
+This converter is called once per room entry (for auto-resolve) or once at room start (for manual), and mob HP is carried forward between rounds within a room.
 
 ### Splash Hit Cascade
 
 When an attack misses its primary target, it re-rolls hit chance against each remaining alive mob in the room (in slot order) until one is hit or all are exhausted. Full damage on the cascaded hit. Applies to all attack types (melee, ranged, magic). Thematic justification: mobs are packed together in tight quarters.
+
+**Integration:** Add an optional `splashCascade: boolean` parameter to `resolveRaidRound`. When enabled and a player attack misses, the resolver iterates through other alive mobs in slot order, rolling hit chance against each. First hit ends the cascade. This is a small, targeted change to the resolver — the cascade logic lives inside `resolvePlayerOffensive`.
 
 ### Crowded Debuff
 
@@ -38,15 +53,17 @@ Formula: `multiplier = 1 / (1 + (aliveMobs - 1) * CROWDED_FACTOR)`
 | 4 | 69% |
 | 5 | 63% |
 
-Last mob standing always fights at full power. This creates a tension curve — the fight gets harder as you thin the herd.
+When `aliveMobs = 1`, the formula naturally yields 1.0 (full power). As mobs die, total incoming DPS decreases (fewer attackers) but each surviving mob hits harder individually. The strategic incentive is to eliminate mobs quickly to reduce the number of incoming attacks per round.
+
+**Integration:** Pre-processing approach. Before each round, compute the crowded multiplier from the current alive mob count and apply it to a **copy** of each mob's stats (damage, accuracy). Pass the modified stats copy to `resolveRaidRound`. The original `ExpeditionMobState.stats` are never mutated — the multiplier is recomputed each round as mobs die.
 
 ### Targeting
 
-Player attacks target the lowest-HP mob by default (cleave the weak to reduce incoming actions). In manual mode, the player can override target selection.
+Player attacks target the lowest-HP mob by default (cleave the weak to reduce incoming actions). In manual mode, the player can override target selection via the round action payload (see API section).
 
 ### Combat Mode
 
-Encounter site rooms use `pve_open_world` hit curves (same as current 1v1 encounter combat). The splash hit cascade and crowded debuff are encounter-site-specific modifiers layered on top of the standard raid resolver, not changes to the resolver itself.
+Encounter site rooms use `pve_open_world` hit curves (same as current 1v1 encounter combat).
 
 ## Per-Room Strategy: Auto-Resolve vs Manual
 
@@ -82,6 +99,8 @@ Uses the raid resolver with round-by-round player input, same as expedition manu
 3. Round result returned to client
 4. Repeat until room cleared or player defeated
 
+Manual rooms must be completed in one session. If the player disconnects mid-room, the room resets (mobs return to alive, turn cost lost). This avoids the need to persist per-round state (mob HP, effects, round number) on the encounter site model — keeping the schema simple compared to expeditions which require persistence for multi-player coordination.
+
 ### Loot Multiplier
 
 Each auto-resolved room earns `AUTO_RESOLVE_DROP_MULTIPLIER` (1.5x) applied to that room's contribution to the final chest roll count. Tracked per-room.
@@ -99,11 +118,13 @@ Recipe chance uses the same proportional logic.
 
 ### Turn Cost
 
-`mob_count * ENCOUNTER_TURN_COST` per room, charged when the player enters the room (not all upfront).
+`mob_count * ENCOUNTER_TURN_COST` per room, charged when the player enters the room (not all upfront). With `ENCOUNTER_TURN_COST = 50`, a 4-room large site with 3-5 mobs per room costs 600-1000 turns total (~10-17 minutes of regen at 1 turn/sec). This is intentional — large sites with epic chest rewards should require meaningful turn investment, comparable to expedition costs.
 
 ### Decay Exploit Fix (#30)
 
 If any mobs in a room have decayed since the site was discovered, that room's auto-resolve loot bonus is disabled. The player can still auto-resolve for speed, but the multiplier does not apply. Simple check: `decayedCountInRoom > 0` disables the bonus for that room.
+
+On defeat, only defeated mobs reset to alive — decayed mobs stay decayed. The decayed count persists, so the bonus remains disabled on retry.
 
 ### Single-Room Sites (Small)
 
@@ -124,6 +145,8 @@ The old `CHEST_TIER_UPGRADE` mechanic (full-clear upgrades tier) is removed. Tie
 
 Legendary chests are added to the system but reserved for future content (expeditions, world bosses, special events).
 
+**Type changes:** Extend `ChestRarity` type from `'common' | 'uncommon' | 'rare'` to include `'epic' | 'legendary'`. Add a new `getChestRarityForRoomCount(rooms: number): ChestRarity` function in `encounterChest.ts`. The chest service receives room count (not site size) when granting encounter site rewards.
+
 ### New Chest Constants
 
 ```typescript
@@ -136,7 +159,7 @@ CHEST_RECIPE_CHANCE_LEGENDARY: 0.15,
 
 ### Drop Tables
 
-`ChestDropTable` entries needed at epic and legendary rarity for each mob family. Seed data migration required.
+`ChestDropTable` entries needed at epic and legendary rarity for each mob family. Epic tables are derived from rare tables with adjusted weights (higher-quality drops, lower filler). Legendary tables are placeholder entries for future content. Added via seed data migration.
 
 ## Constants Changes
 
@@ -181,16 +204,57 @@ ENCOUNTER_SITE_CONSTANTS: {
 
 Refactor admin encounter site creation (`POST /admin/encounter-sites`) to use the same `generateRoomAssignments()` + `buildEncounterSiteMobs()` pipeline that player discovery uses. Admin can specify zone, mob family, and size — the room/mob generation uses the standard path. Removes the divergence where admin sites had flat structure, legacy mob counts, and no role distribution.
 
+## API Endpoints
+
+### Auto-Resolve a Room
+
+```
+POST /api/v1/combat/encounter-sites/:id/auto-resolve
+```
+
+- Auth: site owner
+- Precondition: site exists, current room has not started combat
+- Request body: none (uses active combat template)
+- Response: `{ outcome: 'clear' | 'defeat', rounds: RoundResult[], loot?: ChestReward, roomState: RoomState }`
+
+### Manual Round
+
+```
+POST /api/v1/combat/encounter-sites/:id/round
+```
+
+- Auth: site owner
+- Precondition: site exists, current room is in manual combat
+- Request body: `{ action: ActionType, targetMobSlot?: number }` — `targetMobSlot` overrides default lowest-HP targeting
+- Response: `{ roundResult: RoundResult, roomCleared: boolean, defeated: boolean }`
+
+### Start Manual Room
+
+```
+POST /api/v1/combat/encounter-sites/:id/start-room
+```
+
+- Auth: site owner
+- Precondition: site exists, current room has not started combat
+- Charges turn cost for the room, initializes manual combat state in-memory
+- Response: `{ room: number, mobs: MobState[], turnCost: number }`
+
 ## Schema Changes
 
-Encounter site model needs:
+Encounter site model changes:
 
-- `roomStrategy: Json` — per-room tracking of auto-resolve vs manual choice and whether loot bonus applies. Example: `[{ room: 1, mode: "auto", bonusEligible: true }, { room: 2, mode: "manual", bonusEligible: true }]`
+- Add `roomStrategy: Json` — per-room tracking of auto-resolve vs manual choice and whether loot bonus applies. Example: `[{ room: 1, mode: "auto", bonusEligible: true }, { room: 2, mode: "manual", bonusEligible: true }]`
+- Keep `roomCarryHp: Int?` — existing field, continues to track carry HP between rooms. Stamina and mana carry are handled in-memory during combat (same as current behavior) and snapshotted to `roomCarryHp` JSON when a room is cleared (expand to `roomCarryState: Json` with `{ hp, stamina, mana }`)
 - Remove `clearStrategy` and `fullClearActive` fields (replaced by per-room tracking)
+- No per-round state persistence — manual rooms must complete in one session (see Manual Implementation section)
+
+## Migration
+
+All existing encounter sites are deleted during migration. Sites are ephemeral content that decays naturally, so no data preservation is needed. The schema migration drops old fields and adds new ones in a single step.
 
 ## Carry-HP Between Rooms
 
-After clearing a room, remaining HP/stamina/mana carries to the next room (same as current behavior). The choice of auto-resolve vs manual for the next room does not affect this.
+After clearing a room, remaining HP/stamina/mana is saved to `roomCarryState` and restored when the next room starts. The choice of auto-resolve vs manual for the next room does not affect this.
 
 ## Site Deletion
 
