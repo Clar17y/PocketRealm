@@ -476,7 +476,7 @@ describe('applyCrowdedDebuff', () => {
   const baseStats: CombatantStats = {
     hp: 100, maxHp: 100, attack: 15, accuracy: 100,
     defence: 50, magicDefence: 50, dodge: 5, evasion: 10,
-    damageMin: 10, damageMax: 20, speed: 10, damageType: 'melee',
+    damageMin: 10, damageMax: 20, speed: 10, damageType: 'physical',
   };
 
   it('reduces mob damage and accuracy by multiplier', () => {
@@ -661,17 +661,20 @@ export function buildEncounterRaidMob(
     hp: template.hp,
     maxHp: template.hp,
     stats: {
+      hp: template.hp,
+      maxHp: template.hp,
       attack: template.attack,
-      rangedAttack: template.rangedAttack,
-      magicAttack: template.magicAttack,
+      accuracy: template.accuracy,
       defence: template.defence,
       magicDefence: template.magicDefence,
-      accuracy: template.accuracy,
+      dodge: 0,
       evasion: template.evasion,
+      damageMin: template.attack,   // placeholder — check MobTemplate for actual damage fields
+      damageMax: template.attack,   // placeholder — check MobTemplate for actual damage fields
+      speed: 10,
+      damageType: 'physical' as const,
       critChance: template.critChance,
-      critMultiplier: template.critMultiplier,
-      damageMin: template.attack,
-      damageMax: template.attack,
+      critDamage: template.critMultiplier,
     },
     actionTemplate: template.actionTemplate as ExpeditionMobState['actionTemplate'],
     activeEffects: [],
