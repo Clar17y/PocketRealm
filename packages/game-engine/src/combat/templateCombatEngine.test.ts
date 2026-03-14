@@ -597,7 +597,7 @@ describe('runTemplateCombat', () => {
     it('action damage multiplier is applied to rolled damage', () => {
       mockCombatRandom();
 
-      // heavy_attack has damageMultiplier: 1.5
+      // heavy_attack has damageMultiplier: 2.0
       const a = makeCombatant('Player', {
         template: templateOf('heavy_attack'),
         stats: makeStats({ hp: 200, maxHp: 200, damageMin: 20, damageMax: 20 }),
@@ -615,16 +615,16 @@ describe('runTemplateCombat', () => {
         (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
       );
       expect(attackEntry).toBeDefined();
-      // rawDamage = floor(20 * 1.5 * 1.0) = 30 (action multiplier, no channeling bonus)
-      expect(attackEntry?.rawDamage).toBe(30);
-      // Defend gives 35% damage reduction: floor(30 * (1 - 0.35)) = floor(19.5) = 19
-      expect(attackEntry?.damage).toBe(19);
+      // rawDamage = floor(20 * 2.0 * 1.0) = 40 (action multiplier, no channeling bonus)
+      expect(attackEntry?.rawDamage).toBe(40);
+      // Defend gives 35% damage reduction: floor(40 * (1 - 0.35)) = floor(26) = 26
+      expect(attackEntry?.damage).toBe(26);
     });
 
     it('channeling bonus multiplier stacks with action multiplier', () => {
       mockCombatRandom();
 
-      // Both use heavy_attack (1.5x multiplier, isChanneling)
+      // Both use heavy_attack (2.0x multiplier, isChanneling)
       // Both are offensive + channeling → both get CHANNELING_BONUS_DAMAGE (1.5x) on top
       const a = makeCombatant('Player', {
         template: templateOf('heavy_attack'),
@@ -641,12 +641,12 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b);
 
-      // rawDamage = floor(10 * 1.5 * 1.5) = floor(22.5) = 22
+      // rawDamage = floor(10 * 2.0 * 1.5) = floor(30) = 30
       const aAttack = result.log.find(
         (e) => e.round === 1 && e.actor === 'combatantA' && e.damage !== undefined,
       );
       expect(aAttack).toBeDefined();
-      expect(aAttack?.rawDamage).toBe(22);
+      expect(aAttack?.rawDamage).toBe(30);
     });
   });
 

@@ -35,7 +35,7 @@ const heavyAttack: ActionDefinition = {
   category: 'offensive',
   scalingStat: 'weapon',
   cost: { stamina: COMBAT_ACTION_CONSTANTS.HEAVY_ATTACK_STAMINA, mana: 0 },
-  damageMultiplier: 1.5,
+  damageMultiplier: 2.0,
   accuracyModifier: 5,
   isChanneling: true,
 };

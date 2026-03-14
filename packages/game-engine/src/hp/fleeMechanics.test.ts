@@ -66,9 +66,9 @@ describe('calculateFleeResult', () => {
   };
 
   it('returns clean_escape with high roll in success range', () => {
-    // fleeChance for equal levels = 0.3
-    // For clean_escape: roll/0.3 >= 0.8, so roll >= 0.24
-    const result = calculateFleeResult(baseInput, 0.25);
+    // fleeChance for equal levels = 0.5
+    // For clean_escape: roll/0.5 >= 0.8, so roll >= 0.40
+    const result = calculateFleeResult(baseInput, 0.41);
     expect(result.outcome).toBe('clean_escape');
     expect(result.remainingHp).toBe(
       Math.max(1, Math.floor(100 * FLEE_CONSTANTS.HIGH_SUCCESS_HP_PERCENT))
@@ -78,7 +78,7 @@ describe('calculateFleeResult', () => {
   });
 
   it('returns wounded_escape with low roll in success range', () => {
-    // roll/0.3 < 0.8, so roll < 0.24
+    // roll/0.5 < 0.8, so roll < 0.40
     const result = calculateFleeResult(baseInput, 0.1);
     expect(result.outcome).toBe('wounded_escape');
     expect(result.remainingHp).toBe(FLEE_CONSTANTS.PARTIAL_SUCCESS_HP);
@@ -100,7 +100,7 @@ describe('calculateFleeResult', () => {
   });
 
   it('ensures clean_escape HP is at least 1', () => {
-    const result = calculateFleeResult({ ...baseInput, maxHp: 1 }, 0.25);
+    const result = calculateFleeResult({ ...baseInput, maxHp: 1 }, 0.41);
     expect(result.outcome).toBe('clean_escape');
     expect(result.remainingHp).toBeGreaterThanOrEqual(1);
   });
