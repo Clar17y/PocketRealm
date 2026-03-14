@@ -43,7 +43,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 
 | # | Status | Finding | Source File | Branch |
 |---|--------|---------|-------------|--------|
-| 28 | TODO | Item creation outside transaction in craft route | `2026-03-13-015113-crafting-system.md` | |
+| 28 | DONE | Item creation outside transaction in craft route | `2026-03-13-015113-crafting-system.md` | `security/fix-28-craft-item-tx` |
 | 29 | TODO | Travel turn spend not atomic with zone update | `2026-03-13-025034-zones-hp-rest.md` | |
 | 30 | TODO | Breadcrumb return bypasses connection validation | `2026-03-13-025034-zones-hp-rest.md` | |
 | 31 | TODO | Travel ambushes missing guild combat modifiers | `2026-03-13-025034-zones-hp-rest.md` | |
