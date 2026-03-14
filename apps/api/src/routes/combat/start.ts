@@ -328,8 +328,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   const txResult = await prisma.$transaction(async (tx) => {
     const txAny = tx as unknown as any;
-    const spent = await spendPlayerTurnsTx(tx, playerId, totalTurnCost);
 
+    // Re-fetch site and apply decay BEFORE spending turns to detect stale state
     const freshSite = await txAny.encounterSite.findFirst({
       where: { id: encounterSiteId, playerId },
       select: { id: true, playerId: true, mobFamilyId: true, size: true, discoveredAt: true, mobs: true },
@@ -338,6 +338,17 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
     const freshDecayed = applyEncounterSiteDecayInMemory(parseEncounterSiteMobs(freshSite.mobs), freshSite.discoveredAt, new Date());
     const mobs = freshDecayed.mobs.map(m => ({ ...m }));
+
+    // Validate that all fought mobs are still alive in fresh data before spending turns
+    for (const slot of defeatedSlots) {
+      const target = mobs.find(m => m.slot === slot);
+      if (!target || target.status !== 'alive') {
+        throw new AppError(409, 'Encounter site state changed during combat — please retry', 'ENCOUNTER_SITE_STALE');
+      }
+    }
+
+    // Now safe to spend turns — site state is validated
+    const spent = await spendPlayerTurnsTx(tx, playerId, totalTurnCost);
 
     // Mark defeated mobs
     for (const slot of defeatedSlots) {
