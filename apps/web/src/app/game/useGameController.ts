@@ -932,7 +932,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (!activeZoneId) return;
 
     await runAction('gathering', async () => {
-      const res = await mine(playerNodeId, turnSpend, activeZoneId);
+      const res = await mine(playerNodeId, turnSpend);
       const data = res.data;
       if (!data) {
         setActionError(res.error?.message ?? 'Gathering failed');
