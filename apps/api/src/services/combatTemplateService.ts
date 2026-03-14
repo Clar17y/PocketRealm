@@ -1,7 +1,7 @@
 import { prisma, Prisma } from '@pocketrealm/database';
 import type { CombatTemplate, CombatTemplateSlot } from '@pocketrealm/database';
 import type { CombatTemplateSlotData, CombatTemplateData, SlotCondition } from '@pocketrealm/shared';
-import { ALWAYS_AVAILABLE_ACTION_IDS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, SKILL_POINT_CONSTANTS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
 export interface CreateSlotInput {
@@ -185,14 +185,23 @@ export function validateTemplateSlots(
   ]);
 
   for (const slot of slots) {
+    // Validate action exists in the definition registry (prevents corrupt templates)
+    if (!BASE_ACTION_DEFINITIONS[slot.actionId]) {
+      throw new AppError(400, `Unknown action '${slot.actionId}'`, 'UNKNOWN_ACTION');
+    }
     if (!allAvailable.has(slot.actionId)) {
       throw new AppError(400, `Action '${slot.actionId}' is not available`, 'ACTION_UNAVAILABLE');
     }
 
     // Condition field consistency (resource/threshold, effectName) is validated
     // by Zod schemas in the route layer. Here we only check action availability.
-    if (slot.thenActionId && !allAvailable.has(slot.thenActionId)) {
-      throw new AppError(400, `Action '${slot.thenActionId}' is not available`, 'ACTION_UNAVAILABLE');
+    if (slot.thenActionId) {
+      if (!BASE_ACTION_DEFINITIONS[slot.thenActionId]) {
+        throw new AppError(400, `Unknown action '${slot.thenActionId}'`, 'UNKNOWN_ACTION');
+      }
+      if (!allAvailable.has(slot.thenActionId)) {
+        throw new AppError(400, `Action '${slot.thenActionId}' is not available`, 'ACTION_UNAVAILABLE');
+      }
     }
   }
 }
