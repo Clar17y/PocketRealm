@@ -1300,6 +1300,12 @@ export async function handleWipe(expeditionId: string): Promise<void> {
   const wipeTemplateIdMap = await buildTemplateIdMap(wipeTheme);
   const rooms = generateExpeditionRooms(expedition.tier - 1, wipeTheme, Math.random, wipeTemplateIdMap);
 
+  // Collect bot player IDs before the transaction deletes GuildExpeditionMember rows
+  const botMembers = await prisma.guildExpeditionMember.findMany({
+    where: { expeditionId, player: { isBot: true } },
+    select: { playerId: true },
+  });
+
   await prisma.$transaction(async (tx) => {
     await tx.guildExpeditionMember.deleteMany({ where: { expeditionId } });
 
@@ -1319,6 +1325,13 @@ export async function handleWipe(expeditionId: string): Promise<void> {
       },
     });
   });
+
+  // Delete bot Player records after members are removed
+  if (botMembers.length > 0) {
+    await prisma.player.deleteMany({
+      where: { id: { in: botMembers.map((m) => m.playerId) } },
+    });
+  }
 
   await addGuildLog(
     expedition.guildId,
