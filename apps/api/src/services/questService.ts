@@ -297,16 +297,22 @@ export async function incrementQuestProgress(
       if (!metadata?.prefix || metadata.prefix !== quest.filterValue) continue;
     }
 
-    const newValue = Math.min(quest.currentValue + amount, quest.targetValue);
-    const completed = newValue >= quest.targetValue;
-
+    // Atomic increment prevents stale-read data loss from concurrent requests
     const updated = await prisma.playerQuest.update({
       where: { id: quest.id },
-      data: {
-        currentValue: newValue,
-        ...(completed ? { status: 'completed', completedAt: new Date() } : {}),
-      },
+      data: { currentValue: { increment: amount } },
     });
+
+    const newValue = Math.min(updated.currentValue, quest.targetValue);
+    const completed = updated.currentValue >= quest.targetValue;
+
+    if (completed) {
+      // Atomic status transition — updateMany guard prevents duplicate completion
+      await prisma.playerQuest.updateMany({
+        where: { id: quest.id, status: 'active' },
+        data: { currentValue: quest.targetValue, status: 'completed', completedAt: new Date() },
+      });
+    }
 
     updates.push({
       questId: quest.id,

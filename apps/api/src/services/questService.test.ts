@@ -109,7 +109,7 @@ describe('incrementQuestProgress', () => {
     expect(db.playerQuest.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'q1' },
-        data: expect.objectContaining({ currentValue: 8 }),
+        data: { currentValue: { increment: 3 } },
       }),
     );
   });
@@ -134,24 +134,28 @@ describe('incrementQuestProgress', () => {
     ]);
     db.playerQuest.update.mockResolvedValue({
       id: 'q1',
-      currentValue: 10,
+      currentValue: 13, // 8 + 5 via atomic increment
       targetValue: 10,
-      status: 'completed',
+      status: 'active',
     });
+    db.playerQuest.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await incrementQuestProgress(PLAYER_ID, 'kill_count', 5);
     expect(result).toHaveLength(1);
     expect(result[0].completed).toBe(true);
-    expect(result[0].current).toBe(10);
+    expect(result[0].current).toBe(10); // clamped to target
+    // First call: atomic increment
     expect(db.playerQuest.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          currentValue: 10,
-          status: 'completed',
-          completedAt: expect.any(Date),
-        }),
+        where: { id: 'q1' },
+        data: { currentValue: { increment: 5 } },
       }),
     );
+    // Second call: atomic status transition with guard
+    expect(db.playerQuest.updateMany).toHaveBeenCalledWith({
+      where: { id: 'q1', status: 'active' },
+      data: { currentValue: 10, status: 'completed', completedAt: expect.any(Date) },
+    });
   });
 
   it('returns empty array when no matching quests', async () => {
