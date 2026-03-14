@@ -413,10 +413,10 @@ export const HP_CONSTANTS = {
 
 export const FLEE_CONSTANTS = {
   /** Base chance to flee when evasion equals mob level */
-  BASE_FLEE_CHANCE: 0.3,
+  BASE_FLEE_CHANCE: 0.5,
 
   /** Flee chance adjustment per level difference (evasion - mobLevel) */
-  FLEE_CHANCE_PER_LEVEL_DIFF: 0.02,
+  FLEE_CHANCE_PER_LEVEL_DIFF: 0.03,
 
   /** Minimum flee chance (even against much higher level mobs) */
   MIN_FLEE_CHANCE: 0.05,
@@ -494,7 +494,7 @@ export const COMBAT_ACTION_CONSTANTS = {
   /** Light attack: stamina-neutral (cost = base regen) */
   LIGHT_ATTACK_STAMINA: 10,
   NORMAL_ATTACK_STAMINA: 20,
-  HEAVY_ATTACK_STAMINA: 40,
+  HEAVY_ATTACK_STAMINA: 35,
   /** Spell base stamina cost (all actions cost stamina) */
   SPELL_BASE_STAMINA: 15,
   /** Use potion stamina cost */
