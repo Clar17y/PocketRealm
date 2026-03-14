@@ -293,7 +293,7 @@ describe('pvpService', () => {
       expect(result.opponents[0].isAdmin).toBe(true);
     });
 
-    it('queries bracket range correctly', async () => {
+    it('queries with max-widened bracket bounds in a single query', async () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
@@ -303,8 +303,11 @@ describe('pvpService', () => {
 
       await getLadder('p1');
 
-      const expectedLower = Math.floor(1000 * (1 - PVP_CONSTANTS.BRACKET_RANGE));
-      const expectedUpper = Math.ceil(1000 * (1 + PVP_CONSTANTS.BRACKET_RANGE));
+      const maxExpansion = PVP_CONSTANTS.BRACKET_WIDEN_STEP * PVP_CONSTANTS.BRACKET_MAX_WIDEN_ITERATIONS;
+      const bounds = computeBracketBounds(1000);
+      const expectedLower = Math.max(0, bounds.lower - maxExpansion);
+      const expectedUpper = bounds.upper + maxExpansion;
+      expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledTimes(1);
       expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -1249,48 +1252,33 @@ describe('pvpService', () => {
   // -------------------------------------------------------------------------
 
   describe('getLadder bracket widening', () => {
-    it('widens bracket when fewer than MIN_OPPONENTS_SHOWN', async () => {
+    it('includes opponents outside initial bracket when too few in range', async () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
       mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
 
-      // First call returns too few, second returns enough
-      mockPrisma.pvpRating.findMany
-        .mockResolvedValueOnce([
-          { playerId: 'p2', rating: 950, player: { username: 'A', characterLevel: 12, role: 'player', activeTitle: null } },
-        ])
-        .mockResolvedValueOnce(
-          Array.from({ length: 10 }, (_, i) => ({
-            playerId: `p${i + 2}`, rating: 950 + i, player: { username: `Player${i}`, characterLevel: 12, role: 'player', activeTitle: null },
-          })),
-        );
+      // Return mix of in-bracket and out-of-bracket opponents
+      const bounds = computeBracketBounds(1000);
+      mockPrisma.pvpRating.findMany.mockResolvedValue([
+        // In initial bracket
+        { playerId: 'p2', rating: bounds.lower + 10, player: { username: 'Near', characterLevel: 12, role: 'player', activeTitle: null } },
+        // Outside initial bracket but within widened range
+        ...Array.from({ length: 10 }, (_, i) => ({
+          playerId: `p${i + 3}`, rating: bounds.upper + 50 + i, player: { username: `Far${i}`, characterLevel: 12, role: 'player', activeTitle: null },
+        })),
+      ]);
 
       const result = await getLadder('p1');
 
-      expect(result.opponents.length).toBe(10);
-      // findMany called at least twice (initial + 1 widen)
-      expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledTimes(2);
+      // Widening should include the outer opponents since initial bracket only has 1
+      expect(result.opponents.length).toBe(11);
+      // Only one DB query (single fetch + client-side filtering)
+      expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledTimes(1);
     });
 
-    it('stops widening after MAX_WIDEN_ITERATIONS (10)', async () => {
-      mockPrisma.pvpRating.upsert.mockResolvedValue({
-        playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
-      });
-      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
-      mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
-      // Always return too few opponents
-      mockPrisma.pvpRating.findMany.mockResolvedValue([]);
-
-      const result = await getLadder('p1');
-
-      expect(result.opponents.length).toBe(0);
-      // 1 initial + 10 widen iterations
-      expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledTimes(11);
-    });
-
-    it('does not widen when enough opponents in initial bracket', async () => {
+    it('returns only initial bracket opponents when enough are available', async () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
@@ -1305,6 +1293,20 @@ describe('pvpService', () => {
       const result = await getLadder('p1');
 
       expect(result.opponents.length).toBe(12);
+      expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns empty when no opponents exist in widest range', async () => {
+      mockPrisma.pvpRating.upsert.mockResolvedValue({
+        playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
+      });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
+      mockPrisma.pvpRating.findMany.mockResolvedValue([]);
+
+      const result = await getLadder('p1');
+
+      expect(result.opponents.length).toBe(0);
       expect(mockPrisma.pvpRating.findMany).toHaveBeenCalledTimes(1);
     });
   });

@@ -7,7 +7,7 @@ import {
 import {
   PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, BASE_ACTION_DEFINITIONS,
   TALENT_TREE_DEFINITIONS, FLEE_CONSTANTS,
-  type ActionDefinition,
+  type ActionDefinition, type FleeOutcome,
 } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { buildPagination, trackAchievements } from '../utils/routeHelpers.js';
@@ -67,46 +67,49 @@ export async function getLadder(playerId: string) {
   });
   const cooldownIds = new Set(cooldowns.map((c) => c.defenderId));
 
-  // Find opponents in bracket, widening if too few results
+  // Fetch with max-widened bounds in a single query, then filter client-side
+  const maxExpansion = PVP_CONSTANTS.BRACKET_WIDEN_STEP * PVP_CONSTANTS.BRACKET_MAX_WIDEN_ITERATIONS;
+  const widestLower = Math.max(0, lowerBound - maxExpansion);
+  const widestUpper = upperBound + maxExpansion;
+
+  const candidates = await prisma.pvpRating.findMany({
+    where: {
+      playerId: { not: playerId },
+      rating: { gte: widestLower, lte: widestUpper },
+      player: { characterLevel: { gte: PVP_CONSTANTS.MIN_CHARACTER_LEVEL } },
+    },
+    include: {
+      player: { select: { username: true, characterLevel: true, role: true, activeTitle: true } },
+    },
+    orderBy: { rating: 'desc' },
+  });
+
+  const allEligible = candidates
+    .filter((c) => !cooldownIds.has(c.playerId))
+    .map((c) => {
+      const titleDef = c.player.activeTitle ? ACHIEVEMENTS_BY_ID.get(c.player.activeTitle) : null;
+      return {
+        playerId: c.playerId,
+        username: c.player.username,
+        rating: c.rating,
+        characterLevel: c.player.characterLevel,
+        isAdmin: c.player.role === 'admin',
+        title: titleDef?.titleReward,
+        titleTier: titleDef?.tier,
+      };
+    });
+
+  // Progressively widen from the initial bracket until enough opponents found
   let currentLower = lowerBound;
   let currentUpper = upperBound;
-
-  const findAndFilter = async (lower: number, upper: number) => {
-    const candidates = await prisma.pvpRating.findMany({
-      where: {
-        playerId: { not: playerId },
-        rating: { gte: lower, lte: upper },
-        player: { characterLevel: { gte: PVP_CONSTANTS.MIN_CHARACTER_LEVEL } },
-      },
-      include: {
-        player: { select: { username: true, characterLevel: true, role: true, activeTitle: true } },
-      },
-      orderBy: { rating: 'desc' },
-    });
-    return candidates
-      .filter((c) => !cooldownIds.has(c.playerId))
-      .map((c) => {
-        const titleDef = c.player.activeTitle ? ACHIEVEMENTS_BY_ID.get(c.player.activeTitle) : null;
-        return {
-          playerId: c.playerId,
-          username: c.player.username,
-          rating: c.rating,
-          characterLevel: c.player.characterLevel,
-          isAdmin: c.player.role === 'admin',
-          title: titleDef?.titleReward,
-          titleTier: titleDef?.tier,
-        };
-      });
-  };
-
-  let opponents = await findAndFilter(currentLower, currentUpper);
+  let opponents = allEligible.filter((o) => o.rating >= currentLower && o.rating <= currentUpper);
 
   let widenCount = 0;
   while (opponents.length < PVP_CONSTANTS.MIN_OPPONENTS_SHOWN && widenCount < PVP_CONSTANTS.BRACKET_MAX_WIDEN_ITERATIONS) {
     widenCount++;
     currentLower = Math.max(0, currentLower - PVP_CONSTANTS.BRACKET_WIDEN_STEP);
     currentUpper = currentUpper + PVP_CONSTANTS.BRACKET_WIDEN_STEP;
-    opponents = await findAndFilter(currentLower, currentUpper);
+    opponents = allEligible.filter((o) => o.rating >= currentLower && o.rating <= currentUpper);
   }
 
   return {
@@ -498,7 +501,7 @@ export async function challenge(
 
   // Persist attacker resources after combat
   const attackerKnockedOut = false;
-  let fleeOutcome: string | null = null;
+  let fleeOutcome: FleeOutcome | null = null;
   if (combatResult.combatantAHpRemaining <= 0) {
     // PvP loss: guaranteed escape, no knockout, no gold loss
     const fleeChance = calculateFleeChance(attackerAttributes.evasion, target.characterLevel);
