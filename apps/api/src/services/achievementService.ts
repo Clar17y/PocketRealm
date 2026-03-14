@@ -1,5 +1,6 @@
 import { prisma } from '@pocketrealm/database';
 import { createActivityLog } from './activityLogService';
+import { refundPlayerTurnsTx } from './turnBankService';
 import {
   ALL_ACHIEVEMENTS,
   ACHIEVEMENTS_BY_STAT_KEY,
@@ -189,10 +190,7 @@ export async function claimReward(playerId: string, achievementId: string) {
           });
           break;
         case 'turns':
-          await tx.turnBank.update({
-            where: { playerId },
-            data: { currentTurns: { increment: reward.amount } },
-          });
+          await refundPlayerTurnsTx(tx, playerId, reward.amount);
           break;
         case 'item':
           if (reward.itemTemplateId) {
