@@ -7,6 +7,7 @@ import {
 import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { emitAchievementNotifications } from './achievementService';
+import { assertNotOverEncumbered } from './inventoryService';
 import { getWeekStart, getLevelBracket } from '../utils/dateHelpers';
 import { randomIntInclusive } from '../utils/random';
 
@@ -277,6 +278,8 @@ async function applyTeleport(tx: any, playerId: string, targetZoneId?: string) {
     throw new AppError(400, 'Cannot perform this action while on an active expedition', 'EXPEDITION_LOCKED');
   }
 
+  await assertNotOverEncumbered(playerId);
+
   const zone = await tx.zone.findUnique({ where: { id: targetZoneId } });
   if (!zone) throw new AppError(404, 'Zone not found', 'ZONE_NOT_FOUND');
 
@@ -311,6 +314,8 @@ async function applyHearthstone(tx: any, playerId: string) {
   if (activeMembership) {
     throw new AppError(400, 'Cannot perform this action while on an active expedition', 'EXPEDITION_LOCKED');
   }
+
+  await assertNotOverEncumbered(playerId);
 
   if (!player.homeTownId) {
     throw new AppError(400, 'No home town set', 'NO_HOME_TOWN');

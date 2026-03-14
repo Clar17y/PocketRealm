@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockPrisma as db } from '../__test__/setup';
+import { AppError } from '../middleware/errorHandler';
 import { getShopItems, purchaseItem } from './questShopService';
 import {
   GUILD_CONTRACT_DEFINITIONS,
@@ -23,7 +24,12 @@ vi.mock('./expeditionLockoutService', () => ({
   checkExpeditionLockout: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('./inventoryService', () => ({
+  assertNotOverEncumbered: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { emitAchievementNotifications } from './achievementService';
+import { assertNotOverEncumbered } from './inventoryService';
 import { randomIntInclusive } from '../utils/random';
 
 const PLAYER_ID = 'player-1';
@@ -526,6 +532,19 @@ describe('purchaseItem — teleport_scroll', () => {
 
     await expect(purchaseItem(PLAYER_ID, SHOP_ITEM_ID, { targetZoneId: 'zone-42' })).rejects.toThrow('Zone not discovered');
   });
+
+  it('throws when player is over-encumbered', async () => {
+    const item = makeItem({ key: 'teleport_scroll', cost: 6 });
+    const tx = setupTx(item);
+    tx.player.findUnique.mockResolvedValue({ isRecovering: false, currentHp: 100, currentZoneId: 'zone-1' });
+    tx.guildExpeditionMember.findFirst.mockResolvedValue(null);
+
+    vi.mocked(assertNotOverEncumbered).mockRejectedValueOnce(
+      new AppError(400, 'Over-encumbered! Drop, sell, stash, or salvage items to make space.', 'OVER_ENCUMBERED'),
+    );
+
+    await expect(purchaseItem(PLAYER_ID, SHOP_ITEM_ID, { targetZoneId: 'zone-42' })).rejects.toThrow('Over-encumbered');
+  });
 });
 
 // ============================================================================
@@ -566,6 +585,20 @@ describe('purchaseItem — hearthstone', () => {
     tx.player.findUnique.mockResolvedValue(null);
 
     await expect(purchaseItem(PLAYER_ID, SHOP_ITEM_ID)).rejects.toThrow('Player not found');
+  });
+
+  it('throws when player is over-encumbered', async () => {
+    const item = makeItem({ key: 'hearthstone', cost: 4 });
+
+    const tx = setupTx(item);
+    tx.player.findUnique.mockResolvedValue({ isRecovering: false, currentHp: 100, homeTownId: 'town-1', currentZoneId: 'zone-1' });
+    tx.guildExpeditionMember.findFirst.mockResolvedValue(null);
+
+    vi.mocked(assertNotOverEncumbered).mockRejectedValueOnce(
+      new AppError(400, 'Over-encumbered! Drop, sell, stash, or salvage items to make space.', 'OVER_ENCUMBERED'),
+    );
+
+    await expect(purchaseItem(PLAYER_ID, SHOP_ITEM_ID)).rejects.toThrow('Over-encumbered');
   });
 });
 
