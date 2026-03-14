@@ -13,8 +13,9 @@ export function calculateMaxMana(input: ManaCalculationInput): number {
   );
 }
 
-export function calculateManaRegenPerSecond(): number {
-  return MANA_CONSTANTS.PASSIVE_REGEN_PER_SECOND;
+export function calculateManaRegenPerSecond(magicLevel: number): number {
+  return MANA_CONSTANTS.PASSIVE_REGEN_PER_SECOND +
+    magicLevel * MANA_CONSTANTS.PASSIVE_REGEN_PER_MAGIC_LEVEL;
 }
 
 export function calculateManaRegenPerRound(magicLevel: number): number {
@@ -36,12 +37,18 @@ export function calculateCurrentMana(
   return Math.min(storedMana + regenAmount, maxMana);
 }
 
+export function calculateManaRestHealPerTurn(magicLevel: number): number {
+  return MANA_CONSTANTS.REST_HEAL_PER_TURN +
+    magicLevel * MANA_CONSTANTS.REST_HEAL_PER_MAGIC_LEVEL;
+}
+
 export function calculateManaRestHealing(
   currentMana: number,
   maxMana: number,
-  turnsToSpend: number
+  turnsToSpend: number,
+  magicLevel: number,
 ): { turnsUsed: number; healedAmount: number; newMana: number } {
-  const healPerTurn = MANA_CONSTANTS.REST_HEAL_PER_TURN;
+  const healPerTurn = calculateManaRestHealPerTurn(magicLevel);
   const needed = maxMana - currentMana;
   const maxHealAmount = healPerTurn * turnsToSpend;
   const actualHealAmount = Math.min(needed, maxHealAmount);

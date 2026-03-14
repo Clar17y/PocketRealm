@@ -6,6 +6,7 @@ import {
   calculateManaRegenPerRound,
   calculateCurrentMana,
   calculateManaRestHealing,
+  calculateManaRestHealPerTurn,
 } from './manaCalculator';
 
 describe('calculateMaxMana', () => {
@@ -38,9 +39,16 @@ describe('calculateMaxMana', () => {
 });
 
 describe('calculateManaRegenPerSecond', () => {
-  it('returns the passive regen constant', () => {
-    expect(calculateManaRegenPerSecond()).toBe(
+  it('returns base regen at zero magic level', () => {
+    expect(calculateManaRegenPerSecond(0)).toBe(
       MANA_CONSTANTS.PASSIVE_REGEN_PER_SECOND
+    );
+  });
+
+  it('scales with magic level', () => {
+    expect(calculateManaRegenPerSecond(20)).toBeCloseTo(
+      MANA_CONSTANTS.PASSIVE_REGEN_PER_SECOND +
+        20 * MANA_CONSTANTS.PASSIVE_REGEN_PER_MAGIC_LEVEL
     );
   });
 });
@@ -91,18 +99,34 @@ describe('calculateCurrentMana', () => {
   });
 });
 
+describe('calculateManaRestHealPerTurn', () => {
+  it('returns base heal at zero magic level', () => {
+    expect(calculateManaRestHealPerTurn(0)).toBe(
+      MANA_CONSTANTS.REST_HEAL_PER_TURN
+    );
+  });
+
+  it('scales with magic level', () => {
+    expect(calculateManaRestHealPerTurn(20)).toBeCloseTo(
+      MANA_CONSTANTS.REST_HEAL_PER_TURN +
+        20 * MANA_CONSTANTS.REST_HEAL_PER_MAGIC_LEVEL
+    );
+  });
+});
+
 describe('calculateManaRestHealing', () => {
+  // Use level 0 for baseline tests (healPerTurn = base constant)
   const healPerTurn = MANA_CONSTANTS.REST_HEAL_PER_TURN;
 
   it('heals to full when enough turns', () => {
-    const result = calculateManaRestHealing(20, 50, 100);
+    const result = calculateManaRestHealing(20, 50, 100, 0);
     expect(result.newMana).toBe(50);
     expect(result.healedAmount).toBe(30);
     expect(result.turnsUsed).toBe(Math.ceil(30 / healPerTurn));
   });
 
   it('partially heals when not enough turns', () => {
-    const result = calculateManaRestHealing(20, 50, 3);
+    const result = calculateManaRestHealing(20, 50, 3, 0);
     const expectedHeal = healPerTurn * 3;
     expect(result.healedAmount).toBe(Math.min(30, expectedHeal));
     expect(result.newMana).toBe(20 + result.healedAmount);
@@ -110,19 +134,26 @@ describe('calculateManaRestHealing', () => {
   });
 
   it('uses at least 1 turn if turns > 0', () => {
-    const result = calculateManaRestHealing(50, 50, 10);
+    const result = calculateManaRestHealing(50, 50, 10, 0);
     expect(result.turnsUsed).toBeGreaterThanOrEqual(1);
   });
 
   it('heals 0 when already at max', () => {
-    const result = calculateManaRestHealing(50, 50, 10);
+    const result = calculateManaRestHealing(50, 50, 10, 0);
     expect(result.healedAmount).toBe(0);
     expect(result.newMana).toBe(50);
   });
 
   it('uses 0 turns when turnsToSpend is 0', () => {
-    const result = calculateManaRestHealing(20, 50, 0);
+    const result = calculateManaRestHealing(20, 50, 0, 0);
     expect(result.turnsUsed).toBe(0);
     expect(result.healedAmount).toBe(0);
+  });
+
+  it('heals faster with higher magic level', () => {
+    // Level 50: healPerTurn = 3 + 50*0.2 = 13
+    const resultLow = calculateManaRestHealing(0, 50, 5, 0);
+    const resultHigh = calculateManaRestHealing(0, 50, 5, 50);
+    expect(resultHigh.healedAmount).toBeGreaterThan(resultLow.healedAmount);
   });
 });

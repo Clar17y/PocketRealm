@@ -5,7 +5,7 @@ import { getResourceState, restStamina, restMana } from '../services/resourceSer
 import { getTurnState } from '../services/turnBankService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
-import { STAMINA_CONSTANTS, MANA_CONSTANTS } from '@pocketrealm/shared';
+// STAMINA_CONSTANTS/MANA_CONSTANTS no longer needed — healPerTurn comes from ResourceState
 import { createActivityLog } from '../services/activityLogService';
 
 export const resourcesRouter = Router();
@@ -77,9 +77,7 @@ resourcesRouter.get('/estimate', asyncHandler(async (req, res) => {
   const effectiveTurns = calculateEffectiveTurns(query.turns, taxRate);
 
   const resource = query.type === 'stamina' ? state.stamina : state.mana;
-  const healPerTurn = query.type === 'stamina'
-    ? STAMINA_CONSTANTS.REST_HEAL_PER_TURN
-    : MANA_CONSTANTS.REST_HEAL_PER_TURN;
+  const healPerTurn = resource.restHealPerTurn;
 
   const needed = resource.max - resource.current;
   const maxHealAmount = healPerTurn * effectiveTurns;

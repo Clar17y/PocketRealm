@@ -458,8 +458,12 @@ export const STAMINA_CONSTANTS = {
   REGEN_PER_SKILL_LEVEL: 0.2,
   /** Out-of-combat regen rate (per second, like HP) */
   PASSIVE_REGEN_PER_SECOND: 1.0,
+  /** Additional passive regen per avg(melee, ranged, evasion) level */
+  PASSIVE_REGEN_PER_SKILL_LEVEL: 0.02,
   /** Heal per turn when resting */
   REST_HEAL_PER_TURN: 5,
+  /** Additional rest heal per avg(melee, ranged, evasion) level */
+  REST_HEAL_PER_SKILL_LEVEL: 0.3,
 } as const;
 
 // =============================================================================
@@ -477,8 +481,12 @@ export const MANA_CONSTANTS = {
   REGEN_PER_MAGIC_LEVEL: 0.15,
   /** Out-of-combat regen rate (per second) */
   PASSIVE_REGEN_PER_SECOND: 0.5,
+  /** Additional passive regen per magic skill level */
+  PASSIVE_REGEN_PER_MAGIC_LEVEL: 0.015,
   /** Heal per turn when resting */
   REST_HEAL_PER_TURN: 3,
+  /** Additional rest heal per magic skill level */
+  REST_HEAL_PER_MAGIC_LEVEL: 0.2,
 } as const;
 
 // =============================================================================
