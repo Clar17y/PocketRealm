@@ -368,8 +368,8 @@ describe('bossEncounterService', () => {
     // --- HP scaling ---
 
     it('scales boss HP based on participant count and zone tier', async () => {
-      // Zone difficulty=3 -> tierIndex=2 -> BOSS_HP_PER_PLAYER_BY_TIER[2]=1000
-      // 1 participant -> scaledMaxHp = 1000 * 1 = 1000
+      // Zone difficulty=3 -> tierIndex=2 -> BOSS_HP_PER_PLAYER_BY_TIER[2]=600
+      // 1 participant -> scaledMaxHp = 600 * 1 = 600
       setupBasicRound();
 
       await resolveBossRound('enc-1', null);
@@ -378,7 +378,7 @@ describe('bossEncounterService', () => {
       expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
         where: { id: 'enc-1' },
         data: expect.objectContaining({
-          maxHp: 1000,
+          maxHp: 600,
           scaledAt: expect.any(Date),
         }),
       });
@@ -386,8 +386,8 @@ describe('bossEncounterService', () => {
 
     it('scales HP proportionally to current HP percentage', async () => {
       // encounter has currentHp=500, maxHp=1000 -> 50% HP
-      // Zone difficulty=3, 1 player -> scaledMaxHp=1000
-      // scaledCurrentHp = round(1000 * 0.5) = 500
+      // Zone difficulty=3, 1 player -> scaledMaxHp=600
+      // scaledCurrentHp = round(600 * 0.5) = 300
       setupBasicRound({ currentHp: 500 });
 
       await resolveBossRound('enc-1', null);
@@ -395,14 +395,14 @@ describe('bossEncounterService', () => {
       expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
         where: { id: 'enc-1' },
         data: expect.objectContaining({
-          maxHp: 1000,
-          currentHp: 500,
+          maxHp: 600,
+          currentHp: 300,
         }),
       });
     });
 
     it('scales HP with multiple participants', async () => {
-      // 2 participants at tier 3 (index 2): 1000 * 2 = 2000
+      // 2 participants at tier 3 (index 2): 600 * 2 = 1200
       const signups = [
         makeParticipantRow({ playerId: 'p1' }),
         makeParticipantRow({ id: 'bp-2', playerId: 'p2' }),
@@ -428,7 +428,7 @@ describe('bossEncounterService', () => {
 
       expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
         where: { id: 'enc-1' },
-        data: expect.objectContaining({ maxHp: 2000 }),
+        data: expect.objectContaining({ maxHp: 1200 }),
       });
     });
 
@@ -439,10 +439,10 @@ describe('bossEncounterService', () => {
 
       await resolveBossRound('enc-1', null);
 
-      // tierIndex = min(4, 10-1) = 4 -> BOSS_HP_PER_PLAYER_BY_TIER[4] = 4000
+      // tierIndex = min(4, 10-1) = 4 -> BOSS_HP_PER_PLAYER_BY_TIER[4] = 1500
       expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
         where: { id: 'enc-1' },
-        data: expect.objectContaining({ maxHp: 4000 }),
+        data: expect.objectContaining({ maxHp: 1500 }),
       });
     });
 
@@ -453,10 +453,10 @@ describe('bossEncounterService', () => {
 
       await resolveBossRound('enc-1', null);
 
-      // tierIndex = max(0, min(4, 1-1)) = 0 -> BOSS_HP_PER_PLAYER_BY_TIER[0] = 200
+      // tierIndex = max(0, min(4, 1-1)) = 0 -> BOSS_HP_PER_PLAYER_BY_TIER[0] = 150
       expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
         where: { id: 'enc-1' },
-        data: expect.objectContaining({ maxHp: 200 }),
+        data: expect.objectContaining({ maxHp: 150 }),
       });
     });
 
@@ -623,7 +623,7 @@ describe('bossEncounterService', () => {
         round: 1,
         bossDamage: 20, // damageTaken from participantResults
         totalPlayerDamage: 100,
-        bossHpPercent: 50, // 500/1000 * 100
+        bossHpPercent: 83, // 500/600 * 100
         playersAlive: 1,
         playersDead: 0,
       });
@@ -666,7 +666,7 @@ describe('bossEncounterService', () => {
 
       expect(emitSystemMessage).toHaveBeenCalledWith(
         io, 'zone', 'zone:zone-1',
-        expect.stringContaining('50% HP remaining'),
+        expect.stringContaining('83% HP remaining'),
       );
     });
 

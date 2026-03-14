@@ -35,6 +35,9 @@ describe('eventSchedulerService', () => {
     vi.mocked(createBossEncounter).mockResolvedValue({} as any);
     vi.mocked(checkAndResolveDueBossRounds).mockResolvedValue(undefined);
     vi.mocked(emitSystemMessage).mockResolvedValue(undefined);
+
+    // Block boss spawn timer by default (boss-specific tests override)
+    mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
   });
 
   afterEach(() => {
@@ -382,7 +385,7 @@ describe('eventSchedulerService', () => {
 
     it('prefers zones without active events (free zones)', async () => {
       setupZonePath();
-      // random=0.99 → zone path; pickRandom([z2]) → z2; boss roll 0.99 >= 0.10 → skip;
+      // random=0.99 → zone path; pickRandom([z2]) → z2;
       // pickWeighted picks last zone template "{target} Weakening" (family targeting, hp_down)
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
@@ -416,7 +419,7 @@ describe('eventSchedulerService', () => {
 
     it('filters out templates whose effectType conflicts with active zone events', async () => {
       setupZonePath();
-      // random=0.99 → zone path; only zone z1 selected; boss skip (0.99 >= 0.10);
+      // random=0.99 → zone path; only zone z1 selected;
       // pickWeighted with damage_up filtered out picks "{target} Weakening" (hp_down, family)
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
@@ -506,14 +509,12 @@ describe('eventSchedulerService', () => {
       // Controlled random sequence:
       //   call 1: 0.99 → zone path
       //   call 2: 0.0  → pickRandom picks first (only) zone
-      //   call 3: 0.99 → boss roll fails (>= BOSS_SPAWN_CHANCE)
-      //   call 4: 0.30 → pickWeighted picks "Rich {target} Veins" (resource targeting, yield_up)
+      //   call 3: 0.30 → pickWeighted picks "Rich {target} Veins" (resource targeting, yield_up)
       let callIdx = 0;
       vi.spyOn(Math, 'random').mockImplementation(() => {
         callIdx++;
         if (callIdx === 1) return 0.99;
         if (callIdx === 2) return 0.0;
-        if (callIdx === 3) return 0.99;
         return 0.30; // picks "Rich {target} Veins"
       });
 
@@ -541,7 +542,7 @@ describe('eventSchedulerService', () => {
       setupZonePath();
       // random=0.99 → zone path; freeZones empty → candidatePool = all wild zones;
       // pickRandom([z1,z2]) with 0.99 → Math.floor(0.99*2)=1 → z2;
-      // boss skip; "{target} Weakening" (family, hp_down) picked by pickWeighted
+      // "{target} Weakening" (family, hp_down) picked by pickWeighted
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
       mockPrisma.zone.findMany.mockResolvedValue([
@@ -571,30 +572,24 @@ describe('eventSchedulerService', () => {
   });
 
   // =========================================================================
-  // Boss spawning
+  // Boss spawning (dedicated timer)
   // =========================================================================
-  describe('boss spawning', () => {
-    function setupBossPath() {
-      mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
+  describe('boss spawning (dedicated timer)', () => {
+    function setupBossSpawnPath() {
+      // Block event spawning — only test boss spawning
+      mockPrisma.worldEvent.findFirst.mockResolvedValue({ id: 'recent' });
+      // Allow boss spawning
+      mockPrisma.bossEncounter.count.mockResolvedValue(0);
+      mockPrisma.bossEncounter.findFirst.mockResolvedValue(null);
     }
 
-    it('spawns a boss when roll succeeds and boss mob exists', async () => {
-      setupBossPath();
-      const randomSpy = vi.spyOn(Math, 'random');
-      let callIdx = 0;
-      randomSpy.mockImplementation(() => {
-        callIdx++;
-        if (callIdx === 1) return 0.9; // zone path (>= 0.5)
-        if (callIdx === 2) return 0.0; // pickRandom(candidatePool) → first zone
-        if (callIdx === 3) return 0.0; // boss roll (< BOSS_SPAWN_CHANCE)
-        return 0.0; // pickRandom(bossMobs) → first boss
-      });
+    it('spawns a boss when timer elapses and boss mob exists', async () => {
+      setupBossSpawnPath();
+      vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
       mockPrisma.zone.findMany.mockResolvedValue([
         { id: 'z1', name: 'Cursed Swamp' },
       ]);
-      mockPrisma.worldEvent.findMany.mockResolvedValue([]);
-      mockPrisma.bossEncounter.count.mockResolvedValue(0);
       mockPrisma.zoneMobFamily.findMany.mockResolvedValue([
         { mobFamilyId: 'fam1' },
       ]);
@@ -638,20 +633,10 @@ describe('eventSchedulerService', () => {
     });
 
     it('falls back to mob hp when bossBaseHp is null', async () => {
-      setupBossPath();
-      const randomSpy = vi.spyOn(Math, 'random');
-      let callIdx = 0;
-      randomSpy.mockImplementation(() => {
-        callIdx++;
-        if (callIdx === 1) return 0.9;
-        if (callIdx === 2) return 0.0; // pickRandom zone
-        if (callIdx === 3) return 0.0; // boss roll
-        return 0.0;
-      });
+      setupBossSpawnPath();
+      vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
       mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.worldEvent.findMany.mockResolvedValue([]);
-      mockPrisma.bossEncounter.count.mockResolvedValue(0);
       mockPrisma.zoneMobFamily.findMany.mockResolvedValue([{ mobFamilyId: 'fam1' }]);
       mockPrisma.mobTemplate.findMany.mockResolvedValue([
         { id: 'boss1', name: 'Forest Guardian', hp: 300, bossBaseHp: null, isBoss: true },
@@ -666,24 +651,8 @@ describe('eventSchedulerService', () => {
     });
 
     it('skips boss spawn when MAX_BOSS_ENCOUNTERS reached', async () => {
-      setupBossPath();
-      const randomSpy = vi.spyOn(Math, 'random');
-      let callIdx = 0;
-      randomSpy.mockImplementation(() => {
-        callIdx++;
-        if (callIdx === 1) return 0.9; // zone path
-        if (callIdx === 2) return 0.0; // pickRandom zone
-        if (callIdx === 3) return 0.0; // boss roll passes
-        return 0.5;
-      });
-
-      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.worldEvent.findMany.mockResolvedValue([]);
-      mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
-
-      // After boss cap hit, falls through to regular zone event
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
-      mockPrisma.resourceNode.findMany.mockResolvedValue([{ resourceType: 'Iron Ore' }]);
+      // bossEncounter.count defaults to MAX in beforeEach — don't override
+      mockPrisma.worldEvent.findFirst.mockResolvedValue({ id: 'recent' });
 
       await checkAndSpawnEvents(null);
 
@@ -693,45 +662,68 @@ describe('eventSchedulerService', () => {
       expect(createBossEncounter).not.toHaveBeenCalled();
     });
 
-    it('skips boss spawn when no boss mobs exist for zone families', async () => {
-      setupBossPath();
-      const randomSpy = vi.spyOn(Math, 'random');
-      let callIdx = 0;
-      randomSpy.mockImplementation(() => {
-        callIdx++;
-        if (callIdx === 1) return 0.9;
-        if (callIdx === 2) return 0.0;
-        if (callIdx === 3) return 0.0;
-        return 0.5;
+    it('respects 12-hour DB-based cooldown', async () => {
+      mockPrisma.worldEvent.findFirst.mockResolvedValue({ id: 'recent' });
+      mockPrisma.bossEncounter.count.mockResolvedValue(0);
+      mockPrisma.bossEncounter.findFirst.mockResolvedValue({ id: 'recent-boss' });
+
+      await checkAndSpawnEvents(null);
+
+      const intervalMs = WORLD_EVENT_CONSTANTS.BOSS_SPAWN_INTERVAL_HOURS * 60 * 60 * 1000;
+      const expectedCutoff = new Date(BASE + epoch - intervalMs);
+      expect(mockPrisma.bossEncounter.findFirst).toHaveBeenCalledWith({
+        where: { event: { startedAt: { gte: expectedCutoff } } },
+        select: { id: true },
       });
+      expect(createBossEncounter).not.toHaveBeenCalled();
+    });
+
+    it('picks a random wild zone for boss spawn', async () => {
+      setupBossSpawnPath();
+      vi.spyOn(Math, 'random').mockReturnValue(0.0);
+
+      mockPrisma.zone.findMany.mockResolvedValue([
+        { id: 'z1', name: 'Forest' },
+        { id: 'z2', name: 'Swamp' },
+      ]);
+      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
+
+      await checkAndSpawnEvents(null);
+
+      expect(mockPrisma.zone.findMany).toHaveBeenCalledWith({
+        where: { zoneType: 'wild' },
+        select: { id: true, name: true },
+      });
+    });
+
+    it('skips boss spawn when no wild zones exist', async () => {
+      setupBossSpawnPath();
+      mockPrisma.zone.findMany.mockResolvedValue([]);
+
+      await checkAndSpawnEvents(null);
+
+      expect(createBossEncounter).not.toHaveBeenCalled();
+    });
+
+    it('skips boss spawn when no boss mobs exist for zone families', async () => {
+      setupBossSpawnPath();
+      vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
       mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.worldEvent.findMany.mockResolvedValue([]);
-      mockPrisma.bossEncounter.count.mockResolvedValue(0);
       mockPrisma.zoneMobFamily.findMany.mockResolvedValue([{ mobFamilyId: 'fam1' }]);
-      mockPrisma.mobTemplate.findMany.mockResolvedValue([]); // no boss mobs
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
 
-      mockPrisma.resourceNode.findMany.mockResolvedValue([{ resourceType: 'Tin Ore' }]);
       await checkAndSpawnEvents(null);
 
       expect(createBossEncounter).not.toHaveBeenCalled();
     });
 
     it('does not create boss encounter when spawnWorldEvent returns null', async () => {
-      setupBossPath();
-      const randomSpy = vi.spyOn(Math, 'random');
-      let callIdx = 0;
-      randomSpy.mockImplementation(() => {
-        callIdx++;
-        if (callIdx === 1) return 0.9;
-        if (callIdx === 2) return 0.0;
-        if (callIdx === 3) return 0.0;
-        return 0.0;
-      });
+      setupBossSpawnPath();
+      vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
       mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.worldEvent.findMany.mockResolvedValue([]);
-      mockPrisma.bossEncounter.count.mockResolvedValue(0);
       mockPrisma.zoneMobFamily.findMany.mockResolvedValue([{ mobFamilyId: 'fam1' }]);
       mockPrisma.mobTemplate.findMany.mockResolvedValue([
         { id: 'boss1', name: 'Boss', hp: 100, bossBaseHp: null, isBoss: true },
@@ -744,63 +736,17 @@ describe('eventSchedulerService', () => {
       expect(mockPrisma.worldEvent.update).not.toHaveBeenCalled();
     });
 
-    it('boss spawn short-circuits zone event (no regular event after boss)', async () => {
-      setupBossPath();
-      const randomSpy = vi.spyOn(Math, 'random');
-      let callIdx = 0;
-      randomSpy.mockImplementation(() => {
-        callIdx++;
-        if (callIdx === 1) return 0.9;
-        if (callIdx === 2) return 0.0;
-        if (callIdx === 3) return 0.0;
-        return 0.0;
-      });
-
-      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.worldEvent.findMany.mockResolvedValue([]);
-      mockPrisma.bossEncounter.count.mockResolvedValue(0);
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([{ mobFamilyId: 'fam1' }]);
-      mockPrisma.mobTemplate.findMany.mockResolvedValue([
-        { id: 'boss1', name: 'Boss', hp: 100, bossBaseHp: 200, isBoss: true },
-      ]);
-
-      vi.mocked(spawnWorldEvent).mockResolvedValue({
-        id: 'be1', title: 'Boss Appears', description: 'A boss has appeared',
-      } as any);
-      mockPrisma.worldEvent.update.mockResolvedValue({});
-
-      await checkAndSpawnEvents(null);
-
-      // spawnWorldEvent called only once (for the boss), not twice
-      expect(spawnWorldEvent).toHaveBeenCalledTimes(1);
-      expect(spawnWorldEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'boss' }),
-      );
-    });
-
     it('queries mob templates for isBoss=true with matching family IDs', async () => {
-      setupBossPath();
-      const randomSpy = vi.spyOn(Math, 'random');
-      let callIdx = 0;
-      randomSpy.mockImplementation(() => {
-        callIdx++;
-        if (callIdx === 1) return 0.9;
-        if (callIdx === 2) return 0.0;
-        if (callIdx === 3) return 0.0;
-        return 0.0;
-      });
+      setupBossSpawnPath();
+      vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
       mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.worldEvent.findMany.mockResolvedValue([]);
-      mockPrisma.bossEncounter.count.mockResolvedValue(0);
       mockPrisma.zoneMobFamily.findMany.mockResolvedValue([
         { mobFamilyId: 'fam1' },
         { mobFamilyId: 'fam2' },
       ]);
       mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
 
-      // Falls through to regular zone event
-      mockPrisma.resourceNode.findMany.mockResolvedValue([]);
       await checkAndSpawnEvents(null);
 
       expect(mockPrisma.mobTemplate.findMany).toHaveBeenCalledWith({
@@ -809,6 +755,25 @@ describe('eventSchedulerService', () => {
           familyMembers: { some: { mobFamilyId: { in: ['fam1', 'fam2'] } } },
         },
       });
+    });
+
+    it('passes io parameter to emitSystemMessage for boss spawn', async () => {
+      setupBossSpawnPath();
+      vi.spyOn(Math, 'random').mockReturnValue(0.0);
+
+      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
+      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([{ mobFamilyId: 'f1' }]);
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([
+        { id: 'b1', name: 'Boss', hp: 100, bossBaseHp: null, isBoss: true },
+      ]);
+      vi.mocked(spawnWorldEvent).mockResolvedValue({ id: 'be1', title: 'Boss' } as any);
+      mockPrisma.worldEvent.update.mockResolvedValue({});
+
+      const fakeIo = { emit: vi.fn() } as any;
+      await checkAndSpawnEvents(fakeIo);
+
+      expect(emitSystemMessage).toHaveBeenCalledWith(fakeIo, 'world', 'world', expect.any(String));
+      expect(emitSystemMessage).toHaveBeenCalledWith(fakeIo, 'zone', 'zone:z1', expect.any(String));
     });
   });
 
@@ -821,14 +786,12 @@ describe('eventSchedulerService', () => {
       // Controlled random sequence to deterministically pick "Rich {target} Veins" (resource targeting):
       //   call 1: 0.99 → zone path
       //   call 2: 0.0  → pickRandom picks first (only) zone
-      //   call 3: 0.99 → boss roll fails
-      //   call 4: 0.30 → pickWeighted picks "Rich {target} Veins" (resource targeting, yield_up)
+      //   call 3: 0.30 → pickWeighted picks "Rich {target} Veins" (resource targeting, yield_up)
       let callIdx = 0;
       vi.spyOn(Math, 'random').mockImplementation(() => {
         callIdx++;
         if (callIdx === 1) return 0.99;
         if (callIdx === 2) return 0.0;
-        if (callIdx === 3) return 0.99;
         return 0.30;
       });
 
@@ -855,14 +818,12 @@ describe('eventSchedulerService', () => {
       // Controlled random sequence to pick "Bountiful Harvest" (zone targeting — no DB lookups):
       //   call 1: 0.99 → zone path
       //   call 2: 0.0  → pickRandom picks first (only) zone
-      //   call 3: 0.99 → boss roll fails
-      //   call 4: 0.0  → pickWeighted picks first template "Bountiful Harvest" (zone targeting)
+      //   call 3: 0.0  → pickWeighted picks first template "Bountiful Harvest" (zone targeting)
       let callIdx = 0;
       vi.spyOn(Math, 'random').mockImplementation(() => {
         callIdx++;
         if (callIdx === 1) return 0.99;
         if (callIdx === 2) return 0.0;
-        if (callIdx === 3) return 0.99;
         return 0.0;
       });
 
@@ -892,34 +853,7 @@ describe('eventSchedulerService', () => {
       expect(checkAndResolveDueBossRounds).toHaveBeenCalledWith(fakeIo);
     });
 
-    it('passes io parameter to emitSystemMessage for boss spawn', async () => {
-      mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
-      const randomSpy = vi.spyOn(Math, 'random');
-      let callIdx = 0;
-      randomSpy.mockImplementation(() => {
-        callIdx++;
-        if (callIdx === 1) return 0.9;
-        if (callIdx === 2) return 0.0;
-        if (callIdx === 3) return 0.0;
-        return 0.0;
-      });
-
-      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.worldEvent.findMany.mockResolvedValue([]);
-      mockPrisma.bossEncounter.count.mockResolvedValue(0);
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([{ mobFamilyId: 'f1' }]);
-      mockPrisma.mobTemplate.findMany.mockResolvedValue([
-        { id: 'b1', name: 'Boss', hp: 100, bossBaseHp: null, isBoss: true },
-      ]);
-      vi.mocked(spawnWorldEvent).mockResolvedValue({ id: 'be1', title: 'Boss' } as any);
-      mockPrisma.worldEvent.update.mockResolvedValue({});
-
-      const fakeIo = { emit: vi.fn() } as any;
-      await checkAndSpawnEvents(fakeIo);
-
-      expect(emitSystemMessage).toHaveBeenCalledWith(fakeIo, 'world', 'world', expect.any(String));
-      expect(emitSystemMessage).toHaveBeenCalledWith(fakeIo, 'zone', 'zone:z1', expect.any(String));
-    });
+    // Boss IO forwarding test moved to 'boss spawning (dedicated timer)' section
   });
 
   // =========================================================================

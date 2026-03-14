@@ -244,6 +244,36 @@ async function trySpawnBoss(io: SocketServer | null, zoneId: string, zoneName: s
   return true;
 }
 
+/** Dedicated boss spawn timer — independent of zone event cooldowns. */
+export async function checkAndSpawnBoss(io: SocketServer | null): Promise<void> {
+  // Active boss cap
+  const activeBosses = await prisma.bossEncounter.count({
+    where: { status: { in: ['waiting', 'in_progress'] } },
+  });
+  if (activeBosses >= WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS) return;
+
+  // DB-based cooldown (survives server restarts)
+  const intervalMs = WORLD_EVENT_CONSTANTS.BOSS_SPAWN_INTERVAL_HOURS * 60 * 60 * 1000;
+  const cooldownCutoff = new Date(Date.now() - intervalMs);
+  const recentBoss = await prisma.bossEncounter.findFirst({
+    where: { event: { startedAt: { gte: cooldownCutoff } } },
+    select: { id: true },
+  });
+  if (recentBoss) return;
+
+  // Pick a random wild zone
+  const wildZones = await prisma.zone.findMany({
+    where: { zoneType: 'wild' },
+    select: { id: true, name: true },
+  });
+  if (wildZones.length === 0) return;
+
+  const zone = pickRandom(wildZones);
+  if (!zone) return;
+
+  await trySpawnBoss(io, zone.id, zone.name);
+}
+
 /** Try to spawn a zone-scoped event. */
 async function trySpawnZoneEvent(io: SocketServer | null): Promise<void> {
   const wildZones = await prisma.zone.findMany({
@@ -271,12 +301,6 @@ async function trySpawnZoneEvent(io: SocketServer | null): Promise<void> {
   const candidatePool = freeZones.length > 0 ? freeZones : wildZones;
   const zone = pickRandom(candidatePool);
   if (!zone) return;
-
-  // Roll for boss spawn (before regular event)
-  if (Math.random() < WORLD_EVENT_CONSTANTS.BOSS_SPAWN_CHANCE) {
-    const spawned = await trySpawnBoss(io, zone.id, zone.name);
-    if (spawned) return;
-  }
 
   const zoneEffects = effectsByZone.get(zone.id) ?? new Set();
 
@@ -335,6 +359,9 @@ export async function checkAndSpawnEvents(io: SocketServer | null): Promise<void
 
   // Resolve any due boss rounds
   await checkAndResolveDueBossRounds(io);
+
+  // Dedicated boss spawn timer (independent of event cooldowns)
+  await checkAndSpawnBoss(io);
 
   // Respawn cooldown (DB-based, survives server restarts)
   const cooldownMs = WORLD_EVENT_CONSTANTS.EVENT_RESPAWN_DELAY_MINUTES * 60 * 1000;
