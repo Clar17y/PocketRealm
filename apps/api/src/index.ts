@@ -91,9 +91,12 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '100kb' }));
 
-// Request ID: use client-provided header or generate a new UUID
+// Request ID: use client-provided header only if it is a valid UUID,
+// otherwise generate a fresh one to prevent log injection attacks.
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 app.use((req, res, next) => {
-  const id = (req.headers['x-request-id'] as string) || randomUUID();
+  const clientId = req.headers['x-request-id'] as string | undefined;
+  const id = (clientId && UUID_REGEX.test(clientId)) ? clientId : randomUUID();
   req.requestId = id;
   res.setHeader('x-request-id', id);
   next();
