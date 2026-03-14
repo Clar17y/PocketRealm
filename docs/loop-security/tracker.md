@@ -46,7 +46,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 28 | DONE | Item creation outside transaction in craft route | `2026-03-13-015113-crafting-system.md` | `security/fix-28-craft-item-tx` |
 | 29 | DONE | Travel turn spend not atomic with zone update | `2026-03-13-025034-zones-hp-rest.md` | `security/fix-29-travel-turn-atomic` |
 | 30 | FALSE_POSITIVE | Breadcrumb return bypasses connection validation | `2026-03-13-025034-zones-hp-rest.md` | Connection validated at step 5 before breadcrumb at step 7 |
-| 31 | TODO | Travel ambushes missing guild combat modifiers | `2026-03-13-025034-zones-hp-rest.md` | |
+| 31 | DONE | Travel ambushes missing guild combat modifiers | `2026-03-13-025034-zones-hp-rest.md` | `security/fix-31-ambush-guild-mods` |
 | 32 | TODO | Admin ops target only admin's own account | `2026-03-13-030020-admin-panel.md` | |
 | 33 | TODO | No audit logging for admin actions | `2026-03-13-030020-admin-panel.md` | |
 | 34 | TODO | Bot creation creates permanent player records | `2026-03-13-030020-admin-panel.md` | |
