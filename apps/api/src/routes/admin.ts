@@ -9,6 +9,7 @@ import { addStackableItem } from '../services/inventoryService';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { normalizePlayerAttributes } from '../services/attributesService';
+import { createActivityLog } from '../services/activityLogService';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import {
@@ -33,6 +34,11 @@ import {
 const router = Router();
 router.use(authenticate, requireAdmin);
 
+/** Log an admin action for audit trail */
+async function adminAudit(adminId: string, action: string, details: Record<string, unknown>) {
+  await createActivityLog({ playerId: adminId, activityType: 'admin_action', turnsSpent: 0, result: { action, ...details } });
+}
+
 // ---------------------------------------------------------------------------
 // Player
 // ---------------------------------------------------------------------------
@@ -42,6 +48,7 @@ const grantTurnsSchema = z.object({ amount: z.number().int().min(1).max(1_000_00
 router.post('/turns/grant', asyncHandler(async (req, res) => {
   const { amount } = grantTurnsSchema.parse(req.body);
   const result = await refundPlayerTurns(req.player!.playerId, amount);
+  await adminAudit(req.player!.playerId, 'grant_turns', { amount });
   res.json({ success: true, ...result });
 }));
 
@@ -61,6 +68,7 @@ router.post('/player/level', asyncHandler(async (req, res) => {
       attributePoints: { increment: levelDiff },
     },
   });
+  await adminAudit(req.player!.playerId, 'set_level', { level });
   res.json({ success: true, level, characterXp: xp });
 }));
 
@@ -79,6 +87,7 @@ router.post('/set-skill-level', asyncHandler(async (req, res) => {
     create: { playerId: req.player!.playerId, skillType, level, xp: BigInt(xp) },
   });
 
+  await adminAudit(req.player!.playerId, 'set_skill_level', { skillType, level });
   res.json({ success: true, skillType, level });
 }));
 
@@ -102,6 +111,7 @@ router.post('/set-skill-levels', asyncHandler(async (req, res) => {
     )
   );
 
+  await adminAudit(req.player!.playerId, 'set_skill_levels', { skillTypes, level });
   res.json({ success: true, skillTypes, level });
 }));
 
@@ -125,6 +135,7 @@ router.post('/player/xp', asyncHandler(async (req, res) => {
       attributePoints: { increment: levelUps },
     },
   });
+  await adminAudit(req.player!.playerId, 'grant_xp', { amount, newLevel, levelUps });
   res.json({ success: true, characterXp: newXp, characterLevel: newLevel, levelUps });
 }));
 
@@ -149,6 +160,7 @@ router.post('/player/attributes', asyncHandler(async (req, res) => {
   if (body.attributePoints !== undefined) data.attributePoints = body.attributePoints;
 
   await prisma.player.update({ where: { id: req.player!.playerId }, data });
+  await adminAudit(req.player!.playerId, 'set_attributes', { attributes: merged, attributePoints: body.attributePoints });
   res.json({ success: true, attributes: merged, attributePoints: body.attributePoints ?? player.attributePoints });
 }));
 
@@ -184,6 +196,7 @@ router.post('/items/grant', asyncHandler(async (req, res) => {
 
   if (template.stackable) {
     const result = await addStackableItem(playerId, templateId, quantity);
+    await adminAudit(playerId, 'grant_item', { templateId, templateName: template.name, rarity, quantity, stackable: true });
     res.json({ success: true, item: result });
     return;
   }
@@ -209,6 +222,7 @@ router.post('/items/grant', asyncHandler(async (req, res) => {
     });
     items.push(item);
   }
+  await adminAudit(playerId, 'grant_item', { templateId, templateName: template.name, rarity, quantity, itemCount: items.length });
   res.json({ success: true, items });
 }));
 
@@ -315,6 +329,7 @@ router.post('/events/spawn', asyncHandler(async (req, res) => {
     return;
   }
 
+  await adminAudit(req.player!.playerId, 'spawn_event', { eventId: event.id, title, zoneId, durationHours });
   res.json({ success: true, event });
 }));
 
@@ -328,6 +343,7 @@ router.post('/events/:id/cancel', asyncHandler(async (req, res) => {
     where: { id: req.params.id },
     data: { status: 'expired', expiresAt: new Date() },
   });
+  await adminAudit(req.player!.playerId, 'cancel_event', { eventId: req.params.id, eventTitle: event.title });
   res.json({ success: true });
 }));
 
@@ -369,6 +385,7 @@ router.post('/boss/spawn', asyncHandler(async (req, res) => {
   await prisma.worldEvent.update({ where: { id: event.id }, data: { expiresAt: null } });
 
   const encounter = await createBossEncounter(event.id, mobTemplateId, mob.bossBaseHp ?? mob.hp);
+  await adminAudit(req.player!.playerId, 'spawn_boss', { mobTemplateId, mobName: mob.name, zoneId, eventId: event.id });
   res.json({ success: true, event, encounter });
 }));
 
@@ -397,6 +414,7 @@ router.post('/zones/discover-all', asyncHandler(async (req, res) => {
       }),
     ),
   );
+  await adminAudit(playerId, 'discover_all_zones', { discoveredCount: zones.length });
   res.json({ success: true, discoveredCount: zones.length });
 }));
 
@@ -409,6 +427,7 @@ router.post('/zones/teleport', asyncHandler(async (req, res) => {
     where: { id: req.player!.playerId },
     data: { currentZoneId: zoneId },
   });
+  await adminAudit(req.player!.playerId, 'teleport', { zoneId });
   res.json({ success: true, zoneId });
 }));
 
@@ -490,6 +509,7 @@ router.post('/encounter/spawn', asyncHandler(async (req, res) => {
     data: { playerId, zoneId, mobFamilyId, name: siteName, size, mobs: { mobs } },
   });
 
+  await adminAudit(playerId, 'spawn_encounter', { siteId: site.id, siteName, zoneId, size, mobCount: mobs.length });
   res.json({ success: true, site });
 }));
 
@@ -531,6 +551,7 @@ router.post('/resource-nodes/spawn', asyncHandler(async (req, res) => {
       decayedCapacity: 0,
     },
   });
+  await adminAudit(playerId, 'spawn_resource_node', { resourceNodeId, resourceType: template.resourceType, capacity: finalCapacity });
   res.json({ success: true, node, resourceType: template.resourceType, capacity: finalCapacity });
 }));
 
@@ -550,6 +571,7 @@ router.post('/tokens/grant', asyncHandler(async (req, res) => {
     update: { questTokens: { increment: amount } },
   });
 
+  await adminAudit(playerId, 'grant_tokens', { amount, questTokens: state.questTokens });
   res.json({ success: true, questTokens: state.questTokens });
 }));
 
@@ -574,6 +596,7 @@ router.post('/guild/treasury', asyncHandler(async (req, res) => {
     select: { treasuryTurns: true },
   });
 
+  await adminAudit(playerId, 'grant_treasury', { guildId: membership.guildId, amount, treasuryTurns: guild.treasuryTurns });
   res.json({ success: true, treasuryTurns: guild.treasuryTurns });
 }));
 
@@ -593,6 +616,7 @@ router.post('/expedition/reset-cooldowns', asyncHandler(async (req, res) => {
     data: { completedAt: farPast },
   });
 
+  await adminAudit(playerId, 'reset_expedition_cooldowns', { guildId: membership.guildId, expeditionsReset: count });
   res.json({ success: true, expeditionsReset: count });
 }));
 
@@ -730,6 +754,7 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
     botIds.push(bot.id);
   }
 
+  await adminAudit(playerId, 'fill_expedition', { expeditionId: expedition.id, botsCreated: botsNeeded, botIds });
   res.json({
     message: `Created ${botsNeeded} bot participants`,
     botsCreated: botsNeeded,
