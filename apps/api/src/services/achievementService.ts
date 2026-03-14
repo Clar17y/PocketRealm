@@ -171,10 +171,14 @@ export async function claimReward(playerId: string, achievementId: string) {
   const rewards = def.rewards ?? [];
 
   await prisma.$transaction(async (tx) => {
-    await tx.playerAchievement.update({
-      where: { playerId_achievementId: { playerId, achievementId } },
+    // Optimistic lock: only claim if not already claimed (prevents double-reward race)
+    const updated = await tx.playerAchievement.updateMany({
+      where: { playerId, achievementId, rewardClaimed: false },
       data: { rewardClaimed: true },
     });
+    if (updated.count === 0) {
+      throw new AppError(400, 'Reward already claimed', 'ALREADY_CLAIMED');
+    }
 
     for (const reward of rewards) {
       switch (reward.type) {
