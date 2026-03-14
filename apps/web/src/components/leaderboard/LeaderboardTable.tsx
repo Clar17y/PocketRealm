@@ -75,7 +75,7 @@ export function LeaderboardTable({
       {/* Entries */}
       <div className="space-y-1">
         {entries.map((entry) => {
-          const isMe = !!(currentPlayerId && entry.playerId === currentPlayerId);
+          const isMe = !!(myRank && entry.rank === myRank.rank);
           return (
             <div
               key={entry.rank}
