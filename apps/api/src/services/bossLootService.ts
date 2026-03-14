@@ -148,7 +148,7 @@ export async function distributeBossLoot(
       skillType,
       rawXp: scaledXp,
       xpAfterEfficiency: xpResult.boostedXpAfterEfficiency,
-      leveledUp: xpResult.xpResult.leveledUp,
+      leveledUp: xpResult.skillLeveledUp,
       newLevel: xpResult.newLevel,
     };
 

@@ -15,6 +15,7 @@ vi.mock('./xpService', () => ({
     xpResult: { xpAfterEfficiency: 100, leveledUp: false },
     boostedXpAfterEfficiency: 100,
     newLevel: 5,
+    skillLeveledUp: false,
   }),
 }));
 vi.mock('./achievementService', () => ({

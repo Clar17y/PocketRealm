@@ -13,6 +13,7 @@ export interface GrantXpResult {
   newTotalXp: number;
   newDailyXpGained: number;
   newLevel: number;
+  skillLeveledUp: boolean;
   characterXpGain: number;
   characterXpAfter: number;
   characterLevelBefore: number;
@@ -138,6 +139,7 @@ export async function grantSkillXp(
       newTotalXp,
       newDailyXpGained,
       newLevel,
+      skillLeveledUp,
       characterXpGain,
       characterXpAfter,
       characterLevelBefore,

@@ -59,8 +59,10 @@ export function serializeXpGrant(grant: GrantXpResult) {
   return {
     skillType: grant.skillType,
     ...grant.xpResult,
-    // Override with boosted value so UI shows actual XP received
+    // Override stale values from xpResult with boost-aware values
     xpAfterEfficiency: grant.boostedXpAfterEfficiency,
+    newLevel: grant.newLevel,
+    leveledUp: grant.skillLeveledUp,
     newTotalXp: grant.newTotalXp,
     newDailyXpGained: grant.newDailyXpGained,
     characterXpGain: grant.characterXpGain,
