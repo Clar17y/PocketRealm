@@ -16,6 +16,9 @@ vi.mock('../services/bossEncounterService', () => ({
 vi.mock('../services/attributesService', () => ({
   normalizePlayerAttributes: vi.fn((attrs: any) => attrs ?? { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 }),
 }));
+vi.mock('../services/activityLogService', () => ({
+  createActivityLog: vi.fn().mockResolvedValue({ id: 'log-1' }),
+}));
 vi.mock('@pocketrealm/game-engine', () => ({
   xpForLevel: vi.fn((lvl: number) => lvl * 100),
   characterLevelFromXp: vi.fn((xp: number) => Math.floor(xp / 100)),
@@ -172,7 +175,7 @@ describe('admin routes', () => {
       mockGetEventById.mockResolvedValue({ id: 'evt-1', status: 'active' });
       mockPrisma.worldEvent.update.mockResolvedValue({});
 
-      const req = { params: { id: 'evt-1' } } as any;
+      const req = { player: { playerId: 'p1' }, params: { id: 'evt-1' } } as any;
       const res = mockRes();
       const handler = findHandler('post', '/events/:id/cancel');
       await handler(req, res, vi.fn());
