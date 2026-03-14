@@ -16,7 +16,7 @@ describe('encounterChest', () => {
   });
 
   it('maps site size to recipe chance', () => {
-    expect(getChestRecipeChanceForEncounterSize('small')).toBe(0);
+    expect(getChestRecipeChanceForEncounterSize('small')).toBe(0.005);
     expect(getChestRecipeChanceForEncounterSize('medium')).toBe(0.02);
     expect(getChestRecipeChanceForEncounterSize('large')).toBe(0.05);
   });
@@ -35,7 +35,8 @@ describe('encounterChest', () => {
   });
 
   it('rolls recipe drop against chance', () => {
-    expect(rollEncounterChestRecipeDrop('small', () => 0)).toBe(false);
+    expect(rollEncounterChestRecipeDrop('small', () => 0)).toBe(true);
+    expect(rollEncounterChestRecipeDrop('small', () => 0.005)).toBe(false);
     expect(rollEncounterChestRecipeDrop('medium', () => 0.01)).toBe(true);
     expect(rollEncounterChestRecipeDrop('medium', () => 0.02)).toBe(false);
     expect(rollEncounterChestRecipeDrop('large', () => 0.049)).toBe(true);

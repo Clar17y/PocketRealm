@@ -48,6 +48,9 @@ export const COMBAT_CONSTANTS = {
 
   /** Turn cost for a single encounter */
   ENCOUNTER_TURN_COST: 50,
+
+  /** Divisor for diminishing-returns defence reduction: def / (def + factor) */
+  DEFENCE_SCALING_FACTOR: 100,
 } as const;
 
 export const HIT_CURVE_CONSTANTS = {
@@ -144,21 +147,21 @@ export const EXPLORATION_CONSTANTS = {
   AMBUSH_CHANCE_PER_TURN: 0.005,
   ENCOUNTER_SITE_CHANCE_PER_TURN: 0.0008,
   RESOURCE_NODE_CHANCE: 0.0005,
-  HIDDEN_CACHE_CHANCE: 0.0001,
+  HIDDEN_CACHE_CHANCE: 0.0002,
   TRAVEL_AMBUSH_CHANCE_PER_TURN: 0.04,
   ENCOUNTER_SITE_DECAY_RATE_PER_HOUR: 0.06,
   RESOURCE_NODE_DECAY_RATE_PER_HOUR: 0.65,
   ENCOUNTER_SIZE_SMALL: { min: 2, max: 3 },
   ENCOUNTER_SIZE_MEDIUM: { min: 4, max: 6 },
   ENCOUNTER_SIZE_LARGE: { min: 7, max: 10 },
-  MIN_EXPLORATION_TURNS: 10,
-  MAX_EXPLORATION_TURNS: 10_000,
+  MIN_EXPLORATION_TURNS: 100,
+  MAX_EXPLORATION_TURNS: 2_500,
   ZONE_EXIT_SCALING_START: 50,
   ZONE_EXIT_SCALING_MAX_MULTIPLIER: 20,
 } as const;
 
 export const CHEST_CONSTANTS = {
-  CHEST_RECIPE_CHANCE_SMALL: 0,
+  CHEST_RECIPE_CHANCE_SMALL: 0.005,
   CHEST_RECIPE_CHANCE_MEDIUM: 0.02,
   CHEST_RECIPE_CHANCE_LARGE: 0.05,
   CHEST_MATERIAL_ROLLS_SMALL: { min: 1, max: 2 },
@@ -604,18 +607,6 @@ export const POTION_CONSTANTS = {
   /** HP restored by Greater Health Potion */
   GREATER_HEALTH_HEAL: 400,
 
-  /** HP percentage restored by Minor Recovery Potion */
-  MINOR_RECOVERY_PERCENT: 0.25,
-
-  /** HP percentage restored by Recovery Potion */
-  RECOVERY_PERCENT: 0.5,
-
-  /** HP percentage restored by Greater Recovery Potion */
-  GREATER_RECOVERY_PERCENT: 1.0,
-
-  /** Rounds of Potion Sickness cooldown after auto-potion use */
-  AUTO_POTION_SICKNESS_DURATION: 5,
-
   // Stamina potions
   MINOR_STAMINA_RESTORE: 30,
   STAMINA_RESTORE: 60,
@@ -705,16 +696,13 @@ export const WORLD_EVENT_CONSTANTS = {
   BOSS_AOE_PER_PLAYER_BY_TIER: [15, 30, 50, 80, 120] as readonly number[],
   BOSS_DEFENCE_BY_TIER: [5, 12, 20, 35, 50] as readonly number[],
 
-  // Participant scaling
-  HEALER_MAGIC_SCALING: 0.02,
-  ATTACKER_TURN_SCALING: 0.001,
-
   PERSISTED_MOB_REGEN_PERCENT_PER_MINUTE: 1,
   PERSISTED_MOB_REENCOUNTER_CHANCE: 0.3,
   PERSISTED_MOB_MAX_AGE_MINUTES: 120,
 
   // Boss rewards
   BOSS_BASE_XP_REWARD_BY_TIER: [100, 250, 500, 1000, 2000] as readonly number[],
+  BOSS_CONTRIBUTION_FLOOR: 0.25,
   BOSS_RECIPE_DROP_CHANCE: 0.15,
   BOSS_RARITY_BONUS: 5,
   // Trophy drops keyed by boss mob template name. WARNING: keys must match mob
@@ -738,7 +726,6 @@ export const BOSS_ENCOUNTER_CONSTANTS = {
   CONTRIBUTION_HEALING_WEIGHT: 1.0,
   CONTRIBUTION_ABSORB_WEIGHT: 0.9,
   CONTRIBUTION_SURVIVAL_FLAT_BONUS: 10,
-  BOSS_SINGLE_TARGET_DAMAGE_BY_TIER: [30, 60, 100, 160, 250] as readonly number[],
 } as const;
 
 // =============================================================================
@@ -781,6 +768,7 @@ export const HIDDEN_CACHE_CONSTANTS = {
     uncommon: 30,
     rare: 15,
     epic: 5,
+    legendary: 1,
   },
 } as const;
 
@@ -1311,8 +1299,8 @@ export const CASINO_CONSTANTS = {
   ROULETTE_STATS_DEPTH: 200,
   ROUND_DURATION_SECONDS: 60,
   BETTING_WINDOW_SECONDS: 50,
-  BIG_WIN_THRESHOLD: 500,
-  MAX_BETS_PER_ROUND: 5,
+  BIG_WIN_THRESHOLD: 2001,
+  MAX_BETS_PER_ROUND: 12,
 } as const;
 
 // =============================================================================

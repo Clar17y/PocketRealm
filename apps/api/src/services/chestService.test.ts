@@ -507,9 +507,9 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       expect(result.recipeUnlocked!.soulbound).toBe(true);
     });
 
-    it('never triggers recipe unlock for small encounters (0% chance)', async () => {
-      // Small recipe chance is 0.0, so even random = 0 won't trigger
-      vi.spyOn(Math, 'random').mockReturnValue(0);
+    it('skips recipe unlock for small encounters when roll exceeds chance', async () => {
+      // Small recipe chance is 0.005, so random = 0.01 won't trigger
+      vi.spyOn(Math, 'random').mockReturnValue(0.01);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {

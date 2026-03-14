@@ -21,20 +21,21 @@ afterEach(() => {
 // rollRarityWithLuck
 // ---------------------------------------------------------------------------
 describe('rollRarityWithLuck', () => {
-  it('produces all 4 rarities at luck=0 over many rolls', () => {
-    const counts: Record<string, number> = { common: 0, uncommon: 0, rare: 0, epic: 0 };
-    for (let i = 0; i < 1000; i++) {
+  it('produces all 5 rarities at luck=0 over many rolls', () => {
+    const counts: Record<string, number> = { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0 };
+    for (let i = 0; i < 10000; i++) {
       counts[rollRarityWithLuck(0)]++;
     }
     expect(counts.common).toBeGreaterThan(0);
     expect(counts.uncommon).toBeGreaterThan(0);
     expect(counts.rare).toBeGreaterThan(0);
     expect(counts.epic).toBeGreaterThan(0);
+    expect(counts.legendary).toBeGreaterThan(0);
   });
 
   it('shifts toward higher rarities at luck=100', () => {
-    const lowLuckCounts: Record<string, number> = { common: 0, uncommon: 0, rare: 0, epic: 0 };
-    const highLuckCounts: Record<string, number> = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    const lowLuckCounts: Record<string, number> = { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0 };
+    const highLuckCounts: Record<string, number> = { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0 };
 
     for (let i = 0; i < 5000; i++) {
       lowLuckCounts[rollRarityWithLuck(0)]++;
@@ -51,7 +52,7 @@ describe('rollRarityWithLuck', () => {
   });
 
   it('clamps common weight at minimum 5 even at very high luck', () => {
-    const counts: Record<string, number> = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    const counts: Record<string, number> = { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0 };
     for (let i = 0; i < 5000; i++) {
       counts[rollRarityWithLuck(1000)]++;
     }
@@ -118,16 +119,35 @@ describe('grantCacheLootTx', () => {
     expect(totalQuantity).toBeLessThanOrEqual(HIDDEN_CACHE_CONSTANTS.MATERIAL_ROLLS_MAX);
   });
 
-  it('returns empty materials when zone has no resource nodes', async () => {
+  it('returns empty materials when zone has no resource nodes and no fallback recipes', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999);
     mockTxAny.resourceNode.findMany.mockResolvedValue([]);
-    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]); // soulbound query
+    mockTxAny.craftingRecipe.findMany.mockResolvedValue([]); // soulbound + fallback both empty
 
     const result = await grantCacheLootTx(mockTx, params);
 
     expect(result.materials).toEqual([]);
     expect(result.soulboundItem).toBeNull();
     expect(addStackableItemTx).not.toHaveBeenCalled();
+  });
+
+  it('grants fallback soulbound item when cache would otherwise be empty', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999); // > SOULBOUND_DROP_CHANCE → normal soulbound skipped
+    mockTxAny.resourceNode.findMany.mockResolvedValue([]); // no gems → no materials
+    // Only one craftingRecipe.findMany call: the fallback query
+    // (normal soulbound path is skipped because Math.random > SOULBOUND_DROP_CHANCE)
+    mockTxAny.craftingRecipe.findMany.mockResolvedValueOnce([{
+      resultTemplateId: 'fallback-sword-1',
+      resultTemplate: { name: 'Fallback Sword', itemType: 'weapon', stackable: false, maxDurability: 80 },
+    }]);
+
+    const result = await grantCacheLootTx(mockTx, params);
+
+    expect(result.materials).toEqual([]);
+    expect(result.soulboundItem).not.toBeNull();
+    expect(result.soulboundItem!.itemTemplateId).toBe('fallback-sword-1');
+    expect(result.soulboundItem!.name).toBe('Fallback Sword');
+    expect(mockTx.item.create).toHaveBeenCalled();
   });
 
   it('returns empty materials when no raw gem template exists', async () => {

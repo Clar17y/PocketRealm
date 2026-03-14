@@ -112,7 +112,7 @@ export async function distributeBossLoot(
   for (const contributor of contributors) {
     const playerScore = scores.find(s => s.playerId === contributor.playerId)?.score ?? 0;
     const ratio = totalContribution > 0 ? playerScore / totalContribution : 1 / contributors.length;
-    const dropMultiplier = Math.max(0.5, Math.min(2, ratio * contributors.length));
+    const dropMultiplier = Math.max(WORLD_EVENT_CONSTANTS.BOSS_CONTRIBUTION_FLOOR, Math.min(2, ratio * contributors.length));
 
     // 1. Item loot with rarity bonus
     const loot = await rollAndGrantLoot(
@@ -139,7 +139,7 @@ export async function distributeBossLoot(
     }
 
     // 2. XP scaled by contribution
-    const scaledXp = Math.round(baseXp * Math.max(0.5, Math.min(2, ratio * contributors.length)));
+    const scaledXp = Math.round(baseXp * dropMultiplier);
     const skillType = (contributor.attackSkill ?? 'magic') as SkillType;
     const xpResult = await grantSkillXp(contributor.playerId, skillType, scaledXp);
 

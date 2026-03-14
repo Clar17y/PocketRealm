@@ -291,8 +291,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               <Slider
                 value={tutorialLocked ? [100] : turnInvestment}
                 onValueChange={tutorialLocked ? undefined : setTurnInvestment}
-                min={tutorialLocked ? 100 : 10}
-                max={tutorialLocked ? 100 : Math.min(10000, availableTurns)}
+                min={tutorialLocked ? 100 : EXPLORATION_CONSTANTS.MIN_EXPLORATION_TURNS}
+                max={tutorialLocked ? 100 : Math.min(EXPLORATION_CONSTANTS.MAX_EXPLORATION_TURNS, availableTurns)}
                 step={10}
                 disabled={tutorialLocked}
                 className="w-full"
