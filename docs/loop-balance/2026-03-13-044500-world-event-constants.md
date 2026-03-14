@@ -18,7 +18,6 @@
 
 | Constant | Value | Purpose |
 |---|---|---|
-| `BOSS_SPAWN_CHANCE` | 0.10 | Chance per scheduler tick that a zone event becomes a boss |
 | `BOSS_DISCOVERY_CHANCE` | 0.05 | Chance a player event_discovery triggers a boss instead of a regular event |
 | `MAX_BOSS_ENCOUNTERS` | 1 | Max concurrent boss encounters globally |
 | `BOSS_INITIAL_WAIT_MINUTES` | 15 | Time before first boss round resolves |
@@ -102,16 +101,9 @@ Combined probability for a boss discovery in a single 10,000-turn exploration: `
 
 ### 3. Boss Spawn Rate from Scheduler
 
-In `trySpawnZoneEvent`, the boss spawn roll happens before the regular event roll:
-```
-if (Math.random() < BOSS_SPAWN_CHANCE)  // 10%
-```
+Boss spawning is now driven by a dedicated timer rather than a probabilistic roll inside `trySpawnZoneEvent`. The `BOSS_SPAWN_CHANCE` constant has been removed.
 
-But `checkAndSpawnEvents` only attempts one spawn per cooldown window, and the 50/50 world-vs-zone split means zone events (which can spawn bosses) only fire 50% of the time.
-
-Effective boss spawn rate per 30-minute window: `0.5 * 0.10 = 5%`.
-
-Expected time between boss spawns (scheduler path only): `30 min / 0.05 = 600 minutes = 10 hours`.
+`BOSS_SPAWN_INTERVAL_HOURS: 12` — a boss is spawned every 12 hours via `checkAndSpawnBoss`, independent of the zone event pipeline.
 
 With `MAX_BOSS_ENCOUNTERS = 1`, the server can have at most one active boss. If a boss fight takes 2-4 hours (see boss encounter analysis), the effective boss availability is roughly one boss fight per 12-14 hours, which creates scarcity appropriate for a rare world event.
 
