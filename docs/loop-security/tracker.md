@@ -55,7 +55,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 37 | DONE | Encounter site decay check outside transaction | `2026-03-13-024036-exploration-combat-start.md` | `security/fix-37-decay-outside-tx` |
 | 38 | SKIPPED | prismaAny bypasses type safety globally | `2026-03-13-042037-cross-cutting-infrastructure.md` | Audit says "technical debt, not a direct security vulnerability." Used in 17+ files — requires architectural refactoring, not a security fix |
 | 39 | DONE | Template action validation doesn't check definition registry | `2026-03-13-040053-templates-training-friends-events.md` | `security/fix-39-template-action-check` |
-| 40 | TODO | Quest progress not atomic — stale reads | `2026-03-13-035034-quests-shop.md` | |
+| 40 | DONE | Quest progress not atomic — stale reads | `2026-03-13-035034-quests-shop.md` | `security/fix-40-quest-progress-atomic` |
 | 41 | TODO | Daily bonus TOCTOU — double claim | `2026-03-13-035034-quests-shop.md` | |
 | 42 | TODO | World event spawn no duplicate prevention | `2026-03-13-043032-shared-services-xp-durability-events.md` | |
 | 43 | TODO | No request ID tracking | `2026-03-13-042037-cross-cutting-infrastructure.md` | |
