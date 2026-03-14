@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SKILL_POINT_CONSTANTS, CHARACTER_CONSTANTS } from '@pocketrealm/shared';
+import { SKILL_CONSTANTS, SKILL_POINT_CONSTANTS, CHARACTER_CONSTANTS } from '@pocketrealm/shared';
 import {
   applyXpGain,
   calculateCharacterXpGain,
@@ -148,19 +148,21 @@ describe('grantSkillXp', () => {
       expect(mockedGetPlayerGuildModifiers).toHaveBeenCalledWith('p1');
     });
 
-    it('applies guild XP boost to raw XP', async () => {
+    it('applies guild XP boost post-efficiency', async () => {
       setupBasicMocks();
-      // 10% guild boost on 100 raw XP -> boosted = floor(100 * 1.1) = 110
+      // 10% guild boost — raw XP passed to applyXpGain is unchanged
       const resultBoosted = await grantSkillXp('p1', 'melee', 100, now, 0.1);
 
       vi.clearAllMocks();
       setupBasicMocks();
       const resultNoBoosted = await grantSkillXp('p1', 'melee', 100, now, 0);
 
-      // boosted should have more XP than unboosted (both at full efficiency)
-      expect(resultBoosted.xpResult.xpAfterEfficiency).toBeGreaterThan(
+      // xpAfterEfficiency is the same (boost is applied post-efficiency)
+      expect(resultBoosted.xpResult.xpAfterEfficiency).toBe(
         resultNoBoosted.xpResult.xpAfterEfficiency,
       );
+      // but newTotalXp is higher because boost is applied to final XP
+      expect(resultBoosted.newTotalXp).toBeGreaterThan(resultNoBoosted.newTotalXp);
     });
 
     it('applies 0 guild XP boost without changing raw XP', async () => {
@@ -179,8 +181,8 @@ describe('grantSkillXp', () => {
       });
 
       const result = await grantSkillXp('p1', 'melee', 100, now);
-      // 20% boost -> floor(100 * 1.2) = 120
-      expect(result.xpResult.xpGained).toBe(120);
+      // Boost is post-efficiency, so raw xpGained is unchanged
+      expect(result.xpResult.xpGained).toBe(100);
     });
   });
 
@@ -195,13 +197,16 @@ describe('grantSkillXp', () => {
       );
     });
 
-    it('applies shop XP boost to raw XP', async () => {
+    it('applies shop XP boost post-efficiency', async () => {
       setupBasicMocks();
       mockedConsumeBuffIfActive.mockResolvedValue(0.25); // 25% shop boost
 
       const result = await grantSkillXp('p1', 'melee', 100, now, 0);
-      // floor(100 * (1 + 0 + 0.25)) = floor(100 * 1.25) = 125
-      expect(result.xpResult.xpGained).toBe(125);
+      // Boost is post-efficiency, so raw xpGained is unchanged
+      expect(result.xpResult.xpGained).toBe(100);
+      // newTotalXp should reflect the 25% post-efficiency boost
+      const expectedBoosted = Math.floor(result.xpResult.xpAfterEfficiency * 1.25);
+      expect(result.newTotalXp).toBe(expectedBoosted);
     });
 
     it('consumeBuffIfActive is always called (handles no-buff internally)', async () => {
@@ -217,13 +222,16 @@ describe('grantSkillXp', () => {
 
   // ── Combined boosts ───────────────────────────────────────────────
   describe('combined guild + shop XP boost', () => {
-    it('sums guild and shop boosts', async () => {
+    it('sums guild and shop boosts post-efficiency', async () => {
       setupBasicMocks();
       mockedConsumeBuffIfActive.mockResolvedValue(0.1); // 10% shop
 
       const result = await grantSkillXp('p1', 'melee', 100, now, 0.2); // 20% guild
-      // totalBoost = 0.2 + 0.1 = 0.3 -> floor(100 * 1.3) = 130
-      expect(result.xpResult.xpGained).toBe(130);
+      // Boost is post-efficiency, so raw xpGained is unchanged
+      expect(result.xpResult.xpGained).toBe(100);
+      // totalBoost = 0.2 + 0.1 = 0.3 -> applied post-efficiency
+      const expectedBoosted = Math.floor(result.xpResult.xpAfterEfficiency * 1.3);
+      expect(result.newTotalXp).toBe(expectedBoosted);
     });
 
     it('no boost applied when both are 0', async () => {
@@ -238,18 +246,21 @@ describe('grantSkillXp', () => {
       setupBasicMocks();
       mockedConsumeBuffIfActive.mockResolvedValue(0.1); // 10% shop
 
-      // 33 * 1.1 = 36.3 -> floor = 36
+      // Boost is post-efficiency, raw xpGained is unchanged
       const result = await grantSkillXp('p1', 'melee', 33, now, 0);
-      expect(result.xpResult.xpGained).toBe(36);
+      expect(result.xpResult.xpGained).toBe(33);
+      // Post-efficiency boost is floored: floor(xpAfterEfficiency * 1.1)
+      const expectedBoosted = Math.floor(result.xpResult.xpAfterEfficiency * 1.1);
+      expect(result.newTotalXp).toBe(expectedBoosted);
     });
   });
 
   // ── Daily window reset ────────────────────────────────────────────
   describe('daily window reset', () => {
     it('resets dailyXpGained when window has expired', async () => {
-      // lastXpResetAt = 7 hours ago (XP_WINDOW_HOURS is 6), so window expired
-      const sevenHoursAgo = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-      setupBasicMocks(makeSkill({ dailyXpGained: 5000, lastXpResetAt: sevenHoursAgo }));
+      // lastXpResetAt = 13 hours ago (XP_WINDOW_HOURS is 12), so window expired
+      const thirteenHoursAgo = new Date(now.getTime() - 13 * 60 * 60 * 1000);
+      setupBasicMocks(makeSkill({ dailyXpGained: 5000, lastXpResetAt: thirteenHoursAgo }));
 
       const result = await grantSkillXp('p1', 'melee', 50, now);
 
@@ -258,8 +269,8 @@ describe('grantSkillXp', () => {
     });
 
     it('sets lastXpResetAt in update when window expired', async () => {
-      const sevenHoursAgo = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-      setupBasicMocks(makeSkill({ dailyXpGained: 5000, lastXpResetAt: sevenHoursAgo }));
+      const thirteenHoursAgo = new Date(now.getTime() - 13 * 60 * 60 * 1000);
+      setupBasicMocks(makeSkill({ dailyXpGained: 5000, lastXpResetAt: thirteenHoursAgo }));
 
       await grantSkillXp('p1', 'melee', 50, now);
 
@@ -268,7 +279,7 @@ describe('grantSkillXp', () => {
     });
 
     it('does NOT set lastXpResetAt when window has not expired', async () => {
-      // lastXpResetAt = 2 hours ago, still within 6-hour window
+      // lastXpResetAt = 2 hours ago, still within 12-hour window
       const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
       setupBasicMocks(makeSkill({ dailyXpGained: 500, lastXpResetAt: twoHoursAgo }));
 
@@ -330,10 +341,11 @@ describe('grantSkillXp', () => {
 
   // ── Character level-up ─────────────────────────────────────────────
   describe('character level-up', () => {
-    it('calculates characterXpGain from xpAfterEfficiency', async () => {
+    it('calculates characterXpGain from boosted xpAfterEfficiency', async () => {
       setupBasicMocks();
       const result = await grantSkillXp('p1', 'melee', 100, now);
 
+      // With no boost, boostedXpAfterEfficiency === xpAfterEfficiency
       const expected = calculateCharacterXpGain(result.xpResult.xpAfterEfficiency);
       expect(result.characterXpGain).toBe(expected);
     });
@@ -354,14 +366,14 @@ describe('grantSkillXp', () => {
 
     it('sets characterLeveledUp to true when level increases', async () => {
       // characterLevelFromXp uses same formula as skill levels but with CHARACTER_CONSTANTS.MAX_LEVEL
-      // Need enough character XP to level up. Lets compute: level 2 requires xpForLevel(2) = floor(100 * 2^1.8) = 348
-      // CharacterXP = floor(skillXpAfterEfficiency * 0.3). We need total char XP >= 348.
-      // With 1200 skill XP, char gain = floor(1200 * 0.3) = 360. If char starts at 0, total = 360 >= 348.
+      // Need enough character XP to level up. Lets compute: level 2 requires xpForLevel(2) = floor(100 * 2^2.0) = 400
+      // CharacterXP = floor(skillXpAfterEfficiency * 0.3). We need total char XP >= 400.
+      // With 1400 skill XP, char gain = floor(1400 * 0.3) = 420. If char starts at 0, total = 420 >= 400.
       setupBasicMocks(makeSkill(), makePlayer({ characterXp: BigInt(0), characterLevel: 1 }));
-      const result = await grantSkillXp('p1', 'melee', 1200, now);
+      const result = await grantSkillXp('p1', 'melee', 1400, now);
 
       // Verify character actually leveled up
-      expect(result.characterXpAfter).toBeGreaterThanOrEqual(348);
+      expect(result.characterXpAfter).toBeGreaterThanOrEqual(400);
       expect(result.characterLevelAfter).toBeGreaterThan(1);
       expect(result.characterLeveledUp).toBe(true);
     });
@@ -379,7 +391,7 @@ describe('grantSkillXp', () => {
         makeSkill(),
         makePlayer({ characterXp: BigInt(0), characterLevel: 1, attributePoints: 3 }),
       );
-      const result = await grantSkillXp('p1', 'melee', 1200, now);
+      const result = await grantSkillXp('p1', 'melee', 1400, now);
 
       const levelUps = result.characterLevelAfter - result.characterLevelBefore;
       expect(result.attributePointsAfter).toBe(3 + levelUps);
@@ -437,7 +449,7 @@ describe('grantSkillXp', () => {
         makeSkill(),
         makePlayer({ characterXp: BigInt(0), characterLevel: 1, attributePoints: 2 }),
       );
-      const result = await grantSkillXp('p1', 'melee', 1200, now);
+      const result = await grantSkillXp('p1', 'melee', 1400, now);
 
       const updateCall = mockPrisma.player.update.mock.calls[0][0];
       expect(updateCall.data.characterLevel).toBe(result.characterLevelAfter);
@@ -566,8 +578,8 @@ describe('grantSkillXp', () => {
       });
 
       const result = await grantSkillXp('p1', 'melee', 100, now);
-      // 5% boost -> floor(100 * 1.05) = 105
-      expect(result.xpResult.xpGained).toBe(105);
+      // Boost is post-efficiency, so raw xpGained is unchanged
+      expect(result.xpResult.xpGained).toBe(100);
     });
   });
 
@@ -583,10 +595,55 @@ describe('grantSkillXp', () => {
       expect(mockedConsumeBuffIfActive).toHaveBeenCalledWith(
         expect.anything(), 'p1', 'xp_boost',
       );
-      // 5% guild + 10% shop = 15% -> floor(100 * (1 + 0.05 + 0.1))
-      // Due to floating-point: 0.05 + 0.1 = 0.15000000000000002
-      // 100 * 1.15000000000000002 = 114.99999999999999 -> floor = 114
-      expect(result.xpResult.xpGained).toBe(114);
+    });
+  });
+
+  // ── Post-efficiency boost ──────────────────────────────────────────
+  describe('post-efficiency boost', () => {
+    it('boost yields genuine percentage increase on effective XP', async () => {
+      setupBasicMocks();
+      mockedConsumeBuffIfActive.mockResolvedValue(0);
+
+      const resultNoBoosted = await grantSkillXp('p1', 'melee', 100, now, 0);
+
+      vi.clearAllMocks();
+      setupBasicMocks();
+      mockedConsumeBuffIfActive.mockResolvedValue(0);
+
+      const resultBoosted = await grantSkillXp('p1', 'melee', 100, now, 0.15);
+
+      // Both have same xpAfterEfficiency (raw input is the same)
+      expect(resultBoosted.xpResult.xpAfterEfficiency).toBe(resultNoBoosted.xpResult.xpAfterEfficiency);
+      // newTotalXp = floor(xpAfterEfficiency * (1 + boost)) for boosted, xpAfterEfficiency for unboosted
+      const xpAE = resultNoBoosted.xpResult.xpAfterEfficiency;
+      expect(resultBoosted.newTotalXp).toBe(Math.floor(xpAE * 1.15));
+      expect(resultNoBoosted.newTotalXp).toBe(xpAE);
+    });
+
+    it('boost does not affect window cap consumption', async () => {
+      setupBasicMocks();
+      mockedConsumeBuffIfActive.mockResolvedValue(0);
+
+      const resultBoosted = await grantSkillXp('p1', 'melee', 100, now, 0.2);
+
+      vi.clearAllMocks();
+      setupBasicMocks();
+      mockedConsumeBuffIfActive.mockResolvedValue(0);
+
+      const resultNoBoosted = await grantSkillXp('p1', 'melee', 100, now, 0);
+
+      // newDailyXpGained uses unboosted xpAfterEfficiency
+      expect(resultBoosted.newDailyXpGained).toBe(resultNoBoosted.newDailyXpGained);
+    });
+
+    it('caps total boost at MAX_XP_BOOST', async () => {
+      setupBasicMocks();
+      mockedConsumeBuffIfActive.mockResolvedValue(0.3); // 30% shop
+
+      const result = await grantSkillXp('p1', 'melee', 100, now, 0.4); // 40% guild
+      // 0.4 + 0.3 = 0.7, but capped at MAX_XP_BOOST (0.50)
+      const expectedBoosted = Math.floor(result.xpResult.xpAfterEfficiency * (1 + SKILL_CONSTANTS.MAX_XP_BOOST));
+      expect(result.newTotalXp).toBe(expectedBoosted);
     });
   });
 });
