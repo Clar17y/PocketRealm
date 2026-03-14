@@ -16,7 +16,6 @@ import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEf
 import { normalizePlayerAttributes } from './attributesService';
 
 async function getVitalityLevel(playerId: string): Promise<number> {
-  // Temporary shim until local Prisma client is regenerated with new Player fields.
   const player = await prisma.player.findUnique({
     where: { id: playerId },
     select: { attributes: true },
