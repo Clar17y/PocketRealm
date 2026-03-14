@@ -137,21 +137,22 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
       };
     }
 
-    const baseCost = repairTurnCost(current);
+    const baseCost = repairTurnCost(item.template.tier, current <= 0);
     const turnCost = guildMods.repairCostReduction > 0
       ? Math.max(1, Math.round(baseCost * (1 - guildMods.repairCostReduction)))
       : baseCost;
     const turnSpend = await spendPlayerTurnsTx(tx, playerId, turnCost);
-    const { newMax, decay } = await repairItemDurability(tx, { ...item, ownerId: playerId });
+    const { newMax, decay, destroyed } = await repairItemDurability(tx, { ...item, ownerId: playerId });
 
     return {
       repaired: true as const,
       turns: turnSpend,
       turnCost,
       itemId: item.id,
-      currentDurability: newMax,
-      maxDurability: newMax,
+      currentDurability: destroyed ? 0 : newMax,
+      maxDurability: destroyed ? 0 : newMax,
       maxDurabilityDecay: decay,
+      destroyed,
     };
   });
 
