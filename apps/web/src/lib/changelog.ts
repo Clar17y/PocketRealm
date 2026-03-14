@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.40',
+    date: '2026-03-14',
+    title: 'Security Hardening & Balance Pass',
+    summary:
+      'A major round of under-the-hood improvements. Dozens of race conditions, transaction gaps, and edge cases have been fixed across combat, crafting, travel, guilds, expeditions, and the casino to make the game more fair and resilient. On the balance side: the XP curve has been retuned, PvP no longer costs you gold or knocks you out, flee chances and combat values have been adjusted, resource regeneration now scales more smoothly, mana potions have a proper T1–T5 progression, and world boss and event tuning has been revisited. A batch of 14 smaller balance tweaks rounds things out.',
+  },
+  {
     version: '0.39',
     date: '2026-03-13',
     title: 'Talent Tree Rebalance & AoE Actions',
