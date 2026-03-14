@@ -53,7 +53,7 @@ Status: `TODO` | `IN_PROGRESS` | `DONE` | `FALSE_POSITIVE` | `SKIPPED`
 | 35 | DONE | Achievement turn reward bypasses bank cap | `2026-03-13-033045-player-attributes-skillpoints-achievements.md` | `security/fix-35-achievement-turn-cap` |
 | 36 | DONE | Room carry HP can override current HP | `2026-03-13-024036-exploration-combat-start.md` | `security/fix-36-room-carry-hp` |
 | 37 | DONE | Encounter site decay check outside transaction | `2026-03-13-024036-exploration-combat-start.md` | `security/fix-37-decay-outside-tx` |
-| 38 | TODO | prismaAny bypasses type safety globally | `2026-03-13-042037-cross-cutting-infrastructure.md` | |
+| 38 | SKIPPED | prismaAny bypasses type safety globally | `2026-03-13-042037-cross-cutting-infrastructure.md` | Audit says "technical debt, not a direct security vulnerability." Used in 17+ files — requires architectural refactoring, not a security fix |
 | 39 | TODO | Template action validation doesn't check definition registry | `2026-03-13-040053-templates-training-friends-events.md` | |
 | 40 | TODO | Quest progress not atomic — stale reads | `2026-03-13-035034-quests-shop.md` | |
 | 41 | TODO | Daily bonus TOCTOU — double claim | `2026-03-13-035034-quests-shop.md` | |
