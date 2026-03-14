@@ -87,6 +87,11 @@ function prettySlot(slot: string) {
   return titleCaseFromSnake(slot);
 }
 
+function repairCost(item: EquippedItem): number {
+  const baseCost = (DURABILITY_CONSTANTS.REPAIR_TURN_COST_BY_TIER as Record<number, number>)[item.tier] ?? 100;
+  return item.durability <= 0 ? Math.ceil(baseCost * DURABILITY_CONSTANTS.BROKEN_REPAIR_MULTIPLIER) : baseCost;
+}
+
 export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairItem, onRepairAll, turns, stats }: EquipmentProps) {
   const slotPositions: Record<string, { gridColumn: string; gridRow: string; label: string }> = {
     head: { gridColumn: '2', gridRow: '1', label: 'Head' },
@@ -118,11 +123,6 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [inventoryItems, activeSlotId]);
-
-  const repairCost = (item: EquippedItem) => {
-    const baseCost = (DURABILITY_CONSTANTS.REPAIR_TURN_COST_BY_TIER as Record<number, number>)[item.tier] ?? 100;
-    return item.durability <= 0 ? Math.ceil(baseCost * DURABILITY_CONSTANTS.BROKEN_REPAIR_MULTIPLIER) : baseCost;
-  };
 
   const repairableItems = useMemo(() => {
     return slots
@@ -537,7 +537,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
 
             <div className="text-xs text-[var(--rpg-text-secondary)] mb-4">
-              Max durability will decrease slightly for each repaired item.
+              Max durability will decrease for each repaired item. Items with very low max durability may be permanently destroyed.
             </div>
 
             <div className="grid grid-cols-2 gap-2">
