@@ -13,7 +13,7 @@ describe('calculatePersistedMobHp', () => {
   it('regenerates 1% of maxHp per minute by default', () => {
     const oneMinLater = new Date(baseTime.getTime() + 60_000);
     const regenPct = WORLD_EVENT_CONSTANTS.PERSISTED_MOB_REGEN_PERCENT_PER_MINUTE;
-    const expectedRegen = Math.ceil(maxHp * regenPct / 100);
+    const expectedRegen = Math.floor(maxHp * regenPct / 100);
     expect(calculatePersistedMobHp(500, maxHp, baseTime, oneMinLater)).toBe(
       500 + expectedRegen,
     );
@@ -36,11 +36,20 @@ describe('calculatePersistedMobHp', () => {
     expect(calculatePersistedMobHp(maxHp, maxHp, baseTime, later)).toBe(maxHp);
   });
 
-  it('ceils regen amount so low-HP mobs still regenerate', () => {
-    // Small maxHp so regen is fractional — ceil ensures at least 1 HP per tick
+  it('guarantees at least 1 HP regen per minute for low-HP mobs', () => {
+    // Small maxHp so raw regen is fractional (3 * 1 / 100 = 0.03)
+    // After 1 full minute, guarantee at least 1 HP
     const smallMaxHp = 3;
     const oneMinLater = new Date(baseTime.getTime() + 60_000);
     const result = calculatePersistedMobHp(1, smallMaxHp, baseTime, oneMinLater);
-    expect(result).toBe(2); // ceil(3 * 1 / 100) = 1, so 1 + 1 = 2
+    expect(result).toBe(2); // rawRegen < 1 but elapsedMinutes >= 1 → 1 HP, so 1 + 1 = 2
+  });
+
+  it('does not regen low-HP mobs before 1 minute has elapsed', () => {
+    // Sub-minute check should not grant regen for low-HP mobs
+    const smallMaxHp = 3;
+    const thirtySecsLater = new Date(baseTime.getTime() + 30_000);
+    const result = calculatePersistedMobHp(1, smallMaxHp, baseTime, thirtySecsLater);
+    expect(result).toBe(1); // rawRegen < 1 and elapsedMinutes < 1 → 0 HP regen
   });
 });
