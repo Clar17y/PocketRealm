@@ -63,7 +63,7 @@ export function getAllChestDropTables() {
     // Treants — Medium
     cd(f.treants, 'uncommon', r.tinOre, 60, 2, 3), cd(f.treants, 'uncommon', r.mapleLog, 75, 3, 5), cd(f.treants, 'uncommon', r.moonpetal, 50, 2, 3), cd(f.treants, 'uncommon', d.ancientBark, 70, 3, 6), cd(f.treants, 'uncommon', p.healthPotion, 40, 1, 1),
     // Treants — Large
-    cd(f.treants, 'rare', r.tinOre, 70, 3, 5), cd(f.treants, 'rare', r.mapleLog, 85, 4, 8), cd(f.treants, 'rare', r.moonpetal, 60, 3, 4), cd(f.treants, 'rare', d.ancientBark, 80, 5, 10), cd(f.treants, 'rare', p.healthPotion, 50, 1, 2),
+    cd(f.treants, 'rare', r.tinOre, 70, 3, 5), cd(f.treants, 'rare', r.mapleLog, 85, 4, 8), cd(f.treants, 'rare', r.moonpetal, 60, 3, 4), cd(f.treants, 'rare', d.ancientBark, 80, 5, 10), cd(f.treants, 'rare', p.healthPotion, 50, 1, 2), cd(f.treants, 'rare', p.manaPotion2, 30, 1, 1),
 
     // ══════════════════════════════════════════════════════════════════════
     // TIER 2 — Cave Entrance (Bats, Goblins)
@@ -81,7 +81,7 @@ export function getAllChestDropTables() {
     // Goblins (Cave) — Medium
     cd(f.goblins, 'uncommon', r.tinOre, 70, 2, 4), cd(f.goblins, 'uncommon', r.fungalWood, 40, 1, 3), cd(f.goblins, 'uncommon', r.caveMoss, 40, 1, 2), cd(f.goblins, 'uncommon', d.stolenCoin, 75, 4, 8), cd(f.goblins, 'uncommon', d.crudeGemstone, 50, 1, 3), cd(f.goblins, 'uncommon', d.goblinRag, 50, 2, 3), cd(f.goblins, 'uncommon', p.healthPotion, 40, 1, 1),
     // Goblins (Cave) — Large
-    cd(f.goblins, 'rare', r.tinOre, 80, 3, 6), cd(f.goblins, 'rare', r.fungalWood, 50, 2, 4), cd(f.goblins, 'rare', r.caveMoss, 50, 2, 3), cd(f.goblins, 'rare', d.stolenCoin, 85, 6, 12), cd(f.goblins, 'rare', d.crudeGemstone, 65, 2, 4), cd(f.goblins, 'rare', d.goblinRag, 60, 3, 5), cd(f.goblins, 'rare', p.healthPotion, 50, 1, 2),
+    cd(f.goblins, 'rare', r.tinOre, 80, 3, 6), cd(f.goblins, 'rare', r.fungalWood, 50, 2, 4), cd(f.goblins, 'rare', r.caveMoss, 50, 2, 3), cd(f.goblins, 'rare', d.stolenCoin, 85, 6, 12), cd(f.goblins, 'rare', d.crudeGemstone, 65, 2, 4), cd(f.goblins, 'rare', d.goblinRag, 60, 3, 5), cd(f.goblins, 'rare', p.healthPotion, 50, 1, 2), cd(f.goblins, 'rare', p.manaPotion2, 30, 1, 1),
 
     // ══════════════════════════════════════════════════════════════════════
     // TIER 3 — Ancient Grove (Spirits, Fae)
@@ -92,14 +92,14 @@ export function getAllChestDropTables() {
     // Spirits — Medium
     cd(f.spirits, 'uncommon', r.elderwoodLog, 60, 2, 4), cd(f.spirits, 'uncommon', r.starbloom, 60, 2, 3), cd(f.spirits, 'uncommon', d.spriteDust, 70, 3, 6), cd(f.spirits, 'uncommon', d.dryadThread, 50, 2, 3), cd(f.spirits, 'uncommon', p.greaterHealthPotion, 40, 1, 1),
     // Spirits — Large
-    cd(f.spirits, 'rare', r.elderwoodLog, 70, 3, 5), cd(f.spirits, 'rare', r.starbloom, 70, 3, 5), cd(f.spirits, 'rare', d.spriteDust, 80, 5, 10), cd(f.spirits, 'rare', d.dryadThread, 60, 3, 5), cd(f.spirits, 'rare', p.greaterHealthPotion, 50, 1, 2),
+    cd(f.spirits, 'rare', r.elderwoodLog, 70, 3, 5), cd(f.spirits, 'rare', r.starbloom, 70, 3, 5), cd(f.spirits, 'rare', d.spriteDust, 80, 5, 10), cd(f.spirits, 'rare', d.dryadThread, 60, 3, 5), cd(f.spirits, 'rare', p.greaterHealthPotion, 50, 1, 2), cd(f.spirits, 'rare', p.manaPotion3, 35, 1, 1),
 
     // Fae — Small
     cd(f.fae, 'common', r.elderwoodLog, 50, 1, 2), cd(f.fae, 'common', r.starbloom, 60, 1, 3), cd(f.fae, 'common', p.greaterHealthPotion, 20, 1, 1),
     // Fae — Medium
     cd(f.fae, 'uncommon', r.elderwoodLog, 50, 2, 3), cd(f.fae, 'uncommon', r.starbloom, 60, 2, 4), cd(f.fae, 'uncommon', d.pixieWing, 70, 3, 6), cd(f.fae, 'uncommon', d.faeSilk, 60, 2, 4), cd(f.fae, 'uncommon', p.greaterHealthPotion, 40, 1, 1),
     // Fae — Large
-    cd(f.fae, 'rare', r.elderwoodLog, 60, 3, 4), cd(f.fae, 'rare', r.starbloom, 70, 3, 5), cd(f.fae, 'rare', d.pixieWing, 80, 5, 8), cd(f.fae, 'rare', d.faeSilk, 70, 4, 6), cd(f.fae, 'rare', p.greaterHealthPotion, 50, 1, 2),
+    cd(f.fae, 'rare', r.elderwoodLog, 60, 3, 4), cd(f.fae, 'rare', r.starbloom, 70, 3, 5), cd(f.fae, 'rare', d.pixieWing, 80, 5, 8), cd(f.fae, 'rare', d.faeSilk, 70, 4, 6), cd(f.fae, 'rare', p.greaterHealthPotion, 50, 1, 2), cd(f.fae, 'rare', p.manaPotion3, 35, 1, 1),
 
     // ══════════════════════════════════════════════════════════════════════
     // TIER 3 — Deep Mines (Golems, Crawlers)

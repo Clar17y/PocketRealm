@@ -761,13 +761,13 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b, {
         potions: [
-          { name: 'Mana Potion', healAmount: 40, templateId: 'mana-1', potionType: 'mana' },
+          { name: 'Mana Potion', healAmount: 80, templateId: 'mana-1', potionType: 'mana' },
         ],
       });
 
       expect(result.potionsConsumed).toHaveLength(1);
       expect(result.potionsConsumed[0].name).toBe('Mana Potion');
-      expect(result.potionsConsumed[0].healAmount).toBe(40);
+      expect(result.potionsConsumed[0].healAmount).toBe(80);
       const potionEntry = result.log.find(
         (e) => e.round === 1 && e.actor === 'combatantA' && e.action === 'potion',
       );
@@ -852,11 +852,11 @@ describe('runTemplateCombat', () => {
 
       const result = runTemplateCombat(a, b, {
         potions: [
-          { name: 'Mana Potion', healAmount: 40, templateId: 'mana-1', potionType: 'mana' },
+          { name: 'Mana Potion', healAmount: 80, templateId: 'mana-1', potionType: 'mana' },
         ],
       });
 
-      // Only 5 mana can be restored (45 + 40 capped at 50)
+      // Only 5 mana can be restored (45 + 80 capped at 50)
       expect(result.potionsConsumed).toHaveLength(1);
       expect(result.potionsConsumed[0].healAmount).toBe(5);
     });

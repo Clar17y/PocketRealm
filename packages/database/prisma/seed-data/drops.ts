@@ -62,7 +62,7 @@ export function getAllDropTables() {
     // Dark Treant
     dr(m.darkTreant, d.ancientBark, 65, 3, 4), dr(m.darkTreant, r.mapleLog, 25, 2, 3),
     // Elder Treant
-    dr(m.elderTreant, d.ancientBark, 75, 4, 6), dr(m.elderTreant, r.mapleLog, 40, 3, 4), dr(m.elderTreant, p.healthPotion, 10, 1, 1),
+    dr(m.elderTreant, d.ancientBark, 75, 4, 6), dr(m.elderTreant, r.mapleLog, 40, 3, 4), dr(m.elderTreant, p.healthPotion, 10, 1, 1), dr(m.elderTreant, p.manaPotion2, 8, 1, 1),
 
     // ── Cave Entrance ─────────────────────────────────────────────────────
     // Cave Rat
@@ -88,7 +88,7 @@ export function getAllDropTables() {
     // Goblin Warrior
     dr(m.goblinWarrior, d.goblinRag, 50, 2, 3), dr(m.goblinWarrior, d.stolenCoin, 50, 2, 4), dr(m.goblinWarrior, d.crudeGemstone, 15, 1, 1),
     // Goblin Shaman
-    dr(m.goblinShaman, d.goblinRag, 55, 2, 3), dr(m.goblinShaman, d.stolenCoin, 55, 3, 5), dr(m.goblinShaman, d.crudeGemstone, 25, 1, 2), dr(m.goblinShaman, p.healthPotion, 12, 1, 1),
+    dr(m.goblinShaman, d.goblinRag, 55, 2, 3), dr(m.goblinShaman, d.stolenCoin, 55, 3, 5), dr(m.goblinShaman, d.crudeGemstone, 25, 1, 2), dr(m.goblinShaman, p.healthPotion, 12, 1, 1), dr(m.goblinShaman, p.manaPotion2, 10, 1, 1),
 
     // ── Deep Mines ────────────────────────────────────────────────────────
     // Goblin Miner
@@ -150,7 +150,7 @@ export function getAllDropTables() {
     // Dryad
     dr(m.dryad, d.spriteDust, 60, 2, 3), dr(m.dryad, d.dryadThread, 45, 1, 2), dr(m.dryad, r.starbloom, 20, 1, 1),
     // Ancient Spirit
-    dr(m.ancientSpirit, d.spriteDust, 75, 3, 5), dr(m.ancientSpirit, d.dryadThread, 55, 2, 3), dr(m.ancientSpirit, r.starbloom, 35, 1, 2), dr(m.ancientSpirit, p.greaterHealthPotion, 12, 1, 1),
+    dr(m.ancientSpirit, d.spriteDust, 75, 3, 5), dr(m.ancientSpirit, d.dryadThread, 55, 2, 3), dr(m.ancientSpirit, r.starbloom, 35, 1, 2), dr(m.ancientSpirit, p.greaterHealthPotion, 12, 1, 1), dr(m.ancientSpirit, p.manaPotion3, 10, 1, 1),
     // Dark Treant (Grove)
     dr(m.darkTreantGrove, d.ancientBark, 55, 2, 3), dr(m.darkTreantGrove, r.elderwoodLog, 20, 1, 2),
     // Moss Golem
@@ -158,7 +158,7 @@ export function getAllDropTables() {
     // Ancient Treant
     dr(m.ancientTreant, d.ancientBark, 65, 3, 5), dr(m.ancientTreant, r.elderwoodLog, 35, 2, 3),
     // Treant Patriarch
-    dr(m.treantPatriarch, d.ancientBark, 80, 4, 6), dr(m.treantPatriarch, r.elderwoodLog, 50, 3, 5), dr(m.treantPatriarch, p.greaterHealthPotion, 10, 1, 1),
+    dr(m.treantPatriarch, d.ancientBark, 80, 4, 6), dr(m.treantPatriarch, r.elderwoodLog, 50, 3, 5), dr(m.treantPatriarch, p.greaterHealthPotion, 10, 1, 1), dr(m.treantPatriarch, p.manaPotion3, 8, 1, 1),
     // Pixie Swarm
     dr(m.pixieSwarm, d.pixieWing, 55, 1, 2), dr(m.pixieSwarm, d.faeSilk, 30, 1, 1),
     // Thorn Fairy
@@ -166,7 +166,7 @@ export function getAllDropTables() {
     // Fae Knight
     dr(m.faeKnight, d.pixieWing, 60, 2, 3), dr(m.faeKnight, d.faeSilk, 50, 2, 3), dr(m.faeKnight, r.starbloom, 15, 1, 1),
     // Fae Queen
-    dr(m.faeQueen, d.pixieWing, 75, 3, 5), dr(m.faeQueen, d.faeSilk, 65, 3, 4), dr(m.faeQueen, r.starbloom, 30, 1, 2), dr(m.faeQueen, p.greaterHealthPotion, 12, 1, 1),
+    dr(m.faeQueen, d.pixieWing, 75, 3, 5), dr(m.faeQueen, d.faeSilk, 65, 3, 4), dr(m.faeQueen, r.starbloom, 30, 1, 2), dr(m.faeQueen, p.greaterHealthPotion, 12, 1, 1), dr(m.faeQueen, p.manaPotion3, 10, 1, 1),
 
     // ── Haunted Marsh ─────────────────────────────────────────────────────
     // Skeleton

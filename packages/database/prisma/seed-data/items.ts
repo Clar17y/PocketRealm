@@ -254,7 +254,6 @@ const consumables = [
   consumable(IDS.pots.antivenomPotion, 'Cleansing Potion', 2, { type: 'cleanse_magic_dot', value: 1 }),
   consumable(IDS.pots.greaterHealthPotion, 'Greater Health Potion', 3, { type: 'heal_flat', value: POTION_CONSTANTS.GREATER_HEALTH_HEAL }),
   consumable(IDS.pots.resistPotion, 'Resist Potion', 4, { type: 'buff_defence', value: BUFF_POTION_CONSTANTS.RESIST_DEFENCE_BONUS, duration: BUFF_POTION_CONSTANTS.RESIST_DURATION }),
-  consumable(IDS.pots.manaPotion, 'Mana Potion', 4, { type: 'restore_mana', value: POTION_CONSTANTS.MANA_RESTORE }),
   consumable(IDS.pots.elixirOfPower, 'Elixir of Power', 5, { type: 'buff_attack', value: BUFF_POTION_CONSTANTS.ELIXIR_ATTACK_PERCENT, duration: BUFF_POTION_CONSTANTS.ELIXIR_DURATION }),
   // Stamina potions
   consumable(IDS.pots.minorStaminaPotion, 'Minor Stamina Potion', 1, { type: 'restore_stamina', value: POTION_CONSTANTS.MINOR_STAMINA_RESTORE }),
@@ -262,7 +261,10 @@ const consumables = [
   consumable(IDS.pots.greaterStaminaPotion, 'Greater Stamina Potion', 3, { type: 'restore_stamina', value: POTION_CONSTANTS.GREATER_STAMINA_RESTORE }),
   // Mana potions
   consumable(IDS.pots.minorManaPotion, 'Minor Mana Potion', 1, { type: 'restore_mana', value: POTION_CONSTANTS.MINOR_MANA_RESTORE }),
-  consumable(IDS.pots.greaterManaPotion, 'Greater Mana Potion', 5, { type: 'restore_mana', value: POTION_CONSTANTS.GREATER_MANA_RESTORE }),
+  consumable(IDS.pots.manaPotion2, 'Mana Potion', 2, { type: 'restore_mana', value: POTION_CONSTANTS.MANA_RESTORE_T2 }),
+  consumable(IDS.pots.manaPotion3, 'Focused Mana Potion', 3, { type: 'restore_mana', value: POTION_CONSTANTS.MANA_RESTORE_T3 }),
+  consumable(IDS.pots.manaPotion, 'Greater Mana Potion', 4, { type: 'restore_mana', value: POTION_CONSTANTS.MANA_RESTORE }),
+  consumable(IDS.pots.greaterManaPotion, 'Supreme Mana Potion', 5, { type: 'restore_mana', value: POTION_CONSTANTS.GREATER_MANA_RESTORE }),
 ];
 
 // ── Weapons ──────────────────────────────────────────────────────────────────

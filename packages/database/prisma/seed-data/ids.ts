@@ -213,13 +213,15 @@ export const IDS = {
     antivenomPotion: randomUUID(),
     greaterHealthPotion: randomUUID(),
     resistPotion: randomUUID(),
-    manaPotion: randomUUID(),
+    manaPotion: randomUUID(),            // T4 "Greater Mana Potion" (legacy name)
     elixirOfPower: randomUUID(),
     minorStaminaPotion: randomUUID(),
     staminaPotion: randomUUID(),
     greaterStaminaPotion: randomUUID(),
     minorManaPotion: randomUUID(),
-    greaterManaPotion: randomUUID(),
+    manaPotion2: randomUUID(),        // T2 "Mana Potion"
+    manaPotion3: randomUUID(),        // T3 "Focused Mana Potion"
+    greaterManaPotion: randomUUID(),  // T5 "Supreme Mana Potion" (legacy name)
   },
 
   // ── Item Templates: Weapons ───────────────────────────────────────────────
