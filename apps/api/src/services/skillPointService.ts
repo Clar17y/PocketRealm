@@ -61,6 +61,10 @@ export async function allocatePoints(playerId: string, nodeId: string): Promise<
   if (!node) throw new AppError(404, `Talent node '${nodeId}' not found`, 'NODE_NOT_FOUND');
 
   await prisma.$transaction(async (tx: any) => {
+    // Lock the allocation row so concurrent requests block until this transaction commits,
+    // preventing double-spend under READ COMMITTED isolation.
+    await tx.$queryRaw`SELECT id FROM "SkillPointAllocation" WHERE "playerId" = ${playerId} FOR UPDATE`;
+
     // Read state inside transaction for consistent snapshot
     const skills = await tx.playerSkill.findMany({
       where: { playerId },
