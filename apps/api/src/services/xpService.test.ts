@@ -429,7 +429,7 @@ describe('grantSkillXp', () => {
       const result = await grantSkillXp('p1', 'melee', 100, now);
 
       const updateCall = mockPrisma.player.update.mock.calls[0][0];
-      expect(updateCall.data.characterXp).toBe(BigInt(result.characterXpAfter));
+      expect(updateCall.data.characterXp).toEqual({ increment: BigInt(result.characterXpGain) });
     });
 
     it('updates player with characterLevel and attributePoints increment', async () => {
