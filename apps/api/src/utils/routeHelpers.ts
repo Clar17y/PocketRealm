@@ -11,6 +11,18 @@ import { checkAchievements, emitAchievementNotifications } from '../services/ach
 import { respawnToHomeTown } from '../services/zoneDiscoveryService.js';
 import type { GrantXpResult } from '../services/xpService.js';
 
+// ── Zone presence gate ──────────────────────────────────────────────
+
+export async function assertInZone(playerId: string, zoneId: string): Promise<void> {
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { currentZoneId: true },
+  });
+  if (player?.currentZoneId !== zoneId) {
+    throw new AppError(403, 'You must be in this zone to perform this action', 'WRONG_ZONE');
+  }
+}
+
 // ── Town zone gate ─────────────────────────────────────────────────
 
 export async function assertInTown(playerId: string): Promise<void> {

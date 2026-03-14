@@ -53,7 +53,7 @@ import type { AttackSkill } from '../../services/combatStatsService';
 import { getExplorationPercent } from '../../services/zoneExplorationService';
 import { incrementStats } from '../../services/statsService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
-import { serializeXpGrant, toMobTemplate, assertCanAct, trackAchievements, handleCombatDefeat, buildPveCombatOptions } from '../../utils/routeHelpers.js';
+import { serializeXpGrant, toMobTemplate, assertCanAct, assertInZone, trackAchievements, handleCombatDefeat, buildPveCombatOptions } from '../../utils/routeHelpers.js';
 import { getCombatBuffs, getCombatBuffsWithUses, applyCombatBuffs, consumeCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges } from '../../services/buffService';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
@@ -90,6 +90,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   });
   if (!site) throw new AppError(404, 'Encounter site not found', 'NOT_FOUND');
   if (!site.clearStrategy) throw new AppError(400, 'Select a clearing strategy before fighting', 'STRATEGY_NOT_SET');
+
+  await assertInZone(playerId, site.zoneId as string);
 
   const decayed = await applyEncounterSiteDecayAndPersist({
     id: site.id,
@@ -698,6 +700,8 @@ export function registerStartRoutes(router: Router): void {
       if (!zoneId) {
         throw new AppError(400, 'zoneId is required', 'INVALID_REQUEST');
       }
+
+      await assertInZone(playerId, zoneId);
 
       const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
       if (!zone) {
