@@ -217,24 +217,31 @@ export async function processCombatVictoryRewards(
     playerId, totalXp, attackSkill, params.damageByScalingStat, params.resourceCostByScalingStat, params.guildXpBoost,
   );
 
-  if (params.includeBestiary !== false) {
-    await recordBestiaryKill(playerId, mob.id, mob.mobPrefix);
-  }
-
   // Guild XP + quest/contract progress for all combat victories
   const guildId = await getPlayerGuildId(playerId);
-  if (guildId) {
-    await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
-  }
-  const questProgress: QuestProgressUpdate[] = [];
-  const killProgress = await trackProgress(playerId, 'kill_count', 1, undefined, guildId);
-  questProgress.push(...killProgress);
-  const familyProgress = await trackProgress(playerId, 'kill_family', 1, undefined, guildId);
-  questProgress.push(...familyProgress);
-  if (mob.mobPrefix) {
-    const prefixProgress = await trackProgress(playerId, 'kill_prefix', 1, { prefix: mob.mobPrefix }, guildId);
-    questProgress.push(...prefixProgress);
-  }
+
+  // Run all independent post-combat work in parallel
+  const results = await Promise.allSettled([
+    params.includeBestiary !== false
+      ? recordBestiaryKill(playerId, mob.id, mob.mobPrefix)
+      : Promise.resolve(undefined),
+    guildId ? addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL) : Promise.resolve(),
+    trackProgress(playerId, 'kill_count', 1, undefined, guildId),
+    trackProgress(playerId, 'kill_family', 1, undefined, guildId),
+    mob.mobPrefix
+      ? trackProgress(playerId, 'kill_prefix', 1, { prefix: mob.mobPrefix }, guildId)
+      : Promise.resolve([]),
+  ]);
+
+  const killProgress = results[2].status === 'fulfilled' ? results[2].value : [];
+  const familyProgress = results[3].status === 'fulfilled' ? results[3].value : [];
+  const prefixProgress = results[4].status === 'fulfilled' ? results[4].value : [];
+
+  const questProgress: QuestProgressUpdate[] = [
+    ...killProgress,
+    ...familyProgress,
+    ...prefixProgress,
+  ];
 
   return {
     loot: lootResult.drops,
