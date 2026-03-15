@@ -29,12 +29,12 @@ export async function getSkillLevel(playerId: string, skillType: SkillType): Pro
 export async function getSkillLevels(
   playerId: string,
   skillTypes: SkillType[],
-): Promise<Record<SkillType, number>> {
+): Promise<Record<string, number>> {
   const skills = await prisma.playerSkill.findMany({
     where: { playerId, skillType: { in: skillTypes } },
     select: { skillType: true, level: true },
   });
-  const map = {} as Record<SkillType, number>;
+  const map: Record<string, number> = {};
   for (const st of skillTypes) map[st] = 1; // defaults
   for (const s of skills) map[s.skillType] = s.level;
   return map;
