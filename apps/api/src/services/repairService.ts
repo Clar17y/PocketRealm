@@ -1,15 +1,9 @@
 import type { Prisma } from '@pocketrealm/database';
-import { DURABILITY_CONSTANTS } from '@pocketrealm/shared';
+import { DURABILITY_CONSTANTS, repairTurnCost } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 
-/** Compute the turn cost to repair a single item by tier. */
-export function repairTurnCost(tier: number, isBroken: boolean): number {
-  const baseCost = (DURABILITY_CONSTANTS.REPAIR_TURN_COST_BY_TIER as Record<number, number>)[tier] ?? 100;
-  return isBroken
-    ? Math.ceil(baseCost * DURABILITY_CONSTANTS.BROKEN_REPAIR_MULTIPLIER)
-    : baseCost;
-}
+export { repairTurnCost };
 
 /** Apply durability repair to a single item inside a transaction. */
 export async function repairItemDurability(

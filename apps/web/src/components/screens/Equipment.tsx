@@ -7,7 +7,7 @@ import { StatBar } from '@/components/StatBar';
 import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, X, Zap } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
-import { DURABILITY_CONSTANTS } from '@pocketrealm/shared';
+import { repairTurnCost } from '@pocketrealm/shared';
 import { getStaggerDelay } from '@/lib/animations';
 import { numStat, formatSignedStatValue, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
@@ -88,8 +88,7 @@ function prettySlot(slot: string) {
 }
 
 function repairCost(item: EquippedItem): number {
-  const baseCost = (DURABILITY_CONSTANTS.REPAIR_TURN_COST_BY_TIER as Record<number, number>)[item.tier] ?? 100;
-  return item.durability <= 0 ? Math.ceil(baseCost * DURABILITY_CONSTANTS.BROKEN_REPAIR_MULTIPLIER) : baseCost;
+  return repairTurnCost(item.tier, item.durability <= 0);
 }
 
 export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairItem, onRepairAll, turns, stats }: EquipmentProps) {
@@ -615,26 +614,29 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                       )}
                     </span>
                     <div className="flex items-center gap-2">
-                      {onRepairItem && slot.item && slot.item.durability < slot.item.maxDurability && (
-                        <PixelButton
-                          variant="secondary"
-                          size="sm"
-                          disabled={busy || turns === undefined || turns < repairCost(slot.item)}
-                          onClick={async () => {
-                            if (!slot.item) return;
-                            setBusy(true);
-                            try {
-                              await onRepairItem(slot.item.id);
-                            } catch {
-                              setError('Failed to repair item.');
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          Repair ({repairCost(slot.item)})
-                        </PixelButton>
-                      )}
+                      {onRepairItem && slot.item && slot.item.durability < slot.item.maxDurability && (() => {
+                        const cost = repairCost(slot.item!);
+                        return (
+                          <PixelButton
+                            variant="secondary"
+                            size="sm"
+                            disabled={busy || turns === undefined || turns < cost}
+                            onClick={async () => {
+                              if (!slot.item) return;
+                              setBusy(true);
+                              try {
+                                await onRepairItem(slot.item.id);
+                              } catch {
+                                setError('Failed to repair item.');
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                          >
+                            Repair ({cost})
+                          </PixelButton>
+                        );
+                      })()}
                       <span className="text-xs text-[var(--rpg-text-secondary)] capitalize">{slot.name}</span>
                     </div>
                   </div>
