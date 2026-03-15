@@ -13,6 +13,7 @@ import { MAIL_CONSTANTS } from '@pocketrealm/shared';
 import type { FriendMailEntry, FriendListEntry } from '@pocketrealm/shared';
 import { relativeTime } from '@/lib/format';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { SubNav } from '../common/SubNav';
 import { PixelCard } from '../PixelCard';
 import { PixelButton } from '../PixelButton';
 import { LoadingCard } from '../common/LoadingCard';
@@ -227,9 +228,9 @@ export function MailScreen({
   // Render helpers
   // -----------------------------------------------------------------------
 
-  const tabs: { id: MailView; label: string; count?: number }[] = [
-    { id: 'inbox', label: 'Inbox', count: inboxTotal },
-    { id: 'sent', label: 'Sent', count: sentTotal },
+  const tabs = [
+    { id: 'inbox', label: 'Inbox', badge: inboxTotal > 0 ? inboxTotal : undefined },
+    { id: 'sent', label: 'Sent', badge: sentTotal > 0 ? sentTotal : undefined },
     { id: 'compose', label: 'Compose' },
   ];
 
@@ -263,24 +264,12 @@ export function MailScreen({
 
       {/* Tabs -- only show when not reading a mail */}
       {activeView !== 'read' && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabSwitch(tab.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                activeView === tab.id
-                  ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                  : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-              }`}
-            >
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className="ml-1 text-xs opacity-70">({tab.count})</span>
-              )}
-            </button>
-          ))}
-        </div>
+        <SubNav
+          tabs={tabs}
+          activeId={activeView}
+          onSelect={(id) => handleTabSwitch(id as MailView)}
+          ariaLabel="Mail navigation"
+        />
       )}
 
       {/* Inbox view */}
