@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.41',
+    date: '2026-03-15',
+    title: 'Durability Overhaul',
+    summary:
+      'Equipment durability has been reworked to make gear maintenance a meaningful part of progression. Degradation is now 3x faster (items break in ~317 fights instead of ~950), and elite/prefixed mobs wear your gear down 50% faster than normal enemies. Repair costs now scale by item tier (T1: 50 turns up to T5: 150 turns) with a 1.5x surcharge for broken items. Each repair slightly reduces an item\'s max durability based on rarity: common gear loses up to 5 max durability per repair while legendary items lose only 1. When max durability hits zero, the item is permanently destroyed and unequipped. A warning appears when durability drops below 10%, and the repair modal shows destruction risk. Choose your battles wisely and keep your best gear in good shape.',
+  },
+  {
     version: '0.40',
     date: '2026-03-14',
     title: 'Security Hardening & Balance Pass',
@@ -22,7 +29,7 @@ export const changelog: ChangelogEntry[] = [
   },
   {
     version: '0.38',
-    date: '2026-06-10',
+    date: '2026-03-12',
     title: 'Game Wiki',
     summary:
       'A comprehensive public wiki is now available at /wiki with 31 pages covering every game mechanic in full detail. All formulas, constants, and calculations are pulled directly from the source code, so the wiki is always accurate and up to date. Sections cover Combat (damage, hit chance, crits, actions, buffs, defensive mechanics, mob prefixes), Bosses and Expeditions (encounters, threat, contribution, raids), PvP (combat differences, ELO rating), Progression (XP curves, efficiency caps, skill points), Resources (HP, stamina, mana, flee mechanics), Items (rarity, drop tables, forge, durability, inventory), Crafting (crit system, gathering, salvage), and Exploration (probability model, room generation, mob tiers, zone progression). The wiki uses the same RPG art style and pixel art as the game itself.',

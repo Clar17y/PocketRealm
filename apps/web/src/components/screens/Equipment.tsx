@@ -7,7 +7,7 @@ import { StatBar } from '@/components/StatBar';
 import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, X, Zap } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
-import { DURABILITY_CONSTANTS } from '@pocketrealm/shared';
+import { repairTurnCost } from '@pocketrealm/shared';
 import { getStaggerDelay } from '@/lib/animations';
 import { numStat, formatSignedStatValue, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
@@ -25,6 +25,7 @@ interface EquippedItem {
   imageSrc?: string;
   rarity: Rarity;
   weightClass?: 'heavy' | 'medium' | 'light' | null;
+  tier: number;
   durability: number;
   maxDurability: number;
   baseStats?: Record<string, unknown>;
@@ -86,6 +87,10 @@ function prettySlot(slot: string) {
   return titleCaseFromSnake(slot);
 }
 
+function repairCost(item: EquippedItem): number {
+  return repairTurnCost(item.tier, item.durability <= 0);
+}
+
 export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairItem, onRepairAll, turns, stats }: EquipmentProps) {
   const slotPositions: Record<string, { gridColumn: string; gridRow: string; label: string }> = {
     head: { gridColumn: '2', gridRow: '1', label: 'Head' },
@@ -123,7 +128,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
       .filter((s) => s.item && s.item.durability < s.item.maxDurability)
       .map((s) => {
         const item = s.item!;
-        const turnCost = item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST;
+        const turnCost = repairCost(item);
         return { slotId: s.id, slotName: s.name, item, turnCost };
       });
   }, [slots]);
@@ -531,7 +536,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             </div>
 
             <div className="text-xs text-[var(--rpg-text-secondary)] mb-4">
-              Max durability will decrease slightly for each repaired item.
+              Max durability will decrease for each repaired item. Items with very low max durability may be permanently destroyed.
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -609,26 +614,29 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                       )}
                     </span>
                     <div className="flex items-center gap-2">
-                      {onRepairItem && slot.item && slot.item.durability < slot.item.maxDurability && (
-                        <PixelButton
-                          variant="secondary"
-                          size="sm"
-                          disabled={busy || turns === undefined || turns < (slot.item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST)}
-                          onClick={async () => {
-                            if (!slot.item) return;
-                            setBusy(true);
-                            try {
-                              await onRepairItem(slot.item.id);
-                            } catch {
-                              setError('Failed to repair item.');
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          Repair ({slot.item.durability <= 0 ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST : DURABILITY_CONSTANTS.REPAIR_TURN_COST})
-                        </PixelButton>
-                      )}
+                      {onRepairItem && slot.item && slot.item.durability < slot.item.maxDurability && (() => {
+                        const cost = repairCost(slot.item!);
+                        return (
+                          <PixelButton
+                            variant="secondary"
+                            size="sm"
+                            disabled={busy || turns === undefined || turns < cost}
+                            onClick={async () => {
+                              if (!slot.item) return;
+                              setBusy(true);
+                              try {
+                                await onRepairItem(slot.item.id);
+                              } catch {
+                                setError('Failed to repair item.');
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                          >
+                            Repair ({cost})
+                          </PixelButton>
+                        );
+                      })()}
                       <span className="text-xs text-[var(--rpg-text-secondary)] capitalize">{slot.name}</span>
                     </div>
                   </div>

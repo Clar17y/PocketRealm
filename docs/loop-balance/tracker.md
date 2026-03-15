@@ -137,12 +137,12 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 5. [Potion Rebalance](plans/05-potion-rebalance.md) — #29, #72 — [PR #141](https://github.com/Clar17y/Adventure/pull/141)
 6. [World Boss & Events](plans/06-world-boss-events.md) — #22, #33, #82
 7. [Quick Fixes Batch](plans/07-quick-fixes-batch.md) — #10, #15, #26, #32, #36, #38, #59, #60, #68, #70, #71, #80, #81, #89, #90
+8. [Durability System Overhaul](plans/08-durability-system-overhaul.md) — #11, #12, #13, #44, #45, #46
 
 ### Needs Brainstorm First
 
 - **Guild Economy Redesign** — #1, #2, #27, #28, #94, #95
 - **Encounter Site Rework** — #6, #30, #37, #75, #76, #77, #79
-- **Durability System Overhaul** — #11, #12, #13, #44, #45, #46
 - **Boss/Threat System** — #20, #21
 
 ---

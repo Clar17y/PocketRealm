@@ -15,6 +15,7 @@ import {
   validateExplorationTurns,
 } from '@pocketrealm/game-engine';
 import {
+  DURABILITY_CONSTANTS,
   WORLD_EVENT_TEMPLATES,
   WORLD_EVENT_CONSTANTS,
   getUnlockedTiers,
@@ -347,9 +348,12 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           allPotionsConsumed.push(consumed);
         }
 
+        const explDurabilityMult = prefixedMob.mobPrefix
+          ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
+          : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
         const durabilityLost = buffUsesLeft.durability > 0
           ? []
-          : await degradeEquippedDurability(playerId, combatResult.log);
+          : await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', explDurabilityMult);
 
         // Consume combat buff charges per ambush mob
         await prisma.$transaction(async (tx) => {

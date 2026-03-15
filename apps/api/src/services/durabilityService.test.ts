@@ -73,11 +73,11 @@ describe('degradeEquippedDurability', () => {
     );
     mockPrisma.item.update.mockResolvedValue({});
 
-    // 5 player hits = 0.05 weapon degradation
+    // 5 player hits = 0.15 weapon degradation
     const losses = await degradeEquippedDurability('p1', makeLog(5, 3));
     expect(losses).toHaveLength(1);
-    expect(losses[0].newDurability).toBe(49.95);
-    expect(losses[0].amount).toBe(0.05);
+    expect(losses[0].newDurability).toBe(49.85);
+    expect(losses[0].amount).toBe(0.15);
     expect(losses[0].isBroken).toBe(false);
   });
 
@@ -94,11 +94,11 @@ describe('degradeEquippedDurability', () => {
     );
     mockPrisma.item.update.mockResolvedValue({});
 
-    // 3 mob hits = 0.03 armor degradation
+    // 3 mob hits = 0.09 armor degradation
     const losses = await degradeEquippedDurability('p1', makeLog(5, 3));
     expect(losses).toHaveLength(1);
-    expect(losses[0].newDurability).toBe(49.97);
-    expect(losses[0].amount).toBe(0.03);
+    expect(losses[0].newDurability).toBe(49.91);
+    expect(losses[0].amount).toBe(0.09);
   });
 
   it('applies correct degradation to mixed weapon and armor', async () => {
@@ -120,13 +120,13 @@ describe('degradeEquippedDurability', () => {
     );
     mockPrisma.item.update.mockResolvedValue({});
 
-    // 10 player hits = 0.10 weapon, 5 mob hits = 0.05 armor
+    // 10 player hits = 0.30 weapon, 5 mob hits = 0.15 armor
     const losses = await degradeEquippedDurability('p1', makeLog(10, 5));
     expect(losses).toHaveLength(2);
     const weapon = losses.find(l => l.itemName === 'Sword')!;
     const armor = losses.find(l => l.itemName === 'Shield')!;
-    expect(weapon.newDurability).toBe(49.9);
-    expect(armor.newDurability).toBe(49.95);
+    expect(weapon.newDurability).toBe(49.7);
+    expect(armor.newDurability).toBe(49.85);
   });
 
   it('skips weapons when no player hits landed', async () => {
@@ -204,7 +204,7 @@ describe('degradeEquippedDurability', () => {
     );
     mockPrisma.item.update.mockResolvedValue({});
 
-    // 2 mob hits = 0.02 armor degradation → 10.01 - 0.02 = 9.99 (below threshold 10)
+    // 2 mob hits = 0.06 armor degradation → 10.01 - 0.06 = 9.95 (below threshold 10)
     const losses = await degradeEquippedDurability('p1', makeLog(0, 2));
     expect(losses[0].crossedWarningThreshold).toBe(true);
   });
@@ -239,10 +239,10 @@ describe('degradeEquippedDurability', () => {
     );
     mockPrisma.item.update.mockResolvedValue({});
 
-    // 5 player hits = 0.05 weapon degradation → 80 - 0.05 = 79.95
+    // 5 player hits = 0.15 weapon degradation → 80 - 0.15 = 79.85
     const losses = await degradeEquippedDurability('p1', makeLog(5, 0));
     expect(losses[0].maxDurability).toBe(80);
-    expect(losses[0].newDurability).toBe(79.95);
+    expect(losses[0].newDurability).toBe(79.85);
     // Should have been called twice: once to normalize, once to update
     expect(mockPrisma.item.update).toHaveBeenCalledTimes(2);
   });
@@ -287,7 +287,56 @@ describe('degradeEquippedDurability', () => {
     const losses = await degradeEquippedDurability('p1', makeLog(10, 5), 'combatantB');
     const weapon = losses.find(l => l.itemName === 'Sword')!;
     const armor = losses.find(l => l.itemName === 'Shield')!;
-    expect(weapon.amount).toBe(0.05); // 5 of my hits
-    expect(armor.amount).toBe(0.10);  // 10 hits I received
+    expect(weapon.amount).toBe(0.15); // 5 of my hits
+    expect(armor.amount).toBe(0.30);  // 10 hits I received
+  });
+
+  it('applies degradation multiplier to weapon and armor', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue(
+      makeEquipped([
+        {
+          id: 'weapon-1',
+          currentDurability: 50,
+          maxDurability: 100,
+          template: { name: 'Sword', itemType: 'weapon', maxDurability: 100 },
+        },
+        {
+          id: 'armor-1',
+          currentDurability: 50,
+          maxDurability: 100,
+          template: { name: 'Shield', itemType: 'armor', maxDurability: 100 },
+        },
+      ])
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+
+    // 10 player hits, 5 mob hits, 2x multiplier
+    // weapon: 10 * 0.03 * 2 = 0.60, armor: 5 * 0.03 * 2 = 0.30
+    const losses = await degradeEquippedDurability('p1', makeLog(10, 5), 'combatantA', 2);
+    const weapon = losses.find(l => l.itemName === 'Sword')!;
+    const armor = losses.find(l => l.itemName === 'Shield')!;
+    expect(weapon.amount).toBe(0.6);
+    expect(weapon.newDurability).toBe(49.4);
+    expect(armor.amount).toBe(0.3);
+    expect(armor.newDurability).toBe(49.7);
+  });
+
+  it('defaults degradation multiplier to 1', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue(
+      makeEquipped([
+        {
+          id: 'weapon-1',
+          currentDurability: 50,
+          maxDurability: 100,
+          template: { name: 'Sword', itemType: 'weapon', maxDurability: 100 },
+        },
+      ])
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+
+    // 10 player hits, no multiplier passed → default 1x
+    // weapon: 10 * 0.03 * 1 = 0.30
+    const losses = await degradeEquippedDurability('p1', makeLog(10, 0));
+    expect(losses[0].amount).toBe(0.3);
   });
 });
