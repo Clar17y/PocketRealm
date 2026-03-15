@@ -7,7 +7,6 @@ vi.mock('./cacheService', () => ({
 }));
 
 vi.mock('./inventoryService', () => ({
-  addStackableItem: vi.fn().mockResolvedValue({ itemId: 'stack-1', quantity: 1 }),
   getInventoryState: vi.fn().mockResolvedValue({ usedSlots: 0, capacity: 20, availableSlots: 20 }),
 }));
 
@@ -30,7 +29,7 @@ vi.mock('@pocketrealm/game-engine', async (importOriginal) => {
 
 import { mockPrisma } from '../__test__/setup';
 import { rollAndGrantLoot, rollAndGrantLootWithCapacity, enrichLootWithNames } from './lootService';
-import { addStackableItem, getInventoryState } from './inventoryService';
+import { getInventoryState } from './inventoryService';
 import { storePendingLoot } from './pendingLootService';
 import { randomIntInclusive } from '../utils/random';
 import { rollDropRarity, rollBonusStatsForRarity } from '@pocketrealm/game-engine';
@@ -93,9 +92,10 @@ beforeEach(() => {
   vi.spyOn(Math, 'random').mockReturnValue(0.01);
   // Default: randomIntInclusive returns 1
   vi.mocked(randomIntInclusive).mockReturnValue(1);
-  // Default: no existing stack in inventory
-  mockPrisma.item.findFirst.mockResolvedValue(null);
-  mockPrisma.item.create.mockResolvedValue({});
+  // Default: no existing stacks in inventory (batch pre-fetch returns empty)
+  mockPrisma.item.findMany.mockResolvedValue([]);
+  mockPrisma.item.create.mockResolvedValue({ id: 'new-item-1', templateId: 'tpl-mat', quantity: 1 });
+  mockPrisma.item.update.mockResolvedValue({});
 });
 
 afterEach(() => {
@@ -192,7 +192,7 @@ describe('rollAndGrantLootWithCapacity', () => {
     });
 
     it('puts stackable items in overflow when no existing stack and capacity full', async () => {
-      mockPrisma.item.findFirst.mockResolvedValue(null); // no existing stack
+      mockPrisma.item.findMany.mockResolvedValue([]); // no existing stacks
       mockPrisma.dropTable.findMany.mockResolvedValue([makeDropEntry()]);
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 0);
       expect(result.drops).toHaveLength(0);
@@ -209,13 +209,16 @@ describe('rollAndGrantLootWithCapacity', () => {
     });
 
     it('allows stackable item when existing stack exists even at full capacity', async () => {
-      mockPrisma.item.findFirst.mockResolvedValue({ id: 'existing-stack', quantity: 5 });
+      mockPrisma.item.findMany.mockResolvedValue([{ id: 'existing-stack', templateId: 'tpl-mat', quantity: 5 }]);
       mockPrisma.dropTable.findMany.mockResolvedValue([makeDropEntry()]);
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 0);
       // Existing stack found, so it can merge — no new slot needed
       expect(result.drops).toHaveLength(1);
       expect(result.overflow).toHaveLength(0);
-      expect(addStackableItem).toHaveBeenCalledWith('p1', 'tpl-mat', 1);
+      expect(mockPrisma.item.update).toHaveBeenCalledWith({
+        where: { id: 'existing-stack' },
+        data: { quantity: { increment: 1 } },
+      });
     });
 
     it('stores pending loot and returns sessionId when overflow exists', async () => {
@@ -243,7 +246,10 @@ describe('rollAndGrantLootWithCapacity', () => {
     });
 
     it('increments slotsUsed for new stackable items (no existing stack)', async () => {
-      mockPrisma.item.findFirst.mockResolvedValue(null);
+      mockPrisma.item.findMany.mockResolvedValue([]);
+      mockPrisma.item.create
+        .mockResolvedValueOnce({ id: 'new-a', templateId: 'tpl-mat-a', quantity: 1 })
+        .mockResolvedValueOnce({ id: 'new-b', templateId: 'tpl-mat-b', quantity: 1 });
       mockPrisma.dropTable.findMany.mockResolvedValue([
         makeDropEntry({ itemTemplateId: 'tpl-mat-a', itemTemplate: { name: 'Mat A', stackable: true, itemType: 'material' } }),
         makeDropEntry({ itemTemplateId: 'tpl-mat-b', itemTemplate: { name: 'Mat B', stackable: true, itemType: 'material' } }),
@@ -257,7 +263,10 @@ describe('rollAndGrantLootWithCapacity', () => {
     });
 
     it('does not increment slotsUsed for stackable with existing stack', async () => {
-      mockPrisma.item.findFirst.mockResolvedValue({ id: 'existing', quantity: 10 });
+      mockPrisma.item.findMany.mockResolvedValue([
+        { id: 'existing-a', templateId: 'tpl-mat-a', quantity: 10 },
+        { id: 'existing-b', templateId: 'tpl-mat-b', quantity: 10 },
+      ]);
       mockPrisma.dropTable.findMany.mockResolvedValue([
         makeDropEntry({ itemTemplateId: 'tpl-mat-a' }),
         makeDropEntry({ itemTemplateId: 'tpl-mat-b' }),
@@ -270,11 +279,27 @@ describe('rollAndGrantLootWithCapacity', () => {
   });
 
   describe('stackable items', () => {
-    it('calls addStackableItem with correct params', async () => {
+    it('creates a new stack with correct params when no existing stack', async () => {
       vi.mocked(randomIntInclusive).mockReturnValue(5);
+      mockPrisma.item.findMany.mockResolvedValue([]);
+      mockPrisma.item.create.mockResolvedValue({ id: 'new-stack', templateId: 'tpl-mat', quantity: 5 });
       mockPrisma.dropTable.findMany.mockResolvedValue([makeDropEntry()]);
       await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
-      expect(addStackableItem).toHaveBeenCalledWith('p1', 'tpl-mat', 5);
+      expect(mockPrisma.item.create).toHaveBeenCalledWith({
+        data: { ownerId: 'p1', templateId: 'tpl-mat', quantity: 5, rarity: 'common' },
+        select: { id: true, templateId: true, quantity: true },
+      });
+    });
+
+    it('increments existing stack with correct params', async () => {
+      vi.mocked(randomIntInclusive).mockReturnValue(5);
+      mockPrisma.item.findMany.mockResolvedValue([{ id: 'stack-1', templateId: 'tpl-mat', quantity: 10 }]);
+      mockPrisma.dropTable.findMany.mockResolvedValue([makeDropEntry()]);
+      await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
+      expect(mockPrisma.item.update).toHaveBeenCalledWith({
+        where: { id: 'stack-1' },
+        data: { quantity: { increment: 5 } },
+      });
     });
 
     it('always assigns common rarity to stackable drops', async () => {
@@ -287,6 +312,7 @@ describe('rollAndGrantLootWithCapacity', () => {
 
     it('quantity from stackable drop appears in the returned drop', async () => {
       vi.mocked(randomIntInclusive).mockReturnValue(7);
+      mockPrisma.item.create.mockResolvedValue({ id: 'new-stack', templateId: 'tpl-mat', quantity: 7 });
       mockPrisma.dropTable.findMany.mockResolvedValue([makeDropEntry()]);
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
       expect(result.drops[0].quantity).toBe(7);
@@ -473,7 +499,8 @@ describe('rollAndGrantLootWithCapacity', () => {
       mockPrisma.dropTable.findMany.mockResolvedValue([makeDropEntry()]);
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
       expect(result.drops).toHaveLength(0);
-      expect(addStackableItem).not.toHaveBeenCalled();
+      expect(mockPrisma.item.update).not.toHaveBeenCalled();
+      expect(mockPrisma.item.create).not.toHaveBeenCalled();
     });
 
     it('skips when quantity rolls to negative', async () => {
@@ -548,7 +575,7 @@ describe('rollAndGrantLootWithCapacity', () => {
     });
 
     it('overflow for stackable has null bonusStats and durability', async () => {
-      mockPrisma.item.findFirst.mockResolvedValue(null);
+      mockPrisma.item.findMany.mockResolvedValue([]); // no existing stacks
       mockPrisma.dropTable.findMany.mockResolvedValue([makeDropEntry()]);
 
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 0);
