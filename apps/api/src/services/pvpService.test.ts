@@ -1106,8 +1106,22 @@ describe('pvpService', () => {
 
       expect(mockPrisma.pvpMatch.findMany).toHaveBeenCalledWith({
         where: { defenderId: 'p1', defenderRead: false },
-        include: { attacker: { select: { username: true } } },
+        select: {
+          id: true,
+          attackerId: true,
+          attackerRating: true,
+          defenderRating: true,
+          attackerRatingChange: true,
+          defenderRatingChange: true,
+          attackerStyle: true,
+          defenderStyle: true,
+          winnerId: true,
+          isRevenge: true,
+          createdAt: true,
+          attacker: { select: { username: true } },
+        },
         orderBy: { createdAt: 'desc' },
+        take: 20,
       });
     });
   });

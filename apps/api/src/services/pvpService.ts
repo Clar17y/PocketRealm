@@ -574,7 +574,20 @@ export async function getHistory(playerId: string, page: number, pageSize: numbe
   const [matches, total] = await Promise.all([
     prisma.pvpMatch.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        attackerId: true,
+        defenderId: true,
+        attackerRating: true,
+        defenderRating: true,
+        attackerRatingChange: true,
+        defenderRatingChange: true,
+        attackerStyle: true,
+        defenderStyle: true,
+        winnerId: true,
+        isRevenge: true,
+        turnsSpent: true,
+        createdAt: true,
         attacker: { select: { username: true } },
         defender: { select: { username: true } },
       },
@@ -664,10 +677,22 @@ export async function getNotificationCount(playerId: string) {
 export async function getNotifications(playerId: string) {
   return prisma.pvpMatch.findMany({
     where: { defenderId: playerId, defenderRead: false },
-    include: {
+    select: {
+      id: true,
+      attackerId: true,
+      attackerRating: true,
+      defenderRating: true,
+      attackerRatingChange: true,
+      defenderRatingChange: true,
+      attackerStyle: true,
+      defenderStyle: true,
+      winnerId: true,
+      isRevenge: true,
+      createdAt: true,
       attacker: { select: { username: true } },
     },
     orderBy: { createdAt: 'desc' },
+    take: 20,
   });
 }
 
