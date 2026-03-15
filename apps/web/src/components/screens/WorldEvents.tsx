@@ -161,7 +161,10 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
               <PixelCard
                 key={boss.id}
                 className="p-3 cursor-pointer hover:brightness-110 transition-all"
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedBossId(boss.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedBossId(boss.id); }}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold font-almendra" style={{ color: 'var(--rpg-red)' }}>

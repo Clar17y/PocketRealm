@@ -423,6 +423,7 @@ function MailList({
                   onClick={(e) => { e.stopPropagation(); onDelete(mail.id); }}
                   className="shrink-0 w-7 h-7 flex items-center justify-center rounded text-[var(--rpg-red)] hover:bg-[var(--rpg-red)]/10 transition-colors"
                   title="Delete"
+                  aria-label="Delete"
                 >
                   &times;
                 </button>

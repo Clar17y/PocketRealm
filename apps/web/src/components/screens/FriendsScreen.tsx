@@ -534,7 +534,10 @@ export function FriendsScreen({
                 key={f.friendshipId}
                 padding="sm"
                 className="cursor-pointer hover:border-[var(--rpg-gold)] transition-colors"
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedFriendshipId(f.friendshipId)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedFriendshipId(f.friendshipId); }}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">

@@ -518,6 +518,7 @@ export function Inventory({
                   <button
                     onClick={() => setSelectedStashItem(null)}
                     className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                    aria-label="Close"
                   >
                     <X size={20} />
                   </button>
@@ -752,6 +753,7 @@ export function Inventory({
               <button
                 onClick={() => setSelectedItem(null)}
                 className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                aria-label="Close"
               >
                 <X size={20} />
               </button>

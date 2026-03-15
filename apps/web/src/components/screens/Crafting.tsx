@@ -348,6 +348,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                 <button
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
+                  aria-label="Decrease quantity"
                   className="w-8 h-8 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center text-[var(--rpg-text-primary)] disabled:opacity-30 hover:bg-[var(--rpg-border)] transition-colors"
                 >
                   <Minus size={14} />
@@ -356,6 +357,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
                 <button
                   onClick={() => setQuantity((q) => Math.min(selectedMax, q + 1))}
                   disabled={quantity >= selectedMax}
+                  aria-label="Increase quantity"
                   className="w-8 h-8 rounded-lg bg-[var(--rpg-background)] flex items-center justify-center text-[var(--rpg-text-primary)] disabled:opacity-30 hover:bg-[var(--rpg-border)] transition-colors"
                 >
                   <Plus size={14} />

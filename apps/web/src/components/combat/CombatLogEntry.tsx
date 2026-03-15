@@ -70,7 +70,10 @@ export function CombatLogEntry({
   return (
     <div
       className={`${hasDetails ? 'cursor-pointer' : ''}`}
+      role={hasDetails ? 'button' : undefined}
+      tabIndex={hasDetails ? 0 : undefined}
       onClick={hasDetails ? () => setExpanded((p) => !p) : undefined}
+      onKeyDown={hasDetails ? (e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded((p) => !p); } : undefined}
     >
       {/* Collapsed view */}
       <div className="flex items-center gap-2 text-sm py-0.5">

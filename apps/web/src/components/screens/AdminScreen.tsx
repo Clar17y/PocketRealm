@@ -249,6 +249,9 @@ function ItemsTab({ onAction }: { onAction?: () => void }) {
           {loading && <div className="text-xs text-[var(--rpg-text-secondary)]">Loading...</div>}
           {templates.map((t) => (
             <div key={t.id} onClick={() => setSelectedId(t.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedId(t.id); }}
               className={`px-2 py-1.5 rounded text-sm cursor-pointer transition-colors ${
                 t.id === selectedId
                   ? 'bg-[var(--rpg-gold)]/20 border border-[var(--rpg-gold)]/40'
@@ -584,6 +587,9 @@ function ResourcesTab({ onAction }: { onAction?: () => void }) {
             {nodes.length === 0 && <div className="text-xs text-[var(--rpg-text-secondary)]">No resource nodes in this zone</div>}
             {nodes.map((n) => (
               <div key={n.id} onClick={() => setSelectedNodeId(n.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedNodeId(n.id); }}
                 className={`px-2 py-1.5 rounded text-sm cursor-pointer transition-colors ${
                   n.id === selectedNodeId
                     ? 'bg-[var(--rpg-gold)]/20 border border-[var(--rpg-gold)]/40'

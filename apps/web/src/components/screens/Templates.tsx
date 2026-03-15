@@ -399,7 +399,7 @@ export function Templates({
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
-          <button onClick={() => setPickerTarget(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]">
+          <button onClick={() => setPickerTarget(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]" aria-label="Back">
             <ChevronLeft size={20} />
           </button>
           <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">{pickerTitle}</h2>
@@ -449,7 +449,7 @@ export function Templates({
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
-          <button onClick={handleCancel} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]">
+          <button onClick={handleCancel} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]" aria-label="Back">
             <ChevronLeft size={20} />
           </button>
           <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">
@@ -501,7 +501,10 @@ export function Templates({
                     {/* Collapsed row - always visible, tappable to expand */}
                     <div
                       className="flex items-center gap-2 p-2 cursor-pointer active:bg-[var(--rpg-surface)]"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setExpandedSlot(isExpanded ? null : i)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpandedSlot(isExpanded ? null : i); }}
                     >
                       <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">
                         {i + 1}
@@ -528,6 +531,7 @@ export function Templates({
                         <button
                           onClick={e => { e.stopPropagation(); moveSlot(i, -1); }}
                           disabled={i === 0}
+                          aria-label="Move up"
                           className="min-w-[36px] min-h-[36px] p-2 flex items-center justify-center text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
                         >
                           <ArrowUp size={14} />
@@ -535,12 +539,14 @@ export function Templates({
                         <button
                           onClick={e => { e.stopPropagation(); moveSlot(i, 1); }}
                           disabled={i === editorSlots.length - 1}
+                          aria-label="Move down"
                           className="min-w-[36px] min-h-[36px] p-2 flex items-center justify-center text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
                         >
                           <ArrowDown size={14} />
                         </button>
                         <button
                           onClick={e => { e.stopPropagation(); removeSlot(i); }}
+                          aria-label="Remove slot"
                           className="min-w-[36px] min-h-[36px] p-2 flex items-center justify-center text-[var(--rpg-red)] hover:text-[#cc4444]"
                         >
                           <X size={14} />

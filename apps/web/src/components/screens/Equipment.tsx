@@ -233,6 +233,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
               <button
                 onClick={closeModal}
                 className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                aria-label="Close"
               >
                 <X size={20} />
               </button>
@@ -497,6 +498,7 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
               <button
                 onClick={() => setShowRepairAll(false)}
                 className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                aria-label="Close"
               >
                 <X size={20} />
               </button>

@@ -295,6 +295,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
                   type="button"
                   onClick={() => void handleAllocate(attribute)}
                   disabled={disabled}
+                  aria-label={`Increase ${meta.label}`}
                   className="px-2 py-1 rounded text-sm font-bold bg-[var(--rpg-gold)] text-[var(--rpg-background)] disabled:opacity-50"
                 >
                   +1
