@@ -40,9 +40,19 @@ export async function ensureEquipmentSlots(playerId: string): Promise<void> {
 export async function getEquipmentStats(playerId: string): Promise<EquipmentStats> {
   const equipped = await prisma.playerEquipment.findMany({
     where: { playerId, itemId: { not: null } },
-    include: {
+    select: {
+      slot: true,
       item: {
-        include: { template: true },
+        select: {
+          currentDurability: true,
+          bonusStats: true,
+          template: {
+            select: {
+              baseStats: true,
+              maxDurability: true,
+            },
+          },
+        },
       },
     },
   });
