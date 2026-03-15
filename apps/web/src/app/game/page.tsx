@@ -555,6 +555,7 @@ export default function GamePage() {
                 rarity: item.rarity,
                 description: item.template.itemType,
                 type: item.template.itemType,
+                tier: item.template.tier,
                 weightClass: item.template.weightClass ?? null,
                 slot: item.template.slot,
                 equippedSlot: item.equippedSlot,
