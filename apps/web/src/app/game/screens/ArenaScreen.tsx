@@ -155,10 +155,16 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
   useEffect(() => {
     if (activeView !== 'rankings') return;
     setRankingsLoading(true);
-    void getLeaderboard('pvp_rating', rankingsAroundMe).then((res) => {
-      if (res.data) setRankingsData(res.data);
-      setRankingsLoading(false);
-    });
+    void getLeaderboard('pvp_rating', rankingsAroundMe)
+      .then((res) => {
+        if (res.data) setRankingsData(res.data);
+      })
+      .catch(() => {
+        setError('Failed to load rankings');
+      })
+      .finally(() => {
+        setRankingsLoading(false);
+      });
   }, [activeView, rankingsAroundMe]);
 
   function handleViewChange(view: ArenaView) {

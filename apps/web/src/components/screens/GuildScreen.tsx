@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSilentRefresh } from '@/hooks/useSilentRefresh';
+import { RefreshingIndicator } from '@/components/common/RefreshingIndicator';
 import { getPlayerGuild, type PlayerGuildResponse } from '@/lib/api';
 import { NoGuildView } from '@/components/guild/NoGuildView';
 import { GuildOverview } from '@/components/guild/GuildOverview';
@@ -31,12 +33,12 @@ interface GuildScreenProps {
 
 export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpeditionContextChange }: GuildScreenProps) {
   const [guildData, setGuildData] = useState<PlayerGuildResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<GuildTab>('overview');
 
-  const loadGuild = useCallback(async () => {
-    setLoading(true);
+  const loadGuild = useCallback(async (silent = false) => {
+    startLoad(silent);
     setError(null);
     try {
       const res = await getPlayerGuild();
@@ -45,15 +47,17 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load guild');
     } finally {
-      setLoading(false);
+      endLoad(silent);
     }
-  }, []);
+  }, [startLoad, endLoad]);
+
+  const refreshGuild = useCallback(() => { void loadGuild(true); }, [loadGuild]);
 
   useEffect(() => {
     void loadGuild();
   }, [loadGuild]);
 
-  if (loading) {
+  if (loading && !guildData) {
     return (
       <ScreenContainer>
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Guild</h2>
@@ -87,7 +91,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
           playerId={playerId}
           characterLevel={characterLevel}
           error={error}
-          onGuildJoined={() => { void loadGuild(); onTurnsChanged(); }}
+          onGuildJoined={() => { refreshGuild(); onTurnsChanged(); }}
         />
       </>
     );
@@ -101,6 +105,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
       </h2>
 
       {error && <ErrorBanner message={error} />}
+      <RefreshingIndicator show={refreshing} />
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {(['overview', 'members', 'upgrades', 'contracts', 'projects', 'expeditions', 'shop', 'specialization', 'log', ...(guildData.role === 'leader' || guildData.role === 'officer' ? ['settings'] : [])] as GuildTab[]).map((tab) => (
@@ -125,7 +130,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
           members={guildData.members}
           myRole={guildData.role}
           playerId={playerId}
-          onRefresh={loadGuild}
+          onRefresh={refreshGuild}
           setError={setError}
         />
       )}
@@ -146,12 +151,12 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
           characterLevel={characterLevel}
           setError={setError}
           onTurnsChanged={onTurnsChanged}
-          onRefresh={loadGuild}
+          onRefresh={refreshGuild}
           onExpeditionContextChange={onExpeditionContextChange}
         />
       )}
       {activeTab === 'shop' && (
-        <ExpeditionShopTab setError={setError} onRefresh={loadGuild} />
+        <ExpeditionShopTab setError={setError} onRefresh={refreshGuild} />
       )}
       {activeTab === 'specialization' && (
         <GuildSpecializationTab guildId={guildData.guild.id} guildLevel={guildData.guild.level} myRole={guildData.role} setError={setError} />
@@ -162,7 +167,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
           guild={guildData.guild}
           myRole={guildData.role}
           playerId={playerId}
-          onRefresh={loadGuild}
+          onRefresh={refreshGuild}
           setError={setError}
         />
       )}

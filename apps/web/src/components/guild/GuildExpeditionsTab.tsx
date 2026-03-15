@@ -7,6 +7,7 @@ import { monsterImageSrc, type ExpeditionContext } from '@/lib/assets';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import {
   getActiveExpedition,
   getExpeditionStatus,
@@ -184,7 +185,7 @@ function EffectPill({ effect, isDebuff }: { effect: BossActiveEffect; isDebuff?:
         role="button"
         tabIndex={0}
         onClick={(e) => { e.stopPropagation(); setShowDetail(!showDetail); }}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setShowDetail(!showDetail); } }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setShowDetail(!showDetail); } }}
         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer select-none ${
           debuff
             ? 'bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]'
@@ -224,6 +225,13 @@ export function GuildExpeditionsTab({
   const [members, setMembers] = useState<ExpeditionMemberData[]>([]);
   const [cooldowns, setCooldowns] = useState<ExpeditionCooldownInfo | null>(null);
   const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
+  const [pendingConfirm, setPendingConfirm] = useState<
+    | { type: 'launch'; tier: number }
+    | { type: 'forceStart' }
+    | { type: 'autoResolve' }
+    | { type: 'abandon' }
+    | null
+  >(null);
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
 
@@ -297,8 +305,11 @@ export function GuildExpeditionsTab({
     return () => clearInterval(interval);
   }, [expedition?.status, loadExpedition]);
 
+  const requestLaunch = (tier: number) => {
+    setPendingConfirm({ type: 'launch', tier });
+  };
+
   const handleLaunch = async (tier: number) => {
-    if (!confirm(`Launch Tier ${tier} expedition? Treasury will be deducted immediately.`)) return;
     setActionLoading(true);
     setError(null);
     try {
@@ -329,9 +340,12 @@ export function GuildExpeditionsTab({
     }
   };
 
+  const requestForceStart = () => {
+    setPendingConfirm({ type: 'forceStart' });
+  };
+
   const handleForceStart = async () => {
     if (!expedition) return;
-    if (!confirm('Force start the expedition now? The signup window will end immediately.')) return;
     setActionLoading(true);
     setError(null);
     try {
@@ -361,9 +375,12 @@ export function GuildExpeditionsTab({
     }
   };
 
+  const requestAutoResolve = () => {
+    setPendingConfirm({ type: 'autoResolve' });
+  };
+
   const handleAutoResolve = async () => {
     if (!expedition) return;
-    if (!confirm('Auto-resolve this room? Templates are locked and all rounds resolve instantly.')) return;
     setActionLoading(true);
     setError(null);
     try {
@@ -443,9 +460,12 @@ export function GuildExpeditionsTab({
     }
   };
 
+  const requestAbandon = () => {
+    setPendingConfirm({ type: 'abandon' });
+  };
+
   const handleAbandon = async () => {
     if (!expedition) return;
-    if (!confirm('Abandon this expedition? This will end the expedition and trigger a cooldown.')) return;
     setActionLoading(true);
     setError(null);
     try {
@@ -477,11 +497,61 @@ export function GuildExpeditionsTab({
     </div>
   );
 
+  const confirmModalConfig: Record<'launch' | 'forceStart' | 'autoResolve' | 'abandon', { title: string; message: string; confirmLabel: string; variant: 'danger' | 'warning' }> = {
+    launch: {
+      title: 'Launch Expedition?',
+      message: pendingConfirm?.type === 'launch'
+        ? `Launch Tier ${pendingConfirm.tier} expedition? Treasury will be deducted immediately.`
+        : '',
+      confirmLabel: 'Launch',
+      variant: 'warning',
+    },
+    forceStart: {
+      title: 'Force Start?',
+      message: 'Force start the expedition now? The signup window will end immediately.',
+      confirmLabel: 'Force Start',
+      variant: 'warning',
+    },
+    autoResolve: {
+      title: 'Auto-Resolve Room?',
+      message: 'Auto-resolve this room? Templates are locked and all rounds resolve instantly.',
+      confirmLabel: 'Auto-Resolve',
+      variant: 'warning',
+    },
+    abandon: {
+      title: 'Abandon Expedition?',
+      message: 'Abandon this expedition? This will end the expedition and trigger a cooldown.',
+      confirmLabel: 'Abandon',
+      variant: 'danger',
+    },
+  };
+
+  const confirmModal = pendingConfirm && (
+    <ConfirmModal
+      title={confirmModalConfig[pendingConfirm.type].title}
+      message={confirmModalConfig[pendingConfirm.type].message}
+      confirmLabel={confirmModalConfig[pendingConfirm.type].confirmLabel}
+      variant={confirmModalConfig[pendingConfirm.type].variant}
+      onConfirm={() => {
+        const action = pendingConfirm;
+        setPendingConfirm(null);
+        switch (action.type) {
+          case 'launch': void handleLaunch(action.tier); break;
+          case 'forceStart': void handleForceStart(); break;
+          case 'autoResolve': void handleAutoResolve(); break;
+          case 'abandon': void handleAbandon(); break;
+        }
+      }}
+      onCancel={() => setPendingConfirm(null)}
+    />
+  );
+
   if (subTab === 'history') {
     return (
       <>
         {tabBar}
         <HistoryView guildId={guildId} playerId={playerId} />
+        {confirmModal}
       </>
     );
   }
@@ -493,7 +563,8 @@ export function GuildExpeditionsTab({
     return (
       <>
         {tabBar}
-        <IdleView isOfficer={isOfficer} characterLevel={characterLevel} actionLoading={actionLoading} onLaunch={handleLaunch} cooldowns={cooldowns} />
+        <IdleView isOfficer={isOfficer} characterLevel={characterLevel} actionLoading={actionLoading} onLaunch={requestLaunch} cooldowns={cooldowns} />
+        {confirmModal}
       </>
     );
   }
@@ -510,8 +581,8 @@ export function GuildExpeditionsTab({
             actionLoading={actionLoading}
             isOfficer={isOfficer}
             onSignup={handleSignup}
-            onForceStart={handleForceStart}
-            onAbandon={handleAbandon}
+            onForceStart={requestForceStart}
+            onAbandon={requestAbandon}
             onExpired={loadExpedition}
           />
         );
@@ -525,12 +596,12 @@ export function GuildExpeditionsTab({
             isOfficer={isOfficer}
             onRecover={handleRecover}
             onForceRound={handleForceRound}
-            onAutoResolve={handleAutoResolve}
+            onAutoResolve={requestAutoResolve}
             autoAdvance={autoAdvance}
             onToggleAutoAdvance={() => setAutoAdvance(prev => !prev)}
             onSetTarget={handleSetTarget}
             onSetHealTarget={handleSetHealTarget}
-            onAbandon={handleAbandon}
+            onAbandon={requestAbandon}
             onRefresh={loadExpedition}
             onExpired={loadExpedition}
             templates={templates}
@@ -546,6 +617,7 @@ export function GuildExpeditionsTab({
     <>
       {tabBar}
       {activeContent}
+      {confirmModal}
     </>
   );
 }
@@ -1365,13 +1437,16 @@ function HistoryView({ guildId, playerId }: { guildId: string; playerId: string 
   const [expandedDetail, setExpandedDetail] = useState<{ expedition: ExpeditionData; members: ExpeditionMemberData[] } | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     getExpeditionHistory(page).then(res => {
+      if (cancelled) return;
       if (res.data) {
         setExpeditions(res.data.expeditions);
         setTotalPages(res.data.pagination.totalPages);
       }
-    }).finally(() => setLoading(false));
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [page]);
 
   const handleExpand = async (id: string) => {
@@ -1823,7 +1898,7 @@ function MemberList({
         <div className="mt-3 pt-2 border-t border-[var(--rpg-border)]">
           <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
           <div className="space-y-0.5">
-            {members
+            {[...members]
               .sort((a, b) => b.totalDamage - a.totalDamage)
               .map((m) => (
                 <div key={`${m.playerId}-contrib`} className="flex justify-between text-xs">

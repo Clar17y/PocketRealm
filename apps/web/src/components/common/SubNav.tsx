@@ -1,21 +1,26 @@
-export interface SubNavTab {
-  id: string;
+export interface SubNavTab<T extends string = string> {
+  id: T;
   label: string;
   badge?: number;
 }
 
-interface SubNavProps {
-  tabs: SubNavTab[];
-  activeId: string;
-  onSelect: (id: string) => void;
+interface SubNavProps<T extends string = string> {
+  tabs: SubNavTab<T>[];
+  activeId: T;
+  onSelect: (id: T) => void;
+  ariaLabel?: string;
 }
 
-export function SubNav({ tabs, activeId, onSelect }: SubNavProps) {
+export function SubNav<T extends string = string>({ tabs, activeId, onSelect, ariaLabel = 'Navigation tabs' }: SubNavProps<T>) {
   return (
-    <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+    <div className="flex gap-2 mb-4 overflow-x-auto pb-2" role="tablist" aria-label={ariaLabel}>
       {tabs.map((tab) => (
         <button
+          type="button"
           key={tab.id}
+          id={`tab-${tab.id}`}
+          role="tab"
+          aria-selected={tab.id === activeId}
           onClick={() => onSelect(tab.id)}
           className={`relative px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
             activeId === tab.id

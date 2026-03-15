@@ -6,9 +6,12 @@ interface PixelCardProps {
   padding?: 'none' | 'sm' | 'md' | 'lg';
   variant?: 'default' | 'framed' | 'ornate';
   onClick?: (e: React.MouseEvent) => void;
+  role?: string;
+  tabIndex?: number;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
 }
 
-export function PixelCard({ children, className, padding = 'md', variant = 'default', onClick }: PixelCardProps) {
+export function PixelCard({ children, className, padding = 'md', variant = 'default', onClick, role, tabIndex, onKeyDown }: PixelCardProps) {
   const paddingClasses = {
     none: 'p-0',
     sm: 'p-2',
@@ -31,6 +34,9 @@ export function PixelCard({ children, className, padding = 'md', variant = 'defa
         className
       )}
       onClick={onClick}
+      role={role}
+      tabIndex={tabIndex}
+      onKeyDown={onKeyDown}
     >
       {variant === 'ornate' && (
         <>

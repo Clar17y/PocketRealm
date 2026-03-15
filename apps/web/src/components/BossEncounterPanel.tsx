@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSilentRefresh } from '@/hooks/useSilentRefresh';
+import { RefreshingIndicator } from '@/components/common/RefreshingIndicator';
 import { Shield } from 'lucide-react';
+import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
@@ -28,7 +31,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
   const [encounter, setEncounter] = useState<BossEncounterResponse | null>(null);
   const [participants, setParticipants] = useState<BossParticipantResponse[]>([]);
   const [myRewards, setMyRewards] = useState<BossPlayerReward | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
   const [signing, setSigning] = useState(false);
   const [autoSignUp, setAutoSignUp] = useState(false);
   const [signupError, setSignupError] = useState('');
@@ -38,16 +41,21 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null);
   const [activeTemplateActionCount, setActiveTemplateActionCount] = useState(0);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    const res = await getBossEncounter(encounterId);
-    if (res.data) {
-      setEncounter(res.data.encounter);
-      setParticipants(res.data.participants);
-      setMyRewards(res.data.myRewards ?? null);
+  const refresh = useCallback(async (silent = false) => {
+    startLoad(silent);
+    try {
+      const res = await getBossEncounter(encounterId);
+      if (res.data) {
+        setEncounter(res.data.encounter);
+        setParticipants(res.data.participants);
+        setMyRewards(res.data.myRewards ?? null);
+      }
+    } catch {
+      // Refresh failure is non-critical; encounter data remains stale
+    } finally {
+      endLoad(silent);
     }
-    setLoading(false);
-  }, [encounterId]);
+  }, [encounterId, startLoad, endLoad]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -85,13 +93,18 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
   async function handleSignup() {
     setSigning(true);
     setSignupError('');
-    const res = await signUpForBoss(encounterId, autoSignUp);
-    if (res.error) {
-      setSignupError(res.error.message);
-    } else {
-      await refresh();
+    try {
+      const res = await signUpForBoss(encounterId, autoSignUp);
+      if (res.error) {
+        setSignupError(res.error.message);
+      } else {
+        await refresh(true);
+      }
+    } catch (err: unknown) {
+      setSignupError(err instanceof Error ? err.message : 'Signup failed');
+    } finally {
+      setSigning(false);
     }
-    setSigning(false);
   }
 
   // Group participants by round
@@ -171,7 +184,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
       .slice(0, 5);
   }, [encounter?.status, participants]);
 
-  if (loading) {
+  if (loading && !encounter) {
     return <PixelCard className="p-4 text-center">Loading boss encounter...</PixelCard>;
   }
 
@@ -217,6 +230,8 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
           />
         </div>
       </div>
+
+      <RefreshingIndicator show={refreshing} />
 
       {/* Status */}
       <div className="flex justify-between text-xs">
@@ -331,7 +346,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
             </label>
           </div>
           <PixelButton onClick={handleSignup} disabled={signing} size="sm">
-            {signing ? 'Signing up...' : 'Sign Up (200 turns)'}
+            {signing ? 'Signing up...' : `Sign Up (${WORLD_EVENT_CONSTANTS.BOSS_SIGNUP_TURN_COST} turns)`}
           </PixelButton>
           {signupError && (
             <p className="text-xs" style={{ color: 'var(--rpg-red)' }}>{signupError}</p>
@@ -440,6 +455,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
                           </div>
 
                           {/* Stamina / Mana bars */}
+                          {/* TODO: API should return maxStamina/maxMana per participant */}
                           <div className="flex gap-2 mt-0.5">
                             <StatBar
                               current={p.currentStamina}

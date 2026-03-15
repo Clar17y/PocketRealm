@@ -96,6 +96,8 @@ export function ExpeditionShopTab({ setError, onRefresh }: ExpeditionShopTabProp
       const res = await getExpeditionShop();
       if (res.error) { setError(res.error.message); return; }
       setShopData(res.data ?? null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load shop');
     } finally {
       setLoading(false);
     }
@@ -111,6 +113,8 @@ export function ExpeditionShopTab({ setError, onRefresh }: ExpeditionShopTabProp
       if (res.error) { setError(res.error.message); return; }
       await loadShop();
       onRefresh?.();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Purchase failed');
     } finally {
       setPurchasing(null);
     }

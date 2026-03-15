@@ -163,13 +163,16 @@ export function useChat({ isAuthenticated, currentZoneId }: UseChatParams): UseC
       socket.emit('chat:switch-zone', { zoneId: currentZoneId });
     }
 
+    let cancelled = false;
     setZoneMessages([]);
     setPinnedZone(null);
     getChatHistory('zone', `zone:${currentZoneId}`).then((res) => {
+      if (cancelled) return;
       if (res.data) {
         setZoneMessages(res.data.messages as ChatMessageEvent[]);
       }
     });
+    return () => { cancelled = true; };
   }, [currentZoneId, isAuthenticated]);
 
   const toggleChat = useCallback(() => {

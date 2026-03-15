@@ -100,6 +100,7 @@ export function TurnPlayback({
       setLoadedCombatLog(combatEvent.details.log as CombatLogEntryResponse[]);
       return;
     }
+    let cancelled = false;
     const logId = combatEvent.details?.combatLogId as string | undefined;
     if (logId && combatLogPrefetch) {
       const cached = combatLogPrefetch.getLog(logId);
@@ -108,9 +109,10 @@ export function TurnPlayback({
         return;
       }
       void combatLogPrefetch.fetchLog(logId).then(log => {
-        setLoadedCombatLog(log);
+        if (!cancelled) setLoadedCombatLog(log);
       });
     }
+    return () => { cancelled = true; };
   }, [combatEvent, combatLogPrefetch]);
 
   const shouldAutoSkip = autoSkipKnownCombat && combatEvent && (() => {

@@ -555,6 +555,7 @@ export default function GamePage() {
                 rarity: item.rarity,
                 description: item.template.itemType,
                 type: item.template.itemType,
+                tier: item.template.tier,
                 weightClass: item.template.weightClass ?? null,
                 slot: item.template.slot,
                 equippedSlot: item.equippedSlot,
@@ -1304,6 +1305,7 @@ export default function GamePage() {
         {actionError && (
           <div
             ref={errorRef}
+            role="alert"
             className={`mb-4 p-3 rounded bg-[var(--rpg-background)] animate-error-flash ${
               actionError.includes('active expedition')
                 ? 'border border-[var(--rpg-gold)] text-[var(--rpg-gold)]'

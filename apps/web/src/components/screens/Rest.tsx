@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/Slider';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { Heart, AlertTriangle } from 'lucide-react';
 import * as api from '@/lib/api';
+import { HP_CONSTANTS } from '@pocketrealm/shared';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface RestProps {
@@ -92,49 +93,55 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
     setIsLoading(true);
     setError(null);
 
-    const result = await api.rest(turns);
-    if (result.error) {
-      setError(result.error.message);
+    try {
+      const result = await api.rest(turns);
+      if (result.error) {
+        setError(result.error.message);
+        return;
+      }
+
+      if (result.data) {
+        onTurnsUpdate(result.data.turns.currentTurns);
+        const newHpState = {
+          ...hpState,
+          currentHp: result.data.currentHp,
+          maxHp: result.data.maxHp,
+        };
+        setHpState(newHpState);
+        onHpUpdate(newHpState);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Rest failed');
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    if (result.data) {
-      onTurnsUpdate(result.data.turns.currentTurns);
-      const newHpState = {
-        ...hpState,
-        currentHp: result.data.currentHp,
-        maxHp: result.data.maxHp,
-      };
-      setHpState(newHpState);
-      onHpUpdate(newHpState);
-    }
-
-    setIsLoading(false);
   };
 
   const handleRecover = async () => {
     setIsLoading(true);
     setError(null);
 
-    const result = await api.recoverFromKnockout();
-    if (result.error) {
-      setError(result.error.message);
-      setIsLoading(false);
-      return;
-    }
-
-    if (result.data) {
-      onTurnsUpdate(result.data.turns.currentTurns);
-      // Fetch fresh HP state after recovery
-      const hpResult = await api.getHpState();
-      if (hpResult.data) {
-        setHpState(hpResult.data);
-        onHpUpdateRef.current(hpResult.data);
+    try {
+      const result = await api.recoverFromKnockout();
+      if (result.error) {
+        setError(result.error.message);
+        return;
       }
-    }
 
-    setIsLoading(false);
+      if (result.data) {
+        onTurnsUpdate(result.data.turns.currentTurns);
+        // Fetch fresh HP state after recovery
+        const hpResult = await api.getHpState();
+        if (hpResult.data) {
+          setHpState(hpResult.data);
+          onHpUpdateRef.current(hpResult.data);
+        }
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Recovery failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!hpState) {
@@ -172,7 +179,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
             <div className="flex justify-between items-center mt-2">
               <span className="text-[var(--rpg-text-secondary)]">HP After Recovery</span>
               <span className="text-[12px] text-[var(--rpg-green-light)] font-pixel">
-                {Math.floor(hpState.maxHp * 0.25)} / {hpState.maxHp}
+                {Math.floor(hpState.maxHp * HP_CONSTANTS.RECOVERY_EXIT_HP_PERCENT)} / {hpState.maxHp}
               </span>
             </div>
           </div>
@@ -211,7 +218,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
     { label: 'Full', pct: 1.0 },
     { label: '75%', pct: 0.75 },
     { label: '50%', pct: 0.50 },
-    { label: '25%', pct: 0.25 },
+    { label: `${Math.round(HP_CONSTANTS.RECOVERY_EXIT_HP_PERCENT * 100)}%`, pct: HP_CONSTANTS.RECOVERY_EXIT_HP_PERCENT },
   ].map(({ label, pct }) => {
     const rawTurns = roundUp10(Math.ceil((missingHp * pct) / healPerTurn));
     return { label, turns: Math.min(Math.max(10, rawTurns), availableTurns) };

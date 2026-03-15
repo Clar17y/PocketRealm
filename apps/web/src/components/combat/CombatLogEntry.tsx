@@ -5,6 +5,7 @@ import type { LastCombatLogEntry } from '@/app/game/gameController.types';
 import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 import { ACTION_CATEGORY_COLORS } from '@/lib/categoryColors';
 import { formatHitBreakdown } from './combatLogEntryUtils';
+import { handleKeyActivate } from '@/lib/utils';
 
 function isMagicDamage(entry: LastCombatLogEntry): boolean {
   return entry.targetMagicDefence !== undefined || entry.magicDefenceReduction !== undefined || entry.action === 'spell';
@@ -70,7 +71,10 @@ export function CombatLogEntry({
   return (
     <div
       className={`${hasDetails ? 'cursor-pointer' : ''}`}
+      role={hasDetails ? 'button' : undefined}
+      tabIndex={hasDetails ? 0 : undefined}
       onClick={hasDetails ? () => setExpanded((p) => !p) : undefined}
+      onKeyDown={hasDetails ? handleKeyActivate(() => setExpanded((p) => !p)) : undefined}
     >
       {/* Collapsed view */}
       <div className="flex items-center gap-2 text-sm py-0.5">

@@ -13,10 +13,13 @@ import { MAIL_CONSTANTS } from '@pocketrealm/shared';
 import type { FriendMailEntry, FriendListEntry } from '@pocketrealm/shared';
 import { relativeTime } from '@/lib/format';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { SubNav } from '../common/SubNav';
 import { PixelCard } from '../PixelCard';
 import { PixelButton } from '../PixelButton';
 import { LoadingCard } from '../common/LoadingCard';
 import { ErrorBanner } from '../common/ErrorBanner';
+import { ConfirmModal } from '../common/ConfirmModal';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 
 interface MailScreenProps {
   playerId: string | null;
@@ -62,9 +65,23 @@ export function MailScreen({
   const [sending, setSending] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Confirm delete
+  const confirmDelete = useConfirmAction<string>();
+
   // General
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync initialRecipientId when it changes after mount
+  useEffect(() => {
+    if (initialRecipientId) {
+      setComposeRecipientId(initialRecipientId);
+      setActiveView('compose');
+    } else if (activeView === 'compose' && !composeRecipientId) {
+      setActiveView('inbox');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to prop changes
+  }, [initialRecipientId]);
 
   // -----------------------------------------------------------------------
   // Loaders
@@ -223,9 +240,9 @@ export function MailScreen({
   // Render helpers
   // -----------------------------------------------------------------------
 
-  const tabs: { id: MailView; label: string; count?: number }[] = [
-    { id: 'inbox', label: 'Inbox', count: inboxTotal },
-    { id: 'sent', label: 'Sent', count: sentTotal },
+  const tabs: { id: MailView; label: string; badge?: number }[] = [
+    { id: 'inbox', label: 'Inbox', badge: inboxTotal > 0 ? inboxTotal : undefined },
+    { id: 'sent', label: 'Sent', badge: sentTotal > 0 ? sentTotal : undefined },
     { id: 'compose', label: 'Compose' },
   ];
 
@@ -259,24 +276,12 @@ export function MailScreen({
 
       {/* Tabs -- only show when not reading a mail */}
       {activeView !== 'read' && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabSwitch(tab.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                activeView === tab.id
-                  ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-                  : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-              }`}
-            >
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className="ml-1 text-xs opacity-70">({tab.count})</span>
-              )}
-            </button>
-          ))}
-        </div>
+        <SubNav
+          tabs={tabs}
+          activeId={activeView}
+          onSelect={handleTabSwitch}
+          ariaLabel="Mail navigation"
+        />
       )}
 
       {/* Inbox view */}
@@ -289,7 +294,7 @@ export function MailScreen({
           totalPages={inboxTotalPages}
           onPageChange={handleInboxPageChange}
           onOpen={(m) => void handleOpenMail(m, 'inbox')}
-          onDelete={(id) => void handleDelete(id)}
+          onDelete={(id) => confirmDelete.request(id)}
         />
       )}
 
@@ -303,7 +308,7 @@ export function MailScreen({
           totalPages={sentTotalPages}
           onPageChange={handleSentPageChange}
           onOpen={(m) => void handleOpenMail(m, 'sent')}
-          onDelete={(id) => void handleDelete(id)}
+          onDelete={(id) => confirmDelete.request(id)}
         />
       )}
 
@@ -330,7 +335,18 @@ export function MailScreen({
           playerId={playerId}
           onBack={() => { setSelectedMail(null); setActiveView(returnView); }}
           onReply={() => handleReply(selectedMail)}
-          onDelete={() => void handleDelete(selectedMail.id)}
+          onDelete={() => confirmDelete.request(selectedMail.id)}
+        />
+      )}
+
+      {confirmDelete.pending && (
+        <ConfirmModal
+          title="Delete Mail?"
+          message="This message will be permanently deleted."
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={() => confirmDelete.execute((id) => void handleDelete(id))}
+          onCancel={confirmDelete.cancel}
         />
       )}
     </ScreenContainer>
@@ -419,6 +435,7 @@ function MailList({
                   onClick={(e) => { e.stopPropagation(); onDelete(mail.id); }}
                   className="shrink-0 w-7 h-7 flex items-center justify-center rounded text-[var(--rpg-red)] hover:bg-[var(--rpg-red)]/10 transition-colors"
                   title="Delete"
+                  aria-label="Delete"
                 >
                   &times;
                 </button>

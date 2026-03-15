@@ -22,6 +22,7 @@ import { relativeTime } from '@/lib/format';
 import { getMobPrefixDefinition, HP_CONSTANTS } from '@pocketrealm/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../gameController.types';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
+import { SubNav } from '@/components/common/SubNav';
 
 interface CombatScreenProps {
   hpState: HpState;
@@ -294,41 +295,16 @@ export function CombatScreen({
         />
       )}
 
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveView('encounters')}
-          className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-            activeView === 'encounters'
-              ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-              : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-          }`}
-        >
-          Encounters
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveView('history')}
-          className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-            activeView === 'history'
-              ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-              : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-          }`}
-        >
-          History
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveView('bossHistory')}
-          className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-            activeView === 'bossHistory'
-              ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
-              : 'bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]'
-          }`}
-        >
-          Boss History
-        </button>
-      </div>
+      <SubNav
+        tabs={[
+          { id: 'encounters', label: 'Encounters' },
+          { id: 'history', label: 'History' },
+          { id: 'bossHistory', label: 'Boss History' },
+        ]}
+        activeId={activeView}
+        onSelect={setActiveView}
+        ariaLabel="Combat navigation"
+      />
 
       {activeView === 'bossHistory' ? (
         <BossHistory />

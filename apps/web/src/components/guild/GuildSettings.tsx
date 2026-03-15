@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import {
   updateGuildSettings, disbandGuild,
   getGuildJoinRequests, acceptJoinRequest, rejectJoinRequest,
@@ -122,6 +123,7 @@ export function GuildSettings({
   const [desc, setDesc] = useState(guild.description || '');
   const [saving, setSaving] = useState(false);
   const [disbanding, setDisbanding] = useState(false);
+  const [showDisbandConfirm, setShowDisbandConfirm] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -143,8 +145,6 @@ export function GuildSettings({
   };
 
   const handleDisband = async () => {
-    if (!confirm('Are you sure you want to DISBAND this guild? This cannot be undone!')) return;
-    if (!confirm('This will remove ALL members. Are you absolutely sure?')) return;
     setDisbanding(true);
     setError(null);
     try {
@@ -222,10 +222,21 @@ export function GuildSettings({
       {myRole === 'leader' && (
         <PixelCard>
           <h3 className="text-lg font-bold text-[var(--rpg-red)] mb-2">Danger Zone</h3>
-          <PixelButton onClick={handleDisband} disabled={disbanding}>
+          <PixelButton onClick={() => setShowDisbandConfirm(true)} disabled={disbanding}>
             {disbanding ? 'Disbanding...' : 'Disband Guild'}
           </PixelButton>
         </PixelCard>
+      )}
+
+      {showDisbandConfirm && (
+        <ConfirmModal
+          title="Disband Guild?"
+          message="Are you sure you want to DISBAND this guild? This will remove ALL members and cannot be undone!"
+          confirmLabel="Disband"
+          variant="danger"
+          onConfirm={() => { setShowDisbandConfirm(false); void handleDisband(); }}
+          onCancel={() => setShowDisbandConfirm(false)}
+        />
       )}
     </div>
   );

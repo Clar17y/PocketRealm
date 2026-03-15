@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSilentRefresh } from '@/hooks/useSilentRefresh';
+import { RefreshingIndicator } from '@/components/common/RefreshingIndicator';
 import {
   getFriendsList,
   searchPlayerByUsername,
@@ -19,12 +21,14 @@ import type { SparResponse } from '@/lib/api';
 import type { FriendListEntry, FriendRequest, BlockedPlayer } from '@pocketrealm/shared';
 import { FRIEND_CONSTANTS } from '@pocketrealm/shared';
 import { relativeTime } from '@/lib/format';
+import { handleKeyActivate } from '@/lib/utils';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
 import { SubNav } from '@/components/common/SubNav';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { FriendProfileModal } from '@/components/friends/FriendProfileModal';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
@@ -61,7 +65,6 @@ export function FriendsScreen({
   const [blocks, setBlocks] = useState<BlockedPlayer[]>([]);
 
   // --- UI state ---
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<FriendsView>('list');
 
@@ -85,12 +88,18 @@ export function FriendsScreen({
   // --- action busy guard ---
   const [actionBusy, setActionBusy] = useState(false);
 
+  // --- confirm dialog state ---
+  const [confirmAction, setConfirmAction] = useState<{ type: 'remove' | 'block'; friendId: string; name: string } | null>(null);
+
+  // --- refreshing (silent reload after actions) ---
+  const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
+
   // -----------------------------------------------------------------------
   // Data loaders
   // -----------------------------------------------------------------------
 
-  const loadFriends = useCallback(async () => {
-    setLoading(true);
+  const loadFriends = useCallback(async (silent = false) => {
+    startLoad(silent);
     setError(null);
     try {
       const res = await getFriendsList();
@@ -102,9 +111,9 @@ export function FriendsScreen({
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load friends');
     } finally {
-      setLoading(false);
+      endLoad(silent);
     }
-  }, []);
+  }, [startLoad, endLoad]);
 
   const loadIncoming = useCallback(async () => {
     try {
@@ -209,7 +218,7 @@ export function FriendsScreen({
         return;
       }
       onFriendCountsChanged?.();
-      void loadFriends();
+      void loadFriends(true);
       void loadIncoming();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to accept request');
@@ -249,7 +258,7 @@ export function FriendsScreen({
         return;
       }
       onFriendCountsChanged?.();
-      void loadFriends();
+      void loadFriends(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to remove friend');
     } finally {
@@ -269,7 +278,7 @@ export function FriendsScreen({
       }
       onFriendCountsChanged?.();
       // Remove from friends/requests lists and refresh blocks
-      void loadFriends();
+      void loadFriends(true);
       void loadIncoming();
       void loadBlocks();
     } catch (err: unknown) {
@@ -352,7 +361,7 @@ export function FriendsScreen({
   // Loading state
   // -----------------------------------------------------------------------
 
-  if (loading) {
+  if (loading && friends.length === 0) {
     return (
       <ScreenContainer>
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">
@@ -519,7 +528,10 @@ export function FriendsScreen({
                 key={f.friendshipId}
                 padding="sm"
                 className="cursor-pointer hover:border-[var(--rpg-gold)] transition-colors"
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedFriendshipId(f.friendshipId)}
+                onKeyDown={handleKeyActivate(() => setSelectedFriendshipId(f.friendshipId))}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -546,7 +558,7 @@ export function FriendsScreen({
                       disabled={actionBusy}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleUnfriend(f.friendshipId);
+                        setConfirmAction({ type: 'remove', friendId: f.friendshipId, name: f.username });
                       }}
                     >
                       Remove
@@ -557,7 +569,7 @@ export function FriendsScreen({
                       disabled={actionBusy}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleBlock(f.playerId);
+                        setConfirmAction({ type: 'block', friendId: f.playerId, name: f.username });
                       }}
                     >
                       Block
@@ -689,6 +701,8 @@ export function FriendsScreen({
         </div>
       )}
 
+      <RefreshingIndicator show={refreshing} />
+
       {selectedFriendshipId && (
         <FriendProfileModal
           friendshipId={selectedFriendshipId}
@@ -697,14 +711,31 @@ export function FriendsScreen({
           onSendMail={handleSendMail}
           onUnfriend={() => {
             setSelectedFriendshipId(null);
-            void loadFriends();
+            void loadFriends(true);
             onFriendCountsChanged?.();
           }}
           onBlock={() => {
             setSelectedFriendshipId(null);
-            void loadFriends();
+            void loadFriends(true);
             onFriendCountsChanged?.();
           }}
+        />
+      )}
+
+      {confirmAction && (
+        <ConfirmModal
+          title={confirmAction.type === 'remove' ? 'Remove Friend?' : 'Block Player?'}
+          message={confirmAction.type === 'remove'
+            ? `Remove ${confirmAction.name} from your friends list?`
+            : `Block ${confirmAction.name}? They won't be able to send you messages or friend requests.`}
+          confirmLabel={confirmAction.type === 'remove' ? 'Remove' : 'Block'}
+          variant="danger"
+          onConfirm={() => {
+            const { type, friendId } = confirmAction;
+            setConfirmAction(null);
+            type === 'remove' ? void handleUnfriend(friendId) : void handleBlock(friendId);
+          }}
+          onCancel={() => setConfirmAction(null)}
         />
       )}
     </ScreenContainer>

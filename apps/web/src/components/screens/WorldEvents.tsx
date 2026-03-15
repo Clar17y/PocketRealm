@@ -10,6 +10,7 @@ import {
   type BossEncounterResponse,
 } from '@/lib/api';
 import { BossEncounterPanel } from '@/components/BossEncounterPanel';
+import { handleKeyActivate } from '@/lib/utils';
 import { formatTimeRemaining } from '@/lib/format';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { ScreenContainer } from '../common/ScreenContainer';
@@ -88,13 +89,18 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const [eventsRes, bossRes] = await Promise.all([
-      getActiveEvents(),
-      getActiveBossEncounters(),
-    ]);
-    if (eventsRes.data) setEvents(eventsRes.data.events);
-    if (bossRes.data) setBosses(bossRes.data.encounters);
-    setLoading(false);
+    try {
+      const [eventsRes, bossRes] = await Promise.all([
+        getActiveEvents(),
+        getActiveBossEncounters(),
+      ]);
+      if (eventsRes.data) setEvents(eventsRes.data.events);
+      if (bossRes.data) setBosses(bossRes.data.encounters);
+    } catch {
+      // Network failure is non-critical; stale data remains visible
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -156,7 +162,10 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
               <PixelCard
                 key={boss.id}
                 className="p-3 cursor-pointer hover:brightness-110 transition-all"
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedBossId(boss.id)}
+                onKeyDown={handleKeyActivate(() => setSelectedBossId(boss.id))}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold font-almendra" style={{ color: 'var(--rpg-red)' }}>

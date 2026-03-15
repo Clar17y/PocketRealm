@@ -11,9 +11,12 @@ import {
   activateTemplate,
 } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
+import { handleKeyActivate } from '@/lib/utils';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@pocketrealm/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 // --- Constants ---
@@ -195,6 +198,7 @@ export function Templates({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
+  const confirmDelete = useConfirmAction<string>();
 
   useEffect(() => {
     void onLoadTemplates();
@@ -203,13 +207,21 @@ export function Templates({
   // -- List actions --
 
   const handleActivate = useCallback(async (id: string) => {
-    await activateTemplate(id);
-    await onLoadTemplates();
+    try {
+      await activateTemplate(id);
+      await onLoadTemplates();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to activate template');
+    }
   }, [onLoadTemplates]);
 
   const handleDelete = useCallback(async (id: string) => {
-    await deleteTemplate(id);
-    await onLoadTemplates();
+    try {
+      await deleteTemplate(id);
+      await onLoadTemplates();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete template');
+    }
   }, [onLoadTemplates]);
 
   const handleNewTemplate = useCallback(() => {
@@ -389,7 +401,7 @@ export function Templates({
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
-          <button onClick={() => setPickerTarget(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]">
+          <button onClick={() => setPickerTarget(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]" aria-label="Back">
             <ChevronLeft size={20} />
           </button>
           <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">{pickerTitle}</h2>
@@ -439,7 +451,7 @@ export function Templates({
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
-          <button onClick={handleCancel} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]">
+          <button onClick={handleCancel} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]" aria-label="Back">
             <ChevronLeft size={20} />
           </button>
           <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">
@@ -491,7 +503,10 @@ export function Templates({
                     {/* Collapsed row - always visible, tappable to expand */}
                     <div
                       className="flex items-center gap-2 p-2 cursor-pointer active:bg-[var(--rpg-surface)]"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setExpandedSlot(isExpanded ? null : i)}
+                      onKeyDown={handleKeyActivate(() => setExpandedSlot(isExpanded ? null : i))}
                     >
                       <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">
                         {i + 1}
@@ -518,6 +533,7 @@ export function Templates({
                         <button
                           onClick={e => { e.stopPropagation(); moveSlot(i, -1); }}
                           disabled={i === 0}
+                          aria-label="Move up"
                           className="min-w-[36px] min-h-[36px] p-2 flex items-center justify-center text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
                         >
                           <ArrowUp size={14} />
@@ -525,12 +541,14 @@ export function Templates({
                         <button
                           onClick={e => { e.stopPropagation(); moveSlot(i, 1); }}
                           disabled={i === editorSlots.length - 1}
+                          aria-label="Move down"
                           className="min-w-[36px] min-h-[36px] p-2 flex items-center justify-center text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] disabled:opacity-30"
                         >
                           <ArrowDown size={14} />
                         </button>
                         <button
                           onClick={e => { e.stopPropagation(); removeSlot(i); }}
+                          aria-label="Remove slot"
                           className="min-w-[36px] min-h-[36px] p-2 flex items-center justify-center text-[var(--rpg-red)] hover:text-[#cc4444]"
                         >
                           <X size={14} />
@@ -787,7 +805,7 @@ export function Templates({
                       Activate
                     </PixelButton>
                   )}
-                  <PixelButton size="sm" variant="danger" onClick={() => handleDelete(t.id)}>
+                  <PixelButton size="sm" variant="danger" onClick={() => confirmDelete.request(t.id)}>
                     Delete
                   </PixelButton>
                 </div>
@@ -795,6 +813,16 @@ export function Templates({
             </PixelCard>
           ))}
         </div>
+      )}
+      {confirmDelete.pending && (
+        <ConfirmModal
+          title="Delete Template?"
+          message="This combat template will be permanently deleted."
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={() => confirmDelete.execute((id) => void handleDelete(id))}
+          onCancel={confirmDelete.cancel}
+        />
       )}
     </ScreenContainer>
   );

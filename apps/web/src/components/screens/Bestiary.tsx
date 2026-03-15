@@ -287,7 +287,7 @@ function ExpeditionBestiaryTab({ themes }: { themes: ExpeditionBestiaryTheme[] }
                     <div className="text-xs text-[var(--rpg-gold)] mt-1 font-pixel">x{selectedMob.killCount} defeated</div>
                   </div>
                 </div>
-                <button onClick={() => setSelectedMob(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]">
+                <button onClick={() => setSelectedMob(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]" aria-label="Close">
                   <X size={20} />
                 </button>
               </div>
@@ -414,7 +414,7 @@ function WorldBossBestiaryTab({ bosses }: { bosses: WorldBossEntry[] }) {
                     <div className="text-xs text-[var(--rpg-gold)] font-pixel">x{selectedBoss.defeatCount} defeated</div>
                   </div>
                 </div>
-                <button onClick={() => setSelectedBoss(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]">
+                <button onClick={() => setSelectedBoss(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]" aria-label="Close">
                   <X size={20} />
                 </button>
               </div>
@@ -644,6 +644,7 @@ export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosse
                     <button
                       onClick={() => setSelectedMonster(null)}
                       className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                      aria-label="Close"
                     >
                       <X size={20} />
                     </button>

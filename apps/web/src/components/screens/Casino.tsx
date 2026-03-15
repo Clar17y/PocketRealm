@@ -215,26 +215,37 @@ export function Casino({
   // Fetch stats when toggled on
   useEffect(() => {
     if (!showHeatMap) { setNumberStats(null); return; }
+    let cancelled = false;
     api.getRouletteStats().then((res) => {
+      if (cancelled) return;
       if (res.data) setNumberStats(res.data.stats);
     });
+    return () => { cancelled = true; };
   }, [showHeatMap]);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Fetch round state
   const fetchRound = useCallback(async () => {
-    const result = await api.getRouletteRound();
-    if (result.data) {
-      setRoundState(result.data);
+    try {
+      const result = await api.getRouletteRound();
+      if (result.data) {
+        setRoundState(result.data);
+      }
+    } catch {
+      // Polling failure is non-critical; next poll will retry
     }
   }, []);
 
   // Fetch history
   const fetchHistory = useCallback(async () => {
-    const result = await api.getRouletteHistory();
-    if (result.data) {
-      setHistory(result.data.history);
+    try {
+      const result = await api.getRouletteHistory();
+      if (result.data) {
+        setHistory(result.data.history);
+      }
+    } catch {
+      // History fetch failure is non-critical
     }
   }, []);
 

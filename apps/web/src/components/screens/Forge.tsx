@@ -6,6 +6,7 @@ import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getF
 import { Anvil, Sparkles, TrendingUp } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ActivityLog } from '@/components/ActivityLog';
@@ -147,6 +148,8 @@ export function Forge({
   const [selectedUpgradeSacrificeId, setSelectedUpgradeSacrificeId] = useState<string | null>(null);
   const [selectedRerollSacrificeId, setSelectedRerollSacrificeId] = useState<string | null>(null);
   const [busy, setBusy] = useState<'upgrade' | 'reroll' | null>(null);
+  const [confirmUpgrade, setConfirmUpgrade] = useState(false);
+  const [confirmReroll, setConfirmReroll] = useState(false);
   const [upgradePickerOpen, setUpgradePickerOpen] = useState(false);
   const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
   const noFacility = zoneCraftingLevel === 0;
@@ -212,7 +215,25 @@ export function Forge({
     }
   }, [rerollSacrifices, selectedRerollSacrificeId]);
 
+  const handleUpgrade = async () => {
+    if (!selected || !selectedUpgradeSacrificeId) return;
+    setBusy('upgrade');
+    try {
+      await onUpgrade(selected.id, selectedUpgradeSacrificeId);
+    } finally {
+      setBusy(null);
+    }
+  };
 
+  const handleReroll = async () => {
+    if (!selected || !selectedRerollSacrificeId) return;
+    setBusy('reroll');
+    try {
+      await onReroll(selected.id, selectedRerollSacrificeId);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const canUseForge = Boolean(selected && !selected.equippedSlot);
   const hasUpgradeSacrifice = upgradeSacrifices.length > 0;
@@ -383,15 +404,7 @@ export function Forge({
                   || upgradeCost === null
                   || busy !== null
                 }
-                onClick={async () => {
-                  if (!selectedUpgradeSacrificeId) return;
-                  setBusy('upgrade');
-                  try {
-                    await onUpgrade(selected.id, selectedUpgradeSacrificeId);
-                  } finally {
-                    setBusy(null);
-                  }
-                }}
+                onClick={() => setConfirmUpgrade(true)}
               >
                 Upgrade Rarity
               </PixelButton>
@@ -438,21 +451,34 @@ export function Forge({
                   || rerollCost === null
                   || busy !== null
                 }
-                onClick={async () => {
-                  if (!selectedRerollSacrificeId) return;
-                  setBusy('reroll');
-                  try {
-                    await onReroll(selected.id, selectedRerollSacrificeId);
-                  } finally {
-                    setBusy(null);
-                  }
-                }}
+                onClick={() => setConfirmReroll(true)}
               >
                 Reroll Bonus Stats
               </PixelButton>
             </div>
           </div>
         </PixelCard>
+      )}
+
+      {confirmUpgrade && (
+        <ConfirmModal
+          title="Confirm Upgrade"
+          message="If the upgrade fails, both items will be destroyed. This cannot be undone."
+          confirmLabel="Upgrade"
+          variant="danger"
+          onConfirm={() => { setConfirmUpgrade(false); void handleUpgrade(); }}
+          onCancel={() => setConfirmUpgrade(false)}
+        />
+      )}
+      {confirmReroll && (
+        <ConfirmModal
+          title="Confirm Reroll"
+          message="All current bonus stats will be permanently replaced with new random stats."
+          confirmLabel="Reroll"
+          variant="warning"
+          onConfirm={() => { setConfirmReroll(false); void handleReroll(); }}
+          onCancel={() => setConfirmReroll(false)}
+        />
       )}
 
       <ActivityLog entries={activityLog} maxHeight="max-h-48" />

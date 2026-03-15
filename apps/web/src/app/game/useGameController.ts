@@ -77,6 +77,7 @@ import {
 import type { PlayerBuffData } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
+import { STAMINA_CONSTANTS, MANA_CONSTANTS } from '@pocketrealm/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
 import { findShortestZonePath } from '@/lib/zoneRoutes';
@@ -252,8 +253,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [actionError, setActionError] = useState<string | null>(null);
   const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, expeditionThemes, worldBosses, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
-  const [staminaState, setStaminaState] = useState<ResourceState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 5 });
-  const [manaState, setManaState] = useState<ResourceState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5, restHealPerTurn: 3 });
+  const [staminaState, setStaminaState] = useState<ResourceState>({
+    current: STAMINA_CONSTANTS.BASE_POOL, max: STAMINA_CONSTANTS.BASE_POOL,
+    regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 5
+  });
+  const [manaState, setManaState] = useState<ResourceState>({
+    current: MANA_CONSTANTS.BASE_POOL, max: MANA_CONSTANTS.BASE_POOL,
+    regenPerRound: 5, regenPerSecond: 0.5, restHealPerTurn: 3
+  });
   const [skillPointState, setSkillPointState] = useState<SkillPointState | null>(null);
   const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);
@@ -535,17 +542,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, [tutorialStep]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      void loadAll();
-      void loadPvpNotificationCount();
-      void loadFriendCounts();
-      const interval = setInterval(() => void loadTurnsAndHp(), 10000);
-      // Poll PvP notifications less frequently (60s)
-      const pvpInterval = setInterval(() => void loadPvpNotificationCount(), 60000);
-      // Poll friend counts at same cadence as PvP
-      const friendInterval = setInterval(() => void loadFriendCounts(), 60000);
-      return () => { clearInterval(interval); clearInterval(pvpInterval); clearInterval(friendInterval); };
-    }
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    // Initial loads are one-shot and safe to complete after cleanup —
+    // only guard recurring intervals to prevent stale polling.
+    void loadAll();
+    void loadPvpNotificationCount();
+    void loadFriendCounts();
+    const interval = setInterval(() => { if (!cancelled) void loadTurnsAndHp(); }, 10000);
+    // Poll PvP notifications less frequently (60s)
+    const pvpInterval = setInterval(() => { if (!cancelled) void loadPvpNotificationCount(); }, 60000);
+    // Poll friend counts at same cadence as PvP
+    const friendInterval = setInterval(() => { if (!cancelled) void loadFriendCounts(); }, 60000);
+    return () => { cancelled = true; clearInterval(interval); clearInterval(pvpInterval); clearInterval(friendInterval); };
   }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount, loadFriendCounts]);
 
   const getActiveTab = () => {
@@ -899,7 +908,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Auto-skip any active playback when navigating away
     if (playbackActive) {
       if (explorationPlaybackData) {
-        handlePlaybackSkip();
+        void handlePlaybackSkip();
       }
       if (combatPlaybackQueue) {
         // Skip to the end of the queue
@@ -916,7 +925,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         void refreshPendingEncounters();
       }
       if (travelPlaybackData) {
-        handleTravelPlaybackSkip();
+        void handleTravelPlaybackSkip();
       }
     }
     // Clear last combat log when leaving the combat screen — it's in history if needed

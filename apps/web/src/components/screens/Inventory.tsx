@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { Backpack, Crosshair, Heart, Shield, Sword, X, Zap, Coins } from 'lucide-react';
-import { CRAFTING_CONSTANTS } from '@pocketrealm/shared';
+import { CRAFTING_CONSTANTS, repairTurnCost } from '@pocketrealm/shared';
 import { useBatchMode } from '@/hooks/useBatchMode';
 import { BatchActionBar, BatchCheckboxOverlay, BatchDimOverlay } from '@/components/common/BatchActionBar';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
@@ -15,6 +15,7 @@ import { getStash } from '@/lib/api/items';
 import { itemImageSrc } from '@/lib/assets';
 import { rarityMeetsThreshold, type Rarity, type ConfirmRarity } from '@/lib/rarity';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { StashTutorial } from '@/components/common/StashTutorial';
 import { getStaggerDelay } from '@/lib/animations';
@@ -31,6 +32,7 @@ interface Item {
   description: string;
   type: string;
   weightClass?: 'heavy' | 'medium' | 'light' | null;
+  tier?: number;
   slot?: string | null;
   equippedSlot?: string | null;
   durability?: { current: number; max: number } | null;
@@ -102,6 +104,7 @@ export function Inventory({
 }: InventoryProps) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
     type: 'drop' | 'salvage' | 'sell';
     itemId: string;
@@ -122,6 +125,10 @@ export function Inventory({
   const [stashItems, setStashItems] = useState<StashItem[]>([]);
   const [stashLoading, setStashLoading] = useState(false);
   const [selectedStashItem, setSelectedStashItem] = useState<StashItem | null>(null);
+
+  // Keep a stable ref for getSalvageCost so loadStash doesn't need it as a dependency
+  const getSalvageCostRef = useRef(getSalvageCost);
+  getSalvageCostRef.current = getSalvageCost;
 
   // Mutual exclusion helpers — activate one mode, reset all others in the same tab
   const backpackModes = [salvageBatch, stashBatch, sellBatchMode];
@@ -159,7 +166,7 @@ export function Inventory({
             type: item.template.itemType,
             durability: isEquip && max > 0 ? { current: item.currentDurability ?? max, max } : null,
             sellPrice: item.template.sellPrice ?? null,
-            salvageCost: isEquip && getSalvageCost ? getSalvageCost(item.template.id) : null,
+            salvageCost: isEquip && getSalvageCostRef.current ? getSalvageCostRef.current(item.template.id) : null,
           };
         }));
       }
@@ -276,6 +283,8 @@ export function Inventory({
         </div>
       </div>
 
+      {batchError && <ErrorBanner message={batchError} />}
+
       {/* Equipped Items */}
       {equippedItems.length > 0 && (
         <div className="space-y-2">
@@ -344,10 +353,13 @@ export function Inventory({
               onAction={async () => {
                 if (!onWithdrawBatch) return;
                 withdrawBatchMode.setBusy(true);
+                setBatchError(null);
                 try {
                   await onWithdrawBatch([...withdrawBatchMode.selection]);
                   withdrawBatchMode.reset();
                   await loadStash();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Withdraw failed');
                 } finally {
                   withdrawBatchMode.setBusy(false);
                 }
@@ -367,10 +379,13 @@ export function Inventory({
               onAction={async () => {
                 if (!onSellBatch) return;
                 stashSellBatch.setBusy(true);
+                setBatchError(null);
                 try {
                   await onSellBatch([...stashSellBatch.selection]);
                   stashSellBatch.reset();
                   await loadStash();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Sell failed');
                 } finally {
                   stashSellBatch.setBusy(false);
                 }
@@ -390,10 +405,13 @@ export function Inventory({
               onAction={async () => {
                 if (!onSalvageBatch) return;
                 stashSalvageBatch.setBusy(true);
+                setBatchError(null);
                 try {
                   await onSalvageBatch([...stashSalvageBatch.selection]);
                   stashSalvageBatch.reset();
                   await loadStash();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Salvage failed');
                 } finally {
                   stashSalvageBatch.setBusy(false);
                 }
@@ -502,6 +520,7 @@ export function Inventory({
                   <button
                     onClick={() => setSelectedStashItem(null)}
                     className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                    aria-label="Close"
                   >
                     <X size={20} />
                   </button>
@@ -549,9 +568,12 @@ export function Inventory({
               onAction={async () => {
                 if (!onSalvageBatch) return;
                 salvageBatch.setBusy(true);
+                setBatchError(null);
                 try {
                   await onSalvageBatch([...salvageBatch.selection]);
                   salvageBatch.reset();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Salvage failed');
                 } finally {
                   salvageBatch.setBusy(false);
                 }
@@ -566,9 +588,12 @@ export function Inventory({
               onAction={async () => {
                 if (!onDepositBatch) return;
                 stashBatch.setBusy(true);
+                setBatchError(null);
                 try {
                   await onDepositBatch([...stashBatch.selection]);
                   stashBatch.reset();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Stash failed');
                 } finally {
                   stashBatch.setBusy(false);
                 }
@@ -588,9 +613,12 @@ export function Inventory({
               onAction={async () => {
                 if (!onSellBatch) return;
                 sellBatchMode.setBusy(true);
+                setBatchError(null);
                 try {
                   await onSellBatch([...sellBatchMode.selection]);
                   sellBatchMode.reset();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Sell failed');
                 } finally {
                   sellBatchMode.setBusy(false);
                 }
@@ -727,6 +755,7 @@ export function Inventory({
               <button
                 onClick={() => setSelectedItem(null)}
                 className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
+                aria-label="Close"
               >
                 <X size={20} />
               </button>
@@ -891,7 +920,9 @@ export function Inventory({
                     }
                   }}
                 >
-                  {selectedItem.durability && selectedItem.durability.current <= 0 ? 'Fix (150)' : 'Repair (100)'}
+                  {selectedItem.durability && selectedItem.durability.current <= 0
+                    ? `Fix (${repairTurnCost(selectedItem.tier ?? 1, true)})`
+                    : `Repair (${repairTurnCost(selectedItem.tier ?? 1, false)})`}
                 </PixelButton>
 
                 <PixelButton
