@@ -6,7 +6,7 @@ import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { Backpack, Crosshair, Heart, Shield, Sword, X, Zap, Coins } from 'lucide-react';
-import { CRAFTING_CONSTANTS } from '@pocketrealm/shared';
+import { CRAFTING_CONSTANTS, DURABILITY_CONSTANTS } from '@pocketrealm/shared';
 import { useBatchMode } from '@/hooks/useBatchMode';
 import { BatchActionBar, BatchCheckboxOverlay, BatchDimOverlay } from '@/components/common/BatchActionBar';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
@@ -891,7 +891,9 @@ export function Inventory({
                     }
                   }}
                 >
-                  {selectedItem.durability && selectedItem.durability.current <= 0 ? 'Fix (150)' : 'Repair (100)'}
+                  {selectedItem.durability && selectedItem.durability.current <= 0
+                    ? `Fix (${DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST})`
+                    : `Repair (${DURABILITY_CONSTANTS.REPAIR_TURN_COST})`}
                 </PixelButton>
 
                 <PixelButton

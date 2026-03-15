@@ -77,6 +77,7 @@ import {
 import type { PlayerBuffData } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
+import { STAMINA_CONSTANTS, MANA_CONSTANTS } from '@pocketrealm/shared';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
 import { findShortestZonePath } from '@/lib/zoneRoutes';
@@ -252,8 +253,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [actionError, setActionError] = useState<string | null>(null);
   const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, expeditionThemes, worldBosses, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
-  const [staminaState, setStaminaState] = useState<ResourceState>({ current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 5 });
-  const [manaState, setManaState] = useState<ResourceState>({ current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5, restHealPerTurn: 3 });
+  const [staminaState, setStaminaState] = useState<ResourceState>({
+    current: STAMINA_CONSTANTS.BASE_POOL, max: STAMINA_CONSTANTS.BASE_POOL,
+    regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 5
+  });
+  const [manaState, setManaState] = useState<ResourceState>({
+    current: MANA_CONSTANTS.BASE_POOL, max: MANA_CONSTANTS.BASE_POOL,
+    regenPerRound: 5, regenPerSecond: 0.5, restHealPerTurn: 3
+  });
   const [skillPointState, setSkillPointState] = useState<SkillPointState | null>(null);
   const [templates, setTemplates] = useState<CombatTemplateData[]>([]);
   const [pvpNotificationCount, setPvpNotificationCount] = useState(0);

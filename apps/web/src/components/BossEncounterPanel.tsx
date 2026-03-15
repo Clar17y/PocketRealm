@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Shield } from 'lucide-react';
+import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
@@ -331,7 +332,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
             </label>
           </div>
           <PixelButton onClick={handleSignup} disabled={signing} size="sm">
-            {signing ? 'Signing up...' : 'Sign Up (200 turns)'}
+            {signing ? 'Signing up...' : `Sign Up (${WORLD_EVENT_CONSTANTS.BOSS_SIGNUP_TURN_COST} turns)`}
           </PixelButton>
           {signupError && (
             <p className="text-xs" style={{ color: 'var(--rpg-red)' }}>{signupError}</p>
@@ -440,6 +441,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
                           </div>
 
                           {/* Stamina / Mana bars */}
+                          {/* TODO: API should return maxStamina/maxMana per participant */}
                           <div className="flex gap-2 mt-0.5">
                             <StatBar
                               current={p.currentStamina}
