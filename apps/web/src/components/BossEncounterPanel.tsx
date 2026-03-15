@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSilentRefresh } from '@/hooks/useSilentRefresh';
+import { RefreshingIndicator } from '@/components/common/RefreshingIndicator';
 import { Shield } from 'lucide-react';
 import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
 import { PixelCard } from '@/components/PixelCard';
@@ -29,8 +31,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
   const [encounter, setEncounter] = useState<BossEncounterResponse | null>(null);
   const [participants, setParticipants] = useState<BossParticipantResponse[]>([]);
   const [myRewards, setMyRewards] = useState<BossPlayerReward | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
   const [signing, setSigning] = useState(false);
   const [autoSignUp, setAutoSignUp] = useState(false);
   const [signupError, setSignupError] = useState('');
@@ -41,11 +42,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
   const [activeTemplateActionCount, setActiveTemplateActionCount] = useState(0);
 
   const refresh = useCallback(async (silent = false) => {
-    if (silent) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    startLoad(silent);
     try {
       const res = await getBossEncounter(encounterId);
       if (res.data) {
@@ -56,13 +53,9 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
     } catch {
       // Refresh failure is non-critical; encounter data remains stale
     } finally {
-      if (silent) {
-        setRefreshing(false);
-      } else {
-        setLoading(false);
-      }
+      endLoad(silent);
     }
-  }, [encounterId]);
+  }, [encounterId, startLoad, endLoad]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -238,7 +231,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
         </div>
       </div>
 
-      {refreshing && <div className="text-xs text-[var(--rpg-text-secondary)] animate-pulse">Refreshing...</div>}
+      <RefreshingIndicator show={refreshing} />
 
       {/* Status */}
       <div className="flex justify-between text-xs">

@@ -12,6 +12,7 @@ import {
 } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
 import { handleKeyActivate } from '@/lib/utils';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@pocketrealm/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
@@ -197,7 +198,7 @@ export function Templates({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const confirmDelete = useConfirmAction<string>();
 
   useEffect(() => {
     void onLoadTemplates();
@@ -804,7 +805,7 @@ export function Templates({
                       Activate
                     </PixelButton>
                   )}
-                  <PixelButton size="sm" variant="danger" onClick={() => setConfirmDeleteId(t.id)}>
+                  <PixelButton size="sm" variant="danger" onClick={() => confirmDelete.request(t.id)}>
                     Delete
                   </PixelButton>
                 </div>
@@ -813,14 +814,14 @@ export function Templates({
           ))}
         </div>
       )}
-      {confirmDeleteId && (
+      {confirmDelete.pending && (
         <ConfirmModal
           title="Delete Template?"
           message="This combat template will be permanently deleted."
           confirmLabel="Delete"
           variant="danger"
-          onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); void handleDelete(id); }}
-          onCancel={() => setConfirmDeleteId(null)}
+          onConfirm={() => confirmDelete.execute((id) => void handleDelete(id))}
+          onCancel={confirmDelete.cancel}
         />
       )}
     </ScreenContainer>

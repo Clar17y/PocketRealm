@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSilentRefresh } from '@/hooks/useSilentRefresh';
+import { RefreshingIndicator } from '@/components/common/RefreshingIndicator';
 import {
   getFriendsList,
   searchPlayerByUsername,
@@ -63,7 +65,6 @@ export function FriendsScreen({
   const [blocks, setBlocks] = useState<BlockedPlayer[]>([]);
 
   // --- UI state ---
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<FriendsView>('list');
 
@@ -91,18 +92,14 @@ export function FriendsScreen({
   const [confirmAction, setConfirmAction] = useState<{ type: 'remove' | 'block'; friendId: string; name: string } | null>(null);
 
   // --- refreshing (silent reload after actions) ---
-  const [refreshing, setRefreshing] = useState(false);
+  const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
 
   // -----------------------------------------------------------------------
   // Data loaders
   // -----------------------------------------------------------------------
 
   const loadFriends = useCallback(async (silent = false) => {
-    if (silent) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    startLoad(silent);
     setError(null);
     try {
       const res = await getFriendsList();
@@ -114,13 +111,9 @@ export function FriendsScreen({
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load friends');
     } finally {
-      if (silent) {
-        setRefreshing(false);
-      } else {
-        setLoading(false);
-      }
+      endLoad(silent);
     }
-  }, []);
+  }, [startLoad, endLoad]);
 
   const loadIncoming = useCallback(async () => {
     try {
@@ -708,7 +701,7 @@ export function FriendsScreen({
         </div>
       )}
 
-      {refreshing && <div className="text-xs text-[var(--rpg-text-secondary)] animate-pulse">Refreshing...</div>}
+      <RefreshingIndicator show={refreshing} />
 
       {selectedFriendshipId && (
         <FriendProfileModal

@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSilentRefresh } from '@/hooks/useSilentRefresh';
+import { RefreshingIndicator } from '@/components/common/RefreshingIndicator';
 import { getPlayerGuild, type PlayerGuildResponse } from '@/lib/api';
 import { NoGuildView } from '@/components/guild/NoGuildView';
 import { GuildOverview } from '@/components/guild/GuildOverview';
@@ -31,17 +33,12 @@ interface GuildScreenProps {
 
 export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpeditionContextChange }: GuildScreenProps) {
   const [guildData, setGuildData] = useState<PlayerGuildResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<GuildTab>('overview');
 
   const loadGuild = useCallback(async (silent = false) => {
-    if (silent) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    startLoad(silent);
     setError(null);
     try {
       const res = await getPlayerGuild();
@@ -50,13 +47,9 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load guild');
     } finally {
-      if (silent) {
-        setRefreshing(false);
-      } else {
-        setLoading(false);
-      }
+      endLoad(silent);
     }
-  }, []);
+  }, [startLoad, endLoad]);
 
   const refreshGuild = useCallback(() => { void loadGuild(true); }, [loadGuild]);
 
@@ -112,7 +105,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
       </h2>
 
       {error && <ErrorBanner message={error} />}
-      {refreshing && <div className="text-xs text-[var(--rpg-text-secondary)] animate-pulse">Refreshing...</div>}
+      <RefreshingIndicator show={refreshing} />
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {(['overview', 'members', 'upgrades', 'contracts', 'projects', 'expeditions', 'shop', 'specialization', 'log', ...(guildData.role === 'leader' || guildData.role === 'officer' ? ['settings'] : [])] as GuildTab[]).map((tab) => (

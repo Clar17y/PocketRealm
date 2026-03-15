@@ -544,6 +544,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
+    // Initial loads are one-shot and safe to complete after cleanup —
+    // only guard recurring intervals to prevent stale polling.
     void loadAll();
     void loadPvpNotificationCount();
     void loadFriendCounts();

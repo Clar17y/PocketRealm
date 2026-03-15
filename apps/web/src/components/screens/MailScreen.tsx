@@ -19,6 +19,7 @@ import { PixelButton } from '../PixelButton';
 import { LoadingCard } from '../common/LoadingCard';
 import { ErrorBanner } from '../common/ErrorBanner';
 import { ConfirmModal } from '../common/ConfirmModal';
+import { useConfirmAction } from '@/hooks/useConfirmAction';
 
 interface MailScreenProps {
   playerId: string | null;
@@ -65,7 +66,7 @@ export function MailScreen({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Confirm delete
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const confirmDelete = useConfirmAction<string>();
 
   // General
   const [loading, setLoading] = useState(true);
@@ -76,7 +77,10 @@ export function MailScreen({
     if (initialRecipientId) {
       setComposeRecipientId(initialRecipientId);
       setActiveView('compose');
+    } else if (activeView === 'compose' && !composeRecipientId) {
+      setActiveView('inbox');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to prop changes
   }, [initialRecipientId]);
 
   // -----------------------------------------------------------------------
@@ -236,7 +240,7 @@ export function MailScreen({
   // Render helpers
   // -----------------------------------------------------------------------
 
-  const tabs = [
+  const tabs: { id: MailView; label: string; badge?: number }[] = [
     { id: 'inbox', label: 'Inbox', badge: inboxTotal > 0 ? inboxTotal : undefined },
     { id: 'sent', label: 'Sent', badge: sentTotal > 0 ? sentTotal : undefined },
     { id: 'compose', label: 'Compose' },
@@ -290,7 +294,7 @@ export function MailScreen({
           totalPages={inboxTotalPages}
           onPageChange={handleInboxPageChange}
           onOpen={(m) => void handleOpenMail(m, 'inbox')}
-          onDelete={(id) => setConfirmDeleteId(id)}
+          onDelete={(id) => confirmDelete.request(id)}
         />
       )}
 
@@ -304,7 +308,7 @@ export function MailScreen({
           totalPages={sentTotalPages}
           onPageChange={handleSentPageChange}
           onOpen={(m) => void handleOpenMail(m, 'sent')}
-          onDelete={(id) => setConfirmDeleteId(id)}
+          onDelete={(id) => confirmDelete.request(id)}
         />
       )}
 
@@ -331,18 +335,18 @@ export function MailScreen({
           playerId={playerId}
           onBack={() => { setSelectedMail(null); setActiveView(returnView); }}
           onReply={() => handleReply(selectedMail)}
-          onDelete={() => setConfirmDeleteId(selectedMail.id)}
+          onDelete={() => confirmDelete.request(selectedMail.id)}
         />
       )}
 
-      {confirmDeleteId && (
+      {confirmDelete.pending && (
         <ConfirmModal
           title="Delete Mail?"
           message="This message will be permanently deleted."
           confirmLabel="Delete"
           variant="danger"
-          onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); void handleDelete(id); }}
-          onCancel={() => setConfirmDeleteId(null)}
+          onConfirm={() => confirmDelete.execute((id) => void handleDelete(id))}
+          onCancel={confirmDelete.cancel}
         />
       )}
     </ScreenContainer>

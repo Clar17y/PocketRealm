@@ -497,7 +497,7 @@ export function GuildExpeditionsTab({
     </div>
   );
 
-  const confirmModalConfig: Record<string, { title: string; message: string; confirmLabel: string; variant: 'danger' | 'warning' }> = {
+  const confirmModalConfig: Record<'launch' | 'forceStart' | 'autoResolve' | 'abandon', { title: string; message: string; confirmLabel: string; variant: 'danger' | 'warning' }> = {
     launch: {
       title: 'Launch Expedition?',
       message: pendingConfirm?.type === 'launch'
@@ -551,6 +551,7 @@ export function GuildExpeditionsTab({
       <>
         {tabBar}
         <HistoryView guildId={guildId} playerId={playerId} />
+        {confirmModal}
       </>
     );
   }
