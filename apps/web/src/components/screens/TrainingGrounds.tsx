@@ -114,19 +114,24 @@ export function TrainingGrounds({
     const displayName = prefixDef ? `${prefixDef.displayName} ${selectedMob.name}` : selectedMob.name;
     setMobDisplayName(displayName);
 
-    const result = await startTrainingFight(selectedMob.id, prefix);
+    try {
+      const result = await startTrainingFight(selectedMob.id, prefix);
 
-    if (result.error) {
-      setError(result.error.message);
+      if (result.error) {
+        setError(result.error.message);
+        setTrainingState('idle');
+        return;
+      }
+
+      if (result.data) {
+        setCombatResult(result.data.combat);
+        setCooldown(result.data.cooldownSeconds);
+        onCooldownUpdateRef.current(result.data.cooldownSeconds);
+        setTrainingState('playback');
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Training fight failed');
       setTrainingState('idle');
-      return;
-    }
-
-    if (result.data) {
-      setCombatResult(result.data.combat);
-      setCooldown(result.data.cooldownSeconds);
-      onCooldownUpdateRef.current(result.data.cooldownSeconds);
-      setTrainingState('playback');
     }
   }, [selectedMob, cooldown, trainingState, selectedPrefix]);
 

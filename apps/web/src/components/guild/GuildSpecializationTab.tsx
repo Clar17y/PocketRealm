@@ -38,7 +38,9 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
       const res = await getGuildSpecialization(guildId);
       if (res.error) { setError(res.error.message); return; }
       setStatus(res.data ?? null);
-    } catch { /* */ } finally {
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load specialization');
+    } finally {
       setLoading(false);
     }
   }, [guildId, setError]);

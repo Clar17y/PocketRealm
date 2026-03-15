@@ -88,13 +88,18 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const [eventsRes, bossRes] = await Promise.all([
-      getActiveEvents(),
-      getActiveBossEncounters(),
-    ]);
-    if (eventsRes.data) setEvents(eventsRes.data.events);
-    if (bossRes.data) setBosses(bossRes.data.encounters);
-    setLoading(false);
+    try {
+      const [eventsRes, bossRes] = await Promise.all([
+        getActiveEvents(),
+        getActiveBossEncounters(),
+      ]);
+      if (eventsRes.data) setEvents(eventsRes.data.events);
+      if (bossRes.data) setBosses(bossRes.data.encounters);
+    } catch {
+      // Network failure is non-critical; stale data remains visible
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);

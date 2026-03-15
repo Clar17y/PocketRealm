@@ -99,8 +99,8 @@ export function FriendProfileModal({
         const res = await blockPlayer(profile.playerId);
         if (res.data) onBlock();
       }
-    } catch {
-      // action failed -- modal will close and parent can handle
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Action failed');
     } finally {
       setActionLoading(false);
       setConfirmAction(null);

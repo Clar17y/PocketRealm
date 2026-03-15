@@ -205,13 +205,21 @@ export function Templates({
   // -- List actions --
 
   const handleActivate = useCallback(async (id: string) => {
-    await activateTemplate(id);
-    await onLoadTemplates();
+    try {
+      await activateTemplate(id);
+      await onLoadTemplates();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to activate template');
+    }
   }, [onLoadTemplates]);
 
   const handleDelete = useCallback(async (id: string) => {
-    await deleteTemplate(id);
-    await onLoadTemplates();
+    try {
+      await deleteTemplate(id);
+      await onLoadTemplates();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete template');
+    }
   }, [onLoadTemplates]);
 
   const handleNewTemplate = useCallback(() => {

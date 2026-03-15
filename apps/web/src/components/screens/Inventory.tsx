@@ -102,6 +102,7 @@ export function Inventory({
 }: InventoryProps) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
     type: 'drop' | 'salvage' | 'sell';
     itemId: string;
@@ -276,6 +277,12 @@ export function Inventory({
         </div>
       </div>
 
+      {batchError && (
+        <div className="text-[var(--rpg-red)] text-sm bg-[var(--rpg-red)]/10 border border-[var(--rpg-red)]/30 rounded-lg px-3 py-2">
+          {batchError}
+        </div>
+      )}
+
       {/* Equipped Items */}
       {equippedItems.length > 0 && (
         <div className="space-y-2">
@@ -344,10 +351,13 @@ export function Inventory({
               onAction={async () => {
                 if (!onWithdrawBatch) return;
                 withdrawBatchMode.setBusy(true);
+                setBatchError(null);
                 try {
                   await onWithdrawBatch([...withdrawBatchMode.selection]);
                   withdrawBatchMode.reset();
                   await loadStash();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Withdraw failed');
                 } finally {
                   withdrawBatchMode.setBusy(false);
                 }
@@ -367,10 +377,13 @@ export function Inventory({
               onAction={async () => {
                 if (!onSellBatch) return;
                 stashSellBatch.setBusy(true);
+                setBatchError(null);
                 try {
                   await onSellBatch([...stashSellBatch.selection]);
                   stashSellBatch.reset();
                   await loadStash();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Sell failed');
                 } finally {
                   stashSellBatch.setBusy(false);
                 }
@@ -390,10 +403,13 @@ export function Inventory({
               onAction={async () => {
                 if (!onSalvageBatch) return;
                 stashSalvageBatch.setBusy(true);
+                setBatchError(null);
                 try {
                   await onSalvageBatch([...stashSalvageBatch.selection]);
                   stashSalvageBatch.reset();
                   await loadStash();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Salvage failed');
                 } finally {
                   stashSalvageBatch.setBusy(false);
                 }
@@ -549,9 +565,12 @@ export function Inventory({
               onAction={async () => {
                 if (!onSalvageBatch) return;
                 salvageBatch.setBusy(true);
+                setBatchError(null);
                 try {
                   await onSalvageBatch([...salvageBatch.selection]);
                   salvageBatch.reset();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Salvage failed');
                 } finally {
                   salvageBatch.setBusy(false);
                 }
@@ -566,9 +585,12 @@ export function Inventory({
               onAction={async () => {
                 if (!onDepositBatch) return;
                 stashBatch.setBusy(true);
+                setBatchError(null);
                 try {
                   await onDepositBatch([...stashBatch.selection]);
                   stashBatch.reset();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Stash failed');
                 } finally {
                   stashBatch.setBusy(false);
                 }
@@ -588,9 +610,12 @@ export function Inventory({
               onAction={async () => {
                 if (!onSellBatch) return;
                 sellBatchMode.setBusy(true);
+                setBatchError(null);
                 try {
                   await onSellBatch([...sellBatchMode.selection]);
                   sellBatchMode.reset();
+                } catch (err: unknown) {
+                  setBatchError(err instanceof Error ? err.message : 'Sell failed');
                 } finally {
                   sellBatchMode.setBusy(false);
                 }

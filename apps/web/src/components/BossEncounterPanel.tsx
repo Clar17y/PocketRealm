@@ -41,13 +41,18 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const res = await getBossEncounter(encounterId);
-    if (res.data) {
-      setEncounter(res.data.encounter);
-      setParticipants(res.data.participants);
-      setMyRewards(res.data.myRewards ?? null);
+    try {
+      const res = await getBossEncounter(encounterId);
+      if (res.data) {
+        setEncounter(res.data.encounter);
+        setParticipants(res.data.participants);
+        setMyRewards(res.data.myRewards ?? null);
+      }
+    } catch {
+      // Refresh failure is non-critical; encounter data remains stale
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [encounterId]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -86,13 +91,18 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
   async function handleSignup() {
     setSigning(true);
     setSignupError('');
-    const res = await signUpForBoss(encounterId, autoSignUp);
-    if (res.error) {
-      setSignupError(res.error.message);
-    } else {
-      await refresh();
+    try {
+      const res = await signUpForBoss(encounterId, autoSignUp);
+      if (res.error) {
+        setSignupError(res.error.message);
+      } else {
+        await refresh();
+      }
+    } catch (err: unknown) {
+      setSignupError(err instanceof Error ? err.message : 'Signup failed');
+    } finally {
+      setSigning(false);
     }
-    setSigning(false);
   }
 
   // Group participants by round

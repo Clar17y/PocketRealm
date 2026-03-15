@@ -44,10 +44,12 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
     try {
       const res = await getGuildProjects(guildId);
       if (res.data) setData(res.data);
-    } catch { /* */ } finally {
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load projects');
+    } finally {
       setLoading(false);
     }
-  }, [guildId]);
+  }, [guildId, setError]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
 
@@ -73,8 +75,10 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
       if (resources.length > 0 && !selectedTemplateId) {
         setSelectedTemplateId(resources[0].templateId);
       }
-    } catch { /* */ }
-  }, [selectedTemplateId]);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load materials');
+    }
+  }, [selectedTemplateId, setError]);
 
   const handleStartProject = async (projectKey: string) => {
     if (!confirm('Start this project? The treasury cost will be deducted immediately.')) return;

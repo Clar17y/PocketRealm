@@ -93,49 +93,55 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
     setIsLoading(true);
     setError(null);
 
-    const result = await api.rest(turns);
-    if (result.error) {
-      setError(result.error.message);
+    try {
+      const result = await api.rest(turns);
+      if (result.error) {
+        setError(result.error.message);
+        return;
+      }
+
+      if (result.data) {
+        onTurnsUpdate(result.data.turns.currentTurns);
+        const newHpState = {
+          ...hpState,
+          currentHp: result.data.currentHp,
+          maxHp: result.data.maxHp,
+        };
+        setHpState(newHpState);
+        onHpUpdate(newHpState);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Rest failed');
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    if (result.data) {
-      onTurnsUpdate(result.data.turns.currentTurns);
-      const newHpState = {
-        ...hpState,
-        currentHp: result.data.currentHp,
-        maxHp: result.data.maxHp,
-      };
-      setHpState(newHpState);
-      onHpUpdate(newHpState);
-    }
-
-    setIsLoading(false);
   };
 
   const handleRecover = async () => {
     setIsLoading(true);
     setError(null);
 
-    const result = await api.recoverFromKnockout();
-    if (result.error) {
-      setError(result.error.message);
-      setIsLoading(false);
-      return;
-    }
-
-    if (result.data) {
-      onTurnsUpdate(result.data.turns.currentTurns);
-      // Fetch fresh HP state after recovery
-      const hpResult = await api.getHpState();
-      if (hpResult.data) {
-        setHpState(hpResult.data);
-        onHpUpdateRef.current(hpResult.data);
+    try {
+      const result = await api.recoverFromKnockout();
+      if (result.error) {
+        setError(result.error.message);
+        return;
       }
-    }
 
-    setIsLoading(false);
+      if (result.data) {
+        onTurnsUpdate(result.data.turns.currentTurns);
+        // Fetch fresh HP state after recovery
+        const hpResult = await api.getHpState();
+        if (hpResult.data) {
+          setHpState(hpResult.data);
+          onHpUpdateRef.current(hpResult.data);
+        }
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Recovery failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!hpState) {
