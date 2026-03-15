@@ -275,7 +275,7 @@ export function MailScreen({
         <SubNav
           tabs={tabs}
           activeId={activeView}
-          onSelect={(id) => handleTabSwitch(id as MailView)}
+          onSelect={handleTabSwitch}
           ariaLabel="Mail navigation"
         />
       )}

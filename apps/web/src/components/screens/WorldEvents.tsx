@@ -10,6 +10,7 @@ import {
   type BossEncounterResponse,
 } from '@/lib/api';
 import { BossEncounterPanel } from '@/components/BossEncounterPanel';
+import { handleKeyActivate } from '@/lib/utils';
 import { formatTimeRemaining } from '@/lib/format';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { ScreenContainer } from '../common/ScreenContainer';
@@ -164,7 +165,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
                 role="button"
                 tabIndex={0}
                 onClick={() => setSelectedBossId(boss.id)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBossId(boss.id); } }}
+                onKeyDown={handleKeyActivate(() => setSelectedBossId(boss.id))}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold font-almendra" style={{ color: 'var(--rpg-red)' }}>

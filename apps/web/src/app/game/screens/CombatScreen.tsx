@@ -302,7 +302,7 @@ export function CombatScreen({
           { id: 'bossHistory', label: 'Boss History' },
         ]}
         activeId={activeView}
-        onSelect={(id) => setActiveView(id as 'encounters' | 'history' | 'bossHistory')}
+        onSelect={setActiveView}
         ariaLabel="Combat navigation"
       />
 

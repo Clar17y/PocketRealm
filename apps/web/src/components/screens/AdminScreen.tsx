@@ -39,6 +39,7 @@ import {
 } from '@/lib/api';
 import { Shield } from 'lucide-react';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { handleKeyActivate } from '@/lib/utils';
 
 type AdminTab = 'player' | 'items' | 'world' | 'zones' | 'resources' | 'guild';
 
@@ -251,7 +252,7 @@ function ItemsTab({ onAction }: { onAction?: () => void }) {
             <div key={t.id} onClick={() => setSelectedId(t.id)}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(t.id); } }}
+              onKeyDown={handleKeyActivate(() => setSelectedId(t.id))}
               className={`px-2 py-1.5 rounded text-sm cursor-pointer transition-colors ${
                 t.id === selectedId
                   ? 'bg-[var(--rpg-gold)]/20 border border-[var(--rpg-gold)]/40'
@@ -589,7 +590,7 @@ function ResourcesTab({ onAction }: { onAction?: () => void }) {
               <div key={n.id} onClick={() => setSelectedNodeId(n.id)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedNodeId(n.id); } }}
+                onKeyDown={handleKeyActivate(() => setSelectedNodeId(n.id))}
                 className={`px-2 py-1.5 rounded text-sm cursor-pointer transition-colors ${
                   n.id === selectedNodeId
                     ? 'bg-[var(--rpg-gold)]/20 border border-[var(--rpg-gold)]/40'

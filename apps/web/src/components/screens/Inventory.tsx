@@ -15,6 +15,7 @@ import { getStash } from '@/lib/api/items';
 import { itemImageSrc } from '@/lib/assets';
 import { rarityMeetsThreshold, type Rarity, type ConfirmRarity } from '@/lib/rarity';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { StashTutorial } from '@/components/common/StashTutorial';
 import { getStaggerDelay } from '@/lib/animations';
@@ -281,11 +282,7 @@ export function Inventory({
         </div>
       </div>
 
-      {batchError && (
-        <div className="text-[var(--rpg-red)] text-sm bg-[var(--rpg-red)]/10 border border-[var(--rpg-red)]/30 rounded-lg px-3 py-2">
-          {batchError}
-        </div>
-      )}
+      {batchError && <ErrorBanner message={batchError} />}
 
       {/* Equipped Items */}
       {equippedItems.length > 0 && (

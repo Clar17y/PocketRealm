@@ -11,6 +11,7 @@ import {
   activateTemplate,
 } from '@/lib/api';
 import type { Screen } from '@/app/game/gameController.types';
+import { handleKeyActivate } from '@/lib/utils';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@pocketrealm/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
@@ -504,7 +505,7 @@ export function Templates({
                       role="button"
                       tabIndex={0}
                       onClick={() => setExpandedSlot(isExpanded ? null : i)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedSlot(isExpanded ? null : i); } }}
+                      onKeyDown={handleKeyActivate(() => setExpandedSlot(isExpanded ? null : i))}
                     >
                       <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">
                         {i + 1}

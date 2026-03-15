@@ -19,6 +19,7 @@ import type { SparResponse } from '@/lib/api';
 import type { FriendListEntry, FriendRequest, BlockedPlayer } from '@pocketrealm/shared';
 import { FRIEND_CONSTANTS } from '@pocketrealm/shared';
 import { relativeTime } from '@/lib/format';
+import { handleKeyActivate } from '@/lib/utils';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
 import { SubNav } from '@/components/common/SubNav';
 import { LoadingCard } from '@/components/common/LoadingCard';
@@ -537,7 +538,7 @@ export function FriendsScreen({
                 role="button"
                 tabIndex={0}
                 onClick={() => setSelectedFriendshipId(f.friendshipId)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedFriendshipId(f.friendshipId); } }}
+                onKeyDown={handleKeyActivate(() => setSelectedFriendshipId(f.friendshipId))}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
