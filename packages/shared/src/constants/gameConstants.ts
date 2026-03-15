@@ -174,22 +174,35 @@ export const CHEST_CONSTANTS = {
 // =============================================================================
 
 export const DURABILITY_CONSTANTS = {
-  /** Durability lost per hit landed/received */
-  COMBAT_DEGRADATION: 0.01,
+  /** Durability lost per hit landed (weapon) or received (armor) */
+  COMBAT_DEGRADATION: 0.03,
 
-  /** Turn cost to repair an item */
-  REPAIR_TURN_COST: 100,
+  /** Combat-context multipliers applied to base degradation */
+  DEGRADATION_MULTIPLIER: {
+    default: 1,
+    elite: 1.5,
+    mini_boss: 2,
+    final_boss: 3,
+    world_boss: 3,
+  } as const,
 
-  /** Turn cost to repair a broken (0 durability) item */
-  BROKEN_REPAIR_TURN_COST: 150,
+  /** Turn cost to repair by item tier */
+  REPAIR_TURN_COST_BY_TIER: {
+    1: 50, 2: 75, 3: 100, 4: 125, 5: 150,
+  } as const,
 
-  /** Max durability lost per repair */
-  REPAIR_MAX_DECAY: 5,
+  /** Broken item repair cost = tier cost × this */
+  BROKEN_REPAIR_MULTIPLIER: 1.5,
 
-  /** Minimum max durability before item is destroyed */
-  MIN_MAX_DURABILITY: 10,
+  /** Max durability decay per repair, by rarity */
+  REPAIR_MAX_DECAY_BY_RARITY: {
+    common: 5, uncommon: 4, rare: 3, epic: 2, legendary: 1,
+  } as const,
 
-  /** Percentage threshold for low-durability warnings */
+  /** Items destroyed when maxDurability reaches this */
+  MIN_MAX_DURABILITY: 0,
+
+  /** Fraction of max durability that triggers low-durability warning */
   WARNING_THRESHOLD: 0.10,
 } as const;
 

@@ -618,6 +618,7 @@ export default function GamePage() {
                       imageSrc: itemImageSrc(template.name, template.itemType),
                       rarity: e.item!.rarity,
                       weightClass: template.weightClass ?? null,
+                      tier: template.tier ?? 1,
                       durability: cur,
                       maxDurability: max,
                       baseStats: template.baseStats,

@@ -68,9 +68,11 @@ export async function repairItem(itemId: string) {
     repaired: boolean;
     turns?: TurnStateResponse;
     itemId: string;
+    name?: string;
     currentDurability: number | null;
     maxDurability: number | null;
     maxDurabilityDecay?: number;
+    destroyed?: boolean;
   }>('/api/v1/inventory/repair', {
     method: 'POST',
     body: JSON.stringify({ itemId }),
@@ -90,6 +92,7 @@ export async function repairAllEquipped() {
       currentDurability: number;
       maxDurability: number;
       maxDurabilityDecay: number;
+      destroyed: boolean;
     }>;
   }>('/api/v1/inventory/repair-equipped', {
     method: 'POST',

@@ -1,27 +1,43 @@
 import type { Prisma } from '@pocketrealm/database';
-import { DURABILITY_CONSTANTS } from '@pocketrealm/shared';
+import { DURABILITY_CONSTANTS, repairTurnCost, type ItemRarity } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 
-/** Compute the turn cost to repair a single item. */
-export function repairTurnCost(currentDurability: number): number {
-  return currentDurability <= 0
-    ? DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST
-    : DURABILITY_CONSTANTS.REPAIR_TURN_COST;
-}
+export { repairTurnCost };
+
+const REPAIR_DECAY = DURABILITY_CONSTANTS.REPAIR_MAX_DECAY_BY_RARITY;
 
 /** Apply durability repair to a single item inside a transaction. */
 export async function repairItemDurability(
   tx: Prisma.TransactionClient,
-  item: { id: string; ownerId: string; currentDurability: number | null; maxDurability: number | null; template: { maxDurability: number } },
+  item: {
+    id: string;
+    ownerId: string;
+    currentDurability: number | null;
+    maxDurability: number | null;
+    rarity: string;
+    template: { maxDurability: number };
+  },
   randomFn: () => number = Math.random,
-): Promise<{ newMax: number; decay: number }> {
+): Promise<{ newMax: number; decay: number; destroyed: boolean }> {
   const max = item.maxDurability ?? item.template.maxDurability;
+  const rarity = item.rarity as ItemRarity;
+  const maxDecay = rarity in REPAIR_DECAY ? REPAIR_DECAY[rarity] : 5;
   const decay = Math.min(
-    DURABILITY_CONSTANTS.REPAIR_MAX_DECAY,
-    Math.max(1, Math.floor(randomFn() * (DURABILITY_CONSTANTS.REPAIR_MAX_DECAY + 1))),
+    maxDecay,
+    Math.max(1, Math.floor(randomFn() * (maxDecay + 1))),
   );
   const newMax = Math.max(DURABILITY_CONSTANTS.MIN_MAX_DURABILITY, max - decay);
+
+  if (newMax <= 0) {
+    // Item destroyed — unequip and delete
+    await tx.playerEquipment.updateMany({
+      where: { itemId: item.id },
+      data: { itemId: null },
+    });
+    await tx.item.delete({ where: { id: item.id } });
+    return { newMax: 0, decay, destroyed: true };
+  }
 
   const updated = await tx.item.updateMany({
     where: {
@@ -36,7 +52,7 @@ export async function repairItemDurability(
     throw new AppError(409, 'Item durability changed; try again', 'ITEM_STATE_CHANGED');
   }
 
-  return { newMax, decay };
+  return { newMax, decay, destroyed: false };
 }
 
 export interface RepairEquippedResult {
@@ -57,6 +73,7 @@ export interface RepairEquippedResult {
     currentDurability: number;
     maxDurability: number;
     maxDurabilityDecay: number;
+    destroyed: boolean;
   }>;
 }
 
@@ -91,7 +108,7 @@ export async function repairAllEquipped(
 
   const itemCosts = damaged.map((d) => ({
     ...d,
-    turnCost: repairTurnCost(d.current),
+    turnCost: repairTurnCost(d.item.template.tier, d.current <= 0),
   }));
   const totalTurnCost = itemCosts.reduce((sum, ic) => sum + ic.turnCost, 0);
 
@@ -99,7 +116,7 @@ export async function repairAllEquipped(
 
   const repairedItems = [];
   for (const ic of itemCosts) {
-    const { newMax, decay } = await repairItemDurability(
+    const { newMax, decay, destroyed } = await repairItemDurability(
       tx,
       { ...ic.item, ownerId: playerId },
       randomFn,
@@ -113,6 +130,7 @@ export async function repairAllEquipped(
       currentDurability: newMax,
       maxDurability: newMax,
       maxDurabilityDecay: decay,
+      destroyed,
     });
   }
 

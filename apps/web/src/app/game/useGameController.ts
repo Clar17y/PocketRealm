@@ -1155,11 +1155,19 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const handleRepairItem = (itemId: string) =>
     simpleAction('repair', () => repairItem(itemId), (data) => {
       if (data.turns) setTurns(data.turns.currentTurns);
+      if (data.destroyed) {
+        const label = data.name ?? 'Item';
+        pushLog({ timestamp: nowStamp(), type: 'warning', message: `${label} was too degraded to survive repair and has been permanently destroyed.` });
+      }
     });
 
   const handleRepairAllEquipped = () =>
     simpleAction('repair_all', () => repairAllEquipped(), (data) => {
       if (data.turns) setTurns(data.turns.currentTurns);
+      const destroyed = data.items.filter((i) => i.destroyed);
+      for (const item of destroyed) {
+        pushLog({ timestamp: nowStamp(), type: 'warning', message: `${item.name} was too degraded to survive repair and has been permanently destroyed.` });
+      }
     });
 
   const handleUseItem = (itemId: string) =>
