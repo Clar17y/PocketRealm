@@ -149,6 +149,7 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
       turns: turnSpend,
       turnCost,
       itemId: item.id,
+      name: item.template.name,
       currentDurability: newMax,
       maxDurability: newMax,
       maxDurabilityDecay: decay,

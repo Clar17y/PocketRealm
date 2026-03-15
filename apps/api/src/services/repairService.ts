@@ -1,9 +1,11 @@
 import type { Prisma } from '@pocketrealm/database';
-import { DURABILITY_CONSTANTS, repairTurnCost } from '@pocketrealm/shared';
+import { DURABILITY_CONSTANTS, repairTurnCost, type ItemRarity } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 
 export { repairTurnCost };
+
+const REPAIR_DECAY = DURABILITY_CONSTANTS.REPAIR_MAX_DECAY_BY_RARITY;
 
 /** Apply durability repair to a single item inside a transaction. */
 export async function repairItemDurability(
@@ -19,7 +21,8 @@ export async function repairItemDurability(
   randomFn: () => number = Math.random,
 ): Promise<{ newMax: number; decay: number; destroyed: boolean }> {
   const max = item.maxDurability ?? item.template.maxDurability;
-  const maxDecay = (DURABILITY_CONSTANTS.REPAIR_MAX_DECAY_BY_RARITY as Record<string, number>)[item.rarity] ?? 5;
+  const rarity = item.rarity as ItemRarity;
+  const maxDecay = rarity in REPAIR_DECAY ? REPAIR_DECAY[rarity] : 5;
   const decay = Math.min(
     maxDecay,
     Math.max(1, Math.floor(randomFn() * (maxDecay + 1))),

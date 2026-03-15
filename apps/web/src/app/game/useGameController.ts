@@ -1149,7 +1149,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     simpleAction('repair', () => repairItem(itemId), (data) => {
       if (data.turns) setTurns(data.turns.currentTurns);
       if (data.destroyed) {
-        pushLog({ timestamp: nowStamp(), type: 'warning', message: 'Item was too degraded to survive repair and has been permanently destroyed.' });
+        const label = data.name ?? 'Item';
+        pushLog({ timestamp: nowStamp(), type: 'warning', message: `${label} was too degraded to survive repair and has been permanently destroyed.` });
       }
     });
 

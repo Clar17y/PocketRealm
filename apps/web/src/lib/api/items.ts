@@ -68,6 +68,7 @@ export async function repairItem(itemId: string) {
     repaired: boolean;
     turns?: TurnStateResponse;
     itemId: string;
+    name?: string;
     currentDurability: number | null;
     maxDurability: number | null;
     maxDurabilityDecay?: number;
