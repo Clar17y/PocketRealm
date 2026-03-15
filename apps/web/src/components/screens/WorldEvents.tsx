@@ -164,7 +164,7 @@ export function WorldEvents({ currentZoneId, currentZoneName, playerId, onNaviga
                 role="button"
                 tabIndex={0}
                 onClick={() => setSelectedBossId(boss.id)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedBossId(boss.id); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBossId(boss.id); } }}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold font-almendra" style={{ color: 'var(--rpg-red)' }}>

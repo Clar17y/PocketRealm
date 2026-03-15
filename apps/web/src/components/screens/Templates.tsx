@@ -504,7 +504,7 @@ export function Templates({
                       role="button"
                       tabIndex={0}
                       onClick={() => setExpandedSlot(isExpanded ? null : i)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpandedSlot(isExpanded ? null : i); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedSlot(isExpanded ? null : i); } }}
                     >
                       <span className="text-[8px] font-pixel text-[var(--rpg-text-secondary)] w-5 shrink-0 text-center">
                         {i + 1}

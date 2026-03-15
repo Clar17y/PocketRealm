@@ -16,6 +16,7 @@ export function SubNav({ tabs, activeId, onSelect, ariaLabel = 'Navigation tabs'
     <div className="flex gap-2 mb-4 overflow-x-auto pb-2" role="tablist" aria-label={ariaLabel}>
       {tabs.map((tab) => (
         <button
+          type="button"
           key={tab.id}
           id={`tab-${tab.id}`}
           role="tab"
