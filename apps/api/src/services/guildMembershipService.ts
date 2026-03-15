@@ -14,7 +14,7 @@ export async function joinGuild(playerId: string, guildId: string): Promise<Guil
   const player = await prisma.player.findUnique({ where: { id: playerId }, select: { id: true, characterLevel: true, username: true } });
   if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
 
-  const existing = await prisma.guildMember.findUnique({ where: { playerId } });
+  const existing = await prisma.guildMember.findUnique({ where: { playerId }, select: { guildId: true } });
   if (existing) throw new AppError(400, 'Already in a guild', 'ALREADY_IN_GUILD');
 
   const guild = await prisma.guild.findUnique({
@@ -89,7 +89,7 @@ export async function requestJoinGuild(playerId: string, guildId: string): Promi
   });
   if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
 
-  const existingMembership = await prisma.guildMember.findUnique({ where: { playerId } });
+  const existingMembership = await prisma.guildMember.findUnique({ where: { playerId }, select: { guildId: true } });
   if (existingMembership) throw new AppError(400, 'Already in a guild', 'ALREADY_IN_GUILD');
 
   if (player.characterLevel < GUILD_CONSTANTS.JOIN_MIN_LEVEL) {
@@ -115,6 +115,7 @@ export async function requestJoinGuild(playerId: string, guildId: string): Promi
 
   const existing = await prisma.guildJoinRequest.findUnique({
     where: { guildId_playerId: { guildId, playerId } },
+    select: { status: true },
   });
   if (existing?.status === 'pending') throw new AppError(400, 'Join request already pending', 'REQUEST_ALREADY_SENT');
 
