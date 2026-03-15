@@ -8,8 +8,7 @@ import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { useConsumable } from '../services/consumableService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { repairAllEquipped, repairTurnCost, repairItemDurability } from '../services/repairService';
-import { invalidateCache } from '../services/cacheService';
-import { equipmentCacheKey } from '../services/equipmentService';
+import { invalidateEquipmentCache } from '../services/equipmentService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sellItem, sellBulk } from '../services/sellService';
 import { depositItem, depositBatch, withdrawItem, withdrawBatch, listStash } from '../services/stashService';
@@ -161,7 +160,7 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
 
   // Invalidate after the transaction commits so a rollback never leaves stale cache.
   if (result.repaired) {
-    await invalidateCache(equipmentCacheKey(playerId));
+    await invalidateEquipmentCache(playerId);
   }
 
   res.json(result);
@@ -176,6 +175,12 @@ inventoryRouter.post('/repair-equipped', asyncHandler(async (req, res) => {
   const result = await prisma.$transaction(async (tx) => {
     return repairAllEquipped(tx, playerId);
   });
+
+  // Invalidate after the transaction commits so a rollback never leaves stale cache.
+  if (result.repaired) {
+    await invalidateEquipmentCache(playerId);
+  }
+
   res.json(result);
 }));
 

@@ -51,11 +51,7 @@ export async function rollAndGrantLootWithCapacity(
   }
 
   // Pre-fetch all existing stacks for stackable drops in one query
-  const successfulDrops = entries.filter(e => {
-    const chance = Math.min(1, Math.max(0, e.dropChance.toNumber()));
-    return chance > 0;
-  });
-  const stackableTemplateIds = successfulDrops
+  const stackableTemplateIds = entries
     .filter(d => d.itemTemplate.stackable)
     .map(d => d.itemTemplateId);
 

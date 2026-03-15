@@ -39,7 +39,7 @@ export async function buildPvpCombatant(
   username: string,
   useCurrentResources: boolean,
 ) {
-  const [player, equipStats, attackStyle, template, skillPoints] = await Promise.all([
+  const [player, equipStats, attackStyle, template, skillPoints, levels] = await Promise.all([
     prisma.player.findUniqueOrThrow({
       where: { id: playerId },
       select: { attributes: true },
@@ -48,11 +48,10 @@ export async function buildPvpCombatant(
     getAttackStyle(playerId),
     getActiveTemplate(playerId),
     getSkillPoints(playerId),
+    getSkillLevels(playerId, ['melee', 'ranged', 'evasion', 'magic'] as SkillType[]),
   ]);
 
   const attributes = normalizePlayerAttributes(player.attributes);
-
-  const levels = await getSkillLevels(playerId, ['melee', 'ranged', 'evasion', 'magic'] as SkillType[]);
   const meleeLevel = levels.melee;
   const rangedLevel = levels.ranged;
   const evasionLevel = levels.evasion;

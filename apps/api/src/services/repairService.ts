@@ -2,8 +2,6 @@ import type { Prisma } from '@pocketrealm/database';
 import { DURABILITY_CONSTANTS, repairTurnCost, type ItemRarity } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
-import { equipmentCacheKey } from './equipmentService';
-import { invalidateCache } from './cacheService';
 
 export { repairTurnCost };
 
@@ -140,6 +138,7 @@ export async function repairAllEquipped(
     });
   }
 
-  await invalidateCache(equipmentCacheKey(playerId));
+  // Cache invalidation is intentionally omitted here — callers must invalidate
+  // after the surrounding transaction commits, not inside it.
   return { repaired: true, turns: turnSpend, totalTurnCost, items: repairedItems };
 }

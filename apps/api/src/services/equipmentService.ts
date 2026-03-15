@@ -4,7 +4,12 @@ import { ALL_EQUIPMENT_SLOTS, ALL_SKILLS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { cachedQuery, invalidateCache } from './cacheService';
 
-export const equipmentCacheKey = (playerId: string) => `equipment:stats:${playerId}`;
+const equipmentCacheKey = (playerId: string) => `equipment:stats:${playerId}`;
+
+/** Invalidate the equipment stats cache for a player. Call after transactions commit. */
+export async function invalidateEquipmentCache(playerId: string): Promise<void> {
+  await invalidateCache(equipmentCacheKey(playerId));
+}
 
 export interface EquipmentStats {
   attack: number;

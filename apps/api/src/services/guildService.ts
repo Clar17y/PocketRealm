@@ -6,7 +6,7 @@ import {
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';
-import { cachedQuery } from './cacheService';
+import { cachedQuery, invalidateCache } from './cacheService';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -217,7 +217,12 @@ export async function getPlayerGuild(
   };
 }
 
-export const guildIdCacheKey = (playerId: string) => `guild:member:${playerId}`;
+const guildIdCacheKey = (playerId: string) => `guild:member:${playerId}`;
+
+/** Invalidate the guild ID cache for one or more players. Call after transactions commit. */
+export async function invalidateGuildIdCache(...playerIds: string[]): Promise<void> {
+  await invalidateCache(...playerIds.map(guildIdCacheKey));
+}
 
 export async function getPlayerGuildId(playerId: string): Promise<string | null> {
   return cachedQuery(

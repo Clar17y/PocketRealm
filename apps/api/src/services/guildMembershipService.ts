@@ -3,9 +3,8 @@ import { GUILD_CONSTANTS, type GuildData } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import {
   requireRole, addGuildLog, calculateMaxMembers,
-  addGuildXp, checkGuildAchievementsForAllMembers, getGuild, guildIdCacheKey,
+  addGuildXp, checkGuildAchievementsForAllMembers, getGuild, invalidateGuildIdCache,
 } from './guildService';
-import { invalidateCache } from './cacheService';
 
 // ---------------------------------------------------------------------------
 // Join / Leave
@@ -46,7 +45,7 @@ export async function joinGuild(playerId: string, guildId: string): Promise<Guil
     await addGuildLog(guildId, 'member_joined', `${player.username} joined the guild`, undefined, tx);
   });
 
-  await invalidateCache(guildIdCacheKey(playerId));
+  await invalidateGuildIdCache(playerId);
 
   // Add guild XP for new member
   await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
@@ -72,7 +71,7 @@ export async function leaveGuild(playerId: string): Promise<void> {
     await addGuildLog(membership.guildId, 'member_left', `${membership.player.username} left the guild`, undefined, tx);
   });
 
-  await invalidateCache(guildIdCacheKey(playerId));
+  await invalidateGuildIdCache(playerId);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +187,7 @@ export async function respondToJoinRequest(
       await addGuildLog(membership.guildId, 'join_request_accepted', `${request.player.username} was accepted into the guild`, undefined, tx);
     });
 
-    await invalidateCache(guildIdCacheKey(request.playerId));
+    await invalidateGuildIdCache(request.playerId);
 
     await addGuildXp(membership.guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
     void checkGuildAchievementsForAllMembers(membership.guildId, ['guildMemberCount']);
@@ -226,7 +225,7 @@ export async function kickMember(requesterId: string, targetId: string): Promise
     await addGuildLog(requester.guildId, 'member_kicked', `${target.player.username} was kicked`, undefined, tx);
   });
 
-  await invalidateCache(guildIdCacheKey(targetId));
+  await invalidateGuildIdCache(targetId);
 }
 
 export async function promoteMember(leaderId: string, targetId: string): Promise<void> {
@@ -312,7 +311,7 @@ export async function disbandGuild(leaderId: string, guildId: string): Promise<v
     where: { guildId },
     select: { playerId: true },
   });
-  await invalidateCache(...members.map((m) => guildIdCacheKey(m.playerId)));
+  await invalidateGuildIdCache(...members.map((m) => m.playerId));
 
   await prisma.guild.delete({ where: { id: guildId } });
 }
