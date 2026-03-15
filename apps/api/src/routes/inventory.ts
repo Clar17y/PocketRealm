@@ -8,6 +8,8 @@ import { spendPlayerTurnsTx } from '../services/turnBankService';
 import { useConsumable } from '../services/consumableService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { repairAllEquipped, repairTurnCost, repairItemDurability } from '../services/repairService';
+import { invalidateCache } from '../services/cacheService';
+import { equipmentCacheKey } from '../services/equipmentService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sellItem, sellBulk } from '../services/sellService';
 import { depositItem, depositBatch, withdrawItem, withdrawBatch, listStash } from '../services/stashService';
@@ -156,6 +158,11 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
       destroyed,
     };
   });
+
+  // Invalidate after the transaction commits so a rollback never leaves stale cache.
+  if (result.repaired) {
+    await invalidateCache(equipmentCacheKey(playerId));
+  }
 
   res.json(result);
 }));
