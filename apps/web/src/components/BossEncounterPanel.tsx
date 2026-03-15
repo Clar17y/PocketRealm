@@ -30,6 +30,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
   const [participants, setParticipants] = useState<BossParticipantResponse[]>([]);
   const [myRewards, setMyRewards] = useState<BossPlayerReward | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [signing, setSigning] = useState(false);
   const [autoSignUp, setAutoSignUp] = useState(false);
   const [signupError, setSignupError] = useState('');
@@ -39,8 +40,12 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null);
   const [activeTemplateActionCount, setActiveTemplateActionCount] = useState(0);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (silent = false) => {
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const res = await getBossEncounter(encounterId);
       if (res.data) {
@@ -51,7 +56,11 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
     } catch {
       // Refresh failure is non-critical; encounter data remains stale
     } finally {
-      setLoading(false);
+      if (silent) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, [encounterId]);
 
@@ -96,7 +105,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
       if (res.error) {
         setSignupError(res.error.message);
       } else {
-        await refresh();
+        await refresh(true);
       }
     } catch (err: unknown) {
       setSignupError(err instanceof Error ? err.message : 'Signup failed');
@@ -182,7 +191,7 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
       .slice(0, 5);
   }, [encounter?.status, participants]);
 
-  if (loading) {
+  if (loading && !encounter) {
     return <PixelCard className="p-4 text-center">Loading boss encounter...</PixelCard>;
   }
 
@@ -228,6 +237,8 @@ export function BossEncounterPanel({ encounterId, playerId, onClose, onNavigate 
           />
         </div>
       </div>
+
+      {refreshing && <div className="text-xs text-[var(--rpg-text-secondary)] animate-pulse">Refreshing...</div>}
 
       {/* Status */}
       <div className="flex justify-between text-xs">
