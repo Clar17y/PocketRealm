@@ -15,6 +15,7 @@ import {
 } from '@pocketrealm/game-engine';
 import {
   COMBAT_CONSTANTS,
+  DURABILITY_CONSTANTS,
   ZONE_EXPLORATION_CONSTANTS,
   type LootDrop,
   type MobTemplate,
@@ -254,9 +255,12 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       let mobLoot: LootDropWithName[] = [];
       let mobXpGrants: GrantXpResult[] = [];
       const mobXpAwarded = combatResult.outcome === 'victory' ? Math.max(0, prefixedMob.xpReward) : 0;
+      const durabilityMult = prefixedMob.mobPrefix
+        ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
+        : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
       const mobDurabilityLost = buffUsesLeft.durability > 0
         ? []
-        : await degradeEquippedDurability(playerId, combatResult.log);
+        : await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', durabilityMult);
 
       // Consume combat buff charges per mob
       await prisma.$transaction(async (tx) => {
@@ -845,9 +849,12 @@ export function registerStartRoutes(router: Router): void {
       let pendingLootSessionId: string | null = null;
       let xpGrants: GrantXpResult[] = [];
       let zoneQuestProgress: QuestProgressUpdate[] = [];
+      const zoneDurabilityMult = prefixedMob.mobPrefix
+        ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
+        : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
       const durabilityLost = zoneCombatBuffs.durabilityShield > 0
         ? []
-        : await degradeEquippedDurability(playerId, combatResult.log);
+        : await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', zoneDurabilityMult);
       let fleeResult = null as null | ReturnType<typeof calculateFleeResult>;
       let respawnedTo: { townId: string; townName: string } | null = null;
 

@@ -11,7 +11,7 @@ import {
   filterAndWeightMobsByTier,
   runTemplateCombat,
 } from '@pocketrealm/game-engine';
-import type { PotionConsumed } from '@pocketrealm/shared';
+import { DURABILITY_CONSTANTS, type PotionConsumed } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { refundPlayerTurns } from '../services/turnBankService';
@@ -392,7 +392,10 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           allPotionsConsumed.push(consumed);
         }
 
-        const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log);
+        const travelDurabilityMult = prefixedMob.mobPrefix
+          ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
+          : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
+        const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', travelDurabilityMult);
 
         // Resolve mob family for event badges + achievement tracking (pre-fetched)
         const travelMobFamilyId = mobToFamilyMap.get(prefixedMob.id) ?? null;

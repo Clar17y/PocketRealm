@@ -31,19 +31,51 @@ export default function DurabilityPage() {
       </p>
 
       <h2>Repair</h2>
-      <ConstantsTable
-        rows={[
-          { name: 'REPAIR_TURN_COST', value: DURABILITY_CONSTANTS.REPAIR_TURN_COST, description: 'Turn cost to repair an item' },
-          { name: 'BROKEN_REPAIR_TURN_COST', value: DURABILITY_CONSTANTS.BROKEN_REPAIR_TURN_COST, description: 'Turn cost to repair a broken (0 durability) item' },
-          { name: 'REPAIR_MAX_DECAY', value: DURABILITY_CONSTANTS.REPAIR_MAX_DECAY, description: 'Max durability lost per repair' },
-          { name: 'MIN_MAX_DURABILITY', value: DURABILITY_CONSTANTS.MIN_MAX_DURABILITY, description: 'Minimum max durability before item is destroyed' },
-        ]}
-      />
+      <h3>Repair Cost by Item Tier</h3>
+      <table className="wiki-table">
+        <thead>
+          <tr>
+            <th>Tier</th>
+            <th>Cost (turns)</th>
+            <th>Broken Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {([1, 2, 3, 4, 5] as const).map((t) => {
+            const base = DURABILITY_CONSTANTS.REPAIR_TURN_COST_BY_TIER[t];
+            return (
+              <tr key={t}>
+                <td>T{t}</td>
+                <td>{base}</td>
+                <td>{Math.ceil(base * DURABILITY_CONSTANTS.BROKEN_REPAIR_MULTIPLIER)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <h3>Max Durability Decay by Rarity</h3>
+      <table className="wiki-table">
+        <thead>
+          <tr>
+            <th>Rarity</th>
+            <th>Max Decay per Repair</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(['common', 'uncommon', 'rare', 'epic', 'legendary'] as const).map((r) => (
+            <tr key={r}>
+              <td className="capitalize">{r}</td>
+              <td>1–{DURABILITY_CONSTANTS.REPAIR_MAX_DECAY_BY_RARITY[r]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
       <p>
-        Each repair reduces the item&apos;s maximum durability by{' '}
-        <strong>{DURABILITY_CONSTANTS.REPAIR_MAX_DECAY}</strong>. When maximum
-        durability drops to{' '}
-        <strong>{DURABILITY_CONSTANTS.MIN_MAX_DURABILITY}</strong>, the item is
+        Each repair reduces the item&apos;s maximum durability by a random
+        amount based on rarity (legendary items always lose exactly 1). When
+        maximum durability reaches <strong>0</strong>, the item is permanently
         destroyed.
       </p>
 

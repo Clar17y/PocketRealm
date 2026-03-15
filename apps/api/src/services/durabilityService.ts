@@ -33,12 +33,13 @@ export async function degradeEquippedDurability(
   playerId: string,
   combatLog: CombatHitEntry[],
   perspective: CombatActor = 'combatantA',
+  degradationMultiplier: number = 1,
 ): Promise<DurabilityLoss[]> {
   const hits = countCombatHits(combatLog);
   const myHits = perspective === 'combatantA' ? hits.playerHitsLanded : hits.mobHitsLanded;
   const theirHits = perspective === 'combatantA' ? hits.mobHitsLanded : hits.playerHitsLanded;
-  const weaponDegradation = round2(myHits * DURABILITY_CONSTANTS.COMBAT_DEGRADATION);
-  const armorDegradation = round2(theirHits * DURABILITY_CONSTANTS.COMBAT_DEGRADATION);
+  const weaponDegradation = round2(myHits * DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier);
+  const armorDegradation = round2(theirHits * DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier);
 
   if (weaponDegradation <= 0 && armorDegradation <= 0) return [];
 
