@@ -1823,7 +1823,7 @@ function MemberList({
         <div className="mt-3 pt-2 border-t border-[var(--rpg-border)]">
           <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
           <div className="space-y-0.5">
-            {members
+            {[...members]
               .sort((a, b) => b.totalDamage - a.totalDamage)
               .map((m) => (
                 <div key={`${m.playerId}-contrib`} className="flex justify-between text-xs">
