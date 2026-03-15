@@ -215,7 +215,25 @@ export function Forge({
     }
   }, [rerollSacrifices, selectedRerollSacrificeId]);
 
+  const handleUpgrade = async () => {
+    if (!selected || !selectedUpgradeSacrificeId) return;
+    setBusy('upgrade');
+    try {
+      await onUpgrade(selected.id, selectedUpgradeSacrificeId);
+    } finally {
+      setBusy(null);
+    }
+  };
 
+  const handleReroll = async () => {
+    if (!selected || !selectedRerollSacrificeId) return;
+    setBusy('reroll');
+    try {
+      await onReroll(selected.id, selectedRerollSacrificeId);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const canUseForge = Boolean(selected && !selected.equippedSlot);
   const hasUpgradeSacrifice = upgradeSacrifices.length > 0;
@@ -448,16 +466,7 @@ export function Forge({
           message="If the upgrade fails, both items will be destroyed. This cannot be undone."
           confirmLabel="Upgrade"
           variant="danger"
-          onConfirm={async () => {
-            setConfirmUpgrade(false);
-            if (!selected || !selectedUpgradeSacrificeId) return;
-            setBusy('upgrade');
-            try {
-              await onUpgrade(selected.id, selectedUpgradeSacrificeId);
-            } finally {
-              setBusy(null);
-            }
-          }}
+          onConfirm={() => { setConfirmUpgrade(false); void handleUpgrade(); }}
           onCancel={() => setConfirmUpgrade(false)}
         />
       )}
@@ -467,16 +476,7 @@ export function Forge({
           message="All current bonus stats will be permanently replaced with new random stats."
           confirmLabel="Reroll"
           variant="warning"
-          onConfirm={async () => {
-            setConfirmReroll(false);
-            if (!selected || !selectedRerollSacrificeId) return;
-            setBusy('reroll');
-            try {
-              await onReroll(selected.id, selectedRerollSacrificeId);
-            } finally {
-              setBusy(null);
-            }
-          }}
+          onConfirm={() => { setConfirmReroll(false); void handleReroll(); }}
           onCancel={() => setConfirmReroll(false)}
         />
       )}

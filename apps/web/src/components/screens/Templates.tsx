@@ -818,7 +818,7 @@ export function Templates({
           message="This combat template will be permanently deleted."
           confirmLabel="Delete"
           variant="danger"
-          onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); handleDelete(id); }}
+          onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); void handleDelete(id); }}
           onCancel={() => setConfirmDeleteId(null)}
         />
       )}
