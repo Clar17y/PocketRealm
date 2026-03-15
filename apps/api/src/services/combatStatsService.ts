@@ -26,6 +26,20 @@ export async function getSkillLevel(playerId: string, skillType: SkillType): Pro
   return skill?.level ?? 1;
 }
 
+export async function getSkillLevels(
+  playerId: string,
+  skillTypes: SkillType[],
+): Promise<Record<string, number>> {
+  const skills = await prisma.playerSkill.findMany({
+    where: { playerId, skillType: { in: skillTypes } },
+    select: { skillType: true, level: true },
+  });
+  const map: Record<string, number> = {};
+  for (const st of skillTypes) map[st] = 1; // defaults
+  for (const s of skills) map[s.skillType] = s.level;
+  return map;
+}
+
 export async function buildPerActionScaling(
   playerId: string,
   preloaded?: {
@@ -35,11 +49,10 @@ export async function buildPerActionScaling(
     guildDamageMultiplier?: number;
   },
 ): Promise<PerActionScaling> {
-  const [meleeLevel, rangedLevel, magicLevel] = await Promise.all([
-    getSkillLevel(playerId, 'melee'),
-    getSkillLevel(playerId, 'ranged'),
-    getSkillLevel(playerId, 'magic'),
-  ]);
+  const levels = await getSkillLevels(playerId, ['melee', 'ranged', 'magic']);
+  const meleeLevel = levels.melee;
+  const rangedLevel = levels.ranged;
+  const magicLevel = levels.magic;
 
   if (preloaded) {
     const { equipmentStats, attributes, weaponRequiredSkill } = preloaded;
