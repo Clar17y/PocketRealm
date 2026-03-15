@@ -17,6 +17,7 @@ import { PixelCard } from '../PixelCard';
 import { PixelButton } from '../PixelButton';
 import { LoadingCard } from '../common/LoadingCard';
 import { ErrorBanner } from '../common/ErrorBanner';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface MailScreenProps {
   playerId: string | null;
@@ -61,6 +62,9 @@ export function MailScreen({
   const [composeBody, setComposeBody] = useState('');
   const [sending, setSending] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Confirm delete
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // General
   const [loading, setLoading] = useState(true);
@@ -289,7 +293,7 @@ export function MailScreen({
           totalPages={inboxTotalPages}
           onPageChange={handleInboxPageChange}
           onOpen={(m) => void handleOpenMail(m, 'inbox')}
-          onDelete={(id) => void handleDelete(id)}
+          onDelete={(id) => setConfirmDeleteId(id)}
         />
       )}
 
@@ -303,7 +307,7 @@ export function MailScreen({
           totalPages={sentTotalPages}
           onPageChange={handleSentPageChange}
           onOpen={(m) => void handleOpenMail(m, 'sent')}
-          onDelete={(id) => void handleDelete(id)}
+          onDelete={(id) => setConfirmDeleteId(id)}
         />
       )}
 
@@ -330,7 +334,18 @@ export function MailScreen({
           playerId={playerId}
           onBack={() => { setSelectedMail(null); setActiveView(returnView); }}
           onReply={() => handleReply(selectedMail)}
-          onDelete={() => void handleDelete(selectedMail.id)}
+          onDelete={() => setConfirmDeleteId(selectedMail.id)}
+        />
+      )}
+
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Delete Mail?"
+          message="This message will be permanently deleted."
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); void handleDelete(id); }}
+          onCancel={() => setConfirmDeleteId(null)}
         />
       )}
     </ScreenContainer>

@@ -25,6 +25,7 @@ import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { FriendProfileModal } from '@/components/friends/FriendProfileModal';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
@@ -85,12 +86,22 @@ export function FriendsScreen({
   // --- action busy guard ---
   const [actionBusy, setActionBusy] = useState(false);
 
+  // --- confirm dialog state ---
+  const [confirmAction, setConfirmAction] = useState<{ type: 'remove' | 'block'; friendId: string; name: string } | null>(null);
+
+  // --- refreshing (silent reload after actions) ---
+  const [refreshing, setRefreshing] = useState(false);
+
   // -----------------------------------------------------------------------
   // Data loaders
   // -----------------------------------------------------------------------
 
-  const loadFriends = useCallback(async () => {
-    setLoading(true);
+  const loadFriends = useCallback(async (silent = false) => {
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await getFriendsList();
@@ -102,7 +113,11 @@ export function FriendsScreen({
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load friends');
     } finally {
-      setLoading(false);
+      if (silent) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -209,7 +224,7 @@ export function FriendsScreen({
         return;
       }
       onFriendCountsChanged?.();
-      void loadFriends();
+      void loadFriends(true);
       void loadIncoming();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to accept request');
@@ -249,7 +264,7 @@ export function FriendsScreen({
         return;
       }
       onFriendCountsChanged?.();
-      void loadFriends();
+      void loadFriends(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to remove friend');
     } finally {
@@ -269,7 +284,7 @@ export function FriendsScreen({
       }
       onFriendCountsChanged?.();
       // Remove from friends/requests lists and refresh blocks
-      void loadFriends();
+      void loadFriends(true);
       void loadIncoming();
       void loadBlocks();
     } catch (err: unknown) {
@@ -352,7 +367,7 @@ export function FriendsScreen({
   // Loading state
   // -----------------------------------------------------------------------
 
-  if (loading) {
+  if (loading && friends.length === 0) {
     return (
       <ScreenContainer>
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">
@@ -546,7 +561,7 @@ export function FriendsScreen({
                       disabled={actionBusy}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleUnfriend(f.friendshipId);
+                        setConfirmAction({ type: 'remove', friendId: f.friendshipId, name: f.username });
                       }}
                     >
                       Remove
@@ -557,7 +572,7 @@ export function FriendsScreen({
                       disabled={actionBusy}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleBlock(f.playerId);
+                        setConfirmAction({ type: 'block', friendId: f.playerId, name: f.username });
                       }}
                     >
                       Block
@@ -689,6 +704,8 @@ export function FriendsScreen({
         </div>
       )}
 
+      {refreshing && <div className="text-xs text-[var(--rpg-text-secondary)] animate-pulse">Refreshing...</div>}
+
       {selectedFriendshipId && (
         <FriendProfileModal
           friendshipId={selectedFriendshipId}
@@ -697,14 +714,31 @@ export function FriendsScreen({
           onSendMail={handleSendMail}
           onUnfriend={() => {
             setSelectedFriendshipId(null);
-            void loadFriends();
+            void loadFriends(true);
             onFriendCountsChanged?.();
           }}
           onBlock={() => {
             setSelectedFriendshipId(null);
-            void loadFriends();
+            void loadFriends(true);
             onFriendCountsChanged?.();
           }}
+        />
+      )}
+
+      {confirmAction && (
+        <ConfirmModal
+          title={confirmAction.type === 'remove' ? 'Remove Friend?' : 'Block Player?'}
+          message={confirmAction.type === 'remove'
+            ? `Remove ${confirmAction.name} from your friends list?`
+            : `Block ${confirmAction.name}? They won't be able to send you messages or friend requests.`}
+          confirmLabel={confirmAction.type === 'remove' ? 'Remove' : 'Block'}
+          variant="danger"
+          onConfirm={() => {
+            const { type, friendId } = confirmAction;
+            setConfirmAction(null);
+            type === 'remove' ? void handleUnfriend(friendId) : void handleBlock(friendId);
+          }}
+          onCancel={() => setConfirmAction(null)}
         />
       )}
     </ScreenContainer>

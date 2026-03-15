@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import {
   getGuildSpecialization, selectGuildSpecialization, respecGuildSpecialization,
   GUILD_MODIFIER_LABELS,
@@ -29,6 +30,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
   const [status, setStatus] = useState<SpecializationStatusResponse | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState<{ type: 'select' | 'respec'; path: string } | null>(null);
 
   const isLeader = myRole === 'leader';
 
@@ -48,7 +50,6 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
   useEffect(() => { void loadSpec(); }, [loadSpec]);
 
   const handleSelect = async (path: string) => {
-    if (!confirm(`Select ${path} specialization? This choice can be changed later via respec.`)) return;
     setActionLoading(true);
     setError(null);
     try {
@@ -63,8 +64,6 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
   };
 
   const handleRespec = async (path: string) => {
-    const cost = GUILD_CONSTANTS.SPECIALIZATION_RESPEC_COST;
-    if (!confirm(`Respec to ${path}? This costs ${formatNumber(cost)} treasury turns.`)) return;
     setActionLoading(true);
     setError(null);
     try {
@@ -77,6 +76,23 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
       setActionLoading(false);
     }
   };
+
+  const confirmModal = pendingConfirm && (
+    <ConfirmModal
+      title={pendingConfirm.type === 'select' ? 'Select Specialization?' : 'Respec Specialization?'}
+      message={pendingConfirm.type === 'select'
+        ? `Select ${pendingConfirm.path} specialization? This choice can be changed later via respec.`
+        : `Respec to ${pendingConfirm.path}? This costs ${formatNumber(GUILD_CONSTANTS.SPECIALIZATION_RESPEC_COST)} treasury turns.`}
+      confirmLabel={pendingConfirm.type === 'select' ? 'Select' : 'Respec'}
+      variant="warning"
+      onConfirm={() => {
+        const { type, path } = pendingConfirm;
+        setPendingConfirm(null);
+        type === 'select' ? void handleSelect(path) : void handleRespec(path);
+      }}
+      onCancel={() => setPendingConfirm(null)}
+    />
+  );
 
   if (loading && status === undefined) {
     return <LoadingCard />;
@@ -116,7 +132,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
                   <p className="text-xs text-[var(--rpg-text-secondary)]">{spec.description}</p>
                 </div>
                 {isLeader && (
-                  <PixelButton onClick={() => handleSelect(spec.path)} disabled={actionLoading}>
+                  <PixelButton onClick={() => setPendingConfirm({ type: 'select', path: spec.path })} disabled={actionLoading}>
                     Select
                   </PixelButton>
                 )}
@@ -125,6 +141,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
             </PixelCard>
           );
         })}
+        {confirmModal}
       </div>
     );
   }
@@ -222,7 +239,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
                     <p className="text-sm font-bold" style={{ color: c.primary }}>{spec.name}</p>
                     <p className="text-xs text-[var(--rpg-text-secondary)]">{spec.description}</p>
                   </div>
-                  <PixelButton onClick={() => handleRespec(spec.path)} disabled={actionLoading}>
+                  <PixelButton onClick={() => setPendingConfirm({ type: 'respec', path: spec.path })} disabled={actionLoading}>
                     Respec
                   </PixelButton>
                 </div>
@@ -231,6 +248,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
           </div>
         </PixelCard>
       )}
+      {confirmModal}
     </div>
   );
 }

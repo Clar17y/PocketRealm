@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import {
   getGuildProjects, startGuildProject, contributeProjectTurns, contributeProjectMaterials,
   GUILD_MODIFIER_LABELS,
@@ -36,6 +37,7 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
   const [resourceItems, setResourceItems] = useState<ResourceItem[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [materialQuantity, setMaterialQuantity] = useState('10');
+  const [showStartConfirm, setShowStartConfirm] = useState<string | null>(null);
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
 
@@ -81,7 +83,6 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
   }, [selectedTemplateId, setError]);
 
   const handleStartProject = async (projectKey: string) => {
-    if (!confirm('Start this project? The treasury cost will be deducted immediately.')) return;
     setActionLoading(true);
     setError(null);
     try {
@@ -182,7 +183,7 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
                 project={proj}
                 isOfficer={isOfficer}
                 actionLoading={actionLoading}
-                onStart={() => handleStartProject(proj.key)}
+                onStart={() => setShowStartConfirm(proj.key)}
               />
             ))}
           </div>
@@ -223,6 +224,17 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
         projects={data?.projects ?? []}
         available={available}
       />
+
+      {showStartConfirm && (
+        <ConfirmModal
+          title="Start Project?"
+          message="Start this project? The treasury cost will be deducted immediately."
+          confirmLabel="Start"
+          variant="warning"
+          onConfirm={() => { const key = showStartConfirm; setShowStartConfirm(null); void handleStartProject(key); }}
+          onCancel={() => setShowStartConfirm(null)}
+        />
+      )}
     </div>
   );
 }
