@@ -1303,6 +1303,7 @@ export default function GamePage() {
         {actionError && (
           <div
             ref={errorRef}
+            role="alert"
             className={`mb-4 p-3 rounded bg-[var(--rpg-background)] animate-error-flash ${
               actionError.includes('active expedition')
                 ? 'border border-[var(--rpg-gold)] text-[var(--rpg-gold)]'

@@ -71,6 +71,14 @@ export function MailScreen({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync initialRecipientId when it changes after mount
+  useEffect(() => {
+    if (initialRecipientId) {
+      setComposeRecipientId(initialRecipientId);
+      setActiveView('compose');
+    }
+  }, [initialRecipientId]);
+
   // -----------------------------------------------------------------------
   // Loaders
   // -----------------------------------------------------------------------

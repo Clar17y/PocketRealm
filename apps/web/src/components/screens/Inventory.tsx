@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -124,6 +124,10 @@ export function Inventory({
   const [stashLoading, setStashLoading] = useState(false);
   const [selectedStashItem, setSelectedStashItem] = useState<StashItem | null>(null);
 
+  // Keep a stable ref for getSalvageCost so loadStash doesn't need it as a dependency
+  const getSalvageCostRef = useRef(getSalvageCost);
+  getSalvageCostRef.current = getSalvageCost;
+
   // Mutual exclusion helpers — activate one mode, reset all others in the same tab
   const backpackModes = [salvageBatch, stashBatch, sellBatchMode];
   const stashModes = [withdrawBatchMode, stashSellBatch, stashSalvageBatch];
@@ -160,7 +164,7 @@ export function Inventory({
             type: item.template.itemType,
             durability: isEquip && max > 0 ? { current: item.currentDurability ?? max, max } : null,
             sellPrice: item.template.sellPrice ?? null,
-            salvageCost: isEquip && getSalvageCost ? getSalvageCost(item.template.id) : null,
+            salvageCost: isEquip && getSalvageCostRef.current ? getSalvageCostRef.current(item.template.id) : null,
           };
         }));
       }
