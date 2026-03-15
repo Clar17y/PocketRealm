@@ -1121,7 +1121,6 @@ describe('pvpService', () => {
           attacker: { select: { username: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: 20,
       });
     });
   });

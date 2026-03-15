@@ -692,7 +692,6 @@ export async function getNotifications(playerId: string) {
       attacker: { select: { username: true } },
     },
     orderBy: { createdAt: 'desc' },
-    take: 20,
   });
 }
 
