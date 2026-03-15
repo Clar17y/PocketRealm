@@ -189,7 +189,7 @@ describe('pvpCombatantBuilder', () => {
       expect(result).toBe('melee');
       expect(mockPrisma.playerEquipment.findUnique).toHaveBeenCalledWith({
         where: { playerId_slot: { playerId: PLAYER_ID, slot: 'main_hand' } },
-        include: { item: { include: { template: true } } },
+        select: { item: { select: { template: { select: { requiredSkill: true } } } } },
       });
     });
 

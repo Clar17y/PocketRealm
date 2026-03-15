@@ -20,7 +20,7 @@ export type AttackStyle = 'melee' | 'ranged' | 'magic';
 export async function getAttackStyle(playerId: string): Promise<AttackStyle> {
   const mainHand = await prisma.playerEquipment.findUnique({
     where: { playerId_slot: { playerId, slot: 'main_hand' } },
-    include: { item: { include: { template: true } } },
+    select: { item: { select: { template: { select: { requiredSkill: true } } } } },
   });
   const reqSkill = mainHand?.item?.template?.requiredSkill as string | null;
   if (reqSkill === 'ranged') return 'ranged';

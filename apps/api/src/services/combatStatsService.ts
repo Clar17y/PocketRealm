@@ -12,7 +12,7 @@ export function attackSkillFromRequiredSkill(value: SkillType | null | undefined
 export async function getMainHandAttackSkill(playerId: string): Promise<AttackSkill | null> {
   const mainHand = await prisma.playerEquipment.findUnique({
     where: { playerId_slot: { playerId, slot: 'main_hand' } },
-    include: { item: { include: { template: true } } },
+    select: { item: { select: { template: { select: { requiredSkill: true } } } } },
   });
   const requiredSkill = mainHand?.item?.template?.requiredSkill as SkillType | null | undefined;
   return attackSkillFromRequiredSkill(requiredSkill);
