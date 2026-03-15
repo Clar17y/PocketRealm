@@ -2,8 +2,20 @@ import { Prisma, prisma } from '@pocketrealm/database';
 import { rollBonusStatsForRarity, rollDropRarity } from '@pocketrealm/game-engine';
 import type { EquipmentSlot, ItemStats, ItemType, LootDrop } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
+import { cachedQuery } from './cacheService';
 import { addStackableItem, getInventoryState } from './inventoryService';
 import { storePendingLoot, type PendingLootItem } from './pendingLootService';
+
+async function getDropTable(mobTemplateId: string) {
+  return cachedQuery(
+    `droptable:${mobTemplateId}`,
+    () => prisma.dropTable.findMany({
+      where: { mobTemplateId },
+      include: { itemTemplate: true },
+    }),
+    86400, // 24h TTL — static data
+  );
+}
 
 export type LootDropWithName = LootDrop & { itemName: string | null };
 
@@ -27,10 +39,7 @@ export async function rollAndGrantLootWithCapacity(
   dropChanceMultiplier = 1,
   capacityOverride?: number,
 ): Promise<{ drops: LootDrop[]; overflow: PendingLootItem[]; pendingLootSessionId: string | null }> {
-  const entries = await prisma.dropTable.findMany({
-    where: { mobTemplateId },
-    include: { itemTemplate: true },
-  });
+  const entries = await getDropTable(mobTemplateId);
 
   let usedSlots: number;
   let capacity: number;

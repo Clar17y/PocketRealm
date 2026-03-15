@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // --- Module mocks (must be before imports) ---
 
+vi.mock('./cacheService', () => ({
+  cachedQuery: vi.fn((_key: string, fetcher: () => Promise<unknown>) => fetcher()),
+}));
+
 vi.mock('./inventoryService', () => ({
   addStackableItem: vi.fn().mockResolvedValue({ itemId: 'stack-1', quantity: 1 }),
   getInventoryState: vi.fn().mockResolvedValue({ usedSlots: 0, capacity: 20, availableSlots: 20 }),
