@@ -1,0 +1,184 @@
+# Code Health Audit Tracker
+
+**Started:** 2026-03-14
+**Total files:** 166 | **Audited:** 136 | **Remaining:** 30
+
+---
+
+## Services (63 files)
+
+- [x] `apps/api/src/services/activityLogService.ts` — [report](2026-03-14-213118-activityLogService.md) — 2M, 1L
+- [x] `apps/api/src/services/achievementService.ts` — [report](2026-03-14-214208-achievementService.md) — 1H, 2M, 3L
+- [x] `apps/api/src/services/attributesService.ts` — [report](2026-03-14-215134-attributesService.md) — 1C, 1M, 1L
+- [x] `apps/api/src/services/blockService.ts` — [report](2026-03-14-220125-blockService.md) — 1M, 1L
+- [x] `apps/api/src/services/bossBestiaryService.ts` — [report](2026-03-14-221131-bossBestiaryService.md) — 1L
+- [x] `apps/api/src/services/bossEncounterService.ts` — [report](2026-03-14-222158-bossEncounterService.md) — 2H, 2M, 2L
+- [x] `apps/api/src/services/bossLootService.ts` — [report](2026-03-14-223131-bossLootService.md) — 1H, 2M, 2L
+- [x] `apps/api/src/services/buffService.ts` — [report](2026-03-14-224139-buffService.md) — 1C, 1H, 1M, 1L
+- [x] `apps/api/src/services/cacheLootService.ts` — [report](2026-03-14-225136-cacheLootService.md) — 1C, 1M, 4L
+- [x] `apps/api/src/services/casinoService.ts` — [report](2026-03-14-230227-casinoService.md) — 1H, 2M, 3L
+- [x] `apps/api/src/services/chatService.ts` — [report](2026-03-14-231120-chatService.md) — 2L
+- [x] `apps/api/src/services/chestService.ts` — [report](2026-03-14-232131-chestService.md) — 1C, 3L
+- [x] `apps/api/src/services/combatLogMapper.ts` — [report](2026-03-14-233125-combatLogMapper.md) — 2L
+- [x] `apps/api/src/services/combatOrchestrationService.ts` — [report](2026-03-14-234145-combatOrchestrationService.md) — 3M, 2L
+- [x] `apps/api/src/services/combatStatsService.ts` — [report](2026-03-14-235130-combatStatsService.md) — 2L
+- [x] `apps/api/src/services/combatTemplateService.ts` — [report](2026-03-15-000209-combatTemplateService.md) — 2L
+- [x] `apps/api/src/services/consumableService.ts` — [report](2026-03-15-001120-consumableService.md) — 1M, 1L
+- [x] `apps/api/src/services/dropRollingService.ts` — [report](2026-03-15-002131-dropRollingService.md) — 1H, 1M, 3L
+- [x] `apps/api/src/services/durabilityService.ts` — [report](2026-03-15-003119-durabilityService.md) — 1L
+- [x] `apps/api/src/services/eloService.ts` — [report](2026-03-15-004125-eloService.md) — clean
+- [x] `apps/api/src/services/equipmentService.ts` — [report](2026-03-15-005132-equipmentService.md) — 1L
+- [x] `apps/api/src/services/eventSchedulerService.ts` — [report](2026-03-15-010134-eventSchedulerService.md) — 1M, 4L
+- [x] `apps/api/src/services/expeditionBestiaryService.ts` — [report](2026-03-15-011119-expeditionBestiaryService.md) — 1L
+- [x] `apps/api/src/services/expeditionLockoutService.ts` — [report](2026-03-15-012115-expeditionLockoutService.md) — clean
+- [x] `apps/api/src/services/expeditionLootService.ts` — [report](2026-03-15-013125-expeditionLootService.md) — 1M, 1L
+- [x] `apps/api/src/services/expeditionService.ts` — [report](2026-03-15-014211-expeditionService.md) — 1H, 2M, 2L
+- [x] `apps/api/src/services/expeditionShopService.ts` — [report](2026-03-15-015122-expeditionShopService.md) — 1L
+- [x] `apps/api/src/services/friendMailService.ts` — [report](2026-03-15-020122-friendMailService.md) — 1M
+- [x] `apps/api/src/services/friendService.ts` — [report](2026-03-15-021125-friendService.md) — clean
+- [x] `apps/api/src/services/guildContractService.ts` — [report](2026-03-15-022130-guildContractService.md) — 1H, 1M, 3L
+- [x] `apps/api/src/services/guildMembershipService.ts` — [report](2026-03-15-023138-guildMembershipService.md) — 1H, 1L
+- [x] `apps/api/src/services/guildProjectService.ts` — [report](2026-03-15-024125-guildProjectService.md) — 2M, 1L
+- [x] `apps/api/src/services/guildService.ts` — [report](2026-03-15-025139-guildService.md) — 1C, 1H, 2M, 2L
+- [x] `apps/api/src/services/guildSpecializationService.ts` — [report](2026-03-15-030122-guildSpecializationService.md) — 1L
+- [x] `apps/api/src/services/guildTaxService.ts` — [report](2026-03-15-031134-guildTaxService.md) — 1L
+- [x] `apps/api/src/services/guildUpgradeService.ts` — [report](2026-03-15-032121-guildUpgradeService.md) — 1H, 1M
+- [x] `apps/api/src/services/hpService.ts` — [report](2026-03-15-033125-hpService.md) — clean
+- [x] `apps/api/src/services/inventoryService.ts` — [report](2026-03-15-034139-inventoryService.md) — 1M, 5L
+- [x] `apps/api/src/services/leaderboardService.ts` — [report](2026-03-15-035141-leaderboardService.md) — 2L
+- [x] `apps/api/src/services/lootService.ts` — [report](2026-03-15-040122-lootService.md) — 1M, 2L
+- [x] `apps/api/src/services/pendingLootService.ts` — [report](2026-03-15-041121-pendingLootService.md) — 1M, 1L
+- [x] `apps/api/src/services/persistedMobService.ts` — [report](2026-03-15-042123-persistedMobService.md) — clean
+- [x] `apps/api/src/services/potionService.ts` — [report](2026-03-15-043120-potionService.md) — 1M
+- [x] `apps/api/src/services/progressService.ts` — [report](2026-03-15-044124-progressService.md) — 2L
+- [x] `apps/api/src/services/pvpCombatantBuilder.ts` — [report](2026-03-15-045131-pvpCombatantBuilder.md) — 2L
+- [x] `apps/api/src/services/pvpService.ts` — [report](2026-03-15-050141-pvpService.md) — 3L
+- [x] `apps/api/src/services/questService.ts` — [report](2026-03-15-051130-questService.md) — 3L
+- [x] `apps/api/src/services/questShopService.ts` — [report](2026-03-15-052129-questShopService.md) — 1C, 2H
+- [x] `apps/api/src/services/repairService.ts` — [report](2026-03-15-053125-repairService.md) — 1L
+- [x] `apps/api/src/services/resourceService.ts` — [report](2026-03-15-054128-resourceService.md) — 1M, 2L
+- [x] `apps/api/src/services/roundResolutionScheduler.ts` — [report](2026-03-15-055120-roundResolutionScheduler.md) — clean
+- [x] `apps/api/src/services/sellService.ts` — [report](2026-03-15-060119-sellService.md) — 1L
+- [x] `apps/api/src/services/skillPointService.ts` — [report](2026-03-15-061122-skillPointService.md) — 1H, 1M, 1L
+- [x] `apps/api/src/services/sparService.ts` — [report](2026-03-15-062128-sparService.md) — 3L
+- [x] `apps/api/src/services/stashService.ts` — [report](2026-03-15-063122-stashService.md) — 2M
+- [x] `apps/api/src/services/statsService.ts` — [report](2026-03-15-064134-statsService.md) — 3L
+- [x] `apps/api/src/services/systemMessageService.ts` — [report](2026-03-15-065118-systemMessageService.md) — clean
+- [x] `apps/api/src/services/trainingService.ts` — [report](2026-03-15-070136-trainingService.md) — 1M, 1L
+- [x] `apps/api/src/services/turnBankService.ts` — [report](2026-03-15-071157-turnBankService.md) — 1L
+- [x] `apps/api/src/services/worldEventService.ts` — [report](2026-03-15-072151-worldEventService.md) — 3L
+- [x] `apps/api/src/services/xpService.ts` — [report](2026-03-15-073131-xpService.md) — 1C, 1L
+- [x] `apps/api/src/services/zoneDiscoveryService.ts` — [report](2026-03-15-074146-zoneDiscoveryService.md) — 1M, 2L
+- [x] `apps/api/src/services/zoneExplorationService.ts` — [report](2026-03-15-075126-zoneExplorationService.md) — clean
+
+## Routes (41 files)
+
+- [x] `apps/api/src/routes/achievements.ts` — [report](2026-03-15-080131-achievements.md) — 2L
+- [x] `apps/api/src/routes/admin.ts` — [report](2026-03-15-081134-admin.md) — 1H, 2M, 3L
+- [x] `apps/api/src/routes/auth.ts` — [report](2026-03-15-082129-auth.md) — 2M
+- [x] `apps/api/src/routes/bestiary.ts` — [report](2026-03-15-083135-bestiary.md) — 1H, 1L
+- [x] `apps/api/src/routes/boss.ts` — [report](2026-03-15-084119-boss.md) — 1M, 1L
+- [x] `apps/api/src/routes/casino.ts` — [report](2026-03-15-085118-casino.md) — 2L
+- [x] `apps/api/src/routes/chat.ts` — [report](2026-03-15-090113-chat.md) — clean
+- [x] `apps/api/src/routes/combat.ts` — [report](2026-03-15-091122-combat.md) — 2L
+- [x] `apps/api/src/routes/combat/helpers.ts` — [report](2026-03-15-092241-combat-helpers.md) — 7L
+- [x] `apps/api/src/routes/combat/logs.ts` — [report](2026-03-15-093131-combat-logs.md) — 1M, 1L
+- [x] `apps/api/src/routes/combat/sites.ts` — [report](2026-03-15-094119-combat-sites.md) — clean
+- [x] `apps/api/src/routes/combat/start.ts` — [report](2026-03-15-095225-combat-start.md) — 1C, 1H, 1M, 1L
+- [x] `apps/api/src/routes/crafting.ts` — [report](2026-03-15-100122-crafting.md) — clean
+- [x] `apps/api/src/routes/crafting/craft.ts` — [report](2026-03-15-101125-crafting-craft.md) — 2H, 1L
+- [x] `apps/api/src/routes/crafting/forge.ts` — [report](2026-03-15-102125-crafting-forge.md) — 1M, 2L
+- [x] `apps/api/src/routes/crafting/helpers.ts` — [report](2026-03-15-103135-crafting-helpers.md) — 1H, 2L
+- [x] `apps/api/src/routes/crafting/recipes.ts` — [report](2026-03-15-104122-crafting-recipes.md) — 1H, 1L
+- [x] `apps/api/src/routes/crafting/salvage.ts` — [report](2026-03-15-105128-crafting-salvage.md) — 1H, 2M
+- [x] `apps/api/src/routes/equipment.ts` — [report](2026-03-15-110123-equipment.md) — 1L
+- [x] `apps/api/src/routes/expedition.ts` — [report](2026-03-15-111118-expedition.md) — 1L
+- [x] `apps/api/src/routes/exploration.ts` — [report](2026-03-15-112116-exploration.md) — clean
+- [x] `apps/api/src/routes/exploration/estimate.ts` — [report](2026-03-15-113116-exploration-estimate.md) — clean
+- [x] `apps/api/src/routes/exploration/helpers.ts` — [report](2026-03-15-114153-exploration-helpers.md) — 5L
+- [x] `apps/api/src/routes/exploration/start.ts` — [report](2026-03-15-115212-exploration-start.md) — 1C, 1H, 2L
+- [x] `apps/api/src/routes/friends.ts` — [report](2026-03-15-120117-friends.md) — clean
+- [x] `apps/api/src/routes/gathering.ts` — [report](2026-03-15-121127-gathering.md) — 1L
+- [x] `apps/api/src/routes/guild.ts` — [report](2026-03-15-122118-guild.md) — clean
+- [x] `apps/api/src/routes/hp.ts` — [report](2026-03-15-123149-hp.md) — clean
+- [x] `apps/api/src/routes/inventory.ts` — [report](2026-03-15-124113-inventory.md) — clean
+- [x] `apps/api/src/routes/leaderboard.ts` — [report](2026-03-15-125120-leaderboard.md) — clean
+- [x] `apps/api/src/routes/player.ts` — [report](2026-03-15-130122-player.md) — clean
+- [x] `apps/api/src/routes/pvp.ts` — [report](2026-03-15-131139-pvp.md) — 1L
+- [x] `apps/api/src/routes/quests.ts` — [report](2026-03-15-132124-quests.md) — clean
+- [x] `apps/api/src/routes/resources.ts` — [report](2026-03-15-133143-resources.md) — clean
+- [x] `apps/api/src/routes/shop.ts` — [report](2026-03-15-134135-shop.md) — clean
+- [x] `apps/api/src/routes/skillpoints.ts` — [report](2026-03-15-135118-skillpoints.md) — clean
+- [x] `apps/api/src/routes/templates.ts` — [report](2026-03-15-140125-templates.md) — clean
+- [x] `apps/api/src/routes/training.ts` — [report](2026-03-15-141112-training.md) — clean
+- [x] `apps/api/src/routes/turns.ts` — [report](2026-03-15-142121-turns.md) — clean
+- [x] `apps/api/src/routes/worldEvents.ts` — [report](2026-03-15-143122-worldEvents.md) — clean
+- [x] `apps/api/src/routes/zones.ts` — [report](2026-03-15-144131-zones.md) — 1H, 1M, 2L
+
+## Game Engine (32 files)
+
+- [x] `packages/game-engine/src/casino/roulette.ts` — [report](2026-03-15-145154-roulette.md) — clean
+- [x] `packages/game-engine/src/combat/actionResolver.ts` — [report](2026-03-15-150122-actionResolver.md) — clean
+- [x] `packages/game-engine/src/combat/bossContribution.ts` — [report](2026-03-15-151117-bossContribution.md) — clean
+- [x] `packages/game-engine/src/combat/bossRoundResolver.ts` — [report](2026-03-15-152203-bossRoundResolver.md) — clean
+- [x] `packages/game-engine/src/combat/combatHelpers.ts` — [report](2026-03-15-153149-combatHelpers.md) — 1M, 1L
+- [x] `packages/game-engine/src/combat/conditionEvaluator.ts` — [report](2026-03-15-154119-conditionEvaluator.md) — 1L
+- [x] `packages/game-engine/src/combat/damageCalculator.ts` — [report](2026-03-15-155144-damageCalculator.md) — 2L
+- [x] `packages/game-engine/src/combat/mobPrefixes.ts` — [report](2026-03-15-160202-mobPrefixes.md) — clean
+- [x] `packages/game-engine/src/combat/mobTemplateConverter.ts` — [report](2026-03-15-161146-mobTemplateConverter.md) — clean
+- [x] `packages/game-engine/src/combat/persistedMobRegen.ts` — [report](2026-03-15-162126-persistedMobRegen.md) — clean
+- [x] `packages/game-engine/src/combat/raidRoundResolver.ts` — [report](2026-03-15-163134-raidRoundResolver.md) — 1L
+- [x] `packages/game-engine/src/combat/templateCombatEngine.ts` — [report](2026-03-15-164129-templateCombatEngine.md) — 1L
+- [x] `packages/game-engine/src/combat/threatSystem.ts` — [report](2026-03-15-165212-threatSystem.md) — clean
+- [x] `packages/game-engine/src/crafting/craftingCrit.ts` — [report](2026-03-15-170138-craftingCrit.md) — 3L
+- [x] `packages/game-engine/src/events/applyEventModifiers.ts` — [report](2026-03-15-171145-applyEventModifiers.md) — 2L
+- [x] `packages/game-engine/src/expedition/roomGenerator.ts` — [report](2026-03-15-172134-expedition-roomGenerator.md) — 2L
+- [x] `packages/game-engine/src/exploration/encounterChest.ts` — [report](2026-03-15-173127-encounterChest.md) — clean
+- [x] `packages/game-engine/src/exploration/mobTierFilter.ts` — [report](2026-03-15-174130-mobTierFilter.md) — clean
+- [x] `packages/game-engine/src/exploration/probabilityModel.ts` — [report](2026-03-15-175148-probabilityModel.md) — 1L
+- [x] `packages/game-engine/src/exploration/roomGenerator.ts` — [report](2026-03-15-180152-exploration-roomGenerator.md) — clean
+- [x] `packages/game-engine/src/exploration/zoneExitScaling.ts` — [report](2026-03-15-181126-zoneExitScaling.md) — clean
+- [x] `packages/game-engine/src/gathering/gatheringCrit.ts` — [report](2026-03-15-182126-gatheringCrit.md) — 1L
+- [x] `packages/game-engine/src/hp/fleeMechanics.ts` — [report](2026-03-15-183128-fleeMechanics.md) — clean
+- [x] `packages/game-engine/src/hp/hpCalculator.ts` — [report](2026-03-15-184118-hpCalculator.md) — clean
+- [x] `packages/game-engine/src/inventory/inventoryCapacity.ts` — [report](2026-03-15-185127-inventoryCapacity.md) — clean
+- [x] `packages/game-engine/src/inventory/sellPrice.ts` — [report](2026-03-15-190140-sellPrice.md) — clean
+- [x] `packages/game-engine/src/items/itemRarity.ts` — [report](2026-03-15-191136-itemRarity.md) — 1L
+- [x] `packages/game-engine/src/resources/manaCalculator.ts` — [report](2026-03-15-192126-manaCalculator.md) — clean
+- [x] `packages/game-engine/src/resources/staminaCalculator.ts` — [report](2026-03-15-193215-staminaCalculator.md) — 1L
+- [x] `packages/game-engine/src/skills/xpCalculator.ts` — [report](2026-03-15-194312-xpCalculator.md) — 2L
+- [x] `packages/game-engine/src/turns/turnCalculator.ts` — [report](2026-03-15-195418-turnCalculator.md) — 2L
+- [x] `packages/game-engine/src/utils/math.ts` — [report](2026-03-15-200524-math.md) — clean
+
+## Shared (30 files)
+
+- [ ] `packages/shared/src/constants/achievementDefinitions.ts`
+- [ ] `packages/shared/src/constants/bossTemplateDefinitions.ts`
+- [ ] `packages/shared/src/constants/combatActionDefinitions.ts`
+- [ ] `packages/shared/src/constants/combatEffectNames.ts`
+- [ ] `packages/shared/src/constants/expeditionDefinitions.ts`
+- [ ] `packages/shared/src/constants/gameConstants.ts`
+- [ ] `packages/shared/src/constants/mobPrefixes.ts`
+- [ ] `packages/shared/src/constants/talentTreeDefinitions.ts`
+- [ ] `packages/shared/src/constants/worldEventTemplates.ts`
+- [ ] `packages/shared/src/types/achievement.types.ts`
+- [ ] `packages/shared/src/types/bossTemplate.types.ts`
+- [ ] `packages/shared/src/types/casino.types.ts`
+- [ ] `packages/shared/src/types/chat.types.ts`
+- [ ] `packages/shared/src/types/combat.types.ts`
+- [ ] `packages/shared/src/types/combatAction.types.ts`
+- [ ] `packages/shared/src/types/encounter.types.ts`
+- [ ] `packages/shared/src/types/expedition.types.ts`
+- [ ] `packages/shared/src/types/friend.types.ts`
+- [ ] `packages/shared/src/types/guild.types.ts`
+- [ ] `packages/shared/src/types/hp.types.ts`
+- [ ] `packages/shared/src/types/item.types.ts`
+- [ ] `packages/shared/src/types/mobPrefix.types.ts`
+- [ ] `packages/shared/src/types/player.types.ts`
+- [ ] `packages/shared/src/types/quest.types.ts`
+- [ ] `packages/shared/src/types/shop.types.ts`
+- [ ] `packages/shared/src/types/skill.types.ts`
+- [ ] `packages/shared/src/types/worldEvent.types.ts`
+- [ ] `packages/shared/src/utils/achievementChains.ts`
+- [ ] `packages/shared/src/utils/mobUtils.ts`
+- [ ] `packages/shared/src/utils/tierUtils.ts`
