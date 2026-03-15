@@ -227,12 +227,12 @@ export async function processCombatVictoryRewards(
     await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
   }
   const questProgress: QuestProgressUpdate[] = [];
-  const killProgress = await trackProgress(playerId, 'kill_count', 1);
+  const killProgress = await trackProgress(playerId, 'kill_count', 1, undefined, guildId);
   questProgress.push(...killProgress);
-  const familyProgress = await trackProgress(playerId, 'kill_family', 1);
+  const familyProgress = await trackProgress(playerId, 'kill_family', 1, undefined, guildId);
   questProgress.push(...familyProgress);
   if (mob.mobPrefix) {
-    const prefixProgress = await trackProgress(playerId, 'kill_prefix', 1, { prefix: mob.mobPrefix });
+    const prefixProgress = await trackProgress(playerId, 'kill_prefix', 1, { prefix: mob.mobPrefix }, guildId);
     questProgress.push(...prefixProgress);
   }
 
