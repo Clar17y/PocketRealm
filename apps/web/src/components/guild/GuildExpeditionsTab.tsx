@@ -1436,13 +1436,16 @@ function HistoryView({ guildId, playerId }: { guildId: string; playerId: string 
   const [expandedDetail, setExpandedDetail] = useState<{ expedition: ExpeditionData; members: ExpeditionMemberData[] } | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     getExpeditionHistory(page).then(res => {
+      if (cancelled) return;
       if (res.data) {
         setExpeditions(res.data.expeditions);
         setTotalPages(res.data.pagination.totalPages);
       }
-    }).finally(() => setLoading(false));
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [page]);
 
   const handleExpand = async (id: string) => {

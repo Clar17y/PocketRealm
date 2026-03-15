@@ -542,17 +542,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, [tutorialStep]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      void loadAll();
-      void loadPvpNotificationCount();
-      void loadFriendCounts();
-      const interval = setInterval(() => void loadTurnsAndHp(), 10000);
-      // Poll PvP notifications less frequently (60s)
-      const pvpInterval = setInterval(() => void loadPvpNotificationCount(), 60000);
-      // Poll friend counts at same cadence as PvP
-      const friendInterval = setInterval(() => void loadFriendCounts(), 60000);
-      return () => { clearInterval(interval); clearInterval(pvpInterval); clearInterval(friendInterval); };
-    }
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    void loadAll();
+    void loadPvpNotificationCount();
+    void loadFriendCounts();
+    const interval = setInterval(() => { if (!cancelled) void loadTurnsAndHp(); }, 10000);
+    // Poll PvP notifications less frequently (60s)
+    const pvpInterval = setInterval(() => { if (!cancelled) void loadPvpNotificationCount(); }, 60000);
+    // Poll friend counts at same cadence as PvP
+    const friendInterval = setInterval(() => { if (!cancelled) void loadFriendCounts(); }, 60000);
+    return () => { cancelled = true; clearInterval(interval); clearInterval(pvpInterval); clearInterval(friendInterval); };
   }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount, loadFriendCounts]);
 
   const getActiveTab = () => {
@@ -906,7 +906,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Auto-skip any active playback when navigating away
     if (playbackActive) {
       if (explorationPlaybackData) {
-        handlePlaybackSkip();
+        void handlePlaybackSkip();
       }
       if (combatPlaybackQueue) {
         // Skip to the end of the queue
@@ -923,7 +923,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         void refreshPendingEncounters();
       }
       if (travelPlaybackData) {
-        handleTravelPlaybackSkip();
+        void handleTravelPlaybackSkip();
       }
     }
     // Clear last combat log when leaving the combat screen — it's in history if needed

@@ -215,9 +215,12 @@ export function Casino({
   // Fetch stats when toggled on
   useEffect(() => {
     if (!showHeatMap) { setNumberStats(null); return; }
+    let cancelled = false;
     api.getRouletteStats().then((res) => {
+      if (cancelled) return;
       if (res.data) setNumberStats(res.data.stats);
     });
+    return () => { cancelled = true; };
   }, [showHeatMap]);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
