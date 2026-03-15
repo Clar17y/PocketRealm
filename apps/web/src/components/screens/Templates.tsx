@@ -14,6 +14,7 @@ import type { Screen } from '@/app/game/gameController.types';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@pocketrealm/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 // --- Constants ---
@@ -195,6 +196,7 @@ export function Templates({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     void onLoadTemplates();
@@ -787,7 +789,7 @@ export function Templates({
                       Activate
                     </PixelButton>
                   )}
-                  <PixelButton size="sm" variant="danger" onClick={() => handleDelete(t.id)}>
+                  <PixelButton size="sm" variant="danger" onClick={() => setConfirmDeleteId(t.id)}>
                     Delete
                   </PixelButton>
                 </div>
@@ -795,6 +797,16 @@ export function Templates({
             </PixelCard>
           ))}
         </div>
+      )}
+      {confirmDeleteId && (
+        <ConfirmModal
+          title="Delete Template?"
+          message="This combat template will be permanently deleted."
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); handleDelete(id); }}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
       )}
     </ScreenContainer>
   );
