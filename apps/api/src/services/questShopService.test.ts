@@ -695,9 +695,9 @@ describe('purchaseItem — recipe_scroll', () => {
 
     const tx = setupTx(item);
     tx.craftingRecipe.findMany.mockResolvedValue([
-      { id: 'r1', name: 'Iron Sword', skillType: 'weaponsmithing', requiredLevel: 1 },
-      { id: 'r2', name: 'Steel Sword', skillType: 'weaponsmithing', requiredLevel: 10 },
-      { id: 'r3', name: 'Gold Ring', skillType: 'mining', requiredLevel: 5 },
+      { id: 'r1', skillType: 'weaponsmithing', requiredLevel: 1, resultTemplate: { name: 'Iron Sword' } },
+      { id: 'r2', skillType: 'weaponsmithing', requiredLevel: 10, resultTemplate: { name: 'Steel Sword' } },
+      { id: 'r3', skillType: 'mining', requiredLevel: 5, resultTemplate: { name: 'Gold Ring' } },
     ]);
     tx.playerRecipe.findMany.mockResolvedValue([{ recipeId: 'r1' }]);
     tx.playerSkill.findMany.mockResolvedValue([
@@ -719,7 +719,7 @@ describe('purchaseItem — recipe_scroll', () => {
 
     const tx = setupTx(item);
     tx.craftingRecipe.findMany.mockResolvedValue([
-      { id: 'r1', name: 'Iron Sword', skillType: 'weaponsmithing', requiredLevel: 1 },
+      { id: 'r1', skillType: 'weaponsmithing', requiredLevel: 1, resultTemplate: { name: 'Iron Sword' } },
     ]);
     tx.playerRecipe.findMany.mockResolvedValue([{ recipeId: 'r1' }]); // already knows it
     tx.playerSkill.findMany.mockResolvedValue([]);
@@ -732,7 +732,7 @@ describe('purchaseItem — recipe_scroll', () => {
 
     const tx = setupTx(item);
     tx.craftingRecipe.findMany.mockResolvedValue([
-      { id: 'r1', name: 'Advanced Sword', skillType: 'weaponsmithing', requiredLevel: 50 },
+      { id: 'r1', skillType: 'weaponsmithing', requiredLevel: 50, resultTemplate: { name: 'Advanced Sword' } },
     ]);
     tx.playerRecipe.findMany.mockResolvedValue([]);
     tx.playerSkill.findMany.mockResolvedValue([{ skillType: 'weaponsmithing', level: 5 }]);
@@ -745,7 +745,7 @@ describe('purchaseItem — recipe_scroll', () => {
 
     const tx = setupTx(item);
     tx.craftingRecipe.findMany.mockResolvedValue([
-      { id: 'r1', name: 'Basic Recipe', skillType: 'alchemy', requiredLevel: 0 },
+      { id: 'r1', skillType: 'alchemy', requiredLevel: 0, resultTemplate: { name: 'Basic Recipe' } },
     ]);
     tx.playerRecipe.findMany.mockResolvedValue([]);
     tx.playerSkill.findMany.mockResolvedValue([]); // no skills → all at 0
@@ -762,9 +762,9 @@ describe('purchaseItem — recipe_scroll', () => {
 
     const tx = setupTx(item);
     tx.craftingRecipe.findMany.mockResolvedValue([
-      { id: 'r1', name: 'Recipe A', skillType: 'mining', requiredLevel: 0 },
-      { id: 'r2', name: 'Recipe B', skillType: 'mining', requiredLevel: 0 },
-      { id: 'r3', name: 'Recipe C', skillType: 'mining', requiredLevel: 0 },
+      { id: 'r1', skillType: 'mining', requiredLevel: 0, resultTemplate: { name: 'Recipe A' } },
+      { id: 'r2', skillType: 'mining', requiredLevel: 0, resultTemplate: { name: 'Recipe B' } },
+      { id: 'r3', skillType: 'mining', requiredLevel: 0, resultTemplate: { name: 'Recipe C' } },
     ]);
     tx.playerRecipe.findMany.mockResolvedValue([]);
     tx.playerSkill.findMany.mockResolvedValue([{ skillType: 'mining', level: 99 }]);
@@ -812,7 +812,7 @@ describe('purchaseItem — guild_contract_reroll', () => {
     const result = await purchaseItem(PLAYER_ID, SHOP_ITEM_ID, { targetContractId: CONTRACT_ID });
 
     expect(result.effect.type).toBe('contract_reroll');
-    expect(result.effect.oldKey).toBe('kill_count');
+    expect(result.effect['oldKey']).toBe('kill_count');
     expect(tx.guildContract.delete).toHaveBeenCalledWith({ where: { id: CONTRACT_ID } });
     expect(tx.guildContract.create).toHaveBeenCalled();
     expect(tx.guildLog.create).toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { prisma } from '@pocketrealm/database';
+import { prisma, type GuildContract } from '@pocketrealm/database';
 import {
   GUILD_CONTRACT_DEFINITIONS,
   GUILD_CONTRACT_CONSTANTS,
@@ -50,8 +50,8 @@ export async function generateWeeklyContracts(guildId: string, now: Date = new D
 
   const selected = selectWithCategorySpread([...GUILD_CONTRACT_DEFINITIONS], CONTRACTS_PER_WEEK, MIN_CATEGORIES);
 
-  const contracts = await prisma.$transaction(async (tx: any) => {
-    const created: any[] = [];
+  const contracts = await prisma.$transaction(async (tx) => {
+    const created: GuildContract[] = [];
     for (const def of selected) {
       const contract = await tx.guildContract.create({
         data: {
@@ -143,7 +143,7 @@ export async function incrementContractProgress(
 
   if (newValue >= contract.targetValue) {
     // Contract completed — use optimistic locking to prevent double-completion
-    const completed = await prisma.$transaction(async (tx: any) => {
+    const completed = await prisma.$transaction(async (tx) => {
       // Only complete if still active (guards against concurrent completion)
       const { count } = await tx.guildContract.updateMany({
         where: { id: contract.id, status: 'active' },

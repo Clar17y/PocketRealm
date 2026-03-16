@@ -65,7 +65,7 @@ async function grantSoulboundFromRecipes(
         quantity: 1,
         maxDurability,
         currentDurability: maxDurability,
-      } as any,
+      },
     });
     return {
       soulboundItem: { itemTemplateId: picked.resultTemplateId, name: picked.resultTemplate.name, rarity },
@@ -98,14 +98,13 @@ export async function grantCacheLootTx(
     availableSlots?: number;
   }
 ): Promise<CacheLootResult> {
-  const txAny = tx as unknown as Record<string, unknown>;
   const { MATERIAL_ROLLS_MIN, MATERIAL_ROLLS_MAX, SOULBOUND_DROP_CHANCE } = HIDDEN_CACHE_CONSTANTS;
 
   // --- Refined gem materials from zone gathering nodes ---
-  const resourceNodes = await (txAny as any).resourceNode.findMany({
+  const resourceNodes = await tx.resourceNode.findMany({
     where: { zoneId: params.zoneId },
     select: { skillRequired: true, levelRequired: true },
-  }) as Array<{ skillRequired: string; levelRequired: number }>;
+  });
 
   // Determine which raw gems this zone produces
   const rawGemNames: string[] = [];
@@ -119,29 +118,26 @@ export async function grantCacheLootTx(
 
   if (rawGemNames.length > 0) {
     // Find all raw gem template IDs in one query
-    const rawGemTemplates = await (txAny as any).itemTemplate.findMany({
+    const rawGemTemplates = await tx.itemTemplate.findMany({
       where: { name: { in: rawGemNames }, itemType: 'resource' },
       select: { id: true, name: true },
-    }) as Array<{ id: string; name: string }>;
+    });
     const rawGemIdSet = new Set(rawGemTemplates.map(t => t.id));
 
     // Fetch all refining recipes and filter by raw gem materials in JS
     // (materials is a Json column storing { templateId, quantity } — can't use relational filters)
-    const refiningRecipes = await (txAny as any).craftingRecipe.findMany({
+    const refiningRecipes = await tx.craftingRecipe.findMany({
       where: { skillType: 'refining' },
       select: {
         resultTemplateId: true,
         resultTemplate: { select: { name: true } },
         materials: true,
       },
-    }) as Array<{
-      resultTemplateId: string;
-      resultTemplate: { name: string };
-      materials: Array<{ templateId: string; quantity: number }>;
-    }>;
+    });
 
     for (const recipe of refiningRecipes) {
-      const usesZoneGem = recipe.materials.some(m => rawGemIdSet.has(m.templateId));
+      const mats = recipe.materials as unknown as Array<{ templateId: string; quantity: number }>;
+      const usesZoneGem = mats.some(m => rawGemIdSet.has(m.templateId));
       if (!usesZoneGem) continue;
 
       cutGemTemplateIds.push({
@@ -161,10 +157,10 @@ export async function grantCacheLootTx(
   // (merging into an existing stack doesn't consume a new slot)
   const existingStacks = new Set<string>();
   if (params.availableSlots != null) {
-    const playerItems = await (txAny as any).item.findMany({
+    const playerItems = await tx.item.findMany({
       where: { ownerId: params.playerId, inStash: false },
       select: { templateId: true },
-    }) as Array<{ templateId: string }>;
+    });
     for (const item of playerItems) existingStacks.add(item.templateId);
   }
 
@@ -219,10 +215,10 @@ export async function grantCacheLootTx(
   } as const;
 
   if (Math.random() < SOULBOUND_DROP_CHANCE) {
-    const soulboundRecipes = (await (txAny as any).craftingRecipe.findMany({
+    const soulboundRecipes = await tx.craftingRecipe.findMany({
       where: { soulbound: true, mobFamilyId: params.mobFamilyId },
       select: soulboundRecipeSelect,
-    })) as SoulboundRecipe[];
+    });
 
     if (soulboundRecipes.length > 0) {
       const grant = await grantSoulboundFromRecipes(tx, soulboundRecipes, params.playerId, params.luck, remainingSlots, overflow);
@@ -233,13 +229,13 @@ export async function grantCacheLootTx(
 
   // --- Fallback: if cache would be empty, grant a soulbound item from zone mob families ---
   if (materials.length === 0 && soulboundItem === null) {
-    const fallbackRecipes = (await (txAny as any).craftingRecipe.findMany({
+    const fallbackRecipes = await tx.craftingRecipe.findMany({
       where: {
         soulbound: true,
         mobFamily: { zoneMappings: { some: { zoneId: params.zoneId } } },
       },
       select: soulboundRecipeSelect,
-    })) as SoulboundRecipe[];
+    });
 
     if (fallbackRecipes.length > 0) {
       const grant = await grantSoulboundFromRecipes(tx, fallbackRecipes, params.playerId, params.luck, remainingSlots, overflow);

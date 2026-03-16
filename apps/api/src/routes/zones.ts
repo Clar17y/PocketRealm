@@ -320,11 +320,11 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       // Pre-build mob→family lookup to avoid N+1 queries in the loop
       const mobToFamilyMap = new Map(mobFamilyMembers.map(m => [m.mobTemplateId, m.mobFamilyId]));
 
-      const zoneTiers = (currentZone as unknown as { explorationTiers: Record<string, number> | null }).explorationTiers;
+      const zoneTiers = currentZone.explorationTiers as Record<string, number> | null;
       const tieredMobs = filterAndWeightMobsByTier(
         mobTemplates.map(m => ({
           ...m,
-          explorationTier: (m as unknown as { explorationTier: number | null }).explorationTier ?? 1,
+          explorationTier: m.explorationTier ?? 1,
         })),
         explorationProgress.percent,
         zoneTiers,
@@ -349,7 +349,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         if (tieredMobs.length === 0) break;
 
         const rawMob = pickWeighted(tieredMobs, m => m.encounterWeight) ?? tieredMobs[0]!;
-        const baseMob = toMobTemplate(rawMob as unknown as Record<string, unknown>);
+        const baseMob = toMobTemplate(rawMob);
         const prefixedMob = applyMobPrefix(baseMob, rollMobPrefix());
 
         const playerStats = buildPlayerCombatStats(

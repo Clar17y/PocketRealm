@@ -2,8 +2,20 @@ import { Prisma, prisma } from '@pocketrealm/database';
 import { rollBonusStatsForRarity, rollDropRarity } from '@pocketrealm/game-engine';
 import type { EquipmentSlot, ItemStats, ItemType, LootDrop } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
-import { addStackableItem, getInventoryState } from './inventoryService';
+import { cachedQuery } from './cacheService';
+import { getInventoryState } from './inventoryService';
 import { storePendingLoot, type PendingLootItem } from './pendingLootService';
+
+async function getDropTable(mobTemplateId: string) {
+  return cachedQuery(
+    `droptable:${mobTemplateId}`,
+    () => prisma.dropTable.findMany({
+      where: { mobTemplateId },
+      include: { itemTemplate: true },
+    }),
+    86400, // 24h TTL — static data
+  );
+}
 
 export type LootDropWithName = LootDrop & { itemName: string | null };
 
@@ -27,10 +39,7 @@ export async function rollAndGrantLootWithCapacity(
   dropChanceMultiplier = 1,
   capacityOverride?: number,
 ): Promise<{ drops: LootDrop[]; overflow: PendingLootItem[]; pendingLootSessionId: string | null }> {
-  const entries = await prisma.dropTable.findMany({
-    where: { mobTemplateId },
-    include: { itemTemplate: true },
-  });
+  const entries = await getDropTable(mobTemplateId);
 
   let usedSlots: number;
   let capacity: number;
@@ -41,22 +50,33 @@ export async function rollAndGrantLootWithCapacity(
     ({ usedSlots, capacity } = await getInventoryState(playerId));
   }
 
+  // Pre-fetch all existing stacks for stackable drops in one query
+  const stackableTemplateIds = entries
+    .filter(d => d.itemTemplate.stackable)
+    .map(d => d.itemTemplateId);
+
+  const existingStacks = stackableTemplateIds.length > 0
+    ? await prisma.item.findMany({
+        where: { ownerId: playerId, templateId: { in: stackableTemplateIds }, inStash: false },
+        select: { id: true, templateId: true, quantity: true },
+      })
+    : [];
+  const stackMap = new Map(existingStacks.map(s => [s.templateId, s]));
+
   let slotsUsed = usedSlots;
   const drops: LootDrop[] = [];
   const overflow: PendingLootItem[] = [];
 
   for (const entry of entries) {
-    const chance = Math.min(1, Math.max(0, entry.dropChance.toNumber()));
+    const chance = Math.min(1, Math.max(0, Number(entry.dropChance)));
     if (chance <= 0 || Math.random() >= chance) continue;
 
     const quantity = randomIntInclusive(entry.minQuantity, entry.maxQuantity);
     if (quantity <= 0) continue;
 
     if (entry.itemTemplate.stackable) {
-      const existing = await prisma.item.findFirst({
-        where: { ownerId: playerId, templateId: entry.itemTemplateId, inStash: false },
-      });
-      if (!existing && slotsUsed >= capacity) {
+      const existingStack = stackMap.get(entry.itemTemplateId);
+      if (!existingStack && slotsUsed >= capacity) {
         overflow.push({
           templateId: entry.itemTemplateId,
           templateName: entry.itemTemplate.name,
@@ -68,8 +88,20 @@ export async function rollAndGrantLootWithCapacity(
         });
         continue;
       }
-      await addStackableItem(playerId, entry.itemTemplateId, quantity);
-      if (!existing) slotsUsed++;
+      if (existingStack) {
+        await prisma.item.update({
+          where: { id: existingStack.id },
+          data: { quantity: { increment: quantity } },
+        });
+        existingStack.quantity += quantity; // update local state for subsequent same-template drops
+      } else {
+        const newItem = await prisma.item.create({
+          data: { ownerId: playerId, templateId: entry.itemTemplateId, quantity, rarity: 'common' },
+          select: { id: true, templateId: true, quantity: true },
+        });
+        stackMap.set(entry.itemTemplateId, newItem);
+        slotsUsed++;
+      }
       drops.push({ itemTemplateId: entry.itemTemplateId, quantity, rarity: 'common' });
       continue;
     }
@@ -108,7 +140,7 @@ export async function rollAndGrantLootWithCapacity(
           maxDurability,
           currentDurability: maxDurability,
           bonusStats: bonusStats ? (bonusStats as Prisma.InputJsonObject) : undefined,
-        } as any,
+        },
       });
       slotsUsed++;
       drops.push({ itemTemplateId: entry.itemTemplateId, quantity: 1, rarity });

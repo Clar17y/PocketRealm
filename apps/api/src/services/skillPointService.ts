@@ -60,7 +60,7 @@ export async function allocatePoints(playerId: string, nodeId: string): Promise<
   const node = getTalentNode(nodeId);
   if (!node) throw new AppError(404, `Talent node '${nodeId}' not found`, 'NODE_NOT_FOUND');
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx) => {
     // Lock the allocation row so concurrent requests block until this transaction commits,
     // preventing double-spend under READ COMMITTED isolation.
     await tx.$queryRaw`SELECT id FROM "skill_point_allocations" WHERE "player_id" = ${playerId} FOR UPDATE`;
@@ -133,7 +133,7 @@ export async function respecPoints(
     throw new AppError(400, 'No points to respec', 'NOTHING_TO_RESPEC');
   }
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx) => {
     await spendPlayerTurnsTx(tx, playerId, SKILL_POINT_CONSTANTS.RESPEC_TURN_COST, now);
     await tx.skillPointAllocation.update({
       where: { playerId },

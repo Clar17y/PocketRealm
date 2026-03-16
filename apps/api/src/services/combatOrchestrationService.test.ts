@@ -759,8 +759,8 @@ describe('processCombatVictoryRewards', () => {
       attackSkill: 'melee',
     });
 
-    expect(mockTrackProgress).toHaveBeenCalledWith('p1', 'kill_count', 1);
-    expect(mockTrackProgress).toHaveBeenCalledWith('p1', 'kill_family', 1);
+    expect(mockTrackProgress).toHaveBeenCalledWith('p1', 'kill_count', 1, undefined, null);
+    expect(mockTrackProgress).toHaveBeenCalledWith('p1', 'kill_family', 1, undefined, null);
   });
 
   it('tracks kill_prefix progress when mob has a prefix', async () => {
@@ -770,7 +770,7 @@ describe('processCombatVictoryRewards', () => {
       attackSkill: 'melee',
     });
 
-    expect(mockTrackProgress).toHaveBeenCalledWith('p1', 'kill_prefix', 1, { prefix: 'savage' });
+    expect(mockTrackProgress).toHaveBeenCalledWith('p1', 'kill_prefix', 1, { prefix: 'savage' }, null);
   });
 
   it('does not track kill_prefix when mob has no prefix', async () => {

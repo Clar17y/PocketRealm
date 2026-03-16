@@ -49,22 +49,7 @@ recipesRouter.get('/', asyncHandler(async (req, res) => {
         },
       },
       orderBy: [{ requiredLevel: 'asc' }],
-    }) as Array<{
-      id: string;
-      skillType: string;
-      requiredLevel: number;
-      resultTemplate: any;
-      mobFamily?: {
-        name: string;
-        siteNounLarge: string;
-      } | null;
-      isAdvanced?: boolean;
-      soulbound?: boolean;
-      mobFamilyId?: string | null;
-      turnCost: number;
-      materials: unknown;
-      xpReward: number;
-    }>;
+    });
 
     const visible = recipes
       .map((r: typeof recipes[number]) => {
