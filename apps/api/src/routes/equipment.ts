@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '@pocketrealm/database';
 import type { EquipmentSlot } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
-import { equipItem, ensureEquipmentSlots, unequipSlot } from '../services/equipmentService';
+import { equipItem, unequipSlot, getEquippedItemInSlot, ensureEquipmentSlots } from '../services/equipmentService';
 import { assertNotRecovering } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
 import { toInventoryItemDTO, fetchInventoryMeta, fetchEquipmentMap } from '../services/stateUpdateHelpers';
@@ -43,12 +42,7 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
   await assertNotRecovering(playerId);
 
   // Capture any item currently in the target slot before equipping (swap detection)
-  await ensureEquipmentSlots(playerId);
-  const currentSlotRow = await prisma.playerEquipment.findUnique({
-    where: { playerId_slot: { playerId, slot: body.slot } },
-    include: { item: { include: { template: true } } },
-  });
-  const previousItem = currentSlotRow?.item ?? null;
+  const previousItem = await getEquippedItemInSlot(playerId, body.slot as EquipmentSlot);
 
   await equipItem(playerId, body.itemId, body.slot as EquipmentSlot);
 
@@ -91,12 +85,7 @@ equipmentRouter.post('/unequip', asyncHandler(async (req, res) => {
   await assertNotRecovering(playerId);
 
   // Capture the item being unequipped before clearing the slot
-  await ensureEquipmentSlots(playerId);
-  const currentSlotRow = await prisma.playerEquipment.findUnique({
-    where: { playerId_slot: { playerId, slot: body.slot } },
-    include: { item: { include: { template: true } } },
-  });
-  const unequippedItem = currentSlotRow?.item ?? null;
+  const unequippedItem = await getEquippedItemInSlot(playerId, body.slot as EquipmentSlot);
 
   await unequipSlot(playerId, body.slot as EquipmentSlot);
 

@@ -22,6 +22,7 @@ import {
   selectSpecialization, respecSpecialization, getSpecializationStatus,
 } from '../services/guildSpecializationService';
 import { asyncHandler } from '../utils/asyncHandler';
+import { buildStateUpdates } from '../services/stateUpdateHelpers';
 
 export const guildRouter = Router();
 guildRouter.use(authenticate);
@@ -234,10 +235,12 @@ guildRouter.post('/:id/projects/start', asyncHandler(async (req, res) => {
 // POST /:id/projects/:projectId/contribute/turns
 guildRouter.post('/:id/projects/:projectId/contribute/turns', asyncHandler(async (req, res) => {
   const body = contributeTurnsSchema.parse(req.body);
+  const playerId = req.player!.playerId;
   const result = await contributeTurns(
-    req.player!.playerId, req.params.id, req.params.projectId, body.amount,
+    playerId, req.params.id, req.params.projectId, body.amount,
   );
-  res.json(result);
+  const stateUpdates = await buildStateUpdates(playerId, ['resources']);
+  res.json({ ...result, stateUpdates });
 }));
 
 // POST /:id/projects/:projectId/contribute/materials

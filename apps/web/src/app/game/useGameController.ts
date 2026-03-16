@@ -362,7 +362,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setInventory: (updater) => setInventory(updater as any),
     setInventoryCapacity,
     setInventoryUsedSlots,
-    setEquipment: (eq) => setEquipment(eq as any),
+    setEquipment: (eq) => setEquipment(
+      Object.entries(eq).map(([slot, item]) => ({
+        slot,
+        itemId: item?.id ?? null,
+        item,
+      })),
+    ),
     setSkills: (skills) => { if (skills) setSkills(skills as any); },
     setHpState: (hp) => { setHpState(hp); hpStateRef.current = hp; },
     setStaminaState: (s) => setStaminaState(s as any),

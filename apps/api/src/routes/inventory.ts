@@ -301,11 +301,17 @@ inventoryRouter.post('/sell', asyncHandler(async (req, res) => {
   const body = sellSchema.parse(req.body);
   await assertInTown(playerId);
   const result = await sellItem(playerId, body.itemId, body.quantity);
-  const inventoryMeta = await fetchInventoryMeta(playerId);
+  const [remainingDTOs, inventoryMeta] = await Promise.all([
+    fetchItemDTOs([body.itemId]),
+    fetchInventoryMeta(playerId),
+  ]);
+  const wasFullySold = remainingDTOs.length === 0;
   res.json({
     ...result,
     stateUpdates: {
-      inventoryRemoved: [body.itemId],
+      ...(wasFullySold
+        ? { inventoryRemoved: [body.itemId] }
+        : { inventoryUpdated: remainingDTOs }),
       gold: result.newGold,
       inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
     },
@@ -350,11 +356,17 @@ inventoryRouter.post('/stash/deposit', asyncHandler(async (req, res) => {
   const body = stashSchema.parse(req.body);
   await assertInTown(playerId);
   await depositItem(playerId, body.itemId, body.quantity);
-  const inventoryMeta = await fetchInventoryMeta(playerId);
+  const [remainingDTOs, inventoryMeta] = await Promise.all([
+    fetchItemDTOs([body.itemId]),
+    fetchInventoryMeta(playerId),
+  ]);
+  const wasFullyMoved = remainingDTOs.length === 0;
   res.json({
     success: true,
     stateUpdates: {
-      inventoryRemoved: [body.itemId],
+      ...(wasFullyMoved
+        ? { inventoryRemoved: [body.itemId] }
+        : { inventoryUpdated: remainingDTOs }),
       inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
     },
   });
@@ -383,15 +395,34 @@ inventoryRouter.post('/stash/withdraw', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = stashSchema.parse(req.body);
   await assertInTown(playerId);
+
+  // Pre-fetch templateId to detect merges after withdrawal
+  const sourceItem = await prisma.item.findUnique({
+    where: { id: body.itemId },
+    select: { templateId: true },
+  });
+  if (!sourceItem) throw new AppError(404, 'Item not found', 'NOT_FOUND');
+
   await withdrawItem(playerId, body.itemId, body.quantity);
+
+  // After withdrawal, find the resulting backpack item (may differ from body.itemId if merged)
+  const backpackItem = await prisma.item.findFirst({
+    where: { ownerId: playerId, templateId: sourceItem.templateId, inStash: false },
+    select: { id: true },
+  });
+  const resultItemId = backpackItem?.id ?? body.itemId;
+  const wasMerge = resultItemId !== body.itemId;
+
   const [itemDTOs, inventoryMeta] = await Promise.all([
-    fetchItemDTOs([body.itemId]),
+    fetchItemDTOs([resultItemId]),
     fetchInventoryMeta(playerId),
   ]);
   res.json({
     success: true,
     stateUpdates: {
-      inventoryAdded: itemDTOs,
+      ...(wasMerge
+        ? { inventoryUpdated: itemDTOs }
+        : { inventoryAdded: itemDTOs }),
       inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
     },
   });

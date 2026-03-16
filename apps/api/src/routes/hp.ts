@@ -71,7 +71,10 @@ hpRouter.post('/recover', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
 
   const result = await recover(playerId);
-  const turns = await getTurnState(playerId);
+  const [turns, stateUpdates] = await Promise.all([
+    getTurnState(playerId),
+    buildStateUpdates(playerId, ['hp', 'resources']),
+  ]);
 
   // Log the activity
   await createActivityLog({
@@ -88,6 +91,7 @@ hpRouter.post('/recover', asyncHandler(async (req, res) => {
   res.json({
     ...result,
     turns,
+    stateUpdates,
   });
 }));
 

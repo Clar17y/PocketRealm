@@ -24,6 +24,7 @@ import {
   purchaseShopItem,
 } from '../services/expeditionShopService';
 import { asyncHandler } from '../utils/asyncHandler';
+import { buildStateUpdates } from '../services/stateUpdateHelpers';
 import { paginationSchema, buildPagination } from '../utils/routeHelpers';
 import { EXPEDITION_THEMES } from '@pocketrealm/shared';
 
@@ -196,8 +197,10 @@ expeditionRouter.post('/launch', asyncHandler(async (req, res) => {
 // POST /:id/signup
 expeditionRouter.post('/:id/signup', asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
-  const member = await signUpForExpedition(id, req.player!.playerId);
-  res.json({ member });
+  const playerId = req.player!.playerId;
+  const member = await signUpForExpedition(id, playerId);
+  const stateUpdates = await buildStateUpdates(playerId, ['resources']);
+  res.json({ member, stateUpdates });
 }));
 
 // POST /:id/force-start
@@ -325,6 +328,8 @@ expeditionRouter.patch('/:id/heal-target', asyncHandler(async (req, res) => {
 // POST /:id/recover
 expeditionRouter.post('/:id/recover', asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
-  const member = await recoverFromKO(id, req.player!.playerId);
-  res.json({ member });
+  const playerId = req.player!.playerId;
+  const member = await recoverFromKO(id, playerId);
+  const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+  res.json({ member, stateUpdates });
 }));

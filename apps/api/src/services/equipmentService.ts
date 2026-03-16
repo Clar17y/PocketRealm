@@ -45,6 +45,16 @@ export async function ensureEquipmentSlots(playerId: string): Promise<void> {
   });
 }
 
+/** Fetch the item currently in an equipment slot (with template), or null if empty. */
+export async function getEquippedItemInSlot(playerId: string, slot: EquipmentSlot) {
+  await ensureEquipmentSlots(playerId);
+  const row = await prisma.playerEquipment.findUnique({
+    where: { playerId_slot: { playerId, slot } },
+    include: { item: { include: { template: true } } },
+  });
+  return row?.item ?? null;
+}
+
 export async function getEquipmentStats(playerId: string): Promise<EquipmentStats> {
   return cachedQuery(equipmentCacheKey(playerId), () => computeEquipmentStats(playerId), 600);
 }
