@@ -18,6 +18,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { consumeItemsByTemplateTx, getTotalQuantityByTemplate, getInventoryState } from '../../services/inventoryService';
+import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchInventoryMeta } from '../../services/stateUpdateHelpers';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
@@ -173,11 +174,15 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
 
     // Single transaction: spend turns + consume materials + create items
     const baseTurnCost = recipe.turnCost * quantity;
-    const { turnSpend, taxResult, craftedItemIds, craftedItemDetails } = await prisma.$transaction(async (tx) => {
+    const { turnSpend, taxResult, craftedItemIds, craftedItemDetails, fullyConsumedIds, partiallyConsumedIds } = await prisma.$transaction(async (tx) => {
       const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, baseTurnCost);
 
+      const allFullyConsumed: string[] = [];
+      const allPartiallyConsumed: string[] = [];
       for (const mat of materials) {
-        await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * quantity);
+        const consumeResult = await consumeItemsByTemplateTx(tx, playerId, mat.templateId, mat.quantity * quantity);
+        allFullyConsumed.push(...consumeResult.fullyConsumedIds);
+        allPartiallyConsumed.push(...consumeResult.partiallyConsumedIds);
       }
 
       const itemIds: string[] = [];
@@ -243,7 +248,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         }
       }
 
-      return { turnSpend: spent, taxResult: tax, craftedItemIds: itemIds, craftedItemDetails: itemDetails };
+      return { turnSpend: spent, taxResult: tax, craftedItemIds: itemIds, craftedItemDetails: itemDetails, fullyConsumedIds: allFullyConsumed, partiallyConsumedIds: allPartiallyConsumed };
     });
 
     // Consume shop crafting crit buff (one use per craft action)
@@ -309,6 +314,14 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     const craftingBuffBadges: EventModifierBadge[] = [];
     if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });
 
+    const [inventoryAdded, inventoryUpdated, skills, characterProgression, inventoryMeta] = await Promise.all([
+      fetchItemDTOs(craftedItemIds),
+      fetchItemDTOs(partiallyConsumedIds),
+      fetchSkillDTOs(playerId),
+      fetchCharacterProgression(playerId),
+      fetchInventoryMeta(playerId),
+    ]);
+
     res.json({
       logId: log.id,
       turns: turnSpend,
@@ -323,5 +336,13 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       tax: taxInfoFromResult(taxResult),
       ...(craftQuestProgress.length > 0 ? { questProgress: craftQuestProgress } : {}),
       ...(craftingBuffBadges.length > 0 ? { activeEvents: craftingBuffBadges } : {}),
+      stateUpdates: {
+        inventoryAdded,
+        inventoryRemoved: fullyConsumedIds,
+        inventoryUpdated,
+        skills,
+        characterProgression,
+        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      },
     });
 }));

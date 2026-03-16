@@ -98,12 +98,17 @@ export async function getTotalQuantityByTemplate(
   return items.reduce((sum: number, item: typeof items[number]) => sum + item.quantity, 0);
 }
 
+export interface ConsumeItemsResult {
+  fullyConsumedIds: string[];
+  partiallyConsumedIds: string[];
+}
+
 async function consumeItemsByTemplateWithClient(
   client: InventoryClient,
   playerId: string,
   itemTemplateId: string,
   quantity: number
-): Promise<void> {
+): Promise<ConsumeItemsResult> {
   if (!Number.isInteger(quantity) || quantity <= 0) {
     throw new AppError(400, 'Quantity must be a positive integer', 'INVALID_QUANTITY');
   }
@@ -114,6 +119,9 @@ async function consumeItemsByTemplateWithClient(
     select: { id: true, quantity: true },
   });
 
+  const fullyConsumedIds: string[] = [];
+  const partiallyConsumedIds: string[] = [];
+
   let remaining = quantity;
   for (const item of items) {
     if (remaining <= 0) break;
@@ -122,25 +130,29 @@ async function consumeItemsByTemplateWithClient(
         where: { id: item.id },
         data: { quantity: item.quantity - remaining },
       });
+      partiallyConsumedIds.push(item.id);
       remaining = 0;
       break;
     }
 
     remaining -= item.quantity;
     await client.item.delete({ where: { id: item.id } });
+    fullyConsumedIds.push(item.id);
   }
 
   if (remaining > 0) {
     throw new AppError(400, 'Insufficient materials', 'INSUFFICIENT_ITEMS');
   }
+
+  return { fullyConsumedIds, partiallyConsumedIds };
 }
 
 export async function consumeItemsByTemplate(
   playerId: string,
   itemTemplateId: string,
   quantity: number
-): Promise<void> {
-  await consumeItemsByTemplateWithClient(prisma, playerId, itemTemplateId, quantity);
+): Promise<ConsumeItemsResult> {
+  return consumeItemsByTemplateWithClient(prisma, playerId, itemTemplateId, quantity);
 }
 
 export async function consumeItemsByTemplateTx(
@@ -148,8 +160,8 @@ export async function consumeItemsByTemplateTx(
   playerId: string,
   itemTemplateId: string,
   quantity: number
-): Promise<void> {
-  await consumeItemsByTemplateWithClient(tx, playerId, itemTemplateId, quantity);
+): Promise<ConsumeItemsResult> {
+  return consumeItemsByTemplateWithClient(tx, playerId, itemTemplateId, quantity);
 }
 
 /** Fetch current slot usage and capacity in a single parallel call. */
