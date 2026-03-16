@@ -101,15 +101,28 @@ export async function fetchItemDTOs(
 ): Promise<InventoryItemDTO[]> {
   if (itemIds.length === 0) return [];
 
-  const items = await prisma.item.findMany({
-    where: { id: { in: itemIds } },
-    include: { template: true },
-  });
+  const [items, slotMap] = await Promise.all([
+    prisma.item.findMany({
+      where: { id: { in: itemIds } },
+      include: { template: true },
+    }),
+    // Auto-lookup equipped slots if caller didn't provide a map
+    equippedSlotMap
+      ? Promise.resolve(equippedSlotMap)
+      : prisma.playerEquipment.findMany({
+          where: { itemId: { in: itemIds } },
+          select: { itemId: true, slot: true },
+        }).then((rows) => {
+          const m = new Map<string, string>();
+          for (const r of rows) if (r.itemId) m.set(r.itemId, r.slot);
+          return m;
+        }),
+  ]);
 
   return items.map((item) =>
     toInventoryItemDTO(
       { ...item, bonusStats: item.bonusStats as Record<string, number> | null },
-      equippedSlotMap?.get(item.id) ?? null,
+      slotMap.get(item.id) ?? null,
     ),
   );
 }
