@@ -14,7 +14,7 @@ export async function getActiveBuffs(playerId: string): Promise<PlayerBuffData[]
     orderBy: { createdAt: 'asc' },
   });
 
-  return buffs.map((b: any) => ({
+  return buffs.map((b) => ({
     id: b.id,
     buffType: b.buffType,
     remainingUses: b.remainingUses,
@@ -82,7 +82,7 @@ export async function getCombatBuffs(playerId: string): Promise<CombatBuffs> {
     where: { playerId, buffType: { in: ['combat_damage', 'combat_defence', 'durability_shield'] } },
     select: { buffType: true, bonusValue: true },
   });
-  const map = new Map<string, number>(buffs.map((b: any) => [b.buffType as string, b.bonusValue as number]));
+  const map = new Map<string, number>(buffs.map((b) => [b.buffType, b.bonusValue]));
   return {
     damageBoost: map.get('combat_damage') ?? 0,
     defenceBoost: map.get('combat_defence') ?? 0,
