@@ -7,6 +7,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { addStackableItemTx } from '../../services/inventoryService';
+import { fetchItemDTOs, fetchInventoryMeta } from '../../services/stateUpdateHelpers';
 import {
   getZoneCraftingLevel,
   assertZoneAllowsCrafting,
@@ -63,7 +64,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
     });
     const templateById = new Map(materialTemplates.map((template) => [template.id, template]));
 
-    const { turnSpend, taxResult, returned } = await prisma.$transaction(async (tx) => {
+    const { turnSpend, taxResult, returned, addedItemIds, updatedItemIds } = await prisma.$transaction(async (tx) => {
       const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, salvageTurnCost);
 
       const consumed = await tx.item.deleteMany({
@@ -83,6 +84,8 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
         quantity: number;
         itemIds: string[];
       }> = [];
+      const addedItemIds: string[] = [];
+      const updatedItemIds: string[] = [];
 
       for (const material of refundedMaterials) {
         const template = templateById.get(material.templateId);
@@ -92,6 +95,11 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
 
         if (template.stackable) {
           const stack = await addStackableItemTx(tx, playerId, material.templateId, material.quantity, targetStash);
+          if (stack.created) {
+            addedItemIds.push(stack.itemId);
+          } else {
+            updatedItemIds.push(stack.itemId);
+          }
           minted.push({
             templateId: material.templateId,
             name: template.name,
@@ -118,6 +126,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
             select: { id: true },
           });
           createdIds.push(created.id);
+          addedItemIds.push(created.id);
         }
 
         minted.push({
@@ -128,29 +137,34 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
         });
       }
 
-      return { turnSpend: spent, taxResult: tax, returned: minted };
+      return { turnSpend: spent, taxResult: tax, returned: minted, addedItemIds, updatedItemIds };
     });
 
     // --- Achievement stat tracking ---
     await trackAchievements(playerId, { totalSalvages: 1 });
 
-    const log = await createActivityLog({
-      playerId,
-      activityType: 'salvage',
-      turnsSpent: turnSpend.spent,
-      result: {
-        salvagedItemId: item.id,
-        salvagedTemplateId: item.templateId,
-        salvageRecipeId: recipe.id,
-        salvageRefundRate: CRAFTING_CONSTANTS.SALVAGE_BASE_REFUND_RATE,
-        returnedMaterials: returned.map((entry) => ({
-          templateId: entry.templateId,
-          name: entry.name,
-          quantity: entry.quantity,
-          itemIds: entry.itemIds,
-        })),
-      },
-    });
+    const [addedDTOs, updatedDTOs, inventoryMeta, log] = await Promise.all([
+      fetchItemDTOs(addedItemIds),
+      fetchItemDTOs(updatedItemIds),
+      fetchInventoryMeta(playerId),
+      createActivityLog({
+        playerId,
+        activityType: 'salvage',
+        turnsSpent: turnSpend.spent,
+        result: {
+          salvagedItemId: item.id,
+          salvagedTemplateId: item.templateId,
+          salvageRecipeId: recipe.id,
+          salvageRefundRate: CRAFTING_CONSTANTS.SALVAGE_BASE_REFUND_RATE,
+          returnedMaterials: returned.map((entry) => ({
+            templateId: entry.templateId,
+            name: entry.name,
+            quantity: entry.quantity,
+            itemIds: entry.itemIds,
+          })),
+        },
+      }),
+    ]);
 
     res.json({
       logId: log.id,
@@ -165,6 +179,12 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
         })),
       },
       tax: taxInfoFromResult(taxResult),
+      stateUpdates: {
+        inventoryRemoved: [item.id],
+        ...(addedDTOs.length > 0 && { inventoryAdded: addedDTOs }),
+        ...(updatedDTOs.length > 0 && { inventoryUpdated: updatedDTOs }),
+        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      },
     });
 }));
 
@@ -262,7 +282,7 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
     const templateById = new Map(materialTemplates.map((t) => [t.id, t]));
 
     // Single transaction: spend turns, delete items, mint materials
-    const { turnSpend, taxResult, returned } = await prisma.$transaction(async (tx) => {
+    const { turnSpend, taxResult, returned, addedItemIds, updatedItemIds } = await prisma.$transaction(async (tx) => {
       const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, totalTurnCost);
 
       const deleted = await tx.item.deleteMany({
@@ -276,6 +296,9 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
       }
 
       const minted: Array<{ templateId: string; name: string; quantity: number }> = [];
+      const addedItemIds: string[] = [];
+      const updatedItemIds: string[] = [];
+
       for (const [templateId, totals] of materialTotals) {
         const template = templateById.get(templateId);
         if (!template) {
@@ -287,12 +310,17 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
         for (const [qty, inStash] of [[totals.backpack, false], [totals.stash, true]] as const) {
           if (qty <= 0) continue;
           if (template.stackable) {
-            await addStackableItemTx(tx, playerId, templateId, qty, inStash);
+            const stack = await addStackableItemTx(tx, playerId, templateId, qty, inStash);
+            if (stack.created) {
+              addedItemIds.push(stack.itemId);
+            } else {
+              updatedItemIds.push(stack.itemId);
+            }
           } else {
             const needsDurability = template.itemType === 'weapon' || template.itemType === 'armor';
             const maxDurability = needsDurability ? template.maxDurability : null;
             for (let i = 0; i < qty; i++) {
-              await tx.item.create({
+              const created = await tx.item.create({
                 data: {
                   ownerId: playerId,
                   templateId,
@@ -302,7 +330,9 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
                   currentDurability: maxDurability,
                   inStash,
                 },
+                select: { id: true },
               });
+              addedItemIds.push(created.id);
             }
           }
         }
@@ -310,25 +340,31 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
         minted.push({ templateId, name: template.name, quantity: totalQty });
       }
 
-      return { turnSpend: spent, taxResult: tax, returned: minted };
+      return { turnSpend: spent, taxResult: tax, returned: minted, addedItemIds, updatedItemIds };
     });
 
     await trackAchievements(playerId, { totalSalvages: plans.length });
 
-    const log = await createActivityLog({
-      playerId,
-      activityType: 'salvage_batch',
-      turnsSpent: turnSpend.spent,
-      result: {
-        itemCount: plans.length,
-        salvaged: plans.map((p) => ({
-          itemId: p.item.id,
-          templateId: p.item.templateId,
-          turnCost: p.turnCost,
-        })),
-        returnedMaterials: returned,
-      },
-    });
+    const salvagedItemIds = plans.map((p) => p.item.id);
+    const [addedDTOs, updatedDTOs, inventoryMeta, log] = await Promise.all([
+      fetchItemDTOs(addedItemIds),
+      fetchItemDTOs(updatedItemIds),
+      fetchInventoryMeta(playerId),
+      createActivityLog({
+        playerId,
+        activityType: 'salvage_batch',
+        turnsSpent: turnSpend.spent,
+        result: {
+          itemCount: plans.length,
+          salvaged: plans.map((p) => ({
+            itemId: p.item.id,
+            templateId: p.item.templateId,
+            turnCost: p.turnCost,
+          })),
+          returnedMaterials: returned,
+        },
+      }),
+    ]);
 
     res.json({
       logId: log.id,
@@ -341,5 +377,11 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
       returnedMaterials: returned,
       totalTurnCost,
       tax: taxInfoFromResult(taxResult),
+      stateUpdates: {
+        inventoryRemoved: salvagedItemIds,
+        ...(addedDTOs.length > 0 && { inventoryAdded: addedDTOs }),
+        ...(updatedDTOs.length > 0 && { inventoryUpdated: updatedDTOs }),
+        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      },
     });
 }));
