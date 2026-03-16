@@ -330,10 +330,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   let chestAvailableSlots = chestAvailableSlotsRaw;
 
   const txResult = await prisma.$transaction(async (tx) => {
-    const txAny = tx as unknown as any;
-
     // Re-fetch site and apply decay BEFORE spending turns to detect stale state
-    const freshSite = await txAny.encounterSite.findFirst({
+    const freshSite = await tx.encounterSite.findFirst({
       where: { id: encounterSiteId, playerId },
       select: { id: true, playerId: true, mobFamilyId: true, size: true, discoveredAt: true, mobs: true },
     });
@@ -396,10 +394,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         fullClearBonus: siteStrategy === 'full_clear' && siteFullClearActive,
         availableSlots: chestAvailableSlots,
       });
-      await txAny.encounterSite.deleteMany({ where: { id: encounterSiteId, playerId } });
+      await tx.encounterSite.deleteMany({ where: { id: encounterSiteId, playerId } });
       encounterSiteCleared = true;
     } else {
-      await txAny.encounterSite.update({
+      await tx.encounterSite.update({
         where: { id: encounterSiteId },
         data: {
           mobs: serializeEncounterSiteMobs(mobs),

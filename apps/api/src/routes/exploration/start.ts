@@ -797,7 +797,6 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     let { availableSlots } = await getInventoryState(playerId);
 
     const persisted = await prisma.$transaction(async (tx) => {
-      const txAny = tx as unknown as any;
       const createdResourceDiscoveries: Array<{
         turnOccurred: number;
         playerNodeId: string;
@@ -840,14 +839,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
       for (const discovery of pendingSites) {
         const distinctRooms = new Set(discovery.mobs.map(m => m.room)).size;
-        const site = await txAny.encounterSite.create({
+        const site = await tx.encounterSite.create({
           data: {
             playerId,
             zoneId: body.zoneId,
             mobFamilyId: discovery.mobFamilyId,
             name: discovery.siteName,
             size: discovery.size,
-            mobs: { mobs: discovery.mobs },
+            mobs: { mobs: discovery.mobs } as unknown as Prisma.InputJsonValue,
             ...(distinctRooms <= 1 ? { clearStrategy: 'full_clear', fullClearActive: true } : {}),
           },
           select: {

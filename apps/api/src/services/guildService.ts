@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@pocketrealm/database';
+import { prisma, Prisma, type GuildMember, type Guild } from '@pocketrealm/database';
 import {
   GUILD_CONSTANTS, GuildData, GuildMemberData, GuildLogEntry, GuildSearchResult,
   type GuildRecruitmentMode, type GuildRole, type GuildSpecialization,
@@ -267,7 +267,7 @@ export async function searchGuilds(
 // Role check (shared with guildMembershipService)
 // ---------------------------------------------------------------------------
 
-export async function requireRole(playerId: string, minRole: 'leader' | 'officer'): Promise<any> {
+export async function requireRole(playerId: string, minRole: 'leader' | 'officer'): Promise<GuildMember & { guild: Guild }> {
   const membership = await prisma.guildMember.findUnique({
     where: { playerId },
     include: { guild: true },
