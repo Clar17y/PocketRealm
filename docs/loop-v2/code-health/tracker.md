@@ -1,7 +1,7 @@
 # Code Health Audit Tracker
 
 **Started:** 2026-03-14
-**Total files:** 166 | **Audited:** 136 | **Remaining:** 30
+**Total files:** 166 | **Audited:** 166 | **Remaining:** 0
 
 ---
 
@@ -152,33 +152,33 @@
 
 ## Shared (30 files)
 
-- [ ] `packages/shared/src/constants/achievementDefinitions.ts`
-- [ ] `packages/shared/src/constants/bossTemplateDefinitions.ts`
-- [ ] `packages/shared/src/constants/combatActionDefinitions.ts`
-- [ ] `packages/shared/src/constants/combatEffectNames.ts`
-- [ ] `packages/shared/src/constants/expeditionDefinitions.ts`
-- [ ] `packages/shared/src/constants/gameConstants.ts`
-- [ ] `packages/shared/src/constants/mobPrefixes.ts`
-- [ ] `packages/shared/src/constants/talentTreeDefinitions.ts`
-- [ ] `packages/shared/src/constants/worldEventTemplates.ts`
-- [ ] `packages/shared/src/types/achievement.types.ts`
-- [ ] `packages/shared/src/types/bossTemplate.types.ts`
-- [ ] `packages/shared/src/types/casino.types.ts`
-- [ ] `packages/shared/src/types/chat.types.ts`
-- [ ] `packages/shared/src/types/combat.types.ts`
-- [ ] `packages/shared/src/types/combatAction.types.ts`
-- [ ] `packages/shared/src/types/encounter.types.ts`
-- [ ] `packages/shared/src/types/expedition.types.ts`
-- [ ] `packages/shared/src/types/friend.types.ts`
-- [ ] `packages/shared/src/types/guild.types.ts`
-- [ ] `packages/shared/src/types/hp.types.ts`
-- [ ] `packages/shared/src/types/item.types.ts`
-- [ ] `packages/shared/src/types/mobPrefix.types.ts`
-- [ ] `packages/shared/src/types/player.types.ts`
-- [ ] `packages/shared/src/types/quest.types.ts`
-- [ ] `packages/shared/src/types/shop.types.ts`
-- [ ] `packages/shared/src/types/skill.types.ts`
-- [ ] `packages/shared/src/types/worldEvent.types.ts`
-- [ ] `packages/shared/src/utils/achievementChains.ts`
-- [ ] `packages/shared/src/utils/mobUtils.ts`
-- [ ] `packages/shared/src/utils/tierUtils.ts`
+- [x] `packages/shared/src/constants/achievementDefinitions.ts` — [report](2026-03-15-201635-achievementDefinitions.md) — 2L
+- [x] `packages/shared/src/constants/bossTemplateDefinitions.ts` — [report](2026-03-15-202740-bossTemplateDefinitions.md) — clean
+- [x] `packages/shared/src/constants/combatActionDefinitions.ts` — [report](2026-03-15-203845-combatActionDefinitions.md) — clean
+- [x] `packages/shared/src/constants/combatEffectNames.ts` — [report](2026-03-15-204950-combatEffectNames.md) — 2L
+- [x] `packages/shared/src/constants/expeditionDefinitions.ts` — [report](2026-03-15-210055-expeditionDefinitions.md) — 1M, 2L
+- [x] `packages/shared/src/constants/gameConstants.ts` — [report](2026-03-15-211201-gameConstants.md) — 3L
+- [x] `packages/shared/src/constants/mobPrefixes.ts` — [report](2026-03-15-212310-mobPrefixes.md) — clean
+- [x] `packages/shared/src/constants/talentTreeDefinitions.ts` — [report](2026-03-15-213420-talentTreeDefinitions.md) — clean
+- [x] `packages/shared/src/constants/worldEventTemplates.ts` — [report](2026-03-15-214530-worldEventTemplates.md) — clean
+- [x] `packages/shared/src/types/achievement.types.ts` — [report](2026-03-15-215640-achievement.types.md) — 3L
+- [x] `packages/shared/src/types/bossTemplate.types.ts` — [report](2026-03-15-220750-bossTemplate.types.md) — clean
+- [x] `packages/shared/src/types/casino.types.ts` — [report](2026-03-15-221900-casino.types.md) — 2L
+- [x] `packages/shared/src/types/chat.types.ts` — [report](2026-03-15-223010-chat.types.md) — 3L
+- [x] `packages/shared/src/types/combat.types.ts` — [report](2026-03-15-224115-combat.types.md) — 1L
+- [x] `packages/shared/src/types/combatAction.types.ts` — [report](2026-03-15-225220-combatAction.types.md) — 1M, 2L
+- [x] `packages/shared/src/types/encounter.types.ts` — [report](2026-03-15-230330-encounter.types.md) — clean
+- [x] `packages/shared/src/types/expedition.types.ts` — [report](2026-03-15-231440-expedition.types.md) — 2M, 1L
+- [x] `packages/shared/src/types/friend.types.ts` — [report](2026-03-15-232545-friend.types.md) — 1L
+- [x] `packages/shared/src/types/guild.types.ts` — [report](2026-03-15-233650-guild.types.md) — 4L
+- [x] `packages/shared/src/types/hp.types.ts` — [report](2026-03-15-234800-hp.types.md) — 1L
+- [x] `packages/shared/src/types/item.types.ts` — [report](2026-03-15-235910-item.types.md) — 4L
+- [x] `packages/shared/src/types/mobPrefix.types.ts` — [report](2026-03-16-001015-mobPrefix.types.md) — 1L
+- [x] `packages/shared/src/types/player.types.ts` — [report](2026-03-16-002120-player.types.md) — 5L
+- [x] `packages/shared/src/types/quest.types.ts` — [report](2026-03-16-003225-quest.types.md) — 2L
+- [x] `packages/shared/src/types/shop.types.ts` — [report](2026-03-16-004430-shop.types.md) — clean
+- [x] `packages/shared/src/types/skill.types.ts` — [report](2026-03-16-005540-skill.types.md) — 3L
+- [x] `packages/shared/src/types/worldEvent.types.ts` — [report](2026-03-16-010650-worldEvent.types.md) — 10L
+- [x] `packages/shared/src/utils/achievementChains.ts` — [report](2026-03-16-011800-achievementChains.md) — 1L
+- [x] `packages/shared/src/utils/mobUtils.ts` — [report](2026-03-16-012910-mobUtils.md) — clean
+- [x] `packages/shared/src/utils/tierUtils.ts` — [report](2026-03-16-014015-tierUtils.md) — clean
