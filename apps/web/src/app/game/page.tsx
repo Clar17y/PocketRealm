@@ -399,7 +399,7 @@ export default function GamePage() {
   ), [inventory]);
   const discountLookup = useMemo(() => buildRecipeDiscountLookup(craftingRecipes, skills), [craftingRecipes, skills]);
   const equipmentStats = useMemo(() => {
-    const stats = { attack: 0, defence: 0, magicDefence: 0, hp: 0, dodge: 0, accuracy: 0, critChance: 0, critDamage: 0 };
+    const stats = { attack: 0, defence: 0, magicDefence: 0, hp: 0, dodge: 0, accuracy: 0, magicPower: 0, rangedPower: 0, luck: 0, critChance: 0, critDamage: 0 };
     for (const e of equipment) {
       const base = e.item?.template?.baseStats as Record<string, unknown> | undefined;
       const bonus = e.item?.bonusStats ?? undefined;
@@ -411,6 +411,9 @@ export default function GamePage() {
         if (typeof src.health === 'number') stats.hp += src.health;
         if (typeof src.dodge === 'number') stats.dodge += src.dodge;
         if (typeof src.accuracy === 'number') stats.accuracy += src.accuracy;
+        if (typeof src.magicPower === 'number') stats.magicPower += src.magicPower;
+        if (typeof src.rangedPower === 'number') stats.rangedPower += src.rangedPower;
+        if (typeof src.luck === 'number') stats.luck += src.luck;
         if (typeof src.critChance === 'number') stats.critChance += src.critChance;
         if (typeof src.critDamage === 'number') stats.critDamage += src.critDamage;
       }

@@ -65,6 +65,9 @@ interface EquipmentProps {
     hp: number;
     dodge: number;
     accuracy: number;
+    magicPower: number;
+    rangedPower: number;
+    luck: number;
     critChance: number;
     critDamage: number;
   };
@@ -586,6 +589,9 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
             { icon: Heart, label: 'HP', value: String(stats.hp), color: 'var(--rpg-green-light)' },
             { icon: Zap, label: 'Dodge', value: String(stats.dodge), color: 'var(--rpg-gold)' },
             { icon: Crosshair, label: 'Accuracy', value: String(stats.accuracy), color: 'var(--rpg-blue-light)' },
+            ...(stats.magicPower ? [{ icon: Sparkles, label: 'Magic Power', value: String(stats.magicPower), color: 'var(--rpg-purple)' }] as const : []),
+            ...(stats.rangedPower ? [{ icon: Target, label: 'Ranged Power', value: String(stats.rangedPower), color: 'var(--rpg-green-light)' }] as const : []),
+            ...(stats.luck ? [{ icon: Zap, label: 'Luck', value: String(stats.luck), color: 'var(--rpg-gold)' }] as const : []),
             { icon: Zap, label: 'Crit Chance', value: `${Math.round((0.05 + stats.critChance) * 100)}%`, color: 'var(--rpg-gold)' },
             { icon: Zap, label: 'Crit Damage', value: `${Math.round((1.5 + stats.critDamage) * 100)}%`, color: 'var(--rpg-gold)' },
           ] as const).map((s) => (
