@@ -86,6 +86,20 @@ function totalStatValue(
   return statValue(baseStats, key) + statValue(bonusStats ?? undefined, key);
 }
 
+const COMPARE_STATS = [
+  { key: 'attack', label: 'Attack' },
+  { key: 'armor', label: 'Armor' },
+  { key: 'magicDefence', label: 'Magic Def' },
+  { key: 'health', label: 'HP' },
+  { key: 'dodge', label: 'Dodge' },
+  { key: 'accuracy', label: 'Accuracy' },
+  { key: 'magicPower', label: 'Magic Power' },
+  { key: 'rangedPower', label: 'Ranged Power' },
+  { key: 'luck', label: 'Luck' },
+  { key: 'critChance', label: 'Crit Chance' },
+  { key: 'critDamage', label: 'Crit Damage' },
+] as const;
+
 function prettySlot(slot: string) {
   return titleCaseFromSnake(slot);
 }
@@ -369,20 +383,6 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                 ) : (
                   <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                     {candidates.map((item) => {
-                      const COMPARE_STATS = [
-                        { key: 'attack', label: 'Attack' },
-                        { key: 'armor', label: 'Armor' },
-                        { key: 'magicDefence', label: 'Magic Def' },
-                        { key: 'health', label: 'HP' },
-                        { key: 'dodge', label: 'Dodge' },
-                        { key: 'accuracy', label: 'Accuracy' },
-                        { key: 'magicPower', label: 'Magic Power' },
-                        { key: 'rangedPower', label: 'Ranged Power' },
-                        { key: 'luck', label: 'Luck' },
-                        { key: 'critChance', label: 'Crit Chance' },
-                        { key: 'critDamage', label: 'Crit Damage' },
-                      ] as const;
-
                       const diffs = COMPARE_STATS.map(({ key, label }) => ({
                         key: label,
                         diff: totalStatValue(item.baseStats, item.bonusStats, key) - totalStatValue(currentItem?.baseStats, currentItem?.bonusStats, key),
@@ -433,9 +433,12 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                               {item.weightClass && (
                                 <div className="mt-1 text-xs text-[var(--rpg-gold)]">{prettyWeightClass(item.weightClass)}</div>
                               )}
-                              {totalStatValue(item.baseStats, item.bonusStats, 'dodge') < 0 && (
-                                <div className="mt-1 text-xs text-[var(--rpg-red)]">Evasion penalty: {totalStatValue(item.baseStats, item.bonusStats, 'dodge')}</div>
-                              )}
+                              {(() => {
+                                const itemDodge = totalStatValue(item.baseStats, item.bonusStats, 'dodge');
+                                return itemDodge < 0 && (
+                                  <div className="mt-1 text-xs text-[var(--rpg-red)]">Evasion penalty: {itemDodge}</div>
+                                );
+                              })()}
 
                               {durability && durability.max > 0 && (
                                 <div className="mt-2">

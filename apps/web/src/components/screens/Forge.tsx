@@ -156,6 +156,14 @@ export function Forge({
   const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
   const noFacility = zoneCraftingLevel === 0;
 
+  const tryForgeAction = (setConfirm: (v: boolean) => void, action: () => void | Promise<void>) => {
+    if (selected && rarityMeetsThreshold(selected.rarity, forgeConfirmRarity)) {
+      setConfirm(true);
+    } else {
+      void action();
+    }
+  };
+
   useEffect(() => {
     if (!selectedItemId || !items.some((item) => item.id === selectedItemId)) {
       setSelectedItemId(items[0]?.id ?? null);
@@ -406,13 +414,7 @@ export function Forge({
                   || upgradeCost === null
                   || busy !== null
                 }
-                onClick={() => {
-                  if (selected && rarityMeetsThreshold(selected.rarity, forgeConfirmRarity)) {
-                    setConfirmUpgrade(true);
-                  } else {
-                    void handleUpgrade();
-                  }
-                }}
+                onClick={() => tryForgeAction(setConfirmUpgrade, handleUpgrade)}
               >
                 Upgrade Rarity
               </PixelButton>
@@ -459,13 +461,7 @@ export function Forge({
                   || rerollCost === null
                   || busy !== null
                 }
-                onClick={() => {
-                  if (selected && rarityMeetsThreshold(selected.rarity, forgeConfirmRarity)) {
-                    setConfirmReroll(true);
-                  } else {
-                    void handleReroll();
-                  }
-                }}
+                onClick={() => tryForgeAction(setConfirmReroll, handleReroll)}
               >
                 Reroll Bonus Stats
               </PixelButton>
