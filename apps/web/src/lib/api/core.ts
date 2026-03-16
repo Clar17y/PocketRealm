@@ -129,6 +129,11 @@ export async function fetchApi<T>(
       | { error?: { message: string; code: string } }
       | null;
 
+    if (res.status === 429) {
+      window.dispatchEvent(new CustomEvent('api:rate-limited'));
+      return { error: { message: 'Too many requests', code: 'RATE_LIMITED' } };
+    }
+
     if (!res.ok) {
       if (!isAuthEndpoint && res.status === 401 && attempt === 0) {
         const refreshed = await refreshTokens();

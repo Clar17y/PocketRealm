@@ -28,6 +28,8 @@ import { WorldEvents } from '@/components/screens/WorldEvents';
 import { Achievements } from '@/components/screens/Achievements';
 import { AchievementToast } from '@/components/AchievementToast';
 import { QuestToast } from '@/components/QuestToast';
+import { RateLimitToast } from '@/components/RateLimitToast';
+import { useRateLimitToast } from './hooks/useRateLimitToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
 import { Settings } from '@/components/screens/Settings';
@@ -289,6 +291,8 @@ export default function GamePage() {
     lootRevealItems,
     handleDismissLootReveal,
   } = useGameController({ isAuthenticated });
+
+  useRateLimitToast();
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
   const [expeditionContext, setExpeditionContext] = useState<ExpeditionContext | null>(null);
@@ -1373,6 +1377,7 @@ export default function GamePage() {
       />
       <AchievementToast onNavigate={(category) => { setAchievementCategory(category); setActiveScreen('achievements'); }} />
       <QuestToast />
+      <RateLimitToast />
     </>
   );
 }
