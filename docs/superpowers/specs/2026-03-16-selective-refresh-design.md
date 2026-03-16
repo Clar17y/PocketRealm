@@ -243,6 +243,7 @@ const SCREEN_POLL_NEEDS: Record<string, string[]> = {
   combat:     ['turns', 'hp', 'resources'],
   rest:       ['turns', 'hp', 'resources'],
   home:       ['turns', 'hp', 'resources'],
+  arena:      ['turns', 'hp', 'resources'],
   gathering:  ['turns'],
   crafting:   ['turns'],
   forge:      ['turns'],
@@ -304,26 +305,7 @@ if (res.status === 429) {
 
 This goes before the existing `!res.ok` block (lines 132-146) so it's caught before the generic error path.
 
-**Toast listener** — in the game layout or a dedicated hook:
-
-```ts
-function useRateLimitToast() {
-  useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-
-    const handler = () => {
-      if (timeout) return; // debounce
-      showToast('Too many requests — wait a moment', 'warning');
-      timeout = setTimeout(() => { timeout = null; }, 4000);
-    };
-
-    window.addEventListener('api:rate-limited', handler);
-    return () => window.removeEventListener('api:rate-limited', handler);
-  }, []);
-}
-```
-
-Integrates with the existing `useToastQueue` system. A new `RateLimitToast` component (similar to `QuestToast`) registers via `window.__showRateLimitToast` and renders through `ToastContainer`. The `useRateLimitToast` hook listens for the `api:rate-limited` event and calls the global:
+**Toast listener** — integrates with the existing `useToastQueue` system. A new `RateLimitToast` component (similar to `QuestToast`) registers via `window.__showRateLimitToast` and renders through `ToastContainer`. The `useRateLimitToast` hook listens for the `api:rate-limited` event and calls the global:
 
 ```ts
 function useRateLimitToast() {
