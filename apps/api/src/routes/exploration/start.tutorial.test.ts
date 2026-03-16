@@ -82,6 +82,9 @@ vi.mock('../../services/systemMessageService', () => ({
 vi.mock('../../services/persistedMobService', () => ({
   persistMobHp: vi.fn(),
 }));
+vi.mock('../../services/stateUpdateHelpers', () => ({
+  buildStateUpdates: vi.fn().mockResolvedValue({}),
+}));
 vi.mock('../../services/potionService', () => ({
   buildPotionPool: vi.fn().mockResolvedValue([]),
   deductConsumedPotions: vi.fn(),
