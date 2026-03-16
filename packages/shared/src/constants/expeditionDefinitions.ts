@@ -28,59 +28,6 @@ export const EXPEDITION_ROOM_COMPOSITIONS: Record<number, { type: ExpeditionRoom
 };
 
 // =============================================================================
-// MOB ACTION TEMPLATES
-// =============================================================================
-
-export const TRASH_MOB_TEMPLATE: readonly BossTemplateAction[] = [
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-];
-
-export const ELITE_MOB_TEMPLATE: readonly BossTemplateAction[] = [
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  { actionId: 'boss_magic_attack', targetMode: 'single_target' },
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
-];
-
-export const MINI_BOSS_TEMPLATE: readonly BossTemplateAction[] = [
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  { actionId: 'boss_magic_attack', targetMode: 'single_target' },
-  { actionId: 'boss_enrage', targetMode: 'single_target' },
-  { actionId: 'boss_heal_self', targetMode: 'single_target' },
-  { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
-  { actionId: 'boss_arcane_storm', targetMode: 'aoe', isTelegraphed: true },
-];
-
-export const MINI_BOSS_ADD_TEMPLATE: readonly BossTemplateAction[] = [
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  { actionId: 'boss_enrage', targetMode: 'single_target' },
-];
-
-export const FINAL_BOSS_PHASE1_TEMPLATE: readonly BossTemplateAction[] = [
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  { actionId: 'boss_magic_attack', targetMode: 'single_target' },
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
-  { actionId: 'boss_enrage', targetMode: 'single_target' },
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-];
-
-export const FINAL_BOSS_PHASE2_TEMPLATE: readonly BossTemplateAction[] = [
-  { actionId: 'boss_magic_attack', targetMode: 'single_target' },
-  { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
-  { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  { actionId: 'boss_arcane_storm', targetMode: 'aoe', isTelegraphed: true },
-];
-
-export const FINAL_BOSS_PHASE3_TEMPLATE: readonly BossTemplateAction[] = [
-  { actionId: 'boss_arcane_storm', targetMode: 'aoe', isTelegraphed: true },
-  { actionId: 'boss_enrage', targetMode: 'single_target' },
-  { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
-];
-
-// =============================================================================
 // EXPEDITION THEMES
 // =============================================================================
 

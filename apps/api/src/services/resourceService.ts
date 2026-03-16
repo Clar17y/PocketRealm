@@ -247,34 +247,6 @@ export async function restMana(
 // Direct setters (post-combat state updates)
 // ---------------------------------------------------------------------------
 
-export async function setStamina(
-  playerId: string,
-  newValue: number,
-  now: Date = new Date(),
-): Promise<void> {
-  await prisma.player.update({
-    where: { id: playerId },
-    data: {
-      currentStamina: Math.max(0, Math.floor(newValue)),
-      lastStaminaRegenAt: now,
-    },
-  });
-}
-
-export async function setMana(
-  playerId: string,
-  newValue: number,
-  now: Date = new Date(),
-): Promise<void> {
-  await prisma.player.update({
-    where: { id: playerId },
-    data: {
-      currentMana: Math.max(0, Math.floor(newValue)),
-      lastManaRegenAt: now,
-    },
-  });
-}
-
 export async function setAllResources(
   playerId: string,
   hp: number,

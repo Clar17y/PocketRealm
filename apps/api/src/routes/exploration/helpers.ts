@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import {
-  EXPLORATION_CONSTANTS,
   resolveZoneTiers,
   getHighestUnlockedTier,
   type EncounterSiteSize,
@@ -137,12 +136,6 @@ export function pickEncounterSize(minRaw: string, maxRaw: string): EncounterSite
   const end = Math.max(0, Math.max(minIndex, maxIndex));
   const allowed = ENCOUNTER_SIZE_ORDER.slice(start, end + 1);
   return allowed[randomIntInclusive(0, allowed.length - 1)] ?? 'small';
-}
-
-export function getEncounterRange(size: EncounterSiteSize): { min: number; max: number } {
-  if (size === 'small') return EXPLORATION_CONSTANTS.ENCOUNTER_SIZE_SMALL;
-  if (size === 'medium') return EXPLORATION_CONSTANTS.ENCOUNTER_SIZE_MEDIUM;
-  return EXPLORATION_CONSTANTS.ENCOUNTER_SIZE_LARGE;
 }
 
 export function getSiteName(

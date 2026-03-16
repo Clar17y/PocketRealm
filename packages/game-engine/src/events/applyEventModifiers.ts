@@ -28,17 +28,6 @@ export function applyMobEventModifiers(
 }
 
 /**
- * Apply active zone resource modifiers to a base yield.
- * Returns the modified yield.
- */
-export function applyResourceEventModifiers(
-  baseYield: number,
-  modifiers: ActiveZoneModifiers,
-): number {
-  return Math.max(1, Math.round(baseYield * modifiers.resourceYieldMultiplier));
-}
-
-/**
  * Compute combined resource yield multiplier from a list of event effects.
  * Works with any shape that has effectType + effectValue (badges, event data, etc).
  */

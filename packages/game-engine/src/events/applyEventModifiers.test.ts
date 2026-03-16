@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyMobEventModifiers,
-  applyResourceEventModifiers,
 } from './applyEventModifiers';
 import type { ActiveZoneModifiers, MobTemplate } from '@pocketrealm/shared';
 
@@ -108,35 +107,3 @@ describe('applyMobEventModifiers', () => {
   });
 });
 
-describe('applyResourceEventModifiers', () => {
-  it('returns base yield when multiplier is 1', () => {
-    expect(applyResourceEventModifiers(10, neutralModifiers)).toBe(10);
-  });
-
-  it('doubles yield with 2x multiplier', () => {
-    const mods: ActiveZoneModifiers = {
-      ...neutralModifiers,
-      resourceYieldMultiplier: 2,
-    };
-    expect(applyResourceEventModifiers(10, mods)).toBe(20);
-  });
-
-  it('ensures minimum yield of 1', () => {
-    const mods: ActiveZoneModifiers = {
-      ...neutralModifiers,
-      resourceYieldMultiplier: 0,
-    };
-    expect(applyResourceEventModifiers(10, mods)).toBe(1);
-  });
-
-  it('rounds the result', () => {
-    const mods: ActiveZoneModifiers = {
-      ...neutralModifiers,
-      resourceYieldMultiplier: 1.5,
-    };
-    // 10 * 1.5 = 15 (exact)
-    expect(applyResourceEventModifiers(10, mods)).toBe(15);
-    // 3 * 1.5 = 4.5 → round = 5
-    expect(applyResourceEventModifiers(3, mods)).toBe(5);
-  });
-});
