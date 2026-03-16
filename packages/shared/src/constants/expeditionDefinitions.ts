@@ -1,4 +1,3 @@
-import type { BossTemplateAction } from '../types/bossTemplate.types';
 import type { CombatantStats } from '../types/combat.types';
 import type { ExpeditionRoomType, ExpeditionShopItem, ExpeditionSetId, ExpeditionTheme, ExpeditionThemeMob } from '../types/expedition.types';
 
@@ -50,7 +49,7 @@ const SPIDER_NEST_ADD: ExpeditionThemeMob = {
   actionTemplate: [
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  ] as BossTemplateAction[],
+  ],
 };
 
 const WOLF_PACK_ADD: ExpeditionThemeMob = {
@@ -59,7 +58,7 @@ const WOLF_PACK_ADD: ExpeditionThemeMob = {
   actionTemplate: [
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  ] as BossTemplateAction[],
+  ],
 };
 
 const BANDIT_CAMP_ADD: ExpeditionThemeMob = {
@@ -68,7 +67,7 @@ const BANDIT_CAMP_ADD: ExpeditionThemeMob = {
   actionTemplate: [
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-  ] as BossTemplateAction[],
+  ],
 };
 
 const CORRUPTED_GROVE_ADD: ExpeditionThemeMob = {
@@ -77,7 +76,7 @@ const CORRUPTED_GROVE_ADD: ExpeditionThemeMob = {
   actionTemplate: [
     { actionId: 'boss_physical_attack', targetMode: 'single_target' },
     { actionId: 'boss_root', targetMode: 'single_target' },
-  ] as BossTemplateAction[],
+  ],
 };
 
 export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
@@ -95,7 +94,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_poison_spray', targetMode: 'aoe' },
-        ] as BossTemplateAction[],
+        ],
       },
       {
         key: 'expWebweaver', name: 'Webweaver', hp: 120,
@@ -104,7 +103,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_root', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
     ],
     elites: [
@@ -116,7 +115,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_poison_spray', targetMode: 'aoe' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_root', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
       {
         key: 'expSilkStalker', name: 'Silk Stalker', hp: 280,
@@ -126,7 +125,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_impale', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_fear_howl', targetMode: 'aoe' },
-        ] as BossTemplateAction[],
+        ],
       },
     ],
     miniBoss: {
@@ -139,7 +138,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
         { actionId: 'boss_frenzy', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
     miniBossAdds: [SPIDER_NEST_ADD],
     regularAdd: SPIDER_NEST_ADD,
@@ -150,7 +149,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
         { actionId: 'boss_venom_cloud', targetMode: 'aoe' },
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
     finalBoss: {
       mob: {
@@ -165,7 +164,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
       phase2: [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
         { actionId: 'boss_mark_for_death', targetMode: 'single_target' },
@@ -173,7 +172,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_poison_spray', targetMode: 'aoe' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_cocoon_burst', targetMode: 'aoe', isTelegraphed: true },
-      ] as BossTemplateAction[],
+      ],
       phase3: [
         { actionId: 'boss_frenzy', targetMode: 'single_target' },
         { actionId: 'boss_impale', targetMode: 'single_target' },
@@ -181,7 +180,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_death_bloom', targetMode: 'aoe', isTelegraphed: true },
         { actionId: 'boss_impale', targetMode: 'single_target' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
   },
 
@@ -199,7 +198,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
       {
         key: 'expSnarler', name: 'Snarler', hp: 130,
@@ -208,7 +207,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_smoke_bomb', targetMode: 'aoe' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
     ],
     elites: [
@@ -221,7 +220,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_rally', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
-        ] as BossTemplateAction[],
+        ],
       },
       {
         key: 'expShadowWolf', name: 'Shadow Wolf', hp: 300,
@@ -231,7 +230,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_fear_howl', targetMode: 'aoe' },
           { actionId: 'boss_magic_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
     ],
     miniBoss: {
@@ -244,7 +243,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_impale', targetMode: 'single_target' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
     miniBossAdds: [WOLF_PACK_ADD],
     regularAdd: WOLF_PACK_ADD,
@@ -255,7 +254,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
         { actionId: 'boss_shadow_bleed', targetMode: 'aoe' },
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
     finalBoss: {
       mob: {
@@ -270,7 +269,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
       phase2: [
         { actionId: 'boss_mark_for_death', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -278,7 +277,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_fear_howl', targetMode: 'aoe' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
       phase3: [
         { actionId: 'boss_frenzy', targetMode: 'single_target' },
         { actionId: 'boss_execution_strike', targetMode: 'single_target' },
@@ -286,7 +285,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_terrifying_howl', targetMode: 'aoe', isTelegraphed: true },
         { actionId: 'boss_execution_strike', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
   },
 
@@ -304,7 +303,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_root', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
       {
         key: 'expBanditArcherExp', name: 'Bandit Archer', hp: 130,
@@ -313,7 +312,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
     ],
     elites: [
@@ -325,7 +324,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_impale', targetMode: 'single_target' },
           { actionId: 'boss_smoke_bomb', targetMode: 'aoe' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
       {
         key: 'expBanditShaman', name: 'Bandit Shaman', hp: 280,
@@ -335,7 +334,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_weaken', targetMode: 'aoe' },
           { actionId: 'boss_magic_attack', targetMode: 'single_target' },
           { actionId: 'boss_regenerate', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
     ],
     miniBoss: {
@@ -348,7 +347,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_impale', targetMode: 'single_target' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_shield_wall', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
     miniBossAdds: [BANDIT_CAMP_ADD],
     regularAdd: BANDIT_CAMP_ADD,
@@ -359,7 +358,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
         { actionId: 'boss_throwing_knives', targetMode: 'aoe' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
     finalBoss: {
       mob: {
@@ -374,7 +373,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
       phase2: [
         { actionId: 'boss_mark_for_death', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
@@ -382,7 +381,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_shield_wall', targetMode: 'single_target' },
         { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
-      ] as BossTemplateAction[],
+      ],
       phase3: [
         { actionId: 'boss_frenzy', targetMode: 'single_target' },
         { actionId: 'boss_execution_strike', targetMode: 'single_target' },
@@ -390,7 +389,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_desperate_fury', targetMode: 'aoe', isTelegraphed: true },
         { actionId: 'boss_execution_strike', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
   },
 
@@ -408,7 +407,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
           { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
       {
         key: 'expFungalSpore', name: 'Fungal Spore', hp: 100,
@@ -417,7 +416,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_magic_attack', targetMode: 'single_target' },
           { actionId: 'boss_poison_spray', targetMode: 'aoe' },
           { actionId: 'boss_magic_attack', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
     ],
     elites: [
@@ -429,7 +428,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_earthquake', targetMode: 'aoe', isTelegraphed: true },
           { actionId: 'boss_bark_shield', targetMode: 'single_target' },
           { actionId: 'boss_regenerate', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
       {
         key: 'expBlightedDryad', name: 'Blighted Dryad', hp: 300,
@@ -439,7 +438,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
           { actionId: 'boss_wither', targetMode: 'aoe' },
           { actionId: 'boss_nature_curse', targetMode: 'single_target' },
           { actionId: 'boss_regenerate', targetMode: 'single_target' },
-        ] as BossTemplateAction[],
+        ],
       },
     ],
     miniBoss: {
@@ -452,7 +451,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_regenerate', targetMode: 'single_target' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_physical_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
     miniBossAdds: [CORRUPTED_GROVE_ADD],
     regularAdd: CORRUPTED_GROVE_ADD,
@@ -463,7 +462,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
         { actionId: 'boss_blight_cloud', targetMode: 'aoe' },
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
     finalBoss: {
       mob: {
@@ -478,7 +477,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_regenerate', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
       phase2: [
         { actionId: 'boss_blight_wave', targetMode: 'aoe', isTelegraphed: true },
         { actionId: 'boss_nature_curse', targetMode: 'single_target' },
@@ -486,7 +485,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
         { actionId: 'boss_summon_adds', targetMode: 'single_target' },
         { actionId: 'boss_regenerate', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
       phase3: [
         { actionId: 'boss_frenzy', targetMode: 'single_target' },
         { actionId: 'boss_magic_attack', targetMode: 'single_target' },
@@ -494,7 +493,7 @@ export const EXPEDITION_THEMES: readonly ExpeditionTheme[] = [
         { actionId: 'boss_death_bloom', targetMode: 'aoe', isTelegraphed: true },
         { actionId: 'boss_regenerate', targetMode: 'single_target' },
         { actionId: 'boss_nature_curse', targetMode: 'single_target' },
-      ] as BossTemplateAction[],
+      ],
     },
   },
 ];

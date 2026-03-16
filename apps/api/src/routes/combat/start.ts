@@ -91,7 +91,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   if (!site) throw new AppError(404, 'Encounter site not found', 'NOT_FOUND');
   if (!site.clearStrategy) throw new AppError(400, 'Select a clearing strategy before fighting', 'STRATEGY_NOT_SET');
 
-  await assertInZone(playerId, site.zoneId as string);
+  await assertInZone(playerId, site.zoneId);
 
   const decayed = await applyEncounterSiteDecayAndPersist({
     id: site.id,
@@ -104,7 +104,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const siteStrategy = site.clearStrategy as 'full_clear' | 'room_by_room';
   const siteFullClearActive = site.fullClearActive ?? true;
   let currentRoom = site.currentRoom ?? 1;
-  const zoneId = site.zoneId as string;
+  const zoneId = site.zoneId;
 
   // Get ALL alive mobs in the current room -- advance if decay emptied it
   let roomMobs = getAllAliveMobsInRoom(decayed.mobs, currentRoom);
@@ -180,7 +180,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     currentPlayerHp = Math.min(site.roomCarryHp, hpState.currentHp);
     await setHp(playerId, currentPlayerHp);
   }
-  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
+  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId });
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
 
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
@@ -287,7 +287,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       fightResults.push({
         room: session.roomNumber,
         slot: roomMob.slot,
-        mobName: template.name as string,
+        mobName: template.name,
         mobDisplayName: prefixedMob.mobDisplayName ?? prefixedMob.name,
         mobTemplateId: prefixedMob.id,
         mobPrefix: prefixedMob.mobPrefix,
@@ -483,7 +483,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
     // Use encounter site's mob family directly (avoids N+1 query)
     const familyIds: string[] = [];
-    if (site.mobFamilyId) familyIds.push(site.mobFamilyId as string);
+    if (site.mobFamilyId) familyIds.push(site.mobFamilyId);
 
     await trackAchievements(playerId, {}, { statKeys: achievementKeys, familyIds });
   } else {
@@ -524,7 +524,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     : null;
 
   // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
-  const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
+  const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId });
 
   // Mob family name from the initial encounter site query (includes mobFamily relation)
   const mobFamilyName: string | null = site.mobFamily?.name ?? null;
