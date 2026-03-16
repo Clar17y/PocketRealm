@@ -81,7 +81,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   // Create player with all related records in a single transaction for atomicity.
   // If any step fails, the entire registration is rolled back so retries won't
   // hit USER_EXISTS (409) for an incomplete player.
-  const player = await (prisma as any).$transaction(async (tx: any) => {
+  const player = await prisma.$transaction(async (tx) => {
     const created = await tx.player.create({
       data: {
         username: body.username,
@@ -157,8 +157,8 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
       });
     }
 
-    // Seed starter resource nodes and encounter site
-    const starterTownForNodes = await tx.zone.findFirst({ where: { isStarter: true }, select: { id: true } });
+    // Seed starter resource nodes and encounter site (reuse starterZones from above)
+    const starterTownForNodes = starterZones[0];
     if (starterTownForNodes) {
       const nodeConnections = await tx.zoneConnection.findMany({
         where: { fromId: starterTownForNodes.id },

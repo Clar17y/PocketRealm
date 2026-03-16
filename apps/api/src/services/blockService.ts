@@ -26,7 +26,7 @@ export async function blockPlayer(blockerId: string, targetId: string): Promise<
   await prisma.$transaction(async (tx) => {
     // Use upsert to eliminate TOCTOU race: concurrent calls both pass the
     // existence check when it runs outside the transaction.
-    await (tx as any).playerBlock.upsert({
+    await tx.playerBlock.upsert({
       where: { blockerId_blockedId: { blockerId, blockedId: targetId } },
       create: { blockerId, blockedId: targetId },
       update: {}, // no-op if already exists

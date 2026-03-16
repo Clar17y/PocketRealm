@@ -65,8 +65,8 @@ export async function checkAchievements(
     }
   }
 
-  // Check each candidate
-  const newlyUnlocked: AchievementDef[] = [];
+  // Check each candidate and batch-insert all that meet threshold
+  const toUnlock: AchievementDef[] = [];
 
   for (const achievement of candidates) {
     if (unlockedSet.has(achievement.id)) continue;
@@ -79,20 +79,26 @@ export async function checkAchievements(
     }
 
     if (progress >= achievement.threshold) {
-      // Use createMany with skipDuplicates to prevent TOCTOU race
-      // where concurrent calls both see the achievement as not-yet-unlocked
-      const { count } = await prisma.playerAchievement.createMany({
-        data: [{ playerId, achievementId: achievement.id }],
-        skipDuplicates: true,
-      });
-      if (count > 0) {
-        newlyUnlocked.push(achievement);
-        unlockedSet.add(achievement.id);
-      }
+      toUnlock.push(achievement);
     }
   }
 
-  return newlyUnlocked;
+  if (toUnlock.length === 0) return [];
+
+  // Batch insert with skipDuplicates to prevent TOCTOU race
+  // where concurrent calls both see achievements as not-yet-unlocked
+  const { count } = await prisma.playerAchievement.createMany({
+    data: toUnlock.map(a => ({ playerId, achievementId: a.id })),
+    skipDuplicates: true,
+  });
+
+  if (count === 0) return [];
+
+  // count === toUnlock.length means all were new (common case).
+  // count < toUnlock.length means a concurrent call beat us on some — return
+  // all eligible since they ARE unlocked either way; duplicate notifications
+  // are harmless and this avoids an extra DB round-trip on the hot path.
+  return toUnlock;
 }
 
 export async function getPlayerAchievements(playerId: string): Promise<{

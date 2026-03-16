@@ -668,7 +668,7 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
     const botName = `ExpBot_${timestamp}_${i}`;
 
     // Wrap each bot creation in a transaction so partial records aren't orphaned
-    const botId = await (prisma as any).$transaction(async (tx: any) => {
+    const botId = await prisma.$transaction(async (tx) => {
       // Create bot player with attributes matching the tier
       const bot = await tx.player.create({
         data: {

@@ -37,7 +37,6 @@ import { getHpState, setHp, enterRecoveringState } from './hpService';
 import { getActiveTemplate } from './combatTemplateService';
 import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { distributeBossLoot } from './bossLootService';
-import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
 import { parseJsonArray, parseJsonRecord } from '../utils/jsonColumnSchemas';
 

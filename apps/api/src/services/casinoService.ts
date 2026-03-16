@@ -269,7 +269,13 @@ export async function getCurrentRound(): Promise<RouletteRoundState> {
     };
   }
 
-  const parsed = safeParseRedisJson(existingRaw, activeRoundSchema, { roundId: '', startedAt: Date.now() }, 'roulette:current_round');
+  const parseResult = activeRoundSchema.safeParse(JSON.parse(existingRaw));
+  if (!parseResult.success) {
+    console.error('[casino] corrupt roulette:current_round in Redis, starting fresh');
+    await redis.del('roulette:current_round');
+    return getCurrentRound();
+  }
+  const parsed = parseResult.data;
   const elapsed = Date.now() - parsed.startedAt;
   const totalMs = CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000;
   const bettingMs = CASINO_CONSTANTS.BETTING_WINDOW_SECONDS * 1000;
