@@ -4,7 +4,7 @@ import {
   calculateMaxStamina, calculateStaminaRegenPerRound,
   calculateMaxMana, calculateManaRegenPerRound,
 } from '@pocketrealm/game-engine';
-import type { SkillType } from '@pocketrealm/shared';
+import type { PerActionScaling, SkillType } from '@pocketrealm/shared';
 import { normalizePlayerAttributes } from './attributesService';
 import { buildPlayerTemplateCombatant } from './combatOrchestrationService';
 import { getSkillLevels } from './combatStatsService';
@@ -97,6 +97,22 @@ export async function buildPvpCombatant(
     equipStats,
   );
 
+  const perActionScaling: PerActionScaling = {
+    skillLevels: { melee: meleeLevel, ranged: rangedLevel, magic: magicLevel },
+    attributes: {
+      strength: attributes.strength,
+      dexterity: attributes.dexterity,
+      intelligence: attributes.intelligence,
+    },
+    weaponPower: {
+      attack: equipStats.attack,
+      rangedPower: equipStats.rangedPower,
+      magicPower: equipStats.magicPower,
+    },
+    equipmentAccuracy: equipStats.accuracy,
+    weaponRequiredSkill: attackStyle,
+  };
+
   return buildPlayerTemplateCombatant({
     playerId,
     username,
@@ -109,5 +125,6 @@ export async function buildPvpCombatant(
     maxMana,
     manaRegenPerRound: calculateManaRegenPerRound(magicLevel),
     unlockedActions: skillPoints.unlockedActions,
+    perActionScaling,
   });
 }

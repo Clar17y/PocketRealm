@@ -472,6 +472,13 @@ describe('pvpCombatantBuilder', () => {
         maxMana: 150,
         manaRegenPerRound: 4,
         unlockedActions: ['power_strike', 'fireball'],
+        perActionScaling: {
+          skillLevels: { melee: 5, ranged: 5, magic: 5 },
+          attributes: { strength: 10, dexterity: 8, intelligence: 6 },
+          weaponPower: { attack: 10, rangedPower: 8, magicPower: 12 },
+          equipmentAccuracy: 5,
+          weaponRequiredSkill: 'melee',
+        },
       });
     });
 
@@ -499,7 +506,52 @@ describe('pvpCombatantBuilder', () => {
         maxMana: 80,
         manaRegenPerRound: 2,
         unlockedActions: [],
+        perActionScaling: {
+          skillLevels: { melee: 5, ranged: 5, magic: 5 },
+          attributes: { strength: 10, dexterity: 8, intelligence: 6 },
+          weaponPower: { attack: 10, rangedPower: 8, magicPower: 12 },
+          equipmentAccuracy: 5,
+          weaponRequiredSkill: 'melee',
+        },
       });
+    });
+
+    // ── perActionScaling: weaponRequiredSkill matches attack style ───
+
+    it('sets weaponRequiredSkill to magic when wielding a staff', async () => {
+      mockPrisma.playerEquipment.findUnique.mockResolvedValue({
+        item: { template: { requiredSkill: 'magic' } },
+      });
+      mockGetSkillLevels.mockResolvedValue({ melee: 5, ranged: 5, evasion: 5, magic: 20 });
+      mockGetEquipmentStats.mockResolvedValue(fakeEquipmentStats({ magicPower: 30 }) as any);
+
+      await buildPvpCombatant(PLAYER_ID, USERNAME, false);
+
+      expect(mockBuildPlayerTemplateCombatant).toHaveBeenCalledWith(
+        expect.objectContaining({
+          perActionScaling: expect.objectContaining({
+            weaponRequiredSkill: 'magic',
+            skillLevels: expect.objectContaining({ magic: 20 }),
+            weaponPower: expect.objectContaining({ magicPower: 30 }),
+          }),
+        }),
+      );
+    });
+
+    it('sets weaponRequiredSkill to ranged when wielding a bow', async () => {
+      mockPrisma.playerEquipment.findUnique.mockResolvedValue({
+        item: { template: { requiredSkill: 'ranged' } },
+      });
+
+      await buildPvpCombatant(PLAYER_ID, USERNAME, false);
+
+      expect(mockBuildPlayerTemplateCombatant).toHaveBeenCalledWith(
+        expect.objectContaining({
+          perActionScaling: expect.objectContaining({
+            weaponRequiredSkill: 'ranged',
+          }),
+        }),
+      );
     });
 
     // ── calculateMaxHp uses normalized attributes ────────────────────
