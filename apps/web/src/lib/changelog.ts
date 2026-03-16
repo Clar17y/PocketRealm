@@ -11,7 +11,7 @@ export const changelog: ChangelogEntry[] = [
     date: '2026-03-16',
     title: 'Performance Optimization',
     summary:
-      'A major database performance pass targeting combat and post-combat processing. Ten missing database indexes have been added (the Item table previously had none, meaning every inventory lookup was a full table scan). Frequently accessed data like equipment stats, guild membership, and drop tables are now cached in Redis and invalidated on change. Queries across seven services have been slimmed to fetch only the columns they actually use — equipment stat lookups went from ~30 columns to 4. Skill level queries are now batched into a single call instead of 3–4 separate ones, and post-combat reward processing (bestiary, guild XP, quest progress) now runs in parallel. Overall per-combat query count is roughly halved. Validation errors now return a readable 400 response instead of a generic 500, and CORS preflight requests no longer count against the rate limit.',
+      'Combat, exploration, and gathering should all feel noticeably faster. Behind the scenes, the server now does roughly half as much work per fight by caching equipment stats, batching lookups, and running post-combat rewards in parallel. Encounter sites, ambushes, and PvP all benefit. Crafting and other actions now show a clear error message when something goes wrong instead of a generic "Internal Server Error". Fixed an issue where rapid actions could incorrectly trigger a "too many requests" error.',
   },
   {
     version: '0.41',
