@@ -49,6 +49,7 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       lowHpWarning: true,
       confirmRarity: true,
       lootRevealRarity: true,
+      forgeConfirmRarity: true,
       activeTitle: true,
       gold: true,
       homeTownId: true,
@@ -135,7 +136,7 @@ playerRouter.post('/attributes', asyncHandler(async (req, res) => {
 const SETTINGS_FIELDS = [
   'combatLogSpeedMs', 'explorationSpeedMs',
   'autoSkipKnownCombat', 'defaultExploreTurns', 'quickRestHealPercent', 'defaultRefiningMax',
-  'lowHpWarning', 'confirmRarity', 'lootRevealRarity',
+  'lowHpWarning', 'confirmRarity', 'lootRevealRarity', 'forgeConfirmRarity',
   'homeTownId',
 ] as const;
 
@@ -143,12 +144,13 @@ const settingsSchema = z.object({
   combatLogSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   explorationSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   autoSkipKnownCombat: z.boolean().optional(),
-  defaultExploreTurns: z.number().int().min(10).max(10000).refine(v => v % 10 === 0, { message: 'Must be a multiple of 10' }).optional(),
+  defaultExploreTurns: z.number().int().min(100).max(2500).refine(v => v % 10 === 0, { message: 'Must be a multiple of 10' }).optional(),
   quickRestHealPercent: z.number().int().min(25).max(100).refine(v => v % 25 === 0, { message: 'Must be a multiple of 25' }).optional(),
   defaultRefiningMax: z.boolean().optional(),
   lowHpWarning: z.boolean().optional(),
   confirmRarity: z.enum(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
   lootRevealRarity: z.enum(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
+  forgeConfirmRarity: z.enum(['none', 'common', 'uncommon', 'rare', 'epic', 'legendary']).optional(),
   homeTownId: z.string().uuid().optional(),
 }).refine(data => Object.values(data).some(v => v !== undefined), { message: 'At least one setting required' });
 

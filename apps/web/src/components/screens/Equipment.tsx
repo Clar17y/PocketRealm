@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
-import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, X, Zap } from 'lucide-react';
+import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, Target, X, Zap } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
 import { repairTurnCost } from '@pocketrealm/shared';
@@ -317,6 +317,11 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                       <StatLine icon={Heart} label="HP" statKey="health" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health')} color="text-[var(--rpg-green-light)]" />
                       <StatLine icon={Zap} label="Dodge" statKey="dodge" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge')} color="text-[var(--rpg-gold)]" />
                       <StatLine icon={Crosshair} label="Accuracy" statKey="accuracy" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy')} color="text-[var(--rpg-blue-light)]" />
+                      <StatLine icon={Sparkles} label="Magic Power" statKey="magicPower" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicPower')} color="text-[var(--rpg-purple)]" />
+                      <StatLine icon={Target} label="Ranged Power" statKey="rangedPower" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'rangedPower')} color="text-[var(--rpg-green-light)]" />
+                      <StatLine icon={Zap} label="Luck" statKey="luck" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'luck')} color="text-[var(--rpg-gold)]" />
+                      <StatLine icon={Zap} label="Crit Chance" statKey="critChance" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'critChance')} color="text-[var(--rpg-gold)]" />
+                      <StatLine icon={Zap} label="Crit Damage" statKey="critDamage" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'critDamage')} color="text-[var(--rpg-gold)]" />
                       {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'inventorySlots') !== 0 && (
                         <div className="flex items-center gap-2">
                           <Backpack size={16} className="text-[var(--rpg-gold)]" />
@@ -361,28 +366,24 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                 ) : (
                   <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                     {candidates.map((item) => {
-                      const currentAttack = totalStatValue(currentItem?.baseStats, currentItem?.bonusStats, 'attack');
-                      const currentArmor = totalStatValue(currentItem?.baseStats, currentItem?.bonusStats, 'armor');
-                      const currentMagicDefence = totalStatValue(currentItem?.baseStats, currentItem?.bonusStats, 'magicDefence');
-                      const currentHealth = totalStatValue(currentItem?.baseStats, currentItem?.bonusStats, 'health');
-                      const currentDodge = totalStatValue(currentItem?.baseStats, currentItem?.bonusStats, 'dodge');
-                      const currentAccuracy = totalStatValue(currentItem?.baseStats, currentItem?.bonusStats, 'accuracy');
+                      const COMPARE_STATS = [
+                        { key: 'attack', label: 'Attack' },
+                        { key: 'armor', label: 'Armor' },
+                        { key: 'magicDefence', label: 'Magic Def' },
+                        { key: 'health', label: 'HP' },
+                        { key: 'dodge', label: 'Dodge' },
+                        { key: 'accuracy', label: 'Accuracy' },
+                        { key: 'magicPower', label: 'Magic Power' },
+                        { key: 'rangedPower', label: 'Ranged Power' },
+                        { key: 'luck', label: 'Luck' },
+                        { key: 'critChance', label: 'Crit Chance' },
+                        { key: 'critDamage', label: 'Crit Damage' },
+                      ] as const;
 
-                      const nextAttack = totalStatValue(item.baseStats, item.bonusStats, 'attack');
-                      const nextArmor = totalStatValue(item.baseStats, item.bonusStats, 'armor');
-                      const nextMagicDefence = totalStatValue(item.baseStats, item.bonusStats, 'magicDefence');
-                      const nextHealth = totalStatValue(item.baseStats, item.bonusStats, 'health');
-                      const nextDodge = totalStatValue(item.baseStats, item.bonusStats, 'dodge');
-                      const nextAccuracy = totalStatValue(item.baseStats, item.bonusStats, 'accuracy');
-
-                      const diffs = [
-                        { key: 'Attack', diff: nextAttack - currentAttack },
-                        { key: 'Armor', diff: nextArmor - currentArmor },
-                        { key: 'Magic Def', diff: nextMagicDefence - currentMagicDefence },
-                        { key: 'HP', diff: nextHealth - currentHealth },
-                        { key: 'Dodge', diff: nextDodge - currentDodge },
-                        { key: 'Accuracy', diff: nextAccuracy - currentAccuracy },
-                      ].filter((d) => d.diff !== 0);
+                      const diffs = COMPARE_STATS.map(({ key, label }) => ({
+                        key: label,
+                        diff: totalStatValue(item.baseStats, item.bonusStats, key) - totalStatValue(currentItem?.baseStats, currentItem?.bonusStats, key),
+                      })).filter((d) => d.diff !== 0);
 
                       const isEquippedHere = item.equippedSlot === activeSlotId;
                       const durability = item.durability;

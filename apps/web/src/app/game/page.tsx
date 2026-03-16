@@ -232,6 +232,8 @@ export default function GamePage() {
     handleSetConfirmRarity,
     lootRevealRarity,
     handleSetLootRevealRarity,
+    forgeConfirmRarity,
+    handleSetForgeConfirmRarity,
     handleQuickRest,
     guildTaxRate,
     homeTownId,
@@ -857,6 +859,7 @@ export default function GamePage() {
             guildTaxRate={guildTaxRate}
             forgeLuckUses={activeBuffs.find(b => b.buffType === 'forge_luck')?.remainingUses ?? 0}
             forgeProtectionUses={activeBuffs.find(b => b.buffType === 'forge_protection')?.remainingUses ?? 0}
+            forgeConfirmRarity={forgeConfirmRarity}
           />
         );
       }
@@ -1023,6 +1026,8 @@ export default function GamePage() {
             onConfirmRarityChange={handleSetConfirmRarity}
             lootRevealRarity={lootRevealRarity}
             onLootRevealRarityChange={handleSetLootRevealRarity}
+            forgeConfirmRarity={forgeConfirmRarity}
+            onForgeConfirmRarityChange={handleSetForgeConfirmRarity}
             onLogout={() => { logout(); router.push('/'); }}
           />
         );

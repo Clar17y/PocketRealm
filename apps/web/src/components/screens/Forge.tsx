@@ -7,7 +7,7 @@ import { Anvil, Sparkles, TrendingUp } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
-import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
+import { RARITY_COLORS, rarityMeetsThreshold, type ConfirmRarity, type Rarity } from '@/lib/rarity';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ActivityLog } from '@/components/ActivityLog';
 import { inflateCost } from '@/lib/taxCalc';
@@ -119,6 +119,7 @@ interface ForgeProps {
   guildTaxRate?: number;
   forgeLuckUses?: number;
   forgeProtectionUses?: number;
+  forgeConfirmRarity?: ConfirmRarity;
 }
 
 function titleCaseRarity(rarity: Rarity): string {
@@ -143,6 +144,7 @@ export function Forge({
   guildTaxRate = 0,
   forgeLuckUses = 0,
   forgeProtectionUses = 0,
+  forgeConfirmRarity = 'rare',
 }: ForgeProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(items[0]?.id ?? null);
   const [selectedUpgradeSacrificeId, setSelectedUpgradeSacrificeId] = useState<string | null>(null);
@@ -404,7 +406,13 @@ export function Forge({
                   || upgradeCost === null
                   || busy !== null
                 }
-                onClick={() => setConfirmUpgrade(true)}
+                onClick={() => {
+                  if (selected && rarityMeetsThreshold(selected.rarity, forgeConfirmRarity)) {
+                    setConfirmUpgrade(true);
+                  } else {
+                    void handleUpgrade();
+                  }
+                }}
               >
                 Upgrade Rarity
               </PixelButton>
@@ -451,7 +459,13 @@ export function Forge({
                   || rerollCost === null
                   || busy !== null
                 }
-                onClick={() => setConfirmReroll(true)}
+                onClick={() => {
+                  if (selected && rarityMeetsThreshold(selected.rarity, forgeConfirmRarity)) {
+                    setConfirmReroll(true);
+                  } else {
+                    void handleReroll();
+                  }
+                }}
               >
                 Reroll Bonus Stats
               </PixelButton>
