@@ -6,6 +6,7 @@ import { getTurnState } from '../services/turnBankService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { createActivityLog } from '../services/activityLogService';
+import { buildStateUpdates } from '../services/stateUpdateHelpers';
 
 export const resourcesRouter = Router();
 resourcesRouter.use(authenticate);
@@ -37,7 +38,10 @@ resourcesRouter.post('/rest', asyncHandler(async (req, res) => {
     ? await restStamina(playerId, body.turns)
     : await restMana(playerId, body.turns);
 
-  const turns = await getTurnState(playerId);
+  const [turns, stateUpdates] = await Promise.all([
+    getTurnState(playerId),
+    buildStateUpdates(playerId, ['hp', 'resources']),
+  ]);
 
   await createActivityLog({
     playerId,
@@ -55,6 +59,7 @@ resourcesRouter.post('/rest', asyncHandler(async (req, res) => {
     ...result,
     turns,
     tax: taxInfoFromResult(taxResult),
+    stateUpdates,
   });
 }));
 
