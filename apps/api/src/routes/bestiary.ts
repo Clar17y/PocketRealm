@@ -80,18 +80,14 @@ bestiaryRouter.get('/', asyncHandler(async (req, res) => {
   res.json({
     mobs: mobTemplates.map((mob: typeof mobTemplates[number]) => {
       const kills = killsByMobId.get(mob.id) ?? 0;
-      const mobStats = mob as unknown as { accuracy?: number; attack?: number };
-      const mobAccuracy = typeof mobStats.accuracy === 'number'
-        ? mobStats.accuracy
-        : Math.floor(mobStats.attack ?? 0);
+      const mobAccuracy = mob.accuracy;
 
       // Exploration tier-lock calculation
-      const zoneExpl = mob.zone as unknown as { turnsToExplore: number | null; explorationTiers: Record<string, number> | null };
-      const turnsToExplore = zoneExpl.turnsToExplore ?? null;
+      const turnsToExplore = mob.zone.turnsToExplore ?? null;
       const turnsExplored = explorationByZoneId.get(mob.zoneId) ?? 0;
       const zonePercent = calculateExplorationPercent(turnsExplored, turnsToExplore);
-      const zoneTiers = zoneExpl.explorationTiers;
-      const mobTier = (mob as unknown as { explorationTier: number | null }).explorationTier ?? 1;
+      const zoneTiers = mob.zone.explorationTiers as Record<string, number> | null;
+      const mobTier = mob.explorationTier ?? 1;
       const tierThreshold = zoneTiers ? (zoneTiers[String(mobTier)] ?? 0) : 0;
       const tierLocked = zonePercent < tierThreshold;
 
@@ -121,7 +117,7 @@ bestiaryRouter.get('/', asyncHandler(async (req, res) => {
         })),
         prefixesEncountered: isHidden ? [] : (prefixKeysByMobId.get(mob.id) ?? []),
         bossRotation: (() => {
-          const isBoss = (mob as unknown as { isBoss: boolean }).isBoss;
+          const isBoss = mob.isBoss;
           if (!isBoss || isHidden) return undefined;
           const roundsRevealed = rotationByMobId.get(mob.id) ?? 0;
           const template = BOSS_TEMPLATES[mob.name];

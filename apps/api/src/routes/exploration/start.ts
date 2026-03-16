@@ -258,7 +258,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           // Tutorial: guaranteed Field Mouse with no prefix
           const fieldMouse = mobTemplates.find(m => m.name === 'Field Mouse')
             ?? mobTemplates[0]!;
-          baseMob = toMobTemplate(fieldMouse as unknown as Record<string, unknown>);
+          baseMob = toMobTemplate(fieldMouse);
           prefixedMob = applyMobPrefix(baseMob, null);
         } else {
           const tieredMobs = filterAndWeightMobsByTier(
@@ -295,7 +295,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           const mob = pickWeighted(weightedCandidates, 'encounterWeight') as typeof candidates[number] | null;
           if (!mob) continue;
 
-          baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
+          baseMob = toMobTemplate(mob);
 
           const ambushFamilyId = mobToFamilyMap.get(baseMob.id);
           const ambushModifiers = ambushFamilyId

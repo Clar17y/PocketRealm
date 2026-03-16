@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler';
-import { Prisma, prisma } from '@pocketrealm/database';
+import { Prisma, prisma, type MobTemplate as PrismaMobTemplate } from '@pocketrealm/database';
 import { createActivityLog } from '../../services/activityLogService';
 import {
   applyMobEventModifiers,
@@ -201,7 +201,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       const template = mobTemplateById.get(roomMob.mobTemplateId);
       if (!template) continue;
 
-      const baseMob = toMobTemplate(template as unknown as Record<string, unknown>);
+      const baseMob = toMobTemplate(template);
       const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
       const prefixedMob = applyMobPrefix(modifiedMob, roomMob.prefix ?? null);
 
@@ -722,17 +722,17 @@ export function registerStartRoutes(router: Router): void {
 
       const explorationProgress = await getExplorationPercent(playerId, zoneId);
 
-      let mob = null as null | (MobTemplate & { spellPattern: unknown });
+      let mob: PrismaMobTemplate | null = null;
 
       if (body.mobTemplateId) {
         const found = await prisma.mobTemplate.findUnique({ where: { id: body.mobTemplateId } });
         if (!found || found.zoneId !== zoneId) {
           throw new AppError(400, 'Invalid mobTemplateId for this zone', 'INVALID_MOB');
         }
-        mob = found as unknown as MobTemplate & { spellPattern: unknown };
+        mob = found;
       } else {
         const mobs = await prisma.mobTemplate.findMany({ where: { zoneId } });
-        const zoneTiers = (zone as unknown as { explorationTiers: Record<string, number> | null }).explorationTiers;
+        const zoneTiers = zone.explorationTiers as Record<string, number> | null;
         const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
 
         let currentTier = 0;
@@ -746,7 +746,7 @@ export function registerStartRoutes(router: Router): void {
         const selectedTier = selectTierWithBleedthrough(currentTier, zoneTiers);
         const mobsWithTier = mobs.map(m => ({
           ...m,
-          explorationTier: (m as unknown as { explorationTier: number | null }).explorationTier ?? 1,
+          explorationTier: m.explorationTier ?? 1,
         }));
 
         let candidates = mobsWithTier.filter(m => m.explorationTier === selectedTier);
@@ -766,7 +766,7 @@ export function registerStartRoutes(router: Router): void {
         if (!picked) {
           throw new AppError(400, 'No mobs available for this zone', 'NO_MOBS');
         }
-        mob = picked as unknown as MobTemplate & { spellPattern: unknown };
+        mob = picked;
       }
 
       let mobPrefix = rollMobPrefix();
@@ -774,7 +774,7 @@ export function registerStartRoutes(router: Router): void {
       const requestedAttackSkill: AttackSkill | null = body.attackSkill ?? null;
 
       // Prepare player combat data + zone events + mob family lookup in parallel
-      const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
+      const baseMob = toMobTemplate(mob!);
       const [combatPrep, zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyRow] = await Promise.all([
         preparePlayerForCombat(playerId, { requestedAttackSkill, maxHp: hpState.maxHp }),
         getActiveEventsForZone(zoneId),
