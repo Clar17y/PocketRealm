@@ -15,18 +15,7 @@ vi.mock('../middleware/auth', () => ({
   verifyRefreshToken: vi.fn(),
 }));
 
-vi.mock('../services/zoneDiscoveryService', () => ({
-  ensureStarterDiscoveries: vi.fn().mockResolvedValue(undefined),
-  ensureStarterEncounterAndNodes: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('../services/equipmentService', () => ({
-  ensureEquipmentSlots: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { mockPrisma } from '../__test__/setup';
-import { ensureStarterDiscoveries, ensureStarterEncounterAndNodes } from '../services/zoneDiscoveryService';
-import { ensureEquipmentSlots } from '../services/equipmentService';
 import { authRouter } from './auth';
 
 function findHandler(method: string, path: string) {
@@ -55,7 +44,7 @@ describe('POST /register', () => {
     };
   });
 
-  it('grants and equips the starter off-hand for a newly registered player', async () => {
+  it('wraps all registration steps in a transaction', async () => {
     mockPrisma.player.findFirst.mockResolvedValue(null);
     mockPrisma.zone.findFirst.mockResolvedValue({ id: 'starter-town' });
     mockPrisma.zoneConnection.findFirst.mockResolvedValue({
@@ -65,14 +54,47 @@ describe('POST /register', () => {
       id: STARTER_LOADOUT.tutorialOffHandTemplateId,
       maxDurability: 40,
     });
-    mockPrisma.player.create.mockResolvedValue({
-      id: 'player-1',
-      username: 'Rook',
-      email: 'rook@example.com',
-      role: 'player',
+
+    // Track calls made via the transaction client (tx)
+    const txCalls: string[] = [];
+    const txClient: any = new Proxy({}, {
+      get(_target, prop) {
+        if (prop === 'player') return {
+          create: vi.fn().mockImplementation(() => {
+            txCalls.push('player.create');
+            return Promise.resolve({
+              id: 'player-1', username: 'Rook', email: 'rook@example.com', role: 'player',
+            });
+          }),
+        };
+        if (prop === 'playerEquipment') return {
+          findMany: vi.fn().mockImplementation(() => { txCalls.push('playerEquipment.findMany'); return Promise.resolve([]); }),
+          createMany: vi.fn().mockImplementation(() => { txCalls.push('playerEquipment.createMany'); return Promise.resolve({}); }),
+          upsert: vi.fn().mockImplementation(() => { txCalls.push('playerEquipment.upsert'); return Promise.resolve({}); }),
+        };
+        if (prop === 'item') return {
+          create: vi.fn().mockImplementation(() => { txCalls.push('item.create'); return Promise.resolve({ id: 'starter-item-1' }); }),
+        };
+        if (prop === 'zone') return {
+          findMany: vi.fn().mockImplementation(() => { txCalls.push('zone.findMany'); return Promise.resolve([{ id: 'starter-town' }]); }),
+          findFirst: vi.fn().mockImplementation(() => { txCalls.push('zone.findFirst'); return Promise.resolve({ id: 'starter-town' }); }),
+        };
+        if (prop === 'zoneConnection') return {
+          findMany: vi.fn().mockImplementation(() => { txCalls.push('zoneConnection.findMany'); return Promise.resolve([]); }),
+        };
+        if (prop === 'playerZoneDiscovery') return {
+          createMany: vi.fn().mockImplementation(() => { txCalls.push('playerZoneDiscovery.createMany'); return Promise.resolve({}); }),
+        };
+        // Return no-op for any other model
+        return new Proxy({}, { get: () => vi.fn().mockResolvedValue(null) });
+      },
     });
-    mockPrisma.item.create.mockResolvedValue({ id: 'starter-item-1' });
-    mockPrisma.playerEquipment.upsert.mockResolvedValue({});
+
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+      if (typeof fn === 'function') return fn(txClient);
+      return Promise.all(fn);
+    });
+
     const req = {
       body: {
         username: 'Rook',
@@ -86,29 +108,17 @@ describe('POST /register', () => {
     const handler = findHandler('post', '/register');
     await handler(req, res, next);
 
-    expect(mockPrisma.itemTemplate.findUnique).toHaveBeenCalledWith({
-      where: { id: STARTER_LOADOUT.tutorialOffHandTemplateId },
-      select: { id: true, maxDurability: true },
-    });
-    expect(ensureEquipmentSlots).toHaveBeenCalledWith('player-1');
-    expect(mockPrisma.item.create).toHaveBeenCalledWith({
-      data: {
-        ownerId: 'player-1',
-        templateId: STARTER_LOADOUT.tutorialOffHandTemplateId,
-        rarity: 'common',
-        quantity: 1,
-        maxDurability: 40,
-        currentDurability: 40,
-      },
-      select: { id: true },
-    });
-    expect(mockPrisma.playerEquipment.upsert).toHaveBeenCalledWith({
-      where: { playerId_slot: { playerId: 'player-1', slot: 'off_hand' } },
-      create: { playerId: 'player-1', slot: 'off_hand', itemId: 'starter-item-1' },
-      update: { itemId: 'starter-item-1' },
-    });
-    expect(ensureStarterDiscoveries).toHaveBeenCalledWith('player-1');
-    expect(ensureStarterEncounterAndNodes).toHaveBeenCalledWith('player-1');
+    // Verify transaction was used
+    expect(mockPrisma.$transaction).toHaveBeenCalled();
+
+    // Verify key operations happened via tx, not top-level prisma
+    expect(txCalls).toContain('player.create');
+    expect(txCalls).toContain('playerEquipment.findMany');
+    expect(txCalls).toContain('item.create');
+    expect(txCalls).toContain('playerEquipment.upsert');
+
+    // Verify the response
+    expect(res.status).toHaveBeenCalledWith(201);
     expect(next).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { prisma } from '@pocketrealm/database';
-import { WORLD_EVENT_CONSTANTS, type BossPlayerReward, type SkillType } from '@pocketrealm/shared';
+import { WORLD_EVENT_CONSTANTS, ALL_SKILLS, type BossPlayerReward, type SkillType } from '@pocketrealm/shared';
 import { calculateContributionScore } from '@pocketrealm/game-engine';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantLoot, enrichLootWithNames } from './lootService';
@@ -134,7 +134,8 @@ export async function distributeBossLoot(
 
     // 2. XP scaled by contribution
     const scaledXp = Math.round(baseXp * dropMultiplier);
-    const skillType = (contributor.attackSkill ?? 'magic') as SkillType;
+    const rawSkill = contributor.attackSkill ?? 'magic';
+    const skillType: SkillType = ALL_SKILLS.includes(rawSkill as SkillType) ? (rawSkill as SkillType) : 'magic';
     const xpResult = await grantSkillXp(contributor.playerId, skillType, scaledXp);
 
     const xpReward: BossPlayerReward['xp'] = {

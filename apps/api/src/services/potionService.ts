@@ -1,5 +1,6 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import type { CombatPotion, CombatTemplateSlotData, ConsumableEffect, ConsumableEffectType, PotionConsumed } from '@pocketrealm/shared';
+import { consumableEffectSchema } from '../utils/jsonColumnSchemas';
 
 const POTION_ACTION_IDS = new Set([
   'use_hp_potion', 'use_stamina_potion', 'use_mana_potion',
@@ -39,8 +40,9 @@ export async function buildPotionPool(playerId: string, maxHp: number): Promise<
 
   const potions: CombatPotion[] = [];
   for (const item of consumables) {
-    const effect = item.template.consumableEffect as ConsumableEffect | null;
-    if (!effect) continue;
+    const effectParsed = consumableEffectSchema.safeParse(item.template.consumableEffect);
+    if (!effectParsed.success || !effectParsed.data) continue;
+    const effect = effectParsed.data as ConsumableEffect;
 
     const potionType = getEffectPotionType(effect.type);
     const isResource = potionType === 'hp' || potionType === 'stamina' || potionType === 'mana';

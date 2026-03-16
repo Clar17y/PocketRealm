@@ -2,6 +2,7 @@ import { prisma } from '@pocketrealm/database';
 import type { ConsumableEffect, ConsumableEffectType } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getHpState } from './hpService';
+import { consumableEffectSchema } from '../utils/jsonColumnSchemas';
 
 const COMBAT_ONLY_EFFECT_TYPES: ReadonlySet<ConsumableEffectType> = new Set([
   'restore_stamina', 'restore_mana', 'cleanse_magic_dot', 'buff_attack', 'buff_defence',
@@ -34,10 +35,11 @@ export async function useConsumable(
     throw new AppError(400, 'Item is not a consumable', 'INVALID_ITEM_TYPE');
   }
 
-  const effect = item.template.consumableEffect as ConsumableEffect | null;
-  if (!effect) {
+  const effectParsed = consumableEffectSchema.safeParse(item.template.consumableEffect);
+  if (!effectParsed.success || !effectParsed.data) {
     throw new AppError(400, 'This consumable has no usable effect yet', 'NO_EFFECT');
   }
+  const effect = effectParsed.data as ConsumableEffect;
 
   if (COMBAT_ONLY_EFFECT_TYPES.has(effect.type)) {
     throw new AppError(400, 'This potion can only be used in combat', 'COMBAT_ONLY');
