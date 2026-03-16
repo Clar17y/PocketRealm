@@ -27,6 +27,7 @@ import {
   type BossRoundInput,
   type BossRoundResult,
 } from '@pocketrealm/game-engine';
+import { AppError } from '../middleware/errorHandler';
 import { emitSystemMessage } from './systemMessageService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { getEquipmentStats } from './equipmentService';
@@ -188,9 +189,9 @@ export async function signUpForBossRound(
   const encounter = await prisma.bossEncounter.findUnique({
     where: { id: encounterId },
   });
-  if (!encounter) throw new Error('Boss encounter not found');
+  if (!encounter) throw new AppError(404, 'Boss encounter not found', 'NOT_FOUND');
   if (encounter.status === 'defeated' || encounter.status === 'expired') {
-    throw new Error('Boss encounter is already over');
+    throw new AppError(410, 'Boss encounter is already over', 'ENCOUNTER_ENDED');
   }
 
   const nextRound = encounter.roundNumber + 1;

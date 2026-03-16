@@ -183,11 +183,8 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
 
     res.json({ participant });
   } catch (err) {
-    if (err instanceof Error && err.message.includes('not found')) {
-      return next(new AppError(404, err.message, 'NOT_FOUND'));
-    }
-    if (err instanceof Error && err.message.includes('already over')) {
-      return next(new AppError(410, err.message, 'ENCOUNTER_OVER'));
+    if (err instanceof AppError) {
+      return res.status(err.statusCode).json({ error: err.message });
     }
     next(err);
   }
