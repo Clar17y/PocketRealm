@@ -74,10 +74,11 @@ import {
   getFriendMailUnreadCount,
   getPlayerBuffs,
 } from '@/lib/api';
-import type { PlayerBuffData } from '@pocketrealm/shared';
+import type { PlayerBuffData, StateUpdates } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
 import { STAMINA_CONSTANTS, MANA_CONSTANTS } from '@pocketrealm/shared';
+import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
 import { findShortestZonePath } from '@/lib/zoneRoutes';
@@ -326,6 +327,20 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   useEffect(() => {
     hpStateRef.current = hpState;
   }, [hpState]);
+
+  const stateSetters: StateSetters = {
+    setInventory: (updater) => setInventory(updater as any),
+    setInventoryCapacity,
+    setInventoryUsedSlots,
+    setEquipment: (eq) => setEquipment(eq as any),
+    setSkills: (skills) => { if (skills) setSkills(skills as any); },
+    setHpState: (hp) => { setHpState(hp); hpStateRef.current = hp; },
+    setStaminaState: (s) => setStaminaState(s as any),
+    setManaState: (m) => setManaState(m as any),
+    setGold,
+    setActiveBuffs: (buffs) => { setActiveBuffs(buffs as any); },
+    setCharacterProgression: (cp) => setCharacterProgression(cp as any),
+  };
 
   const loadTurnsAndHp = useCallback(async () => {
     const [turnRes, hpRes, resourceRes] = await Promise.all([getTurns(), getHpState(), getResources()]);
@@ -633,7 +648,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   };
 
-  // Helper for simple API-call-then-reload actions
+  // Helper for simple API-call-then-stateUpdates actions
   const simpleAction = async <T>(
     actionName: string,
     apiFn: () => Promise<ApiResponse<T>>,
@@ -643,8 +658,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       await runSimpleAction({
         actionName,
         apiFn,
-        onSuccess,
-        loadAll,
+        onSuccess: async (data) => {
+          applyStateUpdates((data as { stateUpdates?: StateUpdates }).stateUpdates, stateSetters);
+          await onSuccess?.(data);
+        },
         setActionError,
       });
     });
