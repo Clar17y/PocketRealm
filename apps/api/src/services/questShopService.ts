@@ -1,4 +1,4 @@
-import { prisma } from '@pocketrealm/database';
+import { prisma, Prisma } from '@pocketrealm/database';
 import {
   GUILD_CONTRACT_DEFINITIONS,
   GUILD_CONTRACT_CONSTANTS,
@@ -21,12 +21,11 @@ interface PurchaseParams {
 }
 
 export async function getShopItems(playerId: string) {
-  const db = prisma as any;
   const [items, questState, purchases, activeBuffs] = await Promise.all([
-    db.shopItem.findMany({ where: { enabled: true }, orderBy: { sortOrder: 'asc' } }),
-    db.playerQuestState.findUnique({ where: { playerId } }),
-    db.playerShopPurchase.findMany({ where: { playerId }, select: { shopItemId: true, purchasedAt: true } }) as Promise<any[]>,
-    db.playerBuff.findMany({ where: { playerId }, select: { buffType: true } }) as Promise<any[]>,
+    prisma.shopItem.findMany({ where: { enabled: true }, orderBy: { sortOrder: 'asc' } }),
+    prisma.playerQuestState.findUnique({ where: { playerId } }),
+    prisma.playerShopPurchase.findMany({ where: { playerId }, select: { shopItemId: true, purchasedAt: true } }),
+    prisma.playerBuff.findMany({ where: { playerId }, select: { buffType: true } }),
   ]);
 
   const questTokens = questState?.questTokens ?? 0;
@@ -42,9 +41,9 @@ export async function getShopItems(playerId: string) {
     }
   }
 
-  const activeBuffTypes = new Set(activeBuffs.map((b: any) => b.buffType));
+  const activeBuffTypes = new Set(activeBuffs.map((b) => b.buffType));
 
-  const mapped: ShopItemData[] = items.map((item: any) => {
+  const mapped: ShopItemData[] = items.map((item) => {
     const purchasedThisWeek = weeklyCountMap.get(item.id) ?? 0;
     const purchasedAllTime = allTimeCountMap.get(item.id) ?? 0;
     const hasBuff = item.buffType ? activeBuffTypes.has(item.buffType) : false;
@@ -60,7 +59,7 @@ export async function getShopItems(playerId: string) {
       name: item.name,
       description: item.description,
       cost: item.cost,
-      category: item.category,
+      category: item.category as ShopItemData['category'],
       weeklyLimit: item.weeklyLimit,
       lifetimeLimit: item.lifetimeLimit,
       buffType: item.buffType,
@@ -78,14 +77,12 @@ export async function getShopItems(playerId: string) {
 }
 
 export async function purchaseItem(playerId: string, shopItemId: string, params?: PurchaseParams) {
-  const db = prisma as any;
-
-  const item = await db.shopItem.findUnique({ where: { id: shopItemId } });
+  const item = await prisma.shopItem.findUnique({ where: { id: shopItemId } });
   if (!item || !item.enabled) {
     throw new AppError(404, 'Shop item not found', 'SHOP_ITEM_NOT_FOUND');
   }
 
-  const result = await db.$transaction(async (tx: any) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Check token balance (TOCTOU safe inside tx)
     const questState = await tx.playerQuestState.findUnique({ where: { playerId } });
     if (!questState || questState.questTokens < item.cost) {
@@ -153,7 +150,7 @@ export async function purchaseItem(playerId: string, shopItemId: string, params?
   return { success: true, ...result };
 }
 
-async function applyEffect(tx: any, playerId: string, item: any, params?: PurchaseParams) {
+async function applyEffect(tx: Prisma.TransactionClient, playerId: string, item: { key: string; buffType: string | null; buffValue: number | null; buffUses: number | null; id: string }, params?: PurchaseParams): Promise<Record<string, unknown>> {
   switch (item.key) {
     // === Reset category ===
     case 'attribute_reset_scroll':
@@ -190,7 +187,7 @@ async function applyEffect(tx: any, playerId: string, item: any, params?: Purcha
   }
 }
 
-async function applyPrestigeTitle(tx: any, playerId: string, achievementId: string) {
+async function applyPrestigeTitle(tx: Prisma.TransactionClient, playerId: string, achievementId: string) {
   // Create the achievement record so the title becomes available via the title system
   await tx.playerAchievement.upsert({
     where: { playerId_achievementId: { playerId, achievementId } },
@@ -200,20 +197,20 @@ async function applyPrestigeTitle(tx: any, playerId: string, achievementId: stri
   return { type: 'prestige', achievementId };
 }
 
-async function applyBuff(tx: any, playerId: string, item: any) {
+async function applyBuff(tx: Prisma.TransactionClient, playerId: string, item: { buffType: string | null; buffUses: number | null; buffValue: number | null; id: string }) {
   await tx.playerBuff.create({
     data: {
       playerId,
-      buffType: item.buffType,
-      remainingUses: item.buffUses,
-      bonusValue: item.buffValue,
+      buffType: item.buffType!,
+      remainingUses: item.buffUses!,
+      bonusValue: item.buffValue!,
       shopItemId: item.id,
     },
   });
   return { type: 'buff', buffType: item.buffType, uses: item.buffUses, value: item.buffValue };
 }
 
-async function applyAttributeReset(tx: any, playerId: string) {
+async function applyAttributeReset(tx: Prisma.TransactionClient, playerId: string) {
   const player = await tx.player.findUnique({
     where: { id: playerId },
     select: { attributes: true, attributePoints: true },
@@ -239,7 +236,7 @@ async function applyAttributeReset(tx: any, playerId: string) {
   return { type: 'attribute_reset', refundedPoints: totalPoints };
 }
 
-async function applyTalentReset(tx: any, playerId: string) {
+async function applyTalentReset(tx: Prisma.TransactionClient, playerId: string) {
   await tx.skillPointAllocation.upsert({
     where: { playerId },
     update: { allocations: {} },
@@ -248,7 +245,7 @@ async function applyTalentReset(tx: any, playerId: string) {
   return { type: 'talent_reset' };
 }
 
-async function applyEfficiencyReset(tx: any, playerId: string) {
+async function applyEfficiencyReset(tx: Prisma.TransactionClient, playerId: string) {
   // Only allow reset if the XP window has naturally expired to prevent mid-window XP doubling
   const skill = await tx.playerSkill.findFirst({
     where: { playerId },
@@ -266,7 +263,7 @@ async function applyEfficiencyReset(tx: any, playerId: string) {
   return { type: 'efficiency_reset' };
 }
 
-async function applyTeleport(tx: any, playerId: string, targetZoneId?: string) {
+async function applyTeleport(tx: Prisma.TransactionClient, playerId: string, targetZoneId?: string) {
   if (!targetZoneId) {
     throw new AppError(400, 'Target zone required', 'MISSING_TARGET_ZONE');
   }
@@ -307,7 +304,7 @@ async function applyTeleport(tx: any, playerId: string, targetZoneId?: string) {
   return { type: 'teleport', zoneId: targetZoneId, zoneName: zone.name };
 }
 
-async function applyHearthstone(tx: any, playerId: string) {
+async function applyHearthstone(tx: Prisma.TransactionClient, playerId: string) {
   // Enforce same travel restrictions as normal zone travel (use tx for TOCTOU safety)
   const player = await tx.player.findUnique({
     where: { id: playerId },
@@ -340,7 +337,7 @@ async function applyHearthstone(tx: any, playerId: string) {
   return { type: 'hearthstone', zoneId: player.homeTownId };
 }
 
-async function applyBestiaryTome(tx: any, playerId: string, targetMobTemplateId?: string) {
+async function applyBestiaryTome(tx: Prisma.TransactionClient, playerId: string, targetMobTemplateId?: string) {
   if (!targetMobTemplateId) {
     throw new AppError(400, 'Target mob template required', 'MISSING_TARGET_MOB');
   }
@@ -388,17 +385,19 @@ async function applyBestiaryTome(tx: any, playerId: string, targetMobTemplateId?
   return { type: 'bestiary_tome', mobName: mob.name, prefixCount: allPrefixes.length };
 }
 
-async function applyRecipeScroll(tx: any, playerId: string) {
+async function applyRecipeScroll(tx: Prisma.TransactionClient, playerId: string) {
   const [allRecipes, knownRecipes, skills] = await Promise.all([
-    tx.craftingRecipe.findMany(),
+    tx.craftingRecipe.findMany({
+      include: { resultTemplate: { select: { name: true } } },
+    }),
     tx.playerRecipe.findMany({ where: { playerId }, select: { recipeId: true } }),
     tx.playerSkill.findMany({ where: { playerId }, select: { skillType: true, level: true } }),
   ]);
 
-  const knownIds = new Set(knownRecipes.map((r: any) => r.recipeId));
-  const skillLevels = new Map(skills.map((s: any) => [s.skillType, s.level]));
+  const knownIds = new Set(knownRecipes.map((r) => r.recipeId));
+  const skillLevels = new Map(skills.map((s) => [s.skillType, s.level]));
 
-  const eligible = allRecipes.filter((r: any) => {
+  const eligible = allRecipes.filter((r) => {
     if (knownIds.has(r.id)) return false;
     const playerLevel = skillLevels.get(r.skillType) ?? 0;
     return playerLevel >= (r.requiredLevel ?? 0);
@@ -411,10 +410,10 @@ async function applyRecipeScroll(tx: any, playerId: string) {
   const chosen = eligible[randomIntInclusive(0, eligible.length - 1)];
   await tx.playerRecipe.create({ data: { playerId, recipeId: chosen.id } });
 
-  return { type: 'recipe_scroll', recipeName: chosen.name };
+  return { type: 'recipe_scroll', recipeName: chosen.resultTemplate.name };
 }
 
-async function applyContractReroll(tx: any, playerId: string, targetContractId?: string) {
+async function applyContractReroll(tx: Prisma.TransactionClient, playerId: string, targetContractId?: string) {
   if (!targetContractId) {
     throw new AppError(400, 'Target contract required', 'MISSING_TARGET_CONTRACT');
   }
@@ -434,11 +433,11 @@ async function applyContractReroll(tx: any, playerId: string, targetContractId?:
   }
 
   // Get all active contracts to exclude their keys
-  const activeContracts: any[] = await tx.guildContract.findMany({
+  const activeContracts = await tx.guildContract.findMany({
     where: { guildId: membership.guildId, status: 'active' },
     select: { contractKey: true },
   });
-  const usedKeys = new Set(activeContracts.map((c: any) => c.contractKey));
+  const usedKeys = new Set(activeContracts.map((c) => c.contractKey));
 
   // Pick a random new definition excluding used keys
   const availableDefs = GUILD_CONTRACT_DEFINITIONS.filter((d) => !usedKeys.has(d.key));

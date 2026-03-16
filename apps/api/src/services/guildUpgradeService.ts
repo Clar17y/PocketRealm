@@ -71,7 +71,7 @@ export async function activateUpgrade(
   const expiresAt = new Date(now.getTime() + tierDef.durationMs);
 
   // Transaction: re-validate treasury + duplicate, then deduct and create
-  const upgrade = await prisma.$transaction(async (tx: any) => {
+  const upgrade = await prisma.$transaction(async (tx) => {
     // Re-check treasury inside transaction to prevent TOCTOU race
     const freshGuild = await tx.guild.findUnique({ where: { id: guildId }, select: { treasuryTurns: true } });
     if (!freshGuild || freshGuild.treasuryTurns < tierDef.cost) {

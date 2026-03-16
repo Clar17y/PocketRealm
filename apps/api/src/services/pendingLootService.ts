@@ -90,7 +90,7 @@ export async function claimPendingLoot(
             bonusStats: lootItem.bonusStats ?? undefined,
             currentDurability: lootItem.currentDurability,
             maxDurability: lootItem.maxDurability,
-          } as any,
+          },
         });
         slotsUsed++;
       }
