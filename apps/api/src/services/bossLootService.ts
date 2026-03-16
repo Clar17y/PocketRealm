@@ -17,11 +17,12 @@ export interface BossContributor {
 }
 
 async function rollBossRecipeDrop(
+  db: any,
   playerId: string,
   mobFamilyId: string,
 ): Promise<BossPlayerReward['recipeUnlocked'] | undefined> {
 
-  const advancedRecipes = (await prisma.craftingRecipe.findMany({
+  const advancedRecipes = (await db.craftingRecipe.findMany({
     where: { isAdvanced: true, mobFamilyId },
     select: {
       id: true,
@@ -39,7 +40,7 @@ async function rollBossRecipeDrop(
 
   if (advancedRecipes.length === 0) return undefined;
 
-  const known = (await prisma.playerRecipe.findMany({
+  const known = (await db.playerRecipe.findMany({
     where: {
       playerId,
       recipeId: { in: advancedRecipes.map((r) => r.id) },
@@ -52,7 +53,7 @@ async function rollBossRecipeDrop(
   if (unknown.length === 0) return undefined;
 
   const picked = unknown[randomIntInclusive(0, unknown.length - 1)]!;
-  await prisma.playerRecipe.create({
+  await db.playerRecipe.create({
     data: { playerId, recipeId: picked.id },
   });
 
@@ -109,69 +110,71 @@ export async function distributeBossLoot(
     }
   }
 
-  for (const contributor of contributors) {
-    const playerScore = scores.find(s => s.playerId === contributor.playerId)?.score ?? 0;
-    const ratio = totalContribution > 0 ? playerScore / totalContribution : 1 / contributors.length;
-    const dropMultiplier = Math.max(WORLD_EVENT_CONSTANTS.BOSS_CONTRIBUTION_FLOOR, Math.min(2, ratio * contributors.length));
+  await (prisma as any).$transaction(async (tx: any) => {
+    for (const contributor of contributors) {
+      const playerScore = scores.find(s => s.playerId === contributor.playerId)?.score ?? 0;
+      const ratio = totalContribution > 0 ? playerScore / totalContribution : 1 / contributors.length;
+      const dropMultiplier = Math.max(WORLD_EVENT_CONSTANTS.BOSS_CONTRIBUTION_FLOOR, Math.min(2, ratio * contributors.length));
 
-    // 1. Item loot with rarity bonus
-    const loot = await rollAndGrantLoot(
-      contributor.playerId,
-      mobTemplateId,
-      mobLevel + rarityBonus,
-      dropMultiplier,
-    );
-    const enrichedLoot = await enrichLootWithNames(loot);
-    const lootReward: BossPlayerReward['loot'] = enrichedLoot.map((drop) => ({
-      itemTemplateId: drop.itemTemplateId,
-      quantity: drop.quantity,
-      rarity: drop.rarity,
-      itemName: drop.itemName ?? undefined,
-    }));
+      // 1. Item loot with rarity bonus
+      const loot = await rollAndGrantLoot(
+        contributor.playerId,
+        mobTemplateId,
+        mobLevel + rarityBonus,
+        dropMultiplier,
+      );
+      const enrichedLoot = await enrichLootWithNames(loot);
+      const lootReward: BossPlayerReward['loot'] = enrichedLoot.map((drop) => ({
+        itemTemplateId: drop.itemTemplateId,
+        quantity: drop.quantity,
+        rarity: drop.rarity,
+        itemName: drop.itemName ?? undefined,
+      }));
 
-    // 1b. Guaranteed trophy material drops
-    for (const tDef of trophyDefs) {
-      const templateId = trophyTemplateMap.get(tDef.itemName);
-      if (!templateId) continue;
-      const qty = randomIntInclusive(tDef.minQty, tDef.maxQty);
-      await addStackableItem(contributor.playerId, templateId, qty);
-      lootReward.push({ itemTemplateId: templateId, quantity: qty, rarity: 'common', itemName: tDef.itemName });
+      // 1b. Guaranteed trophy material drops
+      for (const tDef of trophyDefs) {
+        const templateId = trophyTemplateMap.get(tDef.itemName);
+        if (!templateId) continue;
+        const qty = randomIntInclusive(tDef.minQty, tDef.maxQty);
+        await addStackableItem(contributor.playerId, templateId, qty);
+        lootReward.push({ itemTemplateId: templateId, quantity: qty, rarity: 'common', itemName: tDef.itemName });
+      }
+
+      // 2. XP scaled by contribution
+      const scaledXp = Math.round(baseXp * dropMultiplier);
+      const skillType = (contributor.attackSkill ?? 'magic') as SkillType;
+      const xpResult = await grantSkillXp(contributor.playerId, skillType, scaledXp);
+
+      const xpReward: BossPlayerReward['xp'] = {
+        skillType,
+        rawXp: scaledXp,
+        xpAfterEfficiency: xpResult.boostedXpAfterEfficiency,
+        leveledUp: xpResult.skillLeveledUp,
+        newLevel: xpResult.newLevel,
+      };
+
+      // 3. Recipe drop (15% chance)
+      let recipeUnlocked: BossPlayerReward['recipeUnlocked'] | undefined;
+      if (mobFamilyId && Math.random() < WORLD_EVENT_CONSTANTS.BOSS_RECIPE_DROP_CHANCE) {
+        recipeUnlocked = await rollBossRecipeDrop(tx, contributor.playerId, mobFamilyId);
+      }
+
+      // --- Achievement check (boss stats derived from source tables) ---
+      const bossAchKeys = ['totalBossKills', 'totalBossDamage'];
+      if (recipeUnlocked) bossAchKeys.push('totalRecipesLearned');
+      const bossAchievements = await checkAchievements(contributor.playerId, {
+        statKeys: bossAchKeys,
+        familyId: mobFamilyId || undefined,
+      });
+      await emitAchievementNotifications(contributor.playerId, bossAchievements);
+
+      result[contributor.playerId] = {
+        loot: lootReward,
+        xp: xpReward,
+        recipeUnlocked,
+      };
     }
-
-    // 2. XP scaled by contribution
-    const scaledXp = Math.round(baseXp * dropMultiplier);
-    const skillType = (contributor.attackSkill ?? 'magic') as SkillType;
-    const xpResult = await grantSkillXp(contributor.playerId, skillType, scaledXp);
-
-    const xpReward: BossPlayerReward['xp'] = {
-      skillType,
-      rawXp: scaledXp,
-      xpAfterEfficiency: xpResult.boostedXpAfterEfficiency,
-      leveledUp: xpResult.skillLeveledUp,
-      newLevel: xpResult.newLevel,
-    };
-
-    // 3. Recipe drop (15% chance)
-    let recipeUnlocked: BossPlayerReward['recipeUnlocked'] | undefined;
-    if (mobFamilyId && Math.random() < WORLD_EVENT_CONSTANTS.BOSS_RECIPE_DROP_CHANCE) {
-      recipeUnlocked = await rollBossRecipeDrop(contributor.playerId, mobFamilyId);
-    }
-
-    // --- Achievement check (boss stats derived from source tables) ---
-    const bossAchKeys = ['totalBossKills', 'totalBossDamage'];
-    if (recipeUnlocked) bossAchKeys.push('totalRecipesLearned');
-    const bossAchievements = await checkAchievements(contributor.playerId, {
-      statKeys: bossAchKeys,
-      familyId: mobFamilyId || undefined,
-    });
-    await emitAchievementNotifications(contributor.playerId, bossAchievements);
-
-    result[contributor.playerId] = {
-      loot: lootReward,
-      xp: xpReward,
-      recipeUnlocked,
-    };
-  }
+  }, { timeout: 30000 }); // 30s — boss encounters can have many contributors
 
   return result;
 }

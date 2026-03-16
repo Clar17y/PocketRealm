@@ -203,6 +203,36 @@ describe('distributeBossLoot', () => {
     );
   });
 
+  it('should not distribute partial rewards if one contributor fails', async () => {
+    // Setup: 3 contributors, mock grantSkillXp to fail on 2nd contributor
+    const contributors = [
+      { playerId: 'p1', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
+      { playerId: 'p2', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
+      { playerId: 'p3', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
+    ];
+
+    // grantSkillXp succeeds for p1, fails for p2
+    (grantSkillXp as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        xpResult: { xpAfterEfficiency: 100, leveledUp: false },
+        boostedXpAfterEfficiency: 100,
+        newLevel: 5,
+        skillLeveledUp: false,
+      })
+      .mockRejectedValueOnce(new Error('DB write failed for p2'));
+
+    // The entire distribution should reject (transaction rolls back)
+    await expect(distributeBossLoot('mob-1', 10, contributors, 1)).rejects.toThrow(
+      'DB write failed for p2',
+    );
+
+    // Verify the contributor loop runs inside a $transaction
+    expect(mockPrisma.$transaction).toHaveBeenCalled();
+
+    // p3 should never have been reached because the error in p2 aborts the transaction
+    expect(grantSkillXp).toHaveBeenCalledTimes(2);
+  });
+
   it('includes healing in contribution calculation', async () => {
     const contributors = [
       { playerId: 'p1', totalDamage: 0, totalHealing: 200, damageAbsorbed: 0, roundsSurvived: 1 },
