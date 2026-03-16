@@ -58,6 +58,7 @@ import { serializeXpGrant, toMobTemplate, assertCanAct, assertInZone, trackAchie
 import { getCombatBuffs, getCombatBuffsWithUses, applyCombatBuffs, consumeCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges } from '../../services/buffService';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
+import { buildStateUpdates, fetchItemDTOs } from '../../services/stateUpdateHelpers.js';
 import {
   startSchema,
   pickWeighted,
@@ -604,6 +605,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     fightLogIds = [];
   }
 
+  // --- Build stateUpdates ---
+  const damagedItemIds = [...new Set(aggregatedDurabilityLost.map(d => d.itemId))];
+  const [siteStateUpdates, inventoryUpdated] = await Promise.all([
+    buildStateUpdates(playerId, ['hp', 'skills', 'resources', 'characterProgression', 'buffs']),
+    fetchItemDTOs(damagedItemIds),
+  ]);
+
   // --- Response with fights[] array ---
   const lastFightResult = fightResults[fightResults.length - 1]!;
   res.json({
@@ -684,6 +692,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       return all.length > 0 ? all : undefined;
     })(),
     ...(allQuestProgress.length > 0 ? { questProgress: allQuestProgress } : {}),
+    stateUpdates: {
+      ...siteStateUpdates,
+      ...(inventoryUpdated.length > 0 ? { inventoryUpdated } : {}),
+    },
   });
 }
 
@@ -984,6 +996,13 @@ export function registerStartRoutes(router: Router): void {
         },
       });
 
+      // --- Build stateUpdates ---
+      const zoneDamagedItemIds = [...new Set(durabilityLost.map(d => d.itemId))];
+      const [zoneStateUpdates, zoneInventoryUpdated] = await Promise.all([
+        buildStateUpdates(playerId, ['hp', 'skills', 'resources', 'characterProgression', 'buffs']),
+        fetchItemDTOs(zoneDamagedItemIds),
+      ]);
+
       res.json({
         logId: combatLog.id,
         turns: turnSpend,
@@ -1037,6 +1056,10 @@ export function registerStartRoutes(router: Router): void {
           return all.length > 0 ? all : undefined;
         })(),
         ...(zoneQuestProgress.length > 0 ? { questProgress: zoneQuestProgress } : {}),
+        stateUpdates: {
+          ...zoneStateUpdates,
+          ...(zoneInventoryUpdated.length > 0 ? { inventoryUpdated: zoneInventoryUpdated } : {}),
+        },
       });
   }));
 }
