@@ -241,16 +241,22 @@ export async function getCurrentRound(): Promise<RouletteRoundState> {
   const resolvedRaw = await redis.get(RESULT_KEY);
   if (resolvedRaw) {
     const resolvedData = safeParseRedisJson(resolvedRaw, resolvedRoundSchema, null, 'roulette:resolved_round');
-    const { roundId, startedAt, result: resolvedResult } = resolvedData ?? { roundId: '', startedAt: Date.now(), result: 0 };
-    await emitPhaseIfChanged('result', roundId, 0, resolvedResult);
-    return {
-      roundId,
-      phase: 'result' as const,
-      result: resolvedResult,
-      startedAt: new Date(startedAt).toISOString(),
-      timeRemainingMs: 0,
-      bets: await getPublicBets(roundId),
-    };
+    if (!resolvedData) {
+      // Corrupt resolved round — delete and fall through to active round check
+      console.error('[casino] corrupt roulette:resolved_round in Redis, discarding');
+      await redis.del(RESULT_KEY);
+    } else {
+      const { roundId, startedAt, result: resolvedResult } = resolvedData;
+      await emitPhaseIfChanged('result', roundId, 0, resolvedResult);
+      return {
+        roundId,
+        phase: 'result' as const,
+        result: resolvedResult,
+        startedAt: new Date(startedAt).toISOString(),
+        timeRemainingMs: 0,
+        bets: await getPublicBets(roundId),
+      };
+    }
   }
 
   const existingRaw = await redis.get(ROUND_KEY);
@@ -273,7 +279,18 @@ export async function getCurrentRound(): Promise<RouletteRoundState> {
   if (!parseResult.success) {
     console.error('[casino] corrupt roulette:current_round in Redis, starting fresh');
     await redis.del('roulette:current_round');
-    return getCurrentRound();
+    // Start a new round directly instead of recursing (avoids infinite loop on persistent corruption)
+    const { roundId, startedAt } = await getOrCreateRound();
+    const freshTotalMs = CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000;
+    await emitPhaseIfChanged('betting', roundId, freshTotalMs);
+    return {
+      roundId,
+      phase: 'betting',
+      result: null,
+      startedAt: new Date(startedAt).toISOString(),
+      timeRemainingMs: freshTotalMs,
+      bets: [],
+    };
   }
   const parsed = parseResult.data;
   const elapsed = Date.now() - parsed.startedAt;

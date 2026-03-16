@@ -69,7 +69,15 @@ export async function claimPendingLoot(
   const data = await redis.getdel(key);
   if (!data) throw new AppError(404, 'Pending loot expired or already claimed', 'LOOT_EXPIRED');
 
-  const items: PendingLootItem[] = safeParseRedisJson(data, pendingLootArraySchema, [], `pending_loot:claim:${playerId}`);
+  let items: PendingLootItem[];
+  try {
+    const parsed = JSON.parse(data);
+    items = pendingLootArraySchema.parse(parsed);
+  } catch (err) {
+    // Restore the Redis key so the player can retry — schema failure must not destroy loot
+    await redis.set(key, data, 'EX', INVENTORY_CONSTANTS.PENDING_LOOT_TTL_SECONDS);
+    throw new AppError(500, 'Failed to parse pending loot data', 'LOOT_PARSE_ERROR');
+  }
   const { usedSlots, capacity } = await getInventoryState(playerId);
 
   let slotsUsed = usedSlots;

@@ -142,7 +142,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
     });
 
     // Create initial zone discovery records
-    const starterZones = await tx.zone.findMany({ where: { isStarter: true }, select: { id: true } });
+    const starterZones = await tx.zone.findMany({ where: { isStarter: true }, select: { id: true }, orderBy: { id: 'asc' } });
     if (starterZones.length > 0) {
       const starterIds: string[] = starterZones.map((z: { id: string }) => z.id);
       const connections = await tx.zoneConnection.findMany({

@@ -183,10 +183,7 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
 
     res.json({ participant });
   } catch (err) {
-    if (err instanceof AppError) {
-      return res.status(err.statusCode).json({ error: err.message });
-    }
-    next(err);
+    next(err instanceof AppError ? err : new AppError(500, 'Failed to sign up for boss round', 'BOSS_SIGNUP_FAILED'));
   }
 });
 
