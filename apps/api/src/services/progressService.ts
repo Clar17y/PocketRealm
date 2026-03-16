@@ -26,10 +26,14 @@ export async function trackProgress(
     ? incrementContractProgress(guildId, type as GuildContractType, amount)
     : Promise.resolve();
 
-  const [, questResult] = await Promise.allSettled([
+  const [contractResult, questResult] = await Promise.allSettled([
     contractPromise,
     incrementQuestProgress(playerId, type, amount, metadata),
   ]);
+
+  if (contractResult.status === 'rejected') {
+    console.warn('[trackProgress] contract increment failed', { playerId, type, err: contractResult.reason });
+  }
 
   return questResult.status === 'fulfilled' ? questResult.value : [];
 }
