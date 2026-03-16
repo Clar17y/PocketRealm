@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth';
 import { equipItem, unequipSlot, getEquippedItemInSlot, ensureEquipmentSlots } from '../services/equipmentService';
 import { assertNotRecovering } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
-import { toInventoryItemDTO, fetchInventoryMeta, fetchEquipmentMap, fetchMaterialTotals } from '../services/stateUpdateHelpers';
+import { toInventoryItemDTO, fetchInventoryMeta, fetchEquipmentMap } from '../services/stateUpdateHelpers';
 
 export const equipmentRouter = Router();
 
@@ -46,21 +46,17 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
 
   await equipItem(playerId, body.itemId, body.slot as EquipmentSlot);
 
-  const [equipment, { inventoryUsedSlots }, materialTotals, equippedItemRaw] = await Promise.all([
+  const [equipment, { inventoryUsedSlots }] = await Promise.all([
     fetchEquipmentMap(playerId),
     fetchInventoryMeta(playerId),
-    fetchMaterialTotals(playerId),
-    getEquippedItemInSlot(playerId, body.slot as EquipmentSlot),
   ]);
 
   const updatedItems = [];
 
-  // Newly equipped item stays in inventory with equippedSlot set
-  if (equippedItemRaw) {
-    updatedItems.push(toInventoryItemDTO(
-      { ...equippedItemRaw, bonusStats: equippedItemRaw.bonusStats as Record<string, number> | null },
-      body.slot,
-    ));
+  // Newly equipped item stays in inventory with equippedSlot set — get the DTO from the map
+  const equippedItemDTO = equipment[body.slot] ?? null;
+  if (equippedItemDTO) {
+    updatedItems.push(equippedItemDTO);
   }
 
   // If a different item was displaced, it returns to inventory with equippedSlot: null
@@ -75,7 +71,6 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
     equipment,
     inventoryUpdated: updatedItems,
     inventoryUsedSlots,
-    materialTotals,
   };
 
   res.json({ success: true, stateUpdates });
@@ -100,17 +95,15 @@ equipmentRouter.post('/unequip', asyncHandler(async (req, res) => {
 
   await unequipSlot(playerId, body.slot as EquipmentSlot);
 
-  const [equipment, { inventoryUsedSlots }, materialTotals] = await Promise.all([
+  const [equipment, { inventoryUsedSlots }] = await Promise.all([
     fetchEquipmentMap(playerId),
     fetchInventoryMeta(playerId),
-    fetchMaterialTotals(playerId),
   ]);
 
   res.json({
     success: true,
     stateUpdates: {
       equipment,
-      materialTotals,
       inventoryUpdated: unequippedItem
         ? [
             toInventoryItemDTO(

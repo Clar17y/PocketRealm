@@ -432,15 +432,10 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     );
 
     if (critResult.gemsFound > 0) {
-      // Check if a gem stack already exists before adding (to classify created vs updated)
-      const existingGemStack = await prisma.item.findFirst({
-        where: { ownerId: playerId, templateId: gemTemplateId, inStash: false },
-      });
-      gemExistedBeforeAdd = existingGemStack !== null;
-
       const gemStack = await prisma.$transaction(async (tx) => {
         return addStackableItemTx(tx, playerId, gemTemplateId, critResult.gemsFound);
       });
+      gemExistedBeforeAdd = !gemStack.created;
       const gemTier = levelToGemTier(template.levelRequired);
       gemCrit = {
         itemTemplateId: gemTemplateId,

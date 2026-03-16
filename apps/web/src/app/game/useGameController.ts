@@ -358,6 +358,38 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const activeScreenRef = useRef(activeScreen);
   useEffect(() => { activeScreenRef.current = activeScreen; }, [activeScreen]);
 
+  // Immediate fetch when navigating to a screen that needs HP/resources and values are below max
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const needs = SCREEN_POLL_NEEDS[activeScreen] ?? ['turns'];
+
+    const hpRef = hpStateRef.current;
+    const stamRef = staminaStateRef.current;
+    const manaRef = manaStateRef.current;
+
+    const needsHpFetch = needs.includes('hp') && hpRef.currentHp < hpRef.maxHp;
+    const needsResourceFetch = needs.includes('resources') &&
+      (stamRef.current < stamRef.max || manaRef.current < manaRef.max);
+
+    if (!needsHpFetch && !needsResourceFetch) return;
+
+    const fetches: Promise<void>[] = [];
+    if (needsHpFetch) {
+      fetches.push(getHpState().then(res => {
+        if (res.data) { setHpState(res.data); hpStateRef.current = res.data; }
+      }));
+    }
+    if (needsResourceFetch) {
+      fetches.push(getResources().then(res => {
+        if (res.data) {
+          setStaminaState(res.data.stamina); setManaState(res.data.mana);
+          staminaStateRef.current = res.data.stamina; manaStateRef.current = res.data.mana;
+        }
+      }));
+    }
+    void Promise.all(fetches);
+  }, [activeScreen, isAuthenticated]); // intentionally excludes HP/resource state — only re-run on screen change
+
   const stateSetters = useMemo<StateSetters>(() => ({
     setInventory: (updater) => setInventory(updater as any),
     setInventoryCapacity,
@@ -405,6 +437,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     await Promise.all(fetches);
   }, []); // stable — no deps that change
 
+  const refreshCraftingRecipes = useCallback(async () => {
+    const res = await getCraftingRecipes();
+    if (res.data) {
+      setCraftingRecipes(res.data.recipes);
+      setZoneCraftingLevel(res.data.zoneCraftingLevel);
+      setZoneCraftingName(res.data.zoneName);
+    }
+  }, []);
+
   const loadPvpNotificationCount = useCallback(async () => {
     const result = await getPvpNotificationCount();
     if (result.data) {
@@ -444,14 +485,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const loadAll = useCallback(async () => {
     setActionError(null);
 
-    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, recipesRes, hpRes, resourceRes, skillPointRes, buffsRes] = await Promise.all([
+    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, hpRes, resourceRes, skillPointRes, buffsRes] = await Promise.all([
       getTurns(),
       getPlayer(),
       getSkills(),
       getZones(),
       getInventory(),
       getEquipment(),
-      getCraftingRecipes(),
       getHpState(),
       getResources(),
       getSkillPointState(),
@@ -543,11 +583,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         }))
       );
     }
-    if (recipesRes.data) {
-      setCraftingRecipes(recipesRes.data.recipes);
-      setZoneCraftingLevel(recipesRes.data.zoneCraftingLevel);
-      setZoneCraftingName(recipesRes.data.zoneName);
-    }
+    void refreshCraftingRecipes();
 
     // Fetch guild tax rate (non-blocking — don't delay initial load)
     getPlayerGuild().then((guildRes) => {
@@ -1361,13 +1397,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setPlaybackActive(false);
 
     // Reload zone-dependent crafting recipes after arriving at new zone
-    getCraftingRecipes().then((res) => {
-      if (res.data) {
-        setCraftingRecipes(res.data.recipes);
-        setZoneCraftingLevel(res.data.zoneCraftingLevel);
-        setZoneCraftingName(res.data.zoneName);
-      }
-    });
+    void refreshCraftingRecipes();
 
     if (arrivedInTownRef.current) {
       arrivedInTownRef.current = false;
