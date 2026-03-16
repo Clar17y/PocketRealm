@@ -138,7 +138,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         data: {
           rarity: nextRarity,
           bonusStats: upgradedBonusStats as Prisma.InputJsonObject,
-        } as any,
+        },
       });
 
       const log = await createActivityLog({

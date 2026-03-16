@@ -65,7 +65,7 @@ async function grantSoulboundFromRecipes(
         quantity: 1,
         maxDurability,
         currentDurability: maxDurability,
-      } as any,
+      },
     });
     return {
       soulboundItem: { itemTemplateId: picked.resultTemplateId, name: picked.resultTemplate.name, rarity },

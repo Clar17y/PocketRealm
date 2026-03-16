@@ -59,7 +59,7 @@ async function addStackableItemWithClient(
       maxDurability: null,
       currentDurability: null,
       inStash,
-    } as any,
+    },
     select: { id: true, quantity: true },
   });
   return { itemId: created.id, quantity: created.quantity };

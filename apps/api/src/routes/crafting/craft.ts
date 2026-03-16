@@ -55,18 +55,6 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     const recipe = await prisma.craftingRecipe.findUnique({
       where: { id: body.recipeId },
       include: { resultTemplate: true },
-    }) as (null | {
-      id: string;
-      skillType: string;
-      requiredLevel: number;
-      resultTemplateId: string;
-      isAdvanced?: boolean;
-      soulbound?: boolean;
-      mobFamilyId?: string | null;
-      turnCost: number;
-      materials: unknown;
-      xpReward: number;
-      resultTemplate: any;
     });
     if (!recipe) {
       throw new AppError(404, 'Recipe not found', 'NOT_FOUND');
@@ -214,7 +202,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
           });
           itemIds.push(updated.id);
         } else {
-          const created = await (tx as any).item.create({
+          const created = await tx.item.create({
             data: {
               ownerId: playerId,
               templateId: recipe.resultTemplateId,
@@ -222,14 +210,14 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
               quantity,
               maxDurability: craftedMax,
               currentDurability: craftedMax,
-            } as any,
+            },
             select: { id: true },
           });
           itemIds.push(created.id);
         }
       } else {
         for (const rolled of preRolledItems!) {
-          const created = await (tx as any).item.create({
+          const created = await tx.item.create({
             data: {
               ownerId: playerId,
               templateId: recipe.resultTemplateId,
@@ -238,7 +226,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
               maxDurability: craftedMax,
               currentDurability: craftedMax,
               bonusStats: rolled.bonusStats,
-            } as any,
+            },
             select: { id: true },
           });
           itemIds.push(created.id);

@@ -132,7 +132,7 @@ export async function rollAndGrantDropsTx(
           quantity: 1,
           maxDurability,
           currentDurability: maxDurability,
-        } as any,
+        },
       });
     }
     accumulator.add({ itemTemplateId: picked.itemTemplateId, quantity, rarity });
