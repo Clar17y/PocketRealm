@@ -76,23 +76,12 @@ describe('blockService', () => {
       expect(mockPrisma.playerBlock.create).toHaveBeenCalledWith({
         data: { blockerId: PLAYER_ID, blockedId: TARGET_ID },
       });
-      // Removes accepted friendships
+      // Removes all friendships and pending requests in a single call
       expect(mockPrisma.friendship.deleteMany).toHaveBeenCalledWith({
         where: {
-          status: 'accepted',
           OR: [
             { senderId: PLAYER_ID, receiverId: TARGET_ID },
             { senderId: TARGET_ID, receiverId: PLAYER_ID },
-          ],
-        },
-      });
-      // Deletes pending requests in both directions (no orphan "declined" rows)
-      expect(mockPrisma.friendship.deleteMany).toHaveBeenCalledWith({
-        where: {
-          status: 'pending',
-          OR: [
-            { senderId: TARGET_ID, receiverId: PLAYER_ID },
-            { senderId: PLAYER_ID, receiverId: TARGET_ID },
           ],
         },
       });
