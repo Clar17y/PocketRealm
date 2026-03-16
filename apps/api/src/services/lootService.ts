@@ -68,8 +68,7 @@ export async function rollAndGrantLootWithCapacity(
   const overflow: PendingLootItem[] = [];
 
   for (const entry of entries) {
-    const raw = entry.dropChance;
-    const chance = Math.min(1, Math.max(0, typeof raw === 'number' ? raw : raw.toNumber()));
+    const chance = Math.min(1, Math.max(0, Number(entry.dropChance)));
     if (chance <= 0 || Math.random() >= chance) continue;
 
     const quantity = randomIntInclusive(entry.minQuantity, entry.maxQuantity);

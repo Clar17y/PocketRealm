@@ -38,7 +38,7 @@ import { rollDropRarity, rollBonusStatsForRarity } from '@pocketrealm/game-engin
 
 function makeDropEntry(overrides: Record<string, unknown> = {}) {
   return {
-    dropChance: { toNumber: () => 1.0 },
+    dropChance: 1.0,
     minQuantity: 1,
     maxQuantity: 1,
     itemTemplateId: 'tpl-mat',
@@ -115,7 +115,7 @@ describe('rollAndGrantLoot', () => {
   it('returns empty when roll exceeds drop chance', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.999);
     mockPrisma.dropTable.findMany.mockResolvedValue([
-      makeDropEntry({ dropChance: { toNumber: () => 0.5 } }),
+      makeDropEntry({ dropChance: 0.5 }),
     ]);
     const drops = await rollAndGrantLoot('p1', 'mob-1', 5);
     expect(drops).toEqual([]);
@@ -138,7 +138,7 @@ describe('rollAndGrantLoot', () => {
 
   it('skips entries with 0 drop chance', async () => {
     mockPrisma.dropTable.findMany.mockResolvedValue([
-      makeDropEntry({ dropChance: { toNumber: () => 0 } }),
+      makeDropEntry({ dropChance: 0 }),
     ]);
     const drops = await rollAndGrantLoot('p1', 'mob-1', 5);
     expect(drops).toEqual([]);
@@ -460,7 +460,7 @@ describe('rollAndGrantLootWithCapacity', () => {
     it('clamps drop chance to max 1 (entries with > 1.0 always drop)', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
       mockPrisma.dropTable.findMany.mockResolvedValue([
-        makeDropEntry({ dropChance: { toNumber: () => 1.5 } }),
+        makeDropEntry({ dropChance: 1.5 }),
       ]);
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
       expect(result.drops).toHaveLength(1);
@@ -469,7 +469,7 @@ describe('rollAndGrantLootWithCapacity', () => {
     it('clamps negative drop chance to 0 (never drops)', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.001);
       mockPrisma.dropTable.findMany.mockResolvedValue([
-        makeDropEntry({ dropChance: { toNumber: () => -0.5 } }),
+        makeDropEntry({ dropChance: -0.5 }),
       ]);
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
       expect(result.drops).toHaveLength(0);
@@ -478,7 +478,7 @@ describe('rollAndGrantLootWithCapacity', () => {
     it('skips entries when random exactly equals chance', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
       mockPrisma.dropTable.findMany.mockResolvedValue([
-        makeDropEntry({ dropChance: { toNumber: () => 0.5 } }),
+        makeDropEntry({ dropChance: 0.5 }),
       ]);
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
       // Math.random() >= chance is 0.5 >= 0.5 → true → skipped
@@ -488,7 +488,7 @@ describe('rollAndGrantLootWithCapacity', () => {
     it('drops when random is just below chance', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.499);
       mockPrisma.dropTable.findMany.mockResolvedValue([
-        makeDropEntry({ dropChance: { toNumber: () => 0.5 } }),
+        makeDropEntry({ dropChance: 0.5 }),
       ]);
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
       expect(result.drops).toHaveLength(1);
@@ -531,9 +531,9 @@ describe('rollAndGrantLootWithCapacity', () => {
         .mockReturnValueOnce(0.01);
 
       mockPrisma.dropTable.findMany.mockResolvedValue([
-        makeDropEntry({ itemTemplateId: 'tpl-a', dropChance: { toNumber: () => 0.5 }, itemTemplate: { name: 'A', stackable: true, itemType: 'material' } }),
-        makeDropEntry({ itemTemplateId: 'tpl-b', dropChance: { toNumber: () => 0.5 }, itemTemplate: { name: 'B', stackable: true, itemType: 'material' } }),
-        makeDropEntry({ itemTemplateId: 'tpl-c', dropChance: { toNumber: () => 0.5 }, itemTemplate: { name: 'C', stackable: true, itemType: 'material' } }),
+        makeDropEntry({ itemTemplateId: 'tpl-a', dropChance: 0.5, itemTemplate: { name: 'A', stackable: true, itemType: 'material' } }),
+        makeDropEntry({ itemTemplateId: 'tpl-b', dropChance: 0.5, itemTemplate: { name: 'B', stackable: true, itemType: 'material' } }),
+        makeDropEntry({ itemTemplateId: 'tpl-c', dropChance: 0.5, itemTemplate: { name: 'C', stackable: true, itemType: 'material' } }),
       ]);
 
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
