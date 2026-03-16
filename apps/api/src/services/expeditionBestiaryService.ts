@@ -20,7 +20,7 @@ interface ExpeditionBestiaryTheme {
   mobs: ExpeditionBestiaryMob[];
 }
 
-export interface ExpeditionBestiaryResponse {
+interface ExpeditionBestiaryResponse {
   themes: ExpeditionBestiaryTheme[];
 }
 

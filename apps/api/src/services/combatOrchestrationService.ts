@@ -33,7 +33,7 @@ import { buildPotionPool, templateHasPotionActions } from './potionService';
 
 // ── Prepare player for combat ────────────────────────────────────────
 
-export interface PlayerCombatPrep {
+interface PlayerCombatPrep {
   attackSkill: AttackSkill;
   attackLevel: number;
   progression: PlayerProgressionState;
@@ -49,7 +49,7 @@ export interface PlayerCombatPrep {
   unlockedActions: string[];
 }
 
-export interface PreparePlayerCombatOptions {
+interface PreparePlayerCombatOptions {
   requestedAttackSkill?: AttackSkill | null;
   maxHp: number;
   /** Pre-fetched data to avoid redundant queries */
@@ -179,7 +179,7 @@ export function applyGuildCombatModifiers(
 
 // ── Process combat victory rewards ───────────────────────────────────
 
-export interface VictoryRewardParams {
+interface VictoryRewardParams {
   playerId: string;
   mob: {
     id: string;
@@ -195,7 +195,7 @@ export interface VictoryRewardParams {
   includeBestiary?: boolean;
 }
 
-export interface VictoryRewardResult {
+interface VictoryRewardResult {
   loot: LootDrop[];
   overflow: PendingLootItem[];
   pendingLootSessionId: string | null;
@@ -301,7 +301,7 @@ export async function splitAndGrantXp(
 
 // ── Build combat activity log result ─────────────────────────────────
 
-export interface CombatLogResultParams {
+interface CombatLogResultParams {
   zoneId: string;
   zoneName: string;
   mob: { id: string; name: string; mobPrefix: string | null; mobDisplayName: string | null };

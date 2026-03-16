@@ -81,7 +81,7 @@ export function getCategories() {
   };
 }
 
-export interface LeaderboardEntry {
+interface LeaderboardEntry {
   rank: number;
   playerId: string;
   username: string;
@@ -93,7 +93,7 @@ export interface LeaderboardEntry {
   titleTier?: number;
 }
 
-export interface LeaderboardResponse {
+interface LeaderboardResponse {
   category: string;
   entries: LeaderboardEntry[];
   myRank: LeaderboardEntry | null;

@@ -7,7 +7,7 @@ const COMBAT_ONLY_EFFECT_TYPES: ReadonlySet<ConsumableEffectType> = new Set([
   'restore_stamina', 'restore_mana', 'cleanse_magic_dot', 'buff_attack', 'buff_defence',
 ]);
 
-export interface UseConsumableResult {
+interface UseConsumableResult {
   itemName: string;
   previousHp: number;
   currentHp: number;

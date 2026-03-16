@@ -7,7 +7,7 @@ import { grantSkillXp } from '../../services/xpService';
 import type { LootDropWithName } from '../../services/lootService';
 import { paginationSchema } from '../../utils/routeHelpers.js';
 
-export const attackSkillSchema = z.enum(['melee', 'ranged', 'magic']);
+const attackSkillSchema = z.enum(['melee', 'ranged', 'magic']);
 
 export const lootDropWithNameSchema = z.object({
   itemTemplateId: z.string().min(1),
@@ -90,13 +90,13 @@ export function countEncounterSiteState(mobs: EncounterMobSlot[]): {
   return { total: mobs.length, alive, defeated, decayed };
 }
 
-export function roleOrder(role: EncounterMobRole): number {
+function roleOrder(role: EncounterMobRole): number {
   if (role === 'trash') return 0;
   if (role === 'elite') return 1;
   return 2;
 }
 
-export function getNextEncounterMob(mobs: EncounterMobSlot[]): EncounterMobSlot | null {
+function getNextEncounterMob(mobs: EncounterMobSlot[]): EncounterMobSlot | null {
   const alive = mobs.filter((mob) => mob.status === 'alive');
   if (alive.length === 0) return null;
   alive.sort((a, b) => {
@@ -107,7 +107,7 @@ export function getNextEncounterMob(mobs: EncounterMobSlot[]): EncounterMobSlot 
   return alive[0] ?? null;
 }
 
-export function getNextEncounterMobInRoom(mobs: EncounterMobSlot[], roomNumber: number): EncounterMobSlot | null {
+function getNextEncounterMobInRoom(mobs: EncounterMobSlot[], roomNumber: number): EncounterMobSlot | null {
   const alive = mobs.filter((mob) => mob.status === 'alive' && mob.room === roomNumber);
   if (alive.length === 0) return null;
   alive.sort((a, b) => {
@@ -142,7 +142,7 @@ export function getRoomState(mobs: EncounterMobSlot[], roomNumber: number): {
   return { total: roomMobs.length, alive, defeated };
 }
 
-export function getMaxRoom(mobs: EncounterMobSlot[]): number {
+function getMaxRoom(mobs: EncounterMobSlot[]): number {
   return Math.max(...mobs.map(m => m.room), 1);
 }
 

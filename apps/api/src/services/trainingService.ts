@@ -24,7 +24,7 @@ export async function getCooldownRemaining(playerId: string): Promise<number> {
   return ttl > 0 ? ttl : 0;
 }
 
-export type TrainingCombatResult = Omit<TemplateCombatResult, 'log'> & {
+type TrainingCombatResult = Omit<TemplateCombatResult, 'log'> & {
   log: ReturnType<typeof mapTemplateCombatLog>;
 };
 

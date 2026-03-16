@@ -29,9 +29,9 @@ export const startSchema = z.object({
 
 // --- Types ---
 
-export type { EncounterSiteSize, EncounterMobRole, EncounterMobStatus } from '@pocketrealm/shared';
+export type { EncounterSiteSize } from '@pocketrealm/shared';
 
-export type NarrativeEventType =
+type NarrativeEventType =
   | 'ambush_victory'
   | 'ambush_defeat'
   | 'encounter_site'
@@ -148,7 +148,7 @@ export function getSiteName(
   return `Large ${familyName} ${nouns.siteNounLarge}`;
 }
 
-export function pickFamilyMemberByRole(
+function pickFamilyMemberByRole(
   members: ZoneFamilyMember[],
   role: EncounterMobRole,
   fallback: EncounterMobRole[] = []

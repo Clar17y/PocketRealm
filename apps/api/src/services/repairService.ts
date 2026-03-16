@@ -55,7 +55,7 @@ export async function repairItemDurability(
   return { newMax, decay, destroyed: false };
 }
 
-export interface RepairEquippedResult {
+interface RepairEquippedResult {
   repaired: boolean;
   turns?: {
     previousTurns: number;

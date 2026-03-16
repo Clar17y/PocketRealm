@@ -90,7 +90,7 @@ export async function getCombatBuffs(playerId: string): Promise<CombatBuffs> {
   };
 }
 
-export interface CombatBuffRemainingUses {
+interface CombatBuffRemainingUses {
   damage: number;
   defence: number;
   durability: number;
