@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getShopItems, purchaseItem } from '../services/questShopService';
+import { buildStateUpdates } from '../services/stateUpdateHelpers';
 
 export const shopRouter = Router();
 shopRouter.use(authenticate);
@@ -30,5 +31,13 @@ shopRouter.post('/purchase/:itemId', asyncHandler(async (req, res) => {
   const { itemId } = purchaseParamsSchema.parse(req.params);
   const body = purchaseBodySchema.parse(req.body);
   const result = await purchaseItem(playerId, itemId, body);
+
+  // Include buff state if the purchase activated a buff
+  if (result.effect?.type === 'buff') {
+    const stateUpdates = await buildStateUpdates(playerId, ['buffs']);
+    res.json({ ...result, stateUpdates });
+    return;
+  }
+
   res.json(result);
 }));

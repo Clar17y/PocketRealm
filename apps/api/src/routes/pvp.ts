@@ -19,6 +19,7 @@ import { checkAchievements, emitAchievementNotifications } from '../services/ach
 import { paginationSchema } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
 import { trackProgress } from '../services/progressService';
+import { buildStateUpdates } from '../services/stateUpdateHelpers';
 
 export const pvpRouter = Router();
 pvpRouter.use(authenticate);
@@ -116,7 +117,8 @@ pvpRouter.post('/challenge', asyncHandler(async (req, res) => {
     void trackProgress(body.targetId, 'pvp_damage', defenderDamage);
   }
 
-  res.json(result);
+  const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources', 'skills', 'characterProgression']);
+  res.json({ ...result, stateUpdates });
 }));
 
 /**
