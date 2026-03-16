@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
+import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID, EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -144,7 +144,7 @@ const settingsSchema = z.object({
   combatLogSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   explorationSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   autoSkipKnownCombat: z.boolean().optional(),
-  defaultExploreTurns: z.number().int().min(100).max(2500).refine(v => v % 10 === 0, { message: 'Must be a multiple of 10' }).optional(),
+  defaultExploreTurns: z.number().int().min(EXPLORATION_CONSTANTS.MIN_EXPLORATION_TURNS).max(EXPLORATION_CONSTANTS.MAX_EXPLORATION_TURNS).refine(v => v % 10 === 0, { message: 'Must be a multiple of 10' }).optional(),
   quickRestHealPercent: z.number().int().min(25).max(100).refine(v => v % 25 === 0, { message: 'Must be a multiple of 25' }).optional(),
   defaultRefiningMax: z.boolean().optional(),
   lowHpWarning: z.boolean().optional(),

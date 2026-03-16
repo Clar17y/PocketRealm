@@ -2,7 +2,7 @@ export const PERCENT_STATS = new Set(['critChance', 'critDamage']);
 
 export const STAT_ORDER = [
   'attack', 'armor', 'magicDefence', 'health', 'dodge',
-  'accuracy', 'magicPower', 'luck', 'evasion', 'critChance', 'critDamage',
+  'accuracy', 'magicPower', 'rangedPower', 'luck', 'evasion', 'critChance', 'critDamage',
 ];
 
 export function prettyStatName(stat: string): string {
