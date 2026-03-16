@@ -7,7 +7,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { addStackableItemTx } from '../../services/inventoryService';
-import { fetchItemDTOs, fetchInventoryMeta } from '../../services/stateUpdateHelpers';
+import { fetchItemDTOs, fetchInventoryMeta, fetchMaterialTotals } from '../../services/stateUpdateHelpers';
 import {
   getZoneCraftingLevel,
   assertZoneAllowsCrafting,
@@ -143,10 +143,11 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
     // --- Achievement stat tracking ---
     await trackAchievements(playerId, { totalSalvages: 1 });
 
-    const [addedDTOs, updatedDTOs, inventoryMeta, log] = await Promise.all([
+    const [addedDTOs, updatedDTOs, inventoryMeta, materialTotals, log] = await Promise.all([
       fetchItemDTOs(addedItemIds),
       fetchItemDTOs(updatedItemIds),
       fetchInventoryMeta(playerId),
+      fetchMaterialTotals(playerId),
       createActivityLog({
         playerId,
         activityType: 'salvage',
@@ -184,6 +185,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
         ...(addedDTOs.length > 0 && { inventoryAdded: addedDTOs }),
         ...(updatedDTOs.length > 0 && { inventoryUpdated: updatedDTOs }),
         inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        materialTotals,
       },
     });
 }));
@@ -346,10 +348,11 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
     await trackAchievements(playerId, { totalSalvages: plans.length });
 
     const salvagedItemIds = plans.map((p) => p.item.id);
-    const [addedDTOs, updatedDTOs, inventoryMeta, log] = await Promise.all([
+    const [addedDTOs, updatedDTOs, inventoryMeta, matTotals, log] = await Promise.all([
       fetchItemDTOs(addedItemIds),
       fetchItemDTOs(updatedItemIds),
       fetchInventoryMeta(playerId),
+      fetchMaterialTotals(playerId),
       createActivityLog({
         playerId,
         activityType: 'salvage_batch',
@@ -382,6 +385,7 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
         ...(addedDTOs.length > 0 && { inventoryAdded: addedDTOs }),
         ...(updatedDTOs.length > 0 && { inventoryUpdated: updatedDTOs }),
         inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        materialTotals: matTotals,
       },
     });
 }));

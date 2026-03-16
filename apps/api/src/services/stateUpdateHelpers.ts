@@ -289,6 +289,26 @@ export async function fetchBuffDTOs(playerId: string): Promise<BuffStateDTO[]> {
 }
 
 // ---------------------------------------------------------------------------
+// fetchMaterialTotals
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch aggregated material totals (including stash items) keyed by templateId.
+ */
+export async function fetchMaterialTotals(playerId: string): Promise<Record<string, number>> {
+  const rows = await prisma.item.groupBy({
+    by: ['templateId'],
+    where: { ownerId: playerId },
+    _sum: { quantity: true },
+  });
+  const totals: Record<string, number> = {};
+  for (const row of rows) {
+    totals[row.templateId] = row._sum.quantity ?? 0;
+  }
+  return totals;
+}
+
+// ---------------------------------------------------------------------------
 // buildStateUpdates
 // ---------------------------------------------------------------------------
 
@@ -300,7 +320,8 @@ type StateUpdateField =
   | 'gold'
   | 'buffs'
   | 'inventoryUsedSlots'
-  | 'inventoryCapacity';
+  | 'inventoryCapacity'
+  | 'materialTotals';
 
 /**
  * Fetch only the requested state fields in parallel, returning a Partial<StateUpdates>.
@@ -323,6 +344,7 @@ export async function buildStateUpdates(
     gold,
     buffs,
     inventoryMeta,
+    materialTotals,
   ] = await Promise.all([
     fieldSet.has('skills') ? fetchSkillDTOs(playerId) : Promise.resolve(undefined),
     fieldSet.has('hp') ? fetchHpState(playerId) : Promise.resolve(undefined),
@@ -333,6 +355,7 @@ export async function buildStateUpdates(
     fieldSet.has('gold') ? fetchGold(playerId) : Promise.resolve(undefined),
     fieldSet.has('buffs') ? fetchBuffDTOs(playerId) : Promise.resolve(undefined),
     needsInventoryMeta ? fetchInventoryMeta(playerId) : Promise.resolve(undefined),
+    fieldSet.has('materialTotals') ? fetchMaterialTotals(playerId) : Promise.resolve(undefined),
   ]);
 
   if (skills !== undefined) result.skills = skills;
@@ -347,6 +370,7 @@ export async function buildStateUpdates(
     if (fieldSet.has('inventoryCapacity')) result.inventoryCapacity = inventoryMeta.inventoryCapacity;
     if (fieldSet.has('inventoryUsedSlots')) result.inventoryUsedSlots = inventoryMeta.inventoryUsedSlots;
   }
+  if (materialTotals !== undefined) result.materialTotals = materialTotals;
 
   return result;
 }

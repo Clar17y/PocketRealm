@@ -376,6 +376,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setGold,
     setActiveBuffs: (buffs) => { setActiveBuffs(buffs as any); },
     setCharacterProgression: (cp) => setCharacterProgression(cp as any),
+    setMaterialTotals,
   }), []);
   // All useState setters are stable references, so empty deps is correct
 
@@ -1358,6 +1359,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const completeQueuedTravelRoute = async () => {
     travelRouteRef.current = null;
     setPlaybackActive(false);
+
+    // Reload zone-dependent crafting recipes after arriving at new zone
+    getCraftingRecipes().then((res) => {
+      if (res.data) {
+        setCraftingRecipes(res.data.recipes);
+        setZoneCraftingLevel(res.data.zoneCraftingLevel);
+        setZoneCraftingName(res.data.zoneName);
+      }
+    });
 
     if (arrivedInTownRef.current) {
       arrivedInTownRef.current = false;

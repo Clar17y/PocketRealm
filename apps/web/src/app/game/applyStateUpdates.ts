@@ -12,6 +12,7 @@ export interface StateSetters {
   setGold: (g: number) => void;
   setActiveBuffs: (b: NonNullable<StateUpdates['buffs']>) => void;
   setCharacterProgression: (cp: NonNullable<StateUpdates['characterProgression']>) => void;
+  setMaterialTotals: (mt: Record<string, number>) => void;
 }
 
 export function applyStateUpdates(
@@ -50,4 +51,5 @@ export function applyStateUpdates(
   if (updates.inventoryCapacity !== undefined) setters.setInventoryCapacity(updates.inventoryCapacity);
   if (updates.inventoryUsedSlots !== undefined) setters.setInventoryUsedSlots(updates.inventoryUsedSlots);
   if (updates.characterProgression !== undefined) setters.setCharacterProgression(updates.characterProgression);
+  if (updates.materialTotals !== undefined) setters.setMaterialTotals(updates.materialTotals);
 }

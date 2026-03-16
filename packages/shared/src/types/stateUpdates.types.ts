@@ -62,6 +62,7 @@ export interface StateUpdates {
   buffs?: BuffStateDTO[];
   inventoryCapacity?: number;
   inventoryUsedSlots?: number;
+  materialTotals?: Record<string, number>;
   characterProgression?: {
     characterXp: number;
     characterLevel: number;

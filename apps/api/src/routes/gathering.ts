@@ -11,7 +11,7 @@ import { grantSkillXp } from '../services/xpService';
 import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
-import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchResourceState, fetchInventoryMeta } from '../services/stateUpdateHelpers.js';
+import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchResourceState, fetchInventoryMeta, fetchMaterialTotals } from '../services/stateUpdateHelpers.js';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
 import { rollGemCritBatch, computeEventTurnCost } from '@pocketrealm/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -476,13 +476,14 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     }
   }
 
-  const [inventoryAddedDTOs, inventoryUpdatedDTOs, skills, characterProgression, resources, inventoryMeta] = await Promise.all([
+  const [inventoryAddedDTOs, inventoryUpdatedDTOs, skills, characterProgression, resources, inventoryMeta, materialTotals] = await Promise.all([
     fetchItemDTOs(inventoryAdded),
     fetchItemDTOs(inventoryUpdated),
     fetchSkillDTOs(playerId),
     fetchCharacterProgression(playerId),
     fetchResourceState(playerId),
     fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
   ]);
 
   const stateUpdates = {
@@ -492,6 +493,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     characterProgression,
     resources,
     inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    materialTotals,
   };
 
   const log = await createActivityLog({

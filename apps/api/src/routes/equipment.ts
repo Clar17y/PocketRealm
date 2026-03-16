@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth';
 import { equipItem, unequipSlot, getEquippedItemInSlot, ensureEquipmentSlots } from '../services/equipmentService';
 import { assertNotRecovering } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
-import { toInventoryItemDTO, fetchInventoryMeta, fetchEquipmentMap } from '../services/stateUpdateHelpers';
+import { toInventoryItemDTO, fetchInventoryMeta, fetchEquipmentMap, fetchMaterialTotals } from '../services/stateUpdateHelpers';
 
 export const equipmentRouter = Router();
 
@@ -46,15 +46,17 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
 
   await equipItem(playerId, body.itemId, body.slot as EquipmentSlot);
 
-  const [equipment, { inventoryUsedSlots }] = await Promise.all([
+  const [equipment, { inventoryUsedSlots }, materialTotals] = await Promise.all([
     fetchEquipmentMap(playerId),
     fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
   ]);
 
   const stateUpdates: Record<string, unknown> = {
     equipment,
     inventoryRemoved: [body.itemId],
     inventoryUsedSlots,
+    materialTotals,
   };
 
   // If a different item was in the slot before, it returns to inventory
@@ -89,15 +91,17 @@ equipmentRouter.post('/unequip', asyncHandler(async (req, res) => {
 
   await unequipSlot(playerId, body.slot as EquipmentSlot);
 
-  const [equipment, { inventoryUsedSlots }] = await Promise.all([
+  const [equipment, { inventoryUsedSlots }, materialTotals] = await Promise.all([
     fetchEquipmentMap(playerId),
     fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
   ]);
 
   res.json({
     success: true,
     stateUpdates: {
       equipment,
+      materialTotals,
       inventoryAdded: unequippedItem
         ? [
             toInventoryItemDTO(

@@ -18,7 +18,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { consumeItemsByTemplateTx, getTotalQuantityByTemplate, getInventoryState } from '../../services/inventoryService';
-import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchInventoryMeta } from '../../services/stateUpdateHelpers';
+import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchInventoryMeta, fetchMaterialTotals } from '../../services/stateUpdateHelpers';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
@@ -314,12 +314,13 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     const craftingBuffBadges: EventModifierBadge[] = [];
     if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });
 
-    const [inventoryAdded, inventoryUpdated, skills, characterProgression, inventoryMeta] = await Promise.all([
+    const [inventoryAdded, inventoryUpdated, skills, characterProgression, inventoryMeta, materialTotals] = await Promise.all([
       fetchItemDTOs(craftedItemIds),
       fetchItemDTOs(partiallyConsumedIds),
       fetchSkillDTOs(playerId),
       fetchCharacterProgression(playerId),
       fetchInventoryMeta(playerId),
+      fetchMaterialTotals(playerId),
     ]);
 
     res.json({
@@ -343,6 +344,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         skills,
         characterProgression,
         inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        materialTotals,
       },
     });
 }));
