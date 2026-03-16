@@ -27,7 +27,10 @@ async function addStackableItemWithClient(
     throw new AppError(400, 'Quantity must be a positive integer', 'INVALID_QUANTITY');
   }
 
-  const template = await client.itemTemplate.findUnique({ where: { id: itemTemplateId } });
+  const template = await client.itemTemplate.findUnique({
+    where: { id: itemTemplateId },
+    select: { stackable: true },
+  });
   if (!template) {
     throw new AppError(404, 'Item template not found', 'NOT_FOUND');
   }
@@ -199,8 +202,17 @@ export async function getUsedSlots(playerId: string): Promise<number> {
 /** Compute inventory capacity from equipped backpack + belt bonus. */
 export async function getPlayerCapacity(playerId: string): Promise<number> {
   const equipped = await prisma.playerEquipment.findMany({
-    where: { playerId, itemId: { not: null } },
-    include: { item: { include: { template: true } } },
+    where: { playerId, slot: { in: ['backpack', 'belt'] }, itemId: { not: null } },
+    select: {
+      slot: true,
+      item: {
+        select: {
+          rarity: true,
+          bonusStats: true,
+          template: { select: { tier: true } },
+        },
+      },
+    },
   });
 
   let backpackTier = 0;

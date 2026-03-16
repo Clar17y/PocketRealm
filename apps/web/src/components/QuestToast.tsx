@@ -4,12 +4,14 @@ import { useToastQueue } from '@/hooks/useToastQueue';
 import { ToastContainer } from '@/components/common/ToastContainer';
 import type { QuestProgressUpdate } from '@pocketrealm/shared';
 
+let _questSeq = 0;
+
 export function QuestToast() {
   const queue = useToastQueue<QuestProgressUpdate>({
     globalKey: '__showQuestToast',
     maxVisible: 3,
     autoDismissMs: 3000,
-    makeItem: (raw) => ({ id: `quest-${raw.questId}-${Date.now()}`, data: raw }),
+    makeItem: (raw) => ({ id: `quest-${raw.questId}-${++_questSeq}`, data: raw }),
   });
 
   if (queue.isEmpty) return null;

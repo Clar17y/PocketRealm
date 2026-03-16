@@ -2,6 +2,14 @@ import { prisma } from '@pocketrealm/database';
 import type { EquipmentSlot, SkillType } from '@pocketrealm/shared';
 import { ALL_EQUIPMENT_SLOTS, ALL_SKILLS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { cachedQuery, invalidateCache } from './cacheService';
+
+const equipmentCacheKey = (playerId: string) => `equipment:stats:${playerId}`;
+
+/** Invalidate the equipment stats cache for a player. Call after transactions commit. */
+export async function invalidateEquipmentCache(playerId: string): Promise<void> {
+  await invalidateCache(equipmentCacheKey(playerId));
+}
 
 export interface EquipmentStats {
   attack: number;
@@ -38,11 +46,25 @@ export async function ensureEquipmentSlots(playerId: string): Promise<void> {
 }
 
 export async function getEquipmentStats(playerId: string): Promise<EquipmentStats> {
+  return cachedQuery(equipmentCacheKey(playerId), () => computeEquipmentStats(playerId), 600);
+}
+
+async function computeEquipmentStats(playerId: string): Promise<EquipmentStats> {
   const equipped = await prisma.playerEquipment.findMany({
     where: { playerId, itemId: { not: null } },
-    include: {
+    select: {
+      slot: true,
       item: {
-        include: { template: true },
+        select: {
+          currentDurability: true,
+          bonusStats: true,
+          template: {
+            select: {
+              baseStats: true,
+              maxDurability: true,
+            },
+          },
+        },
       },
     },
   });
@@ -163,6 +185,8 @@ export async function equipItem(
     create: { playerId, slot, itemId },
     update: { itemId },
   });
+
+  await invalidateCache(equipmentCacheKey(playerId));
 }
 
 export async function unequipSlot(playerId: string, slot: EquipmentSlot): Promise<void> {
@@ -172,5 +196,7 @@ export async function unequipSlot(playerId: string, slot: EquipmentSlot): Promis
     where: { playerId_slot: { playerId, slot } },
     data: { itemId: null },
   });
+
+  await invalidateCache(equipmentCacheKey(playerId));
 }
 

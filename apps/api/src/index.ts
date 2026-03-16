@@ -108,12 +108,14 @@ app.use((req, res, next) => {
 app.set('trust proxy', 1);
 
 // Global rate limiter: 120 requests per minute per IP
+// Skip CORS preflight (OPTIONS) — they carry no payload and shouldn't count against the limit.
 app.use('/api/v1/', rateLimit({
   windowMs: 60_000,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later', code: 'RATE_LIMITED' },
+  skip: (req) => req.method === 'OPTIONS',
 }));
 
 // Health check

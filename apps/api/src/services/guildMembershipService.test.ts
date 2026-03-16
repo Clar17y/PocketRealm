@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 
+vi.mock('../redis', () => ({
+  redis: { get: vi.fn().mockResolvedValue(null), set: vi.fn(), del: vi.fn() },
+}));
+
 import { mockPrisma } from '../__test__/setup';
 import {
   joinGuild,
