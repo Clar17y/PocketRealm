@@ -3,7 +3,7 @@ import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '@pocketrealm/database';
-import { TURN_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT } from '@pocketrealm/shared';
+import { TURN_CONSTANTS, ALL_SKILLS, ALL_EQUIPMENT_SLOTS, STARTER_LOADOUT } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import {
   generateAccessToken,
@@ -11,8 +11,8 @@ import {
   refreshTokenExpiresAt,
   verifyRefreshToken,
 } from '../middleware/auth';
-import { ensureEquipmentSlots } from '../services/equipmentService';
-import { ensureStarterDiscoveries, ensureStarterEncounterAndNodes } from '../services/zoneDiscoveryService';
+// ensureEquipmentSlots, ensureStarterDiscoveries, ensureStarterEncounterAndNodes
+// are inlined within the registration transaction for atomicity.
 import { asyncHandler } from '../utils/asyncHandler';
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
@@ -76,57 +76,146 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
     throw new AppError(500, 'Starter off-hand template is missing', 'MISSING_STARTER_ITEM');
   }
 
-  // Create player with all related records
-  const player = await prisma.player.create({
-    data: {
-      username: body.username,
-      email: body.email,
-      passwordHash,
-      lastActiveAt: now,
-      currentZoneId: startingZone.id,
-      lastTravelledFromZoneId: starterTown.id,
-      homeTownId: starterTown.id,
-      turnBank: {
-        create: {
-          currentTurns: TURN_CONSTANTS.STARTING_TURNS,
+  // Create player with all related records in a single transaction for atomicity.
+  // If any step fails, the entire registration is rolled back so retries won't
+  // hit USER_EXISTS (409) for an incomplete player.
+  const player = await (prisma as any).$transaction(async (tx: any) => {
+    const created = await tx.player.create({
+      data: {
+        username: body.username,
+        email: body.email,
+        passwordHash,
+        lastActiveAt: now,
+        currentZoneId: startingZone.id,
+        lastTravelledFromZoneId: starterTown.id,
+        homeTownId: starterTown.id,
+        turnBank: {
+          create: {
+            currentTurns: TURN_CONSTANTS.STARTING_TURNS,
+          },
+        },
+        skills: {
+          create: ALL_SKILLS.map((skill: string) => ({
+            skillType: skill,
+            level: 1,
+            xp: BigInt(0),
+          })),
         },
       },
-      skills: {
-        create: ALL_SKILLS.map(skill => ({
-          skillType: skill,
-          level: 1,
-          xp: BigInt(0),
-        })),
+      include: {
+        turnBank: true,
+        skills: true,
       },
-    },
-    include: {
-      turnBank: true,
-      skills: true,
-    },
-  });
-  await ensureEquipmentSlots(player.id);
-  const starterOffHand = await prisma.item.create({
-    data: {
-      ownerId: player.id,
-      templateId: starterOffHandTemplate.id,
-      rarity: 'common',
-      quantity: 1,
-      maxDurability: starterOffHandTemplate.maxDurability,
-      currentDurability: starterOffHandTemplate.maxDurability,
-    },
-    select: { id: true },
-  });
-  await prisma.playerEquipment.upsert({
-    where: { playerId_slot: { playerId: player.id, slot: 'off_hand' } },
-    create: { playerId: player.id, slot: 'off_hand', itemId: starterOffHand.id },
-    update: { itemId: starterOffHand.id },
-  });
+    });
 
-  // Create initial zone discovery records
-  await ensureStarterDiscoveries(player.id);
+    // Ensure equipment slots
+    const existingSlots = await tx.playerEquipment.findMany({
+      where: { playerId: created.id },
+      select: { slot: true },
+    });
+    const existingSlotSet = new Set(existingSlots.map((e: { slot: string }) => e.slot));
+    const missingSlots = ALL_EQUIPMENT_SLOTS.filter((slot: string) => !existingSlotSet.has(slot));
+    if (missingSlots.length > 0) {
+      await tx.playerEquipment.createMany({
+        data: missingSlots.map((slot: string) => ({ playerId: created.id, slot, itemId: null })),
+      });
+    }
 
-  // Seed starter resource nodes and encounter site
-  await ensureStarterEncounterAndNodes(player.id);
+    // Create starter off-hand item and equip it
+    const starterOffHand = await tx.item.create({
+      data: {
+        ownerId: created.id,
+        templateId: starterOffHandTemplate.id,
+        rarity: 'common',
+        quantity: 1,
+        maxDurability: starterOffHandTemplate.maxDurability,
+        currentDurability: starterOffHandTemplate.maxDurability,
+      },
+      select: { id: true },
+    });
+    await tx.playerEquipment.upsert({
+      where: { playerId_slot: { playerId: created.id, slot: 'off_hand' } },
+      create: { playerId: created.id, slot: 'off_hand', itemId: starterOffHand.id },
+      update: { itemId: starterOffHand.id },
+    });
+
+    // Create initial zone discovery records
+    const starterZones = await tx.zone.findMany({ where: { isStarter: true }, select: { id: true } });
+    if (starterZones.length > 0) {
+      const starterIds: string[] = starterZones.map((z: { id: string }) => z.id);
+      const connections = await tx.zoneConnection.findMany({
+        where: { fromId: { in: starterIds } },
+        select: { toId: true },
+      });
+      const connectedIds: string[] = connections.map((c: { toId: string }) => c.toId);
+      const allDiscoveryZoneIds = [...new Set([...starterIds, ...connectedIds])];
+      await tx.playerZoneDiscovery.createMany({
+        data: allDiscoveryZoneIds.map((zoneId: string) => ({ playerId: created.id, zoneId })),
+        skipDuplicates: true,
+      });
+    }
+
+    // Seed starter resource nodes and encounter site
+    const starterTownForNodes = await tx.zone.findFirst({ where: { isStarter: true }, select: { id: true } });
+    if (starterTownForNodes) {
+      const nodeConnections = await tx.zoneConnection.findMany({
+        where: { fromId: starterTownForNodes.id },
+        select: { toId: true },
+      });
+      if (nodeConnections.length > 0) {
+        const wildZone = await tx.zone.findFirst({
+          where: { id: { in: nodeConnections.map((c: { toId: string }) => c.toId) }, zoneType: 'wild' },
+          select: { id: true },
+        });
+        if (wildZone) {
+          // Resource nodes
+          const oreNode = await tx.resourceNode.findFirst({
+            where: { zoneId: wildZone.id, resourceType: 'Copper Ore' },
+            select: { id: true },
+          });
+          const logNode = await tx.resourceNode.findFirst({
+            where: { zoneId: wildZone.id, resourceType: 'Oak Log' },
+            select: { id: true },
+          });
+          const nodeData: Array<{ playerId: string; resourceNodeId: string; remainingCapacity: number; decayedCapacity: number }> = [];
+          if (oreNode) nodeData.push({ playerId: created.id, resourceNodeId: oreNode.id, remainingCapacity: 6, decayedCapacity: 0 });
+          if (logNode) nodeData.push({ playerId: created.id, resourceNodeId: logNode.id, remainingCapacity: 6, decayedCapacity: 0 });
+          if (nodeData.length > 0) {
+            await tx.playerResourceNode.createMany({ data: nodeData });
+          }
+
+          // Encounter site
+          const zoneMobFamily = await tx.zoneMobFamily.findFirst({
+            where: { zoneId: wildZone.id },
+            orderBy: { discoveryWeight: 'desc' },
+            select: { mobFamilyId: true, mobFamily: { select: { name: true, siteNounSmall: true } } },
+          });
+          if (zoneMobFamily) {
+            const fieldMouse = await tx.mobTemplate.findFirst({
+              where: { zoneId: wildZone.id, name: 'Field Mouse' },
+              select: { id: true },
+            });
+            if (fieldMouse) {
+              const mobs = [{ slot: 0, mobTemplateId: fieldMouse.id, role: 'trash', prefix: null, status: 'alive', room: 1 }];
+              const siteName = `Small ${zoneMobFamily.mobFamily.name} ${zoneMobFamily.mobFamily.siteNounSmall}`;
+              await tx.encounterSite.create({
+                data: {
+                  playerId: created.id,
+                  zoneId: wildZone.id,
+                  mobFamilyId: zoneMobFamily.mobFamilyId,
+                  name: siteName,
+                  size: 'small',
+                  mobs: { mobs },
+                },
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return created;
+  });
 
   // Generate tokens
   const payload = { playerId: player.id, username: player.username, role: player.role };
