@@ -375,7 +375,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setManaState: (m) => setManaState(m as any),
     setGold,
     setActiveBuffs: (buffs) => { setActiveBuffs(buffs as any); },
-    setCharacterProgression: (cp) => setCharacterProgression(cp as any),
+    setCharacterProgression: (cp) => setCharacterProgression((prev) => ({ ...prev, ...cp })),
     setMaterialTotals,
   }), []);
   // All useState setters are stable references, so empty deps is correct
