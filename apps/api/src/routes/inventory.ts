@@ -14,6 +14,7 @@ import { sellItem, sellBulk } from '../services/sellService';
 import { depositItem, depositBatch, withdrawItem, withdrawBatch, listStash } from '../services/stashService';
 import { claimPendingLoot, getPendingLoot } from '../services/pendingLootService';
 import { getInventoryState } from '../services/inventoryService';
+import { fetchInventoryMeta, fetchItemDTOs, buildStateUpdates } from '../services/stateUpdateHelpers';
 
 export const inventoryRouter = Router();
 
@@ -92,12 +93,26 @@ inventoryRouter.delete('/:id', asyncHandler(async (req, res) => {
       where: { id: item.id },
       data: { quantity: item.quantity - query.quantity },
     });
-    res.json({ destroyed: false, itemId: updated.id, remainingQuantity: updated.quantity });
+    const inventoryMeta = await fetchInventoryMeta(playerId);
+    res.json({
+      destroyed: false,
+      itemId: updated.id,
+      remainingQuantity: updated.quantity,
+      stateUpdates: { inventoryUsedSlots: inventoryMeta.inventoryUsedSlots },
+    });
     return;
   }
 
   await prisma.item.delete({ where: { id: item.id } });
-  res.json({ destroyed: true, itemId: item.id });
+  const inventoryMeta = await fetchInventoryMeta(playerId);
+  res.json({
+    destroyed: true,
+    itemId: item.id,
+    stateUpdates: {
+      inventoryRemoved: [item.id],
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    },
+  });
 }));
 
 const repairSchema = z.object({
@@ -163,7 +178,38 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
     await invalidateEquipmentCache(playerId);
   }
 
-  res.json(result);
+  if (!result.repaired) {
+    res.json(result);
+    return;
+  }
+
+  if (result.destroyed) {
+    const [inventoryMeta, gold] = await Promise.all([
+      fetchInventoryMeta(playerId),
+      buildStateUpdates(playerId, ['gold']),
+    ]);
+    res.json({
+      ...result,
+      stateUpdates: {
+        inventoryRemoved: [result.itemId],
+        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        gold: gold.gold,
+      },
+    });
+    return;
+  }
+
+  const [repairedDTOs, gold] = await Promise.all([
+    fetchItemDTOs([result.itemId]),
+    buildStateUpdates(playerId, ['gold']),
+  ]);
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryUpdated: repairedDTOs,
+      gold: gold.gold,
+    },
+  });
 }));
 
 /**
@@ -181,7 +227,27 @@ inventoryRouter.post('/repair-equipped', asyncHandler(async (req, res) => {
     await invalidateEquipmentCache(playerId);
   }
 
-  res.json(result);
+  if (!result.repaired) {
+    res.json(result);
+    return;
+  }
+
+  const survivingIds = result.items.filter((i) => !i.destroyed).map((i) => i.itemId);
+  const destroyedIds = result.items.filter((i) => i.destroyed).map((i) => i.itemId);
+
+  const [survivingDTOs, goldUpdates] = await Promise.all([
+    fetchItemDTOs(survivingIds),
+    buildStateUpdates(playerId, ['gold']),
+  ]);
+
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryUpdated: survivingDTOs,
+      ...(destroyedIds.length > 0 ? { inventoryRemoved: destroyedIds } : {}),
+      gold: goldUpdates.gold,
+    },
+  });
 }));
 
 const useSchema = z.object({
@@ -196,7 +262,20 @@ inventoryRouter.post('/use', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = useSchema.parse(req.body);
   const result = await useConsumable(playerId, body.itemId);
-  res.json(result);
+
+  const stateFields = await buildStateUpdates(playerId, ['hp', 'resources', 'buffs']);
+
+  const stateUpdates: Record<string, unknown> = {
+    hp: stateFields.hp,
+    resources: stateFields.resources,
+    buffs: stateFields.buffs,
+  };
+
+  if (result.remainingQuantity === null) {
+    stateUpdates.inventoryRemoved = [body.itemId];
+  }
+
+  res.json({ ...result, stateUpdates });
 }));
 
 // --- Sell endpoints ---
@@ -211,7 +290,15 @@ inventoryRouter.post('/sell', asyncHandler(async (req, res) => {
   const body = sellSchema.parse(req.body);
   await assertInTown(playerId);
   const result = await sellItem(playerId, body.itemId, body.quantity);
-  res.json(result);
+  const inventoryMeta = await fetchInventoryMeta(playerId);
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryRemoved: [body.itemId],
+      gold: result.newGold,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    },
+  });
 }));
 
 const sellBulkSchema = z.object({
@@ -223,7 +310,15 @@ inventoryRouter.post('/sell/bulk', asyncHandler(async (req, res) => {
   const body = sellBulkSchema.parse(req.body);
   await assertInTown(playerId);
   const result = await sellBulk(playerId, body.itemIds);
-  res.json(result);
+  const inventoryMeta = await fetchInventoryMeta(playerId);
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryRemoved: body.itemIds,
+      gold: result.newGold,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    },
+  });
 }));
 
 // --- Stash endpoints ---
