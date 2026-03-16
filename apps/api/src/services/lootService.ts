@@ -140,7 +140,7 @@ export async function rollAndGrantLootWithCapacity(
           maxDurability,
           currentDurability: maxDurability,
           bonusStats: bonusStats ? (bonusStats as Prisma.InputJsonObject) : undefined,
-        } as any,
+        },
       });
       slotsUsed++;
       drops.push({ itemTemplateId: entry.itemTemplateId, quantity: 1, rarity });

@@ -135,14 +135,6 @@ export interface SlotCondition {
 
 // --- Combat Template ---
 
-/** @deprecated Used by mob templates only. Player templates use CombatTemplateSlotData. */
-export interface CombatTemplateAction {
-  /** Action definition ID (references an unlocked ability) */
-  actionId: string;
-  /** Optional override label for display */
-  label?: string;
-}
-
 export interface CombatTemplateSlotData {
   id: string;
   sortOrder: number;
@@ -171,12 +163,6 @@ export interface ResourceState {
   regenPerRound: number;
   regenPerSecond: number;
   restHealPerTurn: number;
-}
-
-export interface CombatResourceState {
-  hp: ResourceState;
-  stamina: ResourceState;
-  mana: ResourceState;
 }
 
 // --- Skill Points ---

@@ -4,7 +4,7 @@ import type { CombatTemplateSlotData, CombatTemplateData, SlotCondition } from '
 import { ALWAYS_AVAILABLE_ACTION_IDS, SKILL_POINT_CONSTANTS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
-export interface CreateSlotInput {
+interface CreateSlotInput {
   sortOrder?: number;
   actionId: string;
   condition?: SlotCondition;

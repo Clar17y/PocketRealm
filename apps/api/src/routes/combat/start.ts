@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler';
-import { Prisma, prisma } from '@pocketrealm/database';
+import { Prisma, prisma, type MobTemplate as PrismaMobTemplate } from '@pocketrealm/database';
 import { createActivityLog } from '../../services/activityLogService';
 import {
   applyMobEventModifiers,
@@ -91,7 +91,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   if (!site) throw new AppError(404, 'Encounter site not found', 'NOT_FOUND');
   if (!site.clearStrategy) throw new AppError(400, 'Select a clearing strategy before fighting', 'STRATEGY_NOT_SET');
 
-  await assertInZone(playerId, site.zoneId as string);
+  await assertInZone(playerId, site.zoneId);
 
   const decayed = await applyEncounterSiteDecayAndPersist({
     id: site.id,
@@ -104,7 +104,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const siteStrategy = site.clearStrategy as 'full_clear' | 'room_by_room';
   const siteFullClearActive = site.fullClearActive ?? true;
   let currentRoom = site.currentRoom ?? 1;
-  const zoneId = site.zoneId as string;
+  const zoneId = site.zoneId;
 
   // Get ALL alive mobs in the current room -- advance if decay emptied it
   let roomMobs = getAllAliveMobsInRoom(decayed.mobs, currentRoom);
@@ -180,7 +180,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     currentPlayerHp = Math.min(site.roomCarryHp, hpState.currentHp);
     await setHp(playerId, currentPlayerHp);
   }
-  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
+  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId });
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
 
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
@@ -201,7 +201,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       const template = mobTemplateById.get(roomMob.mobTemplateId);
       if (!template) continue;
 
-      const baseMob = toMobTemplate(template as unknown as Record<string, unknown>);
+      const baseMob = toMobTemplate(template);
       const modifiedMob = applyMobEventModifiers(baseMob, zoneModifiers);
       const prefixedMob = applyMobPrefix(modifiedMob, roomMob.prefix ?? null);
 
@@ -287,7 +287,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       fightResults.push({
         room: session.roomNumber,
         slot: roomMob.slot,
-        mobName: template.name as string,
+        mobName: template.name,
         mobDisplayName: prefixedMob.mobDisplayName ?? prefixedMob.name,
         mobTemplateId: prefixedMob.id,
         mobPrefix: prefixedMob.mobPrefix,
@@ -330,10 +330,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   let chestAvailableSlots = chestAvailableSlotsRaw;
 
   const txResult = await prisma.$transaction(async (tx) => {
-    const txAny = tx as unknown as any;
-
     // Re-fetch site and apply decay BEFORE spending turns to detect stale state
-    const freshSite = await txAny.encounterSite.findFirst({
+    const freshSite = await tx.encounterSite.findFirst({
       where: { id: encounterSiteId, playerId },
       select: { id: true, playerId: true, mobFamilyId: true, size: true, discoveredAt: true, mobs: true },
     });
@@ -396,10 +394,10 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         fullClearBonus: siteStrategy === 'full_clear' && siteFullClearActive,
         availableSlots: chestAvailableSlots,
       });
-      await txAny.encounterSite.deleteMany({ where: { id: encounterSiteId, playerId } });
+      await tx.encounterSite.deleteMany({ where: { id: encounterSiteId, playerId } });
       encounterSiteCleared = true;
     } else {
-      await txAny.encounterSite.update({
+      await tx.encounterSite.update({
         where: { id: encounterSiteId },
         data: {
           mobs: serializeEncounterSiteMobs(mobs),
@@ -483,7 +481,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
     // Use encounter site's mob family directly (avoids N+1 query)
     const familyIds: string[] = [];
-    if (site.mobFamilyId) familyIds.push(site.mobFamilyId as string);
+    if (site.mobFamilyId) familyIds.push(site.mobFamilyId);
 
     await trackAchievements(playerId, {}, { statKeys: achievementKeys, familyIds });
   } else {
@@ -524,7 +522,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     : null;
 
   // Mob-specific event modifiers for appliedToThisMob flag (reuse cached events)
-  const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId as string });
+  const siteMobBadges = filterEventModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId: site.mobFamilyId });
 
   // Mob family name from the initial encounter site query (includes mobFamily relation)
   const mobFamilyName: string | null = site.mobFamily?.name ?? null;
@@ -601,7 +599,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       });
       fightLogIds.push(fightLog.id);
     }
-  } catch {
+  } catch (err) {
+    console.warn('Per-fight activity log creation failed', { err });
     fightLogIds = [];
   }
 
@@ -724,17 +723,17 @@ export function registerStartRoutes(router: Router): void {
 
       const explorationProgress = await getExplorationPercent(playerId, zoneId);
 
-      let mob = null as null | (MobTemplate & { spellPattern: unknown });
+      let mob: PrismaMobTemplate | null = null;
 
       if (body.mobTemplateId) {
         const found = await prisma.mobTemplate.findUnique({ where: { id: body.mobTemplateId } });
         if (!found || found.zoneId !== zoneId) {
           throw new AppError(400, 'Invalid mobTemplateId for this zone', 'INVALID_MOB');
         }
-        mob = found as unknown as MobTemplate & { spellPattern: unknown };
+        mob = found;
       } else {
         const mobs = await prisma.mobTemplate.findMany({ where: { zoneId } });
-        const zoneTiers = (zone as unknown as { explorationTiers: Record<string, number> | null }).explorationTiers;
+        const zoneTiers = zone.explorationTiers as Record<string, number> | null;
         const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
 
         let currentTier = 0;
@@ -748,7 +747,7 @@ export function registerStartRoutes(router: Router): void {
         const selectedTier = selectTierWithBleedthrough(currentTier, zoneTiers);
         const mobsWithTier = mobs.map(m => ({
           ...m,
-          explorationTier: (m as unknown as { explorationTier: number | null }).explorationTier ?? 1,
+          explorationTier: m.explorationTier ?? 1,
         }));
 
         let candidates = mobsWithTier.filter(m => m.explorationTier === selectedTier);
@@ -768,7 +767,7 @@ export function registerStartRoutes(router: Router): void {
         if (!picked) {
           throw new AppError(400, 'No mobs available for this zone', 'NO_MOBS');
         }
-        mob = picked as unknown as MobTemplate & { spellPattern: unknown };
+        mob = picked;
       }
 
       let mobPrefix = rollMobPrefix();
@@ -776,7 +775,7 @@ export function registerStartRoutes(router: Router): void {
       const requestedAttackSkill: AttackSkill | null = body.attackSkill ?? null;
 
       // Prepare player combat data + zone events + mob family lookup in parallel
-      const baseMob = toMobTemplate(mob as unknown as Record<string, unknown>);
+      const baseMob = toMobTemplate(mob!);
       const [combatPrep, zoneCombatZoneEvents, zoneCombatWorldEvents, zoneMobFamilyRow] = await Promise.all([
         preparePlayerForCombat(playerId, { requestedAttackSkill, maxHp: hpState.maxHp }),
         getActiveEventsForZone(zoneId),

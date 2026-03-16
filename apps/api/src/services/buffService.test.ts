@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Prisma } from '@pocketrealm/database';
 import { mockPrisma as db } from '../__test__/setup';
+
+/** Shorthand to cast a partial mock object as a Prisma TransactionClient for test purposes. */
+const asTx = (mock: unknown) => mock as unknown as Prisma.TransactionClient;
 import {
   getActiveBuffs,
   getBuffValue,
@@ -93,7 +97,7 @@ describe('consumeBuff', () => {
         delete: vi.fn(),
       },
     };
-    await consumeBuff(mockTx, PLAYER_ID, 'xp_boost');
+    await consumeBuff(asTx(mockTx), PLAYER_ID, 'xp_boost');
     expect(mockTx.playerBuff.update).toHaveBeenCalledWith({
       where: { playerId_buffType: { playerId: PLAYER_ID, buffType: 'xp_boost' } },
       data: { remainingUses: { decrement: 1 } },
@@ -108,7 +112,7 @@ describe('consumeBuff', () => {
         delete: vi.fn().mockResolvedValue({}),
       },
     };
-    await consumeBuff(mockTx, PLAYER_ID, 'xp_boost');
+    await consumeBuff(asTx(mockTx), PLAYER_ID, 'xp_boost');
     expect(mockTx.playerBuff.delete).toHaveBeenCalledWith({ where: { id: 'b1' } });
   });
 
@@ -119,7 +123,7 @@ describe('consumeBuff', () => {
         delete: vi.fn().mockResolvedValue({}),
       },
     };
-    await consumeBuff(mockTx, PLAYER_ID, 'xp_boost');
+    await consumeBuff(asTx(mockTx), PLAYER_ID, 'xp_boost');
     expect(mockTx.playerBuff.delete).toHaveBeenCalledWith({ where: { id: 'b1' } });
   });
 });
@@ -133,7 +137,7 @@ describe('consumeBuffIfActive', () => {
         delete: vi.fn(),
       },
     };
-    const value = await consumeBuffIfActive(mockTx, PLAYER_ID, 'gathering_yield');
+    const value = await consumeBuffIfActive(asTx(mockTx), PLAYER_ID, 'gathering_yield');
     expect(value).toBe(0.15);
     expect(mockTx.playerBuff.update).toHaveBeenCalledWith({
       where: { id: 'b1' },
@@ -145,7 +149,7 @@ describe('consumeBuffIfActive', () => {
     const mockTx = {
       playerBuff: { findUnique: vi.fn().mockResolvedValue(null) },
     };
-    const value = await consumeBuffIfActive(mockTx, PLAYER_ID, 'xp_boost');
+    const value = await consumeBuffIfActive(asTx(mockTx), PLAYER_ID, 'xp_boost');
     expect(value).toBe(0);
   });
 
@@ -157,7 +161,7 @@ describe('consumeBuffIfActive', () => {
         update: vi.fn().mockResolvedValue({ id: 'b1', remainingUses: 0 }),
       },
     };
-    const value = await consumeBuffIfActive(mockTx, PLAYER_ID, 'xp_boost');
+    const value = await consumeBuffIfActive(asTx(mockTx), PLAYER_ID, 'xp_boost');
     expect(value).toBe(0.10);
     expect(mockTx.playerBuff.update).toHaveBeenCalledWith({
       where: { id: 'b1' },
@@ -174,7 +178,7 @@ describe('consumeBuffIfActive', () => {
         delete: vi.fn(),
       },
     };
-    await consumeBuffIfActive(mockTx, PLAYER_ID, 'xp_boost');
+    await consumeBuffIfActive(asTx(mockTx), PLAYER_ID, 'xp_boost');
     expect(mockTx.playerBuff.update).not.toHaveBeenCalled();
     expect(mockTx.playerBuff.delete).not.toHaveBeenCalled();
   });
@@ -336,7 +340,7 @@ describe('consumeBuffChargesPerMob', () => {
       .mockResolvedValueOnce({ id: 'bs', bonusValue: 0.50, remainingUses: 2 });
     const uses = { damage: 5, defence: 3, durability: 2 };
 
-    await consumeBuffChargesPerMob(tx, PLAYER_ID, uses);
+    await consumeBuffChargesPerMob(asTx(tx), PLAYER_ID, uses);
 
     expect(uses.damage).toBe(4);
     expect(uses.defence).toBe(2);
@@ -348,7 +352,7 @@ describe('consumeBuffChargesPerMob', () => {
     const tx = makeTx();
     const uses = { damage: 0, defence: 0, durability: 0 };
 
-    await consumeBuffChargesPerMob(tx, PLAYER_ID, uses);
+    await consumeBuffChargesPerMob(asTx(tx), PLAYER_ID, uses);
 
     expect(tx.playerBuff.findUnique).not.toHaveBeenCalled();
     expect(uses).toEqual({ damage: 0, defence: 0, durability: 0 });
@@ -359,7 +363,7 @@ describe('consumeBuffChargesPerMob', () => {
     tx.playerBuff.findUnique.mockResolvedValueOnce({ id: 'bd', bonusValue: 0.10, remainingUses: 3 });
     const uses = { damage: 3, defence: 0, durability: 0 };
 
-    await consumeBuffChargesPerMob(tx, PLAYER_ID, uses);
+    await consumeBuffChargesPerMob(asTx(tx), PLAYER_ID, uses);
 
     expect(uses.damage).toBe(2);
     expect(tx.playerBuff.findUnique).toHaveBeenCalledTimes(1);
@@ -370,7 +374,7 @@ describe('consumeBuffChargesPerMob', () => {
     tx.playerBuff.findUnique.mockResolvedValueOnce({ id: 'bs', bonusValue: 0.50, remainingUses: 10 });
     const uses = { damage: 0, defence: 0, durability: 10 };
 
-    await consumeBuffChargesPerMob(tx, PLAYER_ID, uses);
+    await consumeBuffChargesPerMob(asTx(tx), PLAYER_ID, uses);
 
     expect(uses.durability).toBe(9);
     expect(tx.playerBuff.findUnique).toHaveBeenCalledTimes(1);
@@ -382,7 +386,7 @@ describe('consumeBuffChargesPerMob', () => {
     const uses = { damage: 2, defence: 2, durability: 2 };
     const ref = uses; // same reference
 
-    await consumeBuffChargesPerMob(tx, PLAYER_ID, uses);
+    await consumeBuffChargesPerMob(asTx(tx), PLAYER_ID, uses);
 
     expect(ref.damage).toBe(1);
     expect(ref.defence).toBe(1);
@@ -496,7 +500,7 @@ describe('consumeCombatBuffs', () => {
       .mockResolvedValueOnce({ id: 'bs', bonusValue: 0.50, remainingUses: 2 });
 
     const buffs = { damageBoost: 0.10, defenceBoost: 0.10, durabilityShield: 0.50 };
-    await consumeCombatBuffs(tx, PLAYER_ID, buffs);
+    await consumeCombatBuffs(asTx(tx), PLAYER_ID, buffs);
 
     // Each buff should have been looked up via consumeBuffIfActive
     expect(tx.playerBuff.findUnique).toHaveBeenCalledTimes(3);
@@ -509,7 +513,7 @@ describe('consumeCombatBuffs', () => {
       .mockResolvedValueOnce({ id: 'bs', bonusValue: 0.50, remainingUses: 3 });
 
     const buffs = { damageBoost: 0, defenceBoost: 0.10, durabilityShield: 0.50 };
-    await consumeCombatBuffs(tx, PLAYER_ID, buffs);
+    await consumeCombatBuffs(asTx(tx), PLAYER_ID, buffs);
 
     // Only 2 calls: defence + durability
     expect(tx.playerBuff.findUnique).toHaveBeenCalledTimes(2);
@@ -522,7 +526,7 @@ describe('consumeCombatBuffs', () => {
       .mockResolvedValueOnce({ id: 'bs', bonusValue: 0.50, remainingUses: 3 });
 
     const buffs = { damageBoost: 0.10, defenceBoost: 0, durabilityShield: 0.50 };
-    await consumeCombatBuffs(tx, PLAYER_ID, buffs);
+    await consumeCombatBuffs(asTx(tx), PLAYER_ID, buffs);
 
     expect(tx.playerBuff.findUnique).toHaveBeenCalledTimes(2);
   });
@@ -532,7 +536,7 @@ describe('consumeCombatBuffs', () => {
     tx.playerBuff.findUnique.mockResolvedValueOnce({ id: 'bd', bonusValue: 0.10, remainingUses: 5 });
 
     const buffs = { damageBoost: 0.10, defenceBoost: 0, durabilityShield: 0 };
-    await consumeCombatBuffs(tx, PLAYER_ID, buffs);
+    await consumeCombatBuffs(asTx(tx), PLAYER_ID, buffs);
 
     expect(tx.playerBuff.findUnique).toHaveBeenCalledTimes(1);
   });
@@ -540,7 +544,7 @@ describe('consumeCombatBuffs', () => {
   it('does nothing when all buffs are 0', async () => {
     const tx = makeTx();
     const buffs = { damageBoost: 0, defenceBoost: 0, durabilityShield: 0 };
-    await consumeCombatBuffs(tx, PLAYER_ID, buffs);
+    await consumeCombatBuffs(asTx(tx), PLAYER_ID, buffs);
 
     expect(tx.playerBuff.findUnique).not.toHaveBeenCalled();
   });

@@ -33,7 +33,7 @@ import { buildPotionPool, templateHasPotionActions } from './potionService';
 
 // ── Prepare player for combat ────────────────────────────────────────
 
-export interface PlayerCombatPrep {
+interface PlayerCombatPrep {
   attackSkill: AttackSkill;
   attackLevel: number;
   progression: PlayerProgressionState;
@@ -49,7 +49,7 @@ export interface PlayerCombatPrep {
   unlockedActions: string[];
 }
 
-export interface PreparePlayerCombatOptions {
+interface PreparePlayerCombatOptions {
   requestedAttackSkill?: AttackSkill | null;
   maxHp: number;
   /** Pre-fetched data to avoid redundant queries */
@@ -179,7 +179,7 @@ export function applyGuildCombatModifiers(
 
 // ── Process combat victory rewards ───────────────────────────────────
 
-export interface VictoryRewardParams {
+interface VictoryRewardParams {
   playerId: string;
   mob: {
     id: string;
@@ -195,7 +195,7 @@ export interface VictoryRewardParams {
   includeBestiary?: boolean;
 }
 
-export interface VictoryRewardResult {
+interface VictoryRewardResult {
   loot: LootDrop[];
   overflow: PendingLootItem[];
   pendingLootSessionId: string | null;
@@ -260,8 +260,6 @@ export async function splitAndGrantXp(
   resourceCostByScalingStat: { melee: number; ranged: number; magic: number } | undefined,
   guildXpBoost: number | undefined,
 ): Promise<GrantXpResult[]> {
-  const boost = guildXpBoost || undefined;
-
   // Compute contribution per skill: damage + weighted resource cost
   const contribution = { melee: 0, ranged: 0, magic: 0 };
   if (damageByScalingStat) {
@@ -278,13 +276,13 @@ export async function splitAndGrantXp(
 
   const totalContribution = contribution.melee + contribution.ranged + contribution.magic;
   if (totalContribution <= 0) {
-    return [await grantSkillXp(playerId, fallbackSkill, totalXp, undefined, boost)];
+    return [await grantSkillXp(playerId, fallbackSkill, totalXp, undefined, guildXpBoost)];
   }
 
   // Find skills that contributed
   const skills = (['melee', 'ranged', 'magic'] as const).filter(s => contribution[s] > 0);
   if (skills.length === 1) {
-    return [await grantSkillXp(playerId, skills[0], totalXp, undefined, boost)];
+    return [await grantSkillXp(playerId, skills[0], totalXp, undefined, guildXpBoost)];
   }
 
   // Distribute with floor, give remainder to highest-contribution skill
@@ -300,7 +298,7 @@ export async function splitAndGrantXp(
   const results: GrantXpResult[] = [];
   for (const skill of skills) {
     if (xpBySkill[skill] > 0) {
-      results.push(await grantSkillXp(playerId, skill, xpBySkill[skill], undefined, boost));
+      results.push(await grantSkillXp(playerId, skill, xpBySkill[skill], undefined, guildXpBoost));
     }
   }
   return results;
@@ -308,7 +306,7 @@ export async function splitAndGrantXp(
 
 // ── Build combat activity log result ─────────────────────────────────
 
-export interface CombatLogResultParams {
+interface CombatLogResultParams {
   zoneId: string;
   zoneName: string;
   mob: { id: string; name: string; mobPrefix: string | null; mobDisplayName: string | null };
@@ -319,18 +317,18 @@ export interface CombatLogResultParams {
     outcome: string;
     combatantAMaxHp: number;
     combatantBMaxHp: number;
-    log: unknown[];
-    potionsConsumed?: unknown[];
+    log: Parameters<typeof mapTemplateCombatLog>[0];
+    potionsConsumed?: readonly { templateId: string; name: string }[];
   };
   rewards: {
     xp: number;
     baseXp: number;
-    loot: unknown[];
-    durabilityLost: unknown[];
-    skillXpGrants: unknown[];
+    loot: readonly { itemTemplateId: string; quantity: number; rarity?: string }[];
+    durabilityLost: readonly { itemId: string; amount: number }[];
+    skillXpGrants: readonly Record<string, unknown>[];
   };
-  eventModifiers: unknown[];
-  potionsConsumed?: unknown[];
+  eventModifiers: readonly { effectType: string; effectValue: number; title: string }[];
+  potionsConsumed?: readonly { templateId: string; name: string }[];
 }
 
 export function buildCombatLogResult(params: CombatLogResultParams): Prisma.InputJsonValue {
@@ -347,7 +345,7 @@ export function buildCombatLogResult(params: CombatLogResultParams): Prisma.Inpu
     outcome: params.combatResult.outcome,
     playerMaxHp: params.combatResult.combatantAMaxHp,
     mobMaxHp: params.combatResult.combatantBMaxHp,
-    log: mapTemplateCombatLog(params.combatResult.log as Parameters<typeof mapTemplateCombatLog>[0]),
+    log: mapTemplateCombatLog(params.combatResult.log),
     rewards: params.rewards,
     eventModifiers: params.eventModifiers,
     ...(params.potionsConsumed ? { potionsConsumed: params.potionsConsumed } : {}),

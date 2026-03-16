@@ -258,7 +258,7 @@ Existing `ChatPanel` overlay + Socket.IO infrastructure. Needs:
 
 ### What's Fully Working (End-to-End)
 
-**Resource Events — `yield_up`**: Templates exist → scheduler spawns them on wild zones → gathering route applies `resourceYieldMultiplier` via `applyResourceEventModifiers()` → players get increased yield when mining during active events.
+**Resource Events — `yield_up`**: Templates exist → scheduler spawns them on wild zones → gathering route applies `resourceYieldMultiplier` inline via `zoneModifiers` from `worldEventService` → players get increased yield when mining during active events.
 
 **Mob Events — `damage_up`, `hp_down`, `hp_up`, `spawn_rate_up`**: Templates exist → scheduler spawns them → both combat route AND exploration route call `getActiveZoneModifiers()` and apply `applyMobEventModifiers()` to scale mob damage/HP before combat resolution. Works for direct combat and exploration ambushes.
 

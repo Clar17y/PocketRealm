@@ -24,7 +24,7 @@ export async function getCooldownRemaining(playerId: string): Promise<number> {
   return ttl > 0 ? ttl : 0;
 }
 
-export type TrainingCombatResult = Omit<TemplateCombatResult, 'log'> & {
+type TrainingCombatResult = Omit<TemplateCombatResult, 'log'> & {
   log: ReturnType<typeof mapTemplateCombatLog>;
 };
 
@@ -111,7 +111,7 @@ export async function simulateFight(
   });
 
   // Build mob TemplateCombatant
-  const mobTemplate = toMobTemplate(mob as Record<string, unknown>);
+  const mobTemplate = toMobTemplate(mob);
   const finalMob = applyMobPrefix(mobTemplate, prefix);
   const mobCombatant = mobToTemplateCombatant(finalMob);
 

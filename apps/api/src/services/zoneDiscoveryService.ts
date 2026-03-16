@@ -1,4 +1,14 @@
-import { prisma } from '@pocketrealm/database';
+import { Prisma, prisma } from '@pocketrealm/database';
+
+/** Shape of a mob entry stored in the encounterSite JSON `mobs` column. */
+interface EncounterSiteMob {
+  slot: number;
+  mobTemplateId: string;
+  role: string;
+  prefix: string | null;
+  status: string;
+  room?: number;
+}
 
 /** Ensure starter zone + town-adjacent discoveries exist for a player. */
 export async function ensureStarterDiscoveries(playerId: string): Promise<void> {
@@ -102,7 +112,7 @@ export async function ensureStarterEncounterAndNodes(playerId: string): Promise<
   });
   if (!fieldMouse) return;
 
-  const mobs = [
+  const mobs: EncounterSiteMob[] = [
     { slot: 0, mobTemplateId: fieldMouse.id, role: 'trash', prefix: null, status: 'alive', room: 1 },
   ];
 
@@ -115,7 +125,7 @@ export async function ensureStarterEncounterAndNodes(playerId: string): Promise<
       mobFamilyId: zoneMobFamily.mobFamilyId,
       name: siteName,
       size: 'small',
-      mobs: { mobs },
+      mobs: { mobs } as unknown as Prisma.InputJsonValue,
     },
   });
 }

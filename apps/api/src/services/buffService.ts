@@ -1,4 +1,4 @@
-import { prisma } from '@pocketrealm/database';
+import { prisma, Prisma } from '@pocketrealm/database';
 import type { PlayerBuffData } from '@pocketrealm/shared';
 
 export interface CombatBuffs {
@@ -8,13 +8,13 @@ export interface CombatBuffs {
 }
 
 export async function getActiveBuffs(playerId: string): Promise<PlayerBuffData[]> {
-  const buffs = await (prisma as any).playerBuff.findMany({
+  const buffs = await prisma.playerBuff.findMany({
     where: { playerId },
     include: { shopItem: { select: { name: true } } },
     orderBy: { createdAt: 'asc' },
   });
 
-  return buffs.map((b: any) => ({
+  return buffs.map((b) => ({
     id: b.id,
     buffType: b.buffType,
     remainingUses: b.remainingUses,
@@ -25,7 +25,7 @@ export async function getActiveBuffs(playerId: string): Promise<PlayerBuffData[]
 }
 
 export async function getBuffValue(playerId: string, buffType: string): Promise<number> {
-  const buff = await (prisma as any).playerBuff.findUnique({
+  const buff = await prisma.playerBuff.findUnique({
     where: { playerId_buffType: { playerId, buffType } },
     select: { bonusValue: true },
   });
@@ -33,7 +33,7 @@ export async function getBuffValue(playerId: string, buffType: string): Promise<
 }
 
 export async function hasActiveBuff(playerId: string, buffType: string): Promise<boolean> {
-  const buff = await (prisma as any).playerBuff.findUnique({
+  const buff = await prisma.playerBuff.findUnique({
     where: { playerId_buffType: { playerId, buffType } },
     select: { id: true },
   });
@@ -44,7 +44,7 @@ export async function hasActiveBuff(playerId: string, buffType: string): Promise
  * Decrement a buff's remaining uses. Deletes the buff when it hits 0.
  * Must be called within a Prisma transaction.
  */
-export async function consumeBuff(tx: any, playerId: string, buffType: string): Promise<void> {
+export async function consumeBuff(tx: Prisma.TransactionClient, playerId: string, buffType: string): Promise<void> {
   const updated = await tx.playerBuff.update({
     where: { playerId_buffType: { playerId, buffType } },
     data: { remainingUses: { decrement: 1 } },
@@ -59,7 +59,7 @@ export async function consumeBuff(tx: any, playerId: string, buffType: string): 
  * Returns the bonus value (0 if no buff).
  * Must be called within a Prisma transaction.
  */
-export async function consumeBuffIfActive(tx: any, playerId: string, buffType: string): Promise<number> {
+export async function consumeBuffIfActive(tx: Prisma.TransactionClient, playerId: string, buffType: string): Promise<number> {
   const buff = await tx.playerBuff.findUnique({
     where: { playerId_buffType: { playerId, buffType } },
     select: { bonusValue: true, id: true },
@@ -78,11 +78,11 @@ export async function consumeBuffIfActive(tx: any, playerId: string, buffType: s
 
 /** Fetch all combat-related buff values for a player (single query). */
 export async function getCombatBuffs(playerId: string): Promise<CombatBuffs> {
-  const buffs = await (prisma as any).playerBuff.findMany({
+  const buffs = await prisma.playerBuff.findMany({
     where: { playerId, buffType: { in: ['combat_damage', 'combat_defence', 'durability_shield'] } },
     select: { buffType: true, bonusValue: true },
   });
-  const map = new Map<string, number>(buffs.map((b: any) => [b.buffType as string, b.bonusValue as number]));
+  const map = new Map<string, number>(buffs.map((b) => [b.buffType, b.bonusValue]));
   return {
     damageBoost: map.get('combat_damage') ?? 0,
     defenceBoost: map.get('combat_defence') ?? 0,
@@ -90,7 +90,7 @@ export async function getCombatBuffs(playerId: string): Promise<CombatBuffs> {
   };
 }
 
-export interface CombatBuffRemainingUses {
+interface CombatBuffRemainingUses {
   damage: number;
   defence: number;
   durability: number;
@@ -98,7 +98,7 @@ export interface CombatBuffRemainingUses {
 
 /** Fetch combat buff bonus values AND remaining use counts in a single query. */
 export async function getCombatBuffsWithUses(playerId: string): Promise<{ buffs: CombatBuffs; uses: CombatBuffRemainingUses }> {
-  const rows = await (prisma as any).playerBuff.findMany({
+  const rows = await prisma.playerBuff.findMany({
     where: { playerId, buffType: { in: ['combat_damage', 'combat_defence', 'durability_shield'] } },
     select: { buffType: true, bonusValue: true, remainingUses: true },
   });
@@ -114,7 +114,7 @@ export async function getCombatBuffsWithUses(playerId: string): Promise<{ buffs:
 
 /** Consume one charge of each active combat buff. Mutates `uses` in place. */
 export async function consumeBuffChargesPerMob(
-  tx: any,
+  tx: Prisma.TransactionClient,
   playerId: string,
   uses: CombatBuffRemainingUses,
 ): Promise<void> {
@@ -139,7 +139,7 @@ export function applyCombatBuffs(
 
 /** Consume all active combat buffs in a transaction. */
 export async function consumeCombatBuffs(
-  tx: any,
+  tx: Prisma.TransactionClient,
   playerId: string,
   buffs: CombatBuffs,
 ): Promise<void> {
@@ -150,7 +150,7 @@ export async function consumeCombatBuffs(
 
 /** Consume a buff in its own transaction when the caller has no transaction context. */
 export async function consumeBuffStandalone(playerId: string, buffType: string): Promise<void> {
-  await (prisma as any).$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx) => {
     await consumeBuffIfActive(tx, playerId, buffType);
   });
 }

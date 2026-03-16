@@ -12,7 +12,7 @@ interface BossBestiaryEntry {
   rotation: Array<{ round: number; actionName: string; targetMode: string; isTelegraphed: boolean }> | null;
 }
 
-export interface WorldBossBestiaryResponse {
+interface WorldBossBestiaryResponse {
   bosses: BossBestiaryEntry[];
 }
 

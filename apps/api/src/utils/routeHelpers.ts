@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import type { MobTemplate, CombatOptions, CombatPotion } from '@pocketrealm/shared';
+import type { MobTemplate as PrismaMobTemplate } from '@pocketrealm/database';
+import type { MobTemplate, SpellAction, DamageType, CombatOptions, CombatPotion } from '@pocketrealm/shared';
 import { calculateFleeResult } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler.js';
 import { getHpState, setHp, enterRecoveringState } from '../services/hpService.js';
@@ -179,13 +180,26 @@ export async function getOwnedItem(
 
 // ── Mob template coercion ────────────────────────────────────────────
 
-export function toMobTemplate(raw: Record<string, unknown>): MobTemplate {
+export function toMobTemplate(raw: PrismaMobTemplate): MobTemplate {
   return {
-    ...raw,
+    id: raw.id,
+    name: raw.name,
+    zoneId: raw.zoneId,
+    level: raw.level,
+    hp: raw.hp,
+    accuracy: raw.accuracy,
+    defence: raw.defence,
+    magicDefence: raw.magicDefence,
+    evasion: raw.evasion,
+    damageMin: raw.damageMin,
+    damageMax: raw.damageMax,
+    xpReward: raw.xpReward,
+    encounterWeight: raw.encounterWeight,
     spellPattern: Array.isArray(raw.spellPattern)
-      ? (raw.spellPattern as MobTemplate['spellPattern'])
+      ? (raw.spellPattern as unknown as SpellAction[])
       : [],
-  } as MobTemplate;
+    damageType: raw.damageType as DamageType,
+  };
 }
 
 // ── Flee with gold loss ──────────────────────────────────────────────

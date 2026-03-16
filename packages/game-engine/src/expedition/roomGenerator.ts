@@ -4,22 +4,11 @@ import type {
   ExpeditionMobState,
   ExpeditionTheme,
   ExpeditionThemeMob,
-  CombatantStats,
-  BossTemplateAction,
 } from '@pocketrealm/shared';
 import {
   EXPEDITION_ROOM_COMPOSITIONS,
   EXPEDITION_CONSTANTS,
 } from '@pocketrealm/shared';
-
-/** @deprecated Use ExpeditionTheme roster instead. Kept for expeditionService compatibility. */
-export interface MobPoolEntry {
-  mobTemplateId: string;
-  name: string;
-  level: number;
-  hp: number;
-  stats: CombatantStats;
-}
 
 const MAX_TIER_INDEX = 2;
 
@@ -58,7 +47,7 @@ function buildMobFromTheme(
     hp: themeMob.hp,
     maxHp: themeMob.hp,
     stats: { ...themeMob.stats, hp: themeMob.hp, maxHp: themeMob.hp },
-    actionTemplate: themeMob.actionTemplate as BossTemplateAction[],
+    actionTemplate: themeMob.actionTemplate,
     activeEffects: [],
   };
 }
@@ -113,10 +102,10 @@ function generateMobsForRoom(
       const bossThemeMob = theme.finalBoss.mob;
       const bossMob = buildMobFromTheme(bossThemeMob, roomIndex, 0, templateIdMap);
       bossMob.phaseTemplates = [
-        { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[1], template: theme.finalBoss.phase3 as BossTemplateAction[] },
-        { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[0], template: theme.finalBoss.phase2 as BossTemplateAction[] },
+        { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[1], template: theme.finalBoss.phase3 },
+        { hpThreshold: EXPEDITION_CONSTANTS.BOSS_PHASE_THRESHOLDS[0], template: theme.finalBoss.phase2 },
       ];
-      bossMob.actionTemplate = theme.finalBoss.phase1 as BossTemplateAction[];
+      bossMob.actionTemplate = theme.finalBoss.phase1;
       mobs.push(bossMob);
       break;
     }

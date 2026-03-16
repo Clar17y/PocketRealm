@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@pocketrealm/database';
+import { prisma, Prisma, type GuildMember, type Guild } from '@pocketrealm/database';
 import {
   GUILD_CONSTANTS, GuildData, GuildMemberData, GuildLogEntry, GuildSearchResult,
   type GuildRecruitmentMode, type GuildRole, type GuildSpecialization,
@@ -107,11 +107,11 @@ export async function addGuildLog(
   eventType: string,
   message: string,
   metadata?: Record<string, unknown>,
-  tx?: any,
+  tx?: Prisma.TransactionClient,
 ): Promise<void> {
   const client = tx ?? prisma;
   await client.guildLog.create({
-    data: { guildId, eventType, message, metadata: metadata ?? undefined },
+    data: { guildId, eventType, message, metadata: (metadata ?? undefined) as Prisma.InputJsonValue | undefined },
   });
 }
 
@@ -143,7 +143,7 @@ export async function createGuild(
   }
 
   // All race-sensitive checks and turn spend inside a single transaction
-  const guild = await prisma.$transaction(async (tx: any) => {
+  const guild = await prisma.$transaction(async (tx) => {
     const existing = await tx.guildMember.findUnique({ where: { playerId } });
     if (existing) throw new AppError(400, 'Already in a guild', 'ALREADY_IN_GUILD');
 
@@ -207,7 +207,7 @@ export async function getPlayerGuild(
   if (!membership) return null;
 
   // Look up leader username
-  const leaderMember = membership.guild.members.find((m: any) => m.role === 'leader');
+  const leaderMember = membership.guild.members.find((m) => m.role === 'leader');
   const guildWithLeader = { ...membership.guild, leaderUsername: leaderMember?.player?.username };
 
   return {
@@ -259,7 +259,7 @@ export async function searchGuilds(
   ]);
 
   return {
-    guilds: guilds.map((g: any) => ({
+    guilds: guilds.map((g) => ({
       id: g.id,
       name: g.name,
       tag: g.tag,
@@ -267,10 +267,10 @@ export async function searchGuilds(
       level: g.level,
       memberCount: g._count.members,
       maxMembers: calculateMaxMembers(g.level),
-      recruitmentMode: g.recruitmentMode,
+      recruitmentMode: g.recruitmentMode as GuildRecruitmentMode,
       minLevelRequirement: g.minLevelRequirement,
       taxRate: g.taxRate,
-      specialization: g.specialization,
+      specialization: g.specialization as GuildSpecialization | null,
     })),
     total,
     page,
@@ -281,7 +281,7 @@ export async function searchGuilds(
 // Role check (shared with guildMembershipService)
 // ---------------------------------------------------------------------------
 
-export async function requireRole(playerId: string, minRole: 'leader' | 'officer'): Promise<any> {
+export async function requireRole(playerId: string, minRole: 'leader' | 'officer'): Promise<GuildMember & { guild: Guild }> {
   const membership = await prisma.guildMember.findUnique({
     where: { playerId },
     include: { guild: true },
@@ -377,11 +377,11 @@ export async function getGuildLog(
   ]);
 
   return {
-    entries: logs.map((l: any) => ({
+    entries: logs.map((l) => ({
       id: l.id,
       eventType: l.eventType,
       message: l.message,
-      metadata: l.metadata,
+      metadata: l.metadata as Record<string, unknown> | null,
       createdAt: l.createdAt instanceof Date ? l.createdAt.toISOString() : l.createdAt,
     })),
     total,

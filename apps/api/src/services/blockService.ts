@@ -23,37 +23,21 @@ export async function blockPlayer(blockerId: string, targetId: string): Promise<
     throw new AppError(404, 'Player not found', 'NOT_FOUND');
   }
 
-  const existing = await prisma.playerBlock.findUnique({
-    where: { blockerId_blockedId: { blockerId, blockedId: targetId } },
-    select: { id: true },
-  });
-  if (existing) {
-    throw new AppError(400, 'Already blocked', 'ALREADY_BLOCKED');
-  }
-
   await prisma.$transaction(async (tx) => {
-    await tx.playerBlock.create({
-      data: { blockerId, blockedId: targetId },
+    // Use upsert to eliminate TOCTOU race: concurrent calls both pass the
+    // existence check when it runs outside the transaction.
+    await tx.playerBlock.upsert({
+      where: { blockerId_blockedId: { blockerId, blockedId: targetId } },
+      create: { blockerId, blockedId: targetId },
+      update: {}, // no-op if already exists
     });
 
-    // Remove any existing friendship (either direction)
+    // Remove any existing friendship or pending request (either direction)
     await tx.friendship.deleteMany({
       where: {
-        status: 'accepted',
         OR: [
           { senderId: blockerId, receiverId: targetId },
           { senderId: targetId, receiverId: blockerId },
-        ],
-      },
-    });
-
-    // Delete any pending requests between the two players (both directions)
-    await tx.friendship.deleteMany({
-      where: {
-        status: 'pending',
-        OR: [
-          { senderId: targetId, receiverId: blockerId },
-          { senderId: blockerId, receiverId: targetId },
         ],
       },
     });

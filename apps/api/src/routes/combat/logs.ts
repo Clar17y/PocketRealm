@@ -7,6 +7,7 @@ import { enrichLootWithNames } from '../../services/lootService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { lootDropWithNameSchema } from './helpers';
 import { paginationSchema, buildPagination } from '../../utils/routeHelpers.js';
+import { parseJsonRecord } from '../../utils/jsonColumnSchemas';
 
 const logParamsSchema = z.object({
   id: z.string().uuid(),
@@ -92,9 +93,7 @@ export function registerLogRoutes(router: Router): void {
 
       const whereClause = Prisma.sql`WHERE ${Prisma.join(whereParts, ' AND ')}`;
       const offset = (query.page - 1) * query.pageSize;
-      const listRowsQuery = query.sort === 'xp'
-        ? Prisma.sql`
-            SELECT
+      const selectColumns = Prisma.sql`
               "id",
               "created_at" AS "createdAt",
               ("result"->>'zoneId') AS "zoneId",
@@ -123,47 +122,15 @@ export function registerLogRoutes(router: Router): void {
               ), 0) AS "roundCount",
               COALESCE(("result"->>'fightCount')::int, 1) AS "fightCount",
               ("result"->>'encounterSiteId') AS "encounterSiteId",
-              ("result"->>'mobFamilyName') AS "mobFamilyName"
+              ("result"->>'mobFamilyName') AS "mobFamilyName"`;
+      const orderBy = query.sort === 'xp'
+        ? Prisma.sql`ORDER BY COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) DESC, "created_at" DESC`
+        : Prisma.sql`ORDER BY "created_at" DESC`;
+      const listRowsQuery = Prisma.sql`
+            SELECT ${selectColumns}
             FROM "activity_logs"
             ${whereClause}
-            ORDER BY COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) DESC, "created_at" DESC
-            LIMIT ${query.pageSize}
-            OFFSET ${offset}
-          `
-        : Prisma.sql`
-            SELECT
-              "id",
-              "created_at" AS "createdAt",
-              ("result"->>'zoneId') AS "zoneId",
-              ("result"->>'zoneName') AS "zoneName",
-              ("result"->>'mobTemplateId') AS "mobTemplateId",
-              ("result"->>'mobName') AS "mobName",
-              COALESCE(("result"->>'mobDisplayName'), ("result"->>'mobName')) AS "mobDisplayName",
-              ("result"->>'outcome') AS "outcome",
-              COALESCE(
-                NULLIF(("result"->>'source'), ''),
-                CASE
-                  WHEN COALESCE(("result"->>'encounterSiteId'), '') <> '' THEN 'encounter_site'
-                  ELSE 'zone_combat'
-                END
-              ) AS "source",
-              COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) AS "xpGained",
-              COALESCE((
-                SELECT MAX(
-                  CASE
-                    WHEN jsonb_typeof(log_entry->'round') = 'number'
-                      THEN (log_entry->>'round')::int
-                    ELSE 0
-                  END
-                )
-                FROM jsonb_array_elements(COALESCE("result"->'log', '[]'::jsonb)) AS log_entry
-              ), 0) AS "roundCount",
-              COALESCE(("result"->>'fightCount')::int, 1) AS "fightCount",
-              ("result"->>'encounterSiteId') AS "encounterSiteId",
-              ("result"->>'mobFamilyName') AS "mobFamilyName"
-            FROM "activity_logs"
-            ${whereClause}
-            ORDER BY "created_at" DESC
+            ${orderBy}
             LIMIT ${query.pageSize}
             OFFSET ${offset}
           `;
@@ -251,7 +218,7 @@ export function registerLogRoutes(router: Router): void {
       throw new AppError(404, 'Combat log not found', 'NOT_FOUND');
     }
 
-    const result = summaryLog.result as Record<string, unknown>;
+    const result = parseJsonRecord<unknown>(summaryLog.result, 'summaryLog.result');
     if (result.source !== 'encounter_site') {
       throw new AppError(400, 'Not an encounter site summary log', 'INVALID_SOURCE');
     }
@@ -328,14 +295,14 @@ export function registerLogRoutes(router: Router): void {
 
       let combat = log.result;
       if (combat && typeof combat === 'object' && !Array.isArray(combat)) {
-        const combatRecord = combat as Record<string, unknown>;
+        const combatRecord = parseJsonRecord<unknown>(combat, 'combat.result');
         const rewards = combatRecord.rewards;
 
         if (rewards && typeof rewards === 'object' && !Array.isArray(rewards)) {
-          const rewardsRecord = rewards as Record<string, unknown>;
+          const rewardsRecord = parseJsonRecord<unknown>(rewards, 'combat.rewards');
           const lootUnknown = rewardsRecord.loot;
           const siteCompletionUnknown = rewardsRecord.siteCompletion;
-          let nextRewards = rewardsRecord;
+          let nextRewards: Record<string, unknown> = rewardsRecord;
           if (Array.isArray(lootUnknown)) {
             const parsedLoot = lootUnknown
               .map((entry) => lootDropWithNameSchema.safeParse(entry))
@@ -350,7 +317,7 @@ export function registerLogRoutes(router: Router): void {
           }
 
           if (siteCompletionUnknown && typeof siteCompletionUnknown === 'object' && !Array.isArray(siteCompletionUnknown)) {
-            const siteCompletionRecord = siteCompletionUnknown as Record<string, unknown>;
+            const siteCompletionRecord = parseJsonRecord<unknown>(siteCompletionUnknown, 'combat.siteCompletion');
             const chestLootUnknown = siteCompletionRecord.loot;
             if (Array.isArray(chestLootUnknown)) {
               const parsedChestLoot = chestLootUnknown
@@ -379,7 +346,7 @@ export function registerLogRoutes(router: Router): void {
         if (Array.isArray(combatRecord.log)) {
           combat = {
             ...(combat as Record<string, unknown>),
-            log: mapTemplateCombatLog(combatRecord.log),
+            log: mapTemplateCombatLog(combatRecord.log as Record<string, unknown>[]),
           } as unknown as Prisma.JsonValue;
         }
       }

@@ -23,7 +23,7 @@ export function isItemType(value: string): value is ItemType {
   return value === 'weapon' || value === 'armor' || value === 'resource' || value === 'consumable';
 }
 
-export function isItemRarity(value: string): value is ItemRarity {
+function isItemRarity(value: string): value is ItemRarity {
   return value === 'common' || value === 'uncommon' || value === 'rare' || value === 'epic' || value === 'legendary';
 }
 
@@ -162,7 +162,7 @@ export function normalizeBonusStats(value: unknown): ItemStats {
 
 // ── Sacrificial item validation ──────────────────────────────────────
 
-export interface SacrificialItemMatch {
+interface SacrificialItemMatch {
   id: string;
   templateId: string;
   rarity: string;
@@ -181,7 +181,7 @@ export async function getValidatedSacrificialItem(params: {
     throw new AppError(400, 'Sacrificial item must be different from target item', 'FORGE_INVALID_SACRIFICE');
   }
 
-  const sacrificial = await (prisma as any).item.findUnique({
+  const sacrificial = await prisma.item.findUnique({
     where: { id: params.sacrificialItemId },
     include: { template: true },
   });

@@ -11,14 +11,14 @@ import { FULL_CLEAR_CONSTANTS, type LootDrop } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantDropsTx, type DropTableEntry, type DropGrantResult } from './dropRollingService';
 
-export interface RecipeUnlockReward {
+interface RecipeUnlockReward {
   recipeId: string;
   resultTemplateId: string;
   recipeName: string;
   soulbound: boolean;
 }
 
-export interface EncounterSiteChestRewards {
+interface EncounterSiteChestRewards {
   chestRarity: ChestRarity;
   materialRolls: number;
   loot: LootDrop[];
@@ -37,7 +37,6 @@ export async function grantEncounterSiteChestRewardsTx(
     availableSlots?: number;
   }
 ): Promise<EncounterSiteChestRewards> {
-  const txAny = tx as unknown as any;
   const effectiveSize = params.fullClearBonus && FULL_CLEAR_CONSTANTS.CHEST_TIER_UPGRADE
     ? getUpgradedChestSize(params.size)
     : params.size;
@@ -48,7 +47,7 @@ export async function grantEncounterSiteChestRewardsTx(
     ? Math.ceil(baseRolls * FULL_CLEAR_CONSTANTS.DROP_MULTIPLIER)
     : baseRolls;
 
-  const dropEntries = (await txAny.chestDropTable.findMany({
+  const dropEntries = await tx.chestDropTable.findMany({
     where: {
       mobFamilyId: params.mobFamilyId,
       chestRarity,
@@ -62,7 +61,7 @@ export async function grantEncounterSiteChestRewardsTx(
         },
       },
     },
-  })) as DropTableEntry[];
+  });
 
   const dropResult = await rollAndGrantDropsTx(tx, params.playerId, dropEntries, materialRolls, 'common', params.availableSlots);
 
@@ -73,7 +72,7 @@ export async function grantEncounterSiteChestRewardsTx(
     : baseRecipeChance;
   const rolledRecipe = Math.random() < recipeChance;
   if (rolledRecipe) {
-    const advancedRecipes = (await txAny.craftingRecipe.findMany({
+    const advancedRecipes = await tx.craftingRecipe.findMany({
       where: {
         isAdvanced: true,
         mobFamilyId: params.mobFamilyId,
@@ -87,28 +86,23 @@ export async function grantEncounterSiteChestRewardsTx(
         },
       },
       orderBy: [{ requiredLevel: 'asc' }, { id: 'asc' }],
-    })) as Array<{
-      id: string;
-      resultTemplateId: string;
-      soulbound: boolean;
-      resultTemplate: { name: string };
-    }>;
+    });
 
     if (advancedRecipes.length > 0) {
-      const known = (await txAny.playerRecipe.findMany({
+      const known = await tx.playerRecipe.findMany({
         where: {
           playerId: params.playerId,
           recipeId: { in: advancedRecipes.map((recipe) => recipe.id) },
         },
         select: { recipeId: true },
-      })) as Array<{ recipeId: string }>;
+      });
 
       const knownRecipeIds = new Set(known.map((entry) => entry.recipeId));
       const unknownRecipes = advancedRecipes.filter((recipe) => !knownRecipeIds.has(recipe.id));
 
       if (unknownRecipes.length > 0) {
         const pickedRecipe = unknownRecipes[randomIntInclusive(0, unknownRecipes.length - 1)]!;
-        await txAny.playerRecipe.create({
+        await tx.playerRecipe.create({
           data: {
             playerId: params.playerId,
             recipeId: pickedRecipe.id,
