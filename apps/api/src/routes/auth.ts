@@ -37,6 +37,8 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
+const refreshSchema = z.object({ refreshToken: z.string().min(1) });
+
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
@@ -297,12 +299,8 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
 }));
 
 authRouter.post('/refresh', asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
+  const { refreshToken } = refreshSchema.parse(req.body);
   const now = new Date();
-
-  if (!refreshToken) {
-    throw new AppError(400, 'Refresh token required', 'MISSING_TOKEN');
-  }
 
   // Verify token
   const payload = verifyRefreshToken(refreshToken);
@@ -358,11 +356,11 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
 }));
 
 authRouter.post('/logout', asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
+  const parsed = refreshSchema.safeParse(req.body);
 
-  if (refreshToken) {
+  if (parsed.success) {
     await prisma.refreshToken.deleteMany({
-      where: { token: refreshToken },
+      where: { token: parsed.data.refreshToken },
     });
   }
 
