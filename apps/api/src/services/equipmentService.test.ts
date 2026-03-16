@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('./cacheService', () => ({
+  cachedQuery: vi.fn((_key: string, fetcher: () => Promise<unknown>) => fetcher()),
+  invalidateCache: vi.fn(),
+}));
+
 import { mockPrisma } from '../__test__/setup';
 import {
   isSkillType,

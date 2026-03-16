@@ -6,6 +6,7 @@ import {
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';
+import { cachedQuery, invalidateCache } from './cacheService';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -216,12 +217,25 @@ export async function getPlayerGuild(
   };
 }
 
+const guildIdCacheKey = (playerId: string) => `guild:member:${playerId}`;
+
+/** Invalidate the guild ID cache for one or more players. Call after transactions commit. */
+export async function invalidateGuildIdCache(...playerIds: string[]): Promise<void> {
+  await invalidateCache(...playerIds.map(guildIdCacheKey));
+}
+
 export async function getPlayerGuildId(playerId: string): Promise<string | null> {
-  const membership = await prisma.guildMember.findUnique({
-    where: { playerId },
-    select: { guildId: true },
-  });
-  return membership?.guildId ?? null;
+  return cachedQuery(
+    guildIdCacheKey(playerId),
+    async () => {
+      const membership = await prisma.guildMember.findUnique({
+        where: { playerId },
+        select: { guildId: true },
+      });
+      return membership?.guildId ?? null;
+    },
+    300,
+  );
 }
 
 export async function searchGuilds(
