@@ -260,8 +260,6 @@ export async function splitAndGrantXp(
   resourceCostByScalingStat: { melee: number; ranged: number; magic: number } | undefined,
   guildXpBoost: number | undefined,
 ): Promise<GrantXpResult[]> {
-  const boost = guildXpBoost ?? undefined;
-
   // Compute contribution per skill: damage + weighted resource cost
   const contribution = { melee: 0, ranged: 0, magic: 0 };
   if (damageByScalingStat) {
@@ -278,13 +276,13 @@ export async function splitAndGrantXp(
 
   const totalContribution = contribution.melee + contribution.ranged + contribution.magic;
   if (totalContribution <= 0) {
-    return [await grantSkillXp(playerId, fallbackSkill, totalXp, undefined, boost)];
+    return [await grantSkillXp(playerId, fallbackSkill, totalXp, undefined, guildXpBoost)];
   }
 
   // Find skills that contributed
   const skills = (['melee', 'ranged', 'magic'] as const).filter(s => contribution[s] > 0);
   if (skills.length === 1) {
-    return [await grantSkillXp(playerId, skills[0], totalXp, undefined, boost)];
+    return [await grantSkillXp(playerId, skills[0], totalXp, undefined, guildXpBoost)];
   }
 
   // Distribute with floor, give remainder to highest-contribution skill
@@ -300,7 +298,7 @@ export async function splitAndGrantXp(
   const results: GrantXpResult[] = [];
   for (const skill of skills) {
     if (xpBySkill[skill] > 0) {
-      results.push(await grantSkillXp(playerId, skill, xpBySkill[skill], undefined, boost));
+      results.push(await grantSkillXp(playerId, skill, xpBySkill[skill], undefined, guildXpBoost));
     }
   }
   return results;

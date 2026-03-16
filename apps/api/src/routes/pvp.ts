@@ -97,9 +97,7 @@ pvpRouter.post('/challenge', asyncHandler(async (req, res) => {
     });
     await emitAchievementNotifications(result.winnerId, pvpAchievements);
 
-    void trackProgress(result.winnerId, 'pvp_wins', 1).catch(err =>
-      console.warn('trackProgress failed', { err, playerId: result.winnerId, metric: 'pvp_wins' })
-    );
+    void trackProgress(result.winnerId, 'pvp_wins', 1);
   }
 
   // Track pvp_damage for both combatants (quest: "Deal X damage in the arena")
@@ -112,14 +110,10 @@ pvpRouter.post('/challenge', asyncHandler(async (req, res) => {
     .reduce((sum: number, e: { damage?: number }) => sum + (e.damage ?? 0), 0);
 
   if (attackerDamage > 0) {
-    void trackProgress(playerId, 'pvp_damage', attackerDamage).catch(err =>
-      console.warn('trackProgress failed', { err, playerId, metric: 'pvp_damage' })
-    );
+    void trackProgress(playerId, 'pvp_damage', attackerDamage);
   }
   if (defenderDamage > 0) {
-    void trackProgress(body.targetId, 'pvp_damage', defenderDamage).catch(err =>
-      console.warn('trackProgress failed', { err, playerId: body.targetId, metric: 'pvp_damage' })
-    );
+    void trackProgress(body.targetId, 'pvp_damage', defenderDamage);
   }
 
   res.json(result);
