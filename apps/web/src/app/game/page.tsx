@@ -53,6 +53,7 @@ import {
 } from '@/lib/tutorial';
 import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
+import { applyStateUpdates } from './applyStateUpdates';
 import { GuildScreen } from '@/components/screens/GuildScreen';
 import { FriendsScreen } from '@/components/screens/FriendsScreen';
 import { MailScreen } from '@/components/screens/MailScreen';
@@ -290,6 +291,7 @@ export default function GamePage() {
     cancelAbandonLoot,
     lootRevealItems,
     handleDismissLootReveal,
+    stateSetters,
   } = useGameController({ isAuthenticated });
 
   useRateLimitToast();
@@ -992,9 +994,8 @@ export default function GamePage() {
             currentTurns={turns}
             playerId={player?.id ?? null}
             isInTown={currentZone?.zoneType === 'town'}
-            onTurnsChanged={() => void loadTurnsAndHp()}
+            onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onNotificationsChanged={() => void loadPvpNotificationCount()}
-            onHpChanged={() => void loadTurnsAndHp()}
             onNavigate={(s) => setActiveScreen(s as Screen)}
             combatSpeedMs={combatLogSpeedMs}
           />
