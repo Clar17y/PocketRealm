@@ -58,7 +58,7 @@ import { serializeXpGrant, toMobTemplate, assertCanAct, assertInZone, trackAchie
 import { getCombatBuffs, getCombatBuffsWithUses, applyCombatBuffs, consumeCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges } from '../../services/buffService';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
-import { buildStateUpdates, fetchItemDTOs } from '../../services/stateUpdateHelpers.js';
+import { buildStateUpdates, fetchItemDTOs, fetchMaterialTotals } from '../../services/stateUpdateHelpers.js';
 import {
   startSchema,
   pickWeighted,
@@ -408,12 +408,13 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       });
     }
 
-    await deductConsumedPotions(playerId, allPotionsConsumed, tx);
-    return { turnSpend: spent, siteCompletionRewards: completionRewards };
+    const potionDeductResult = await deductConsumedPotions(playerId, allPotionsConsumed, tx);
+    return { turnSpend: spent, siteCompletionRewards: completionRewards, potionDeductResult };
   });
 
   const turnSpend = txResult.turnSpend;
   const siteCompletionRewards = txResult.siteCompletionRewards;
+  const sitePotionDeductResult = txResult.potionDeductResult;
 
   // Collect chest overflow
   if (siteCompletionRewards?.overflow?.length) {
@@ -607,9 +608,11 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   // --- Build stateUpdates ---
   const damagedItemIds = [...new Set(aggregatedDurabilityLost.map(d => d.itemId))];
-  const [siteStateUpdates, inventoryUpdated] = await Promise.all([
+  const updatedItemIds = [...new Set([...damagedItemIds, ...sitePotionDeductResult.partiallyConsumedIds])];
+  const [siteStateUpdates, inventoryUpdated, materialTotals] = await Promise.all([
     buildStateUpdates(playerId, ['hp', 'skills', 'resources', 'characterProgression', 'buffs']),
-    fetchItemDTOs(damagedItemIds),
+    fetchItemDTOs(updatedItemIds),
+    fetchMaterialTotals(playerId),
   ]);
 
   // --- Response with fights[] array ---
@@ -694,7 +697,9 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     ...(allQuestProgress.length > 0 ? { questProgress: allQuestProgress } : {}),
     stateUpdates: {
       ...siteStateUpdates,
+      ...(sitePotionDeductResult.fullyConsumedIds.length > 0 ? { inventoryRemoved: sitePotionDeductResult.fullyConsumedIds } : {}),
       ...(inventoryUpdated.length > 0 ? { inventoryUpdated } : {}),
+      materialTotals,
     },
   });
 }
@@ -850,11 +855,13 @@ export function registerStartRoutes(router: Router): void {
 
       const combatResult = runTemplateCombat(playerCombatant, mobCombatant, combatOptions);
 
-      const turnSpend = await prisma.$transaction(async (tx) => {
+      const zoneTxResult = await prisma.$transaction(async (tx) => {
         const spent = await spendPlayerTurnsTx(tx, playerId, COMBAT_CONSTANTS.ENCOUNTER_TURN_COST);
-        await deductConsumedPotions(playerId, combatResult.potionsConsumed, tx);
-        return spent;
+        const potionDeductResult = await deductConsumedPotions(playerId, combatResult.potionsConsumed, tx);
+        return { turnSpend: spent, potionDeductResult };
       });
+      const turnSpend = zoneTxResult.turnSpend;
+      const zonePotionDeductResult = zoneTxResult.potionDeductResult;
 
       let loot: LootDrop[] = [];
       let pendingLootSessionId: string | null = null;
@@ -998,9 +1005,11 @@ export function registerStartRoutes(router: Router): void {
 
       // --- Build stateUpdates ---
       const zoneDamagedItemIds = [...new Set(durabilityLost.map(d => d.itemId))];
-      const [zoneStateUpdates, zoneInventoryUpdated] = await Promise.all([
+      const zoneUpdatedItemIds = [...new Set([...zoneDamagedItemIds, ...zonePotionDeductResult.partiallyConsumedIds])];
+      const [zoneStateUpdates, zoneInventoryUpdated, zoneMaterialTotals] = await Promise.all([
         buildStateUpdates(playerId, ['hp', 'skills', 'resources', 'characterProgression', 'buffs']),
-        fetchItemDTOs(zoneDamagedItemIds),
+        fetchItemDTOs(zoneUpdatedItemIds),
+        fetchMaterialTotals(playerId),
       ]);
 
       res.json({
@@ -1058,7 +1067,9 @@ export function registerStartRoutes(router: Router): void {
         ...(zoneQuestProgress.length > 0 ? { questProgress: zoneQuestProgress } : {}),
         stateUpdates: {
           ...zoneStateUpdates,
+          ...(zonePotionDeductResult.fullyConsumedIds.length > 0 ? { inventoryRemoved: zonePotionDeductResult.fullyConsumedIds } : {}),
           ...(zoneInventoryUpdated.length > 0 ? { inventoryUpdated: zoneInventoryUpdated } : {}),
+          materialTotals: zoneMaterialTotals,
         },
       });
   }));
