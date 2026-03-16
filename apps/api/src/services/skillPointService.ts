@@ -8,6 +8,7 @@ import {
 } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
+import { skillPointAllocationsSchema } from '../utils/jsonColumnSchemas';
 
 /**
  * Total skill points earned = sum of (level - 1) for all skills * POINTS_PER_LEVEL.
@@ -24,12 +25,12 @@ async function getTotalPointsEarned(playerId: string): Promise<number> {
 /** Get the player's allocation record, creating one if it doesn't exist. */
 async function getOrCreateAllocation(playerId: string): Promise<{ allocations: Record<string, number> }> {
   const record = await prisma.skillPointAllocation.findUnique({ where: { playerId } });
-  if (record) return { allocations: (record.allocations as Record<string, number>) ?? {} };
+  if (record) return { allocations: skillPointAllocationsSchema.catch({}).parse(record.allocations ?? {}) };
 
   const created = await prisma.skillPointAllocation.create({
     data: { playerId, allocations: {} },
   });
-  return { allocations: (created.allocations as Record<string, number>) ?? {} };
+  return { allocations: skillPointAllocationsSchema.catch({}).parse(created.allocations ?? {}) };
 }
 
 /** Get current skill point state for a player. */
@@ -74,8 +75,8 @@ export async function allocatePoints(playerId: string, nodeId: string): Promise<
 
     const record = await tx.skillPointAllocation.findUnique({ where: { playerId } });
     const allocations: Record<string, number> = record
-      ? ((record.allocations as Record<string, number>) ?? {})
-      : ((await tx.skillPointAllocation.create({ data: { playerId, allocations: {} } })).allocations as Record<string, number>) ?? {};
+      ? skillPointAllocationsSchema.catch({}).parse(record.allocations ?? {})
+      : skillPointAllocationsSchema.catch({}).parse((await tx.skillPointAllocation.create({ data: { playerId, allocations: {} } })).allocations ?? {});
 
     const totalPointsSpent = Object.values(allocations).reduce((sum: number, v: number) => sum + v, 0);
     const availablePoints = totalPointsEarned - totalPointsSpent;

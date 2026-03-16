@@ -19,6 +19,7 @@ import type {
   CasinoResultEvent,
   CasinoPhaseEvent,
 } from '@pocketrealm/shared';
+import { activeRoundSchema, resolvedRoundSchema, safeParseRedisJson } from '../utils/jsonColumnSchemas';
 
 export interface GoldExchangeResult {
   turnsSpent: number;
@@ -70,19 +71,23 @@ const RESULT_DISPLAY_SECONDS = 5;
 async function getOrCreateRound(): Promise<{ roundId: string; startedAt: number; isNew: boolean }> {
   const existing = await redis.get(ROUND_KEY);
   if (existing) {
-    const parsed: ActiveRound = JSON.parse(existing);
-    const elapsed = Date.now() - parsed.startedAt;
-    if (elapsed < CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000) {
-      return { ...parsed, isNew: false };
+    const parsed = safeParseRedisJson(existing, activeRoundSchema, null, 'roulette:current_round');
+    if (parsed) {
+      const elapsed = Date.now() - parsed.startedAt;
+      if (elapsed < CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000) {
+        return { ...parsed, isNew: false };
+      }
+      await resolveRound(parsed.roundId);
     }
-    await resolveRound(parsed.roundId);
   }
 
   // Don't create a new round while the result is still being displayed
   const resolved = await redis.get(RESULT_KEY);
   if (resolved) {
-    const parsed = JSON.parse(resolved);
-    return { roundId: parsed.roundId, startedAt: parsed.startedAt, isNew: false };
+    const parsed = safeParseRedisJson(resolved, resolvedRoundSchema, null, 'roulette:resolved_round');
+    if (parsed) {
+      return { roundId: parsed.roundId, startedAt: parsed.startedAt, isNew: false };
+    }
   }
 
   const round = await prisma.rouletteRound.create({ data: {} });
@@ -189,8 +194,9 @@ async function resolveRound(roundId: string): Promise<number> {
   }
 
   // Keep the resolved round visible for a few seconds before allowing a new round
-  const parsed = await redis.get(ROUND_KEY);
-  const startedAt = parsed ? JSON.parse(parsed).startedAt : Date.now();
+  const rawRound = await redis.get(ROUND_KEY);
+  const parsedRound = safeParseRedisJson(rawRound, activeRoundSchema, null, 'roulette:current_round');
+  const startedAt = parsedRound?.startedAt ?? Date.now();
   await redis.del(ROUND_KEY);
   await redis.set(RESULT_KEY, JSON.stringify({ roundId, startedAt, result }), 'EX', RESULT_DISPLAY_SECONDS);
 
@@ -224,9 +230,10 @@ async function emitPhaseIfChanged(
 
 export async function getCurrentRound(): Promise<RouletteRoundState> {
   // Check if we're in the result display window
-  const resolved = await redis.get(RESULT_KEY);
-  if (resolved) {
-    const { roundId, startedAt, result: resolvedResult } = JSON.parse(resolved);
+  const resolvedRaw = await redis.get(RESULT_KEY);
+  if (resolvedRaw) {
+    const resolvedData = safeParseRedisJson(resolvedRaw, resolvedRoundSchema, null, 'roulette:resolved_round');
+    const { roundId, startedAt, result: resolvedResult } = resolvedData ?? { roundId: '', startedAt: Date.now(), result: 0 };
     await emitPhaseIfChanged('result', roundId, 0, resolvedResult);
     return {
       roundId,
@@ -238,8 +245,8 @@ export async function getCurrentRound(): Promise<RouletteRoundState> {
     };
   }
 
-  const existing = await redis.get(ROUND_KEY);
-  if (!existing) {
+  const existingRaw = await redis.get(ROUND_KEY);
+  if (!existingRaw) {
     // Auto-start a new round so the casino never stalls in idle
     const { roundId, startedAt } = await getOrCreateRound();
     const totalMs = CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000;
@@ -254,7 +261,7 @@ export async function getCurrentRound(): Promise<RouletteRoundState> {
     };
   }
 
-  const parsed: ActiveRound = JSON.parse(existing);
+  const parsed = safeParseRedisJson(existingRaw, activeRoundSchema, { roundId: '', startedAt: Date.now() }, 'roulette:current_round');
   const elapsed = Date.now() - parsed.startedAt;
   const totalMs = CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000;
   const bettingMs = CASINO_CONSTANTS.BETTING_WINDOW_SECONDS * 1000;

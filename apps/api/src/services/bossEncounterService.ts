@@ -38,6 +38,7 @@ import { getActiveTemplate } from './combatTemplateService';
 import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { distributeBossLoot } from './bossLootService';
 import { redis } from '../redis';
+import { parseJsonArray, parseJsonRecord } from '../utils/jsonColumnSchemas';
 
 // --- Mappers ---
 
@@ -56,12 +57,11 @@ function toBossEncounterData(row: {
   roundSummaries?: unknown;
   rewardsByPlayer?: unknown;
 }): BossEncounterData {
-  let parsedSummaries: BossRoundSummary[] | null = null;
-  if (Array.isArray(row.roundSummaries)) {
-    parsedSummaries = row.roundSummaries as BossRoundSummary[];
-  }
-  const parsedRewards = (row.rewardsByPlayer && typeof row.rewardsByPlayer === 'object' && !Array.isArray(row.rewardsByPlayer))
-    ? row.rewardsByPlayer as Record<string, BossPlayerReward>
+  const parsedSummaries: BossRoundSummary[] | null = Array.isArray(row.roundSummaries)
+    ? parseJsonArray<BossRoundSummary>(row.roundSummaries, 'roundSummaries')
+    : null;
+  const parsedRewards: Record<string, BossPlayerReward> | null = (row.rewardsByPlayer && typeof row.rewardsByPlayer === 'object' && !Array.isArray(row.rewardsByPlayer))
+    ? parseJsonRecord<BossPlayerReward>(row.rewardsByPlayer, 'rewardsByPlayer')
     : null;
   return {
     id: row.id,
@@ -70,7 +70,7 @@ function toBossEncounterData(row: {
     currentHp: row.currentHp,
     maxHp: row.maxHp,
     baseHp: row.baseHp,
-    bossEffects: Array.isArray(row.bossEffects) ? row.bossEffects as BossActiveEffect[] : [],
+    bossEffects: parseJsonArray<BossActiveEffect>(row.bossEffects, 'bossEffects'),
     roundNumber: row.roundNumber,
     nextRoundAt: row.nextRoundAt?.toISOString() ?? null,
     status: row.status as BossEncounterStatus,
@@ -388,7 +388,7 @@ async function resolveBossRoundInner(
     template: bossTemplate?.actions ?? [{ actionId: 'boss_physical_attack', targetMode: 'single_target' as const }],
     actionDefinitions: bossTemplate?.actionDefinitions ?? BOSS_ACTION_DEFINITIONS,
     roundNumber: nextRound,
-    activeEffects: Array.isArray(encounter.bossEffects) ? encounter.bossEffects as unknown as BossActiveEffect[] : [],
+    activeEffects: parseJsonArray<BossActiveEffect>(encounter.bossEffects, 'encounter.bossEffects'),
   };
 
   // Build threat table from carried-forward threat values
@@ -419,9 +419,7 @@ async function resolveBossRoundInner(
     playersAlive,
     playersDead,
   };
-  const existingSummaries = (Array.isArray(encounter.roundSummaries)
-    ? encounter.roundSummaries
-    : []) as unknown as BossRoundSummary[];
+  const existingSummaries = parseJsonArray<BossRoundSummary>(encounter.roundSummaries, 'encounter.roundSummaries');
   const newSummaries = [...existingSummaries, roundSummary];
 
   const nextNextRoundAt = new Date(Date.now() + WORLD_EVENT_CONSTANTS.BOSS_ROUND_INTERVAL_MINUTES * 60 * 1000);

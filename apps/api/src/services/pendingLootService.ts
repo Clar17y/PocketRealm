@@ -4,6 +4,7 @@ import { INVENTORY_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
 import { getInventoryState } from './inventoryService';
+import { pendingLootArraySchema, safeParseRedisJson } from '../utils/jsonColumnSchemas';
 
 export interface PendingLootItem {
   templateId: string;
@@ -53,7 +54,8 @@ export async function storePendingLoot(playerId: string, items: PendingLootItem[
 
 export async function getPendingLoot(playerId: string, sessionId: string): Promise<PendingLootItem[] | null> {
   const data = await redis.get(lootKey(playerId, sessionId));
-  return data ? JSON.parse(data) : null;
+  if (!data) return null;
+  return safeParseRedisJson(data, pendingLootArraySchema, [], `pending_loot:${playerId}`);
 }
 
 export async function claimPendingLoot(
@@ -67,7 +69,7 @@ export async function claimPendingLoot(
   const data = await redis.getdel(key);
   if (!data) throw new AppError(404, 'Pending loot expired or already claimed', 'LOOT_EXPIRED');
 
-  const items: PendingLootItem[] = JSON.parse(data);
+  const items: PendingLootItem[] = safeParseRedisJson(data, pendingLootArraySchema, [], `pending_loot:claim:${playerId}`);
   const { usedSlots, capacity } = await getInventoryState(playerId);
 
   let slotsUsed = usedSlots;
