@@ -79,11 +79,16 @@ export async function checkAchievements(
     }
 
     if (progress >= achievement.threshold) {
-      await prisma.playerAchievement.create({
-        data: { playerId, achievementId: achievement.id },
+      // Use createMany with skipDuplicates to prevent TOCTOU race
+      // where concurrent calls both see the achievement as not-yet-unlocked
+      const { count } = await prisma.playerAchievement.createMany({
+        data: [{ playerId, achievementId: achievement.id }],
+        skipDuplicates: true,
       });
-      newlyUnlocked.push(achievement);
-      unlockedSet.add(achievement.id);
+      if (count > 0) {
+        newlyUnlocked.push(achievement);
+        unlockedSet.add(achievement.id);
+      }
     }
   }
 

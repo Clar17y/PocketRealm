@@ -206,7 +206,7 @@ export async function getPlayerGuild(
   if (!membership) return null;
 
   // Look up leader username
-  const leaderMember = membership.guild.members.find((m: any) => m.role === 'leader');
+  const leaderMember = membership.guild.members.find(m => m.role === 'leader');
   const guildWithLeader = { ...membership.guild, leaderUsername: leaderMember?.player?.username };
 
   return {
@@ -245,7 +245,7 @@ export async function searchGuilds(
   ]);
 
   return {
-    guilds: guilds.map((g: any) => ({
+    guilds: guilds.map((g) => ({
       id: g.id,
       name: g.name,
       tag: g.tag,
@@ -253,10 +253,10 @@ export async function searchGuilds(
       level: g.level,
       memberCount: g._count.members,
       maxMembers: calculateMaxMembers(g.level),
-      recruitmentMode: g.recruitmentMode,
+      recruitmentMode: g.recruitmentMode as GuildRecruitmentMode,
       minLevelRequirement: g.minLevelRequirement,
       taxRate: g.taxRate,
-      specialization: g.specialization,
+      specialization: g.specialization as GuildSpecialization | null,
     })),
     total,
     page,
@@ -363,12 +363,12 @@ export async function getGuildLog(
   ]);
 
   return {
-    entries: logs.map((l: any) => ({
+    entries: logs.map((l) => ({
       id: l.id,
       eventType: l.eventType,
       message: l.message,
-      metadata: l.metadata,
-      createdAt: l.createdAt instanceof Date ? l.createdAt.toISOString() : l.createdAt,
+      metadata: (l.metadata ?? null) as Record<string, unknown> | null,
+      createdAt: l.createdAt instanceof Date ? l.createdAt.toISOString() : String(l.createdAt),
     })),
     total,
     page,

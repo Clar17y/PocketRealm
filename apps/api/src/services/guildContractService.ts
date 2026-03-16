@@ -51,7 +51,17 @@ export async function generateWeeklyContracts(guildId: string, now: Date = new D
   const selected = selectWithCategorySpread([...GUILD_CONTRACT_DEFINITIONS], CONTRACTS_PER_WEEK, MIN_CATEGORIES);
 
   const contracts = await prisma.$transaction(async (tx: any) => {
-    const created: any[] = [];
+    const created: Array<{
+      id: string;
+      contractKey: string;
+      targetValue: number;
+      currentValue: number;
+      status: string;
+      rewardGuildXp: number;
+      rewardTreasuryTurns: number;
+      weekStartedAt: Date;
+      expiresAt: Date;
+    }> = [];
     for (const def of selected) {
       const contract = await tx.guildContract.create({
         data: {

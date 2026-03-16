@@ -4,7 +4,12 @@ import { AppError } from '../middleware/errorHandler';
 import { isBlocked } from './blockService';
 import { sanitizeUserText } from '../utils/sanitize';
 
-interface MailRow {
+const MAIL_INCLUDE = {
+  sender: { select: { username: true } },
+  recipient: { select: { username: true } },
+} as const;
+
+function toMailEntry(mail: {
   id: string;
   senderId: string;
   recipientId: string;
@@ -13,19 +18,10 @@ interface MailRow {
   goldCost: number;
   isSystem: boolean;
   isRead: boolean;
-  isDeletedBySender: boolean;
-  isDeletedByRecipient: boolean;
   createdAt: Date;
   sender: { username: string };
   recipient: { username: string };
-}
-
-const MAIL_INCLUDE = {
-  sender: { select: { username: true } },
-  recipient: { select: { username: true } },
-} as const;
-
-function toMailEntry(mail: MailRow): FriendMailEntry {
+}): FriendMailEntry {
   return {
     id: mail.id,
     senderId: mail.senderId,
@@ -138,7 +134,7 @@ export async function sendMail(
     return created;
   });
 
-  return toMailEntry(mail as MailRow);
+  return toMailEntry(mail);
 }
 
 export async function sendSystemMail(
@@ -162,7 +158,7 @@ export async function sendSystemMail(
     include: MAIL_INCLUDE,
   });
 
-  return toMailEntry(mail as MailRow);
+  return toMailEntry(mail);
 }
 
 export async function getInbox(
@@ -183,7 +179,7 @@ export async function getInbox(
     prisma.friendMail.count({ where }),
   ]);
 
-  return { mails: (mails as MailRow[]).map(toMailEntry), total };
+  return { mails: mails.map(toMailEntry), total };
 }
 
 export async function getSentMail(
@@ -204,7 +200,7 @@ export async function getSentMail(
     prisma.friendMail.count({ where }),
   ]);
 
-  return { mails: (mails as MailRow[]).map(toMailEntry), total };
+  return { mails: mails.map(toMailEntry), total };
 }
 
 export async function readMail(
@@ -232,10 +228,10 @@ export async function readMail(
       where: { id: mailId },
       data: { isRead: true },
     });
-    return toMailEntry({ ...mail, isRead: true } as MailRow);
+    return toMailEntry({ ...mail, isRead: true });
   }
 
-  return toMailEntry(mail as MailRow);
+  return toMailEntry(mail);
 }
 
 export async function deleteMail(

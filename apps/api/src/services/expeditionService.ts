@@ -1,3 +1,4 @@
+import type { Server } from 'socket.io';
 import { Prisma, prisma } from '@pocketrealm/database';
 import {
   EXPEDITION_CONSTANTS,
@@ -60,6 +61,13 @@ async function cleanupExpeditionBots(expeditionId: string): Promise<void> {
   });
 }
 
+const VALID_EXPEDITION_STATUSES = new Set<ExpeditionStatus>(['recruiting', 'in_progress', 'completed', 'failed']);
+
+function validateExpeditionStatus(status: string): ExpeditionStatus {
+  if (VALID_EXPEDITION_STATUSES.has(status as ExpeditionStatus)) return status as ExpeditionStatus;
+  return 'failed';
+}
+
 // ---------------------------------------------------------------------------
 // Data Transformation
 // ---------------------------------------------------------------------------
@@ -97,7 +105,7 @@ function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
     id: exp.id,
     guildId: exp.guildId,
     tier: exp.tier,
-    status: exp.status as ExpeditionStatus,
+    status: validateExpeditionStatus(exp.status),
     currentRoom: exp.currentRoom,
     totalRooms: exp.totalRooms,
     currentRoomType: currentRoomDef?.roomType ?? null,
@@ -707,7 +715,7 @@ async function buildRaidParticipant(
 // Check & Resolve Expedition Rounds (background timer entry point)
 // ---------------------------------------------------------------------------
 
-export async function checkAndResolveExpeditionRounds(io: unknown): Promise<void> {
+export async function checkAndResolveExpeditionRounds(io: Server | null): Promise<void> {
   const now = new Date();
   const dueExpeditions = await prisma.guildExpedition.findMany({
     where: {
@@ -788,7 +796,7 @@ async function getMembers(expeditionId: string) {
 // Resolve Expedition Round
 // ---------------------------------------------------------------------------
 
-export async function resolveExpeditionRound(expeditionId: string, io: unknown): Promise<void> {
+export async function resolveExpeditionRound(expeditionId: string, io: Server | null): Promise<void> {
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id: expeditionId },
     include: {
@@ -1474,7 +1482,7 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
   // Award completion bonus tokens
   const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const roomTypes = rooms.map(r => r.roomType);
-  await awardCompletionBonus(expedition.members, expedition.tier, rooms.length, roomTypes, expeditionId);
+  await awardCompletionBonus(expedition.members, expedition.tier, roomTypes, expeditionId);
 
   // Award guild XP completion bonus
   await prisma.guild.update({

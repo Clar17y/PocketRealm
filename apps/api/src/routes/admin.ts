@@ -155,8 +155,8 @@ router.post('/player/attributes', asyncHandler(async (req, res) => {
   });
   const current = normalizePlayerAttributes(player.attributes);
   const merged: PlayerAttributes = { ...current, ...(body.attributes ?? {}) };
-  const data: Record<string, unknown> = {};
-  if (body.attributes) data.attributes = merged;
+  const data: Prisma.PlayerUncheckedUpdateInput = {};
+  if (body.attributes) data.attributes = merged as unknown as Prisma.InputJsonValue;
   if (body.attributePoints !== undefined) data.attributePoints = body.attributePoints;
 
   await prisma.player.update({ where: { id: req.player!.playerId }, data });

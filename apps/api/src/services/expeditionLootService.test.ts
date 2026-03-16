@@ -212,7 +212,7 @@ describe('awardCompletionBonus', () => {
     const members = [{ playerId: 'p1' }];
     const roomTypes: Array<'trash' | 'elite' | 'final_boss'> = ['trash', 'elite', 'final_boss'];
 
-    const bonus = await awardCompletionBonus(members, 1, roomTypes.length, roomTypes);
+    const bonus = await awardCompletionBonus(members, 1, roomTypes);
 
     let expectedTotal = 0;
     for (const rt of roomTypes) {
@@ -226,7 +226,7 @@ describe('awardCompletionBonus', () => {
     const members = [{ playerId: 'p1' }, { playerId: 'p2' }];
     const roomTypes: Array<'trash' | 'elite'> = ['trash', 'elite'];
 
-    await awardCompletionBonus(members, 1, roomTypes.length, roomTypes);
+    await awardCompletionBonus(members, 1, roomTypes);
 
     expect(mockPrisma.player.updateMany).toHaveBeenCalledTimes(1);
     expect(mockPrisma.player.updateMany).toHaveBeenCalledWith({
@@ -239,10 +239,10 @@ describe('awardCompletionBonus', () => {
     const members = [{ playerId: 'p1' }];
     const roomTypes: Array<'trash'> = ['trash'];
 
-    const tier1 = await awardCompletionBonus(members, 1, 1, roomTypes);
+    const tier1 = await awardCompletionBonus(members, 1, roomTypes);
     vi.clearAllMocks();
     mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
-    const tier2 = await awardCompletionBonus(members, 2, 1, roomTypes);
+    const tier2 = await awardCompletionBonus(members, 2, roomTypes);
 
     expect(tier2).toBe(tier1 * EXPEDITION_CONSTANTS.TOKEN_TIER_MULTIPLIER[1] / EXPEDITION_CONSTANTS.TOKEN_TIER_MULTIPLIER[0]);
   });
@@ -250,7 +250,7 @@ describe('awardCompletionBonus', () => {
   it('returns zero bonus when no rooms', async () => {
     const members = [{ playerId: 'p1' }];
 
-    const bonus = await awardCompletionBonus(members, 1, 0, []);
+    const bonus = await awardCompletionBonus(members, 1, []);
 
     expect(bonus).toBe(0);
     expect(mockPrisma.player.updateMany).not.toHaveBeenCalled();

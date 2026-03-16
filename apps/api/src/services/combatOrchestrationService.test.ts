@@ -515,11 +515,11 @@ describe('buildCombatLogResult', () => {
       rewards: {
         xp: 25,
         baseXp: 20,
-        loot: [{ name: 'Wolf Fang', qty: 1 }],
+        loot: [{ itemTemplateId: 'wolf-fang', quantity: 1, rarity: 'common' }],
         durabilityLost: [],
         skillXpGrants: [],
       },
-      eventModifiers: [{ type: 'damage_up', value: 0.1 }],
+      eventModifiers: [{ effectType: 'damage_up', effectValue: 0.1, title: 'Damage Up' }],
     }) as Record<string, unknown>;
 
     expect(result.zoneId).toBe('z1');
@@ -534,7 +534,7 @@ describe('buildCombatLogResult', () => {
     expect(result.outcome).toBe('victory');
     expect(result.playerMaxHp).toBe(100);
     expect(result.mobMaxHp).toBe(50);
-    expect(result.eventModifiers).toEqual([{ type: 'damage_up', value: 0.1 }]);
+    expect(result.eventModifiers).toEqual([{ effectType: 'damage_up', effectValue: 0.1, title: 'Damage Up' }]);
   });
 
   it('calls mapTemplateCombatLog on the combat log', () => {
@@ -560,7 +560,7 @@ describe('buildCombatLogResult', () => {
   });
 
   it('includes potionsConsumed when provided', () => {
-    const potions = [{ potionId: 'hp_potion', quantity: 2 }];
+    const potions = [{ templateId: 'hp_potion', name: 'Health Potion', healAmount: 50, round: 1 }];
     const result = buildCombatLogResult({
       zoneId: 'z1', zoneName: 'Zone',
       mob: { id: 'm1', name: 'Mob', mobPrefix: null, mobDisplayName: null },
@@ -605,8 +605,8 @@ describe('buildCombatLogResult', () => {
     const rewards = {
       xp: 100,
       baseXp: 80,
-      loot: [{ name: 'Iron Sword', qty: 1 }],
-      durabilityLost: [{ slot: 'main_hand', lost: 2 }],
+      loot: [{ itemTemplateId: 'iron-sword', quantity: 1, rarity: 'common' }],
+      durabilityLost: [{ itemId: 'item-1', amount: 2 }],
       skillXpGrants: [{ skill: 'melee', xp: 50 }],
     };
 

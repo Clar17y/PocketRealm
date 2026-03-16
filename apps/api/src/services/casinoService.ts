@@ -21,6 +21,13 @@ import type {
 } from '@pocketrealm/shared';
 import { activeRoundSchema, resolvedRoundSchema, safeParseRedisJson } from '../utils/jsonColumnSchemas';
 
+const VALID_BET_TYPES = new Set<RouletteBetType>(['straight', 'split', 'red', 'black', 'odd', 'even', 'dozen', 'column', 'corner']);
+
+function validateBetType(value: string): RouletteBetType {
+  if (VALID_BET_TYPES.has(value as RouletteBetType)) return value as RouletteBetType;
+  return 'straight'; // fallback for corrupted data
+}
+
 export interface GoldExchangeResult {
   turnsSpent: number;
   goldGained: number;
@@ -126,8 +133,9 @@ async function resolveRound(roundId: string): Promise<number> {
   });
 
   const updates = bets.map((bet) => {
-    const won = isWinningBet(bet.betType as RouletteBetType, bet.betValue, result);
-    const payout = won ? calculatePayout(bet.betType as RouletteBetType, bet.amount) : 0;
+    const validatedBetType = validateBetType(bet.betType);
+    const won = isWinningBet(validatedBetType, bet.betValue, result);
+    const payout = won ? calculatePayout(validatedBetType, bet.amount) : 0;
     return { id: bet.id, playerId: bet.playerId, payout, won, username: bet.player.username, betType: bet.betType, betValue: bet.betValue, amount: bet.amount };
   });
 
@@ -164,7 +172,7 @@ async function resolveRound(roundId: string): Promise<number> {
       .filter((b) => b.won)
       .map((b) => ({
         playerName: b.username,
-        betType: b.betType as RouletteBetType,
+        betType: validateBetType(b.betType),
         betValue: b.betValue,
         amount: b.amount,
         payout: b.payout,
@@ -300,7 +308,7 @@ async function getPublicBets(roundId: string): Promise<RoulettePublicBet[]> {
   });
   return bets.map((b) => ({
     playerName: b.player.username,
-    betType: b.betType as RouletteBetType,
+    betType: validateBetType(b.betType),
     betValue: b.betValue,
     amount: b.amount,
   }));

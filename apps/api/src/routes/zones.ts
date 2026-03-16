@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '@pocketrealm/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { createActivityLog } from '../services/activityLogService';
 import {
   buildPlayerCombatStats,
@@ -642,7 +642,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
   }
 
   // 11. Successful arrival
-  const updateData: Record<string, unknown> = {
+  const updateData: Prisma.PlayerUncheckedUpdateInput = {
     currentZoneId: destinationId,
     lastTravelledFromZoneId: currentZoneId,
   };

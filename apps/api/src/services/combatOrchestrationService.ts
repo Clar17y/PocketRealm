@@ -312,18 +312,18 @@ export interface CombatLogResultParams {
     outcome: string;
     combatantAMaxHp: number;
     combatantBMaxHp: number;
-    log: unknown[];
-    potionsConsumed?: unknown[];
+    log: Parameters<typeof mapTemplateCombatLog>[0];
+    potionsConsumed?: readonly { templateId: string; name: string }[];
   };
   rewards: {
     xp: number;
     baseXp: number;
-    loot: unknown[];
-    durabilityLost: unknown[];
-    skillXpGrants: unknown[];
+    loot: readonly { itemTemplateId: string; quantity: number; rarity?: string }[];
+    durabilityLost: readonly { itemId: string; amount: number }[];
+    skillXpGrants: readonly Record<string, unknown>[];
   };
-  eventModifiers: unknown[];
-  potionsConsumed?: unknown[];
+  eventModifiers: readonly { effectType: string; effectValue: number; title: string }[];
+  potionsConsumed?: readonly { templateId: string; name: string }[];
 }
 
 export function buildCombatLogResult(params: CombatLogResultParams): Prisma.InputJsonValue {
@@ -340,7 +340,7 @@ export function buildCombatLogResult(params: CombatLogResultParams): Prisma.Inpu
     outcome: params.combatResult.outcome,
     playerMaxHp: params.combatResult.combatantAMaxHp,
     mobMaxHp: params.combatResult.combatantBMaxHp,
-    log: mapTemplateCombatLog(params.combatResult.log as Parameters<typeof mapTemplateCombatLog>[0]),
+    log: mapTemplateCombatLog(params.combatResult.log),
     rewards: params.rewards,
     eventModifiers: params.eventModifiers,
     ...(params.potionsConsumed ? { potionsConsumed: params.potionsConsumed } : {}),
