@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.43',
+    date: '2026-03-16',
+    title: 'UI Fixes & Quality of Life',
+    summary:
+      "Exploration's max turns button now correctly reflects the 2,500-turn cap instead of showing a hardcoded 5,000. The casino displays your bet count and max bet amount, disabling the button when you hit the limit. A new \"Forge Destruction Confirmation\" setting lets you choose which rarity threshold triggers a confirmation dialog. Item stats like magic power, ranged power, luck, crit chance, and crit damage now show properly in both Inventory and Equipment views.",
+  },
+  {
     version: '0.42',
     date: '2026-03-16',
     title: 'Performance Optimization',
