@@ -357,35 +357,53 @@ export async function checkAndSpawnEvents(io: SocketServer | null): Promise<void
   if (now - lastRunAt < MIN_INTERVAL_MS) return;
   lastRunAt = now;
 
-  // Expire stale events
-  const expired = await expireStaleEvents();
-  for (const event of expired) {
-    const location = event.zoneName ?? 'the world';
-    await emitSystemMessage(io, 'world', 'world', `Event ended: ${event.title} in ${location}`);
-    if (event.zoneId) {
-      await emitSystemMessage(io, 'zone', `zone:${event.zoneId}`, `Event ended: ${event.title}`);
+  // Each scheduler step is isolated so a failure in one doesn't skip the rest.
+
+  // Step 1: Expire stale events
+  try {
+    const expired = await expireStaleEvents();
+    for (const event of expired) {
+      const location = event.zoneName ?? 'the world';
+      await emitSystemMessage(io, 'world', 'world', `Event ended: ${event.title} in ${location}`);
+      if (event.zoneId) {
+        await emitSystemMessage(io, 'zone', `zone:${event.zoneId}`, `Event ended: ${event.title}`);
+      }
     }
+  } catch (err) {
+    console.error('Scheduler step expireStaleEvents failed', err);
   }
 
-  // Resolve any due boss rounds
-  await checkAndResolveDueBossRounds(io);
+  // Step 2: Resolve any due boss rounds
+  try {
+    await checkAndResolveDueBossRounds(io);
+  } catch (err) {
+    console.error('Scheduler step checkAndResolveDueBossRounds failed', err);
+  }
 
-  // Dedicated boss spawn timer (independent of event cooldowns)
-  await checkAndSpawnBoss(io);
+  // Step 3: Dedicated boss spawn timer (independent of event cooldowns)
+  try {
+    await checkAndSpawnBoss(io);
+  } catch (err) {
+    console.error('Scheduler step checkAndSpawnBoss failed', err);
+  }
 
-  // Respawn cooldown (DB-based, survives server restarts)
-  const cooldownMs = WORLD_EVENT_CONSTANTS.EVENT_RESPAWN_DELAY_MINUTES * 60 * 1000;
-  const cooldownCutoff = new Date(now - cooldownMs);
-  const recentEvent = await prisma.worldEvent.findFirst({
-    where: { startedAt: { gte: cooldownCutoff } },
-    select: { id: true },
-  });
-  if (recentEvent) return;
-
-  // Roll for world-wide or zone event (50/50 chance, but caps enforce limits)
-  if (Math.random() < 0.5) {
-    await trySpawnWorldWideEvent(io);
-  } else {
-    await trySpawnZoneEvent(io);
+  // Step 4: Spawn new world/zone event (respawn cooldown gated)
+  try {
+    const cooldownMs = WORLD_EVENT_CONSTANTS.EVENT_RESPAWN_DELAY_MINUTES * 60 * 1000;
+    const cooldownCutoff = new Date(now - cooldownMs);
+    const recentEvent = await prisma.worldEvent.findFirst({
+      where: { startedAt: { gte: cooldownCutoff } },
+      select: { id: true },
+    });
+    if (!recentEvent) {
+      // Roll for world-wide or zone event (50/50 chance, but caps enforce limits)
+      if (Math.random() < 0.5) {
+        await trySpawnWorldWideEvent(io);
+      } else {
+        await trySpawnZoneEvent(io);
+      }
+    }
+  } catch (err) {
+    console.error('Scheduler step spawnNewEvent failed', err);
   }
 }

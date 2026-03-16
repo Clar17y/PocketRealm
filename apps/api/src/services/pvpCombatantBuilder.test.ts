@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SkillType } from '@pocketrealm/shared';
 import { mockPrisma } from '../__test__/setup';
 
 // ── Mocks ────────────────────────────────────────────────────────────
@@ -22,7 +21,7 @@ vi.mock('./combatOrchestrationService', () => ({
 }));
 
 vi.mock('./combatStatsService', () => ({
-  getSkillLevel: vi.fn(),
+  getSkillLevels: vi.fn(),
 }));
 
 vi.mock('./combatTemplateService', () => ({
@@ -58,7 +57,7 @@ import {
 } from '@pocketrealm/game-engine';
 import { normalizePlayerAttributes } from './attributesService';
 import { buildPlayerTemplateCombatant } from './combatOrchestrationService';
-import { getSkillLevel } from './combatStatsService';
+import { getSkillLevels } from './combatStatsService';
 import { getActiveTemplate } from './combatTemplateService';
 import { getEquipmentStats } from './equipmentService';
 import { getHpState } from './hpService';
@@ -73,7 +72,7 @@ const mockCalculateMaxMana = vi.mocked(calculateMaxMana);
 const mockCalculateManaRegenPerRound = vi.mocked(calculateManaRegenPerRound);
 const mockNormalizePlayerAttributes = vi.mocked(normalizePlayerAttributes);
 const mockBuildPlayerTemplateCombatant = vi.mocked(buildPlayerTemplateCombatant);
-const mockGetSkillLevel = vi.mocked(getSkillLevel);
+const mockGetSkillLevels = vi.mocked(getSkillLevels);
 const mockGetActiveTemplate = vi.mocked(getActiveTemplate);
 const mockGetEquipmentStats = vi.mocked(getEquipmentStats);
 const mockGetHpState = vi.mocked(getHpState);
@@ -155,7 +154,7 @@ function setupDefaultMocks() {
   mockGetActiveTemplate.mockResolvedValue(FAKE_TEMPLATE as any);
   mockGetSkillPoints.mockResolvedValue(fakeSkillPoints());
   mockNormalizePlayerAttributes.mockReturnValue(fakeAttributes() as any);
-  mockGetSkillLevel.mockResolvedValue(5);
+  mockGetSkillLevels.mockResolvedValue({ melee: 5, ranged: 5, evasion: 5, magic: 5 });
   mockCalculateMaxHp.mockReturnValue(120);
   mockBuildPlayerCombatStats.mockReturnValue(fakeCombatStats() as any);
   mockBuildPlayerTemplateCombatant.mockReturnValue(FAKE_COMBATANT as any);
@@ -189,7 +188,7 @@ describe('pvpCombatantBuilder', () => {
       expect(result).toBe('melee');
       expect(mockPrisma.playerEquipment.findUnique).toHaveBeenCalledWith({
         where: { playerId_slot: { playerId: PLAYER_ID, slot: 'main_hand' } },
-        include: { item: { include: { template: true } } },
+        select: { item: { select: { template: { select: { requiredSkill: true } } } } },
       });
     });
 
@@ -298,10 +297,10 @@ describe('pvpCombatantBuilder', () => {
     it('queries skill levels for melee, ranged, evasion, and magic', async () => {
       await buildPvpCombatant(PLAYER_ID, USERNAME, false);
 
-      expect(mockGetSkillLevel).toHaveBeenCalledWith(PLAYER_ID, 'melee');
-      expect(mockGetSkillLevel).toHaveBeenCalledWith(PLAYER_ID, 'ranged');
-      expect(mockGetSkillLevel).toHaveBeenCalledWith(PLAYER_ID, 'evasion');
-      expect(mockGetSkillLevel).toHaveBeenCalledWith(PLAYER_ID, 'magic');
+      expect(mockGetSkillLevels).toHaveBeenCalledWith(
+        PLAYER_ID,
+        expect.arrayContaining(['melee', 'ranged', 'evasion', 'magic']),
+      );
     });
 
     // ── Attack style → skill level mapping ───────────────────────────
@@ -311,13 +310,7 @@ describe('pvpCombatantBuilder', () => {
         item: { template: { requiredSkill: 'melee' } },
       });
       // melee=10, ranged=20, evasion=15, magic=25
-      mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
-        if (skill === 'melee') return 10;
-        if (skill === 'ranged') return 20;
-        if (skill === ('evasion' as SkillType)) return 15;
-        if (skill === 'magic') return 25;
-        return 1;
-      });
+      mockGetSkillLevels.mockResolvedValue({ melee: 10, ranged: 20, evasion: 15, magic: 25 });
 
       await buildPvpCombatant(PLAYER_ID, USERNAME, false);
 
@@ -333,13 +326,7 @@ describe('pvpCombatantBuilder', () => {
       mockPrisma.playerEquipment.findUnique.mockResolvedValue({
         item: { template: { requiredSkill: 'ranged' } },
       });
-      mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
-        if (skill === 'melee') return 10;
-        if (skill === 'ranged') return 20;
-        if (skill === ('evasion' as SkillType)) return 15;
-        if (skill === 'magic') return 25;
-        return 1;
-      });
+      mockGetSkillLevels.mockResolvedValue({ melee: 10, ranged: 20, evasion: 15, magic: 25 });
 
       await buildPvpCombatant(PLAYER_ID, USERNAME, false);
 
@@ -354,13 +341,7 @@ describe('pvpCombatantBuilder', () => {
       mockPrisma.playerEquipment.findUnique.mockResolvedValue({
         item: { template: { requiredSkill: 'magic' } },
       });
-      mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
-        if (skill === 'melee') return 10;
-        if (skill === 'ranged') return 20;
-        if (skill === ('evasion' as SkillType)) return 15;
-        if (skill === 'magic') return 25;
-        return 1;
-      });
+      mockGetSkillLevels.mockResolvedValue({ melee: 10, ranged: 20, evasion: 15, magic: 25 });
 
       await buildPvpCombatant(PLAYER_ID, USERNAME, false);
 
@@ -387,13 +368,7 @@ describe('pvpCombatantBuilder', () => {
     });
 
     it('calculates max stamina/mana from skill levels when useCurrentResources=false', async () => {
-      mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
-        if (skill === 'melee') return 10;
-        if (skill === 'ranged') return 20;
-        if (skill === ('evasion' as SkillType)) return 15;
-        if (skill === 'magic') return 25;
-        return 1;
-      });
+      mockGetSkillLevels.mockResolvedValue({ melee: 10, ranged: 20, evasion: 15, magic: 25 });
       mockCalculateMaxStamina.mockReturnValue(200);
       mockCalculateMaxMana.mockReturnValue(150);
 
@@ -554,13 +529,7 @@ describe('pvpCombatantBuilder', () => {
     // ── Stamina/mana regen per round calculation ─────────────────────
 
     it('passes correct skill levels to calculateStaminaRegenPerRound', async () => {
-      mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
-        if (skill === 'melee') return 12;
-        if (skill === 'ranged') return 18;
-        if (skill === ('evasion' as SkillType)) return 9;
-        if (skill === 'magic') return 30;
-        return 1;
-      });
+      mockGetSkillLevels.mockResolvedValue({ melee: 12, ranged: 18, evasion: 9, magic: 30 });
 
       await buildPvpCombatant(PLAYER_ID, USERNAME, false);
 
@@ -568,13 +537,7 @@ describe('pvpCombatantBuilder', () => {
     });
 
     it('passes magic level to calculateManaRegenPerRound', async () => {
-      mockGetSkillLevel.mockImplementation(async (_pid, skill) => {
-        if (skill === 'melee') return 12;
-        if (skill === 'ranged') return 18;
-        if (skill === ('evasion' as SkillType)) return 9;
-        if (skill === 'magic') return 30;
-        return 1;
-      });
+      mockGetSkillLevels.mockResolvedValue({ melee: 12, ranged: 18, evasion: 9, magic: 30 });
 
       await buildPvpCombatant(PLAYER_ID, USERNAME, false);
 
@@ -631,7 +594,7 @@ describe('pvpCombatantBuilder', () => {
     // ── Edge: zero skill levels ──────────────────────────────────────
 
     it('handles zero skill levels gracefully', async () => {
-      mockGetSkillLevel.mockResolvedValue(0);
+      mockGetSkillLevels.mockResolvedValue({ melee: 0, ranged: 0, evasion: 0, magic: 0 });
       mockCalculateMaxStamina.mockReturnValue(50);
       mockCalculateMaxMana.mockReturnValue(30);
 

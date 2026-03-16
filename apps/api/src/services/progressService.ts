@@ -14,10 +14,13 @@ export async function trackProgress(
   type: ProgressType,
   amount: number,
   metadata?: { prefix?: string; zoneId?: string; rarity?: string },
+  preloadedGuildId?: string | null,
 ): Promise<QuestProgressUpdate[]> {
   if (amount <= 0) return [];
 
-  const guildId = await getPlayerGuildId(playerId);
+  const guildId = preloadedGuildId !== undefined
+    ? preloadedGuildId
+    : await getPlayerGuildId(playerId);
 
   const contractPromise = (guildId && GUILD_CONTRACT_TYPES.has(type))
     ? incrementContractProgress(guildId, type as GuildContractType, amount)

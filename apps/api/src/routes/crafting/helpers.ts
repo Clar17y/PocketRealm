@@ -181,7 +181,7 @@ export async function getValidatedSacrificialItem(params: {
     throw new AppError(400, 'Sacrificial item must be different from target item', 'FORGE_INVALID_SACRIFICE');
   }
 
-  const sacrificial = await (prisma as any).item.findUnique({
+  const sacrificial = await prisma.item.findUnique({
     where: { id: params.sacrificialItemId },
     include: { template: true },
   });

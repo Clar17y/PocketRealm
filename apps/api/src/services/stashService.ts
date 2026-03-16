@@ -56,7 +56,7 @@ async function moveStackableItem(
         maxDurability: null,
         currentDurability: null,
         inStash: targetInStash,
-      } as any,
+      },
     });
   }
 }
@@ -66,7 +66,7 @@ export async function depositItem(
   itemId: string,
   quantity?: number
 ): Promise<void> {
-  return prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const item = await tx.item.findUnique({
       where: { id: itemId },
       include: { template: true, equipment: true },
@@ -81,7 +81,7 @@ export async function depositItem(
     }
 
     await moveStackableItem(tx, item, depositQty, true);
-  }) as unknown as void;
+  });
 }
 
 export async function withdrawItem(
@@ -96,7 +96,7 @@ export async function withdrawItem(
     throw new AppError(400, 'Backpack is full', 'BACKPACK_FULL');
   }
 
-  return prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const item = await tx.item.findUnique({
       where: { id: itemId },
       include: { template: true },
@@ -110,7 +110,7 @@ export async function withdrawItem(
     }
 
     await moveStackableItem(tx, item, withdrawQty, false);
-  }) as unknown as void;
+  });
 }
 
 export async function depositBatch(

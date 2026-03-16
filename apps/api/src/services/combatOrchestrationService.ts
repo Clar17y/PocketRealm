@@ -217,24 +217,31 @@ export async function processCombatVictoryRewards(
     playerId, totalXp, attackSkill, params.damageByScalingStat, params.resourceCostByScalingStat, params.guildXpBoost,
   );
 
-  if (params.includeBestiary !== false) {
-    await recordBestiaryKill(playerId, mob.id, mob.mobPrefix);
-  }
-
   // Guild XP + quest/contract progress for all combat victories
   const guildId = await getPlayerGuildId(playerId);
-  if (guildId) {
-    await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL);
-  }
-  const questProgress: QuestProgressUpdate[] = [];
-  const killProgress = await trackProgress(playerId, 'kill_count', 1);
-  questProgress.push(...killProgress);
-  const familyProgress = await trackProgress(playerId, 'kill_family', 1);
-  questProgress.push(...familyProgress);
-  if (mob.mobPrefix) {
-    const prefixProgress = await trackProgress(playerId, 'kill_prefix', 1, { prefix: mob.mobPrefix });
-    questProgress.push(...prefixProgress);
-  }
+
+  // Run all independent post-combat work in parallel
+  const results = await Promise.allSettled([
+    params.includeBestiary !== false
+      ? recordBestiaryKill(playerId, mob.id, mob.mobPrefix)
+      : Promise.resolve(undefined),
+    guildId ? addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MOB_KILL) : Promise.resolve(),
+    trackProgress(playerId, 'kill_count', 1, undefined, guildId),
+    trackProgress(playerId, 'kill_family', 1, undefined, guildId),
+    mob.mobPrefix
+      ? trackProgress(playerId, 'kill_prefix', 1, { prefix: mob.mobPrefix }, guildId)
+      : Promise.resolve([]),
+  ]);
+
+  const killProgress = results[2].status === 'fulfilled' ? results[2].value : [];
+  const familyProgress = results[3].status === 'fulfilled' ? results[3].value : [];
+  const prefixProgress = results[4].status === 'fulfilled' ? results[4].value : [];
+
+  const questProgress: QuestProgressUpdate[] = [
+    ...killProgress,
+    ...familyProgress,
+    ...prefixProgress,
+  ];
 
   return {
     loot: lootResult.drops,
@@ -312,18 +319,18 @@ interface CombatLogResultParams {
     outcome: string;
     combatantAMaxHp: number;
     combatantBMaxHp: number;
-    log: unknown[];
-    potionsConsumed?: unknown[];
+    log: Parameters<typeof mapTemplateCombatLog>[0];
+    potionsConsumed?: readonly { templateId: string; name: string }[];
   };
   rewards: {
     xp: number;
     baseXp: number;
-    loot: unknown[];
-    durabilityLost: unknown[];
-    skillXpGrants: unknown[];
+    loot: readonly { itemTemplateId: string; quantity: number; rarity?: string }[];
+    durabilityLost: readonly { itemId: string; amount: number }[];
+    skillXpGrants: readonly Record<string, unknown>[];
   };
-  eventModifiers: unknown[];
-  potionsConsumed?: unknown[];
+  eventModifiers: readonly { effectType: string; effectValue: number; title: string }[];
+  potionsConsumed?: readonly { templateId: string; name: string }[];
 }
 
 export function buildCombatLogResult(params: CombatLogResultParams): Prisma.InputJsonValue {
@@ -340,7 +347,7 @@ export function buildCombatLogResult(params: CombatLogResultParams): Prisma.Inpu
     outcome: params.combatResult.outcome,
     playerMaxHp: params.combatResult.combatantAMaxHp,
     mobMaxHp: params.combatResult.combatantBMaxHp,
-    log: mapTemplateCombatLog(params.combatResult.log as Parameters<typeof mapTemplateCombatLog>[0]),
+    log: mapTemplateCombatLog(params.combatResult.log),
     rewards: params.rewards,
     eventModifiers: params.eventModifiers,
     ...(params.potionsConsumed ? { potionsConsumed: params.potionsConsumed } : {}),

@@ -1,3 +1,4 @@
+import type { Server } from 'socket.io';
 import { Prisma, prisma } from '@pocketrealm/database';
 import {
   EXPEDITION_CONSTANTS,
@@ -42,6 +43,7 @@ import { getPlayerProgressionState } from './attributesService';
 import { getActiveTemplate } from './combatTemplateService';
 import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
 import { buildPotionPool, templateHasPotionActions, deductConsumedPotions } from './potionService';
+import { parseJsonArray } from '../utils/jsonColumnSchemas';
 
 // ---------------------------------------------------------------------------
 // Bot Cleanup — delete bot players created by admin /expedition/fill
@@ -57,6 +59,13 @@ async function cleanupExpeditionBots(expeditionId: string): Promise<void> {
   await prisma.player.deleteMany({
     where: { id: { in: botMembers.map((m) => m.playerId) } },
   });
+}
+
+const VALID_EXPEDITION_STATUSES = new Set<ExpeditionStatus>(['recruiting', 'in_progress', 'completed', 'failed']);
+
+function validateExpeditionStatus(status: string): ExpeditionStatus {
+  if (VALID_EXPEDITION_STATUSES.has(status as ExpeditionStatus)) return status as ExpeditionStatus;
+  return 'failed';
 }
 
 // ---------------------------------------------------------------------------
@@ -84,21 +93,19 @@ interface GuildExpeditionRow {
 }
 
 function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
-  const rooms = exp.roomDefinitions as unknown as ExpeditionRoomDefinition[];
+  const rooms = parseJsonArray<ExpeditionRoomDefinition>(exp.roomDefinitions, 'roomDefinitions');
   const currentRoomDef = rooms[exp.currentRoom];
   const aliveMobs = currentRoomDef
     ? currentRoomDef.mobs.filter((m) => m.hp > 0)
     : [];
 
-  const roundLogs = (Array.isArray(exp.roundSummaries)
-    ? exp.roundSummaries
-    : []) as unknown as ExpeditionRoundLog[];
+  const roundLogs = parseJsonArray<ExpeditionRoundLog>(exp.roundSummaries, 'roundSummaries');
 
   return {
     id: exp.id,
     guildId: exp.guildId,
     tier: exp.tier,
-    status: exp.status as ExpeditionStatus,
+    status: validateExpeditionStatus(exp.status),
     currentRoom: exp.currentRoom,
     totalRooms: exp.totalRooms,
     currentRoomType: currentRoomDef?.roomType ?? null,
@@ -120,9 +127,7 @@ function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
       activeEffects: m.activeEffects ?? [],
     })),
     roundLogs,
-    attemptLogs: (Array.isArray(exp.expeditionAttemptLogs)
-      ? exp.expeditionAttemptLogs
-      : []) as unknown as ExpeditionAttemptLog[],
+    attemptLogs: parseJsonArray<ExpeditionAttemptLog>(exp.expeditionAttemptLogs, 'expeditionAttemptLogs'),
     themeId: exp.themeId ?? null,
     themeName: EXPEDITION_THEMES_BY_ID.get(exp.themeId ?? '')?.name ?? null,
   };
@@ -166,7 +171,7 @@ function toExpeditionMemberData(m: GuildExpeditionMemberRow): ExpeditionMemberDa
     roomDamage: Number(m.roomDamage),
     roomHealing: Number(m.roomHealing),
     targetMobId: m.targetMobId,
-    activeEffects: (Array.isArray(m.activeEffects) ? m.activeEffects : []) as ExpeditionMemberData['activeEffects'],
+    activeEffects: parseJsonArray<ExpeditionMemberData['activeEffects'][number]>(m.activeEffects, 'member.activeEffects'),
     healTargetPlayerId: m.healTargetPlayerId ?? null,
     threatValue: m.threatValue,
     tokensEarned: m.tokensEarned,
@@ -472,7 +477,7 @@ export async function forceStartExpedition(
   }
 
   // Transition to in_progress (same pattern as checkAndResolveExpeditionRounds)
-  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
+  const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const snapshot = {
     mobs: rooms[0]?.mobs ?? [],
     members: await getMembers(expeditionId),
@@ -710,7 +715,7 @@ async function buildRaidParticipant(
 // Check & Resolve Expedition Rounds (background timer entry point)
 // ---------------------------------------------------------------------------
 
-export async function checkAndResolveExpeditionRounds(io: unknown): Promise<void> {
+export async function checkAndResolveExpeditionRounds(io: Server | null): Promise<void> {
   const now = new Date();
   const dueExpeditions = await prisma.guildExpedition.findMany({
     where: {
@@ -727,7 +732,7 @@ export async function checkAndResolveExpeditionRounds(io: unknown): Promise<void
 
       if (memberCount >= minParticipants) {
         // Transition to in_progress: take room start snapshot, schedule first round
-        const rooms = exp.roomDefinitions as unknown as ExpeditionRoomDefinition[];
+        const rooms = parseJsonArray<ExpeditionRoomDefinition>(exp.roomDefinitions, 'roomDefinitions');
         const snapshot = {
           mobs: rooms[0]?.mobs ?? [],
           members: await getMembers(exp.id),
@@ -791,7 +796,7 @@ async function getMembers(expeditionId: string) {
 // Resolve Expedition Round
 // ---------------------------------------------------------------------------
 
-export async function resolveExpeditionRound(expeditionId: string, io: unknown): Promise<void> {
+export async function resolveExpeditionRound(expeditionId: string, io: Server | null): Promise<void> {
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id: expeditionId },
     include: {
@@ -800,7 +805,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
   });
   if (!expedition || expedition.status !== 'in_progress') return;
 
-  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
+  const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const currentRoomDef = rooms[expedition.currentRoom];
   if (!currentRoomDef) return;
 
@@ -858,9 +863,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: unknown):
     ...result.roundLog,
     roomIndex: expedition.currentRoom,
   };
-  const existingLogs = (Array.isArray(expedition.roundSummaries)
-    ? expedition.roundSummaries
-    : []) as unknown as ExpeditionRoundLog[];
+  const existingLogs = parseJsonArray<ExpeditionRoundLog>(expedition.roundSummaries, 'roundSummaries');
   const newSummaries = [...existingLogs, roundLog];
 
   // Compute nextRoundAt for the normal (non-cleared, non-wipe) case
@@ -957,7 +960,7 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
     data: { nextRoundAt: null },
   });
 
-  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
+  const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const currentRoomDef = rooms[expedition.currentRoom];
   if (!currentRoomDef) {
     throw new AppError(400, 'No room to resolve', 'NO_ROOM');
@@ -1148,7 +1151,7 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
   });
   if (!expedition) return;
 
-  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
+  const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const currentRoomDef = rooms[expedition.currentRoom];
   const roomType = currentRoomDef?.roomType ?? 'trash';
 
@@ -1477,9 +1480,9 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
   });
 
   // Award completion bonus tokens
-  const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
+  const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const roomTypes = rooms.map(r => r.roomType);
-  await awardCompletionBonus(expedition.members, expedition.tier, rooms.length, roomTypes, expeditionId);
+  await awardCompletionBonus(expedition.members, expedition.tier, roomTypes, expeditionId);
 
   // Award guild XP completion bonus
   await prisma.guild.update({
@@ -1531,7 +1534,7 @@ export async function setTargetMob(
 
   // Validate targetMobId if set
   if (targetMobId !== null) {
-    const rooms = expedition.roomDefinitions as unknown as ExpeditionRoomDefinition[];
+    const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
     const currentRoomDef = rooms[expedition.currentRoom];
     if (!currentRoomDef) throw new AppError(400, 'No current room', 'NO_ROOM');
     const mob = currentRoomDef.mobs.find(m => m.id === targetMobId && m.hp > 0);

@@ -185,13 +185,7 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
 
     res.json({ participant });
   } catch (err) {
-    if (err instanceof Error && err.message.includes('not found')) {
-      return next(new AppError(404, err.message, 'NOT_FOUND'));
-    }
-    if (err instanceof Error && err.message.includes('already over')) {
-      return next(new AppError(410, err.message, 'ENCOUNTER_OVER'));
-    }
-    next(err);
+    next(err instanceof AppError ? err : new AppError(500, 'Failed to sign up for boss round', 'BOSS_SIGNUP_FAILED'));
   }
 });
 

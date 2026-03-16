@@ -80,9 +80,11 @@ model Player {
   resourceNodes      PlayerResourceNode[]
   zoneDiscoveries    PlayerZoneDiscovery[]
   zoneExplorations   PlayerZoneExploration[]
-  pvpRating          PvpRating?
-  pvpAttacks         PvpMatch[] @relation("PvpAttacker")
-  pvpDefenses        PvpMatch[] @relation("PvpDefender")
+  pvpRating                PvpRating?
+  pvpAttacks               PvpMatch[]    @relation("PvpAttacker")
+  pvpDefenses              PvpMatch[]    @relation("PvpDefender")
+  pvpCooldownsAsAttacker   PvpCooldown[] @relation("pvpCooldownAttacker")
+  pvpCooldownsAsDefender   PvpCooldown[] @relation("pvpCooldownDefender")
   bossParticipants   BossParticipant[]
   persistedMobs      PersistedMob[]
   stats              PlayerStats?
@@ -222,6 +224,7 @@ model Item {
   owner     Player            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   equipment PlayerEquipment[]
 
+  @@index([ownerId, templateId, inStash])
   @@map("items")
 }
 
@@ -334,6 +337,7 @@ model MobTemplate {
   persistedMobs     PersistedMob[]
   bossRotations     PlayerBossRotation[]
 
+  @@index([isExpeditionMob])
   @@map("mob_templates")
 }
 
@@ -348,6 +352,7 @@ model DropTable {
   mobTemplate  MobTemplate  @relation(fields: [mobTemplateId], references: [id], onDelete: Cascade)
   itemTemplate ItemTemplate @relation(fields: [itemTemplateId], references: [id], onDelete: Cascade)
 
+  @@index([mobTemplateId])
   @@map("drop_tables")
 }
 
@@ -614,6 +619,7 @@ model PvpRating {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
+  @@index([rating])
   @@map("pvp_ratings")
 }
 
@@ -639,6 +645,7 @@ model PvpMatch {
 
   @@index([attackerId, createdAt])
   @@index([defenderId, createdAt])
+  @@index([defenderId, defenderRead])
   @@map("pvp_matches")
 }
 
@@ -648,7 +655,11 @@ model PvpCooldown {
   defenderId String   @map("defender_id")
   expiresAt  DateTime @map("expires_at")
 
+  attacker Player @relation("pvpCooldownAttacker", fields: [attackerId], references: [id], onDelete: Cascade)
+  defender Player @relation("pvpCooldownDefender", fields: [defenderId], references: [id], onDelete: Cascade)
+
   @@unique([attackerId, defenderId])
+  @@index([attackerId, expiresAt])
   @@map("pvp_cooldowns")
 }
 
@@ -729,6 +740,7 @@ model BossParticipant {
 
   @@unique([encounterId, playerId, roundNumber])
   @@index([encounterId, roundNumber])
+  @@index([playerId])
   @@map("boss_participants")
 }
 
@@ -828,6 +840,7 @@ model Guild {
   joinRequests GuildJoinRequest[]
   expeditions  GuildExpedition[]
 
+  @@index([level])
   @@map("guilds")
 }
 
@@ -859,6 +872,7 @@ model GuildUpgrade {
   guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
 
   @@index([guildId, upgradeType, expiresAt])
+  @@index([guildId, expiresAt])
   @@map("guild_upgrades")
 }
 

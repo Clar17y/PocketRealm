@@ -227,7 +227,14 @@ async function writeToZset(
 
 async function refreshPvp() {
   const ratings = await prisma.pvpRating.findMany({
-    include: { player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
+    select: {
+      playerId: true,
+      rating: true,
+      wins: true,
+      bestRating: true,
+      winStreak: true,
+      player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } },
+    },
   });
 
   const fields: { slug: string; field: 'rating' | 'wins' | 'bestRating' | 'winStreak' }[] = [
@@ -287,7 +294,12 @@ async function refreshProgression() {
 
 async function refreshSkills() {
   const skills = await prisma.playerSkill.findMany({
-    include: { player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
+    select: {
+      playerId: true,
+      skillType: true,
+      level: true,
+      player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } },
+    },
   });
 
   // Individual skill leaderboards

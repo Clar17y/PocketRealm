@@ -10,6 +10,7 @@ import { requireRole } from './guildService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { consumeItemsByTemplateTx } from './inventoryService';
 import { addGuildXp } from './guildService';
+import { materialsProgressSchema } from '../utils/jsonColumnSchemas';
 
 // ---------------------------------------------------------------------------
 // Start Project
@@ -125,7 +126,7 @@ export async function getGuildProjects(guildId: string) {
         playerId: c.playerId,
         username: usernameMap.get(c.playerId) ?? 'Unknown',
         turnsContributed: c.turnsContributed,
-        materialsContributed: (c.materialsContributed ?? {}) as Record<string, number>,
+        materialsContributed: materialsProgressSchema.catch({}).parse(c.materialsContributed ?? {}),
       })),
     };
   });
@@ -248,7 +249,7 @@ export async function contributeMaterials(
   const existingContribution = await prisma.guildProjectContribution.findUnique({
     where: { projectId_playerId: { projectId, playerId } },
   });
-  const contributedMaterials = (existingContribution?.materialsContributed ?? {}) as Record<string, number>;
+  const contributedMaterials = materialsProgressSchema.catch({}).parse(existingContribution?.materialsContributed ?? {});
   const playerCategoryTotal = contributedMaterials[category] ?? 0;
   if (playerCategoryTotal + quantity > GUILD_PROJECT_CONSTANTS.PER_PROJECT_MATERIAL_CAP) {
     throw new AppError(
@@ -259,7 +260,7 @@ export async function contributeMaterials(
   }
 
   // Check category not already fully contributed
-  const progress = (project.materialsProgress ?? {}) as Record<string, number>;
+  const progress = materialsProgressSchema.catch({}).parse(project.materialsProgress ?? {});
   const currentProgress = progress[category] ?? 0;
   if (currentProgress >= requiredCost.quantity) {
     throw new AppError(400, `${category} materials already fully contributed`, 'CATEGORY_COMPLETE');
@@ -284,7 +285,7 @@ export async function contributeMaterials(
     const existingContrib = await tx.guildProjectContribution.findUnique({
       where: { projectId_playerId: { projectId, playerId } },
     });
-    const existingMaterials = (existingContrib?.materialsContributed ?? {}) as Record<string, number>;
+    const existingMaterials = materialsProgressSchema.catch({}).parse(existingContrib?.materialsContributed ?? {});
     const newMaterialsContrib = {
       ...existingMaterials,
       [category]: (existingMaterials[category] ?? 0) + effectiveQuantity,
@@ -385,7 +386,7 @@ async function checkAndCompleteProject(
   if (project.turnsContributed < def.memberTurnGoal) return;
 
   // Check all material goals
-  const progress = (project.materialsProgress ?? {}) as Record<string, number>;
+  const progress = materialsProgressSchema.catch({}).parse(project.materialsProgress ?? {});
   for (const cost of def.materialCosts) {
     if ((progress[cost.category] ?? 0) < cost.quantity) return;
   }
@@ -431,7 +432,7 @@ function toProjectData(
     status: project.status,
     treasuryCost: def?.treasuryCost ?? 0,
     materialCosts: def?.materialCosts ? [...def.materialCosts] : [],
-    materialsProgress: (project.materialsProgress ?? {}) as Record<string, number>,
+    materialsProgress: materialsProgressSchema.catch({}).parse(project.materialsProgress ?? {}),
     memberTurnGoal: def?.memberTurnGoal ?? 0,
     turnsContributed: project.turnsContributed,
     perks: def?.perks ? [...def.perks] : [],

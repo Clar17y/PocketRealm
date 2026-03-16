@@ -3,7 +3,7 @@ import { GUILD_CONSTANTS, type GuildData } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import {
   requireRole, addGuildLog, calculateMaxMembers,
-  addGuildXp, checkGuildAchievementsForAllMembers, getGuild,
+  addGuildXp, checkGuildAchievementsForAllMembers, getGuild, invalidateGuildIdCache,
 } from './guildService';
 
 // ---------------------------------------------------------------------------
@@ -14,7 +14,7 @@ export async function joinGuild(playerId: string, guildId: string): Promise<Guil
   const player = await prisma.player.findUnique({ where: { id: playerId }, select: { id: true, characterLevel: true, username: true } });
   if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
 
-  const existing = await prisma.guildMember.findUnique({ where: { playerId } });
+  const existing = await prisma.guildMember.findUnique({ where: { playerId }, select: { guildId: true } });
   if (existing) throw new AppError(400, 'Already in a guild', 'ALREADY_IN_GUILD');
 
   const guild = await prisma.guild.findUnique({
@@ -40,10 +40,12 @@ export async function joinGuild(playerId: string, guildId: string): Promise<Guil
     throw new AppError(400, 'Guild is full', 'GUILD_FULL');
   }
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx) => {
     await tx.guildMember.create({ data: { guildId, playerId, role: 'member' } });
     await addGuildLog(guildId, 'member_joined', `${player.username} joined the guild`, undefined, tx);
   });
+
+  await invalidateGuildIdCache(playerId);
 
   // Add guild XP for new member
   await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
@@ -64,10 +66,12 @@ export async function leaveGuild(playerId: string): Promise<void> {
     throw new AppError(400, 'Leader must transfer leadership before leaving', 'LEADER_CANNOT_LEAVE');
   }
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx) => {
     await tx.guildMember.delete({ where: { guildId_playerId: { guildId: membership.guildId, playerId } } });
     await addGuildLog(membership.guildId, 'member_left', `${membership.player.username} left the guild`, undefined, tx);
   });
+
+  await invalidateGuildIdCache(playerId);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +93,7 @@ export async function requestJoinGuild(playerId: string, guildId: string): Promi
   });
   if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
 
-  const existingMembership = await prisma.guildMember.findUnique({ where: { playerId } });
+  const existingMembership = await prisma.guildMember.findUnique({ where: { playerId }, select: { guildId: true } });
   if (existingMembership) throw new AppError(400, 'Already in a guild', 'ALREADY_IN_GUILD');
 
   if (player.characterLevel < GUILD_CONSTANTS.JOIN_MIN_LEVEL) {
@@ -115,6 +119,7 @@ export async function requestJoinGuild(playerId: string, guildId: string): Promi
 
   const existing = await prisma.guildJoinRequest.findUnique({
     where: { guildId_playerId: { guildId, playerId } },
+    select: { status: true },
   });
   if (existing?.status === 'pending') throw new AppError(400, 'Join request already pending', 'REQUEST_ALREADY_SENT');
 
@@ -176,11 +181,13 @@ export async function respondToJoinRequest(
       throw new AppError(400, 'Player is already in a guild', 'ALREADY_IN_GUILD');
     }
 
-    await prisma.$transaction(async (tx: any) => {
+    await prisma.$transaction(async (tx) => {
       await tx.guildMember.create({ data: { guildId: membership.guildId, playerId: request.playerId, role: 'member' } });
       await tx.guildJoinRequest.update({ where: { id: requestId }, data: { status: 'accepted' } });
       await addGuildLog(membership.guildId, 'join_request_accepted', `${request.player.username} was accepted into the guild`, undefined, tx);
     });
+
+    await invalidateGuildIdCache(request.playerId);
 
     await addGuildXp(membership.guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
     void checkGuildAchievementsForAllMembers(membership.guildId, ['guildMemberCount']);
@@ -213,10 +220,12 @@ export async function kickMember(requesterId: string, targetId: string): Promise
     throw new AppError(403, 'Officers cannot kick other officers', 'INSUFFICIENT_ROLE');
   }
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx) => {
     await tx.guildMember.delete({ where: { guildId_playerId: { guildId: requester.guildId, playerId: targetId } } });
     await addGuildLog(requester.guildId, 'member_kicked', `${target.player.username} was kicked`, undefined, tx);
   });
+
+  await invalidateGuildIdCache(targetId);
 }
 
 export async function promoteMember(leaderId: string, targetId: string): Promise<void> {
@@ -232,7 +241,7 @@ export async function promoteMember(leaderId: string, targetId: string): Promise
     throw new AppError(400, 'Can only promote members to officer', 'ALREADY_OFFICER');
   }
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx) => {
     await tx.guildMember.update({
       where: { guildId_playerId: { guildId: leader.guildId, playerId: targetId } },
       data: { role: 'officer' },
@@ -254,7 +263,7 @@ export async function demoteMember(leaderId: string, targetId: string): Promise<
     throw new AppError(400, 'Can only demote officers to member', 'NOT_OFFICER');
   }
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx) => {
     await tx.guildMember.update({
       where: { guildId_playerId: { guildId: leader.guildId, playerId: targetId } },
       data: { role: 'member' },
@@ -273,7 +282,7 @@ export async function transferLeadership(leaderId: string, targetId: string): Pr
     throw new AppError(404, 'Target is not in your guild', 'NOT_IN_GUILD');
   }
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx) => {
     await tx.guildMember.update({
       where: { guildId_playerId: { guildId: leader.guildId, playerId: targetId } },
       data: { role: 'leader' },
@@ -297,6 +306,12 @@ export async function transferLeadership(leaderId: string, targetId: string): Pr
 export async function disbandGuild(leaderId: string, guildId: string): Promise<void> {
   const leader = await requireRole(leaderId, 'leader');
   if (leader.guildId !== guildId) throw new AppError(403, 'Not your guild', 'WRONG_GUILD');
+
+  const members = await prisma.guildMember.findMany({
+    where: { guildId },
+    select: { playerId: true },
+  });
+  await invalidateGuildIdCache(...members.map((m) => m.playerId));
 
   await prisma.guild.delete({ where: { id: guildId } });
 }

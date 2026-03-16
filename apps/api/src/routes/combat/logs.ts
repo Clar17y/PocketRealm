@@ -7,6 +7,7 @@ import { enrichLootWithNames } from '../../services/lootService';
 import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { lootDropWithNameSchema } from './helpers';
 import { paginationSchema, buildPagination } from '../../utils/routeHelpers.js';
+import { parseJsonRecord } from '../../utils/jsonColumnSchemas';
 
 const logParamsSchema = z.object({
   id: z.string().uuid(),
@@ -217,7 +218,7 @@ export function registerLogRoutes(router: Router): void {
       throw new AppError(404, 'Combat log not found', 'NOT_FOUND');
     }
 
-    const result = summaryLog.result as Record<string, unknown>;
+    const result = parseJsonRecord<unknown>(summaryLog.result, 'summaryLog.result');
     if (result.source !== 'encounter_site') {
       throw new AppError(400, 'Not an encounter site summary log', 'INVALID_SOURCE');
     }
@@ -294,14 +295,14 @@ export function registerLogRoutes(router: Router): void {
 
       let combat = log.result;
       if (combat && typeof combat === 'object' && !Array.isArray(combat)) {
-        const combatRecord = combat as Record<string, unknown>;
+        const combatRecord = parseJsonRecord<unknown>(combat, 'combat.result');
         const rewards = combatRecord.rewards;
 
         if (rewards && typeof rewards === 'object' && !Array.isArray(rewards)) {
-          const rewardsRecord = rewards as Record<string, unknown>;
+          const rewardsRecord = parseJsonRecord<unknown>(rewards, 'combat.rewards');
           const lootUnknown = rewardsRecord.loot;
           const siteCompletionUnknown = rewardsRecord.siteCompletion;
-          let nextRewards = rewardsRecord;
+          let nextRewards: Record<string, unknown> = rewardsRecord;
           if (Array.isArray(lootUnknown)) {
             const parsedLoot = lootUnknown
               .map((entry) => lootDropWithNameSchema.safeParse(entry))
@@ -316,7 +317,7 @@ export function registerLogRoutes(router: Router): void {
           }
 
           if (siteCompletionUnknown && typeof siteCompletionUnknown === 'object' && !Array.isArray(siteCompletionUnknown)) {
-            const siteCompletionRecord = siteCompletionUnknown as Record<string, unknown>;
+            const siteCompletionRecord = parseJsonRecord<unknown>(siteCompletionUnknown, 'combat.siteCompletion');
             const chestLootUnknown = siteCompletionRecord.loot;
             if (Array.isArray(chestLootUnknown)) {
               const parsedChestLoot = chestLootUnknown
@@ -345,7 +346,7 @@ export function registerLogRoutes(router: Router): void {
         if (Array.isArray(combatRecord.log)) {
           combat = {
             ...(combat as Record<string, unknown>),
-            log: mapTemplateCombatLog(combatRecord.log),
+            log: mapTemplateCombatLog(combatRecord.log as Record<string, unknown>[]),
           } as unknown as Prisma.JsonValue;
         }
       }

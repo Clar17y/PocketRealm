@@ -53,28 +53,29 @@ describe('blockService', () => {
       });
     });
 
-    it('throws ALREADY_BLOCKED when block already exists', async () => {
+    it('is idempotent when block already exists (upsert)', async () => {
       mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
-      mockPrisma.playerBlock.findUnique.mockResolvedValue({ id: 'block-1' });
+      mockPrisma.playerBlock.upsert.mockResolvedValue({});
+      mockPrisma.friendship.deleteMany.mockResolvedValue({ count: 0 });
 
-      await expect(blockPlayer(PLAYER_ID, TARGET_ID)).rejects.toThrow(AppError);
-      await expect(blockPlayer(PLAYER_ID, TARGET_ID)).rejects.toMatchObject({
-        statusCode: 400,
-        code: 'ALREADY_BLOCKED',
-      });
+      // Should not throw — upsert handles duplicates gracefully
+      await blockPlayer(PLAYER_ID, TARGET_ID);
+
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
     });
 
     it('creates block, removes friendship, and deletes pending requests in transaction', async () => {
       mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
-      mockPrisma.playerBlock.findUnique.mockResolvedValue(null);
-      mockPrisma.playerBlock.create.mockResolvedValue({});
+      mockPrisma.playerBlock.upsert.mockResolvedValue({});
       mockPrisma.friendship.deleteMany.mockResolvedValue({ count: 1 });
 
       await blockPlayer(PLAYER_ID, TARGET_ID);
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
-      expect(mockPrisma.playerBlock.create).toHaveBeenCalledWith({
-        data: { blockerId: PLAYER_ID, blockedId: TARGET_ID },
+      expect(mockPrisma.playerBlock.upsert).toHaveBeenCalledWith({
+        where: { blockerId_blockedId: { blockerId: PLAYER_ID, blockedId: TARGET_ID } },
+        create: { blockerId: PLAYER_ID, blockedId: TARGET_ID },
+        update: {},
       });
       // Removes all friendships and pending requests in a single call
       expect(mockPrisma.friendship.deleteMany).toHaveBeenCalledWith({

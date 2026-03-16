@@ -137,7 +137,6 @@ export async function awardRoomTokens(
 export async function awardCompletionBonus(
   members: { playerId: string }[],
   tier: number,
-  totalRooms: number,
   roomTypes: ExpeditionRoomType[],
   expeditionId?: string,
 ): Promise<number> {

@@ -18,7 +18,7 @@ export function normalizePlayerAttributes(raw: unknown): PlayerAttributes {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base;
 
   for (const attribute of ATTRIBUTE_TYPES) {
-    base[attribute] = coerceAttributeValue((raw as Record<string, unknown>)[attribute]);
+    base[attribute] = coerceAttributeValue((raw as Record<string, number>)[attribute]);
   }
 
   return base;
@@ -65,8 +65,7 @@ export async function allocateAttributePoints(
   }
 
   return prisma.$transaction(async (tx) => {
-    const txAny = tx as unknown as any;
-    const player = await txAny.player.findUnique({
+    const player = await tx.player.findUnique({
       where: { id: playerId },
       select: {
         characterXp: true,
@@ -87,11 +86,11 @@ export async function allocateAttributePoints(
     const attributes = normalizePlayerAttributes(player.attributes);
     attributes[attribute] += spendPoints;
 
-    const updated = await txAny.player.update({
+    const updated = await tx.player.update({
       where: { id: playerId },
       data: {
         attributePoints: player.attributePoints - spendPoints,
-        attributes,
+        attributes: { ...attributes },
       },
       select: {
         characterXp: true,

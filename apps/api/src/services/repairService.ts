@@ -36,6 +36,8 @@ export async function repairItemDurability(
       data: { itemId: null },
     });
     await tx.item.delete({ where: { id: item.id } });
+    // Cache invalidation is intentionally omitted here — callers must invalidate
+    // after the surrounding transaction commits, not inside it.
     return { newMax: 0, decay, destroyed: true };
   }
 
@@ -52,6 +54,8 @@ export async function repairItemDurability(
     throw new AppError(409, 'Item durability changed; try again', 'ITEM_STATE_CHANGED');
   }
 
+  // Cache invalidation is intentionally omitted here — callers must invalidate
+  // after the surrounding transaction commits, not inside it.
   return { newMax, decay, destroyed: false };
 }
 
@@ -134,5 +138,7 @@ export async function repairAllEquipped(
     });
   }
 
+  // Cache invalidation is intentionally omitted here — callers must invalidate
+  // after the surrounding transaction commits, not inside it.
   return { repaired: true, turns: turnSpend, totalTurnCost, items: repairedItems };
 }

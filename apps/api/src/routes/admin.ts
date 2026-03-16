@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
 import { asyncHandler } from '../utils/asyncHandler';
 import { refundPlayerTurns } from '../services/turnBankService';
-import { addStackableItem } from '../services/inventoryService';
+import { addStackableItem, addStackableItemTx } from '../services/inventoryService';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { normalizePlayerAttributes } from '../services/attributesService';
@@ -155,8 +155,8 @@ router.post('/player/attributes', asyncHandler(async (req, res) => {
   });
   const current = normalizePlayerAttributes(player.attributes);
   const merged: PlayerAttributes = { ...current, ...(body.attributes ?? {}) };
-  const data: Record<string, unknown> = {};
-  if (body.attributes) data.attributes = merged;
+  const data: Prisma.PlayerUncheckedUpdateInput = {};
+  if (body.attributes) data.attributes = merged as unknown as Prisma.InputJsonValue;
   if (body.attributePoints !== undefined) data.attributePoints = body.attributePoints;
 
   await prisma.player.update({ where: { id: req.player!.playerId }, data });
@@ -565,7 +565,7 @@ router.post('/tokens/grant', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { amount } = grantTokensSchema.parse(req.body);
 
-  const state = await (prisma as any).playerQuestState.upsert({
+  const state = await prisma.playerQuestState.upsert({
     where: { playerId },
     create: { playerId, questTokens: amount, dailyBonusClaimed: false, lastDailyReset: new Date('2000-01-01'), lastWeeklyReset: new Date('2000-01-01') },
     update: { questTokens: { increment: amount } },
@@ -667,91 +667,96 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
   for (let i = 0; i < botsNeeded; i++) {
     const botName = `ExpBot_${timestamp}_${i}`;
 
-    // Create bot player with attributes matching the tier
-    const bot = await prisma.player.create({
-      data: {
-        username: botName,
-        email: `${botName}@bot.local`,
-        passwordHash: 'bot-no-login',
-        isBot: true,
-        characterLevel: botLevel,
-        attributes: botAttributes,
-      },
-    });
+    // Wrap each bot creation in a transaction so partial records aren't orphaned
+    const botId = await prisma.$transaction(async (tx) => {
+      // Create bot player with attributes matching the tier
+      const bot = await tx.player.create({
+        data: {
+          username: botName,
+          email: `${botName}@bot.local`,
+          passwordHash: 'bot-no-login',
+          isBot: true,
+          characterLevel: botLevel,
+          attributes: botAttributes,
+        },
+      });
 
-    // Create all supporting records in parallel
-    await Promise.all([
-      // Guild membership
-      prisma.guildMember.create({
-        data: { guildId: membership.guildId, playerId: bot.id, role: 'member' },
-      }),
-      // Turn bank
-      prisma.turnBank.create({
-        data: { playerId: bot.id, currentTurns: 100_000, lastRegenAt: new Date() },
-      }),
-      // Player stats
-      prisma.playerStats.create({
-        data: { playerId: bot.id },
-      }),
-      // Combat skills (needed for stat calculations)
-      prisma.playerSkill.createMany({
-        data: ALL_SKILLS.map(skillType => ({
+      // Create all supporting records in parallel
+      await Promise.all([
+        // Guild membership
+        tx.guildMember.create({
+          data: { guildId: membership.guildId, playerId: bot.id, role: 'member' },
+        }),
+        // Turn bank
+        tx.turnBank.create({
+          data: { playerId: bot.id, currentTurns: 100_000, lastRegenAt: new Date() },
+        }),
+        // Player stats
+        tx.playerStats.create({
+          data: { playerId: bot.id },
+        }),
+        // Combat skills (needed for stat calculations)
+        tx.playerSkill.createMany({
+          data: ALL_SKILLS.map((skillType: string) => ({
+            playerId: bot.id,
+            skillType,
+            level: 10,
+            xp: BigInt(0),
+          })),
+        }),
+      ]);
+
+      // Create combat template: conditional potion usage + buff opener + sustained DPS
+      const template = await tx.combatTemplate.create({
+        data: { playerId: bot.id, name: 'Bot Expedition', isActive: true },
+      });
+      await tx.combatTemplateSlot.createMany({
+        data: [
+          // Slot 0: Open with battle_cry buff, else light_attack
+          { templateId: template.id, sortOrder: 0, actionId: 'light_attack',
+            conditionType: 'no_buff', effectName: 'Battle Cry', thenActionId: 'battle_cry' },
+          // Slot 1: Venomous strike for DoT, potion if low HP
+          { templateId: template.id, sortOrder: 1, actionId: 'venomous_strike',
+            conditionType: 'resource_below', resource: 'hp', threshold: 50, thenActionId: 'use_hp_potion' },
+          // Slot 2: Rending slash for bleed DoT, potion if low HP
+          { templateId: template.id, sortOrder: 2, actionId: 'rending_slash',
+            conditionType: 'resource_below', resource: 'hp', threshold: 50, thenActionId: 'use_hp_potion' },
+          // Slot 3: Light attack, potion if low HP
+          { templateId: template.id, sortOrder: 3, actionId: 'light_attack',
+            conditionType: 'resource_below', resource: 'hp', threshold: 50, thenActionId: 'use_hp_potion' },
+          // Slot 4: Light attack, potion if low HP
+          { templateId: template.id, sortOrder: 4, actionId: 'light_attack',
+            conditionType: 'resource_below', resource: 'hp', threshold: 50, thenActionId: 'use_hp_potion' },
+        ],
+      });
+
+      // Grant 100 HP potions (find the tier-appropriate potion template)
+      const potionTemplate = await tx.itemTemplate.findFirst({
+        where: { itemType: 'consumable', name: { contains: 'Health Potion', mode: 'insensitive' } },
+        orderBy: { tier: 'asc' },
+      });
+      if (potionTemplate) {
+        await addStackableItemTx(tx, bot.id, potionTemplate.id, 100);
+      }
+
+      // Sign up bot for expedition
+      await tx.guildExpeditionMember.create({
+        data: {
+          expeditionId: expedition.id,
           playerId: bot.id,
-          skillType,
-          level: 10,
-          xp: BigInt(0),
-        })),
-      }),
-    ]);
+          currentHp: maxHp,
+          currentStamina: maxStamina,
+          currentMana: maxMana,
+          maxHp,
+          maxStamina,
+          maxMana,
+        },
+      });
 
-    // Create combat template: conditional potion usage + buff opener + sustained DPS
-    const template = await prisma.combatTemplate.create({
-      data: { playerId: bot.id, name: 'Bot Expedition', isActive: true },
-    });
-    await prisma.combatTemplateSlot.createMany({
-      data: [
-        // Slot 0: Open with battle_cry buff, else light_attack
-        { templateId: template.id, sortOrder: 0, actionId: 'light_attack',
-          conditionType: 'no_buff', effectName: 'Battle Cry', thenActionId: 'battle_cry' },
-        // Slot 1: Venomous strike for DoT, potion if low HP
-        { templateId: template.id, sortOrder: 1, actionId: 'venomous_strike',
-          conditionType: 'resource_below', resource: 'hp', threshold: 50, thenActionId: 'use_hp_potion' },
-        // Slot 2: Rending slash for bleed DoT, potion if low HP
-        { templateId: template.id, sortOrder: 2, actionId: 'rending_slash',
-          conditionType: 'resource_below', resource: 'hp', threshold: 50, thenActionId: 'use_hp_potion' },
-        // Slot 3: Light attack, potion if low HP
-        { templateId: template.id, sortOrder: 3, actionId: 'light_attack',
-          conditionType: 'resource_below', resource: 'hp', threshold: 50, thenActionId: 'use_hp_potion' },
-        // Slot 4: Light attack, potion if low HP
-        { templateId: template.id, sortOrder: 4, actionId: 'light_attack',
-          conditionType: 'resource_below', resource: 'hp', threshold: 50, thenActionId: 'use_hp_potion' },
-      ],
+      return bot.id;
     });
 
-    // Grant 100 HP potions (find the tier-appropriate potion template)
-    const potionTemplate = await prisma.itemTemplate.findFirst({
-      where: { itemType: 'consumable', name: { contains: 'Health Potion', mode: 'insensitive' } },
-      orderBy: { tier: 'asc' },
-    });
-    if (potionTemplate) {
-      await addStackableItem(bot.id, potionTemplate.id, 100);
-    }
-
-    // Sign up bot for expedition
-    await prisma.guildExpeditionMember.create({
-      data: {
-        expeditionId: expedition.id,
-        playerId: bot.id,
-        currentHp: maxHp,
-        currentStamina: maxStamina,
-        currentMana: maxMana,
-        maxHp,
-        maxStamina,
-        maxMana,
-      },
-    });
-
-    botIds.push(bot.id);
+    botIds.push(botId);
   }
 
   await adminAudit(playerId, 'fill_expedition', { expeditionId: expedition.id, botsCreated: botsNeeded, botIds });

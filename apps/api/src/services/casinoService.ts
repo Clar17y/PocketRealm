@@ -19,6 +19,14 @@ import type {
   CasinoResultEvent,
   CasinoPhaseEvent,
 } from '@pocketrealm/shared';
+import { activeRoundSchema, resolvedRoundSchema, safeParseRedisJson } from '../utils/jsonColumnSchemas';
+
+const VALID_BET_TYPES = new Set<RouletteBetType>(['straight', 'split', 'red', 'black', 'odd', 'even', 'dozen', 'column', 'corner']);
+
+function validateBetType(value: string): RouletteBetType {
+  if (VALID_BET_TYPES.has(value as RouletteBetType)) return value as RouletteBetType;
+  return 'straight'; // fallback for corrupted data
+}
 
 export interface GoldExchangeResult {
   turnsSpent: number;
@@ -70,19 +78,23 @@ const RESULT_DISPLAY_SECONDS = 5;
 async function getOrCreateRound(): Promise<{ roundId: string; startedAt: number; isNew: boolean }> {
   const existing = await redis.get(ROUND_KEY);
   if (existing) {
-    const parsed: ActiveRound = JSON.parse(existing);
-    const elapsed = Date.now() - parsed.startedAt;
-    if (elapsed < CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000) {
-      return { ...parsed, isNew: false };
+    const parsed = safeParseRedisJson(existing, activeRoundSchema, null, 'roulette:current_round');
+    if (parsed) {
+      const elapsed = Date.now() - parsed.startedAt;
+      if (elapsed < CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000) {
+        return { ...parsed, isNew: false };
+      }
+      await resolveRound(parsed.roundId);
     }
-    await resolveRound(parsed.roundId);
   }
 
   // Don't create a new round while the result is still being displayed
   const resolved = await redis.get(RESULT_KEY);
   if (resolved) {
-    const parsed = JSON.parse(resolved);
-    return { roundId: parsed.roundId, startedAt: parsed.startedAt, isNew: false };
+    const parsed = safeParseRedisJson(resolved, resolvedRoundSchema, null, 'roulette:resolved_round');
+    if (parsed) {
+      return { roundId: parsed.roundId, startedAt: parsed.startedAt, isNew: false };
+    }
   }
 
   const round = await prisma.rouletteRound.create({ data: {} });
@@ -110,7 +122,7 @@ async function resolveRound(roundId: string): Promise<number> {
       if (round?.result !== null && round?.result !== undefined) return round.result;
       await new Promise((r) => setTimeout(r, 300));
     }
-    return 0;
+    throw new AppError(409, 'Round resolution in progress, retry later', 'LOCK_CONTENTION');
   }
 
   const result = generateSpinResult();
@@ -121,8 +133,9 @@ async function resolveRound(roundId: string): Promise<number> {
   });
 
   const updates = bets.map((bet) => {
-    const won = isWinningBet(bet.betType as RouletteBetType, bet.betValue, result);
-    const payout = won ? calculatePayout(bet.betType as RouletteBetType, bet.amount) : 0;
+    const validatedBetType = validateBetType(bet.betType);
+    const won = isWinningBet(validatedBetType, bet.betValue, result);
+    const payout = won ? calculatePayout(validatedBetType, bet.amount) : 0;
     return { id: bet.id, playerId: bet.playerId, payout, won, username: bet.player.username, betType: bet.betType, betValue: bet.betValue, amount: bet.amount };
   });
 
@@ -159,7 +172,7 @@ async function resolveRound(roundId: string): Promise<number> {
       .filter((b) => b.won)
       .map((b) => ({
         playerName: b.username,
-        betType: b.betType as RouletteBetType,
+        betType: validateBetType(b.betType),
         betValue: b.betValue,
         amount: b.amount,
         payout: b.payout,
@@ -178,8 +191,8 @@ async function resolveRound(roundId: string): Promise<number> {
     const p = await prisma.player.findUnique({ where: { id: wId }, select: { gold: true } });
     if (p) {
       await prisma.$executeRaw`
-        INSERT INTO player_stats (player_id, peak_gold_held)
-        VALUES (${wId}, ${p.gold})
+        INSERT INTO player_stats (player_id, peak_gold_held, updated_at)
+        VALUES (${wId}, ${p.gold}, NOW())
         ON CONFLICT (player_id)
         DO UPDATE SET peak_gold_held = GREATEST(player_stats.peak_gold_held, ${p.gold})
       `;
@@ -189,8 +202,9 @@ async function resolveRound(roundId: string): Promise<number> {
   }
 
   // Keep the resolved round visible for a few seconds before allowing a new round
-  const parsed = await redis.get(ROUND_KEY);
-  const startedAt = parsed ? JSON.parse(parsed).startedAt : Date.now();
+  const rawRound = await redis.get(ROUND_KEY);
+  const parsedRound = safeParseRedisJson(rawRound, activeRoundSchema, null, 'roulette:current_round');
+  const startedAt = parsedRound?.startedAt ?? Date.now();
   await redis.del(ROUND_KEY);
   await redis.set(RESULT_KEY, JSON.stringify({ roundId, startedAt, result }), 'EX', RESULT_DISPLAY_SECONDS);
 
@@ -224,22 +238,29 @@ async function emitPhaseIfChanged(
 
 export async function getCurrentRound(): Promise<RouletteRoundState> {
   // Check if we're in the result display window
-  const resolved = await redis.get(RESULT_KEY);
-  if (resolved) {
-    const { roundId, startedAt, result: resolvedResult } = JSON.parse(resolved);
-    await emitPhaseIfChanged('result', roundId, 0, resolvedResult);
-    return {
-      roundId,
-      phase: 'result' as const,
-      result: resolvedResult,
-      startedAt: new Date(startedAt).toISOString(),
-      timeRemainingMs: 0,
-      bets: await getPublicBets(roundId),
-    };
+  const resolvedRaw = await redis.get(RESULT_KEY);
+  if (resolvedRaw) {
+    const resolvedData = safeParseRedisJson(resolvedRaw, resolvedRoundSchema, null, 'roulette:resolved_round');
+    if (!resolvedData) {
+      // Corrupt resolved round — delete and fall through to active round check
+      console.error('[casino] corrupt roulette:resolved_round in Redis, discarding');
+      await redis.del(RESULT_KEY);
+    } else {
+      const { roundId, startedAt, result: resolvedResult } = resolvedData;
+      await emitPhaseIfChanged('result', roundId, 0, resolvedResult);
+      return {
+        roundId,
+        phase: 'result' as const,
+        result: resolvedResult,
+        startedAt: new Date(startedAt).toISOString(),
+        timeRemainingMs: 0,
+        bets: await getPublicBets(roundId),
+      };
+    }
   }
 
-  const existing = await redis.get(ROUND_KEY);
-  if (!existing) {
+  const existingRaw = await redis.get(ROUND_KEY);
+  if (!existingRaw) {
     // Auto-start a new round so the casino never stalls in idle
     const { roundId, startedAt } = await getOrCreateRound();
     const totalMs = CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000;
@@ -254,7 +275,24 @@ export async function getCurrentRound(): Promise<RouletteRoundState> {
     };
   }
 
-  const parsed: ActiveRound = JSON.parse(existing);
+  const parseResult = activeRoundSchema.safeParse(JSON.parse(existingRaw));
+  if (!parseResult.success) {
+    console.error('[casino] corrupt roulette:current_round in Redis, starting fresh');
+    await redis.del('roulette:current_round');
+    // Start a new round directly instead of recursing (avoids infinite loop on persistent corruption)
+    const { roundId, startedAt } = await getOrCreateRound();
+    const freshTotalMs = CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000;
+    await emitPhaseIfChanged('betting', roundId, freshTotalMs);
+    return {
+      roundId,
+      phase: 'betting',
+      result: null,
+      startedAt: new Date(startedAt).toISOString(),
+      timeRemainingMs: freshTotalMs,
+      bets: [],
+    };
+  }
+  const parsed = parseResult.data;
   const elapsed = Date.now() - parsed.startedAt;
   const totalMs = CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000;
   const bettingMs = CASINO_CONSTANTS.BETTING_WINDOW_SECONDS * 1000;
@@ -293,7 +331,7 @@ async function getPublicBets(roundId: string): Promise<RoulettePublicBet[]> {
   });
   return bets.map((b) => ({
     playerName: b.player.username,
-    betType: b.betType as RouletteBetType,
+    betType: validateBetType(b.betType),
     betValue: b.betValue,
     amount: b.amount,
   }));

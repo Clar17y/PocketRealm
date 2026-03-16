@@ -7,7 +7,7 @@ import {
 import type { SkillType } from '@pocketrealm/shared';
 import { normalizePlayerAttributes } from './attributesService';
 import { buildPlayerTemplateCombatant } from './combatOrchestrationService';
-import { getSkillLevel } from './combatStatsService';
+import { getSkillLevels } from './combatStatsService';
 import { getActiveTemplate } from './combatTemplateService';
 import { getEquipmentStats } from './equipmentService';
 import { getHpState } from './hpService';
@@ -20,7 +20,7 @@ export type AttackStyle = 'melee' | 'ranged' | 'magic';
 export async function getAttackStyle(playerId: string): Promise<AttackStyle> {
   const mainHand = await prisma.playerEquipment.findUnique({
     where: { playerId_slot: { playerId, slot: 'main_hand' } },
-    include: { item: { include: { template: true } } },
+    select: { item: { select: { template: { select: { requiredSkill: true } } } } },
   });
   const reqSkill = mainHand?.item?.template?.requiredSkill as string | null;
   if (reqSkill === 'ranged') return 'ranged';
@@ -39,7 +39,7 @@ export async function buildPvpCombatant(
   username: string,
   useCurrentResources: boolean,
 ) {
-  const [player, equipStats, attackStyle, template, skillPoints] = await Promise.all([
+  const [player, equipStats, attackStyle, template, skillPoints, levels] = await Promise.all([
     prisma.player.findUniqueOrThrow({
       where: { id: playerId },
       select: { attributes: true },
@@ -48,16 +48,14 @@ export async function buildPvpCombatant(
     getAttackStyle(playerId),
     getActiveTemplate(playerId),
     getSkillPoints(playerId),
+    getSkillLevels(playerId, ['melee', 'ranged', 'evasion', 'magic'] as SkillType[]),
   ]);
 
   const attributes = normalizePlayerAttributes(player.attributes);
-
-  const [meleeLevel, rangedLevel, evasionLevel, magicLevel] = await Promise.all([
-    getSkillLevel(playerId, 'melee'),
-    getSkillLevel(playerId, 'ranged'),
-    getSkillLevel(playerId, 'evasion' as SkillType),
-    getSkillLevel(playerId, 'magic'),
-  ]);
+  const meleeLevel = levels.melee;
+  const rangedLevel = levels.ranged;
+  const evasionLevel = levels.evasion;
+  const magicLevel = levels.magic;
 
   const skillLevel = attackStyle === 'ranged' ? rangedLevel
     : attackStyle === 'magic' ? magicLevel

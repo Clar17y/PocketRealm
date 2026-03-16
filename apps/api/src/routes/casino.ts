@@ -14,8 +14,8 @@ casinoRouter.use(authenticate);
 
 async function updatePeakGold(playerId: string, currentGold: number): Promise<void> {
   await prisma.$executeRaw`
-    INSERT INTO player_stats (player_id, peak_gold_held)
-    VALUES (${playerId}, ${currentGold})
+    INSERT INTO player_stats (player_id, peak_gold_held, updated_at)
+    VALUES (${playerId}, ${currentGold}, NOW())
     ON CONFLICT (player_id)
     DO UPDATE SET peak_gold_held = GREATEST(player_stats.peak_gold_held, ${currentGold})
   `;

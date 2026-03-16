@@ -111,7 +111,7 @@ export async function simulateFight(
   });
 
   // Build mob TemplateCombatant
-  const mobTemplate = toMobTemplate(mob as Record<string, unknown>);
+  const mobTemplate = toMobTemplate(mob);
   const finalMob = applyMobPrefix(mobTemplate, prefix);
   const mobCombatant = mobToTemplateCombatant(finalMob);
 
