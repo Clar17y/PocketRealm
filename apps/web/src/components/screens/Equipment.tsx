@@ -430,8 +430,8 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                               {item.weightClass && (
                                 <div className="mt-1 text-xs text-[var(--rpg-gold)]">{prettyWeightClass(item.weightClass)}</div>
                               )}
-                              {nextDodge < 0 && (
-                                <div className="mt-1 text-xs text-[var(--rpg-red)]">Evasion penalty: {nextDodge}</div>
+                              {totalStatValue(item.baseStats, item.bonusStats, 'dodge') < 0 && (
+                                <div className="mt-1 text-xs text-[var(--rpg-red)]">Evasion penalty: {totalStatValue(item.baseStats, item.bonusStats, 'dodge')}</div>
                               )}
 
                               {durability && durability.max > 0 && (
