@@ -254,7 +254,9 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       newDiscoveries = discoveredZones;
     }
 
-    void trackProgress(playerId, 'zone_travel', 1).catch(() => {});
+    void trackProgress(playerId, 'zone_travel', 1).catch(err =>
+      console.warn('trackProgress failed', { err, playerId, metric: 'zone_travel' })
+    );
 
     res.json({
       zone: { id: destinationZone.id, name: destinationZone.name, zoneType: destinationZone.zoneType },
@@ -663,7 +665,9 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     data: updateData,
   });
 
-  void trackProgress(playerId, 'zone_travel', 1).catch(() => {});
+  void trackProgress(playerId, 'zone_travel', 1).catch(err =>
+    console.warn('trackProgress failed', { err, playerId, metric: 'zone_travel' })
+  );
 
   // --- Achievement tracking (counters + derived checks) ---
   const travelCounters: Record<string, number> = {};

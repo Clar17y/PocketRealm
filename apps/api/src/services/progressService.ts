@@ -20,7 +20,7 @@ export async function trackProgress(
   const guildId = await getPlayerGuildId(playerId);
 
   const contractPromise = (guildId && GUILD_CONTRACT_TYPES.has(type))
-    ? incrementContractProgress(guildId, type as GuildContractType, amount).catch(() => {})
+    ? incrementContractProgress(guildId, type as GuildContractType, amount)
     : Promise.resolve();
 
   const [, questResult] = await Promise.allSettled([

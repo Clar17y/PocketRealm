@@ -179,7 +179,9 @@ bossRouter.post('/:id/signup', async (req, res, next) => {
     );
 
     // Guild contract + quest progress for boss participation
-    void trackProgress(playerId, 'boss_rounds', 1).catch(() => {});
+    void trackProgress(playerId, 'boss_rounds', 1).catch(err =>
+      console.warn('trackProgress failed', { err, playerId, metric: 'boss_rounds' })
+    );
 
     res.json({ participant });
   } catch (err) {
