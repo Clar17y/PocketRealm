@@ -369,19 +369,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setCharacterProgression: (cp) => setCharacterProgression(cp as any),
   };
 
-  const loadTurnsAndHp = useCallback(async () => {
-    const [turnRes, hpRes, resourceRes] = await Promise.all([getTurns(), getHpState(), getResources()]);
-    if (turnRes.data) setTurns(turnRes.data.currentTurns);
-    if (hpRes.data) {
-      setHpState(hpRes.data);
-      hpStateRef.current = hpRes.data;
-    }
-    if (resourceRes.data) {
-      setStaminaState(resourceRes.data.stamina);
-      setManaState(resourceRes.data.mana);
-    }
-  }, []);
-
   const pollScreenData = useCallback(async () => {
     const needs = SCREEN_POLL_NEEDS[activeScreen] ?? ['turns'];
     const fetches: Promise<void>[] = [];
@@ -1803,7 +1790,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleUnequipSlot,
     handleAllocateAttribute,
     loadAll,
-    loadTurnsAndHp,
     loadPvpNotificationCount,
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,

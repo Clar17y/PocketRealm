@@ -246,7 +246,6 @@ export default function GamePage() {
     openChangelog,
     zoneCraftingLevel,
     zoneCraftingName,
-    loadTurnsAndHp,
     loadPvpNotificationCount,
     achievementData,
     achievementUnclaimedCount,
@@ -1082,7 +1081,7 @@ export default function GamePage() {
           <GuildScreen
             playerId={player?.id ?? null}
             characterLevel={characterProgression.characterLevel}
-            onTurnsChanged={() => void loadTurnsAndHp()}
+            onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onExpeditionContextChange={setExpeditionContext}
           />
         );
@@ -1090,7 +1089,7 @@ export default function GamePage() {
         return (
           <FriendsScreen
             playerId={player?.id ?? null}
-            onTurnsChanged={() => void loadTurnsAndHp()}
+            onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onFriendCountsChanged={() => void loadFriendCounts()}
             combatSpeedMs={combatLogSpeedMs}
             onNavigateToMail={(recipientId, recipientName) => {
