@@ -62,7 +62,7 @@ export async function claimPendingLoot(
   playerId: string,
   sessionId: string,
   selectedIndices: number[]
-): Promise<void> {
+): Promise<{ claimedItemIds: string[] }> {
   const key = lootKey(playerId, sessionId);
 
   // Atomically read-and-delete to prevent double-claim race condition
@@ -85,13 +85,14 @@ export async function claimPendingLoot(
   const uniqueIndices = [...new Set(selectedIndices)];
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const claimedItemIds = await prisma.$transaction(async (tx) => {
+      const ids: string[] = [];
       for (const idx of uniqueIndices) {
         if (idx < 0 || idx >= items.length) continue;
         if (slotsUsed >= capacity) break;
 
         const lootItem = items[idx];
-        await tx.item.create({
+        const created = await tx.item.create({
           data: {
             ownerId: playerId,
             templateId: lootItem.templateId,
@@ -102,9 +103,12 @@ export async function claimPendingLoot(
             maxDurability: lootItem.maxDurability,
           },
         });
+        ids.push(created.id);
         slotsUsed++;
       }
+      return ids;
     });
+    return { claimedItemIds };
   } catch (err) {
     // Restore the Redis key so the player can retry — prevents loot loss on DB failure
     await redis.set(key, data, 'EX', INVENTORY_CONSTANTS.PENDING_LOOT_TTL_SECONDS);

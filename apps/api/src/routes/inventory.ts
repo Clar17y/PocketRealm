@@ -339,7 +339,14 @@ inventoryRouter.post('/stash/deposit', asyncHandler(async (req, res) => {
   const body = stashSchema.parse(req.body);
   await assertInTown(playerId);
   await depositItem(playerId, body.itemId, body.quantity);
-  res.json({ success: true });
+  const inventoryMeta = await fetchInventoryMeta(playerId);
+  res.json({
+    success: true,
+    stateUpdates: {
+      inventoryRemoved: [body.itemId],
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    },
+  });
 }));
 
 const stashBatchSchema = z.object({
@@ -351,7 +358,14 @@ inventoryRouter.post('/stash/deposit/batch', asyncHandler(async (req, res) => {
   const body = stashBatchSchema.parse(req.body);
   await assertInTown(playerId);
   const result = await depositBatch(playerId, body.itemIds);
-  res.json(result);
+  const inventoryMeta = await fetchInventoryMeta(playerId);
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryRemoved: body.itemIds,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    },
+  });
 }));
 
 inventoryRouter.post('/stash/withdraw', asyncHandler(async (req, res) => {
@@ -359,7 +373,17 @@ inventoryRouter.post('/stash/withdraw', asyncHandler(async (req, res) => {
   const body = stashSchema.parse(req.body);
   await assertInTown(playerId);
   await withdrawItem(playerId, body.itemId, body.quantity);
-  res.json({ success: true });
+  const [itemDTOs, inventoryMeta] = await Promise.all([
+    fetchItemDTOs([body.itemId]),
+    fetchInventoryMeta(playerId),
+  ]);
+  res.json({
+    success: true,
+    stateUpdates: {
+      inventoryAdded: itemDTOs,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    },
+  });
 }));
 
 inventoryRouter.post('/stash/withdraw/batch', asyncHandler(async (req, res) => {
@@ -367,7 +391,17 @@ inventoryRouter.post('/stash/withdraw/batch', asyncHandler(async (req, res) => {
   const body = stashBatchSchema.parse(req.body);
   await assertInTown(playerId);
   const result = await withdrawBatch(playerId, body.itemIds);
-  res.json(result);
+  const [itemDTOs, inventoryMeta] = await Promise.all([
+    fetchItemDTOs(body.itemIds),
+    fetchInventoryMeta(playerId),
+  ]);
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryAdded: itemDTOs,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    },
+  });
 }));
 
 // --- Loot endpoints ---
@@ -393,6 +427,16 @@ const lootClaimSchema = z.object({
 inventoryRouter.post('/loot/claim', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = lootClaimSchema.parse(req.body);
-  await claimPendingLoot(playerId, body.sessionId, body.selectedIndices);
-  res.json({ success: true });
+  const { claimedItemIds } = await claimPendingLoot(playerId, body.sessionId, body.selectedIndices);
+  const [itemDTOs, inventoryMeta] = await Promise.all([
+    fetchItemDTOs(claimedItemIds),
+    fetchInventoryMeta(playerId),
+  ]);
+  res.json({
+    success: true,
+    stateUpdates: {
+      inventoryAdded: itemDTOs,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    },
+  });
 }));
