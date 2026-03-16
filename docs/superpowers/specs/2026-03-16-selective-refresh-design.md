@@ -69,13 +69,13 @@ Each action route builds a `stateUpdates` object before responding. The enrichme
 
 | Route | stateUpdates fields |
 |-------|-------------------|
-| `POST /crafting/craft` | `inventoryAdded` (crafted items), `inventoryRemoved` (consumed materials — stackable items with qty 0), `inventoryUpdated` (partially consumed stacks), `skills`, `resources`, `inventoryUsedSlots` |
+| `POST /crafting/craft` | `inventoryAdded` (crafted items), `inventoryRemoved` (consumed materials — stackable items with qty 0), `inventoryUpdated` (partially consumed stacks), `skills`, `resources`, `inventoryUsedSlots`, `characterProgression` (XP may trigger level-up) |
 | `POST /crafting/salvage` | `inventoryAdded` (returned materials), `inventoryRemoved` (salvaged item), `inventoryUpdated` (stacks that gained quantity), `inventoryUsedSlots` |
 | `POST /crafting/salvage/batch` | Same as salvage, multiple items |
-| `POST /gathering/mine` | `inventoryAdded` (gathered items + gems), `inventoryUpdated` (existing stacks incremented), `skills`, `resources`, `inventoryUsedSlots` |
+| `POST /gathering/mine` | `inventoryAdded` (gathered items + gems), `inventoryUpdated` (existing stacks incremented), `skills`, `resources`, `inventoryUsedSlots`, `characterProgression` |
 | `POST /equipment/equip` | `inventoryRemoved` (item leaves inventory), `equipment` (full map), `inventoryUsedSlots` |
 | `POST /equipment/unequip` | `inventoryAdded` (item returns to inventory), `equipment` (full map), `inventoryUsedSlots` |
-| `POST /combat/start` | `hp`, `skills`, `resources`, `inventoryUpdated` (durability changes), `buffs` |
+| `POST /combat/start` | `hp`, `skills`, `resources`, `inventoryUpdated` (durability changes), `buffs`, `characterProgression` |
 | `POST /exploration/start` | `hp`, `resources` |
 | `POST /inventory/sell` | `inventoryRemoved`, `gold`, `inventoryUsedSlots` |
 | `POST /inventory/sell/bulk` | `inventoryRemoved`, `gold`, `inventoryUsedSlots` |
@@ -91,6 +91,11 @@ Each action route builds a `stateUpdates` object before responding. The enrichme
 | `POST /travel/start` | `hp`, `resources` |
 | `POST /rest/start` | `hp`, `resources` |
 | `POST /buffs/activate` | `buffs`, `inventoryRemoved` or `inventoryUpdated` |
+| `POST /pvp/scout` | (no stateUpdates — scout returns scout data, turns set from response inline) |
+| `POST /pvp/challenge` | `hp`, `resources`, `skills`, `characterProgression` |
+| `POST /skillpoints/allocate` | (returns full `SkillPointState` directly — no stateUpdates needed, handler already sets state from response) |
+
+**Out of scope:** PvP scout/challenge currently use `onTurnsChanged`/`onHpChanged` callbacks from `ArenaScreen` that call `loadTurnsAndHp()` in the parent. These will be refactored: the PvP API responses will include `stateUpdates`, and `ArenaScreen` will call `applyStateUpdates` directly instead of using callbacks. The `onTurnsChanged`/`onHpChanged` callback props will be removed.
 
 #### Building stateUpdates in Services
 
@@ -124,7 +129,7 @@ async function craftItem(playerId, recipeId, quantity) {
 }
 ```
 
-A shared `toInventoryItemDTO(item)` helper serialises a Prisma inventory item + template join into the DTO shape. A shared `buildStateUpdates(playerId, fields[])` helper can fetch only the requested fields to avoid duplication across services.
+A shared `toInventoryItemDTO(item)` helper serialises a Prisma inventory item + template join into the DTO shape. `InventoryItemDTO` should reuse or extend existing inventory types in `packages/shared` if a suitable type exists, rather than creating a parallel definition. A shared `buildStateUpdates(playerId, fields[])` helper can fetch only the requested fields to avoid duplication across services.
 
 ### 3. Frontend: applyStateUpdates Utility
 
@@ -142,7 +147,6 @@ interface StateSetters {
   setManaState: (m: ResourceState) => void;
   setGold: (g: number) => void;
   setActiveBuffs: (b: BuffState[]) => void;
-  setSkillPointState: (sp: SkillPointState) => void;
   setCharacterProgression: (cp: CharacterProgression) => void;
 }
 
@@ -230,7 +234,7 @@ Non-simple handlers (craft, combat, exploration, gathering, travel) call `applyS
 
 ### 5. Screen-Aware Polling
 
-Replace the single 10s `loadTurnsAndHp` interval with a screen-aware poller.
+Replace the single 10s `loadTurnsAndHp` interval with a screen-aware poller. Note: `loadTurnsAndHp` is also called mid-travel-hop (3 call sites) to refresh state between multi-zone travel hops. These call sites will also switch to `applyStateUpdates` — the travel API response already returns turns, and will be enriched with `hp` and `resources` in `stateUpdates`.
 
 ```ts
 // Screens grouped by data needs
@@ -319,7 +323,24 @@ function useRateLimitToast() {
 }
 ```
 
-Uses the existing toast system if one exists, or a minimal one if not.
+Integrates with the existing `useToastQueue` system. A new `RateLimitToast` component (similar to `QuestToast`) registers via `window.__showRateLimitToast` and renders through `ToastContainer`. The `useRateLimitToast` hook listens for the `api:rate-limited` event and calls the global:
+
+```ts
+function useRateLimitToast() {
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const handler = () => {
+      if (timeout) return;
+      const show = (window as Record<string, unknown>).__showRateLimitToast as
+        | ((msg: string) => void) | undefined;
+      show?.('Too many requests — wait a moment');
+      timeout = setTimeout(() => { timeout = null; }, 4000);
+    };
+    window.addEventListener('api:rate-limited', handler);
+    return () => window.removeEventListener('api:rate-limited', handler);
+  }, []);
+}
+```
 
 ### 7. loadAll Retained for Initial Load Only
 
