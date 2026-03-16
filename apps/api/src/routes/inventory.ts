@@ -93,12 +93,18 @@ inventoryRouter.delete('/:id', asyncHandler(async (req, res) => {
       where: { id: item.id },
       data: { quantity: item.quantity - query.quantity },
     });
-    const inventoryMeta = await fetchInventoryMeta(playerId);
+    const [inventoryMeta, updatedDTOs] = await Promise.all([
+      fetchInventoryMeta(playerId),
+      fetchItemDTOs([updated.id]),
+    ]);
     res.json({
       destroyed: false,
       itemId: updated.id,
       remainingQuantity: updated.quantity,
-      stateUpdates: { inventoryUsedSlots: inventoryMeta.inventoryUsedSlots },
+      stateUpdates: {
+        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        inventoryUpdated: updatedDTOs,
+      },
     });
     return;
   }
@@ -273,6 +279,9 @@ inventoryRouter.post('/use', asyncHandler(async (req, res) => {
 
   if (result.remainingQuantity === null) {
     stateUpdates.inventoryRemoved = [body.itemId];
+  } else {
+    const updatedDTOs = await fetchItemDTOs([body.itemId]);
+    stateUpdates.inventoryUpdated = updatedDTOs;
   }
 
   res.json({ ...result, stateUpdates });

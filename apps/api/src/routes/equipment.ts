@@ -78,8 +78,7 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
     fetchInventoryMeta(playerId),
   ]);
 
-  const response: Record<string, unknown> = {
-    success: true,
+  const stateUpdates: Record<string, unknown> = {
     equipment,
     inventoryRemoved: [body.itemId],
     inventoryUsedSlots,
@@ -87,7 +86,7 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
 
   // If a different item was in the slot before, it returns to inventory
   if (previousItem && previousItem.id !== body.itemId) {
-    response.inventoryAdded = [
+    stateUpdates.inventoryAdded = [
       toInventoryItemDTO(
         { ...previousItem, bonusStats: previousItem.bonusStats as Record<string, number> | null },
         null,
@@ -95,7 +94,7 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
     ];
   }
 
-  res.json(response);
+  res.json({ success: true, stateUpdates });
 }));
 
 const unequipSchema = z.object({
@@ -129,16 +128,18 @@ equipmentRouter.post('/unequip', asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    equipment,
-    inventoryAdded: unequippedItem
-      ? [
-          toInventoryItemDTO(
-            { ...unequippedItem, bonusStats: unequippedItem.bonusStats as Record<string, number> | null },
-            null,
-          ),
-        ]
-      : [],
-    inventoryUsedSlots,
+    stateUpdates: {
+      equipment,
+      inventoryAdded: unequippedItem
+        ? [
+            toInventoryItemDTO(
+              { ...unequippedItem, bonusStats: unequippedItem.bonusStats as Record<string, number> | null },
+              null,
+            ),
+          ]
+        : [],
+      inventoryUsedSlots,
+    },
   });
 }));
 

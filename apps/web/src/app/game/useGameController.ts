@@ -346,6 +346,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   useEffect(() => {
     hpStateRef.current = hpState;
   }, [hpState]);
+  const staminaStateRef = useRef(staminaState);
+  useEffect(() => {
+    staminaStateRef.current = staminaState;
+  }, [staminaState]);
+  const manaStateRef = useRef(manaState);
+  useEffect(() => {
+    manaStateRef.current = manaState;
+  }, [manaState]);
 
   const stateSetters: StateSetters = {
     setInventory: (updater) => setInventory(updater as any),
@@ -380,15 +388,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
     fetches.push(getTurns().then(res => { if (res.data) setTurns(res.data.currentTurns); }));
 
-    if (needs.includes('hp') && hpState.currentHp < hpState.maxHp) {
+    if (needs.includes('hp') && hpStateRef.current.currentHp < hpStateRef.current.maxHp) {
       fetches.push(getHpState().then(res => {
         if (res.data) { setHpState(res.data); hpStateRef.current = res.data; }
       }));
     }
 
     if (needs.includes('resources')) {
-      const staminaFull = staminaState.current >= staminaState.max;
-      const manaFull = manaState.current >= manaState.max;
+      const staminaFull = staminaStateRef.current.current >= staminaStateRef.current.max;
+      const manaFull = manaStateRef.current.current >= manaStateRef.current.max;
       if (!staminaFull || !manaFull) {
         fetches.push(getResources().then(res => {
           if (res.data) { setStaminaState(res.data.stamina); setManaState(res.data.mana); }
@@ -397,7 +405,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
 
     await Promise.all(fetches);
-  }, [activeScreen, hpState.currentHp, hpState.maxHp, staminaState, manaState]);
+  }, [activeScreen]);
 
   const loadPvpNotificationCount = useCallback(async () => {
     const result = await getPvpNotificationCount();
@@ -1612,6 +1620,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         const healed = result.data.currentHp - hpState.currentHp;
         setTurns(result.data.turns.currentTurns);
         setHpState(prev => ({ ...prev, currentHp: result.data!.currentHp, maxHp: result.data!.maxHp }));
+        applyStateUpdates((result.data as any).stateUpdates, stateSetters);
         pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${actualTurns.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
       }
     });
