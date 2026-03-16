@@ -18,7 +18,7 @@ import {
   sparFriend,
 } from '@/lib/api';
 import type { SparResponse } from '@/lib/api';
-import type { FriendListEntry, FriendRequest, BlockedPlayer } from '@pocketrealm/shared';
+import type { FriendListEntry, FriendRequest, BlockedPlayer, StateUpdates } from '@pocketrealm/shared';
 import { FRIEND_CONSTANTS } from '@pocketrealm/shared';
 import { relativeTime } from '@/lib/format';
 import { handleKeyActivate } from '@/lib/utils';
@@ -39,7 +39,7 @@ import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 
 interface FriendsScreenProps {
   playerId: string | null;
-  onStateUpdates?: (updates: any) => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
   onFriendCountsChanged?: () => void;
   combatSpeedMs?: number;
   onNavigateToMail?: (recipientId: string, recipientName: string) => void;

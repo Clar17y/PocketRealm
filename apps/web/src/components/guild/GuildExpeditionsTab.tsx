@@ -37,6 +37,7 @@ import type {
   ExpeditionCooldownInfo,
   BossActiveEffect,
   CombatTemplateData,
+  StateUpdates,
 } from '@pocketrealm/shared';
 import { EXPEDITION_CONSTANTS, EXPEDITION_THEMES, mobDisplayName } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
@@ -85,7 +86,7 @@ interface GuildExpeditionsTabProps {
   myRole: 'leader' | 'officer' | 'member';
   characterLevel: number;
   setError: (msg: string | null) => void;
-  onStateUpdates?: (updates: any) => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
   onRefresh?: () => void;
   onExpeditionContextChange?: (ctx: ExpeditionContext | null) => void;
 }

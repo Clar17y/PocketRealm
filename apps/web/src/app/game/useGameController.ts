@@ -355,7 +355,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     manaStateRef.current = manaState;
   }, [manaState]);
 
-  const stateSetters: StateSetters = {
+  const activeScreenRef = useRef(activeScreen);
+  useEffect(() => { activeScreenRef.current = activeScreen; }, [activeScreen]);
+
+  const stateSetters = useMemo<StateSetters>(() => ({
     setInventory: (updater) => setInventory(updater as any),
     setInventoryCapacity,
     setInventoryUsedSlots,
@@ -367,10 +370,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setGold,
     setActiveBuffs: (buffs) => { setActiveBuffs(buffs as any); },
     setCharacterProgression: (cp) => setCharacterProgression(cp as any),
-  };
+  }), []);
+  // All useState setters are stable references, so empty deps is correct
 
   const pollScreenData = useCallback(async () => {
-    const needs = SCREEN_POLL_NEEDS[activeScreen] ?? ['turns'];
+    const needs = SCREEN_POLL_NEEDS[activeScreenRef.current] ?? ['turns'];
     const fetches: Promise<void>[] = [];
 
     fetches.push(getTurns().then(res => { if (res.data) setTurns(res.data.currentTurns); }));
@@ -392,7 +396,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
 
     await Promise.all(fetches);
-  }, [activeScreen]);
+  }, []); // stable — no deps that change
 
   const loadPvpNotificationCount = useCallback(async () => {
     const result = await getPvpNotificationCount();

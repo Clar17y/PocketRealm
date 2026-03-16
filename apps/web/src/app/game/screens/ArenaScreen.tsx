@@ -23,7 +23,7 @@ import {
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
-import { PVP_CONSTANTS } from '@pocketrealm/shared';
+import { PVP_CONSTANTS, type StateUpdates } from '@pocketrealm/shared';
 import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
 import { Swords, Eye, Trophy, Bell, ChevronLeft, ChevronRight, Medal, Shield } from 'lucide-react';
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable';
@@ -36,7 +36,7 @@ interface ArenaScreenProps {
   currentTurns: number;
   playerId: string | null;
   isInTown?: boolean;
-  onStateUpdates?: (updates: any) => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
   onNotificationsChanged?: () => void;
   onNavigate?: (screen: string) => void;
   combatSpeedMs?: number;

@@ -11,14 +11,14 @@ import {
   type GuildProjectResponse, type GuildProjectAvailableResponse, type GuildProjectsListResponse,
 } from '@/lib/api/guild';
 import { getInventory } from '@/lib/api/items';
-import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS, getCategoryForTemplate } from '@pocketrealm/shared';
+import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS, getCategoryForTemplate, type StateUpdates } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
 
 interface GuildProjectsTabProps {
   guildId: string;
   myRole: string;
   setError: (err: string | null) => void;
-  onStateUpdates?: (updates: any) => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
 }
 
 interface ResourceItem {

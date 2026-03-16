@@ -1,35 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import type { EquipmentSlot, InventoryItemDTO } from '@pocketrealm/shared';
+import type { EquipmentSlot } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { equipItem, ensureEquipmentSlots, unequipSlot } from '../services/equipmentService';
 import { assertNotRecovering } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
-import { toInventoryItemDTO, fetchInventoryMeta } from '../services/stateUpdateHelpers';
+import { toInventoryItemDTO, fetchInventoryMeta, fetchEquipmentMap } from '../services/stateUpdateHelpers';
 
 export const equipmentRouter = Router();
-
-/**
- * Fetch the full equipment map for a player.
- * Returns a Record mapping each slot to an InventoryItemDTO or null.
- */
-async function fetchEquipmentMap(playerId: string): Promise<Record<string, InventoryItemDTO | null>> {
-  const rows = await prisma.playerEquipment.findMany({
-    where: { playerId },
-    include: { item: { include: { template: true } } },
-  });
-  const map: Record<string, InventoryItemDTO | null> = {};
-  for (const row of rows) {
-    map[row.slot] = row.item
-      ? toInventoryItemDTO(
-          { ...row.item, bonusStats: row.item.bonusStats as Record<string, number> | null },
-          row.slot,
-        )
-      : null;
-  }
-  return map;
-}
 
 equipmentRouter.use(authenticate);
 

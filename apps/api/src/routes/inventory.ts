@@ -269,7 +269,10 @@ inventoryRouter.post('/use', asyncHandler(async (req, res) => {
   const body = useSchema.parse(req.body);
   const result = await useConsumable(playerId, body.itemId);
 
-  const stateFields = await buildStateUpdates(playerId, ['hp', 'resources', 'buffs']);
+  const [stateFields, updatedDTOs] = await Promise.all([
+    buildStateUpdates(playerId, ['hp', 'resources', 'buffs']),
+    result.remainingQuantity !== null ? fetchItemDTOs([body.itemId]) : Promise.resolve([]),
+  ]);
 
   const stateUpdates: Record<string, unknown> = {
     hp: stateFields.hp,
@@ -280,7 +283,6 @@ inventoryRouter.post('/use', asyncHandler(async (req, res) => {
   if (result.remainingQuantity === null) {
     stateUpdates.inventoryRemoved = [body.itemId];
   } else {
-    const updatedDTOs = await fetchItemDTOs([body.itemId]);
     stateUpdates.inventoryUpdated = updatedDTOs;
   }
 

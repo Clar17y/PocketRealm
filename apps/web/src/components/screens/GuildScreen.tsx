@@ -23,11 +23,12 @@ import { ScreenContainer } from '../common/ScreenContainer';
 type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'projects' | 'expeditions' | 'shop' | 'specialization' | 'log' | 'settings';
 
 import type { ExpeditionContext } from '@/lib/assets';
+import type { StateUpdates } from '@pocketrealm/shared';
 
 interface GuildScreenProps {
   playerId: string | null;
   characterLevel: number;
-  onStateUpdates?: (updates: any) => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
   onExpeditionContextChange?: (ctx: ExpeditionContext | null) => void;
 }
 

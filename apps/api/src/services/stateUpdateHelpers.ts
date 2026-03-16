@@ -1,5 +1,5 @@
 import { prisma } from '@pocketrealm/database';
-import type { InventoryItemDTO, SkillStateDTO, StateUpdates } from '@pocketrealm/shared';
+import type { InventoryItemDTO, SkillStateDTO, StateUpdates, BuffStateDTO } from '@pocketrealm/shared';
 import { getHpState } from './hpService.js';
 import { getResourceState } from './resourceService.js';
 import { getInventoryState } from './inventoryService.js';
@@ -244,6 +244,51 @@ export async function fetchGold(playerId: string): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
+// fetchEquipmentMap
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch the full equipment map for a player.
+ * Returns a Record mapping each slot to an InventoryItemDTO or null.
+ */
+export async function fetchEquipmentMap(playerId: string): Promise<Record<string, InventoryItemDTO | null>> {
+  const rows = await prisma.playerEquipment.findMany({
+    where: { playerId },
+    include: { item: { include: { template: true } } },
+  });
+  const map: Record<string, InventoryItemDTO | null> = {};
+  for (const row of rows) {
+    map[row.slot] = row.item
+      ? toInventoryItemDTO(
+          { ...row.item, bonusStats: row.item.bonusStats as Record<string, number> | null },
+          row.slot,
+        )
+      : null;
+  }
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// fetchBuffDTOs
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch all active buffs for a player, returned as DTOs.
+ */
+export async function fetchBuffDTOs(playerId: string): Promise<BuffStateDTO[]> {
+  const buffs = await prisma.playerBuff.findMany({
+    where: { playerId },
+    select: { id: true, buffType: true, remainingUses: true, bonusValue: true },
+  });
+  return buffs.map((b) => ({
+    id: b.id,
+    buffType: b.buffType,
+    remainingRounds: b.remainingUses,
+    value: b.bonusValue,
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // buildStateUpdates
 // ---------------------------------------------------------------------------
 
@@ -286,12 +331,7 @@ export async function buildStateUpdates(
       ? fetchCharacterProgression(playerId)
       : Promise.resolve(undefined),
     fieldSet.has('gold') ? fetchGold(playerId) : Promise.resolve(undefined),
-    fieldSet.has('buffs')
-      ? prisma.playerBuff.findMany({
-          where: { playerId },
-          select: { id: true, buffType: true, remainingUses: true, bonusValue: true },
-        })
-      : Promise.resolve(undefined),
+    fieldSet.has('buffs') ? fetchBuffDTOs(playerId) : Promise.resolve(undefined),
     needsInventoryMeta ? fetchInventoryMeta(playerId) : Promise.resolve(undefined),
   ]);
 
@@ -301,12 +341,7 @@ export async function buildStateUpdates(
   if (characterProgression !== undefined) result.characterProgression = characterProgression;
   if (gold !== undefined) result.gold = gold;
   if (buffs !== undefined) {
-    result.buffs = buffs.map((b) => ({
-      id: b.id,
-      buffType: b.buffType,
-      remainingRounds: b.remainingUses,
-      value: b.bonusValue,
-    }));
+    result.buffs = buffs;
   }
   if (inventoryMeta !== undefined) {
     if (fieldSet.has('inventoryCapacity')) result.inventoryCapacity = inventoryMeta.inventoryCapacity;
