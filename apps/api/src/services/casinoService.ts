@@ -178,8 +178,8 @@ async function resolveRound(roundId: string): Promise<number> {
     const p = await prisma.player.findUnique({ where: { id: wId }, select: { gold: true } });
     if (p) {
       await prisma.$executeRaw`
-        INSERT INTO player_stats (player_id, peak_gold_held)
-        VALUES (${wId}, ${p.gold})
+        INSERT INTO player_stats (player_id, peak_gold_held, updated_at)
+        VALUES (${wId}, ${p.gold}, NOW())
         ON CONFLICT (player_id)
         DO UPDATE SET peak_gold_held = GREATEST(player_stats.peak_gold_held, ${p.gold})
       `;
