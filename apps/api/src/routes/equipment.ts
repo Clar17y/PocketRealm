@@ -1,12 +1,35 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { EquipmentSlot } from '@pocketrealm/shared';
+import { prisma } from '@pocketrealm/database';
+import type { EquipmentSlot, InventoryItemDTO } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { equipItem, ensureEquipmentSlots, unequipSlot } from '../services/equipmentService';
 import { assertNotRecovering } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
+import { toInventoryItemDTO, fetchInventoryMeta } from '../services/stateUpdateHelpers';
 
 export const equipmentRouter = Router();
+
+/**
+ * Fetch the full equipment map for a player.
+ * Returns a Record mapping each slot to an InventoryItemDTO or null.
+ */
+async function fetchEquipmentMap(playerId: string): Promise<Record<string, InventoryItemDTO | null>> {
+  const rows = await prisma.playerEquipment.findMany({
+    where: { playerId },
+    include: { item: { include: { template: true } } },
+  });
+  const map: Record<string, InventoryItemDTO | null> = {};
+  for (const row of rows) {
+    map[row.slot] = row.item
+      ? toInventoryItemDTO(
+          { ...row.item, bonusStats: row.item.bonusStats as Record<string, number> | null },
+          row.slot,
+        )
+      : null;
+  }
+  return map;
+}
 
 equipmentRouter.use(authenticate);
 
@@ -40,8 +63,39 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
   // Check if player is recovering (prevents HP gear exploit)
   await assertNotRecovering(playerId);
 
+  // Capture any item currently in the target slot before equipping (swap detection)
+  await ensureEquipmentSlots(playerId);
+  const currentSlotRow = await prisma.playerEquipment.findUnique({
+    where: { playerId_slot: { playerId, slot: body.slot } },
+    include: { item: { include: { template: true } } },
+  });
+  const previousItem = currentSlotRow?.item ?? null;
+
   await equipItem(playerId, body.itemId, body.slot as EquipmentSlot);
-  res.json({ success: true });
+
+  const [equipment, { inventoryUsedSlots }] = await Promise.all([
+    fetchEquipmentMap(playerId),
+    fetchInventoryMeta(playerId),
+  ]);
+
+  const response: Record<string, unknown> = {
+    success: true,
+    equipment,
+    inventoryRemoved: [body.itemId],
+    inventoryUsedSlots,
+  };
+
+  // If a different item was in the slot before, it returns to inventory
+  if (previousItem && previousItem.id !== body.itemId) {
+    response.inventoryAdded = [
+      toInventoryItemDTO(
+        { ...previousItem, bonusStats: previousItem.bonusStats as Record<string, number> | null },
+        null,
+      ),
+    ];
+  }
+
+  res.json(response);
 }));
 
 const unequipSchema = z.object({
@@ -58,8 +112,34 @@ equipmentRouter.post('/unequip', asyncHandler(async (req, res) => {
   // Check if player is recovering (prevents HP gear exploit)
   await assertNotRecovering(playerId);
 
+  // Capture the item being unequipped before clearing the slot
+  await ensureEquipmentSlots(playerId);
+  const currentSlotRow = await prisma.playerEquipment.findUnique({
+    where: { playerId_slot: { playerId, slot: body.slot } },
+    include: { item: { include: { template: true } } },
+  });
+  const unequippedItem = currentSlotRow?.item ?? null;
+
   await unequipSlot(playerId, body.slot as EquipmentSlot);
-  res.json({ success: true });
+
+  const [equipment, { inventoryUsedSlots }] = await Promise.all([
+    fetchEquipmentMap(playerId),
+    fetchInventoryMeta(playerId),
+  ]);
+
+  res.json({
+    success: true,
+    equipment,
+    inventoryAdded: unequippedItem
+      ? [
+          toInventoryItemDTO(
+            { ...unequippedItem, bonusStats: unequippedItem.bonusStats as Record<string, number> | null },
+            null,
+          ),
+        ]
+      : [],
+    inventoryUsedSlots,
+  });
 }));
 
 /**
