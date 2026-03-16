@@ -110,7 +110,7 @@ async function resolveRound(roundId: string): Promise<number> {
       if (round?.result !== null && round?.result !== undefined) return round.result;
       await new Promise((r) => setTimeout(r, 300));
     }
-    return 0;
+    throw new AppError(409, 'Round resolution in progress, retry later', 'LOCK_CONTENTION');
   }
 
   const result = generateSpinResult();

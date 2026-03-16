@@ -581,7 +581,7 @@ describe('resolveRound (via getCurrentRound)', () => {
     expect(result.result).toBe(22);
   });
 
-  it('returns 0 when polling times out after 10 attempts', async () => {
+  it('throws when polling times out after 10 attempts (lock contention)', async () => {
     const startedAt = Date.now() - 65_000;
     const roundData = JSON.stringify({ roundId: 'round-1', startedAt });
     mockRedis.get.mockImplementation((key: string) => {
@@ -595,15 +595,20 @@ describe('resolveRound (via getCurrentRound)', () => {
     mockPrisma.rouletteBet.findMany.mockResolvedValue([]);
     vi.useFakeTimers();
 
-    const promise = getCurrentRound();
+    // Attach .catch() immediately to prevent unhandled rejection during timer advancement
+    let caughtError: unknown;
+    const promise = getCurrentRound().catch((e) => { caughtError = e; });
     // 10 polls * 300ms
     await vi.advanceTimersByTimeAsync(3000);
-    const result = await promise;
+    await promise;
 
     vi.useRealTimers();
 
-    expect(result.phase).toBe('result');
-    expect(result.result).toBe(0);
+    expect(caughtError).toBeDefined();
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toBe('Round resolution in progress, retry later');
+    expect((caughtError as any).statusCode).toBe(409);
+    expect((caughtError as any).code).toBe('LOCK_CONTENTION');
   });
 });
 
