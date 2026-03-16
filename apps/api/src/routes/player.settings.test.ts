@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+const RARITY_ENUM = ['none', 'common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
+
 // Reproduce the exact schema from player.ts for direct testing
 const settingsSchema = z.object({
   combatLogSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   explorationSpeedMs: z.number().int().min(100).max(1000).refine(v => v % 100 === 0, { message: 'Must be a multiple of 100' }).optional(),
   autoSkipKnownCombat: z.boolean().optional(),
-  defaultExploreTurns: z.number().int().min(10).max(10000).refine(v => v % 10 === 0, { message: 'Must be a multiple of 10' }).optional(),
+  defaultExploreTurns: z.number().int().min(100).max(2500).refine(v => v % 10 === 0, { message: 'Must be a multiple of 10' }).optional(),
   quickRestHealPercent: z.number().int().min(25).max(100).refine(v => v % 25 === 0, { message: 'Must be a multiple of 25' }).optional(),
   defaultRefiningMax: z.boolean().optional(),
+  lowHpWarning: z.boolean().optional(),
+  confirmRarity: z.enum(RARITY_ENUM).optional(),
+  lootRevealRarity: z.enum(RARITY_ENUM).optional(),
+  forgeConfirmRarity: z.enum(RARITY_ENUM).optional(),
+  homeTownId: z.string().uuid().optional(),
 }).refine(data => Object.values(data).some(v => v !== undefined), { message: 'At least one setting required' });
 
 describe('player settings', () => {

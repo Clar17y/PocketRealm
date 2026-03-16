@@ -45,6 +45,7 @@ export interface PlayerSettings {
   lowHpWarning?: boolean;
   confirmRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   lootRevealRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+  forgeConfirmRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   homeTownId?: string;
 }
 

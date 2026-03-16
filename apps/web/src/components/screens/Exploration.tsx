@@ -325,10 +325,10 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                     1K
                   </button>
                   <button
-                    onClick={() => setTurnInvestment([Math.min(5000, availableTurns)])}
+                    onClick={() => setTurnInvestment([Math.min(EXPLORATION_CONSTANTS.MAX_EXPLORATION_TURNS, availableTurns)])}
                     className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
                   >
-                    5K
+                    Max
                   </button>
                 </div>
               )}

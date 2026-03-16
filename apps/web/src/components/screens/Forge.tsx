@@ -7,7 +7,7 @@ import { Anvil, Sparkles, TrendingUp } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
-import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
+import { RARITY_COLORS, rarityMeetsThreshold, type ConfirmRarity, type Rarity } from '@/lib/rarity';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ActivityLog } from '@/components/ActivityLog';
 import { inflateCost } from '@/lib/taxCalc';
@@ -119,6 +119,7 @@ interface ForgeProps {
   guildTaxRate?: number;
   forgeLuckUses?: number;
   forgeProtectionUses?: number;
+  forgeConfirmRarity?: ConfirmRarity;
 }
 
 function titleCaseRarity(rarity: Rarity): string {
@@ -143,6 +144,7 @@ export function Forge({
   guildTaxRate = 0,
   forgeLuckUses = 0,
   forgeProtectionUses = 0,
+  forgeConfirmRarity = 'rare',
 }: ForgeProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(items[0]?.id ?? null);
   const [selectedUpgradeSacrificeId, setSelectedUpgradeSacrificeId] = useState<string | null>(null);
@@ -153,6 +155,14 @@ export function Forge({
   const [upgradePickerOpen, setUpgradePickerOpen] = useState(false);
   const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
   const noFacility = zoneCraftingLevel === 0;
+
+  const tryForgeAction = (setConfirm: (v: boolean) => void, action: () => void | Promise<void>) => {
+    if (selected && rarityMeetsThreshold(selected.rarity, forgeConfirmRarity)) {
+      setConfirm(true);
+    } else {
+      void action();
+    }
+  };
 
   useEffect(() => {
     if (!selectedItemId || !items.some((item) => item.id === selectedItemId)) {
@@ -404,7 +414,7 @@ export function Forge({
                   || upgradeCost === null
                   || busy !== null
                 }
-                onClick={() => setConfirmUpgrade(true)}
+                onClick={() => tryForgeAction(setConfirmUpgrade, handleUpgrade)}
               >
                 Upgrade Rarity
               </PixelButton>
@@ -451,7 +461,7 @@ export function Forge({
                   || rerollCost === null
                   || busy !== null
                 }
-                onClick={() => setConfirmReroll(true)}
+                onClick={() => tryForgeAction(setConfirmReroll, handleReroll)}
               >
                 Reroll Bonus Stats
               </PixelButton>

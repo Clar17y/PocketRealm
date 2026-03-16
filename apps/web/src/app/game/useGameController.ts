@@ -278,6 +278,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     lowHpWarning,
     confirmRarity,
     lootRevealRarity,
+    forgeConfirmRarity,
     guildTaxRate, setGuildTaxRate,
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
@@ -288,6 +289,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetLowHpWarning,
     handleSetConfirmRarity,
     handleSetLootRevealRarity,
+    handleSetForgeConfirmRarity,
     initSettingsFromServer,
   } = playerSettings;
   const [tutorialStep, setTutorialStep] = useState<number>(TUTORIAL_COMPLETED);
@@ -1649,6 +1651,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleSetConfirmRarity,
     lootRevealRarity,
     handleSetLootRevealRarity,
+    forgeConfirmRarity,
+    handleSetForgeConfirmRarity,
     playbackActive,
     combatPlaybackData,
     combatPlaybackQueue,

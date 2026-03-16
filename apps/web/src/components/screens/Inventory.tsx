@@ -5,12 +5,12 @@ import { PixelCard } from '@/components/PixelCard';
 import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
-import { Backpack, Crosshair, Heart, Shield, Sword, X, Zap, Coins } from 'lucide-react';
+import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, Target, X, Zap, Coins } from 'lucide-react';
 import { CRAFTING_CONSTANTS, repairTurnCost } from '@pocketrealm/shared';
 import { useBatchMode } from '@/hooks/useBatchMode';
 import { BatchActionBar, BatchCheckboxOverlay, BatchDimOverlay } from '@/components/common/BatchActionBar';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
-import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass } from '@/lib/statFormat';
+import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass, statEntries } from '@/lib/statFormat';
 import { getStash } from '@/lib/api/items';
 import { itemImageSrc } from '@/lib/assets';
 import { rarityMeetsThreshold, type Rarity, type ConfirmRarity } from '@/lib/rarity';
@@ -87,10 +87,13 @@ function prettySlot(slot: string) {
 function statDisplay(stat: string) {
   if (stat === 'attack') return { Icon: Sword, color: 'text-[var(--rpg-red)]', label: 'Attack' };
   if (stat === 'armor') return { Icon: Shield, color: 'text-[var(--rpg-blue-light)]', label: 'Armor' };
-  if (stat === 'magicDefence') return { Icon: Zap, color: 'text-[var(--rpg-purple)]', label: 'Magic Def' };
+  if (stat === 'magicDefence') return { Icon: Sparkles, color: 'text-[var(--rpg-purple)]', label: 'Magic Def' };
   if (stat === 'health') return { Icon: Heart, color: 'text-[var(--rpg-green-light)]', label: 'HP' };
   if (stat === 'dodge') return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: 'Dodge' };
   if (stat === 'accuracy') return { Icon: Crosshair, color: 'text-[var(--rpg-blue-light)]', label: 'Accuracy' };
+  if (stat === 'magicPower') return { Icon: Sparkles, color: 'text-[var(--rpg-purple)]', label: 'Magic Power' };
+  if (stat === 'rangedPower') return { Icon: Target, color: 'text-[var(--rpg-green-light)]', label: 'Ranged Power' };
+  if (stat === 'luck') return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: 'Luck' };
   if (stat === 'critChance') return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: 'Crit Chance' };
   if (stat === 'critDamage') return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: 'Crit Damage' };
   if (stat === 'inventorySlots') return { Icon: Backpack, color: 'text-[var(--rpg-gold)]', label: 'Inventory Slots' };
@@ -237,19 +240,13 @@ export function Inventory({
     .reduce((sum, i) => sum + (i.salvageCost ?? 0), 0);
   const stashBatchActive = withdrawBatchMode.active || stashSellBatch.active || stashSalvageBatch.active;
 
-  const stats = selectedItem?.baseStats ?? {};
-  const attack = numStat(stats.attack);
-  const armor = numStat(stats.armor);
-  const magicDefence = numStat(stats.magicDefence);
-  const health = numStat(stats.health);
-  const dodge = numStat(stats.dodge);
-  const accuracy = numStat(stats.accuracy);
-  const inventorySlots = numStat(stats.inventorySlots);
-  const bonusEntries = Object.entries(selectedItem?.bonusStats ?? {})
-    .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]) && entry[1] !== 0);
+  const baseEntries = statEntries(selectedItem?.baseStats as Record<string, unknown> | undefined)
+    .filter(([stat]) => stat !== 'inventorySlots');
+  const inventorySlots = numStat((selectedItem?.baseStats as Record<string, unknown> | undefined)?.inventorySlots);
+  const bonusEntries = statEntries(selectedItem?.bonusStats as Record<string, unknown> | undefined);
 
   const isBackpack = selectedItem?.slot === 'backpack';
-  const hasAnyStats = [attack, armor, magicDefence, health, dodge, accuracy, inventorySlots].some((v) => typeof v === 'number' && v !== 0);
+  const hasAnyStats = baseEntries.length > 0 || (typeof inventorySlots === 'number' && inventorySlots !== 0);
   const hasAnyBonusStats = bonusEntries.length > 0;
   const itemType = selectedItem?.type ?? '';
   const isEquipment = itemType === 'weapon' || itemType === 'armor';
@@ -793,60 +790,18 @@ export function Inventory({
 
                 {hasAnyStats && (
                   <div className="grid grid-cols-2 gap-2">
-                    {typeof attack === 'number' && attack !== 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Sword size={16} className="text-[var(--rpg-red)]" />
-                        <span className="text-[var(--rpg-text-secondary)]">Attack</span>
-                        <span className={`ml-auto font-pixel text-[12px] ${signedClass(attack, 'text-[var(--rpg-red)]')}`}>
-                          {formatSignedStatValue('attack', attack)}
-                        </span>
-                      </div>
-                    )}
-                    {typeof armor === 'number' && armor !== 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Shield size={16} className="text-[var(--rpg-blue-light)]" />
-                        <span className="text-[var(--rpg-text-secondary)]">Armor</span>
-                        <span className={`ml-auto font-pixel text-[12px] ${signedClass(armor, 'text-[var(--rpg-blue-light)]')}`}>
-                          {formatSignedStatValue('armor', armor)}
-                        </span>
-                      </div>
-                    )}
-                    {typeof magicDefence === 'number' && magicDefence !== 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Zap size={16} className="text-[var(--rpg-purple)]" />
-                        <span className="text-[var(--rpg-text-secondary)]">Magic Def</span>
-                        <span className={`ml-auto font-pixel text-[12px] ${signedClass(magicDefence, 'text-[var(--rpg-purple)]')}`}>
-                          {formatSignedStatValue('magicDefence', magicDefence)}
-                        </span>
-                      </div>
-                    )}
-                    {typeof health === 'number' && health !== 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Heart size={16} className="text-[var(--rpg-green-light)]" />
-                        <span className="text-[var(--rpg-text-secondary)]">HP</span>
-                        <span className={`ml-auto font-pixel text-[12px] ${signedClass(health, 'text-[var(--rpg-green-light)]')}`}>
-                          {formatSignedStatValue('health', health)}
-                        </span>
-                      </div>
-                    )}
-                    {typeof dodge === 'number' && dodge !== 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Zap size={16} className="text-[var(--rpg-gold)]" />
-                        <span className="text-[var(--rpg-text-secondary)]">Dodge</span>
-                        <span className={`ml-auto font-pixel text-[12px] ${signedClass(dodge, 'text-[var(--rpg-gold)]')}`}>
-                          {formatSignedStatValue('dodge', dodge)}
-                        </span>
-                      </div>
-                    )}
-                    {typeof accuracy === 'number' && accuracy !== 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Crosshair size={16} className="text-[var(--rpg-blue-light)]" />
-                        <span className="text-[var(--rpg-text-secondary)]">Accuracy</span>
-                        <span className={`ml-auto font-pixel text-[12px] ${signedClass(accuracy, 'text-[var(--rpg-blue-light)]')}`}>
-                          {formatSignedStatValue('accuracy', accuracy)}
-                        </span>
-                      </div>
-                    )}
+                    {baseEntries.map(([stat, value]) => {
+                      const { Icon, color, label } = statDisplay(stat);
+                      return (
+                        <div key={stat} className="flex items-center gap-2 text-sm">
+                          <Icon size={16} className={color} />
+                          <span className="text-[var(--rpg-text-secondary)]">{label}</span>
+                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(value, color)}`}>
+                            {formatSignedStatValue(stat, value)}
+                          </span>
+                        </div>
+                      );
+                    })}
                     {typeof inventorySlots === 'number' && inventorySlots !== 0 && (() => {
                       const rarityBonus = isBackpack
                         ? ({ common: 0, uncommon: 2, rare: 4, epic: 6, legendary: 8 }[selectedItem?.rarity ?? 'common'] ?? 0)

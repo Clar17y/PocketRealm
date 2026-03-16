@@ -343,7 +343,9 @@ export function Casino({
     setIsBetting(false);
   };
 
-  const canBet = roundState?.phase === 'betting' && selectedBetType && betAmount > 0 && betAmount <= gold;
+  const myBetCount = useMemo(() => displayBets.filter((b) => b.playerName === playerName).length, [displayBets, playerName]);
+  const atMaxBets = myBetCount >= CASINO_CONSTANTS.MAX_BETS_PER_ROUND;
+  const canBet = roundState?.phase === 'betting' && selectedBetType && betAmount > 0 && betAmount <= gold && !atMaxBets;
 
   // Countdown display
   const timeRemaining = roundState?.timeRemainingMs
@@ -644,6 +646,11 @@ export function Casino({
             </div>
           </div>
 
+          <div className="flex items-center justify-between text-xs text-[var(--rpg-text-secondary)]">
+            <span>Bets: <span className={atMaxBets ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-primary)]'}>{myBetCount}/{CASINO_CONSTANTS.MAX_BETS_PER_ROUND}</span></span>
+            <span>Max per bet: <span className="text-[var(--rpg-text-primary)]">{CASINO_CONSTANTS.ROULETTE_MAX_BET.toLocaleString()}g</span></span>
+          </div>
+
           <PixelButton
             variant="gold"
             size="md"
@@ -655,11 +662,13 @@ export function Casino({
               ? 'Placing Bet...'
               : roundState?.phase !== 'betting'
                 ? 'Waiting for betting phase...'
-                : !selectedBetType
-                  ? 'Select a bet'
-                  : betAmount > gold
-                    ? 'Not enough gold'
-                    : `Place Bet (${betAmount} gold)`}
+                : atMaxBets
+                  ? `Max bets reached (${CASINO_CONSTANTS.MAX_BETS_PER_ROUND})`
+                  : !selectedBetType
+                    ? 'Select a bet'
+                    : betAmount > gold
+                      ? 'Not enough gold'
+                      : `Place Bet (${betAmount} gold)`}
           </PixelButton>
         </div>
       </PixelCard>

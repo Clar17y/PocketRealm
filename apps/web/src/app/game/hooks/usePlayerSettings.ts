@@ -13,6 +13,7 @@ export interface ServerSettingsPayload {
   lowHpWarning?: boolean | null;
   confirmRarity?: ConfirmRarity | null;
   lootRevealRarity?: ConfirmRarity | null;
+  forgeConfirmRarity?: ConfirmRarity | null;
   homeTownId?: string | null;
 }
 
@@ -26,6 +27,7 @@ export function usePlayerSettings() {
   const [lowHpWarning, setLowHpWarning] = useState(true);
   const [confirmRarity, setConfirmRarity] = useState<ConfirmRarity>('uncommon');
   const [lootRevealRarity, setLootRevealRarity] = useState<ConfirmRarity>('uncommon');
+  const [forgeConfirmRarity, setForgeConfirmRarity] = useState<ConfirmRarity>('rare');
   const [guildTaxRate, setGuildTaxRate] = useState(0);
   const [homeTownId, setHomeTownId] = useState<string | null>(null);
 
@@ -57,6 +59,8 @@ export function usePlayerSettings() {
     handleSetSetting('confirmRarity', value, setConfirmRarity, confirmRarity);
   const handleSetLootRevealRarity = (value: ConfirmRarity) =>
     handleSetSetting('lootRevealRarity', value, setLootRevealRarity, lootRevealRarity);
+  const handleSetForgeConfirmRarity = (value: ConfirmRarity) =>
+    handleSetSetting('forgeConfirmRarity', value, setForgeConfirmRarity, forgeConfirmRarity);
   const handleSetHomeTown = (zoneId: string) =>
     handleSetSetting('homeTownId', zoneId, setHomeTownId, homeTownId);
 
@@ -72,6 +76,7 @@ export function usePlayerSettings() {
     setLowHpWarning(s.lowHpWarning ?? true);
     setConfirmRarity(s.confirmRarity ?? 'uncommon');
     setLootRevealRarity(s.lootRevealRarity ?? 'uncommon');
+    setForgeConfirmRarity(s.forgeConfirmRarity ?? 'rare');
     setHomeTownId(s.homeTownId ?? null);
   };
 
@@ -86,6 +91,7 @@ export function usePlayerSettings() {
     lowHpWarning,
     confirmRarity,
     lootRevealRarity,
+    forgeConfirmRarity,
     guildTaxRate,
     homeTownId,
 
@@ -106,6 +112,7 @@ export function usePlayerSettings() {
     handleSetLowHpWarning,
     handleSetConfirmRarity,
     handleSetLootRevealRarity,
+    handleSetForgeConfirmRarity,
     handleSetHomeTown,
 
     // Initialization

@@ -6,6 +6,7 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { ConfirmRarity } from '@/lib/rarity';
 import { RaritySelector } from '../common/RaritySelector';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 
 interface SettingsProps {
   username: string | undefined;
@@ -34,6 +35,8 @@ interface SettingsProps {
   // Crafting
   defaultRefiningMax: boolean;
   onDefaultRefiningMaxChange: (value: boolean) => void;
+  forgeConfirmRarity: ConfirmRarity;
+  onForgeConfirmRarityChange: (value: ConfirmRarity) => void;
 
   // Inventory
   confirmRarity: ConfirmRarity;
@@ -67,6 +70,8 @@ export function Settings({
   onQuickRestHealPercentChange,
   defaultRefiningMax,
   onDefaultRefiningMaxChange,
+  forgeConfirmRarity,
+  onForgeConfirmRarityChange,
   confirmRarity,
   onConfirmRarityChange,
   lootRevealRarity,
@@ -141,7 +146,7 @@ export function Settings({
           <div>
             <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Default Explore Turns</p>
             <div className="flex items-center gap-3">
-              <Slider min={10} max={10000} step={10}
+              <Slider min={EXPLORATION_CONSTANTS.MIN_EXPLORATION_TURNS} max={EXPLORATION_CONSTANTS.MAX_EXPLORATION_TURNS} step={10}
                 value={[defaultExploreTurns]}
                 onValueChange={(val) => onDefaultExploreTurnsChange(val[0])}
                 onValueCommit={(val) => onDefaultExploreTurnsCommit(val[0])}
@@ -187,6 +192,15 @@ export function Settings({
             <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Auto-set refining quantity to maximum when selecting a recipe</p>
           </div>
           <ToggleSwitch checked={defaultRefiningMax} onChange={onDefaultRefiningMaxChange} />
+        </div>
+
+        <div className="mt-4">
+          <RaritySelector
+            label="Forge Destruction Confirmation"
+            description="Show a confirmation dialog when forging items at or above this rarity."
+            value={forgeConfirmRarity}
+            onChange={onForgeConfirmRarityChange}
+          />
         </div>
       </PixelCard>
 
