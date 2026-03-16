@@ -39,15 +39,24 @@ export function computeBracketBounds(rating: number): { lower: number; upper: nu
 // ---------------------------------------------------------------------------
 
 export async function getOrCreateRating(playerId: string) {
-  return prisma.pvpRating.upsert({
-    where: { playerId },
-    update: {},
-    create: {
-      playerId,
-      rating: PVP_CONSTANTS.STARTING_RATING,
-      bestRating: PVP_CONSTANTS.STARTING_RATING,
-    },
-  });
+  try {
+    return await prisma.pvpRating.upsert({
+      where: { playerId },
+      update: {},
+      create: {
+        playerId,
+        rating: PVP_CONSTANTS.STARTING_RATING,
+        bestRating: PVP_CONSTANTS.STARTING_RATING,
+      },
+    });
+  } catch (err: unknown) {
+    // Prisma upsert race condition: two concurrent requests both try to INSERT.
+    // On unique constraint violation, the row now exists — just read it.
+    if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
+      return prisma.pvpRating.findUniqueOrThrow({ where: { playerId } });
+    }
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
