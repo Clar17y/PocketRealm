@@ -46,28 +46,37 @@ equipmentRouter.post('/equip', asyncHandler(async (req, res) => {
 
   await equipItem(playerId, body.itemId, body.slot as EquipmentSlot);
 
-  const [equipment, { inventoryUsedSlots }, materialTotals] = await Promise.all([
+  const [equipment, { inventoryUsedSlots }, materialTotals, equippedItemRaw] = await Promise.all([
     fetchEquipmentMap(playerId),
     fetchInventoryMeta(playerId),
     fetchMaterialTotals(playerId),
+    getEquippedItemInSlot(playerId, body.slot as EquipmentSlot),
   ]);
 
-  const stateUpdates: Record<string, unknown> = {
+  const updatedItems = [];
+
+  // Newly equipped item stays in inventory with equippedSlot set
+  if (equippedItemRaw) {
+    updatedItems.push(toInventoryItemDTO(
+      { ...equippedItemRaw, bonusStats: equippedItemRaw.bonusStats as Record<string, number> | null },
+      body.slot,
+    ));
+  }
+
+  // If a different item was displaced, it returns to inventory with equippedSlot: null
+  if (previousItem && previousItem.id !== body.itemId) {
+    updatedItems.push(toInventoryItemDTO(
+      { ...previousItem, bonusStats: previousItem.bonusStats as Record<string, number> | null },
+      null,
+    ));
+  }
+
+  const stateUpdates = {
     equipment,
-    inventoryRemoved: [body.itemId],
+    inventoryUpdated: updatedItems,
     inventoryUsedSlots,
     materialTotals,
   };
-
-  // If a different item was in the slot before, it returns to inventory
-  if (previousItem && previousItem.id !== body.itemId) {
-    stateUpdates.inventoryAdded = [
-      toInventoryItemDTO(
-        { ...previousItem, bonusStats: previousItem.bonusStats as Record<string, number> | null },
-        null,
-      ),
-    ];
-  }
 
   res.json({ success: true, stateUpdates });
 }));
@@ -102,7 +111,7 @@ equipmentRouter.post('/unequip', asyncHandler(async (req, res) => {
     stateUpdates: {
       equipment,
       materialTotals,
-      inventoryAdded: unequippedItem
+      inventoryUpdated: unequippedItem
         ? [
             toInventoryItemDTO(
               { ...unequippedItem, bonusStats: unequippedItem.bonusStats as Record<string, number> | null },
