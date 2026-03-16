@@ -1,7 +1,20 @@
 # Code Health Audit Tracker
 
-**Started:** 2026-03-14
+**Started:** 2026-03-14 | **Completed:** 2026-03-16
 **Total files:** 166 | **Audited:** 166 | **Remaining:** 0
+
+## Remediation Summary
+
+All findings remediated across 4 PRs:
+
+| PR | Branch | Scope | Status |
+|----|--------|-------|--------|
+| #182 | `fix/code-health-prisma-types` | Remove `as any` Prisma casts, type `tx` params | Merged |
+| #183 | `fix/code-health-logic-bugs` | Casino lock, achievement rewards, boss loot, guild upgrades | Merged |
+| #186 | `fix/code-health-transactions` | Transaction atomicity, Zod JSON validation, TOCTOU races | Merged |
+| #189 | `fix/code-health-cleanup` | Dead code removal, error logging, export narrowing | Merged |
+
+**Follow-up issues:** #185 (tx-aware registration helpers), #187 (validateEnum generic), #188 (ActivityType + safeUpsert)
 
 ---
 
