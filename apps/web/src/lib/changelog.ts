@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.42',
+    date: '2026-03-16',
+    title: 'Performance Optimization',
+    summary:
+      'Combat, exploration, and gathering should all feel noticeably faster. Behind the scenes, the server now does roughly half as much work per fight by caching equipment stats, batching lookups, and running post-combat rewards in parallel. Encounter sites, ambushes, and PvP all benefit. Crafting and other actions now show a clear error message when something goes wrong instead of a generic "Internal Server Error". Fixed an issue where rapid actions could incorrectly trigger a "too many requests" error.',
+  },
+  {
     version: '0.41',
     date: '2026-03-15',
     title: 'Durability Overhaul',

@@ -20,7 +20,6 @@ async function rollBossRecipeDrop(
   playerId: string,
   mobFamilyId: string,
 ): Promise<BossPlayerReward['recipeUnlocked'] | undefined> {
-
   const advancedRecipes = await prisma.craftingRecipe.findMany({
     where: { isAdvanced: true, mobFamilyId },
     select: {

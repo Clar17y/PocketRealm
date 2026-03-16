@@ -565,7 +565,7 @@ router.post('/tokens/grant', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const { amount } = grantTokensSchema.parse(req.body);
 
-  const state = await (prisma as any).playerQuestState.upsert({
+  const state = await prisma.playerQuestState.upsert({
     where: { playerId },
     create: { playerId, questTokens: amount, dailyBonusClaimed: false, lastDailyReset: new Date('2000-01-01'), lastWeeklyReset: new Date('2000-01-01') },
     update: { questTokens: { increment: amount } },

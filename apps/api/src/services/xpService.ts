@@ -39,11 +39,9 @@ export async function grantSkillXp(
     // both compute a level-up, and both increment attributePoints — doubling the reward.
     await tx.$queryRaw`SELECT id FROM "players" WHERE id = ${playerId} FOR UPDATE`;
 
-    const txAny = tx as unknown as any;
-
     // Atomically read + consume shop XP buff inside the transaction to prevent
     // concurrent actions from double-applying a single-use buff
-    const shopXpBoost = await consumeBuffIfActive(txAny, playerId, 'xp_boost');
+    const shopXpBoost = await consumeBuffIfActive(tx, playerId, 'xp_boost');
 
     const totalXpBoost = Math.min(xpBoost + shopXpBoost, SKILL_CONSTANTS.MAX_XP_BOOST);
     const boostedXpGain = totalXpBoost > 0
@@ -56,7 +54,7 @@ export async function grantSkillXp(
           playerId_skillType: { playerId, skillType },
         },
       }),
-      txAny.player.findUnique({
+      tx.player.findUnique({
         where: { id: playerId },
         select: {
           characterXp: true,
@@ -121,7 +119,7 @@ export async function grantSkillXp(
     const levelUps = Math.max(0, characterLevelAfter - characterLevelBefore);
     const attributePointsAfter = player.attributePoints + levelUps;
 
-    await txAny.player.update({
+    await tx.player.update({
       where: { id: playerId },
       data: {
         // Use atomic increment to prevent concurrent XP grants from racing on characterXp

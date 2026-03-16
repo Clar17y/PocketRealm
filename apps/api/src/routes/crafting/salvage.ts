@@ -35,10 +35,10 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
       requireNotStacked: true,
       requireNotEquipped: true,
     });
-    if ((item as any).isSoulbound) {
+    if (item.isSoulbound) {
       throw new AppError(400, 'Soulbound items cannot be salvaged', 'ITEM_SOULBOUND');
     }
-    const targetStash = Boolean((item as any).inStash);
+    const targetStash = Boolean(item.inStash);
 
     const recipe = await prisma.craftingRecipe.findFirst({
       where: { resultTemplateId: item.templateId },
@@ -114,7 +114,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
               maxDurability,
               currentDurability: maxDurability,
               inStash: targetStash,
-            } as any,
+            },
             select: { id: true },
           });
           createdIds.push(created.id);
@@ -192,12 +192,12 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
     // Filter to weapon/armor only and not equipped
     const equippedItemIds = new Set(
       (await prisma.playerEquipment.findMany({
-        where: { playerId, itemId: { in: items.map((i: any) => i.id) } },
+        where: { playerId, itemId: { in: items.map((i) => i.id) } },
         select: { itemId: true },
       })).map((e) => e.itemId),
     );
 
-    const salvageableItems = items.filter((item: any) =>
+    const salvageableItems = items.filter((item) =>
       (item.template.itemType === 'weapon' || item.template.itemType === 'armor')
       && !equippedItemIds.has(item.id)
       && !item.isSoulbound
@@ -208,7 +208,7 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
     }
 
     // Get unique template IDs and find recipes
-    const uniqueTemplateIds = [...new Set<string>(salvageableItems.map((i: any) => i.templateId as string))];
+    const uniqueTemplateIds = [...new Set<string>(salvageableItems.map((i) => i.templateId))];
     const recipes = await prisma.craftingRecipe.findMany({
       where: { resultTemplateId: { in: uniqueTemplateIds } },
       select: { id: true, resultTemplateId: true, materials: true },
@@ -217,7 +217,7 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
 
     // Build per-item salvage plan
     type SalvagePlan = {
-      item: any;
+      item: typeof items[number];
       recipe: typeof recipes[number];
       turnCost: number;
       refundedMaterials: Array<{ templateId: string; quantity: number }>;
@@ -301,7 +301,7 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
                   maxDurability,
                   currentDurability: maxDurability,
                   inStash,
-                } as any,
+                },
               });
             }
           }

@@ -56,7 +56,7 @@ async function moveStackableItem(
         maxDurability: null,
         currentDurability: null,
         inStash: targetInStash,
-      } as any,
+      },
     });
   }
 }

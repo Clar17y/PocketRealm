@@ -73,20 +73,20 @@ export async function rollAndGrantDropsTx(
   const grantedStackableTemplates = new Set<string>();
   let existingStacks: Set<string> | null = null;
   if (availableSlots != null) {
-    const playerItems = await (tx as any).item.findMany({
+    const playerItems = await tx.item.findMany({
       where: { ownerId: playerId, inStash: false },
       select: { templateId: true },
-    }) as Array<{ templateId: string }>;
-    existingStacks = new Set(playerItems.map((i: { templateId: string }) => i.templateId));
+    });
+    existingStacks = new Set(playerItems.map((i) => i.templateId));
   }
 
   // Fetch template names for overflow display
   const templateNameCache = new Map<string, string>();
   if (availableSlots != null) {
-    const templates = await (tx as any).itemTemplate.findMany({
+    const templates = await tx.itemTemplate.findMany({
       where: { id: { in: dropEntries.map(e => e.itemTemplateId) } },
       select: { id: true, name: true },
-    }) as Array<{ id: string; name: string }>;
+    });
     for (const t of templates) templateNameCache.set(t.id, t.name);
   }
 
@@ -132,7 +132,7 @@ export async function rollAndGrantDropsTx(
           quantity: 1,
           maxDurability,
           currentDurability: maxDurability,
-        } as any,
+        },
       });
     }
     accumulator.add({ itemTemplateId: picked.itemTemplateId, quantity, rarity });

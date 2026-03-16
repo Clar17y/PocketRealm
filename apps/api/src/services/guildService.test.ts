@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../redis', () => ({
+  redis: { get: vi.fn().mockResolvedValue(null), set: vi.fn(), del: vi.fn() },
+}));
+
 import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 import { mockPrisma } from '../__test__/setup';
 import {
@@ -412,6 +417,7 @@ describe('disbandGuild', () => {
     mockPrisma.guildMember.findUnique.mockResolvedValue({
       guildId: 'g1', playerId: 'leader1', role: 'leader', guild: { id: 'g1' },
     });
+    mockPrisma.guildMember.findMany.mockResolvedValue([{ playerId: 'leader1' }]);
     mockPrisma.guild.delete.mockResolvedValue({});
 
     await expect(disbandGuild('leader1', 'g1')).resolves.toBeUndefined();

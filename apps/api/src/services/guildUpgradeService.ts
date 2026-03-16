@@ -71,7 +71,7 @@ export async function activateUpgrade(
   const expiresAt = new Date(now.getTime() + tierDef.durationMs);
 
   // Transaction: re-validate treasury + duplicate, then deduct and create
-  const upgrade = await prisma.$transaction(async (tx: any) => {
+  const upgrade = await prisma.$transaction(async (tx) => {
     // Re-check treasury inside transaction to prevent TOCTOU race
     const freshGuild = await tx.guild.findUnique({ where: { id: guildId }, select: { treasuryTurns: true } });
     if (!freshGuild || freshGuild.treasuryTurns < tierDef.cost) {
@@ -204,6 +204,21 @@ const NO_MODIFIERS: PlayerGuildModifiers = {
   repairCostReduction: 0,
 };
 
+/**
+ * Valid effectType → PlayerGuildModifiers key mapping.
+ * Used by project perks and specialization bonuses to safely resolve
+ * string-typed effectType values to modifier keys without unsafe casts.
+ */
+const EFFECT_TO_MODIFIER: Record<string, keyof PlayerGuildModifiers> = {
+  xpBoost: 'xpBoost',
+  gatheringYield: 'gatheringYield',
+  craftingCrit: 'craftingCrit',
+  combatDamage: 'combatDamage',
+  defenseBoost: 'defenseBoost',
+  travelCostReduction: 'travelCostReduction',
+  repairCostReduction: 'repairCostReduction',
+};
+
 export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerGuildModifiers> {
   const membership = await prisma.guildMember.findUnique({
     where: { playerId },
@@ -265,10 +280,12 @@ export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerG
     const def = GUILD_PROJECT_DEFINITIONS.find((d) => d.key === project.projectKey);
     if (!def) continue;
     for (const perk of def.perks) {
-      const key = perk.effectType as keyof PlayerGuildModifiers;
-      if (key in mods) {
-        projectPerks[key] = Math.max(projectPerks[key] ?? 0, perk.value);
+      const modKey = EFFECT_TO_MODIFIER[perk.effectType];
+      if (!modKey) {
+        console.warn(`Unmapped guild project perk effect type: ${perk.effectType}`);
+        continue;
       }
+      projectPerks[modKey] = Math.max(projectPerks[modKey] ?? 0, perk.value);
     }
   }
   for (const [key, value] of Object.entries(projectPerks)) {
@@ -291,10 +308,12 @@ export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerG
         .sort((a, b) => b.tier - a.tier)[0];
       if (activeTier) {
         for (const bonus of activeTier.bonuses) {
-          const key = bonus.effectType as keyof PlayerGuildModifiers;
-          if (key in mods) {
-            mods[key] += bonus.value;
+          const modKey = EFFECT_TO_MODIFIER[bonus.effectType];
+          if (!modKey) {
+            console.warn(`Unmapped guild specialization effect type: ${bonus.effectType}`);
+            continue;
           }
+          mods[modKey] += bonus.value;
         }
       }
     }

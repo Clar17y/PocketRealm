@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@pocketrealm/database';
+import { prisma, Prisma, type GuildMember, type Guild } from '@pocketrealm/database';
 import {
   GUILD_CONSTANTS, GuildData, GuildMemberData, GuildLogEntry, GuildSearchResult,
   type GuildRecruitmentMode, type GuildRole, type GuildSpecialization,
@@ -6,6 +6,7 @@ import {
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';
+import { cachedQuery, invalidateCache } from './cacheService';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -106,11 +107,11 @@ export async function addGuildLog(
   eventType: string,
   message: string,
   metadata?: Record<string, unknown>,
-  tx?: any,
+  tx?: Prisma.TransactionClient,
 ): Promise<void> {
   const client = tx ?? prisma;
   await client.guildLog.create({
-    data: { guildId, eventType, message, metadata: metadata ?? undefined },
+    data: { guildId, eventType, message, metadata: (metadata ?? undefined) as Prisma.InputJsonValue | undefined },
   });
 }
 
@@ -142,7 +143,7 @@ export async function createGuild(
   }
 
   // All race-sensitive checks and turn spend inside a single transaction
-  const guild = await prisma.$transaction(async (tx: any) => {
+  const guild = await prisma.$transaction(async (tx) => {
     const existing = await tx.guildMember.findUnique({ where: { playerId } });
     if (existing) throw new AppError(400, 'Already in a guild', 'ALREADY_IN_GUILD');
 
@@ -206,7 +207,7 @@ export async function getPlayerGuild(
   if (!membership) return null;
 
   // Look up leader username
-  const leaderMember = membership.guild.members.find(m => m.role === 'leader');
+  const leaderMember = membership.guild.members.find((m) => m.role === 'leader');
   const guildWithLeader = { ...membership.guild, leaderUsername: leaderMember?.player?.username };
 
   return {
@@ -216,12 +217,25 @@ export async function getPlayerGuild(
   };
 }
 
+const guildIdCacheKey = (playerId: string) => `guild:member:${playerId}`;
+
+/** Invalidate the guild ID cache for one or more players. Call after transactions commit. */
+export async function invalidateGuildIdCache(...playerIds: string[]): Promise<void> {
+  await invalidateCache(...playerIds.map(guildIdCacheKey));
+}
+
 export async function getPlayerGuildId(playerId: string): Promise<string | null> {
-  const membership = await prisma.guildMember.findUnique({
-    where: { playerId },
-    select: { guildId: true },
-  });
-  return membership?.guildId ?? null;
+  return cachedQuery(
+    guildIdCacheKey(playerId),
+    async () => {
+      const membership = await prisma.guildMember.findUnique({
+        where: { playerId },
+        select: { guildId: true },
+      });
+      return membership?.guildId ?? null;
+    },
+    300,
+  );
 }
 
 export async function searchGuilds(
@@ -267,7 +281,7 @@ export async function searchGuilds(
 // Role check (shared with guildMembershipService)
 // ---------------------------------------------------------------------------
 
-export async function requireRole(playerId: string, minRole: 'leader' | 'officer'): Promise<any> {
+export async function requireRole(playerId: string, minRole: 'leader' | 'officer'): Promise<GuildMember & { guild: Guild }> {
   const membership = await prisma.guildMember.findUnique({
     where: { playerId },
     include: { guild: true },
@@ -367,8 +381,8 @@ export async function getGuildLog(
       id: l.id,
       eventType: l.eventType,
       message: l.message,
-      metadata: (l.metadata ?? null) as Record<string, unknown> | null,
-      createdAt: l.createdAt instanceof Date ? l.createdAt.toISOString() : String(l.createdAt),
+      metadata: l.metadata as Record<string, unknown> | null,
+      createdAt: l.createdAt instanceof Date ? l.createdAt.toISOString() : l.createdAt,
     })),
     total,
     page,

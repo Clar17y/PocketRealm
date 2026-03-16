@@ -198,20 +198,24 @@ export async function claimReward(playerId: string, achievementId: string) {
           await refundPlayerTurnsTx(tx, playerId, reward.amount);
           break;
         case 'item':
-          if (reward.itemTemplateId) {
+          if (!reward.itemTemplateId) {
+            throw new AppError(500, 'Achievement reward has no item template', 'INVALID_REWARD');
+          }
+          {
             const template = await tx.itemTemplate.findUnique({
               where: { id: reward.itemTemplateId },
             });
-            if (template) {
-              await tx.item.create({
-                data: {
-                  ownerId: playerId,
-                  templateId: reward.itemTemplateId,
-                  rarity: 'legendary',
-                  quantity: reward.amount,
-                },
-              });
+            if (!template) {
+              throw new AppError(500, `Item template ${reward.itemTemplateId} not found`, 'INVALID_REWARD');
             }
+            await tx.item.create({
+              data: {
+                ownerId: playerId,
+                templateId: reward.itemTemplateId,
+                rarity: 'legendary',
+                quantity: reward.amount,
+              },
+            });
           }
           break;
       }

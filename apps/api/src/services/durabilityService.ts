@@ -1,5 +1,6 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import { DURABILITY_CONSTANTS, type CombatLogEntry, type CombatActor, type DurabilityLoss } from '@pocketrealm/shared';
+import { invalidateEquipmentCache } from './equipmentService';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -110,6 +111,8 @@ export async function degradeEquippedDurability(
       });
     }
   });
+
+  await invalidateEquipmentCache(playerId);
 
   return losses;
 }

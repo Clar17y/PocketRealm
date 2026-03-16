@@ -37,6 +37,7 @@ import { getHpState, setHp, enterRecoveringState } from './hpService';
 import { getActiveTemplate } from './combatTemplateService';
 import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { distributeBossLoot } from './bossLootService';
+import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
 import { parseJsonArray, parseJsonRecord } from '../utils/jsonColumnSchemas';
 
@@ -548,8 +549,12 @@ async function resolveBossRoundInner(
                   },
                 });
               });
-            } catch {
-              // Skip players who can't auto-signup (insufficient turns, etc.)
+            } catch (err) {
+              if (err instanceof AppError && err.code === 'INSUFFICIENT_TURNS') {
+                // Expected — player doesn't have enough turns, skip
+              } else {
+                console.error('Boss auto-signup failed unexpectedly', { err, playerId: participant.playerId });
+              }
             }
           }),
         );

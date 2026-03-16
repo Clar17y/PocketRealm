@@ -122,7 +122,7 @@ async function resolveRound(roundId: string): Promise<number> {
       if (round?.result !== null && round?.result !== undefined) return round.result;
       await new Promise((r) => setTimeout(r, 300));
     }
-    return 0;
+    throw new AppError(409, 'Round resolution in progress, retry later', 'LOCK_CONTENTION');
   }
 
   const result = generateSpinResult();
@@ -191,8 +191,8 @@ async function resolveRound(roundId: string): Promise<number> {
     const p = await prisma.player.findUnique({ where: { id: wId }, select: { gold: true } });
     if (p) {
       await prisma.$executeRaw`
-        INSERT INTO player_stats (player_id, peak_gold_held)
-        VALUES (${wId}, ${p.gold})
+        INSERT INTO player_stats (player_id, peak_gold_held, updated_at)
+        VALUES (${wId}, ${p.gold}, NOW())
         ON CONFLICT (player_id)
         DO UPDATE SET peak_gold_held = GREATEST(player_stats.peak_gold_held, ${p.gold})
       `;
