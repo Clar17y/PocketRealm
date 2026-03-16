@@ -36,7 +36,7 @@ function setupMobLookup(name = 'Dragon', familyId = 'fam-1') {
     familyMembers: [{ mobFamily: { id: familyId } }],
   });
   mockPrisma.itemTemplate.findMany.mockResolvedValue([]);
-  // rollBossRecipeDrop accesses craftingRecipe via prisma-as-any
+  // rollBossRecipeDrop accesses craftingRecipe via prisma
   mockPrisma.craftingRecipe.findMany.mockResolvedValue([]);
 }
 
@@ -201,6 +201,32 @@ describe('distributeBossLoot', () => {
         rarity: 'common',
       }),
     );
+  });
+
+  it('should stop processing remaining contributors if one fails', async () => {
+    // Setup: 3 contributors, mock grantSkillXp to fail on 2nd contributor
+    const contributors = [
+      { playerId: 'p1', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
+      { playerId: 'p2', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
+      { playerId: 'p3', totalDamage: 100, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
+    ];
+
+    // grantSkillXp succeeds for p1, fails for p2
+    (grantSkillXp as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        xpResult: { xpAfterEfficiency: 100, leveledUp: false },
+        boostedXpAfterEfficiency: 100,
+        newLevel: 5,
+        skillLeveledUp: false,
+      })
+      .mockRejectedValueOnce(new Error('DB write failed for p2'));
+
+    // The error propagates — p3 is never reached
+    await expect(distributeBossLoot('mob-1', 10, contributors, 1)).rejects.toThrow(
+      'DB write failed for p2',
+    );
+
+    expect(grantSkillXp).toHaveBeenCalledTimes(2);
   });
 
   it('includes healing in contribution calculation', async () => {

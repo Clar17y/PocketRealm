@@ -20,8 +20,7 @@ async function rollBossRecipeDrop(
   playerId: string,
   mobFamilyId: string,
 ): Promise<BossPlayerReward['recipeUnlocked'] | undefined> {
-
-  const advancedRecipes = (await prisma.craftingRecipe.findMany({
+  const advancedRecipes = await prisma.craftingRecipe.findMany({
     where: { isAdvanced: true, mobFamilyId },
     select: {
       id: true,
@@ -30,22 +29,17 @@ async function rollBossRecipeDrop(
       resultTemplate: { select: { name: true } },
     },
     orderBy: [{ requiredLevel: 'asc' }, { id: 'asc' }],
-  })) as Array<{
-    id: string;
-    resultTemplateId: string;
-    soulbound: boolean;
-    resultTemplate: { name: string };
-  }>;
+  });
 
   if (advancedRecipes.length === 0) return undefined;
 
-  const known = (await prisma.playerRecipe.findMany({
+  const known = await prisma.playerRecipe.findMany({
     where: {
       playerId,
       recipeId: { in: advancedRecipes.map((r) => r.id) },
     },
     select: { recipeId: true },
-  })) as Array<{ recipeId: string }>;
+  });
 
   const knownIds = new Set(known.map((k) => k.recipeId));
   const unknown = advancedRecipes.filter((r) => !knownIds.has(r.id));

@@ -741,15 +741,42 @@ describe('bossEncounterService', () => {
     });
 
     it('silently skips auto-signup when player has insufficient turns', async () => {
+      const { AppError } = await import('../middleware/errorHandler.js');
       const { spendPlayerTurnsTx } = await import('./turnBankService.js');
-      vi.mocked(spendPlayerTurnsTx).mockRejectedValueOnce(new Error('Insufficient turns'));
+      vi.mocked(spendPlayerTurnsTx).mockRejectedValueOnce(
+        new AppError(400, 'Insufficient turns', 'INSUFFICIENT_TURNS'),
+      );
 
       const signups = [makeParticipantRow({ autoSignUp: true })];
       setupBasicRound({}, signups);
 
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
       // Should not throw
       const result = await resolveBossRound('enc-1', null);
       expect(result).not.toBeNull();
+      // INSUFFICIENT_TURNS is expected — should NOT log an error
+      expect(consoleSpy).not.toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+
+    it('logs unexpected errors in boss auto-signup', async () => {
+      const { spendPlayerTurnsTx } = await import('./turnBankService.js');
+      vi.mocked(spendPlayerTurnsTx).mockRejectedValueOnce(new Error('DB connection lost'));
+
+      const signups = [makeParticipantRow({ autoSignUp: true })];
+      setupBasicRound({}, signups);
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Should not throw — but should log the unexpected error
+      const result = await resolveBossRound('enc-1', null);
+      expect(result).not.toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Boss auto-signup failed unexpectedly',
+        expect.objectContaining({ playerId: 'p1' }),
+      );
+      consoleSpy.mockRestore();
     });
 
     it('does not auto-signup when autoSignUp is false', async () => {

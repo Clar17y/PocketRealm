@@ -599,7 +599,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       });
       fightLogIds.push(fightLog.id);
     }
-  } catch {
+  } catch (err) {
+    console.warn('Per-fight activity log creation failed', { err });
     fightLogIds = [];
   }
 

@@ -1,4 +1,53 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Must call vi.mock before any imports that depend on the mocked module
+vi.mock('@pocketrealm/shared', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    GUILD_SPECIALIZATION_DEFINITIONS: [
+      // Keep original definitions for existing tests
+      ...(actual.GUILD_SPECIALIZATION_DEFINITIONS as Array<unknown>),
+      // Add a test specialization with an unmapped effectType
+      {
+        path: 'test_unmapped',
+        name: 'Test Unmapped',
+        description: 'Test spec with unmapped effectType',
+        tiers: [
+          {
+            tier: 1,
+            guildLevelGate: 1,
+            bonuses: [
+              { effectType: 'travel_cost_reduction', value: 0.25 }, // snake_case: NOT a valid modifier key
+              { effectType: 'xpBoost', value: 0.05 },              // valid modifier key
+            ],
+          },
+        ],
+      },
+    ],
+    GUILD_PROJECT_DEFINITIONS: [
+      // Keep original definitions for existing tests
+      ...(actual.GUILD_PROJECT_DEFINITIONS as Array<unknown>),
+      // Add a test project with an unmapped effectType
+      {
+        key: 'test_unmapped_project',
+        name: 'Test Unmapped Project',
+        description: 'Test project with unmapped effectType',
+        level: 1,
+        prerequisites: [],
+        treasuryCost: 100,
+        materialCosts: [],
+        memberTurnGoal: 100,
+        perks: [
+          { effectType: 'bogus_effect', value: 0.50 },  // completely invalid key
+          { effectType: 'xpBoost', value: 0.07 },       // valid modifier key
+        ],
+        guildXpReward: 100,
+      },
+    ],
+  };
+});
+
 import { mockPrisma as db } from '../__test__/setup';
 import { activateUpgrade, getActiveUpgrades, getAvailableUpgrades, getPlayerGuildModifiers } from './guildUpgradeService';
 import { GUILD_CONSTANTS } from '@pocketrealm/shared';
@@ -302,5 +351,58 @@ describe('getPlayerGuildModifiers', () => {
     const mods = await getPlayerGuildModifiers(PLAYER_ID);
     expect(mods.travelCostReduction).toBe(0);
     expect(mods.repairCostReduction).toBe(0);
+  });
+
+  it('should not corrupt modifiers when project perk effectType has no matching modifier key', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, lastActiveAt: NOW,
+    });
+    db.guildUpgrade.findMany.mockResolvedValue([]);
+    db.guildProject.findMany.mockResolvedValue([
+      { projectKey: 'test_unmapped_project' },
+    ]);
+    db.guild.findUnique.mockResolvedValue({
+      specialization: null, level: 5,
+    });
+
+    const mods = await getPlayerGuildModifiers(PLAYER_ID);
+
+    // The valid perk (xpBoost: 0.07) should be applied
+    expect(mods.xpBoost).toBe(0.07);
+    // No modifier should be NaN
+    for (const [key, value] of Object.entries(mods)) {
+      expect(value, `modifier '${key}' should not be NaN`).not.toBeNaN();
+    }
+    // Should warn about the unmapped effectType
+    expect(warnSpy).toHaveBeenCalledWith('Unmapped guild project perk effect type: bogus_effect');
+    warnSpy.mockRestore();
+  });
+
+  it('should not corrupt modifiers when specialization effectType has no matching modifier key', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID, lastActiveAt: NOW,
+    });
+    db.guildUpgrade.findMany.mockResolvedValue([]);
+    db.guildProject.findMany.mockResolvedValue([]);
+    // Use the test_unmapped specialization which has 'travel_cost_reduction' (snake_case, invalid key)
+    db.guild.findUnique.mockResolvedValue({
+      specialization: 'test_unmapped', level: 10,
+    });
+
+    const mods = await getPlayerGuildModifiers(PLAYER_ID);
+
+    // The valid bonus (xpBoost: 0.05) should be applied
+    expect(mods.xpBoost).toBe(0.05);
+    // The unmapped 'travel_cost_reduction' must NOT produce NaN anywhere
+    for (const [key, value] of Object.entries(mods)) {
+      expect(value, `modifier '${key}' should not be NaN`).not.toBeNaN();
+    }
+    // travelCostReduction should remain at 0 (the snake_case key should be skipped)
+    expect(mods.travelCostReduction).toBe(0);
+    // Should warn about the unmapped effectType
+    expect(warnSpy).toHaveBeenCalledWith('Unmapped guild specialization effect type: travel_cost_reduction');
+    warnSpy.mockRestore();
   });
 });
