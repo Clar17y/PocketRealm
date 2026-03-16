@@ -31,6 +31,7 @@ import { resolveStats, resolveAllStats, resolveFamilyKills, resolveAllFamilyKill
 import { createActivityLog } from './activityLogService';
 import { getIo } from '../socket';
 import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
+import { AppError } from '../middleware/errorHandler';
 
 const mockResolveStats = resolveStats as ReturnType<typeof vi.fn>;
 const mockResolveAllStats = resolveAllStats as ReturnType<typeof vi.fn>;
@@ -547,7 +548,7 @@ describe('achievementService', () => {
       });
     });
 
-    it('skips item creation when template not found', async () => {
+    it('throws INVALID_REWARD when item template does not exist', async () => {
       mockPrisma.playerAchievement.findUnique.mockResolvedValue({
         playerId: 'p1',
         achievementId: 'family_vermin_5000',
@@ -556,8 +557,55 @@ describe('achievementService', () => {
       mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.itemTemplate.findUnique.mockResolvedValue(null);
 
-      await claimReward('p1', 'family_vermin_5000');
+      try {
+        await claimReward('p1', 'family_vermin_5000');
+        expect.unreachable('should have thrown');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(AppError);
+        expect(err.code).toBe('INVALID_REWARD');
+        expect(err.statusCode).toBe(500);
+        expect(err.message).toContain('not found');
+      }
 
+      // Item should not have been created
+      expect(mockPrisma.item.create).not.toHaveBeenCalled();
+    });
+
+    it('throws INVALID_REWARD when item reward has no itemTemplateId', async () => {
+      // We need an achievement with an item reward that has no itemTemplateId.
+      // Temporarily spy on ACHIEVEMENTS_BY_ID to return a crafted definition.
+      const fakeAchDef = {
+        id: 'fake_item_no_template',
+        category: 'combat',
+        title: 'Fake',
+        description: 'Fake achievement',
+        threshold: 1,
+        tier: 1,
+        rewards: [{ type: 'item' as const, amount: 1 }],
+      };
+      const origGet = ACHIEVEMENTS_BY_ID.get.bind(ACHIEVEMENTS_BY_ID);
+      vi.spyOn(ACHIEVEMENTS_BY_ID, 'get').mockImplementation((key) => {
+        if (key === 'fake_item_no_template') return fakeAchDef as any;
+        return origGet(key);
+      });
+
+      mockPrisma.playerAchievement.findUnique.mockResolvedValue({
+        playerId: 'p1',
+        achievementId: 'fake_item_no_template',
+        rewardClaimed: false,
+      });
+      mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
+
+      try {
+        await claimReward('p1', 'fake_item_no_template');
+        expect.unreachable('should have thrown');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(AppError);
+        expect(err.code).toBe('INVALID_REWARD');
+        expect(err.message).toContain('no item template');
+      }
+
+      // Item should not have been created
       expect(mockPrisma.item.create).not.toHaveBeenCalled();
     });
 
