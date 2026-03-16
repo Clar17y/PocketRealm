@@ -1,6 +1,6 @@
 import { STAMINA_CONSTANTS } from '@pocketrealm/shared';
 
-export interface StaminaCalculationInput {
+interface StaminaCalculationInput {
   meleeLevel: number;
   rangedLevel: number;
   evasionLevel: number;

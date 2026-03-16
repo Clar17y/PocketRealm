@@ -32,7 +32,7 @@ export interface MappedCombatFields {
 
 export function mapTemplateCombatLog<T extends TemplateCombatFields>(log: T[]): (T & MappedCombatFields)[] {
   return log.map(entry => {
-    if (!entry.combatantAAction && !entry.combatantBAction) return entry as T & MappedCombatFields;
+    if (!entry.combatantAAction && !entry.combatantBAction) return { ...entry };
 
     const isA = entry.actor === 'combatantA';
     const actionId = isA ? entry.combatantAAction : entry.combatantBAction;

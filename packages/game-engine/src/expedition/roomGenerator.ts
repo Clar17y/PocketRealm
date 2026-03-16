@@ -4,21 +4,11 @@ import type {
   ExpeditionMobState,
   ExpeditionTheme,
   ExpeditionThemeMob,
-  CombatantStats,
 } from '@pocketrealm/shared';
 import {
   EXPEDITION_ROOM_COMPOSITIONS,
   EXPEDITION_CONSTANTS,
 } from '@pocketrealm/shared';
-
-/** @deprecated Use ExpeditionTheme roster instead. Kept for expeditionService compatibility. */
-export interface MobPoolEntry {
-  mobTemplateId: string;
-  name: string;
-  level: number;
-  hp: number;
-  stats: CombatantStats;
-}
 
 const MAX_TIER_INDEX = 2;
 

@@ -92,9 +92,7 @@ export function registerLogRoutes(router: Router): void {
 
       const whereClause = Prisma.sql`WHERE ${Prisma.join(whereParts, ' AND ')}`;
       const offset = (query.page - 1) * query.pageSize;
-      const listRowsQuery = query.sort === 'xp'
-        ? Prisma.sql`
-            SELECT
+      const selectColumns = Prisma.sql`
               "id",
               "created_at" AS "createdAt",
               ("result"->>'zoneId') AS "zoneId",
@@ -123,47 +121,15 @@ export function registerLogRoutes(router: Router): void {
               ), 0) AS "roundCount",
               COALESCE(("result"->>'fightCount')::int, 1) AS "fightCount",
               ("result"->>'encounterSiteId') AS "encounterSiteId",
-              ("result"->>'mobFamilyName') AS "mobFamilyName"
+              ("result"->>'mobFamilyName') AS "mobFamilyName"`;
+      const orderBy = query.sort === 'xp'
+        ? Prisma.sql`ORDER BY COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) DESC, "created_at" DESC`
+        : Prisma.sql`ORDER BY "created_at" DESC`;
+      const listRowsQuery = Prisma.sql`
+            SELECT ${selectColumns}
             FROM "activity_logs"
             ${whereClause}
-            ORDER BY COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) DESC, "created_at" DESC
-            LIMIT ${query.pageSize}
-            OFFSET ${offset}
-          `
-        : Prisma.sql`
-            SELECT
-              "id",
-              "created_at" AS "createdAt",
-              ("result"->>'zoneId') AS "zoneId",
-              ("result"->>'zoneName') AS "zoneName",
-              ("result"->>'mobTemplateId') AS "mobTemplateId",
-              ("result"->>'mobName') AS "mobName",
-              COALESCE(("result"->>'mobDisplayName'), ("result"->>'mobName')) AS "mobDisplayName",
-              ("result"->>'outcome') AS "outcome",
-              COALESCE(
-                NULLIF(("result"->>'source'), ''),
-                CASE
-                  WHEN COALESCE(("result"->>'encounterSiteId'), '') <> '' THEN 'encounter_site'
-                  ELSE 'zone_combat'
-                END
-              ) AS "source",
-              COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) AS "xpGained",
-              COALESCE((
-                SELECT MAX(
-                  CASE
-                    WHEN jsonb_typeof(log_entry->'round') = 'number'
-                      THEN (log_entry->>'round')::int
-                    ELSE 0
-                  END
-                )
-                FROM jsonb_array_elements(COALESCE("result"->'log', '[]'::jsonb)) AS log_entry
-              ), 0) AS "roundCount",
-              COALESCE(("result"->>'fightCount')::int, 1) AS "fightCount",
-              ("result"->>'encounterSiteId') AS "encounterSiteId",
-              ("result"->>'mobFamilyName') AS "mobFamilyName"
-            FROM "activity_logs"
-            ${whereClause}
-            ORDER BY "created_at" DESC
+            ${orderBy}
             LIMIT ${query.pageSize}
             OFFSET ${offset}
           `;

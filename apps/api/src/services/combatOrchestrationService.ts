@@ -253,7 +253,7 @@ export async function splitAndGrantXp(
   resourceCostByScalingStat: { melee: number; ranged: number; magic: number } | undefined,
   guildXpBoost: number | undefined,
 ): Promise<GrantXpResult[]> {
-  const boost = guildXpBoost || undefined;
+  const boost = guildXpBoost ?? undefined;
 
   // Compute contribution per skill: damage + weighted resource cost
   const contribution = { melee: 0, ranged: 0, magic: 0 };

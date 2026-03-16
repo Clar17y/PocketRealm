@@ -36,24 +36,12 @@ export async function blockPlayer(blockerId: string, targetId: string): Promise<
       data: { blockerId, blockedId: targetId },
     });
 
-    // Remove any existing friendship (either direction)
+    // Remove any existing friendship or pending request (either direction)
     await tx.friendship.deleteMany({
       where: {
-        status: 'accepted',
         OR: [
           { senderId: blockerId, receiverId: targetId },
           { senderId: targetId, receiverId: blockerId },
-        ],
-      },
-    });
-
-    // Delete any pending requests between the two players (both directions)
-    await tx.friendship.deleteMany({
-      where: {
-        status: 'pending',
-        OR: [
-          { senderId: targetId, receiverId: blockerId },
-          { senderId: blockerId, receiverId: targetId },
         ],
       },
     });
