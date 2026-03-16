@@ -81,25 +81,6 @@ export function resolveHitCheck(input: {
 }
 
 /**
- * Temporary compatibility wrapper for legacy callers that still supply
- * d20-style inputs. Later tasks migrate production combat paths to
- * calculateHitChance/resolveHitCheck directly.
- */
-export function doesAttackHit(
-  attackRoll: number,
-  accuracyBonus: number,
-  targetDodge: number,
-  targetEvasion: number
-): boolean {
-  if (attackRoll === 20) return true;
-  if (attackRoll === 1) return false;
-
-  const totalAttack = attackRoll + accuracyBonus;
-  const hitThreshold = 10 + targetDodge + Math.max(0, targetEvasion);
-  return totalAttack >= hitThreshold;
-}
-
-/**
  * Check if attack is a critical hit.
  */
 export function isCriticalHit(bonusCritChance = 0): boolean {

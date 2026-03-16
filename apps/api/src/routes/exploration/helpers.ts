@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import {
-  EXPLORATION_CONSTANTS,
   resolveZoneTiers,
   getHighestUnlockedTier,
   type EncounterSiteSize,
@@ -30,9 +29,9 @@ export const startSchema = z.object({
 
 // --- Types ---
 
-export type { EncounterSiteSize, EncounterMobRole, EncounterMobStatus } from '@pocketrealm/shared';
+export type { EncounterSiteSize } from '@pocketrealm/shared';
 
-export type NarrativeEventType =
+type NarrativeEventType =
   | 'ambush_victory'
   | 'ambush_defeat'
   | 'encounter_site'
@@ -139,12 +138,6 @@ export function pickEncounterSize(minRaw: string, maxRaw: string): EncounterSite
   return allowed[randomIntInclusive(0, allowed.length - 1)] ?? 'small';
 }
 
-export function getEncounterRange(size: EncounterSiteSize): { min: number; max: number } {
-  if (size === 'small') return EXPLORATION_CONSTANTS.ENCOUNTER_SIZE_SMALL;
-  if (size === 'medium') return EXPLORATION_CONSTANTS.ENCOUNTER_SIZE_MEDIUM;
-  return EXPLORATION_CONSTANTS.ENCOUNTER_SIZE_LARGE;
-}
-
 export function getSiteName(
   familyName: string,
   size: EncounterSiteSize,
@@ -155,7 +148,7 @@ export function getSiteName(
   return `Large ${familyName} ${nouns.siteNounLarge}`;
 }
 
-export function pickFamilyMemberByRole(
+function pickFamilyMemberByRole(
   members: ZoneFamilyMember[],
   role: EncounterMobRole,
   fallback: EncounterMobRole[] = []

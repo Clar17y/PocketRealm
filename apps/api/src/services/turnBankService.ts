@@ -113,7 +113,7 @@ export async function spendPlayerTurnsTx(
   return spendPlayerTurnsWithClient(tx, playerId, amount, now);
 }
 
-interface RefundTurnsResult {
+export interface RefundTurnsResult {
   previousTurns: number;
   refunded: number;
   currentTurns: number;

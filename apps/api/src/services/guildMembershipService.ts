@@ -78,7 +78,7 @@ export async function leaveGuild(playerId: string): Promise<void> {
 // Join Requests
 // ---------------------------------------------------------------------------
 
-export interface JoinRequestData {
+interface JoinRequestData {
   id: string;
   playerId: string;
   username: string;

@@ -123,7 +123,9 @@ export async function runSpar(
   const winnerHp = attackerWon ? result.combatantAHpRemaining : result.combatantBHpRemaining;
 
   // Notify defender via system mail (fire-and-forget)
-  sendSparResultMail(attackerId, attackerName, defenderId, attackerWon, winnerHp).catch(() => {});
+  sendSparResultMail(attackerId, attackerName, defenderId, attackerWon, winnerHp).catch(err =>
+    console.warn('sendSparResultMail failed', { err, attackerId, defenderId })
+  );
 
   return {
     winnerId,

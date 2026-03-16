@@ -12,7 +12,7 @@ export interface ExpeditionContributor {
   roomHealing: number;
 }
 
-export interface ExpeditionLootDrop {
+interface ExpeditionLootDrop {
   itemTemplateId: string;
   quantity: number;
   rarity?: string;

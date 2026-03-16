@@ -197,10 +197,10 @@ describe('splitAndGrantXp', () => {
     expect(mockGrantSkillXp).toHaveBeenCalledWith('p1', 'melee', 0, undefined, undefined);
   });
 
-  it('converts guildXpBoost of 0 to undefined (falsy)', async () => {
+  it('passes guildXpBoost of 0 through (not treated as falsy)', async () => {
     await splitAndGrantXp('p1', 5, 'ranged', { melee: 0, ranged: 5, magic: 0 }, NO_RESOURCES, 0);
-    // 0 is falsy → should become undefined
-    expect(mockGrantSkillXp).toHaveBeenCalledWith('p1', 'ranged', 5, undefined, undefined);
+    // 0 is a valid boost value, should not be converted to undefined
+    expect(mockGrantSkillXp).toHaveBeenCalledWith('p1', 'ranged', 5, undefined, 0);
   });
 
   it('uses ranged as fallback when no damage/resource tracking', async () => {

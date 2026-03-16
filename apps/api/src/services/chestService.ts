@@ -11,14 +11,14 @@ import { FULL_CLEAR_CONSTANTS, type LootDrop } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantDropsTx, type DropTableEntry, type DropGrantResult } from './dropRollingService';
 
-export interface RecipeUnlockReward {
+interface RecipeUnlockReward {
   recipeId: string;
   resultTemplateId: string;
   recipeName: string;
   soulbound: boolean;
 }
 
-export interface EncounterSiteChestRewards {
+interface EncounterSiteChestRewards {
   chestRarity: ChestRarity;
   materialRolls: number;
   loot: LootDrop[];

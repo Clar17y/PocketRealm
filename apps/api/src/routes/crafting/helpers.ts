@@ -23,7 +23,7 @@ export function isItemType(value: string): value is ItemType {
   return value === 'weapon' || value === 'armor' || value === 'resource' || value === 'consumable';
 }
 
-export function isItemRarity(value: string): value is ItemRarity {
+function isItemRarity(value: string): value is ItemRarity {
   return value === 'common' || value === 'uncommon' || value === 'rare' || value === 'epic' || value === 'legendary';
 }
 
@@ -162,7 +162,7 @@ export function normalizeBonusStats(value: unknown): ItemStats {
 
 // ── Sacrificial item validation ──────────────────────────────────────
 
-export interface SacrificialItemMatch {
+interface SacrificialItemMatch {
   id: string;
   templateId: string;
   rarity: string;

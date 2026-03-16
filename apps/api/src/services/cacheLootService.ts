@@ -4,13 +4,13 @@ import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
 import type { PendingLootItem } from './pendingLootService';
 
-export interface CacheMaterialDrop {
+interface CacheMaterialDrop {
   itemTemplateId: string;
   name: string;
   quantity: number;
 }
 
-export interface CacheLootResult {
+interface CacheLootResult {
   materials: CacheMaterialDrop[];
   soulboundItem: { itemTemplateId: string; name: string; rarity: string } | null;
   overflow: PendingLootItem[];

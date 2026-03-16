@@ -16,20 +16,29 @@ export async function trackProgress(
   metadata?: { prefix?: string; zoneId?: string; rarity?: string },
   preloadedGuildId?: string | null,
 ): Promise<QuestProgressUpdate[]> {
-  if (amount <= 0) return [];
+  try {
+    if (amount <= 0) return [];
 
-  const guildId = preloadedGuildId !== undefined
-    ? preloadedGuildId
-    : await getPlayerGuildId(playerId);
+    const guildId = preloadedGuildId !== undefined
+      ? preloadedGuildId
+      : await getPlayerGuildId(playerId);
 
-  const contractPromise = (guildId && GUILD_CONTRACT_TYPES.has(type))
-    ? incrementContractProgress(guildId, type as GuildContractType, amount).catch(() => {})
-    : Promise.resolve();
+    const contractPromise = (guildId && GUILD_CONTRACT_TYPES.has(type))
+      ? incrementContractProgress(guildId, type as GuildContractType, amount)
+      : Promise.resolve();
 
-  const [, questResult] = await Promise.allSettled([
-    contractPromise,
-    incrementQuestProgress(playerId, type, amount, metadata),
-  ]);
+    const [contractResult, questResult] = await Promise.allSettled([
+      contractPromise,
+      incrementQuestProgress(playerId, type, amount, metadata),
+    ]);
 
-  return questResult.status === 'fulfilled' ? questResult.value : [];
+    if (contractResult.status === 'rejected') {
+      console.warn('[trackProgress] contract increment failed', { playerId, type, err: contractResult.reason });
+    }
+
+    return questResult.status === 'fulfilled' ? questResult.value : [];
+  } catch (err) {
+    console.warn('[trackProgress] failed', { err, playerId, type });
+    return [];
+  }
 }

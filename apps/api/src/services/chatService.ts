@@ -47,7 +47,7 @@ export async function saveMessage(params: {
 }
 
 export async function getChannelHistory(
-  channelType: string,
+  channelType: ChatChannelType,
   channelId: string,
 ): Promise<ChatMessageEvent[]> {
   const rows = await prisma.chatMessage.findMany({

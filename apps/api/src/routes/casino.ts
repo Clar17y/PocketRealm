@@ -58,8 +58,8 @@ casinoRouter.post('/roulette/bet', asyncHandler(async (req, res) => {
 
   const result = await placeBet(playerId, betType as RouletteBetType, betValue, amount);
 
-  void trackProgress(playerId, 'casino_bets', 1).catch(() => {});
-  void trackProgress(playerId, 'casino_wagers', amount).catch(() => {});
+  void trackProgress(playerId, 'casino_bets', 1);
+  void trackProgress(playerId, 'casino_wagers', amount);
 
   await trackAchievements(playerId, {
     totalBetsPlaced: 1,

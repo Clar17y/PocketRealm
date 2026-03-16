@@ -28,8 +28,6 @@ import {
   getResourceState,
   restStamina,
   restMana,
-  setStamina,
-  setMana,
   setAllResources,
 } from './resourceService';
 import { getPlayerTaxRateTx, applyGuildTaxTx } from './guildTaxService';
@@ -254,69 +252,6 @@ describe('restMana', () => {
     expect(result.healedAmount).toBe(6);
     expect(result.newValue).toBe(36);
     expect(result.turnsUsed).toBe(2);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// setStamina / setMana
-// ---------------------------------------------------------------------------
-
-describe('setStamina', () => {
-  it('updates player stamina', async () => {
-    mockPrisma.player.update.mockResolvedValue({});
-
-    await setStamina('p1', 50, now);
-    expect(mockPrisma.player.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ currentStamina: 50, lastStaminaRegenAt: now }),
-      }),
-    );
-  });
-
-  it('clamps negative stamina to 0', async () => {
-    mockPrisma.player.update.mockResolvedValue({});
-
-    await setStamina('p1', -10, now);
-    expect(mockPrisma.player.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ currentStamina: 0 }),
-      }),
-    );
-  });
-
-  it('floors fractional values', async () => {
-    mockPrisma.player.update.mockResolvedValue({});
-
-    await setStamina('p1', 7.9, now);
-    expect(mockPrisma.player.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ currentStamina: 7 }),
-      }),
-    );
-  });
-});
-
-describe('setMana', () => {
-  it('updates player mana', async () => {
-    mockPrisma.player.update.mockResolvedValue({});
-
-    await setMana('p1', 25, now);
-    expect(mockPrisma.player.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ currentMana: 25, lastManaRegenAt: now }),
-      }),
-    );
-  });
-
-  it('clamps negative mana to 0', async () => {
-    mockPrisma.player.update.mockResolvedValue({});
-
-    await setMana('p1', -5, now);
-    expect(mockPrisma.player.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ currentMana: 0 }),
-      }),
-    );
   });
 });
 
