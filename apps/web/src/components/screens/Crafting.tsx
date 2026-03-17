@@ -32,6 +32,7 @@ interface Recipe {
   isDiscovered?: boolean;
   discoveryHint?: string | null;
   soulbound?: boolean;
+  stackable?: boolean;
   resultQuantity: number;
   requiredLevel: number;
   turnCost: number;
@@ -56,10 +57,11 @@ interface CraftingProps {
   guildTaxRate?: number;
   backpackFull?: boolean;
   isOverEncumbered?: boolean;
+  availableSlots?: number;
 }
 
 
-export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false }: CraftingProps) {
+export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, availableSlots = 0 }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
@@ -88,20 +90,22 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
     if (forgeLocked(recipe)) return 0;
     if (recipe.requiredLevel > skillLevel) return 0;
     if (recipe.isAdvanced && recipe.isDiscovered === false) return 0;
-    if (recipe.materials.length === 0) return 99;
-    return Math.min(...recipe.materials.map((m) => Math.floor(m.owned / m.required)));
+    if (recipe.materials.length === 0) return recipe.stackable ? 99 : Math.min(99, availableSlots);
+    const materialMax = Math.min(...recipe.materials.map((m) => Math.floor(m.owned / m.required)));
+    if (recipe.stackable) return materialMax;
+    return Math.min(materialMax, availableSlots);
   };
 
   const selectedMax = selectedRecipe ? maxCraftable(selectedRecipe) : 0;
 
   // Reset quantity when recipe changes or when max changes
   useEffect(() => {
-    if (defaultMaxQuantity && selectedMax > 0) {
+    if (defaultMaxQuantity && selectedRecipe?.stackable && selectedMax > 0) {
       setQuantity(selectedMax);
     } else {
       setQuantity((prev) => Math.max(1, Math.min(prev, selectedMax || 1)));
     }
-  }, [selectedRecipeId, selectedMax, defaultMaxQuantity]);
+  }, [selectedRecipeId, selectedMax, defaultMaxQuantity, selectedRecipe?.stackable]);
 
   const canCraft = (recipe: Recipe) => {
     if (noFacility) return false;

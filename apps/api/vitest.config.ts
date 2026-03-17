@@ -15,5 +15,11 @@ export default defineConfig({
     env: {
       JWT_SECRET: 'test-secret-at-least-thirty-two-characters-long',
     },
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        maxForks: 3,
+      },
+    },
   },
 });

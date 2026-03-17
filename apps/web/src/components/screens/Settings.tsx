@@ -188,8 +188,8 @@ export function Settings({
         <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Crafting</h3>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs text-[var(--rpg-text-secondary)]">Default Refining to Max</p>
-            <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Auto-set refining quantity to maximum when selecting a recipe</p>
+            <p className="text-xs text-[var(--rpg-text-secondary)]">Default to Max Quantity</p>
+            <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Auto-set quantity to maximum when selecting a stackable recipe</p>
           </div>
           <ToggleSwitch checked={defaultRefiningMax} onChange={onDefaultRefiningMaxChange} />
         </div>
