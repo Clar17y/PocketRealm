@@ -16,6 +16,7 @@ import {
   markScoutNotificationsRead,
 } from '../services/pvpService';
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
+import { sendPush } from '../services/pushNotificationService';
 import { paginationSchema } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
@@ -117,6 +118,14 @@ pvpRouter.post('/challenge', asyncHandler(async (req, res) => {
   if (defenderDamage > 0) {
     void trackProgress(body.targetId, 'pvp_damage', defenderDamage);
   }
+
+  // Fire-and-forget push notification to defender
+  sendPush(result.defenderId, {
+    title: 'PvP Attack!',
+    body: `${result.attackerName} challenged you in the arena!`,
+    tag: 'pvp-attack',
+    data: { type: 'pvp', matchId: result.matchId },
+  }).catch(() => {});
 
   const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources', 'skills', 'characterProgression']);
   res.json({ ...result, stateUpdates });

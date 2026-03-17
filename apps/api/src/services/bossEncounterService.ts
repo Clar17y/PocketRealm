@@ -39,6 +39,7 @@ import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.
 import { distributeBossLoot } from './bossLootService';
 import { redis } from '../redis';
 import { parseJsonArray, parseJsonRecord } from '../utils/jsonColumnSchemas';
+import { sendPush } from './pushNotificationService';
 
 const VALID_ENCOUNTER_STATUSES = new Set<BossEncounterStatus>(['waiting', 'in_progress', 'defeated', 'expired']);
 const VALID_PARTICIPANT_STATUSES = new Set<BossParticipantStatus>(['alive', 'knocked_out']);
@@ -668,6 +669,21 @@ async function resolveBossRoundInner(
       io, 'zone', `zone:${encounter.event.zoneId}`,
       `Boss round ${nextRound}: ${totalPlayerDmg} damage dealt to ${encounter.mobTemplate.name} (${hpPercent}% HP remaining)`,
     );
+  }
+
+  // Fire-and-forget push notifications to round participants
+  const bossName = encounter.mobTemplate.name;
+  const pushBody = result.bossDefeated
+    ? `${bossName} has been defeated!`
+    : `A new round against ${bossName} has been resolved.`;
+  const uniquePlayerIds = [...new Set(signups.map((s) => s.playerId))];
+  for (const pid of uniquePlayerIds) {
+    sendPush(pid, {
+      title: 'Boss Encounter',
+      body: pushBody,
+      tag: 'boss-round',
+      data: { type: 'boss', encounterId },
+    }).catch(() => {});
   }
 
   return { bossDefeated: result.bossDefeated, roundResult: result };
