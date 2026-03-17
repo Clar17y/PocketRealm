@@ -7,6 +7,8 @@ import { LoadingCard } from '@/components/common/LoadingCard';
 import { getExpeditionShop, purchaseExpeditionItem } from '@/lib/api/expedition';
 import type { ExpeditionShopItem, ExpeditionSetId } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
+import { ErrorBanner } from '@/components/common/ErrorBanner';
 
 // ---------------------------------------------------------------------------
 // Set metadata
@@ -77,7 +79,6 @@ function formatStats(stats: Partial<Record<string, unknown>>): string {
 // ---------------------------------------------------------------------------
 
 interface ExpeditionShopTabProps {
-  setError: (msg: string | null) => void;
   onRefresh?: () => void;
 }
 
@@ -85,42 +86,25 @@ interface ExpeditionShopTabProps {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function ExpeditionShopTab({ setError, onRefresh }: ExpeditionShopTabProps) {
-  const [loading, setLoading] = useState(true);
+export function ExpeditionShopTab({ onRefresh }: ExpeditionShopTabProps) {
+  const load = useAsyncAction();
+  const purchase = useAsyncAction();
   const [shopData, setShopData] = useState<{ items: ExpeditionShopItem[]; tokens: number } | null>(null);
-  const [purchasing, setPurchasing] = useState<string | null>(null);
 
-  const loadShop = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await getExpeditionShop();
-      if (res.error) { setError(res.error.message); return; }
-      setShopData(res.data ?? null);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load shop');
-    } finally {
-      setLoading(false);
-    }
-  }, [setError]);
+  const loadShop = useCallback(() => {
+    load.run(() => getExpeditionShop(), (data) => setShopData(data ?? null));
+  }, [load.run]);
 
   useEffect(() => { void loadShop(); }, [loadShop]);
 
-  const handlePurchase = async (itemId: string) => {
-    setPurchasing(itemId);
-    setError(null);
-    try {
-      const res = await purchaseExpeditionItem(itemId);
-      if (res.error) { setError(res.error.message); return; }
-      await loadShop();
-      onRefresh?.();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Purchase failed');
-    } finally {
-      setPurchasing(null);
-    }
-  };
+  const handlePurchase = (itemId: string) =>
+    purchase.run(
+      () => purchaseExpeditionItem(itemId),
+      () => { void loadShop(); onRefresh?.(); },
+      itemId,
+    );
 
-  if (loading && !shopData) return <LoadingCard />;
+  if (load.loading && !shopData) return <LoadingCard />;
 
   if (!shopData) return null;
 
@@ -131,6 +115,7 @@ export function ExpeditionShopTab({ setError, onRefresh }: ExpeditionShopTabProp
 
   return (
     <div className="space-y-4">
+      {(load.error || purchase.error) && <ErrorBanner message={(load.error || purchase.error)!} />}
       {/* Header */}
       <PixelCard>
         <div className="flex justify-between items-center">
@@ -179,7 +164,7 @@ export function ExpeditionShopTab({ setError, onRefresh }: ExpeditionShopTabProp
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {items.map((item) => {
                 const canAfford = shopData.tokens >= item.tokenCost;
-                const isPurchasing = purchasing === item.id;
+                const isPurchasing = purchase.loadingKey === item.id;
 
                 return (
                   <PixelCard key={item.id} padding="sm">
