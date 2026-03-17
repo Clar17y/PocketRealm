@@ -74,7 +74,7 @@ import {
   getFriendMailUnreadCount,
   getPlayerBuffs,
 } from '@/lib/api';
-import type { PlayerBuffData, StateUpdates } from '@pocketrealm/shared';
+import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
 import { STAMINA_CONSTANTS, MANA_CONSTANTS } from '@pocketrealm/shared';
@@ -187,31 +187,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
   const [zoneConnections, setZoneConnections] = useState<Array<{ fromId: string; toId: string; explorationThreshold: number }>>([]);
   const [undiscoveredZones, setUndiscoveredZones] = useState<Array<{ id: string; name: string; explorationThreshold: number; fromZoneId: string; discovered: false }>>([]);
-  const [skills, setSkills] = useState<Array<{ skillType: string; level: number; xp: number; dailyXpGained: number }>>([]);
+  const [skills, setSkills] = useState<SkillStateDTO[]>([]);
   const [characterProgression, setCharacterProgression] = useState<CharacterProgression>(DEFAULT_CHARACTER_PROGRESSION);
-  const [inventory, setInventory] = useState<Array<{
-    id: string;
-    quantity: number;
-    rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-    currentDurability: number | null;
-    maxDurability: number | null;
-    bonusStats: Record<string, number> | null;
-    equippedSlot: string | null;
-    template: {
-      id: string;
-      name: string;
-      itemType: string;
-      weightClass?: 'heavy' | 'medium' | 'light' | null;
-      slot: string | null;
-      tier: number;
-      baseStats: Record<string, unknown>;
-      requiredSkill?: string | null;
-      requiredLevel?: number;
-      maxDurability?: number;
-      stackable?: boolean;
-      sellPrice?: number | null;
-    };
-  }>>([]);
+  const [inventory, setInventory] = useState<InventoryItemDTO[]>([]);
   const [inventoryCapacity, setInventoryCapacity] = useState(24);
   const [inventoryUsedSlots, setInventoryUsedSlots] = useState(0);
   const [materialTotals, setMaterialTotals] = useState<Record<string, number>>({});
@@ -391,7 +369,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, [activeScreen, isAuthenticated]); // intentionally excludes HP/resource state — only re-run on screen change
 
   const stateSetters = useMemo<StateSetters>(() => ({
-    setInventory: (updater) => setInventory(updater as any),
+    setInventory: (updater) => setInventory(updater),
     setInventoryCapacity,
     setInventoryUsedSlots,
     setEquipment: (eq) => setEquipment(
@@ -401,12 +379,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         item,
       })),
     ),
-    setSkills: (skills) => { if (skills) setSkills(skills as any); },
+    setSkills,
     setHpState: (hp) => { setHpState(hp); hpStateRef.current = hp; },
-    setStaminaState: (s) => setStaminaState(s as any),
-    setManaState: (m) => setManaState(m as any),
+    setStaminaState: (partial) => setStaminaState((prev) => ({ ...prev, ...partial })),
+    setManaState: (partial) => setManaState((prev) => ({ ...prev, ...partial })),
     setGold,
-    setActiveBuffs: (buffs) => { setActiveBuffs(buffs as any); },
+    setActiveBuffs: setActiveBuffs,
     setCharacterProgression: (cp) => setCharacterProgression((prev) => ({ ...prev, ...cp })),
     setMaterialTotals,
   }), []);
@@ -779,7 +757,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         playerHpBeforeExploration: hpBefore,
         playerMaxHp: maxHpBefore,
         pendingLootSessionIds: data.pendingLootSessionIds,
-        stateUpdates: (data as any).stateUpdates,
+        stateUpdates: data.stateUpdates,
       });
       setPlaybackActive(true);
 
@@ -992,7 +970,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       // Store pending loot session ID for activation after playback
       combatPendingLootRef.current = data.pendingLootSessionId ?? null;
 
-      applyStateUpdates((data as any).stateUpdates, stateSetters);
+      applyStateUpdates(data.stateUpdates, stateSetters);
       await loadBestiary(false);
     });
   };
@@ -1121,7 +1099,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       pushLog(...newLogs);
-      applyStateUpdates((data as any).stateUpdates, stateSetters);
+      applyStateUpdates(data.stateUpdates, stateSetters);
       await loadGatheringNodes();
       advanceTutorial(TUTORIAL_STEP_GATHER);
     });
@@ -1201,7 +1179,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       pushLog(...newLogs);
-      applyStateUpdates((data as any).stateUpdates, stateSetters);
+      applyStateUpdates(data.stateUpdates, stateSetters);
       advanceTutorial(TUTORIAL_STEP_REFINE);
       advanceTutorial(TUTORIAL_STEP_CRAFT);
     });
@@ -1370,7 +1348,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         type: 'success',
         message: `Claimed ${selectedIndices.length} loot items`,
       });
-      applyStateUpdates((res.data as any).stateUpdates, stateSetters);
+      applyStateUpdates(res.data.stateUpdates, stateSetters);
       await activateNextQueuedLoot();
     });
   };
@@ -1450,12 +1428,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Returned to ${data.zone.name}.` });
 
       if (route.remainingZoneIds.length > 0) {
-        applyStateUpdates((data as any).stateUpdates, stateSetters);
+        applyStateUpdates(data.stateUpdates, stateSetters);
         await executeNextTravelHop();
         return;
       }
 
-      applyStateUpdates((data as any).stateUpdates, stateSetters);
+      applyStateUpdates(data.stateUpdates, stateSetters);
       await completeQueuedTravelRoute();
       return;
     }
@@ -1483,7 +1461,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         currentHop,
         totalHops: route.totalHops,
         finalDestinationName: route.finalDestinationName,
-        stateUpdates: (data as any).stateUpdates,
+        stateUpdates: data.stateUpdates,
       });
       setPlaybackActive(true);
       return;
@@ -1493,12 +1471,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     pushLog({ timestamp: nowStamp(), type: 'success', message: `Arrived at ${data.zone.name}.` });
 
     if (route.remainingZoneIds.length > 0) {
-      applyStateUpdates((data as any).stateUpdates, stateSetters);
+      applyStateUpdates(data.stateUpdates, stateSetters);
       await executeNextTravelHop();
       return;
     }
 
-    applyStateUpdates((data as any).stateUpdates, stateSetters);
+    applyStateUpdates(data.stateUpdates, stateSetters);
     await completeQueuedTravelRoute();
   };
 
@@ -1657,7 +1635,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         const healed = result.data.currentHp - hpState.currentHp;
         setTurns(result.data.turns.currentTurns);
         setHpState(prev => ({ ...prev, currentHp: result.data!.currentHp, maxHp: result.data!.maxHp }));
-        applyStateUpdates((result.data as any).stateUpdates, stateSetters);
+        applyStateUpdates(result.data.stateUpdates, stateSetters);
         pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${actualTurns.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
       }
     });

@@ -1,7 +1,8 @@
 import { prisma } from '@pocketrealm/database';
-import type { InventoryItemDTO, SkillStateDTO, StateUpdates, BuffStateDTO } from '@pocketrealm/shared';
+import type { InventoryItemDTO, SkillStateDTO, StateUpdates, PlayerBuffData } from '@pocketrealm/shared';
+import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { getHpState } from './hpService.js';
-import { getResourceState } from './resourceService.js';
+import { getResourceState, type SkillLevels } from './resourceService.js';
 import { getInventoryState } from './inventoryService.js';
 
 // ---------------------------------------------------------------------------
@@ -70,19 +71,20 @@ type PrismaPlayerSkill = {
   level: number;
   xp: bigint;
   dailyXpGained: number;
+  lastXpResetAt: Date;
 };
 
 /**
  * Convert a Prisma PlayerSkill row to a SkillStateDTO.
- * Converts BigInt xp to a Number.
+ * Converts BigInt xp to a Number and resets dailyXpGained when the XP window has rolled over.
  */
-export function toSkillStateDTO(skill: PrismaPlayerSkill): SkillStateDTO {
+export function toSkillStateDTO(skill: PrismaPlayerSkill, now: Date = new Date()): SkillStateDTO {
   return {
     id: skill.id,
     skillType: skill.skillType,
     level: skill.level,
     xp: Number(skill.xp),
-    dailyXpGained: skill.dailyXpGained,
+    dailyXpGained: shouldResetWindowCap(skill.lastXpResetAt, now) ? 0 : skill.dailyXpGained,
   };
 }
 
@@ -135,6 +137,7 @@ export async function fetchItemDTOs(
  * Fetch all skills for a player, returned as DTOs.
  */
 export async function fetchSkillDTOs(playerId: string): Promise<SkillStateDTO[]> {
+  const now = new Date();
   const skills = await prisma.playerSkill.findMany({
     where: { playerId },
     select: {
@@ -143,10 +146,11 @@ export async function fetchSkillDTOs(playerId: string): Promise<SkillStateDTO[]>
       level: true,
       xp: true,
       dailyXpGained: true,
+      lastXpResetAt: true,
     },
   });
 
-  return skills.map(toSkillStateDTO);
+  return skills.map((s) => toSkillStateDTO(s, now));
 }
 
 // ---------------------------------------------------------------------------
@@ -194,35 +198,27 @@ export async function fetchHpState(
 
 /**
  * Fetch stamina and mana resource state, mapping ResourceState to ResourceStateDTO.
+ * Accepts optional pre-loaded skill levels to avoid a redundant playerSkill query.
  */
 export async function fetchResourceState(
   playerId: string,
+  preloadedSkillLevels?: SkillLevels,
 ): Promise<StateUpdates['resources']> {
   const now = new Date();
-
-  const [resources, player] = await Promise.all([
-    getResourceState(playerId, now),
-    prisma.player.findUniqueOrThrow({
-      where: { id: playerId },
-      select: {
-        lastStaminaRegenAt: true,
-        lastManaRegenAt: true,
-      },
-    }),
-  ]);
+  const resources = await getResourceState(playerId, now, preloadedSkillLevels);
 
   return {
     stamina: {
       current: resources.stamina.current,
       max: resources.stamina.max,
       regenPerSecond: resources.stamina.regenPerSecond,
-      lastRegenAt: player.lastStaminaRegenAt.toISOString(),
+      lastRegenAt: resources.lastStaminaRegenAt.toISOString(),
     },
     mana: {
       current: resources.mana.current,
       max: resources.mana.max,
       regenPerSecond: resources.mana.regenPerSecond,
-      lastRegenAt: player.lastManaRegenAt.toISOString(),
+      lastRegenAt: resources.lastManaRegenAt.toISOString(),
     },
   };
 }
@@ -286,18 +282,21 @@ export async function fetchEquipmentMap(playerId: string): Promise<Record<string
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch all active buffs for a player, returned as DTOs.
+ * Fetch all active buffs for a player, returned as PlayerBuffData.
  */
-export async function fetchBuffDTOs(playerId: string): Promise<BuffStateDTO[]> {
+export async function fetchBuffDTOs(playerId: string): Promise<PlayerBuffData[]> {
   const buffs = await prisma.playerBuff.findMany({
     where: { playerId },
-    select: { id: true, buffType: true, remainingUses: true, bonusValue: true },
+    include: { shopItem: { select: { name: true } } },
+    orderBy: { createdAt: 'asc' },
   });
   return buffs.map((b) => ({
     id: b.id,
     buffType: b.buffType,
-    remainingRounds: b.remainingUses,
-    value: b.bonusValue,
+    remainingUses: b.remainingUses,
+    bonusValue: b.bonusValue,
+    shopItemName: b.shopItem.name,
+    createdAt: b.createdAt.toISOString(),
   }));
 }
 
@@ -337,6 +336,21 @@ type StateUpdateField =
   | 'materialTotals';
 
 /**
+ * Extract skill levels from already-fetched skill DTOs to avoid a redundant
+ * playerSkill query when resources are also requested.
+ */
+function extractSkillLevels(skillDTOs: SkillStateDTO[]): SkillLevels {
+  const map: Record<string, number> = {};
+  for (const s of skillDTOs) map[s.skillType] = s.level;
+  return {
+    melee: map['melee'] ?? 1,
+    ranged: map['ranged'] ?? 1,
+    magic: map['magic'] ?? 1,
+    evasion: map['evasion'] ?? 1,
+  };
+}
+
+/**
  * Fetch only the requested state fields in parallel, returning a Partial<StateUpdates>.
  */
 export async function buildStateUpdates(
@@ -346,11 +360,22 @@ export async function buildStateUpdates(
   const fieldSet = new Set(fields);
   const result: Partial<StateUpdates> = {};
 
+  const needsSkills = fieldSet.has('skills');
+  const needsResources = fieldSet.has('resources');
   const needsInventoryMeta =
     fieldSet.has('inventoryUsedSlots') || fieldSet.has('inventoryCapacity');
 
+  // When both skills and resources are requested, fetch skills first so we can
+  // pass skill levels to fetchResourceState and avoid a redundant DB query.
+  let skills: SkillStateDTO[] | undefined;
+  if (needsSkills && needsResources) {
+    skills = await fetchSkillDTOs(playerId);
+  }
+
+  const preloadedSkillLevels = skills ? extractSkillLevels(skills) : undefined;
+
   const [
-    skills,
+    skillsResult,
     hp,
     resources,
     characterProgression,
@@ -359,9 +384,10 @@ export async function buildStateUpdates(
     inventoryMeta,
     materialTotals,
   ] = await Promise.all([
-    fieldSet.has('skills') ? fetchSkillDTOs(playerId) : Promise.resolve(undefined),
+    // Only fetch skills here if we didn't already fetch them above
+    needsSkills && !skills ? fetchSkillDTOs(playerId) : Promise.resolve(skills),
     fieldSet.has('hp') ? fetchHpState(playerId) : Promise.resolve(undefined),
-    fieldSet.has('resources') ? fetchResourceState(playerId) : Promise.resolve(undefined),
+    needsResources ? fetchResourceState(playerId, preloadedSkillLevels) : Promise.resolve(undefined),
     fieldSet.has('characterProgression')
       ? fetchCharacterProgression(playerId)
       : Promise.resolve(undefined),
@@ -371,7 +397,7 @@ export async function buildStateUpdates(
     fieldSet.has('materialTotals') ? fetchMaterialTotals(playerId) : Promise.resolve(undefined),
   ]);
 
-  if (skills !== undefined) result.skills = skills;
+  if (skillsResult !== undefined) result.skills = skillsResult;
   if (hp !== undefined) result.hp = hp;
   if (resources !== undefined) result.resources = resources;
   if (characterProgression !== undefined) result.characterProgression = characterProgression;

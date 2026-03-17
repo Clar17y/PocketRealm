@@ -1,4 +1,5 @@
 import { fetchApi } from './core';
+import type { StateUpdates } from '@pocketrealm/shared';
 import type { CombatLogEntryResponse } from './combat';
 
 export interface TrainingCombatResult {
@@ -21,6 +22,7 @@ export interface TrainingCombatResult {
 export interface TrainingFightResponse {
   combat: TrainingCombatResult;
   cooldownSeconds: number;
+  stateUpdates?: StateUpdates;
 }
 
 export async function startTrainingFight(mobTemplateId: string, prefix: string | null) {

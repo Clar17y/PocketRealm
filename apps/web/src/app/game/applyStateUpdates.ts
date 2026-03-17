@@ -1,16 +1,16 @@
-import type { StateUpdates, InventoryItemDTO, HpState } from '@pocketrealm/shared';
+import type { StateUpdates, InventoryItemDTO, HpState, SkillStateDTO, PlayerBuffData, ResourceStateDTO } from '@pocketrealm/shared';
 
 export interface StateSetters {
   setInventory: (updater: (prev: InventoryItemDTO[]) => InventoryItemDTO[]) => void;
   setInventoryCapacity: (n: number) => void;
   setInventoryUsedSlots: (n: number) => void;
   setEquipment: (eq: Record<string, InventoryItemDTO | null>) => void;
-  setSkills: (skills: NonNullable<StateUpdates['skills']>) => void;
+  setSkills: (skills: SkillStateDTO[]) => void;
   setHpState: (hp: HpState) => void;
-  setStaminaState: (s: NonNullable<StateUpdates['resources']>['stamina']) => void;
-  setManaState: (m: NonNullable<StateUpdates['resources']>['mana']) => void;
+  setStaminaState: (partial: Partial<ResourceStateDTO>) => void;
+  setManaState: (partial: Partial<ResourceStateDTO>) => void;
   setGold: (g: number) => void;
-  setActiveBuffs: (b: NonNullable<StateUpdates['buffs']>) => void;
+  setActiveBuffs: (b: PlayerBuffData[]) => void;
   setCharacterProgression: (cp: NonNullable<StateUpdates['characterProgression']>) => void;
   setMaterialTotals: (mt: Record<string, number>) => void;
 }

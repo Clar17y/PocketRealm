@@ -313,7 +313,7 @@ export function FriendsScreen({
     try {
       const result = await sparFriend(friendshipId);
       if (result.data) {
-        if ((result.data as any).stateUpdates) onStateUpdates?.((result.data as any).stateUpdates);
+        if (result.data.stateUpdates) onStateUpdates?.(result.data.stateUpdates);
         setSparResult(result.data);
         setSparPlaybackActive(true);
         setSelectedFriendshipId(null); // close profile modal

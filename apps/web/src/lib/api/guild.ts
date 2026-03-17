@@ -1,4 +1,5 @@
 import { fetchApi } from './core';
+import type { StateUpdates } from '@pocketrealm/shared';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -142,6 +143,7 @@ export interface GuildProjectResponse {
   startedAt: string;
   completedAt: string | null;
   contributions?: GuildProjectContributionResponse[];
+  stateUpdates?: StateUpdates;
 }
 
 export interface GuildProjectAvailableResponse {
