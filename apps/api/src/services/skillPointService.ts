@@ -1,6 +1,7 @@
 import { prisma } from '@pocketrealm/database';
 import {
   SKILL_POINT_CONSTANTS,
+  CHARACTER_CONSTANTS,
   ALWAYS_AVAILABLE_ACTION_IDS,
   getAllTalentNodes,
   getTalentNode,
@@ -11,7 +12,16 @@ import { spendPlayerTurnsTx } from './turnBankService';
 import { skillPointAllocationsSchema } from '../utils/jsonColumnSchemas';
 
 /**
- * Total skill points earned = sum of (level - 1) for all skills * POINTS_PER_LEVEL.
+ * Pure helper: total skill points = points from leveling + starting bonus.
+ * Level 1 is baseline so only levels above 1 generate leveling points.
+ */
+function computeTotalSkillPoints(skills: { level: number }[]): number {
+  const fromLevels = skills.reduce((sum, s) => sum + (s.level - 1), 0) * SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL;
+  return fromLevels + CHARACTER_CONSTANTS.STARTING_SKILL_POINTS;
+}
+
+/**
+ * Total skill points earned = sum of (level - 1) for all skills * POINTS_PER_LEVEL + starting bonus.
  * Level 1 is baseline so only levels above 1 generate points.
  */
 async function getTotalPointsEarned(playerId: string): Promise<number> {
@@ -19,7 +29,7 @@ async function getTotalPointsEarned(playerId: string): Promise<number> {
     where: { playerId },
     select: { level: true },
   });
-  return skills.reduce((sum, s) => sum + (s.level - 1), 0) * SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL;
+  return computeTotalSkillPoints(skills);
 }
 
 /** Get the player's allocation record, creating one if it doesn't exist. */
@@ -71,7 +81,7 @@ export async function allocatePoints(playerId: string, nodeId: string): Promise<
       where: { playerId },
       select: { level: true },
     });
-    const totalPointsEarned = skills.reduce((sum: number, s: { level: number }) => sum + (s.level - 1), 0) * SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL;
+    const totalPointsEarned = computeTotalSkillPoints(skills);
 
     const record = await tx.skillPointAllocation.findUnique({ where: { playerId } });
     const allocations: Record<string, number> = record
