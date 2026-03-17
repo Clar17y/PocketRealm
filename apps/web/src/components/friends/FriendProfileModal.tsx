@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { ModalOverlay } from '../common/ModalOverlay';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
@@ -62,7 +63,7 @@ export function FriendProfileModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<'unfriend' | 'block' | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const action = useAsyncAction();
 
   useEffect(() => {
     let cancelled = false;
@@ -88,24 +89,18 @@ export function FriendProfileModal({
     return () => { cancelled = true; };
   }, [friendshipId]);
 
-  const handleConfirmAction = useCallback(async () => {
+  const handleConfirmAction = useCallback(() => {
     if (!confirmAction || !profile) return;
-    setActionLoading(true);
-    try {
-      if (confirmAction === 'unfriend') {
-        const res = await unfriend(friendshipId);
-        if (res.data) onUnfriend();
-      } else {
-        const res = await blockPlayer(profile.playerId);
-        if (res.data) onBlock();
+    const doAction = confirmAction === 'unfriend'
+      ? () => unfriend(friendshipId)
+      : () => blockPlayer(profile.playerId);
+    action.run(doAction, (data) => {
+      if (data) {
+        confirmAction === 'unfriend' ? onUnfriend() : onBlock();
       }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Action failed');
-    } finally {
-      setActionLoading(false);
       setConfirmAction(null);
-    }
-  }, [confirmAction, profile, friendshipId, onUnfriend, onBlock]);
+    });
+  }, [confirmAction, profile, friendshipId, onUnfriend, onBlock, action.run]);
 
   // Confirm dialog for unfriend / block
   if (confirmAction && profile) {
@@ -146,9 +141,9 @@ export function FriendProfileModal({
         )}
 
         {/* Error state */}
-        {error && !loading && (
+        {(error || action.error) && !loading && (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <span className="text-[var(--rpg-red)] text-sm">{error}</span>
+            <span className="text-[var(--rpg-red)] text-sm">{error || action.error}</span>
           </div>
         )}
 
@@ -202,14 +197,14 @@ export function FriendProfileModal({
               <button
                 className="w-full bg-[var(--rpg-red,#c44)] hover:bg-[#b33] text-white rounded-lg font-semibold py-2 text-sm transition-all"
                 onClick={() => setConfirmAction('unfriend')}
-                disabled={actionLoading}
+                disabled={action.loading}
               >
                 Unfriend
               </button>
               <button
                 className="w-full bg-[var(--rpg-red,#c44)] hover:bg-[#b33] text-white rounded-lg font-semibold py-2 text-sm transition-all"
                 onClick={() => setConfirmAction('block')}
-                disabled={actionLoading}
+                disabled={action.loading}
               >
                 Block
               </button>
