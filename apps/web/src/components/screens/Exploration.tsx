@@ -11,6 +11,7 @@ import { Loader2, Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@pocketrealm/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
+import { TurnPresets } from '@/components/common/TurnPresets';
 import Image from 'next/image';
 import { ActivityLog } from '@/components/ActivityLog';
 import { TurnPlayback } from '@/components/playback/TurnPlayback';
@@ -305,32 +306,16 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               )}
 
               {!tutorialLocked && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setTurnInvestment([Math.min(100, availableTurns)])}
-                    className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
-                  >
-                    100
-                  </button>
-                  <button
-                    onClick={() => setTurnInvestment([Math.min(500, availableTurns)])}
-                    className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
-                  >
-                    500
-                  </button>
-                  <button
-                    onClick={() => setTurnInvestment([Math.min(1000, availableTurns)])}
-                    className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
-                  >
-                    1K
-                  </button>
-                  <button
-                    onClick={() => setTurnInvestment([Math.min(EXPLORATION_CONSTANTS.MAX_EXPLORATION_TURNS, availableTurns)])}
-                    className="flex-1 px-3 py-1.5 text-sm bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded hover:border-[var(--rpg-gold)] transition-colors text-[var(--rpg-text-primary)]"
-                  >
-                    Max
-                  </button>
-                </div>
+                <TurnPresets
+                  presets={[
+                    { label: '100', turns: Math.min(100, availableTurns) },
+                    { label: '500', turns: Math.min(500, availableTurns) },
+                    { label: '1K', turns: Math.min(1000, availableTurns) },
+                    { label: 'Max', turns: Math.min(EXPLORATION_CONSTANTS.MAX_EXPLORATION_TURNS, availableTurns) },
+                  ]}
+                  currentValue={turnInvestment[0]}
+                  onChange={(t) => setTurnInvestment([t])}
+                />
               )}
             </div>
           </PixelCard>
