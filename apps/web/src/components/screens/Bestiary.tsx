@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { BookOpen, MapPin, Sword, Shield, Heart, Lock } from 'lucide-react';
 import Image from 'next/image';
 import { monsterImageSrc, uiIconSrc } from '@/lib/assets';
@@ -421,7 +421,10 @@ function WorldBossBestiaryTab({ bosses }: { bosses: WorldBossEntry[] }) {
 export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosses }: BestiaryProps) {
   const [selectedMonster, setSelectedMonster] = useState<Monster | null>(null);
   const [activeView, setActiveView] = useState<'monsters' | 'expeditions' | 'bosses' | 'prefixes'>('monsters');
-  const sortedMonsters = [...monsters].sort((a, b) => Number(b.isDiscovered) - Number(a.isDiscovered));
+  const sortedMonsters = useMemo(
+    () => [...monsters].sort((a, b) => Number(b.isDiscovered) - Number(a.isDiscovered)),
+    [monsters],
+  );
 
   const discoveredCount = monsters.filter((m) => m.isDiscovered).length;
   const totalCount = monsters.length;

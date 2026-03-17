@@ -1764,6 +1764,11 @@ function MemberList({
   myHealTargetPlayerId?: string | null;
   amKnockedOut?: boolean;
 }) {
+  const sortedMembers = useMemo(
+    () => [...members].sort((a, b) => b.totalDamage - a.totalDamage),
+    [members],
+  );
+
   if (members.length === 0) return null;
 
   const canHealTarget = showResources && onSetHealTarget && !amKnockedOut;
@@ -1856,9 +1861,7 @@ function MemberList({
         <div className="mt-3 pt-2 border-t border-[var(--rpg-border)]">
           <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
           <div className="space-y-0.5">
-            {[...members]
-              .sort((a, b) => b.totalDamage - a.totalDamage)
-              .map((m) => (
+            {sortedMembers.map((m) => (
                 <div key={`${m.playerId}-contrib`} className="flex justify-between text-xs">
                   <span className="text-[var(--rpg-text-secondary)] truncate">
                     {m.username ?? m.playerId.slice(0, 8)}
