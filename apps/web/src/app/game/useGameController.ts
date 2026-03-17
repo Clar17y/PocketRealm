@@ -9,6 +9,7 @@ import {
   TUTORIAL_STEP_WELCOME,
   TUTORIAL_STEP_STARTER_WEAPON,
   TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_SAVE_TEMPLATE,
   TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_EXPLORE,
   TUTORIAL_STEP_COMBAT,
@@ -613,6 +614,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const res = await updateTutorialStep(TUTORIAL_SKIPPED);
     if (res.data) setTutorialStep(res.data.tutorialStep);
   }, []);
+
+  const handleTemplateSaved = useCallback(() => {
+    if (tutorialStep === TUTORIAL_STEP_SAVE_TEMPLATE) {
+      void advanceTutorial(TUTORIAL_STEP_SAVE_TEMPLATE);
+    }
+  }, [tutorialStep, advanceTutorial]);
 
   const handleClaimStarterWeapon = useCallback(async (weaponType: 'melee' | 'ranged' | 'magic') => {
     const res = await claimStarterWeapon(weaponType);
@@ -1760,6 +1767,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleRespecSkillPoints,
     templates,
     handleLoadTemplates,
+    handleTemplateSaved,
     pvpNotificationCount,
     incomingFriendRequestCount,
     mailUnreadCount,

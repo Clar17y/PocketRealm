@@ -176,6 +176,7 @@ export default function GamePage() {
     handleRespecSkillPoints,
     templates,
     handleLoadTemplates,
+    handleTemplateSaved,
     pvpNotificationCount,
     incomingFriendRequestCount,
     mailUnreadCount,
@@ -1121,6 +1122,7 @@ export default function GamePage() {
             manaState={manaState}
             onLoadTemplates={handleLoadTemplates}
             onNavigate={setActiveScreen}
+            onTemplateSaved={handleTemplateSaved}
           />
         );
       case 'talentTree':

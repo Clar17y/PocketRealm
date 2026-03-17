@@ -32,7 +32,7 @@ export function TutorialDialog({ tutorialStep, onDismiss }: TutorialDialogProps)
   if (!visible || shownForStep === null) return null;
 
   const stepDef = TUTORIAL_STEPS[shownForStep];
-  if (!stepDef) return null;
+  if (!stepDef?.dialog) return null;
 
   const handleGotIt = () => {
     setVisible(false);

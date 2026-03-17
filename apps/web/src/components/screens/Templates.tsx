@@ -180,6 +180,7 @@ interface TemplatesProps {
   manaState: ResourceState;
   onLoadTemplates: () => Promise<void>;
   onNavigate: (screen: Screen) => void;
+  onTemplateSaved?: () => void;
 }
 
 // --- Component ---
@@ -191,6 +192,7 @@ export function Templates({
   manaState,
   onLoadTemplates,
   onNavigate,
+  onTemplateSaved,
 }: TemplatesProps) {
   const [editingTemplate, setEditingTemplate] = useState<CombatTemplateData | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -324,7 +326,7 @@ export function Templates({
 
     save.run(
       () => isNew ? createTemplate(editorName.trim(), slots) : updateTemplate(editingTemplate!.id, editorName.trim(), slots),
-      () => { void onLoadTemplates(); setEditingTemplate(null); setIsNew(false); },
+      () => { void onLoadTemplates(); setEditingTemplate(null); setIsNew(false); onTemplateSaved?.(); },
     );
   }, [editorName, editorSlots, isNew, editingTemplate, onLoadTemplates, save.run]);
 
