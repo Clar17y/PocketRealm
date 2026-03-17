@@ -30,6 +30,26 @@ run(action, onSuccess, key?);
 - `run(action, onSuccess?, key?)` — optional third parameter for keyed loading
 - Fully backwards compatible; existing callers unaffected
 
+### Bug fix: relax `onSuccess` guard
+
+The current hook skips `onSuccess` when `res.data` is `null` or `undefined` (line 17). Several migrations need `onSuccess` to fire when data is null (e.g., `loadSpec` sets status to `null` when no specialization is selected). Fix: call `onSuccess` whenever there is no error, passing `res.data` (which may be null). Change:
+
+```typescript
+// Before
+if (res.data !== undefined && res.data !== null && onSuccess) {
+  onSuccess(res.data);
+}
+
+// After
+if (res.error) {
+  setError(res.error.message);
+} else if (onSuccess) {
+  onSuccess(res.data as T);
+}
+```
+
+This means `onSuccess` receives `T` which could be `null`. Callers that care should handle that (e.g., `(data) => setStatus(data ?? null)`). Existing callers in NoGuildView always receive non-null data from their APIs, so no change needed there.
+
 ## Migration Scope
 
 ### Files to migrate (6 files, ~14 handlers)
@@ -51,7 +71,7 @@ run(action, onSuccess, key?);
 **After:** 2 hook instances (load + purchase). Uses keyed loading for per-item spinner.
 
 - `loadShop` → `load.run(() => getExpeditionShop(), (data) => setShopData(data ?? null))`
-- `handlePurchase` → `purchase.run(() => purchaseExpeditionItem(itemId), onSuccess, itemId)` — `purchase.loadingKey === item.id` replaces `purchasing === item.id`
+- `handlePurchase` → `purchase.run(() => purchaseExpeditionItem(itemId), () => { void loadShop(); onRefresh?.(); }, itemId)` — `purchase.loadingKey === item.id` replaces `purchasing === item.id`
 
 Remove `setError` prop and `purchasing` state.
 
@@ -61,7 +81,9 @@ Remove `setError` prop and `purchasing` state.
 
 **After:** 3 hook instances (load + action + resourceLoad).
 
-- `loadProjects` → `load.run(() => getGuildProjects(guildId), (data) => setData(data))`
+- `loadProjects` → `load.run(() => getGuildProjects(guildId), (data) => { if (data) setData(data); })`
+
+**Behavioral change:** `loadProjects` currently does not check `res.error` — API errors on initial load were silently swallowed. The hook will surface them via `load.error`. This is an improvement.
 - `handleStartProject` → `action.run(() => startGuildProject(...), () => void loadProjects())`
 - `handleContributeTurns` → `action.run(() => contributeProjectTurns(...), (data) => { handle stateUpdates; void loadProjects(); })`
 - `handleContributeMaterials` → `action.run(() => contributeProjectMaterials(...), () => { void loadProjects(); void loadResourceItems(...); })`
@@ -77,9 +99,11 @@ Remove `setError` prop. Render errors locally. Action handlers share one instanc
 
 - `handleActivate` → `listAction.run(() => activateTemplate(id), () => void onLoadTemplates())`
 - `handleDelete` → `listAction.run(() => deleteTemplate(id), () => void onLoadTemplates())`
-- `handleSave` → pre-validation stays manual with a local `validationError` state. The async portion uses `save.run(...)`. Display `validationError || save.error`.
+- `handleSave` → pre-validation stays manual with a local `validationError` state. The async portion uses `save.run(...)`. Display `validationError || save.error`. Clear `validationError` when the user opens the editor or starts typing.
 
 Replace `saving` with `save.loading`.
+
+**Behavioral change:** `handleActivate` and `handleDelete` currently only catch thrown exceptions — they don't check `res.error`. The hook adds `res.error` checking, which will surface API-level error messages that were previously ignored. This is an improvement.
 
 #### 5. FriendProfileModal.tsx
 
@@ -124,6 +148,10 @@ These use polling, silent refresh, or batch error patterns that don't fit the ho
 This is a cleaner separation of concerns — each tab manages its own error lifecycle instead of sharing mutable state with the parent.
 
 The parent component's props and error wiring for these tabs will need to be cleaned up (remove `setError` prop from interfaces and call sites).
+
+**Important:** Only these 3 migrated tabs lose the `setError` prop. The parent `GuildScreen` still maintains its own error state and `<ErrorBanner>` for other non-migrated tabs (`GuildMembers`, `GuildUpgradesTab`, `GuildExpeditionsTab`, `GuildSettings`).
+
+**ErrorBanner placement:** Each migrated tab renders `<ErrorBanner>` at the top of its outermost `<div>`, before any other content. For components with multiple return branches (like GuildSpecializationTab), the error banner appears in each branch.
 
 ## Testing
 
