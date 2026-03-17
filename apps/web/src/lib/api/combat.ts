@@ -1,4 +1,4 @@
-import type { QuestProgressUpdate } from '@pocketrealm/shared';
+import type { QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 import type { CombatAction } from '@pocketrealm/shared';
 
@@ -63,6 +63,7 @@ export async function travelToZone(zoneId: string) {
     newDiscoveries: Array<{ id: string; name: string }>;
     tax: TaxInfo | null;
     pendingLootSessionId?: string;
+    stateUpdates?: StateUpdates;
   }>('/api/v1/zones/travel', {
     method: 'POST',
     body: JSON.stringify({ zoneId }),
@@ -131,6 +132,7 @@ export async function startExploration(zoneId: string, turns: number, tier?: num
     pendingLootSessionIds?: string[];
     tax: TaxInfo | null;
     questProgress?: QuestProgressUpdate[];
+    stateUpdates?: StateUpdates;
   }>('/api/v1/exploration/start', {
     method: 'POST',
     body: JSON.stringify({ zoneId, turns, ...(tier !== undefined && { tier }) }),
@@ -345,6 +347,7 @@ export interface CombatResponse {
     turnsToExplore: number | null;
   };
   questProgress?: QuestProgressUpdate[];
+  stateUpdates?: StateUpdates;
 }
 
 export interface CombatHistoryListItemResponse {

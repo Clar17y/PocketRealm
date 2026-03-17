@@ -47,9 +47,10 @@ export async function buildPerActionScaling(
     attributes: { strength: number; dexterity: number; intelligence: number };
     weaponRequiredSkill: AttackSkill | null;
     guildDamageMultiplier?: number;
+    skillLevels?: Record<string, number>;
   },
 ): Promise<PerActionScaling> {
-  const levels = await getSkillLevels(playerId, ['melee', 'ranged', 'magic']);
+  const levels = preloaded?.skillLevels ?? await getSkillLevels(playerId, ['melee', 'ranged', 'magic']);
   const meleeLevel = levels.melee;
   const rangedLevel = levels.ranged;
   const magicLevel = levels.magic;

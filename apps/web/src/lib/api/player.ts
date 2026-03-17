@@ -1,4 +1,5 @@
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
+import type { StateUpdates, SkillStateDTO } from '@pocketrealm/shared';
 
 export async function getPlayer() {
   return fetchApi<{
@@ -103,12 +104,7 @@ export async function allocatePlayerAttribute(
 
 export async function getSkills() {
   return fetchApi<{
-    skills: Array<{
-      skillType: string;
-      level: number;
-      xp: number;
-      dailyXpGained: number;
-    }>;
+    skills: SkillStateDTO[];
   }>('/api/v1/player/skills');
 }
 
@@ -263,6 +259,7 @@ export async function rest(turns: number) {
     turnsSpent: number;
     turns: TurnStateResponse;
     tax: TaxInfo | null;
+    stateUpdates?: StateUpdates;
   }>('/api/v1/hp/rest', {
     method: 'POST',
     body: JSON.stringify({ turns }),

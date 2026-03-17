@@ -1,5 +1,5 @@
 import { fetchApi } from './core';
-import type { FriendListEntry, FriendRequest, FriendProfile, BlockedPlayer, FriendMailEntry } from '@pocketrealm/shared';
+import type { FriendListEntry, FriendRequest, FriendProfile, BlockedPlayer, FriendMailEntry, StateUpdates } from '@pocketrealm/shared';
 import type { CombatOutcomeResponse, CombatLogEntryResponse } from './combat';
 
 // ---------------------------------------------------------------------------
@@ -26,6 +26,7 @@ export interface SparResponse {
     attackerStartMana: number;
     log: CombatLogEntryResponse[];
   };
+  stateUpdates?: StateUpdates;
 }
 
 // ---------------------------------------------------------------------------

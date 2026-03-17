@@ -1,4 +1,4 @@
-import type { QuestProgressUpdate } from '@pocketrealm/shared';
+import type { QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 import type { EventModifierBadge } from './combat';
 
@@ -212,6 +212,7 @@ export async function mine(playerNodeId: string, turns: number) {
     };
     tax: TaxInfo | null;
     questProgress?: QuestProgressUpdate[];
+    stateUpdates?: StateUpdates;
   }>('/api/v1/gathering/mine', {
     method: 'POST',
     body: JSON.stringify({ playerNodeId, turns }),
@@ -284,6 +285,7 @@ export async function craft(recipeId: string, quantity: number = 1) {
     };
     tax: TaxInfo | null;
     questProgress?: QuestProgressUpdate[];
+    stateUpdates?: StateUpdates;
   }>('/api/v1/crafting/craft', {
     method: 'POST',
     body: JSON.stringify({ recipeId, quantity }),
@@ -434,7 +436,7 @@ export async function fetchPendingLoot(sessionId: string) {
 }
 
 export async function claimLoot(sessionId: string, selectedIndices: number[]) {
-  return fetchApi<{ success: true }>('/api/v1/inventory/loot/claim', {
+  return fetchApi<{ success: true; stateUpdates?: StateUpdates }>('/api/v1/inventory/loot/claim', {
     method: 'POST',
     body: JSON.stringify({ sessionId, selectedIndices }),
   });

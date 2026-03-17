@@ -7,7 +7,7 @@ import {
 import type { SkillType } from '@pocketrealm/shared';
 import { normalizePlayerAttributes } from './attributesService';
 import { buildPlayerTemplateCombatant } from './combatOrchestrationService';
-import { getSkillLevels } from './combatStatsService';
+import { getSkillLevels, getMainHandAttackSkill, buildPerActionScaling } from './combatStatsService';
 import { getActiveTemplate } from './combatTemplateService';
 import { getEquipmentStats } from './equipmentService';
 import { getHpState } from './hpService';
@@ -39,13 +39,13 @@ export async function buildPvpCombatant(
   username: string,
   useCurrentResources: boolean,
 ) {
-  const [player, equipStats, attackStyle, template, skillPoints, levels] = await Promise.all([
+  const [player, equipStats, weaponRequiredSkill, template, skillPoints, levels] = await Promise.all([
     prisma.player.findUniqueOrThrow({
       where: { id: playerId },
       select: { attributes: true },
     }),
     getEquipmentStats(playerId),
-    getAttackStyle(playerId),
+    getMainHandAttackSkill(playerId),
     getActiveTemplate(playerId),
     getSkillPoints(playerId),
     getSkillLevels(playerId, ['melee', 'ranged', 'evasion', 'magic'] as SkillType[]),
@@ -57,6 +57,7 @@ export async function buildPvpCombatant(
   const evasionLevel = levels.evasion;
   const magicLevel = levels.magic;
 
+  const attackStyle: AttackStyle = weaponRequiredSkill ?? 'melee';
   const skillLevel = attackStyle === 'ranged' ? rangedLevel
     : attackStyle === 'magic' ? magicLevel
     : meleeLevel;
@@ -97,6 +98,14 @@ export async function buildPvpCombatant(
     equipStats,
   );
 
+  // No guildDamageMultiplier in PvP — intentionally omitted for competitive balance
+  const perActionScaling = await buildPerActionScaling(playerId, {
+    equipmentStats: equipStats,
+    attributes,
+    weaponRequiredSkill,
+    skillLevels: { melee: meleeLevel, ranged: rangedLevel, magic: magicLevel },
+  });
+
   return buildPlayerTemplateCombatant({
     playerId,
     username,
@@ -109,5 +118,6 @@ export async function buildPvpCombatant(
     maxMana,
     manaRegenPerRound: calculateManaRegenPerRound(magicLevel),
     unlockedActions: skillPoints.unlockedActions,
+    perActionScaling,
   });
 }
