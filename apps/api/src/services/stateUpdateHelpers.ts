@@ -56,6 +56,7 @@ export function toInventoryItemDTO(
       maxDurability: item.template.maxDurability,
       stackable: item.template.stackable,
       sellPrice: item.template.sellPrice,
+      flavorText: item.template.flavorText ?? null,
     },
     equippedSlot,
   };

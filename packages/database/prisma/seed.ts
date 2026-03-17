@@ -4,6 +4,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 
 import { IDS } from './seed-data/ids';
 import { getAllItemTemplates } from './seed-data/items';
+import { ITEM_FLAVOR_TEXT } from './seed-data/flavorText';
 import { getAllMobTemplates } from './seed-data/mobs';
 import { getAllMobFamilies, getAllMobFamilyMembers, getAllZoneMobFamilies } from './seed-data/families';
 import { getAllResourceNodes } from './seed-data/resources';
@@ -129,9 +130,18 @@ async function seedZoneConnections() {
 
 async function seedItemTemplates() {
   console.log('  Seeding item templates...');
-  const items = getAllItemTemplates();
+  const items = getAllItemTemplates().map(item => ({
+    ...item,
+    flavorText: ITEM_FLAVOR_TEXT[item.name] ?? null,
+  }));
   await prisma.itemTemplate.createMany({ data: items });
   console.log(`  ${items.length} item templates created.`);
+
+  // Log unmatched flavour text entries
+  const itemNames = new Set(items.map(i => i.name));
+  for (const name of Object.keys(ITEM_FLAVOR_TEXT)) {
+    if (!itemNames.has(name)) console.warn(`  ⚠ Unmatched item flavour text: "${name}"`);
+  }
 }
 
 // ============================================================================
