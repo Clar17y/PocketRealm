@@ -701,6 +701,8 @@ export default function GamePage() {
               zoneType: z.zoneType ?? 'wild',
               imageSrc: z.discovered && z.name !== '???' ? zoneImageSrc(z.name) : undefined,
               exploration: z.exploration ?? null,
+              arrivalText: z.arrivalText ?? null,
+              ambientTexts: z.ambientTexts ?? null,
             }))}
             connections={zoneConnections}
             currentZoneId={activeZoneId ?? ''}

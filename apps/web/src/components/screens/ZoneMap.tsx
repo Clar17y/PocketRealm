@@ -36,6 +36,8 @@ interface ZoneMapProps {
       percent: number;
       tiers: Record<string, number> | null;
     } | null;
+    arrivalText?: string | null;
+    ambientTexts?: Record<string, string> | null;
   }>;
   connections: Array<{ fromId: string; toId: string; explorationThreshold: number }>;
   currentZoneId: string;
@@ -208,6 +210,13 @@ export function ZoneMap({
     [zones],
   );
   const selectedZone = selectedZoneId ? zoneById.get(selectedZoneId) : undefined;
+
+  const ambientText = useMemo(() => {
+    if (!selectedZone?.ambientTexts) return null;
+    const texts = selectedZone.ambientTexts as Record<string, string>;
+    const keys = Object.keys(texts);
+    return keys.length > 0 ? texts[keys[Math.floor(Math.random() * keys.length)]] : null;
+  }, [selectedZone?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const currentZone = zoneById.get(currentZoneId);
   const selectedRouteIds = useMemo(() => {
     if (!selectedZoneId) return null;
@@ -329,6 +338,18 @@ export function ZoneMap({
           {selectedZone.description && (
             <p className="text-sm leading-snug text-[var(--rpg-text-secondary)] mb-2">
               {selectedZone.description}
+            </p>
+          )}
+
+          {selectedZone.arrivalText && (
+            <p className="text-sm italic leading-snug text-[var(--rpg-text-secondary)] mb-2 border-l-2 border-[var(--rpg-gold)] pl-3">
+              {selectedZone.arrivalText}
+            </p>
+          )}
+
+          {ambientText && (
+            <p className="text-xs italic leading-snug text-[var(--rpg-text-secondary)] opacity-70 mb-2">
+              {ambientText}
             </p>
           )}
 
