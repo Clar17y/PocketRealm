@@ -8,7 +8,10 @@ const revision =
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
-  additionalPrecacheEntries: [{ url: "/~offline", revision }],
+  additionalPrecacheEntries: [
+    { url: "/~offline", revision },
+    { url: "/icons/icon-96.png", revision },
+  ],
   cacheOnNavigation: true,
   disable: process.env.NODE_ENV === "development",
 });
