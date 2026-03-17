@@ -23,7 +23,7 @@ import {
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
-import { PVP_CONSTANTS } from '@pocketrealm/shared';
+import { PVP_CONSTANTS, type StateUpdates } from '@pocketrealm/shared';
 import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
 import { Swords, Eye, Trophy, Bell, ChevronLeft, ChevronRight, Medal, Shield } from 'lucide-react';
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable';
@@ -36,16 +36,15 @@ interface ArenaScreenProps {
   currentTurns: number;
   playerId: string | null;
   isInTown?: boolean;
-  onTurnsChanged?: () => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
   onNotificationsChanged?: () => void;
-  onHpChanged?: () => void;
   onNavigate?: (screen: string) => void;
   combatSpeedMs?: number;
 }
 
 type ArenaView = 'ladder' | 'history' | 'notifications' | 'rankings';
 
-export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId, isInTown = true, onTurnsChanged, onNotificationsChanged, onHpChanged, onNavigate, combatSpeedMs }: ArenaScreenProps) {
+export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId, isInTown = true, onStateUpdates, onNotificationsChanged, onNavigate, combatSpeedMs }: ArenaScreenProps) {
   const [rating, setRating] = useState<PvpRatingResponse | null>(null);
   const [ladder, setLadder] = useState<PvpLadderEntry[]>([]);
   const [notifications, setNotifications] = useState<PvpNotification[]>([]);
@@ -123,12 +122,12 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
       const result = await scoutPvpOpponent(targetId);
       if (result.data) {
         setScoutData((prev) => ({ ...prev, [targetId]: result.data! }));
+        if ((result.data as any).stateUpdates) onStateUpdates?.((result.data as any).stateUpdates);
       } else if (result.error) {
         setError(result.error.message);
       }
     } finally {
       setActionBusy(null);
-      onTurnsChanged?.();
     }
   }
 
@@ -141,14 +140,13 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
       if (result.data) {
         setLastResult(result.data);
         setPvpPlaybackActive(true);
+        if ((result.data as any).stateUpdates) onStateUpdates?.((result.data as any).stateUpdates);
       } else if (result.error) {
         setError(result.error.message);
       }
     } finally {
       setActionBusy(null);
-      onTurnsChanged?.();
       onNotificationsChanged?.();
-      onHpChanged?.();
     }
   }
 

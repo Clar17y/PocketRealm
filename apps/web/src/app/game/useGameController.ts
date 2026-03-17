@@ -74,10 +74,11 @@ import {
   getFriendMailUnreadCount,
   getPlayerBuffs,
 } from '@/lib/api';
-import type { PlayerBuffData } from '@pocketrealm/shared';
+import type { PlayerBuffData, StateUpdates } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
 import { STAMINA_CONSTANTS, MANA_CONSTANTS } from '@pocketrealm/shared';
+import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
 import { findShortestZonePath } from '@/lib/zoneRoutes';
@@ -139,7 +140,25 @@ interface TravelPlaybackState {
   currentHop: number;
   totalHops: number;
   finalDestinationName: string;
+  stateUpdates?: StateUpdates;
 }
+
+const SCREEN_POLL_NEEDS: Record<string, string[]> = {
+  explore: ['turns', 'hp', 'resources'],
+  combat: ['turns', 'hp', 'resources'],
+  rest: ['turns', 'hp', 'resources'],
+  home: ['turns', 'hp', 'resources'],
+  arena: ['turns', 'hp', 'resources'],
+  travel: ['turns', 'hp', 'resources'],
+  gathering: ['turns'],
+  crafting: ['turns'],
+  forge: ['turns'],
+  casino: ['turns'],
+  skills: ['turns'],
+  zones: ['turns'],
+  bestiary: ['turns'],
+  training: ['turns'],
+};
 
 export function useGameController({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [activeScreen, setActiveScreen] = useState<Screen>('home');
@@ -320,23 +339,110 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     playerHpBeforeExploration: number;
     playerMaxHp: number;
     pendingLootSessionIds?: string[];
+    stateUpdates?: StateUpdates;
   } | null>(null);
   const [travelPlaybackData, setTravelPlaybackData] = useState<TravelPlaybackState | null>(null);
   const hpStateRef = useRef(hpState);
   useEffect(() => {
     hpStateRef.current = hpState;
   }, [hpState]);
+  const staminaStateRef = useRef(staminaState);
+  useEffect(() => {
+    staminaStateRef.current = staminaState;
+  }, [staminaState]);
+  const manaStateRef = useRef(manaState);
+  useEffect(() => {
+    manaStateRef.current = manaState;
+  }, [manaState]);
 
-  const loadTurnsAndHp = useCallback(async () => {
-    const [turnRes, hpRes, resourceRes] = await Promise.all([getTurns(), getHpState(), getResources()]);
-    if (turnRes.data) setTurns(turnRes.data.currentTurns);
-    if (hpRes.data) {
-      setHpState(hpRes.data);
-      hpStateRef.current = hpRes.data;
+  const activeScreenRef = useRef(activeScreen);
+  useEffect(() => { activeScreenRef.current = activeScreen; }, [activeScreen]);
+
+  // Immediate fetch when navigating to a screen that needs HP/resources and values are below max
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const needs = SCREEN_POLL_NEEDS[activeScreen] ?? ['turns'];
+
+    const hpRef = hpStateRef.current;
+    const stamRef = staminaStateRef.current;
+    const manaRef = manaStateRef.current;
+
+    const needsHpFetch = needs.includes('hp') && hpRef.currentHp < hpRef.maxHp;
+    const needsResourceFetch = needs.includes('resources') &&
+      (stamRef.current < stamRef.max || manaRef.current < manaRef.max);
+
+    if (!needsHpFetch && !needsResourceFetch) return;
+
+    const fetches: Promise<void>[] = [];
+    if (needsHpFetch) {
+      fetches.push(getHpState().then(res => {
+        if (res.data) { setHpState(res.data); hpStateRef.current = res.data; }
+      }));
     }
-    if (resourceRes.data) {
-      setStaminaState(resourceRes.data.stamina);
-      setManaState(resourceRes.data.mana);
+    if (needsResourceFetch) {
+      fetches.push(getResources().then(res => {
+        if (res.data) {
+          setStaminaState(res.data.stamina); setManaState(res.data.mana);
+          staminaStateRef.current = res.data.stamina; manaStateRef.current = res.data.mana;
+        }
+      }));
+    }
+    void Promise.all(fetches);
+  }, [activeScreen, isAuthenticated]); // intentionally excludes HP/resource state — only re-run on screen change
+
+  const stateSetters = useMemo<StateSetters>(() => ({
+    setInventory: (updater) => setInventory(updater as any),
+    setInventoryCapacity,
+    setInventoryUsedSlots,
+    setEquipment: (eq) => setEquipment(
+      Object.entries(eq).map(([slot, item]) => ({
+        slot,
+        itemId: item?.id ?? null,
+        item,
+      })),
+    ),
+    setSkills: (skills) => { if (skills) setSkills(skills as any); },
+    setHpState: (hp) => { setHpState(hp); hpStateRef.current = hp; },
+    setStaminaState: (s) => setStaminaState(s as any),
+    setManaState: (m) => setManaState(m as any),
+    setGold,
+    setActiveBuffs: (buffs) => { setActiveBuffs(buffs as any); },
+    setCharacterProgression: (cp) => setCharacterProgression((prev) => ({ ...prev, ...cp })),
+    setMaterialTotals,
+  }), []);
+  // All useState setters are stable references, so empty deps is correct
+
+  const pollScreenData = useCallback(async () => {
+    const needs = SCREEN_POLL_NEEDS[activeScreenRef.current] ?? ['turns'];
+    const fetches: Promise<void>[] = [];
+
+    fetches.push(getTurns().then(res => { if (res.data) setTurns(res.data.currentTurns); }));
+
+    if (needs.includes('hp') && hpStateRef.current.currentHp < hpStateRef.current.maxHp) {
+      fetches.push(getHpState().then(res => {
+        if (res.data) { setHpState(res.data); hpStateRef.current = res.data; }
+      }));
+    }
+
+    if (needs.includes('resources')) {
+      const staminaFull = staminaStateRef.current.current >= staminaStateRef.current.max;
+      const manaFull = manaStateRef.current.current >= manaStateRef.current.max;
+      if (!staminaFull || !manaFull) {
+        fetches.push(getResources().then(res => {
+          if (res.data) { setStaminaState(res.data.stamina); setManaState(res.data.mana); }
+        }));
+      }
+    }
+
+    await Promise.all(fetches);
+  }, []); // stable — no deps that change
+
+  const refreshCraftingRecipes = useCallback(async () => {
+    const res = await getCraftingRecipes();
+    if (res.data) {
+      setCraftingRecipes(res.data.recipes);
+      setZoneCraftingLevel(res.data.zoneCraftingLevel);
+      setZoneCraftingName(res.data.zoneName);
     }
   }, []);
 
@@ -379,14 +485,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const loadAll = useCallback(async () => {
     setActionError(null);
 
-    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, recipesRes, hpRes, resourceRes, skillPointRes, buffsRes] = await Promise.all([
+    const [turnRes, playerRes, skillsRes, zonesRes, invRes, equipRes, hpRes, resourceRes, skillPointRes, buffsRes] = await Promise.all([
       getTurns(),
       getPlayer(),
       getSkills(),
       getZones(),
       getInventory(),
       getEquipment(),
-      getCraftingRecipes(),
       getHpState(),
       getResources(),
       getSkillPointState(),
@@ -478,11 +583,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         }))
       );
     }
-    if (recipesRes.data) {
-      setCraftingRecipes(recipesRes.data.recipes);
-      setZoneCraftingLevel(recipesRes.data.zoneCraftingLevel);
-      setZoneCraftingName(recipesRes.data.zoneName);
-    }
+    void refreshCraftingRecipes();
 
     // Fetch guild tax rate (non-blocking — don't delay initial load)
     getPlayerGuild().then((guildRes) => {
@@ -551,13 +652,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     void loadAll();
     void loadPvpNotificationCount();
     void loadFriendCounts();
-    const interval = setInterval(() => { if (!cancelled) void loadTurnsAndHp(); }, 10000);
+    const interval = setInterval(() => { if (!cancelled) void pollScreenData(); }, 10000);
     // Poll PvP notifications less frequently (60s)
     const pvpInterval = setInterval(() => { if (!cancelled) void loadPvpNotificationCount(); }, 60000);
     // Poll friend counts at same cadence as PvP
     const friendInterval = setInterval(() => { if (!cancelled) void loadFriendCounts(); }, 60000);
     return () => { cancelled = true; clearInterval(interval); clearInterval(pvpInterval); clearInterval(friendInterval); };
-  }, [isAuthenticated, loadAll, loadTurnsAndHp, loadPvpNotificationCount, loadFriendCounts]);
+  }, [isAuthenticated, loadAll, pollScreenData, loadPvpNotificationCount, loadFriendCounts]);
 
   const getActiveTab = () => {
     if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'quests', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
@@ -633,7 +734,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   };
 
-  // Helper for simple API-call-then-reload actions
+  // Helper for simple API-call-then-stateUpdates actions
   const simpleAction = async <T>(
     actionName: string,
     apiFn: () => Promise<ApiResponse<T>>,
@@ -643,8 +744,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       await runSimpleAction({
         actionName,
         apiFn,
-        onSuccess,
-        loadAll,
+        onSuccess: async (data) => {
+          applyStateUpdates((data as { stateUpdates?: StateUpdates }).stateUpdates, stateSetters);
+          await onSuccess?.(data);
+        },
         setActionError,
       });
     });
@@ -676,6 +779,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         playerHpBeforeExploration: hpBefore,
         playerMaxHp: maxHpBefore,
         pendingLootSessionIds: data.pendingLootSessionIds,
+        stateUpdates: (data as any).stateUpdates,
       });
       setPlaybackActive(true);
 
@@ -715,11 +819,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const finalizeExplorationPlayback = async () => {
     const pendingIds = explorationPlaybackData?.pendingLootSessionIds;
+    const savedStateUpdates = explorationPlaybackData?.stateUpdates;
     setExplorationPlaybackData(null);
     combatLogPrefetch.clear();
     setPlaybackActive(false);
     await advanceTutorial(TUTORIAL_STEP_EXPLORE);
-    await loadAll();
+    applyStateUpdates(savedStateUpdates, stateSetters);
     if (pendingIds?.length) {
       pendingLootQueueRef.current = pendingIds.slice(1);
       await activatePendingLoot(pendingIds[0]);
@@ -887,7 +992,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       // Store pending loot session ID for activation after playback
       combatPendingLootRef.current = data.pendingLootSessionId ?? null;
 
-      await Promise.all([loadAll(), loadBestiary(false)]);
+      applyStateUpdates((data as any).stateUpdates, stateSetters);
+      await loadBestiary(false);
     });
   };
 
@@ -1015,7 +1121,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       pushLog(...newLogs);
-      await Promise.all([loadAll(), loadGatheringNodes()]);
+      applyStateUpdates((data as any).stateUpdates, stateSetters);
+      await loadGatheringNodes();
       advanceTutorial(TUTORIAL_STEP_GATHER);
     });
   };
@@ -1094,7 +1201,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       pushLog(...newLogs);
-      await loadAll();
+      applyStateUpdates((data as any).stateUpdates, stateSetters);
       advanceTutorial(TUTORIAL_STEP_REFINE);
       advanceTutorial(TUTORIAL_STEP_CRAFT);
     });
@@ -1263,7 +1370,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         type: 'success',
         message: `Claimed ${selectedIndices.length} loot items`,
       });
-      await loadAll();
+      applyStateUpdates((res.data as any).stateUpdates, stateSetters);
       await activateNextQueuedLoot();
     });
   };
@@ -1288,6 +1395,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const completeQueuedTravelRoute = async () => {
     travelRouteRef.current = null;
     setPlaybackActive(false);
+
+    // Reload zone-dependent crafting recipes after arriving at new zone
+    void refreshCraftingRecipes();
 
     if (arrivedInTownRef.current) {
       arrivedInTownRef.current = false;
@@ -1340,12 +1450,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Returned to ${data.zone.name}.` });
 
       if (route.remainingZoneIds.length > 0) {
-        await loadTurnsAndHp();
+        applyStateUpdates((data as any).stateUpdates, stateSetters);
         await executeNextTravelHop();
         return;
       }
 
-      await loadAll();
+      applyStateUpdates((data as any).stateUpdates, stateSetters);
       await completeQueuedTravelRoute();
       return;
     }
@@ -1373,6 +1483,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         currentHop,
         totalHops: route.totalHops,
         finalDestinationName: route.finalDestinationName,
+        stateUpdates: (data as any).stateUpdates,
       });
       setPlaybackActive(true);
       return;
@@ -1382,12 +1493,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     pushLog({ timestamp: nowStamp(), type: 'success', message: `Arrived at ${data.zone.name}.` });
 
     if (route.remainingZoneIds.length > 0) {
-      await loadTurnsAndHp();
+      applyStateUpdates((data as any).stateUpdates, stateSetters);
       await executeNextTravelHop();
       return;
     }
 
-    await loadAll();
+    applyStateUpdates((data as any).stateUpdates, stateSetters);
     await completeQueuedTravelRoute();
   };
 
@@ -1470,6 +1581,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       !currentPlayback.aborted &&
       (travelRouteRef.current?.remainingZoneIds.length ?? 0) > 0;
 
+    const savedStateUpdates = currentPlayback.stateUpdates;
     setTravelPlaybackData(null);
     setPlaybackActive(false);
 
@@ -1478,12 +1590,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
 
     if (shouldContinueRoute) {
-      await loadTurnsAndHp();
+      applyStateUpdates(savedStateUpdates, stateSetters);
       await executeNextTravelHop();
       return;
     }
 
-    await loadAll();
+    applyStateUpdates(savedStateUpdates, stateSetters);
     await completeQueuedTravelRoute();
   };
 
@@ -1545,6 +1657,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         const healed = result.data.currentHp - hpState.currentHp;
         setTurns(result.data.turns.currentTurns);
         setHpState(prev => ({ ...prev, currentHp: result.data!.currentHp, maxHp: result.data!.maxHp }));
+        applyStateUpdates((result.data as any).stateUpdates, stateSetters);
         pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${actualTurns.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
       }
     });
@@ -1727,7 +1840,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleUnequipSlot,
     handleAllocateAttribute,
     loadAll,
-    loadTurnsAndHp,
     loadPvpNotificationCount,
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
@@ -1752,6 +1864,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleClaimLoot,
     handleDismissLoot,
     handleReopenLoot,
+
+    // State update helpers
+    stateSetters,
 
     // Casino & Training
     handleExchangeGold,

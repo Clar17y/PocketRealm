@@ -11,6 +11,7 @@ import { grantSkillXp } from '../services/xpService';
 import { serializeXpGrant, paginationSchema, buildPagination, assertNotRecovering, trackAchievements } from '../utils/routeHelpers.js';
 import { getSkillLevel } from '../services/combatStatsService.js';
 import { getEquipmentStats } from '../services/equipmentService.js';
+import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchResourceState, fetchInventoryMeta, fetchMaterialTotals } from '../services/stateUpdateHelpers.js';
 import { computeZoneModifiers, computeEventSummaries, getActiveEventsForZone, getActiveWorldWideEvents, getEventModifiersForEntity, type EventModifierBadge } from '../services/worldEventService';
 import { rollGemCritBatch, computeEventTurnCost } from '@pocketrealm/game-engine';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -419,6 +420,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
 
   // --- Gem crit rolls (one per gathering action) ---
   let gemCrit: { itemTemplateId: string; itemId: string; gemName: string; gemsFound: number; critChance: number } | null = null;
+  let gemExistedBeforeAdd = false;
   const gemTemplateId = await getGemTemplateId(skillRequired, levelToGemTier(template.levelRequired));
   if (gemTemplateId) {
     const equipStats = await getEquipmentStats(playerId);
@@ -433,6 +435,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       const gemStack = await prisma.$transaction(async (tx) => {
         return addStackableItemTx(tx, playerId, gemTemplateId, critResult.gemsFound);
       });
+      gemExistedBeforeAdd = !gemStack.created;
       const gemTier = levelToGemTier(template.levelRequired);
       gemCrit = {
         itemTemplateId: gemTemplateId,
@@ -452,6 +455,41 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     totalGatheringActions: actions,
     totalTurnsSpent: turnSpend.spent,
   }, { statKeys: gatherAchKeys });
+
+  // --- Build stateUpdates ---
+  // Classify resource item as created or updated based on existingStack check done earlier
+  const resourceItemIds = [stack.itemId];
+  const inventoryAdded: string[] = existingStack ? [] : resourceItemIds;
+  const inventoryUpdated: string[] = existingStack ? resourceItemIds : [];
+
+  // Include gem item in the appropriate bucket if a gem crit occurred
+  if (gemCrit) {
+    if (gemExistedBeforeAdd) {
+      inventoryUpdated.push(gemCrit.itemId);
+    } else {
+      inventoryAdded.push(gemCrit.itemId);
+    }
+  }
+
+  const [inventoryAddedDTOs, inventoryUpdatedDTOs, skills, characterProgression, resources, inventoryMeta, materialTotals] = await Promise.all([
+    fetchItemDTOs(inventoryAdded),
+    fetchItemDTOs(inventoryUpdated),
+    fetchSkillDTOs(playerId),
+    fetchCharacterProgression(playerId),
+    fetchResourceState(playerId),
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+
+  const stateUpdates = {
+    ...(inventoryAddedDTOs.length > 0 ? { inventoryAdded: inventoryAddedDTOs } : {}),
+    ...(inventoryUpdatedDTOs.length > 0 ? { inventoryUpdated: inventoryUpdatedDTOs } : {}),
+    skills,
+    characterProgression,
+    resources,
+    inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    materialTotals,
+  };
 
   const log = await createActivityLog({
     playerId,
@@ -518,5 +556,6 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       : undefined,
     tax: taxInfoFromResult(taxResult),
     ...(questProgress.length > 0 ? { questProgress } : {}),
+    stateUpdates,
   });
 }));

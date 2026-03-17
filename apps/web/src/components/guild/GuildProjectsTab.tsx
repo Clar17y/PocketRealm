@@ -11,14 +11,14 @@ import {
   type GuildProjectResponse, type GuildProjectAvailableResponse, type GuildProjectsListResponse,
 } from '@/lib/api/guild';
 import { getInventory } from '@/lib/api/items';
-import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS, getCategoryForTemplate } from '@pocketrealm/shared';
+import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS, getCategoryForTemplate, type StateUpdates } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
 
 interface GuildProjectsTabProps {
   guildId: string;
   myRole: string;
   setError: (err: string | null) => void;
-  onTurnsChanged: () => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
 }
 
 interface ResourceItem {
@@ -28,7 +28,7 @@ interface ResourceItem {
   category: string;
 }
 
-export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: GuildProjectsTabProps) {
+export function GuildProjectsTab({ guildId, myRole, setError, onStateUpdates }: GuildProjectsTabProps) {
   const [data, setData] = useState<GuildProjectsListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -104,7 +104,7 @@ export function GuildProjectsTab({ guildId, myRole, setError, onTurnsChanged }: 
     try {
       const res = await contributeProjectTurns(guildId, projectId, amount);
       if (res.error) { setError(res.error.message); return; }
-      onTurnsChanged();
+      if ((res.data as any)?.stateUpdates) onStateUpdates?.((res.data as any).stateUpdates);
       void loadProjects();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to contribute turns');

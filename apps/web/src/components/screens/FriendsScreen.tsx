@@ -18,7 +18,7 @@ import {
   sparFriend,
 } from '@/lib/api';
 import type { SparResponse } from '@/lib/api';
-import type { FriendListEntry, FriendRequest, BlockedPlayer } from '@pocketrealm/shared';
+import type { FriendListEntry, FriendRequest, BlockedPlayer, StateUpdates } from '@pocketrealm/shared';
 import { FRIEND_CONSTANTS } from '@pocketrealm/shared';
 import { relativeTime } from '@/lib/format';
 import { handleKeyActivate } from '@/lib/utils';
@@ -39,7 +39,7 @@ import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 
 interface FriendsScreenProps {
   playerId: string | null;
-  onTurnsChanged: () => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
   onFriendCountsChanged?: () => void;
   combatSpeedMs?: number;
   onNavigateToMail?: (recipientId: string, recipientName: string) => void;
@@ -53,7 +53,7 @@ type FriendsView = 'list' | 'incoming' | 'outgoing' | 'blocked';
 
 export function FriendsScreen({
   playerId,
-  onTurnsChanged,
+  onStateUpdates,
   onFriendCountsChanged,
   combatSpeedMs,
   onNavigateToMail,
@@ -313,6 +313,7 @@ export function FriendsScreen({
     try {
       const result = await sparFriend(friendshipId);
       if (result.data) {
+        if ((result.data as any).stateUpdates) onStateUpdates?.((result.data as any).stateUpdates);
         setSparResult(result.data);
         setSparPlaybackActive(true);
         setSelectedFriendshipId(null); // close profile modal
@@ -321,7 +322,6 @@ export function FriendsScreen({
       }
     } finally {
       setActionBusy(false);
-      onTurnsChanged();
     }
   }
 

@@ -1,0 +1,55 @@
+import type { StateUpdates, InventoryItemDTO, HpState } from '@pocketrealm/shared';
+
+export interface StateSetters {
+  setInventory: (updater: (prev: InventoryItemDTO[]) => InventoryItemDTO[]) => void;
+  setInventoryCapacity: (n: number) => void;
+  setInventoryUsedSlots: (n: number) => void;
+  setEquipment: (eq: Record<string, InventoryItemDTO | null>) => void;
+  setSkills: (skills: NonNullable<StateUpdates['skills']>) => void;
+  setHpState: (hp: HpState) => void;
+  setStaminaState: (s: NonNullable<StateUpdates['resources']>['stamina']) => void;
+  setManaState: (m: NonNullable<StateUpdates['resources']>['mana']) => void;
+  setGold: (g: number) => void;
+  setActiveBuffs: (b: NonNullable<StateUpdates['buffs']>) => void;
+  setCharacterProgression: (cp: NonNullable<StateUpdates['characterProgression']>) => void;
+  setMaterialTotals: (mt: Record<string, number>) => void;
+}
+
+export function applyStateUpdates(
+  updates: StateUpdates | undefined,
+  setters: StateSetters,
+): void {
+  if (!updates) return;
+
+  if (updates.inventoryAdded || updates.inventoryRemoved || updates.inventoryUpdated) {
+    setters.setInventory((prev) => {
+      let next = [...prev];
+      if (updates.inventoryRemoved) {
+        const removeSet = new Set(updates.inventoryRemoved);
+        next = next.filter((item) => !removeSet.has(item.id));
+      }
+      if (updates.inventoryUpdated) {
+        const updateMap = new Map(updates.inventoryUpdated.map((i) => [i.id, i]));
+        next = next.map((item) => updateMap.get(item.id) ?? item);
+      }
+      if (updates.inventoryAdded) {
+        next.push(...updates.inventoryAdded);
+      }
+      return next;
+    });
+  }
+
+  if (updates.equipment !== undefined) setters.setEquipment(updates.equipment);
+  if (updates.skills !== undefined) setters.setSkills(updates.skills);
+  if (updates.hp !== undefined) setters.setHpState(updates.hp);
+  if (updates.resources !== undefined) {
+    setters.setStaminaState(updates.resources.stamina);
+    setters.setManaState(updates.resources.mana);
+  }
+  if (updates.gold !== undefined) setters.setGold(updates.gold);
+  if (updates.buffs !== undefined) setters.setActiveBuffs(updates.buffs);
+  if (updates.inventoryCapacity !== undefined) setters.setInventoryCapacity(updates.inventoryCapacity);
+  if (updates.inventoryUsedSlots !== undefined) setters.setInventoryUsedSlots(updates.inventoryUsedSlots);
+  if (updates.characterProgression !== undefined) setters.setCharacterProgression(updates.characterProgression);
+  if (updates.materialTotals !== undefined) setters.setMaterialTotals(updates.materialTotals);
+}

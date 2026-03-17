@@ -28,6 +28,8 @@ import { WorldEvents } from '@/components/screens/WorldEvents';
 import { Achievements } from '@/components/screens/Achievements';
 import { AchievementToast } from '@/components/AchievementToast';
 import { QuestToast } from '@/components/QuestToast';
+import { RateLimitToast } from '@/components/RateLimitToast';
+import { useRateLimitToast } from './hooks/useRateLimitToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
 import { Settings } from '@/components/screens/Settings';
@@ -51,6 +53,7 @@ import {
 } from '@/lib/tutorial';
 import AdminScreen from '@/components/screens/AdminScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
+import { applyStateUpdates } from './applyStateUpdates';
 import { GuildScreen } from '@/components/screens/GuildScreen';
 import { FriendsScreen } from '@/components/screens/FriendsScreen';
 import { MailScreen } from '@/components/screens/MailScreen';
@@ -243,7 +246,6 @@ export default function GamePage() {
     openChangelog,
     zoneCraftingLevel,
     zoneCraftingName,
-    loadTurnsAndHp,
     loadPvpNotificationCount,
     achievementData,
     achievementUnclaimedCount,
@@ -288,7 +290,10 @@ export default function GamePage() {
     cancelAbandonLoot,
     lootRevealItems,
     handleDismissLootReveal,
+    stateSetters,
   } = useGameController({ isAuthenticated });
+
+  useRateLimitToast();
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
   const [expeditionContext, setExpeditionContext] = useState<ExpeditionContext | null>(null);
@@ -988,9 +993,8 @@ export default function GamePage() {
             currentTurns={turns}
             playerId={player?.id ?? null}
             isInTown={currentZone?.zoneType === 'town'}
-            onTurnsChanged={() => void loadTurnsAndHp()}
+            onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onNotificationsChanged={() => void loadPvpNotificationCount()}
-            onHpChanged={() => void loadTurnsAndHp()}
             onNavigate={(s) => setActiveScreen(s as Screen)}
             combatSpeedMs={combatLogSpeedMs}
           />
@@ -1077,7 +1081,7 @@ export default function GamePage() {
           <GuildScreen
             playerId={player?.id ?? null}
             characterLevel={characterProgression.characterLevel}
-            onTurnsChanged={() => void loadTurnsAndHp()}
+            onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onExpeditionContextChange={setExpeditionContext}
           />
         );
@@ -1085,7 +1089,7 @@ export default function GamePage() {
         return (
           <FriendsScreen
             playerId={player?.id ?? null}
-            onTurnsChanged={() => void loadTurnsAndHp()}
+            onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onFriendCountsChanged={() => void loadFriendCounts()}
             combatSpeedMs={combatLogSpeedMs}
             onNavigateToMail={(recipientId, recipientName) => {
@@ -1373,6 +1377,7 @@ export default function GamePage() {
       />
       <AchievementToast onNavigate={(category) => { setAchievementCategory(category); setActiveScreen('achievements'); }} />
       <QuestToast />
+      <RateLimitToast />
     </>
   );
 }

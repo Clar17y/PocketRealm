@@ -3,7 +3,7 @@ import type { ApiResponse } from '@/lib/api';
 import { runSimpleAction } from './simpleAction';
 
 describe('runSimpleAction', () => {
-  it('awaits async success work before reloading state', async () => {
+  it('awaits async onSuccess work', async () => {
     const events: string[] = [];
 
     await runSimpleAction({
@@ -14,18 +14,14 @@ describe('runSimpleAction', () => {
         await Promise.resolve();
         events.push('success:end');
       },
-      loadAll: async () => {
-        events.push('loadAll');
-      },
       setActionError: vi.fn(),
     });
 
-    expect(events).toEqual(['success:start', 'success:end', 'loadAll']);
+    expect(events).toEqual(['success:start', 'success:end']);
   });
 
-  it('sets the fallback error message and skips reload on API failure', async () => {
+  it('sets the fallback error message and skips onSuccess on API failure', async () => {
     const setActionError = vi.fn();
-    const loadAll = vi.fn();
     const onSuccess = vi.fn();
 
     await runSimpleAction({
@@ -35,12 +31,10 @@ describe('runSimpleAction', () => {
         error: { message: null, code: 'BAD_REQUEST' },
       }),
       onSuccess,
-      loadAll,
       setActionError,
     });
 
     expect(setActionError).toHaveBeenCalledWith('equip item failed');
     expect(onSuccess).not.toHaveBeenCalled();
-    expect(loadAll).not.toHaveBeenCalled();
   });
 });

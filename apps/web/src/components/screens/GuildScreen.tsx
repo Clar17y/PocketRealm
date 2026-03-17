@@ -23,15 +23,16 @@ import { ScreenContainer } from '../common/ScreenContainer';
 type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'projects' | 'expeditions' | 'shop' | 'specialization' | 'log' | 'settings';
 
 import type { ExpeditionContext } from '@/lib/assets';
+import type { StateUpdates } from '@pocketrealm/shared';
 
 interface GuildScreenProps {
   playerId: string | null;
   characterLevel: number;
-  onTurnsChanged: () => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
   onExpeditionContextChange?: (ctx: ExpeditionContext | null) => void;
 }
 
-export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpeditionContextChange }: GuildScreenProps) {
+export function GuildScreen({ playerId, characterLevel, onStateUpdates, onExpeditionContextChange }: GuildScreenProps) {
   const [guildData, setGuildData] = useState<PlayerGuildResponse | null>(null);
   const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +92,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
           playerId={playerId}
           characterLevel={characterLevel}
           error={error}
-          onGuildJoined={() => { refreshGuild(); onTurnsChanged(); }}
+          onGuildJoined={() => { refreshGuild(); }}
         />
       </>
     );
@@ -141,7 +142,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
         <GuildContractsTab guildId={guildData.guild.id} />
       )}
       {activeTab === 'projects' && (
-        <GuildProjectsTab guildId={guildData.guild.id} myRole={guildData.role} setError={setError} onTurnsChanged={onTurnsChanged} />
+        <GuildProjectsTab guildId={guildData.guild.id} myRole={guildData.role} setError={setError} onStateUpdates={onStateUpdates} />
       )}
       {activeTab === 'expeditions' && (
         <GuildExpeditionsTab
@@ -150,7 +151,7 @@ export function GuildScreen({ playerId, characterLevel, onTurnsChanged, onExpedi
           myRole={guildData.role as 'leader' | 'officer' | 'member'}
           characterLevel={characterLevel}
           setError={setError}
-          onTurnsChanged={onTurnsChanged}
+          onStateUpdates={onStateUpdates}
           onRefresh={refreshGuild}
           onExpeditionContextChange={onExpeditionContextChange}
         />

@@ -37,6 +37,7 @@ import type {
   ExpeditionCooldownInfo,
   BossActiveEffect,
   CombatTemplateData,
+  StateUpdates,
 } from '@pocketrealm/shared';
 import { EXPEDITION_CONSTANTS, EXPEDITION_THEMES, mobDisplayName } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
@@ -85,7 +86,7 @@ interface GuildExpeditionsTabProps {
   myRole: 'leader' | 'officer' | 'member';
   characterLevel: number;
   setError: (msg: string | null) => void;
-  onTurnsChanged?: () => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
   onRefresh?: () => void;
   onExpeditionContextChange?: (ctx: ExpeditionContext | null) => void;
 }
@@ -214,7 +215,7 @@ export function GuildExpeditionsTab({
   myRole,
   characterLevel,
   setError,
-  onTurnsChanged,
+  onStateUpdates,
   onRefresh,
   onExpeditionContextChange,
 }: GuildExpeditionsTabProps) {
@@ -331,7 +332,7 @@ export function GuildExpeditionsTab({
     try {
       const res = await signUpForExpedition(expedition.id);
       if (res.error) { setError(res.error.message); return; }
-      onTurnsChanged?.();
+      if ((res.data as any)?.stateUpdates) onStateUpdates?.((res.data as any).stateUpdates);
       void loadExpedition();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to sign up');
@@ -427,7 +428,7 @@ export function GuildExpeditionsTab({
     try {
       const res = await recoverFromExpeditionKO(expedition.id);
       if (res.error) { setError(res.error.message); return; }
-      onTurnsChanged?.();
+      if ((res.data as any)?.stateUpdates) onStateUpdates?.((res.data as any).stateUpdates);
       void loadExpedition();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to recover');

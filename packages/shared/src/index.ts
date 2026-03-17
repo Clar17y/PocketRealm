@@ -17,6 +17,7 @@ export * from './types/quest.types';
 export * from './types/expedition.types';
 export type { ShopItemData, PlayerBuffData, ShopPurchaseResult } from './types/shop.types';
 export * from './types/friend.types';
+export * from './types/stateUpdates.types';
 
 // Constants
 export * from './constants/gameConstants';

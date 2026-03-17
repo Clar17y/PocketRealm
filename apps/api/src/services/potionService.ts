@@ -72,12 +72,18 @@ export async function buildPotionPool(playerId: string, maxHp: number): Promise<
   return potions;
 }
 
+export interface PotionDeductResult {
+  fullyConsumedIds: string[];
+  partiallyConsumedIds: string[];
+}
+
 export async function deductConsumedPotions(
   playerId: string,
   consumed: PotionConsumed[],
   tx?: Prisma.TransactionClient,
-): Promise<void> {
-  if (consumed.length === 0) return;
+): Promise<PotionDeductResult> {
+  const result: PotionDeductResult = { fullyConsumedIds: [], partiallyConsumedIds: [] };
+  if (consumed.length === 0) return result;
 
   const db = tx ?? prisma;
 
@@ -94,11 +100,15 @@ export async function deductConsumedPotions(
 
     if (item.quantity <= count) {
       await db.item.delete({ where: { id: item.id } });
+      result.fullyConsumedIds.push(item.id);
     } else {
       await db.item.update({
         where: { id: item.id },
         data: { quantity: item.quantity - count },
       });
+      result.partiallyConsumedIds.push(item.id);
     }
   }
+
+  return result;
 }

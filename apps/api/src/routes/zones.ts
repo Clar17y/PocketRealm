@@ -34,6 +34,7 @@ import { calculateExplorationPercent, getExplorationPercent } from '../services/
 import { asyncHandler } from '../utils/asyncHandler';
 import { assertNotOverEncumbered } from '../services/inventoryService';
 import { spendWithTaxTx, taxInfoFromResult } from '../services/guildTaxService';
+import { buildStateUpdates } from '../services/stateUpdateHelpers';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 import { trackProgress } from '../services/progressService';
@@ -256,6 +257,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
 
     void trackProgress(playerId, 'zone_travel', 1);
 
+    const breadcrumbStateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
     res.json({
       zone: { id: destinationZone.id, name: destinationZone.name, zoneType: destinationZone.zoneType },
       turns: await getTurnSnapshot(),
@@ -267,6 +269,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       respawnedTo: null,
       newDiscoveries,
       tax: null,
+      stateUpdates: breadcrumbStateUpdates,
     });
     return;
   }
@@ -606,6 +609,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       }
 
       if (ambushAbort?.type === 'knockout') {
+        const knockoutStateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
         res.json({
           zone: { id: ambushAbort.respawn.townId, name: ambushAbort.respawn.townName, zoneType: 'town' },
           turns: await getTurnSnapshot(),
@@ -618,11 +622,13 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           newDiscoveries: ambushAbort.newDiscoveries,
           tax: taxInfoFromResult(taxResult),
           ...(travelPendingLootSessionId ? { pendingLootSessionId: travelPendingLootSessionId } : {}),
+          stateUpdates: knockoutStateUpdates,
         });
         return;
       }
 
       if (ambushAbort?.type === 'flee') {
+        const fleeStateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
         res.json({
           zone: { id: currentZoneId, name: currentZone.name, zoneType: currentZone.zoneType },
           turns: await getTurnSnapshot(),
@@ -635,6 +641,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           newDiscoveries: [],
           tax: taxInfoFromResult(taxResult),
           ...(travelPendingLootSessionId ? { pendingLootSessionId: travelPendingLootSessionId } : {}),
+          stateUpdates: fleeStateUpdates,
         });
         return;
       }
@@ -677,6 +684,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     await trackAchievements(playerId, travelCounters, { statKeys: travelAchKeys, familyIds: ambushMobFamilyIds });
   }
 
+  const travelStateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
   res.json({
     zone: { id: destinationZone.id, name: destinationZone.name, zoneType: destinationZone.zoneType },
     turns: await getTurnSnapshot(),
@@ -689,5 +697,6 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     newDiscoveries,
     tax: taxInfoFromResult(taxResult),
     ...(travelPendingLootSessionId ? { pendingLootSessionId: travelPendingLootSessionId } : {}),
+    stateUpdates: travelStateUpdates,
   });
 }));

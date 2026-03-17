@@ -52,6 +52,7 @@ import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
 import { getMainHandAttackSkill } from '../../services/combatStatsService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
+import { buildStateUpdates } from '../../services/stateUpdateHelpers';
 import {
   startSchema,
   pickWeighted,
@@ -1042,6 +1043,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       });
     }
 
+    const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+
     res.json({
       logId: persisted.logId,
       zone: {
@@ -1066,5 +1069,6 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       },
       tax: taxInfoFromResult(taxResult),
       ...(allQuestProgress.length > 0 ? { questProgress: allQuestProgress } : {}),
+      stateUpdates,
     });
 }));

@@ -8,6 +8,7 @@ import { getPlayerProgressionState } from '../services/attributesService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { createActivityLog } from '../services/activityLogService';
+import { buildStateUpdates } from '../services/stateUpdateHelpers';
 
 export const hpRouter = Router();
 
@@ -36,7 +37,10 @@ hpRouter.post('/rest', asyncHandler(async (req, res) => {
   const body = restSchema.parse(req.body);
 
   const { taxResult, ...result } = await rest(playerId, body.turns);
-  const turns = await getTurnState(playerId);
+  const [turns, stateUpdates] = await Promise.all([
+    getTurnState(playerId),
+    buildStateUpdates(playerId, ['hp', 'resources']),
+  ]);
 
   // Log the activity
   await createActivityLog({
@@ -55,6 +59,7 @@ hpRouter.post('/rest', asyncHandler(async (req, res) => {
     ...result,
     turns,
     tax: taxInfoFromResult(taxResult),
+    stateUpdates,
   });
 }));
 
@@ -66,7 +71,10 @@ hpRouter.post('/recover', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
 
   const result = await recover(playerId);
-  const turns = await getTurnState(playerId);
+  const [turns, stateUpdates] = await Promise.all([
+    getTurnState(playerId),
+    buildStateUpdates(playerId, ['hp', 'resources']),
+  ]);
 
   // Log the activity
   await createActivityLog({
@@ -83,6 +91,7 @@ hpRouter.post('/recover', asyncHandler(async (req, res) => {
   res.json({
     ...result,
     turns,
+    stateUpdates,
   });
 }));
 

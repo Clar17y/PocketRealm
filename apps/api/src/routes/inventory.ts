@@ -14,6 +14,7 @@ import { sellItem, sellBulk } from '../services/sellService';
 import { depositItem, depositBatch, withdrawItem, withdrawBatch, listStash } from '../services/stashService';
 import { claimPendingLoot, getPendingLoot } from '../services/pendingLootService';
 import { getInventoryState } from '../services/inventoryService';
+import { fetchInventoryMeta, fetchItemDTOs, buildStateUpdates, fetchMaterialTotals } from '../services/stateUpdateHelpers';
 
 export const inventoryRouter = Router();
 
@@ -92,12 +93,38 @@ inventoryRouter.delete('/:id', asyncHandler(async (req, res) => {
       where: { id: item.id },
       data: { quantity: item.quantity - query.quantity },
     });
-    res.json({ destroyed: false, itemId: updated.id, remainingQuantity: updated.quantity });
+    const [inventoryMeta, updatedDTOs, materialTotals] = await Promise.all([
+      fetchInventoryMeta(playerId),
+      fetchItemDTOs([updated.id]),
+      fetchMaterialTotals(playerId),
+    ]);
+    res.json({
+      destroyed: false,
+      itemId: updated.id,
+      remainingQuantity: updated.quantity,
+      stateUpdates: {
+        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        inventoryUpdated: updatedDTOs,
+        materialTotals,
+      },
+    });
     return;
   }
 
   await prisma.item.delete({ where: { id: item.id } });
-  res.json({ destroyed: true, itemId: item.id });
+  const [inventoryMeta, materialTotals] = await Promise.all([
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+  res.json({
+    destroyed: true,
+    itemId: item.id,
+    stateUpdates: {
+      inventoryRemoved: [item.id],
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      materialTotals,
+    },
+  });
 }));
 
 const repairSchema = z.object({
@@ -163,7 +190,40 @@ inventoryRouter.post('/repair', asyncHandler(async (req, res) => {
     await invalidateEquipmentCache(playerId);
   }
 
-  res.json(result);
+  if (!result.repaired) {
+    res.json(result);
+    return;
+  }
+
+  if (result.destroyed) {
+    const [inventoryMeta, gold, materialTotals] = await Promise.all([
+      fetchInventoryMeta(playerId),
+      buildStateUpdates(playerId, ['gold']),
+      fetchMaterialTotals(playerId),
+    ]);
+    res.json({
+      ...result,
+      stateUpdates: {
+        inventoryRemoved: [result.itemId],
+        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        gold: gold.gold,
+        materialTotals,
+      },
+    });
+    return;
+  }
+
+  const [repairedDTOs, gold] = await Promise.all([
+    fetchItemDTOs([result.itemId]),
+    buildStateUpdates(playerId, ['gold']),
+  ]);
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryUpdated: repairedDTOs,
+      gold: gold.gold,
+    },
+  });
 }));
 
 /**
@@ -181,7 +241,29 @@ inventoryRouter.post('/repair-equipped', asyncHandler(async (req, res) => {
     await invalidateEquipmentCache(playerId);
   }
 
-  res.json(result);
+  if (!result.repaired) {
+    res.json(result);
+    return;
+  }
+
+  const survivingIds = result.items.filter((i) => !i.destroyed).map((i) => i.itemId);
+  const destroyedIds = result.items.filter((i) => i.destroyed).map((i) => i.itemId);
+
+  const [survivingDTOs, goldUpdates, materialTotals] = await Promise.all([
+    fetchItemDTOs(survivingIds),
+    buildStateUpdates(playerId, ['gold']),
+    destroyedIds.length > 0 ? fetchMaterialTotals(playerId) : Promise.resolve(undefined),
+  ]);
+
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryUpdated: survivingDTOs,
+      ...(destroyedIds.length > 0 ? { inventoryRemoved: destroyedIds } : {}),
+      gold: goldUpdates.gold,
+      ...(materialTotals !== undefined ? { materialTotals } : {}),
+    },
+  });
 }));
 
 const useSchema = z.object({
@@ -196,7 +278,27 @@ inventoryRouter.post('/use', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = useSchema.parse(req.body);
   const result = await useConsumable(playerId, body.itemId);
-  res.json(result);
+
+  const [stateFields, updatedDTOs, materialTotals] = await Promise.all([
+    buildStateUpdates(playerId, ['hp', 'resources', 'buffs']),
+    result.remainingQuantity !== null ? fetchItemDTOs([body.itemId]) : Promise.resolve([]),
+    fetchMaterialTotals(playerId),
+  ]);
+
+  const stateUpdates: Record<string, unknown> = {
+    hp: stateFields.hp,
+    resources: stateFields.resources,
+    buffs: stateFields.buffs,
+    materialTotals,
+  };
+
+  if (result.remainingQuantity === null) {
+    stateUpdates.inventoryRemoved = [body.itemId];
+  } else {
+    stateUpdates.inventoryUpdated = updatedDTOs;
+  }
+
+  res.json({ ...result, stateUpdates });
 }));
 
 // --- Sell endpoints ---
@@ -211,7 +313,23 @@ inventoryRouter.post('/sell', asyncHandler(async (req, res) => {
   const body = sellSchema.parse(req.body);
   await assertInTown(playerId);
   const result = await sellItem(playerId, body.itemId, body.quantity);
-  res.json(result);
+  const [remainingDTOs, inventoryMeta, materialTotals] = await Promise.all([
+    fetchItemDTOs([body.itemId]),
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+  const wasFullySold = remainingDTOs.length === 0;
+  res.json({
+    ...result,
+    stateUpdates: {
+      ...(wasFullySold
+        ? { inventoryRemoved: [body.itemId] }
+        : { inventoryUpdated: remainingDTOs }),
+      gold: result.newGold,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      materialTotals,
+    },
+  });
 }));
 
 const sellBulkSchema = z.object({
@@ -223,7 +341,19 @@ inventoryRouter.post('/sell/bulk', asyncHandler(async (req, res) => {
   const body = sellBulkSchema.parse(req.body);
   await assertInTown(playerId);
   const result = await sellBulk(playerId, body.itemIds);
-  res.json(result);
+  const [inventoryMeta, materialTotals] = await Promise.all([
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryRemoved: body.itemIds,
+      gold: result.newGold,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      materialTotals,
+    },
+  });
 }));
 
 // --- Stash endpoints ---
@@ -244,7 +374,22 @@ inventoryRouter.post('/stash/deposit', asyncHandler(async (req, res) => {
   const body = stashSchema.parse(req.body);
   await assertInTown(playerId);
   await depositItem(playerId, body.itemId, body.quantity);
-  res.json({ success: true });
+  const [remainingDTOs, inventoryMeta, materialTotals] = await Promise.all([
+    fetchItemDTOs([body.itemId]),
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+  const wasFullyMoved = remainingDTOs.length === 0;
+  res.json({
+    success: true,
+    stateUpdates: {
+      ...(wasFullyMoved
+        ? { inventoryRemoved: [body.itemId] }
+        : { inventoryUpdated: remainingDTOs }),
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      materialTotals,
+    },
+  });
 }));
 
 const stashBatchSchema = z.object({
@@ -256,15 +401,57 @@ inventoryRouter.post('/stash/deposit/batch', asyncHandler(async (req, res) => {
   const body = stashBatchSchema.parse(req.body);
   await assertInTown(playerId);
   const result = await depositBatch(playerId, body.itemIds);
-  res.json(result);
+  const [inventoryMeta, materialTotals] = await Promise.all([
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryRemoved: body.itemIds,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      materialTotals,
+    },
+  });
 }));
 
 inventoryRouter.post('/stash/withdraw', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = stashSchema.parse(req.body);
   await assertInTown(playerId);
+
+  // Pre-fetch templateId to detect merges after withdrawal
+  const sourceItem = await prisma.item.findUnique({
+    where: { id: body.itemId },
+    select: { templateId: true },
+  });
+  if (!sourceItem) throw new AppError(404, 'Item not found', 'NOT_FOUND');
+
   await withdrawItem(playerId, body.itemId, body.quantity);
-  res.json({ success: true });
+
+  // After withdrawal, find the resulting backpack item (may differ from body.itemId if merged)
+  const backpackItem = await prisma.item.findFirst({
+    where: { ownerId: playerId, templateId: sourceItem.templateId, inStash: false },
+    select: { id: true },
+  });
+  const resultItemId = backpackItem?.id ?? body.itemId;
+  const wasMerge = resultItemId !== body.itemId;
+
+  const [itemDTOs, inventoryMeta, materialTotals] = await Promise.all([
+    fetchItemDTOs([resultItemId]),
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+  res.json({
+    success: true,
+    stateUpdates: {
+      ...(wasMerge
+        ? { inventoryUpdated: itemDTOs }
+        : { inventoryAdded: itemDTOs }),
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      materialTotals,
+    },
+  });
 }));
 
 inventoryRouter.post('/stash/withdraw/batch', asyncHandler(async (req, res) => {
@@ -272,7 +459,19 @@ inventoryRouter.post('/stash/withdraw/batch', asyncHandler(async (req, res) => {
   const body = stashBatchSchema.parse(req.body);
   await assertInTown(playerId);
   const result = await withdrawBatch(playerId, body.itemIds);
-  res.json(result);
+  const [itemDTOs, inventoryMeta, materialTotals] = await Promise.all([
+    fetchItemDTOs(body.itemIds),
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+  res.json({
+    ...result,
+    stateUpdates: {
+      inventoryAdded: itemDTOs,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      materialTotals,
+    },
+  });
 }));
 
 // --- Loot endpoints ---
@@ -298,6 +497,18 @@ const lootClaimSchema = z.object({
 inventoryRouter.post('/loot/claim', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = lootClaimSchema.parse(req.body);
-  await claimPendingLoot(playerId, body.sessionId, body.selectedIndices);
-  res.json({ success: true });
+  const { claimedItemIds } = await claimPendingLoot(playerId, body.sessionId, body.selectedIndices);
+  const [itemDTOs, inventoryMeta, materialTotals] = await Promise.all([
+    fetchItemDTOs(claimedItemIds),
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+  res.json({
+    success: true,
+    stateUpdates: {
+      inventoryAdded: itemDTOs,
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      materialTotals,
+    },
+  });
 }));

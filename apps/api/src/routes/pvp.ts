@@ -18,6 +18,7 @@ import {
 import { checkAchievements, emitAchievementNotifications } from '../services/achievementService';
 import { paginationSchema } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
+import { buildStateUpdates } from '../services/stateUpdateHelpers';
 import { trackProgress } from '../services/progressService';
 
 export const pvpRouter = Router();
@@ -78,7 +79,8 @@ pvpRouter.post('/scout', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = scoutSchema.parse(req.body);
   const result = await scoutOpponent(playerId, body.targetId);
-  res.json(result);
+  const stateUpdates = await buildStateUpdates(playerId, ['resources']);
+  res.json({ ...result, stateUpdates });
 }));
 
 /**
@@ -116,7 +118,8 @@ pvpRouter.post('/challenge', asyncHandler(async (req, res) => {
     void trackProgress(body.targetId, 'pvp_damage', defenderDamage);
   }
 
-  res.json(result);
+  const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources', 'skills', 'characterProgression']);
+  res.json({ ...result, stateUpdates });
 }));
 
 /**
