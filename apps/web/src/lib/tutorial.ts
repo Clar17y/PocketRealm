@@ -67,7 +67,7 @@ export const TUTORIAL_STEPS: Record<number, TutorialStepDef> = {
       body: 'You start with 5 skill points to spend on combat abilities. Open the Combat tab and visit Talents to unlock a powerful ability like Fireball, Aimed Shot, or Power Strike. This will transform your first fight!',
     },
     pulseTab: 'combat',
-    navigateTo: 'combat',
+    navigateTo: 'talentTree',
   },
   [TUTORIAL_STEP_ATTRIBUTE_POINTS]: {
     banner: 'You have 5 attribute points! Allocate them to shape your build.',
@@ -75,8 +75,8 @@ export const TUTORIAL_STEPS: Record<number, TutorialStepDef> = {
       title: 'Attribute Points',
       body: 'You start with 5 attribute points to allocate. Invest in Strength for melee power, Dexterity for ranged accuracy, Intelligence for magic damage, or spread them around. Your choices shape your character\u2019s strengths!',
     },
-    pulseTab: 'profile',
-    navigateTo: 'profile',
+    pulseTab: 'home',
+    navigateTo: 'home',
   },
   [TUTORIAL_STEP_EXPLORE]: {
     banner: 'Use the turn slider to invest turns and explore your zone.',
