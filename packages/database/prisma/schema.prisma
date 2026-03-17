@@ -238,6 +238,9 @@ model Zone {
   id          String  @id @default(uuid())
   name        String  @db.VarChar(64)
   description String? @db.Text
+  arrivalText        String? @map("arrival_text") @db.Text
+  ambientTexts       Json?   @map("ambient_texts")
+  environmentalTexts Json?   @map("environmental_texts")
   difficulty  Int     @default(1)
   travelCost  Int     @map("travel_cost")
   isStarter   Boolean @default(false) @map("is_starter")
