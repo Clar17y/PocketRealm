@@ -109,6 +109,7 @@ model Player {
   blocksReceived      PlayerBlock[] @relation("PlayerBlockBlocked")
   friendMailsSent     FriendMail[]  @relation("FriendMailSender")
   friendMailsReceived FriendMail[]  @relation("FriendMailRecipient")
+  pushSubscriptions   PushSubscription[]
 
   // Expeditions
   expeditionTokens          Int                        @default(0) @map("expedition_tokens")
@@ -1071,6 +1072,25 @@ model FriendMail {
   @@index([recipientId, isDeletedByRecipient, isRead])
   @@index([senderId, isDeletedBySender])
   @@map("friend_mails")
+}
+
+// =============================================================================
+// PUSH NOTIFICATIONS
+// =============================================================================
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  playerId  String   @map("player_id")
+  endpoint  String   @db.Text
+  p256dh    String   @db.VarChar(255)
+  auth      String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, endpoint])
+  @@index([playerId])
+  @@map("push_subscriptions")
 }
 
 // =============================================================================
