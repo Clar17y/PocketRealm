@@ -44,6 +44,7 @@ import { getActiveTemplate } from './combatTemplateService';
 import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
 import { buildPotionPool, templateHasPotionActions, deductConsumedPotions } from './potionService';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
+import { validateEnum } from '../utils/validateEnum';
 
 // ---------------------------------------------------------------------------
 // Bot Cleanup — delete bot players created by admin /expedition/fill
@@ -62,11 +63,6 @@ async function cleanupExpeditionBots(expeditionId: string): Promise<void> {
 }
 
 const VALID_EXPEDITION_STATUSES = new Set<ExpeditionStatus>(['recruiting', 'in_progress', 'completed', 'failed']);
-
-function validateExpeditionStatus(status: string): ExpeditionStatus {
-  if (VALID_EXPEDITION_STATUSES.has(status as ExpeditionStatus)) return status as ExpeditionStatus;
-  return 'failed';
-}
 
 // ---------------------------------------------------------------------------
 // Data Transformation
@@ -105,7 +101,7 @@ function toExpeditionData(exp: GuildExpeditionRow): ExpeditionData {
     id: exp.id,
     guildId: exp.guildId,
     tier: exp.tier,
-    status: validateExpeditionStatus(exp.status),
+    status: validateEnum(exp.status, VALID_EXPEDITION_STATUSES, 'failed'),
     currentRoom: exp.currentRoom,
     totalRooms: exp.totalRooms,
     currentRoomType: currentRoomDef?.roomType ?? null,
