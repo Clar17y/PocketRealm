@@ -6,6 +6,7 @@ import { IDS } from './seed-data/ids';
 import { getAllItemTemplates } from './seed-data/items';
 import { ITEM_FLAVOR_TEXT } from './seed-data/flavorText';
 import { getAllMobTemplates } from './seed-data/mobs';
+import { MOB_FLAVOR_TEXT, MOB_FAMILY_FLAVOR } from './seed-data/mobFlavorText';
 import { getAllMobFamilies, getAllMobFamilyMembers, getAllZoneMobFamilies } from './seed-data/families';
 import { getAllResourceNodes } from './seed-data/resources';
 import { getAllDropTables } from './seed-data/drops';
@@ -150,9 +151,23 @@ async function seedItemTemplates() {
 
 async function seedMobs() {
   console.log('  Seeding mob templates...');
-  const mobs = getAllMobTemplates();
+  const mobs = getAllMobTemplates().map(mob => {
+    const flavor = MOB_FLAVOR_TEXT[mob.name];
+    return {
+      ...mob,
+      flavorAppearance: flavor?.appearance ?? null,
+      flavorBehavior: flavor?.behavior ?? null,
+      flavorLore: flavor?.lore ?? null,
+    };
+  });
   await prisma.mobTemplate.createMany({ data: mobs });
   console.log(`  ${mobs.length} mob templates created.`);
+
+  // Log unmatched mob flavour text entries
+  const mobNames = new Set(mobs.map(m => m.name));
+  for (const name of Object.keys(MOB_FLAVOR_TEXT)) {
+    if (!mobNames.has(name)) console.warn(`  ⚠ Unmatched mob flavour text: "${name}"`);
+  }
 }
 
 // ============================================================================
@@ -163,9 +178,18 @@ async function seedMobFamilies() {
   console.log('  Seeding mob families...');
   const p = prisma as any;
 
-  const families = getAllMobFamilies();
+  const families = getAllMobFamilies().map(f => ({
+    ...f,
+    flavorOverview: MOB_FAMILY_FLAVOR[f.name] ?? null,
+  }));
   await p.mobFamily.createMany({ data: families });
   console.log(`  ${families.length} mob families created.`);
+
+  // Log unmatched family flavour text entries
+  const familyNames = new Set(families.map(f => f.name));
+  for (const name of Object.keys(MOB_FAMILY_FLAVOR)) {
+    if (!familyNames.has(name)) console.warn(`  ⚠ Unmatched family flavour text: "${name}"`);
+  }
 
   const members = getAllMobFamilyMembers();
   await p.mobFamilyMember.createMany({ data: members });
