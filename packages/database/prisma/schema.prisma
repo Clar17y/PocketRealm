@@ -329,6 +329,9 @@ model MobTemplate {
   isBoss          Boolean @default(false) @map("is_boss")
   bossAoeDmg      Int?    @map("boss_aoe_dmg")
   bossBaseHp      Int?    @map("boss_base_hp")
+  flavorAppearance String? @map("flavor_appearance") @db.Text
+  flavorBehavior   String? @map("flavor_behavior") @db.Text
+  flavorLore       String? @map("flavor_lore") @db.Text
 
   zone              Zone               @relation(fields: [zoneId], references: [id])
   dropTables        DropTable[]
@@ -491,6 +494,7 @@ model MobFamily {
   siteNounSmall  String @map("site_noun_small") @db.VarChar(64)
   siteNounMedium String @map("site_noun_medium") @db.VarChar(64)
   siteNounLarge  String @map("site_noun_large") @db.VarChar(64)
+  flavorOverview String? @map("flavor_overview") @db.Text
 
   members        MobFamilyMember[]
   zoneMappings   ZoneMobFamily[]
