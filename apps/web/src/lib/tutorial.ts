@@ -1,14 +1,18 @@
-export const TUTORIAL_STEP_WELCOME = 0;
-export const TUTORIAL_STEP_EXPLORE = 1;
-export const TUTORIAL_STEP_COMBAT = 2;
-export const TUTORIAL_STEP_GATHER = 3;
-export const TUTORIAL_STEP_TRAVEL = 4;
-export const TUTORIAL_STEP_REFINE = 5;
-export const TUTORIAL_STEP_CRAFT = 6;
-export const TUTORIAL_STEP_EQUIP = 7;
-export const TUTORIAL_STEP_DONE = 8;
-export const TUTORIAL_COMPLETED = 9;
-export const TUTORIAL_SKIPPED = -1;
+export {
+  TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_ATTRIBUTE_POINTS,
+  TUTORIAL_STEP_EXPLORE,
+  TUTORIAL_STEP_COMBAT,
+  TUTORIAL_STEP_GATHER,
+  TUTORIAL_STEP_TRAVEL,
+  TUTORIAL_STEP_REFINE,
+  TUTORIAL_STEP_CRAFT,
+  TUTORIAL_STEP_EQUIP,
+  TUTORIAL_STEP_DONE,
+  TUTORIAL_COMPLETED,
+  TUTORIAL_SKIPPED,
+} from '@pocketrealm/shared';
 
 export type BottomTab = 'home' | 'explore' | 'inventory' | 'combat' | 'profile';
 
