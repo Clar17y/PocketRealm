@@ -5,6 +5,7 @@ import type {
   ExpeditionRoundLog,
   ExpeditionShopItem,
   ExpeditionCooldownInfo,
+  StateUpdates,
 } from '@pocketrealm/shared';
 
 // ---------------------------------------------------------------------------
@@ -65,13 +66,13 @@ export async function launchExpedition(tier: number) {
 }
 
 export async function signUpForExpedition(id: string) {
-  return fetchApi<{ member: ExpeditionMemberData }>(`/api/v1/expedition/${id}/signup`, {
+  return fetchApi<{ member: ExpeditionMemberData; stateUpdates?: StateUpdates }>(`/api/v1/expedition/${id}/signup`, {
     method: 'POST',
   });
 }
 
 export async function forceStartExpedition(id: string) {
-  return fetchApi<{ success: boolean; message: string }>(`/api/v1/expedition/${id}/force-start`, {
+  return fetchApi<{ success: boolean; message: string; stateUpdates?: StateUpdates }>(`/api/v1/expedition/${id}/force-start`, {
     method: 'POST',
   });
 }
@@ -99,7 +100,7 @@ export async function autoResolveRoom(id: string) {
 }
 
 export async function recoverFromExpeditionKO(id: string) {
-  return fetchApi<{ member: ExpeditionMemberData }>(`/api/v1/expedition/${id}/recover`, {
+  return fetchApi<{ member: ExpeditionMemberData; stateUpdates?: StateUpdates }>(`/api/v1/expedition/${id}/recover`, {
     method: 'POST',
   });
 }

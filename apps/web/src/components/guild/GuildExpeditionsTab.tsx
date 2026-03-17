@@ -332,7 +332,7 @@ export function GuildExpeditionsTab({
     try {
       const res = await signUpForExpedition(expedition.id);
       if (res.error) { setError(res.error.message); return; }
-      if ((res.data as any)?.stateUpdates) onStateUpdates?.((res.data as any).stateUpdates);
+      if (res.data?.stateUpdates) onStateUpdates?.(res.data.stateUpdates);
       void loadExpedition();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to sign up');
@@ -428,7 +428,7 @@ export function GuildExpeditionsTab({
     try {
       const res = await recoverFromExpeditionKO(expedition.id);
       if (res.error) { setError(res.error.message); return; }
-      if ((res.data as any)?.stateUpdates) onStateUpdates?.((res.data as any).stateUpdates);
+      if (res.data?.stateUpdates) onStateUpdates?.(res.data.stateUpdates);
       void loadExpedition();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to recover');

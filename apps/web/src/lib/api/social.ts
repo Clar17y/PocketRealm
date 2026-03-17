@@ -1,4 +1,5 @@
 import { fetchApi } from './core';
+import type { StateUpdates } from '@pocketrealm/shared';
 import type { CombatLogEntryResponse, CombatOutcomeResponse } from './combat';
 
 // PvP Arena
@@ -42,6 +43,7 @@ export interface PvpScoutData {
     maxMana: number;
     talentInvestment: Record<string, number>;
   };
+  stateUpdates?: StateUpdates;
 }
 
 export interface PvpMatchResponse {
@@ -96,6 +98,7 @@ export interface PvpChallengeResponse {
   attackerStartMana?: number;
   attackerKnockedOut: boolean;
   fleeOutcome: 'clean_escape' | 'wounded_escape' | 'knockout' | null;
+  stateUpdates?: StateUpdates;
 }
 
 export interface PvpNotification {

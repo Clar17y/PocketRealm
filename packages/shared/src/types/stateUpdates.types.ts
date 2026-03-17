@@ -1,4 +1,5 @@
 import type { HpState } from './hp.types';
+import type { PlayerBuffData } from './shop.types';
 
 /** Mirrors the frontend InventoryItem shape (apps/web/src/lib/api/items.ts:22-34) */
 export interface InventoryItemDTO {
@@ -59,7 +60,7 @@ export interface StateUpdates {
   resources?: { stamina: ResourceStateDTO; mana: ResourceStateDTO };
   hp?: HpState;
   gold?: number;
-  buffs?: BuffStateDTO[];
+  buffs?: PlayerBuffData[];
   inventoryCapacity?: number;
   inventoryUsedSlots?: number;
   materialTotals?: Record<string, number>;

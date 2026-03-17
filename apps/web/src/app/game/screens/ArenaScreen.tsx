@@ -122,7 +122,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
       const result = await scoutPvpOpponent(targetId);
       if (result.data) {
         setScoutData((prev) => ({ ...prev, [targetId]: result.data! }));
-        if ((result.data as any).stateUpdates) onStateUpdates?.((result.data as any).stateUpdates);
+        if (result.data.stateUpdates) onStateUpdates?.(result.data.stateUpdates);
       } else if (result.error) {
         setError(result.error.message);
       }
@@ -140,7 +140,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
       if (result.data) {
         setLastResult(result.data);
         setPvpPlaybackActive(true);
-        if ((result.data as any).stateUpdates) onStateUpdates?.((result.data as any).stateUpdates);
+        if (result.data.stateUpdates) onStateUpdates?.(result.data.stateUpdates);
       } else if (result.error) {
         setError(result.error.message);
       }

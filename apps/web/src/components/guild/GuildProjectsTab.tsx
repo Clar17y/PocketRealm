@@ -104,7 +104,7 @@ export function GuildProjectsTab({ guildId, myRole, setError, onStateUpdates }: 
     try {
       const res = await contributeProjectTurns(guildId, projectId, amount);
       if (res.error) { setError(res.error.message); return; }
-      if ((res.data as any)?.stateUpdates) onStateUpdates?.((res.data as any).stateUpdates);
+      if (res.data?.stateUpdates) onStateUpdates?.(res.data.stateUpdates);
       void loadProjects();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to contribute turns');
