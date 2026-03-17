@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
@@ -184,7 +184,7 @@ export function CombatScreen({
       ? 'text-[var(--rpg-red)]'
       : 'text-[var(--rpg-gold)]';
 
-  const buildShareText = useCallback((): string => {
+  const shareText = useMemo((): string => {
     if (!lastCombat || !displayedFight) return '';
     return formatCombatShareText({
       outcome: outcomeLabel ?? 'Unknown',
@@ -389,7 +389,7 @@ export function CombatScreen({
               {!lastCombatCollapsed && (
                 <>
                   <div className="flex justify-end">
-                    <CopyButton text={buildShareText()} />
+                    <CopyButton text={shareText} />
                   </div>
 
                   <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">

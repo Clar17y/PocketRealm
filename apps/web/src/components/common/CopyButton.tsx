@@ -33,7 +33,7 @@ export function CopyButton({ text, label = 'Copy Log', disabled, className }: Co
       onClick={() => void handleCopy()}
       disabled={disabled || !text}
       className={className ?? 'px-2.5 py-1.5 rounded border border-[var(--rpg-border)] text-xs text-[var(--rpg-text-primary)] disabled:opacity-40'}
-      title={`Copy formatted log for sharing`}
+      title={label}
     >
       {buttonLabel}
     </button>
