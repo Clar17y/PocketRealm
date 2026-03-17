@@ -49,6 +49,8 @@ import {
   isTutorialActive,
   TUTORIAL_STEPS,
   TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_STARTER_WEAPON,
   TUTORIAL_STEP_EXPLORE,
   TUTORIAL_STEP_DONE,
@@ -1374,6 +1376,10 @@ export default function GamePage() {
         onDismiss={() => {
           if (tutorialStep === TUTORIAL_STEP_WELCOME) {
             advanceTutorial(TUTORIAL_STEP_WELCOME);
+          } else if (tutorialStep === TUTORIAL_STEP_SKILL_POINTS) {
+            advanceTutorial(TUTORIAL_STEP_SKILL_POINTS);
+          } else if (tutorialStep === TUTORIAL_STEP_ATTRIBUTE_POINTS) {
+            advanceTutorial(TUTORIAL_STEP_ATTRIBUTE_POINTS);
           } else if (tutorialStep === TUTORIAL_STEP_DONE) {
             advanceTutorial(TUTORIAL_STEP_DONE);
           }

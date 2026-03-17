@@ -211,7 +211,7 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
   if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
 
   // Allow skip (-1) from any state, or advance by exactly 1
-  const isSkip = body.step === -1;
+  const isSkip = body.step === TUTORIAL_SKIPPED;
   const isNextStep = body.step === player.tutorialStep + 1;
 
   if (!isSkip && !isNextStep) {

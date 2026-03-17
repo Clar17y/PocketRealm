@@ -20,10 +20,7 @@ function computeTotalSkillPoints(skills: { level: number }[]): number {
   return fromLevels + CHARACTER_CONSTANTS.STARTING_SKILL_POINTS;
 }
 
-/**
- * Total skill points earned = sum of (level - 1) for all skills * POINTS_PER_LEVEL + starting bonus.
- * Level 1 is baseline so only levels above 1 generate points.
- */
+/** Fetch all skill levels from DB and compute total earned skill points. */
 async function getTotalPointsEarned(playerId: string): Promise<number> {
   const skills = await prisma.playerSkill.findMany({
     where: { playerId },

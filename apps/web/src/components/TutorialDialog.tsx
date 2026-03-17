@@ -5,6 +5,8 @@ import { ModalOverlay } from './common/ModalOverlay';
 import {
   TUTORIAL_STEPS,
   TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_DONE,
   isTutorialActive,
 } from '@/lib/tutorial';
@@ -38,8 +40,8 @@ export function TutorialDialog({ tutorialStep, onDismiss }: TutorialDialogProps)
 
   const handleGotIt = () => {
     setVisible(false);
-    // For welcome and done steps, dismissing the dialog IS the completion trigger
-    if (shownForStep === TUTORIAL_STEP_WELCOME || shownForStep === TUTORIAL_STEP_DONE) {
+    // For dialog-only steps, dismissing the dialog IS the completion trigger
+    if (shownForStep === TUTORIAL_STEP_WELCOME || shownForStep === TUTORIAL_STEP_SKILL_POINTS || shownForStep === TUTORIAL_STEP_ATTRIBUTE_POINTS || shownForStep === TUTORIAL_STEP_DONE) {
       onDismiss();
     }
   };
