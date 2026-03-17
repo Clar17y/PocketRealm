@@ -24,10 +24,10 @@ const META: Record<string, StatDisplayMeta> = {
   critDamage:  { icon: Zap,       cssClass: 'text-[var(--rpg-gold)]',        cssVar: 'var(--rpg-gold)',        label: 'Crit Damage' },
   evasion:     { icon: Zap,       cssClass: 'text-[var(--rpg-gold)]',        cssVar: 'var(--rpg-gold)',        label: 'Evasion' },
   inventorySlots: { icon: Backpack, cssClass: 'text-[var(--rpg-gold)]',      cssVar: 'var(--rpg-gold)',        label: 'Inventory Slots' },
-  // Aliases for Equipment.tsx total stats panel which uses different property names:
-  defence:     { icon: Shield,    cssClass: 'text-[var(--rpg-blue-light)]',  cssVar: 'var(--rpg-blue-light)',  label: 'Armor' },
-  hp:          { icon: Heart,     cssClass: 'text-[var(--rpg-green-light)]', cssVar: 'var(--rpg-green-light)', label: 'HP' },
 };
+// Aliases for Equipment.tsx total stats panel which uses different property names
+META.defence = META.armor;
+META.hp = META.health;
 
 const FALLBACK_META: Omit<StatDisplayMeta, 'label'> = {
   icon: Zap,

@@ -8,6 +8,20 @@ export interface ForgeResultData {
   message: string;
 }
 
+type ForgeOutcome = 'success' | 'protected' | 'fail';
+
+function forgeOutcome(type: ForgeResultData['type']): ForgeOutcome {
+  if (type === 'upgrade_success' || type === 'reroll') return 'success';
+  if (type === 'upgrade_protected') return 'protected';
+  return 'fail';
+}
+
+const OUTCOME_STYLE: Record<ForgeOutcome, { emoji: string; textClass: string; borderClass: string }> = {
+  success:   { emoji: '\u2728',                    textClass: 'text-[var(--rpg-green-light)]', borderClass: 'border-[var(--rpg-green-light)]' },
+  protected: { emoji: '\uD83D\uDEE1\uFE0F',       textClass: 'text-[var(--rpg-blue-light)]',  borderClass: 'border-[var(--rpg-blue-light)]' },
+  fail:      { emoji: '\uD83D\uDCA5',              textClass: 'text-[var(--rpg-red)]',         borderClass: 'border-[var(--rpg-red)]' },
+};
+
 let _seq = 0;
 
 export function ForgeResultToast() {
@@ -27,30 +41,17 @@ export function ForgeResultToast() {
       overflow={queue.overflow}
       dismiss={queue.dismiss}
       renderToast={(item) => {
-        const isSuccess = item.data.type === 'upgrade_success' || item.data.type === 'reroll';
-        const isProtected = item.data.type === 'upgrade_protected';
+        const style = OUTCOME_STYLE[forgeOutcome(item.data.type)];
         return (
           <div className="flex items-center gap-2">
-            <span>{isSuccess ? '\u2728' : isProtected ? '\uD83D\uDEE1\uFE0F' : '\uD83D\uDCA5'}</span>
-            <span className={
-              isSuccess ? 'text-[var(--rpg-green-light)]'
-                : isProtected ? 'text-[var(--rpg-blue-light)]'
-                : 'text-[var(--rpg-red)]'
-            }>
-              {item.data.message}
-            </span>
+            <span>{style.emoji}</span>
+            <span className={style.textClass}>{item.data.message}</span>
           </div>
         );
       }}
       cardClassName={(item) => {
-        const isSuccess = item.data.type === 'upgrade_success' || item.data.type === 'reroll';
-        const isProtected = item.data.type === 'upgrade_protected';
-        const borderColor = isSuccess
-          ? 'border-[var(--rpg-green-light)]'
-          : isProtected
-            ? 'border-[var(--rpg-blue-light)]'
-            : 'border-[var(--rpg-red)]';
-        return `bg-[var(--rpg-surface)] border ${borderColor} rounded-lg px-4 py-3 shadow-lg animate-[slideIn_0.3s_ease-out] min-w-[250px] transition-colors`;
+        const style = OUTCOME_STYLE[forgeOutcome(item.data.type)];
+        return `bg-[var(--rpg-surface)] border ${style.borderClass} rounded-lg px-4 py-3 shadow-lg animate-[slideIn_0.3s_ease-out] min-w-[250px] transition-colors`;
       }}
     />
   );

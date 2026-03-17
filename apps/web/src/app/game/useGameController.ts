@@ -131,7 +131,8 @@ function showForgeToast(data: ForgeResultData) {
   const show = (window as unknown as Record<string, unknown>).__showForgeToast as
     | ((data: ForgeResultData) => void)
     | undefined;
-  if (show) show(data);
+  if (!show) return;
+  show(data);
 }
 
 interface TravelRouteState {
