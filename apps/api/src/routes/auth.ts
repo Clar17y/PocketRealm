@@ -3,7 +3,7 @@ import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '@pocketrealm/database';
-import { TURN_CONSTANTS, ALL_SKILLS, ALL_EQUIPMENT_SLOTS, STARTER_LOADOUT } from '@pocketrealm/shared';
+import { TURN_CONSTANTS, CHARACTER_CONSTANTS, ALL_SKILLS, ALL_EQUIPMENT_SLOTS, STARTER_LOADOUT } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import {
   generateAccessToken,
@@ -91,6 +91,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
         currentZoneId: startingZone.id,
         lastTravelledFromZoneId: starterTown.id,
         homeTownId: starterTown.id,
+        attributePoints: CHARACTER_CONSTANTS.STARTING_ATTRIBUTE_POINTS,
         turnBank: {
           create: {
             currentTurns: TURN_CONSTANTS.STARTING_TURNS,

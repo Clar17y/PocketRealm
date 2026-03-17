@@ -297,6 +297,10 @@ const weapons = [
   weapon(IDS.wep.oakShortbow, 'Oak Shortbow', 1, 'ranged', 1, { rangedPower: 3 }),
   weapon(IDS.wep.oakStaff, 'Oak Staff', 1, 'magic', 1, { magicPower: 5 }),
   weapon(IDS.wep.copperDagger, 'Copper Dagger', 1, 'melee', 3, { attack: 5, dodge: 1 }),
+  // Starter weapons (granted by Kessa Ironweld during tutorial, soulbound)
+  it({ id: STARTER_LOADOUT.starterWeaponIds.melee, name: "Kessa's Training Sword", itemType: 'weapon', slot: 'main_hand', tier: 1, requiredSkill: 'melee', requiredLevel: 1, baseStats: { attack: 4 }, maxDurability: 70, sellPrice: 0 }),
+  it({ id: STARTER_LOADOUT.starterWeaponIds.ranged, name: "Kessa's Training Bow", itemType: 'weapon', slot: 'main_hand', tier: 1, requiredSkill: 'ranged', requiredLevel: 1, baseStats: { rangedPower: 3 }, maxDurability: 70, sellPrice: 0 }),
+  it({ id: STARTER_LOADOUT.starterWeaponIds.magic, name: "Kessa's Training Staff", itemType: 'weapon', slot: 'main_hand', tier: 1, requiredSkill: 'magic', requiredLevel: 1, baseStats: { magicPower: 5 }, maxDurability: 70, sellPrice: 0 }),
   // Tier 2
   weapon(IDS.wep.tinSword, 'Tin Sword', 2, 'melee', 5, { attack: 8 }),
   weapon(IDS.wep.mapleLongbow, 'Maple Longbow', 2, 'ranged', 5, { rangedPower: 7 }),
@@ -444,7 +448,7 @@ const advancedGear = [
   it({ id: IDS.adv.ratHideGloves, name: 'Rat Hide Gloves', itemType: 'armor', slot: 'gloves', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { attack: 2, dodge: 1 }, maxDurability: 60, sellPrice: 0 }),
   it({ id: IDS.adv.spiderSilkBelt, name: 'Spider Silk Belt', itemType: 'armor', slot: 'belt', tier: 1, weightClass: 'light', requiredLevel: 1, baseStats: { health: 3, dodge: 2 }, maxDurability: 60, sellPrice: 0 }),
   it({ id: IDS.adv.boarHideBoots, name: 'Boar Hide Boots', itemType: 'armor', slot: 'boots', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { armor: 2, health: 2 }, maxDurability: 60, sellPrice: 0 }),
-  it({ id: STARTER_LOADOUT.tutorialOffHandTemplateId, name: 'Wayfinder Buckler', itemType: 'armor', slot: 'off_hand', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { accuracy: 12, health: 4 }, maxDurability: 40, sellPrice: 0 }),
+  it({ id: STARTER_LOADOUT.tutorialOffHandTemplateId, name: 'Wayfinder Buckler', itemType: 'armor', slot: 'off_hand', tier: 1, weightClass: 'medium', requiredLevel: 1, baseStats: { accuracy: 7, health: 4 }, maxDurability: 40, sellPrice: 0 }),
   // Tier 2
   it({ id: IDS.adv.wolfFangNecklace, name: 'Wolf Fang Necklace', itemType: 'armor', slot: 'neck', tier: 2, requiredLevel: 5, baseStats: { attack: 3, critChance: 0.01 }, maxDurability: 80, sellPrice: 0 }),
   it({ id: IDS.adv.banditsLuckyRing, name: "Bandit's Lucky Ring", itemType: 'armor', slot: 'ring', tier: 2, requiredLevel: 5, baseStats: { luck: 3, dodge: 2 }, maxDurability: 80, sellPrice: 0 }),

@@ -62,6 +62,11 @@ export const HIT_CURVE_CONSTANTS = {
 
 export const STARTER_LOADOUT = {
   tutorialOffHandTemplateId: 'starter_wayfinder_buckler',
+  starterWeaponIds: {
+    melee: 'starter_training_sword',
+    ranged: 'starter_training_bow',
+    magic: 'starter_training_staff',
+  },
 } as const;
 
 export const CRIT_STAT_CONSTANTS = {
@@ -128,6 +133,12 @@ export const CHARACTER_CONSTANTS = {
 
   /** Maximum character level. */
   MAX_LEVEL: 100,
+
+  /** Skill points granted at character creation (before any leveling). */
+  STARTING_SKILL_POINTS: 5,
+
+  /** Attribute points granted at character creation (before any leveling). */
+  STARTING_ATTRIBUTE_POINTS: 5,
 
   /** Combat stat scaling from allocated attributes. */
   MELEE_DAMAGE_PER_STRENGTH: 1,

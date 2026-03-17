@@ -19,6 +19,7 @@ export {
   restEstimate,
   rest,
   recoverFromKnockout,
+  claimStarterWeapon,
 } from './player';
 export type { PlayerSettings } from './player';
 

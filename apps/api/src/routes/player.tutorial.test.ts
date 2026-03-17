@@ -1,4 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  TUTORIAL_COMPLETED,
+  TUTORIAL_SKIPPED,
+  TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_EXPLORE,
+  TUTORIAL_STEP_COMBAT,
+  TUTORIAL_STEP_GATHER,
+  TUTORIAL_STEP_REFINE,
+  TUTORIAL_STEP_EQUIP,
+  TUTORIAL_STEP_DONE,
+} from '@pocketrealm/shared';
 
 vi.mock('../services/statsService', () => ({
   incrementStats: vi.fn(),
@@ -29,40 +40,40 @@ const mockEmitAchievementNotifications = emitAchievementNotifications as ReturnT
 
 /** Mirrors the validation logic in PATCH /player/tutorial */
 function isValidTutorialAdvance(currentStep: number, requestedStep: number): boolean {
-  const isSkip = requestedStep === -1;
+  const isSkip = requestedStep === TUTORIAL_SKIPPED;
   const isNextStep = requestedStep === currentStep + 1;
   if (!isSkip && !isNextStep) return false;
-  if (currentStep >= 9 || currentStep === -1) return false;
+  if (currentStep >= TUTORIAL_COMPLETED || currentStep === TUTORIAL_SKIPPED) return false;
   return true;
 }
 
 describe('tutorial step validation', () => {
   it('accepts valid forward step (current + 1)', () => {
-    expect(isValidTutorialAdvance(2, 3)).toBe(true);
+    expect(isValidTutorialAdvance(TUTORIAL_STEP_COMBAT, TUTORIAL_STEP_GATHER)).toBe(true);
   });
 
   it('accepts skip (-1)', () => {
-    expect(isValidTutorialAdvance(2, -1)).toBe(true);
+    expect(isValidTutorialAdvance(TUTORIAL_STEP_COMBAT, TUTORIAL_SKIPPED)).toBe(true);
   });
 
   it('rejects skipping steps', () => {
-    expect(isValidTutorialAdvance(2, 5)).toBe(false);
+    expect(isValidTutorialAdvance(TUTORIAL_STEP_COMBAT, TUTORIAL_STEP_REFINE)).toBe(false);
   });
 
   it('rejects going backwards', () => {
-    expect(isValidTutorialAdvance(5, 3)).toBe(false);
+    expect(isValidTutorialAdvance(TUTORIAL_STEP_GATHER, TUTORIAL_STEP_EXPLORE)).toBe(false);
   });
 
   it('rejects updating already completed tutorial', () => {
-    expect(isValidTutorialAdvance(9, 10)).toBe(false);
+    expect(isValidTutorialAdvance(TUTORIAL_COMPLETED, TUTORIAL_COMPLETED + 1)).toBe(false);
   });
 
   it('rejects skipping an already completed tutorial', () => {
-    expect(isValidTutorialAdvance(9, -1)).toBe(false);
+    expect(isValidTutorialAdvance(TUTORIAL_COMPLETED, TUTORIAL_SKIPPED)).toBe(false);
   });
 
   it('rejects advancing an already skipped tutorial', () => {
-    expect(isValidTutorialAdvance(-1, 0)).toBe(false);
+    expect(isValidTutorialAdvance(TUTORIAL_SKIPPED, 0)).toBe(false);
   });
 });
 
@@ -94,10 +105,10 @@ describe('PATCH /tutorial handler', () => {
   });
 
   it('advances tutorial step and updates DB', async () => {
-    mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep: 2 });
+    mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep: TUTORIAL_STEP_COMBAT });
     mockPrisma.player.update.mockResolvedValue({});
 
-    const req = { player: { playerId: 'p1' }, body: { step: 3 } } as any;
+    const req = { player: { playerId: 'p1' }, body: { step: TUTORIAL_STEP_GATHER } } as any;
     const res = mockRes();
     const next = vi.fn();
 
@@ -106,17 +117,17 @@ describe('PATCH /tutorial handler', () => {
 
     expect(mockPrisma.player.update).toHaveBeenCalledWith({
       where: { id: 'p1' },
-      data: { tutorialStep: 3 },
+      data: { tutorialStep: TUTORIAL_STEP_GATHER },
     });
-    expect(res.json).toHaveBeenCalledWith({ tutorialStep: 3 });
+    expect(res.json).toHaveBeenCalledWith({ tutorialStep: TUTORIAL_STEP_GATHER });
   });
 
   it('grants achievement when completing tutorial (step 9)', async () => {
-    mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep: 8 });
+    mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep: TUTORIAL_STEP_DONE });
     mockPrisma.player.update.mockResolvedValue({});
     mockCheckAchievements.mockResolvedValue([{ id: 'tutorial_complete' }]);
 
-    const req = { player: { playerId: 'p1' }, body: { step: 9 } } as any;
+    const req = { player: { playerId: 'p1' }, body: { step: TUTORIAL_COMPLETED } } as any;
     const res = mockRes();
     const next = vi.fn();
 
@@ -129,10 +140,10 @@ describe('PATCH /tutorial handler', () => {
   });
 
   it('does not grant achievement when skipping tutorial', async () => {
-    mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep: 3 });
+    mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep: TUTORIAL_STEP_GATHER });
     mockPrisma.player.update.mockResolvedValue({});
 
-    const req = { player: { playerId: 'p1' }, body: { step: -1 } } as any;
+    const req = { player: { playerId: 'p1' }, body: { step: TUTORIAL_SKIPPED } } as any;
     const res = mockRes();
     const next = vi.fn();
 
@@ -140,13 +151,13 @@ describe('PATCH /tutorial handler', () => {
     await handler(req, res, next);
 
     expect(mockIncrementStats).not.toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith({ tutorialStep: -1 });
+    expect(res.json).toHaveBeenCalledWith({ tutorialStep: TUTORIAL_SKIPPED });
   });
 
   it('calls next with error when player not found', async () => {
     mockPrisma.player.findUnique.mockResolvedValue(null);
 
-    const req = { player: { playerId: 'p1' }, body: { step: 1 } } as any;
+    const req = { player: { playerId: 'p1' }, body: { step: TUTORIAL_STEP_SKILL_POINTS } } as any;
     const res = mockRes();
     const next = vi.fn();
 
@@ -157,9 +168,9 @@ describe('PATCH /tutorial handler', () => {
   });
 
   it('calls next with error for invalid step jump', async () => {
-    mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep: 2 });
+    mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep: TUTORIAL_STEP_COMBAT });
 
-    const req = { player: { playerId: 'p1' }, body: { step: 5 } } as any;
+    const req = { player: { playerId: 'p1' }, body: { step: TUTORIAL_STEP_REFINE } } as any;
     const res = mockRes();
     const next = vi.fn();
 

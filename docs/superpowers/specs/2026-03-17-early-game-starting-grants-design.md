@@ -43,9 +43,44 @@ Reduce the starter off-hand's accuracy bonus from **+12 to +7**.
 
 **Rationale:** Each point in a combat attribute (Strength, Dexterity, or Intelligence) grants +1 accuracy for its combat style (`CHARACTER_CONSTANTS.ACCURACY_PER_STRENGTH/DEXTERITY/INTELLIGENCE`). A player who puts all 5 attribute points into their primary combat stat recovers the full +12 accuracy. A player who spreads points across non-accuracy attributes accepts lower hit rates but gains other benefits (more HP from Vitality, better crits from Luck, etc.). This turns the attribute point grant into a real tradeoff rather than free stats on top of an already-generous buckler.
 
-### 4. Tutorial Flow Update
+### 4. Starter Weapon Choice (Kessa Ironweld)
 
-The existing 9-step tutorial needs two new steps to teach spending skill points and attribute points. These should come early — before the first combat encounter.
+New players receive a starter main-hand weapon before leaving Millbrook. **Kessa Ironweld** (the blacksmith NPC) presents a popup with 3 weapon options. The player picks one, it's created and auto-equipped.
+
+**Lore framing:** Kessa intercepts you as you're about to leave town for the first time. Flavor text in her voice — direct, impatient, caring-under-gruffness. Example: *"Heading past the gate bare-handed? Not on my watch. Pick one — and try not to break it before you're out of earshot."*
+
+**Weapon options:**
+
+| Weapon | ID | Skill | Base Stats | Durability | Sell Price |
+|--------|----|-------|------------|------------|------------|
+| Kessa's Training Sword | `starter_training_sword` | melee | `{ attack: 4 }` | 70 | 0 |
+| Kessa's Training Bow | `starter_training_bow` | ranged | `{ rangedPower: 3 }` | 70 | 0 |
+| Kessa's Training Staff | `starter_training_staff` | magic | `{ magicPower: 5 }` | 70 | 0 |
+
+Stats match existing tier 1 weapons (Wooden Sword, Oak Shortbow, Oak Staff) but with `sellPrice: 0` (soulbound, like the Wayfinder Buckler). All tier 1, requiredLevel 1, `slot: 'main_hand'`.
+
+**Implementation:**
+
+1. Add 3 starter weapon templates to seed data (`packages/database/prisma/seed-data/items.ts`), following the `weapon()` helper pattern used by existing weapons.
+2. Add the 3 template IDs to `STARTER_LOADOUT` in `gameConstants.ts`:
+   ```typescript
+   export const STARTER_LOADOUT = {
+     tutorialOffHandTemplateId: 'starter_wayfinder_buckler',
+     starterWeaponIds: {
+       melee: 'starter_training_sword',
+       ranged: 'starter_training_bow',
+       magic: 'starter_training_staff',
+     },
+   } as const;
+   ```
+3. New API endpoint `POST /api/v1/player/starter-weapon` — accepts `{ weaponType: 'melee' | 'ranged' | 'magic' }`, validates player hasn't already claimed one, creates the item, equips it to `main_hand`. Callable once per player.
+4. Frontend popup: gold-outline modal (reusing existing popup component) showing the 3 weapons with name, stats, and Kessa's flavor text. Player taps one, frontend calls the endpoint, weapon is equipped, tutorial advances.
+
+**Why not grant at registration like the buckler?** The weapon is a *choice* — the player must see the options and pick. Registration happens before the game UI loads. The popup must render in-game during the tutorial.
+
+### 5. Tutorial Flow Update
+
+The existing 9-step tutorial gains 3 new steps: starter weapon choice, skill points, and attribute points. The equip step is repurposed to equip the weapon Kessa just gave you (instead of crafted gear). The original equip-crafted-gear moment happens naturally after the craft step without a dedicated tutorial step.
 
 **Current tutorial order:**
 0. Welcome (turn economy)
@@ -60,55 +95,61 @@ The existing 9-step tutorial needs two new steps to teach spending skill points 
 
 **Proposed tutorial order:**
 0. Welcome (turn economy)
-1. **Skill Points** — "You have 5 skill points! Open your abilities and unlock a combat skill."
-2. **Attribute Points** — "You have 5 attribute points! Allocate them to shape your build."
-3. Exploration (spend turns)
-4. Combat (encounter site fight — now with a real ability equipped)
-5. Gathering
-6. Travel
-7. Refining
-8. Crafting
-9. Equipment
-10. Done
+1. **Starter Weapon** — Kessa's popup, pick sword/bow/staff
+2. **Equip** — "Equip the weapon Kessa gave you" (repurposed from old step 7)
+3. **Skill Points** — "Open your talents and unlock a combat ability." Advances when player has spent ≥1 skill point.
+4. **Attribute Points** — "Allocate your attribute points to shape your build." Advances when player has allocated ≥1 attribute point.
+5. Exploration (spend turns)
+6. Combat (encounter site fight — now with weapon + ability + stats)
+7. Gathering
+8. Travel
+9. Refining
+10. Craft
+11. Done
 
 **New constant values:**
 
 | Constant | Old Value | New Value |
 |----------|-----------|-----------|
 | `TUTORIAL_STEP_WELCOME` | 0 | 0 |
-| `TUTORIAL_STEP_SKILL_POINTS` | — | 1 (new) |
-| `TUTORIAL_STEP_ATTRIBUTE_POINTS` | — | 2 (new) |
-| `TUTORIAL_STEP_EXPLORE` | 1 | 3 |
-| `TUTORIAL_STEP_COMBAT` | 2 | 4 |
-| `TUTORIAL_STEP_GATHER` | 3 | 5 |
-| `TUTORIAL_STEP_TRAVEL` | 4 | 6 |
-| `TUTORIAL_STEP_REFINE` | 5 | 7 |
-| `TUTORIAL_STEP_CRAFT` | 6 | 8 |
-| `TUTORIAL_STEP_EQUIP` | 7 | 9 |
-| `TUTORIAL_STEP_DONE` | 8 | 10 |
-| `TUTORIAL_COMPLETED` | 9 | 11 |
+| `TUTORIAL_STEP_STARTER_WEAPON` | — | 1 (new) |
+| `TUTORIAL_STEP_EQUIP` | 7 | 2 (moved) |
+| `TUTORIAL_STEP_SKILL_POINTS` | — | 3 (new) |
+| `TUTORIAL_STEP_ATTRIBUTE_POINTS` | — | 4 (new) |
+| `TUTORIAL_STEP_EXPLORE` | 1 | 5 |
+| `TUTORIAL_STEP_COMBAT` | 2 | 6 |
+| `TUTORIAL_STEP_GATHER` | 3 | 7 |
+| `TUTORIAL_STEP_TRAVEL` | 4 | 8 |
+| `TUTORIAL_STEP_REFINE` | 5 | 9 |
+| `TUTORIAL_STEP_CRAFT` | 6 | 10 |
+| `TUTORIAL_STEP_DONE` | 8 | 11 |
+| `TUTORIAL_COMPLETED` | 9 | 12 |
 | `TUTORIAL_SKIPPED` | -1 | -1 (unchanged) |
 
-The skill/attribute steps are inserted before exploration so the player has a build before their first fight.
+**Tutorial constants live in `packages/shared`** so both web and API can import them. (Already implemented — `packages/shared/src/constants/tutorialConstants.ts` with re-export from `apps/web/src/lib/tutorial.ts`.)
 
-**Tutorial constants must move to `packages/shared`** so both web and API can import them. Currently the constants live in `apps/web/src/lib/tutorial.ts` but the API uses hardcoded magic numbers (e.g., `tutorialStep === 1` in `exploration/start.ts` line ~191, `tutorialStep >= 9` in `player.ts` line ~221). Moving the constants to shared and importing them in both packages eliminates magic numbers and prevents renumbering bugs.
+**Tutorial advancement triggers (new):**
 
-After the move:
-- `exploration/start.ts` replaces `=== 1` with `=== TUTORIAL_STEP_EXPLORE` (now value 3)
-- `player.ts` replaces `>= 9` with `>= TUTORIAL_COMPLETED` (now value 11)
-- Any other API files using tutorial step magic numbers import from shared
+| Step | Trigger | Detection |
+|------|---------|-----------|
+| Starter Weapon | Player calls `POST /player/starter-weapon` | Endpoint response triggers frontend to advance |
+| Equip | Player equips the starter weapon to `main_hand` | Frontend detects equipment change, advances |
+| Skill Points | Player has spent ≥1 skill point | Frontend polls or reacts to `getSkillPoints()` result where `totalPointsSpent > 0`, advances |
+| Attribute Points | Player has allocated ≥1 attribute point | Frontend polls or reacts to attribute state where any attribute > 0, advances |
 
-**Note:** The tutorial *teaches* spending these points but the grants themselves come from character creation. If a player skips the tutorial (step -1), they still have 5 skill points and 5 attribute points to spend whenever they want.
+All other steps use existing advancement patterns (manual "next" or action detection).
+
+**Note:** The tutorial *teaches* spending these points but the grants themselves come from character creation. If a player skips the tutorial (step -1), they still have 5 skill points, 5 attribute points, and can claim a starter weapon whenever they want.
 
 ## Constants Changes
 
-### Modified
+### Modified (already implemented)
 
 | Constant | Location | Old | New |
 |----------|----------|-----|-----|
 | Wayfinder Buckler `baseStats.accuracy` | `packages/database/prisma/seed-data/items.ts` | 12 | 7 |
 
-### New
+### New (already implemented)
 
 ```typescript
 CHARACTER_CONSTANTS: {
@@ -118,27 +159,56 @@ CHARACTER_CONSTANTS: {
 }
 ```
 
+### New (pending — starter weapon + tutorial reorder)
+
+```typescript
+STARTER_LOADOUT: {
+  tutorialOffHandTemplateId: 'starter_wayfinder_buckler',
+  starterWeaponIds: {
+    melee: 'starter_training_sword',
+    ranged: 'starter_training_bow',
+    magic: 'starter_training_staff',
+  },
+}
+```
+
+Tutorial constants in `packages/shared/src/constants/tutorialConstants.ts` need updating to the new step numbering (see section 5).
+
 ## Schema Changes
 
-None. The `Player` model already has `attributePoints` (Int). Skill points are derived (not stored), and the starting bonus is added as a constant in the calculation. No migration needed.
+None. The `Player` model already has `attributePoints` (Int). Skill points are derived (not stored), and the starting bonus is added as a constant in the calculation. No migration needed. Starter weapon is a regular `Item` created via existing `item.create()` — no schema changes.
 
-Existing players are not a concern (no real players yet). Note: the `STARTING_SKILL_POINTS` bonus applies to all players via the derived calculation, but since there are no real players this is fine.
+Existing players are not a concern (no real players yet).
 
 ## Touch Points
 
+### Already implemented (PR #215)
+
 | File | Change |
 |------|--------|
-| `packages/shared/src/constants/gameConstants.ts` | Add `STARTING_SKILL_POINTS`, `STARTING_ATTRIBUTE_POINTS` to `CHARACTER_CONSTANTS` |
-| `apps/api/src/services/skillPointService.ts` | Extract shared `computePointsFromLevels()` helper; add starting bonus in both `getTotalPointsEarned()` and `allocatePoints()` inline derivation |
-| `apps/api/src/routes/auth.ts` | Add `attributePoints: CHARACTER_CONSTANTS.STARTING_ATTRIBUTE_POINTS` to `tx.player.create()` data |
+| `packages/shared/src/constants/gameConstants.ts` | Added `STARTING_SKILL_POINTS`, `STARTING_ATTRIBUTE_POINTS` to `CHARACTER_CONSTANTS` |
+| `apps/api/src/services/skillPointService.ts` | Extracted `computeTotalSkillPoints()` helper; starting bonus in both derivation sites |
+| `apps/api/src/routes/auth.ts` | Added `attributePoints: CHARACTER_CONSTANTS.STARTING_ATTRIBUTE_POINTS` to `tx.player.create()` |
 | `packages/database/prisma/seed-data/items.ts` | Buckler accuracy 12 → 7 |
-| `packages/shared/src/constants/tutorialConstants.ts` | New file: tutorial step constants (moved from web, extended with new steps) |
-| `apps/web/src/lib/tutorial.ts` | Import step constants from shared; add skill point + attribute point step configs |
-| `apps/api/src/routes/exploration/start.ts` | Import from shared; replace `=== 1` with `=== TUTORIAL_STEP_EXPLORE` |
-| `apps/api/src/routes/player.ts` | Import from shared; replace `>= 9` with `>= TUTORIAL_COMPLETED` |
-| `apps/api/src/routes/exploration/start.tutorial.test.ts` | Import from shared; update step numbers |
-| `apps/api/src/routes/player.tutorial.test.ts` | Import from shared; update step numbers |
-| `apps/api/src/services/skillPointService.test.ts` | Update tests for new starting bonus (fresh players now have 5 points) |
+| `packages/shared/src/constants/tutorialConstants.ts` | Tutorial step constants (moved from web to shared) |
+| `apps/web/src/lib/tutorial.ts` | Import step constants from shared; added skill point + attribute point step configs |
+| `apps/api/src/routes/exploration/start.ts` | Uses `TUTORIAL_STEP_EXPLORE` constant |
+| `apps/api/src/routes/player.ts` | Uses `TUTORIAL_COMPLETED`, `TUTORIAL_SKIPPED` constants; updated Zod schema |
+| Test files | Updated with shared constants and new numbering |
+
+### Pending (starter weapon + tutorial reorder)
+
+| File | Change |
+|------|--------|
+| `packages/shared/src/constants/gameConstants.ts` | Add `starterWeaponIds` to `STARTER_LOADOUT` |
+| `packages/database/prisma/seed-data/items.ts` | Add 3 starter weapon templates |
+| `packages/shared/src/constants/tutorialConstants.ts` | Reorder steps: add `TUTORIAL_STEP_STARTER_WEAPON`, move `TUTORIAL_STEP_EQUIP`, renumber all |
+| `apps/api/src/routes/player.ts` | New `POST /player/starter-weapon` endpoint |
+| `apps/web/src/lib/tutorial.ts` | Update step definitions, add starter weapon + equip steps, reorder |
+| `apps/web/src/components/` | Starter weapon choice popup component (gold-outline modal) |
+| `apps/web/src/app/game/` | Tutorial advancement triggers for skill points and attribute points steps |
+| `apps/api/src/routes/exploration/start.ts` | Update `TUTORIAL_STEP_EXPLORE` value (now 5) |
+| Test files | Update step numbers again |
 
 ## Related Work
 

@@ -44,10 +44,14 @@ import { calculateEfficiency, xpForLevel } from '@pocketrealm/game-engine';
 import { Sword, Shield, Crosshair, Sparkles, Pickaxe, Hammer, Leaf, FlaskConical, Axe, Scissors, Anvil, Gem } from 'lucide-react';
 import { TutorialBanner } from '@/components/TutorialBanner';
 import { TutorialDialog } from '@/components/TutorialDialog';
+import { StarterWeaponPopup } from '@/components/StarterWeaponPopup';
 import {
   isTutorialActive,
   TUTORIAL_STEPS,
   TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_ATTRIBUTE_POINTS,
+  TUTORIAL_STEP_STARTER_WEAPON,
   TUTORIAL_STEP_EXPLORE,
   TUTORIAL_STEP_DONE,
 } from '@/lib/tutorial';
@@ -261,7 +265,7 @@ export default function GamePage() {
     handleClaimQuestReward,
     handleClaimDailyBonus,
     handleRerollQuest,
-    tutorialStep, skipTutorial, advanceTutorial,
+    tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon,
     loadAll,
     activeBuffs,
     combatLogPrefetch,
@@ -1372,11 +1376,18 @@ export default function GamePage() {
         onDismiss={() => {
           if (tutorialStep === TUTORIAL_STEP_WELCOME) {
             advanceTutorial(TUTORIAL_STEP_WELCOME);
+          } else if (tutorialStep === TUTORIAL_STEP_SKILL_POINTS) {
+            advanceTutorial(TUTORIAL_STEP_SKILL_POINTS);
+          } else if (tutorialStep === TUTORIAL_STEP_ATTRIBUTE_POINTS) {
+            advanceTutorial(TUTORIAL_STEP_ATTRIBUTE_POINTS);
           } else if (tutorialStep === TUTORIAL_STEP_DONE) {
             advanceTutorial(TUTORIAL_STEP_DONE);
           }
         }}
       />
+      {tutorialStep === TUTORIAL_STEP_STARTER_WEAPON && (
+        <StarterWeaponPopup onSelect={handleClaimStarterWeapon} />
+      )}
       <AchievementToast onNavigate={(category) => { setAchievementCategory(category); setActiveScreen('achievements'); }} />
       <QuestToast />
       <RateLimitToast />

@@ -7,9 +7,9 @@ import { LoadingCard } from '@/components/common/LoadingCard';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import {
   getGuildSpecialization, selectGuildSpecialization, respecGuildSpecialization,
-  GUILD_MODIFIER_LABELS,
   type SpecializationStatusResponse,
 } from '@/lib/api/guild';
+import { PerkBadges } from '@/components/common/PerkBadges';
 import { GUILD_CONSTANTS, GUILD_SPECIALIZATION_DEFINITIONS } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
@@ -148,15 +148,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole }: GuildSpe
         <div className="mb-3">
           <p className="text-xs text-[var(--rpg-text-secondary)] mb-1">Active Bonuses</p>
           <div className="flex flex-wrap gap-2">
-            {status.bonuses.map((bonus, i) => (
-              <span
-                key={i}
-                className="text-xs px-2 py-0.5 rounded"
-                style={{ backgroundColor: `${colors.bg}20`, color: colors.primary }}
-              >
-                +{Math.round(bonus.value * 100)}% {GUILD_MODIFIER_LABELS[bonus.effectType] ?? bonus.effectType}
-              </span>
-            ))}
+            <PerkBadges perks={status.bonuses} variant="custom" color={colors.primary} bgColor={colors.bg} size="md" />
           </div>
         </div>
 
@@ -182,11 +174,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole }: GuildSpe
               />
             </div>
             <div className="mt-1.5 flex flex-wrap gap-1">
-              {status.nextTier.bonuses.map((bonus, i) => (
-                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]">
-                  +{Math.round(bonus.value * 100)}% {GUILD_MODIFIER_LABELS[bonus.effectType] ?? bonus.effectType}
-                </span>
-              ))}
+              <PerkBadges perks={status.nextTier.bonuses} variant="surface" size="sm" />
             </div>
           </div>
         )}
@@ -267,11 +255,7 @@ function SpecTierList({
               </span>
             </div>
             <div className="flex flex-wrap gap-1">
-              {tier.bonuses.map((bonus, i) => (
-                <span key={i} className="text-[10px] px-1 py-0.5 rounded bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]">
-                  +{Math.round(bonus.value * 100)}% {GUILD_MODIFIER_LABELS[bonus.effectType] ?? bonus.effectType}
-                </span>
-              ))}
+              <PerkBadges perks={tier.bonuses} variant="surface" />
             </div>
           </div>
         );
