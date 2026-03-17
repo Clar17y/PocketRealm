@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID, EXPLORATION_CONSTANTS, TUTORIAL_COMPLETED, TUTORIAL_SKIPPED } from '@pocketrealm/shared';
+import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID, EXPLORATION_CONSTANTS, TUTORIAL_COMPLETED, TUTORIAL_SKIPPED, STARTER_LOADOUT } from '@pocketrealm/shared';
 import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -234,6 +234,61 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
   }
 
   res.json({ tutorialStep: body.step });
+}));
+
+const starterWeaponSchema = z.object({
+  weaponType: z.enum(['melee', 'ranged', 'magic']),
+});
+
+/**
+ * POST /api/v1/player/starter-weapon
+ * Claim a starter weapon from Kessa Ironweld. One-time only.
+ */
+playerRouter.post('/starter-weapon', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { weaponType } = starterWeaponSchema.parse(req.body);
+
+  const templateId = STARTER_LOADOUT.starterWeaponIds[weaponType];
+
+  // Check if player already claimed a starter weapon (any of the 3 types)
+  const allStarterIds = Object.values(STARTER_LOADOUT.starterWeaponIds);
+  const existingClaim = await prisma.item.findFirst({
+    where: { ownerId: playerId, templateId: { in: allStarterIds } },
+    select: { id: true },
+  });
+
+  if (existingClaim) {
+    throw new AppError(400, 'Starter weapon already claimed', 'ALREADY_CLAIMED');
+  }
+
+  const template = await prisma.itemTemplate.findUnique({
+    where: { id: templateId },
+    select: { id: true, maxDurability: true },
+  });
+
+  if (!template) {
+    throw new AppError(500, 'Starter weapon template missing', 'MISSING_TEMPLATE');
+  }
+
+  const item = await prisma.item.create({
+    data: {
+      ownerId: playerId,
+      templateId,
+      rarity: 'common',
+      quantity: 1,
+      maxDurability: template.maxDurability,
+      currentDurability: template.maxDurability,
+    },
+    select: { id: true },
+  });
+
+  await prisma.playerEquipment.upsert({
+    where: { playerId_slot: { playerId, slot: 'main_hand' } },
+    create: { playerId, slot: 'main_hand', itemId: item.id },
+    update: { itemId: item.id },
+  });
+
+  res.json({ success: true, itemId: item.id, weaponType });
 }));
 
 // GET /api/v1/player/buffs — list active buffs
