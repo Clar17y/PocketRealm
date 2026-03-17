@@ -799,6 +799,7 @@ export default function GamePage() {
                 isDiscovered: r.isDiscovered,
                 discoveryHint: r.discoveryHint,
                 soulbound: r.soulbound,
+                stackable: r.resultTemplate.stackable,
                 resultQuantity: 1,
                 requiredLevel: r.requiredLevel,
                 turnCost: r.turnCost,
@@ -824,9 +825,10 @@ export default function GamePage() {
               recoveryCost={hpState.recoveryCost}
               zoneCraftingLevel={zoneCraftingLevel}
               zoneName={zoneCraftingName}
-              defaultMaxQuantity={activeCraftingSkill === 'refining' && defaultRefiningMax}
+              defaultMaxQuantity={defaultRefiningMax}
               guildTaxRate={guildTaxRate}
               backpackFull={backpackFull}
+              availableSlots={Math.max(0, inventoryCapacity - inventoryUsedSlots)}
             />
           </div>
         );

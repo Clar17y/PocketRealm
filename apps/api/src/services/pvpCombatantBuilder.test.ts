@@ -22,6 +22,8 @@ vi.mock('./combatOrchestrationService', () => ({
 
 vi.mock('./combatStatsService', () => ({
   getSkillLevels: vi.fn(),
+  getMainHandAttackSkill: vi.fn(),
+  buildPerActionScaling: vi.fn(),
 }));
 
 vi.mock('./combatTemplateService', () => ({
@@ -57,7 +59,7 @@ import {
 } from '@pocketrealm/game-engine';
 import { normalizePlayerAttributes } from './attributesService';
 import { buildPlayerTemplateCombatant } from './combatOrchestrationService';
-import { getSkillLevels } from './combatStatsService';
+import { getSkillLevels, getMainHandAttackSkill, buildPerActionScaling } from './combatStatsService';
 import { getActiveTemplate } from './combatTemplateService';
 import { getEquipmentStats } from './equipmentService';
 import { getHpState } from './hpService';
@@ -73,6 +75,8 @@ const mockCalculateManaRegenPerRound = vi.mocked(calculateManaRegenPerRound);
 const mockNormalizePlayerAttributes = vi.mocked(normalizePlayerAttributes);
 const mockBuildPlayerTemplateCombatant = vi.mocked(buildPlayerTemplateCombatant);
 const mockGetSkillLevels = vi.mocked(getSkillLevels);
+const mockGetMainHandAttackSkill = vi.mocked(getMainHandAttackSkill);
+const mockBuildPerActionScaling = vi.mocked(buildPerActionScaling);
 const mockGetActiveTemplate = vi.mocked(getActiveTemplate);
 const mockGetEquipmentStats = vi.mocked(getEquipmentStats);
 const mockGetHpState = vi.mocked(getHpState);
@@ -155,6 +159,14 @@ function setupDefaultMocks() {
   mockGetSkillPoints.mockResolvedValue(fakeSkillPoints());
   mockNormalizePlayerAttributes.mockReturnValue(fakeAttributes() as any);
   mockGetSkillLevels.mockResolvedValue({ melee: 5, ranged: 5, evasion: 5, magic: 5 });
+  mockGetMainHandAttackSkill.mockResolvedValue('melee');
+  mockBuildPerActionScaling.mockResolvedValue({
+    skillLevels: { melee: 5, ranged: 5, magic: 5 },
+    attributes: { strength: 10, dexterity: 8, intelligence: 6 },
+    weaponPower: { attack: 10, rangedPower: 8, magicPower: 12 },
+    equipmentAccuracy: 5,
+    weaponRequiredSkill: 'melee',
+  });
   mockCalculateMaxHp.mockReturnValue(120);
   mockBuildPlayerCombatStats.mockReturnValue(fakeCombatStats() as any);
   mockBuildPlayerTemplateCombatant.mockReturnValue(FAKE_COMBATANT as any);
@@ -270,10 +282,6 @@ describe('pvpCombatantBuilder', () => {
   describe('buildPvpCombatant', () => {
     beforeEach(() => {
       setupDefaultMocks();
-      // Default: melee weapon
-      mockPrisma.playerEquipment.findUnique.mockResolvedValue({
-        item: { template: { requiredSkill: 'melee' } },
-      });
     });
 
     it('fetches player attributes and normalizes them', async () => {
@@ -306,9 +314,7 @@ describe('pvpCombatantBuilder', () => {
     // ── Attack style → skill level mapping ───────────────────────────
 
     it('uses melee skill level when attackStyle is melee', async () => {
-      mockPrisma.playerEquipment.findUnique.mockResolvedValue({
-        item: { template: { requiredSkill: 'melee' } },
-      });
+      mockGetMainHandAttackSkill.mockResolvedValue('melee');
       // melee=10, ranged=20, evasion=15, magic=25
       mockGetSkillLevels.mockResolvedValue({ melee: 10, ranged: 20, evasion: 15, magic: 25 });
 
@@ -323,9 +329,7 @@ describe('pvpCombatantBuilder', () => {
     });
 
     it('uses ranged skill level when attackStyle is ranged', async () => {
-      mockPrisma.playerEquipment.findUnique.mockResolvedValue({
-        item: { template: { requiredSkill: 'ranged' } },
-      });
+      mockGetMainHandAttackSkill.mockResolvedValue('ranged');
       mockGetSkillLevels.mockResolvedValue({ melee: 10, ranged: 20, evasion: 15, magic: 25 });
 
       await buildPvpCombatant(PLAYER_ID, USERNAME, false);
@@ -338,9 +342,7 @@ describe('pvpCombatantBuilder', () => {
     });
 
     it('uses magic skill level when attackStyle is magic', async () => {
-      mockPrisma.playerEquipment.findUnique.mockResolvedValue({
-        item: { template: { requiredSkill: 'magic' } },
-      });
+      mockGetMainHandAttackSkill.mockResolvedValue('magic');
       mockGetSkillLevels.mockResolvedValue({ melee: 10, ranged: 20, evasion: 15, magic: 25 });
 
       await buildPvpCombatant(PLAYER_ID, USERNAME, false);
@@ -472,6 +474,13 @@ describe('pvpCombatantBuilder', () => {
         maxMana: 150,
         manaRegenPerRound: 4,
         unlockedActions: ['power_strike', 'fireball'],
+        perActionScaling: {
+          skillLevels: { melee: 5, ranged: 5, magic: 5 },
+          attributes: { strength: 10, dexterity: 8, intelligence: 6 },
+          weaponPower: { attack: 10, rangedPower: 8, magicPower: 12 },
+          equipmentAccuracy: 5,
+          weaponRequiredSkill: 'melee',
+        },
       });
     });
 
@@ -499,7 +508,49 @@ describe('pvpCombatantBuilder', () => {
         maxMana: 80,
         manaRegenPerRound: 2,
         unlockedActions: [],
+        perActionScaling: {
+          skillLevels: { melee: 5, ranged: 5, magic: 5 },
+          attributes: { strength: 10, dexterity: 8, intelligence: 6 },
+          weaponPower: { attack: 10, rangedPower: 8, magicPower: 12 },
+          equipmentAccuracy: 5,
+          weaponRequiredSkill: 'melee',
+        },
       });
+    });
+
+    // ── perActionScaling: weaponRequiredSkill matches attack style ───
+
+    it('passes weaponRequiredSkill=magic to buildPerActionScaling when wielding a staff', async () => {
+      mockGetMainHandAttackSkill.mockResolvedValue('magic');
+      mockGetSkillLevels.mockResolvedValue({ melee: 5, ranged: 5, evasion: 5, magic: 20 });
+      mockGetEquipmentStats.mockResolvedValue(fakeEquipmentStats({ magicPower: 30 }) as any);
+
+      await buildPvpCombatant(PLAYER_ID, USERNAME, false);
+
+      expect(mockBuildPerActionScaling).toHaveBeenCalledWith(PLAYER_ID, expect.objectContaining({
+        weaponRequiredSkill: 'magic',
+        skillLevels: expect.objectContaining({ magic: 20 }),
+      }));
+    });
+
+    it('passes weaponRequiredSkill=ranged to buildPerActionScaling when wielding a bow', async () => {
+      mockGetMainHandAttackSkill.mockResolvedValue('ranged');
+
+      await buildPvpCombatant(PLAYER_ID, USERNAME, false);
+
+      expect(mockBuildPerActionScaling).toHaveBeenCalledWith(PLAYER_ID, expect.objectContaining({
+        weaponRequiredSkill: 'ranged',
+      }));
+    });
+
+    it('passes weaponRequiredSkill=null to buildPerActionScaling when unarmed', async () => {
+      mockGetMainHandAttackSkill.mockResolvedValue(null);
+
+      await buildPvpCombatant(PLAYER_ID, USERNAME, false);
+
+      expect(mockBuildPerActionScaling).toHaveBeenCalledWith(PLAYER_ID, expect.objectContaining({
+        weaponRequiredSkill: null,
+      }));
     });
 
     // ── calculateMaxHp uses normalized attributes ────────────────────
@@ -579,7 +630,7 @@ describe('pvpCombatantBuilder', () => {
     // ── Edge: no weapon equipped defaults to melee ───────────────────
 
     it('defaults to melee attack style when no weapon is equipped', async () => {
-      mockPrisma.playerEquipment.findUnique.mockResolvedValue(null);
+      mockGetMainHandAttackSkill.mockResolvedValue(null);
 
       await buildPvpCombatant(PLAYER_ID, USERNAME, false);
 

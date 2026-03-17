@@ -305,8 +305,8 @@ export const CRAFTING_CONSTANTS = {
   /** Max items per batch salvage request */
   SALVAGE_BATCH_LIMIT: 50,
 
-  /** Max quantity per craft request */
-  MAX_CRAFT_QUANTITY: 100,
+  /** Sanity cap for craft request payload — not a gameplay limit */
+  MAX_CRAFT_QUANTITY_SANITY: 99999,
 } as const;
 
 // =============================================================================

@@ -10,5 +10,11 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
     exclude: ['dist/**', 'node_modules/**'],
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        maxForks: 3,
+      },
+    },
   },
 });

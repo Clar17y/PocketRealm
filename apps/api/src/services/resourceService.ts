@@ -28,7 +28,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-interface SkillLevels {
+export interface SkillLevels {
   melee: number;
   ranged: number;
   magic: number;
@@ -57,11 +57,14 @@ async function getSkillLevels(playerId: string): Promise<SkillLevels> {
 interface CombatResourceState {
   stamina: ResourceState;
   mana: ResourceState;
+  lastStaminaRegenAt: Date;
+  lastManaRegenAt: Date;
 }
 
 export async function getResourceState(
   playerId: string,
   now: Date = new Date(),
+  preloadedSkillLevels?: SkillLevels,
 ): Promise<CombatResourceState> {
   const player = await prisma.player.findUnique({
     where: { id: playerId },
@@ -75,7 +78,7 @@ export async function getResourceState(
 
   if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
 
-  const skills = await getSkillLevels(playerId);
+  const skills = preloadedSkillLevels ?? await getSkillLevels(playerId);
 
   // Stamina
   const maxStamina = calculateMaxStamina({
@@ -128,6 +131,8 @@ export async function getResourceState(
       regenPerSecond: manaRegenPerSecond,
       restHealPerTurn: calculateManaRestHealPerTurn(skills.magic),
     },
+    lastStaminaRegenAt: player.lastStaminaRegenAt,
+    lastManaRegenAt: player.lastManaRegenAt,
   };
 }
 

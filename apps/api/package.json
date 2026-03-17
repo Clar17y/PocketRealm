@@ -5,7 +5,7 @@
   "scripts": {
     "clean": "rimraf --glob \"dist\" \"build\" \"lib\" \"src/**/*.js\" \"src/**/*.js.map\" \"src/**/*.d.ts\" \"src/**/*.d.ts.map\" \"**/*.tsbuildinfo\"",
     "dev": "tsx watch --exclude \"../web/**\" --exclude \"../web/.next/**\" --exclude \"../**/node_modules/**\" --exclude \"../packages/**/dist/**\" --exclude \"../**/*.tsbuildinfo\" src/index.ts",
-    "build": "npm run clean && NODE_OPTIONS=--max-old-space-size=512 tsc",
+    "build": "npm run clean && cross-env NODE_OPTIONS=--max-old-space-size=1024 tsc",
     "start": "node dist/index.js",
     "test": "vitest"
   },
@@ -34,6 +34,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.5",
+    "cross-env": "^10.1.0",
     "tsx": "^4.6.0",
     "typescript": "^5.3.0",
     "vitest": "^4.0.18"

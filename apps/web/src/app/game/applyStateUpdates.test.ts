@@ -18,6 +18,7 @@ function makeSetters(): StateSetters {
     setGold: vi.fn(),
     setActiveBuffs: vi.fn(),
     setCharacterProgression: vi.fn(),
+    setMaterialTotals: vi.fn(),
   };
 }
 
@@ -116,7 +117,7 @@ describe('applyStateUpdates', () => {
     expect(setters.setHpState).toHaveBeenCalledWith(hp);
   });
 
-  it('sets resources when provided', () => {
+  it('passes resource partials to setters for merge', () => {
     const setters = makeSetters();
     const resources = {
       stamina: { current: 50, max: 100, regenPerSecond: 1, lastRegenAt: '' },
@@ -125,6 +126,31 @@ describe('applyStateUpdates', () => {
     applyStateUpdates({ resources }, setters);
     expect(setters.setStaminaState).toHaveBeenCalledWith(resources.stamina);
     expect(setters.setManaState).toHaveBeenCalledWith(resources.mana);
+  });
+
+  it('sets buffs with PlayerBuffData shape', () => {
+    const setters = makeSetters();
+    const buffs = [{
+      id: 'buff-1',
+      buffType: 'combat_damage',
+      remainingUses: 3,
+      bonusValue: 0.1,
+      shopItemName: 'Strength Potion',
+      createdAt: '2026-03-17T00:00:00.000Z',
+    }];
+    applyStateUpdates({ buffs }, setters);
+    expect(setters.setActiveBuffs).toHaveBeenCalledWith(buffs);
+    // Verify the shape has the fields the frontend needs
+    const passedBuffs = (setters.setActiveBuffs as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(passedBuffs[0]).toHaveProperty('remainingUses', 3);
+    expect(passedBuffs[0]).toHaveProperty('bonusValue', 0.1);
+    expect(passedBuffs[0]).toHaveProperty('shopItemName', 'Strength Potion');
+  });
+
+  it('sets materialTotals when provided', () => {
+    const setters = makeSetters();
+    applyStateUpdates({ materialTotals: { 'tpl-ore': 50 } }, setters);
+    expect(setters.setMaterialTotals).toHaveBeenCalledWith({ 'tpl-ore': 50 });
   });
 
   it('sets skills when provided', () => {

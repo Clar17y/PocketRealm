@@ -82,6 +82,7 @@ playerRouter.get('/skills', asyncHandler(async (req, res) => {
   const skills = await prisma.playerSkill.findMany({
     where: { playerId },
     select: {
+      id: true,
       skillType: true,
       level: true,
       xp: true,

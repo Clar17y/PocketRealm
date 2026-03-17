@@ -1,4 +1,5 @@
 import { fetchApi } from './core';
+import type { StateUpdates } from '@pocketrealm/shared';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -142,6 +143,10 @@ export interface GuildProjectResponse {
   startedAt: string;
   completedAt: string | null;
   contributions?: GuildProjectContributionResponse[];
+}
+
+export interface GuildProjectContributeResponse extends GuildProjectResponse {
+  stateUpdates?: StateUpdates;
 }
 
 export interface GuildProjectAvailableResponse {
@@ -301,14 +306,14 @@ export async function startGuildProject(guildId: string, projectKey: string) {
 }
 
 export async function contributeProjectTurns(guildId: string, projectId: string, amount: number) {
-  return fetchApi<GuildProjectResponse>(`/api/v1/guild/${guildId}/projects/${projectId}/contribute/turns`, {
+  return fetchApi<GuildProjectContributeResponse>(`/api/v1/guild/${guildId}/projects/${projectId}/contribute/turns`, {
     method: 'POST',
     body: JSON.stringify({ amount }),
   });
 }
 
 export async function contributeProjectMaterials(guildId: string, projectId: string, templateId: string, quantity: number) {
-  return fetchApi<GuildProjectResponse>(`/api/v1/guild/${guildId}/projects/${projectId}/contribute/materials`, {
+  return fetchApi<GuildProjectContributeResponse>(`/api/v1/guild/${guildId}/projects/${projectId}/contribute/materials`, {
     method: 'POST',
     body: JSON.stringify({ templateId, quantity }),
   });

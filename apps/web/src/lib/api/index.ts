@@ -228,6 +228,7 @@ export type {
   GuildContractResponse,
   GuildContractsResponse,
   GuildProjectResponse,
+  GuildProjectContributeResponse,
   GuildProjectAvailableResponse,
   GuildProjectsListResponse,
   GuildProjectContributionResponse,

@@ -12,6 +12,8 @@ import {
 } from '@/lib/api/guild';
 import { GUILD_CONSTANTS, GUILD_SPECIALIZATION_DEFINITIONS } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
+import { ErrorBanner } from '@/components/common/ErrorBanner';
 
 const PATH_COLORS: Record<string, { primary: string; bg: string }> = {
   warfare: { primary: 'var(--rpg-red)', bg: 'var(--rpg-red)' },
@@ -23,59 +25,27 @@ interface GuildSpecializationTabProps {
   guildId: string;
   guildLevel: number;
   myRole: string;
-  setError: (err: string | null) => void;
 }
 
-export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }: GuildSpecializationTabProps) {
+export function GuildSpecializationTab({ guildId, guildLevel, myRole }: GuildSpecializationTabProps) {
   const [status, setStatus] = useState<SpecializationStatusResponse | null | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const load = useAsyncAction();
+  const action = useAsyncAction();
   const [pendingConfirm, setPendingConfirm] = useState<{ type: 'select' | 'respec'; path: string } | null>(null);
 
   const isLeader = myRole === 'leader';
 
-  const loadSpec = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await getGuildSpecialization(guildId);
-      if (res.error) { setError(res.error.message); return; }
-      setStatus(res.data ?? null);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load specialization');
-    } finally {
-      setLoading(false);
-    }
-  }, [guildId, setError]);
+  const loadSpec = useCallback(() => {
+    load.run(() => getGuildSpecialization(guildId), (data) => setStatus(data ?? null));
+  }, [guildId, load.run]);
 
   useEffect(() => { void loadSpec(); }, [loadSpec]);
 
-  const handleSelect = async (path: string) => {
-    setActionLoading(true);
-    setError(null);
-    try {
-      const res = await selectGuildSpecialization(guildId, path);
-      if (res.error) { setError(res.error.message); return; }
-      void loadSpec();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to select specialization');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const handleSelect = (path: string) =>
+    action.run(() => selectGuildSpecialization(guildId, path), () => void loadSpec());
 
-  const handleRespec = async (path: string) => {
-    setActionLoading(true);
-    setError(null);
-    try {
-      const res = await respecGuildSpecialization(guildId, path);
-      if (res.error) { setError(res.error.message); return; }
-      void loadSpec();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to respec');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const handleRespec = (path: string) =>
+    action.run(() => respecGuildSpecialization(guildId, path), () => void loadSpec());
 
   const confirmModal = pendingConfirm && (
     <ConfirmModal
@@ -94,14 +64,18 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
     />
   );
 
-  if (loading && status === undefined) {
-    return <LoadingCard />;
+  const errorBanner = (load.error || action.error) ? <ErrorBanner message={(load.error || action.error)!} /> : null;
+
+  if (load.loading && status === undefined) {
+    return <>{confirmModal}<LoadingCard /></>;
   }
 
   // Guild level too low
   if (guildLevel < GUILD_CONSTANTS.SPECIALIZATION_UNLOCK_LEVEL) {
     return (
       <div className="space-y-3">
+        {confirmModal}
+        {errorBanner}
         <PixelCard>
           <p className="text-sm text-[var(--rpg-text-secondary)]">
             Specialization unlocks at guild level {GUILD_CONSTANTS.SPECIALIZATION_UNLOCK_LEVEL}.
@@ -117,6 +91,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
   if (!status) {
     return (
       <div className="space-y-3">
+        {errorBanner}
         <PixelCard>
           <p className="text-sm text-[var(--rpg-text-secondary)] mb-3">
             Choose a specialization path for your guild. All active members receive passive bonuses.
@@ -132,7 +107,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
                   <p className="text-xs text-[var(--rpg-text-secondary)]">{spec.description}</p>
                 </div>
                 {isLeader && (
-                  <PixelButton onClick={() => setPendingConfirm({ type: 'select', path: spec.path })} disabled={actionLoading}>
+                  <PixelButton onClick={() => setPendingConfirm({ type: 'select', path: spec.path })} disabled={action.loading}>
                     Select
                   </PixelButton>
                 )}
@@ -153,6 +128,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
 
   return (
     <div className="space-y-3">
+      {(load.error || action.error) && <ErrorBanner message={(load.error || action.error)!} />}
       {/* Current Specialization */}
       <PixelCard>
         <div className="flex justify-between items-start mb-3">
@@ -239,7 +215,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole, setError }
                     <p className="text-sm font-bold" style={{ color: c.primary }}>{spec.name}</p>
                     <p className="text-xs text-[var(--rpg-text-secondary)]">{spec.description}</p>
                   </div>
-                  <PixelButton onClick={() => setPendingConfirm({ type: 'respec', path: spec.path })} disabled={actionLoading}>
+                  <PixelButton onClick={() => setPendingConfirm({ type: 'respec', path: spec.path })} disabled={action.loading}>
                     Respec
                   </PixelButton>
                 </div>
