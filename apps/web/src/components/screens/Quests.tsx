@@ -7,6 +7,8 @@ import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { SubNav } from '@/components/common/SubNav';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
+import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import type { DialogueEvent } from '@pocketrealm/shared';
 import {
   Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, RefreshCw,
   Wrench, Zap, Package, Crown, Shield,
@@ -328,6 +330,12 @@ function ShopTab({
   const [targetSelections, setTargetSelections] = useState<Record<string, string>>({});
   const [mobTemplates, setMobTemplates] = useState<Array<{ id: string; name: string }>>([]);
   const [guildContracts, setGuildContracts] = useState<Array<{ id: string; name: string }>>([]);
+  const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDialogueEvent('idle'), 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const loadShop = useCallback(async () => {
     setShopLoading(true);
@@ -397,6 +405,9 @@ function ShopTab({
         void loadShop();
         // Refresh player state (attributes, skills, etc. may have changed)
         onPurchase?.();
+        // Show buy dialogue then return to idle
+        setDialogueEvent('buy');
+        setTimeout(() => setDialogueEvent('idle'), 4000);
       } else if (res.error) {
         setPurchaseMessage(res.error.message);
       }
@@ -462,6 +473,8 @@ function ShopTab({
 
   return (
     <div className="space-y-4">
+      <NpcDialogueBanner npcKey="millbrook-general-store" event={dialogueEvent} />
+
       {/* Token balance */}
       <PixelCard padding="sm">
         <div className="flex items-center gap-2">

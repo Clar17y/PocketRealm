@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
+import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import type { DialogueEvent } from '@pocketrealm/shared';
 import { Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ActivityLog } from '@/components/ActivityLog';
@@ -64,6 +66,12 @@ interface CraftingProps {
 export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, availableSlots = 0 }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDialogueEvent('idle'), 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (recipes.length === 0) {
@@ -117,6 +125,8 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
 
   return (
     <ScreenContainer>
+      <NpcDialogueBanner npcKey="millbrook-blacksmith" event={dialogueEvent} />
+
       {/* Knockout Banner */}
       {isRecovering && (
         <KnockoutBanner action="crafting" recoveryCost={recoveryCost} />
@@ -381,7 +391,11 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
             variant="gold"
             size="lg"
             className="w-full"
-            onClick={() => onCraft(selectedRecipe.id, quantity)}
+            onClick={() => {
+              onCraft(selectedRecipe.id, quantity);
+              setDialogueEvent('buy');
+              setTimeout(() => setDialogueEvent('idle'), 4000);
+            }}
             disabled={isOverEncumbered || isRecovering || noFacility || selectedMax < 1 || backpackFull}
           >
             {isOverEncumbered

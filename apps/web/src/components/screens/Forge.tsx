@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ITEM_RARITY_CONSTANTS } from '@pocketrealm/shared';
+import type { DialogueEvent } from '@pocketrealm/shared';
+import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@pocketrealm/game-engine';
 import { Anvil, Sparkles, TrendingUp } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
@@ -154,7 +156,13 @@ export function Forge({
   const [confirmReroll, setConfirmReroll] = useState(false);
   const [upgradePickerOpen, setUpgradePickerOpen] = useState(false);
   const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
+  const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
   const noFacility = zoneCraftingLevel === 0;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDialogueEvent('idle'), 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const tryForgeAction = (setConfirm: (v: boolean) => void, action: () => void | Promise<void>) => {
     if (selected && rarityMeetsThreshold(selected.rarity, forgeConfirmRarity)) {
@@ -230,6 +238,8 @@ export function Forge({
     setBusy('upgrade');
     try {
       await onUpgrade(selected.id, selectedUpgradeSacrificeId);
+      setDialogueEvent('buy');
+      setTimeout(() => setDialogueEvent('idle'), 4000);
     } finally {
       setBusy(null);
     }
@@ -240,6 +250,8 @@ export function Forge({
     setBusy('reroll');
     try {
       await onReroll(selected.id, selectedRerollSacrificeId);
+      setDialogueEvent('buy');
+      setTimeout(() => setDialogueEvent('idle'), 4000);
     } finally {
       setBusy(null);
     }
@@ -265,6 +277,7 @@ export function Forge({
 
   return (
     <ScreenContainer>
+      <NpcDialogueBanner npcKey="millbrook-blacksmith" event={dialogueEvent} />
       <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 
