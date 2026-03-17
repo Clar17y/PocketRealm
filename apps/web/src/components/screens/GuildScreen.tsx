@@ -160,7 +160,7 @@ export function GuildScreen({ playerId, characterLevel, onStateUpdates, onExpedi
         <ExpeditionShopTab setError={setError} onRefresh={refreshGuild} />
       )}
       {activeTab === 'specialization' && (
-        <GuildSpecializationTab guildId={guildData.guild.id} guildLevel={guildData.guild.level} myRole={guildData.role} setError={setError} />
+        <GuildSpecializationTab guildId={guildData.guild.id} guildLevel={guildData.guild.level} myRole={guildData.role} />
       )}
       {activeTab === 'log' && <GuildActivityLog guildId={guildData.guild.id} />}
       {activeTab === 'settings' && (
