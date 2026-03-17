@@ -10,9 +10,8 @@ import { ActivityLog } from '@/components/ActivityLog';
 import { inflateCost } from '@/lib/taxCalc';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import { statEntries, prettyStatName, formatStatValue } from '@/lib/statFormat';
-import { xpRateColor } from '@/lib/format';
-import { XpRateTooltip } from '@/components/common/XpRateTooltip';
 import { ItemIcon } from '@/components/common/ItemIcon';
+import { SkillHeader } from '@/components/common/SkillHeader';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface Material {
@@ -123,21 +122,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">{skillName}</h2>
-          <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-[12px] font-pixel">
-            Lv. {skillLevel}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-xs text-[var(--rpg-text-secondary)] flex items-center justify-end gap-1">
-            XP Rate
-            <XpRateTooltip />
-          </div>
-          <div className="text-[12px] font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
-        </div>
-      </div>
+      <SkillHeader skillName={skillName} skillLevel={skillLevel} xpRate={xpRate} />
 
       {/* Recipe List */}
       <div className="space-y-2">

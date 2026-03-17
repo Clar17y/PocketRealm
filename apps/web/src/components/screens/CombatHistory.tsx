@@ -17,6 +17,7 @@ import { relativeTime } from '@/lib/format';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { EventBadges } from '@/components/common/EventBadge';
+import { CopyButton } from '@/components/common/CopyButton';
 import { FightNavigationBar } from '@/components/common/FightNavigationBar';
 import { Pagination } from '@/components/common/Pagination';
 import { ScreenContainer } from '../common/ScreenContainer';
@@ -77,7 +78,6 @@ export function CombatHistory() {
   const [selectedDetail, setSelectedDetail] = useState<CombatResultResponse | null>(null);
   const [selectedLoading, setSelectedLoading] = useState(false);
   const [selectedError, setSelectedError] = useState<string | null>(null);
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [siteFights, setSiteFights] = useState<EncounterSiteFightSummary[] | null>(null);
   const [siteFightIndex, setSiteFightIndex] = useState(0);
   const [siteFightsLoading, setSiteFightsLoading] = useState(false);
@@ -283,19 +283,6 @@ export function CombatHistory() {
     });
   }, [selectedDetail, selectedEntry]);
 
-  const handleCopyShare = useCallback(async () => {
-    if (!shareText) return;
-
-    try {
-      await navigator.clipboard.writeText(shareText);
-      setCopyState('copied');
-      setTimeout(() => setCopyState('idle'), 1500);
-    } catch {
-      setCopyState('error');
-      setTimeout(() => setCopyState('idle'), 2000);
-    }
-  }, [shareText]);
-
   return (
     <ScreenContainer spacing="y-3">
       <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
@@ -448,15 +435,7 @@ export function CombatHistory() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void handleCopyShare()}
-                disabled={!selectedDetail}
-                className="px-2.5 py-1.5 rounded border border-[var(--rpg-border)] text-xs text-[var(--rpg-text-primary)] disabled:opacity-40"
-                title="Copy formatted log for sharing"
-              >
-                {copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'Copy Log'}
-              </button>
+              <CopyButton text={shareText} disabled={!selectedDetail} />
               <div className={`text-sm font-semibold ${outcomeColor(selectedEntry.outcome)}`}>
                 {formatOutcome(selectedEntry.outcome)}
               </div>

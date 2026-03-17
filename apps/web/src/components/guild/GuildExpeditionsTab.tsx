@@ -42,6 +42,7 @@ import type {
 import { EXPEDITION_CONSTANTS, EXPEDITION_THEMES, mobDisplayName } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
+import { ContributionList } from '@/components/common/ContributionList';
 import { RoundLogAttackRow } from './guildExpeditionRoundLog';
 
 // ---------------------------------------------------------------------------
@@ -147,6 +148,10 @@ function HpBar({ current, max, label, color }: { current: number; max: number; l
       <div
         className="absolute inset-y-0 left-0 transition-all duration-300"
         style={{ width: `${pct}%`, backgroundColor: color }}
+        role="progressbar"
+        aria-valuenow={current}
+        aria-valuemin={0}
+        aria-valuemax={max}
       />
       <div className="absolute inset-0 flex items-center px-1.5">
         <span className="text-[8px] font-pixel text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
@@ -920,6 +925,10 @@ function InProgressView({
             <div
               className="h-full rounded-full transition-all"
               style={{ width: `${roomPct}%`, backgroundColor: 'var(--rpg-gold)' }}
+              role="progressbar"
+              aria-valuenow={expedition.currentRoom}
+              aria-valuemin={0}
+              aria-valuemax={expedition.totalRooms}
             />
           </div>
         </div>
@@ -991,8 +1000,9 @@ function InProgressView({
       {/* Template quick-switch */}
       {myMember && templates.length > 1 && (
         <div className="flex items-center gap-2">
-          <label className="text-xs text-[var(--rpg-text-secondary)] whitespace-nowrap">Template</label>
+          <label htmlFor="expedition-template-select" className="text-xs text-[var(--rpg-text-secondary)] whitespace-nowrap">Template</label>
           <select
+            id="expedition-template-select"
             className="flex-1 text-xs px-2 py-1.5 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] outline-none"
             value={templates.find(t => t.isActive)?.id ?? ''}
             onChange={(e) => onActivateTemplate(e.target.value)}
@@ -1577,26 +1587,7 @@ function PreviousAttemptsSection({
               <div className="text-[10px] text-[var(--rpg-text-secondary)]">
                 Reached room {attempt.roomReached + 1} · {attempt.roundLogs.length} round{attempt.roundLogs.length !== 1 ? 's' : ''}
               </div>
-              {attempt.participants && attempt.participants.length > 0 && (
-                <div className="space-y-0.5">
-                  {[...attempt.participants]
-                    .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
-                    .map((m, i) => (
-                      <div key={m.playerId} className="flex justify-between text-xs">
-                        <span className="text-[var(--rpg-text-secondary)]">
-                          <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
-                          {m.username ?? m.playerId.slice(0, 8)}
-                        </span>
-                        <div className="flex gap-2 text-[10px]">
-                          <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
-                          {m.totalHealing > 0 && (
-                            <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
+              <ContributionList participants={attempt.participants ?? []} />
               {attempt.roundLogs.length > 0 && (
                 <RoundLogList logs={attempt.roundLogs} playerId={playerId} />
               )}
@@ -1660,24 +1651,7 @@ function HistoryDetailPanel({
           {attempt.participants && attempt.participants.length > 0 && (
             <div>
               <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
-              <div className="space-y-0.5">
-                {[...attempt.participants]
-                  .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
-                  .map((m, i) => (
-                    <div key={m.playerId} className="flex justify-between text-xs">
-                      <span className="text-[var(--rpg-text-secondary)]">
-                        <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
-                        {m.username ?? m.playerId.slice(0, 8)}
-                      </span>
-                      <div className="flex gap-2 text-[10px]">
-                        <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
-                        {m.totalHealing > 0 && (
-                          <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
+              <ContributionList participants={attempt.participants} />
             </div>
           )}
 
@@ -1691,24 +1665,7 @@ function HistoryDetailPanel({
           {members.length > 0 && (
             <div>
               <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
-              <div className="space-y-0.5">
-                {[...members]
-                  .sort((a, b) => (b.totalDamage + b.totalHealing) - (a.totalDamage + a.totalHealing))
-                  .map((m, i) => (
-                    <div key={m.playerId} className="flex justify-between text-xs">
-                      <span className="text-[var(--rpg-text-secondary)]">
-                        <span className="text-[var(--rpg-gold)] font-bold w-4 inline-block">{i + 1}.</span>
-                        {m.username ?? m.playerId.slice(0, 8)}
-                      </span>
-                      <div className="flex gap-2 text-[10px]">
-                        <span className="text-[var(--rpg-red)]">{formatNumber(m.totalDamage)} dmg</span>
-                        {m.totalHealing > 0 && (
-                          <span className="text-[var(--rpg-green-light)]">{formatNumber(m.totalHealing)} heal</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
+              <ContributionList participants={members} />
             </div>
           )}
           {expedition.roundLogs.length > 0 && (
@@ -1807,6 +1764,11 @@ function MemberList({
   myHealTargetPlayerId?: string | null;
   amKnockedOut?: boolean;
 }) {
+  const sortedMembers = useMemo(
+    () => [...members].sort((a, b) => b.totalDamage - a.totalDamage),
+    [members],
+  );
+
   if (members.length === 0) return null;
 
   const canHealTarget = showResources && onSetHealTarget && !amKnockedOut;
@@ -1899,9 +1861,7 @@ function MemberList({
         <div className="mt-3 pt-2 border-t border-[var(--rpg-border)]">
           <h4 className="text-xs font-bold text-[var(--rpg-text-primary)] mb-1">Contributions</h4>
           <div className="space-y-0.5">
-            {[...members]
-              .sort((a, b) => b.totalDamage - a.totalDamage)
-              .map((m) => (
+            {sortedMembers.map((m) => (
                 <div key={`${m.playerId}-contrib`} className="flex justify-between text-xs">
                   <span className="text-[var(--rpg-text-secondary)] truncate">
                     {m.username ?? m.playerId.slice(0, 8)}
