@@ -6,7 +6,11 @@ import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { updateTutorialStep } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_STARTER_WEAPON,
+  TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_EXPLORE,
+  TUTORIAL_STEP_COMBAT,
   TUTORIAL_STEP_GATHER,
   TUTORIAL_STEP_TRAVEL,
   TUTORIAL_STEP_REFINE,
