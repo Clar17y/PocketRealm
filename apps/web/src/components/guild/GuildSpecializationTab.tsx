@@ -64,6 +64,8 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole }: GuildSpe
     />
   );
 
+  const errorBanner = (load.error || action.error) ? <ErrorBanner message={(load.error || action.error)!} /> : null;
+
   if (load.loading && status === undefined) {
     return <LoadingCard />;
   }
@@ -72,7 +74,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole }: GuildSpe
   if (guildLevel < GUILD_CONSTANTS.SPECIALIZATION_UNLOCK_LEVEL) {
     return (
       <div className="space-y-3">
-        {(load.error || action.error) && <ErrorBanner message={(load.error || action.error)!} />}
+        {errorBanner}
         <PixelCard>
           <p className="text-sm text-[var(--rpg-text-secondary)]">
             Specialization unlocks at guild level {GUILD_CONSTANTS.SPECIALIZATION_UNLOCK_LEVEL}.
@@ -88,7 +90,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole }: GuildSpe
   if (!status) {
     return (
       <div className="space-y-3">
-        {(load.error || action.error) && <ErrorBanner message={(load.error || action.error)!} />}
+        {errorBanner}
         <PixelCard>
           <p className="text-sm text-[var(--rpg-text-secondary)] mb-3">
             Choose a specialization path for your guild. All active members receive passive bonuses.

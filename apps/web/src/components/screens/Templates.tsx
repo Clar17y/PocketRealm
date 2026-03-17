@@ -18,6 +18,7 @@ import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEB
 import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 // --- Constants ---
@@ -442,9 +443,7 @@ export function Templates({
         </div>
 
         {(validationError || save.error || listAction.error) && (
-          <div className="p-2 rounded-lg bg-[var(--rpg-red)]/10 border border-[var(--rpg-red)] text-[var(--rpg-red)] text-sm">
-            {validationError || save.error || listAction.error}
-          </div>
+          <ErrorBanner message={(validationError || save.error || listAction.error)!} />
         )}
 
         {/* Name input */}
@@ -746,11 +745,7 @@ export function Templates({
         </PixelButton>
       </div>
 
-      {listAction.error && (
-        <div className="p-2 rounded-lg bg-[var(--rpg-red)]/10 border border-[var(--rpg-red)] text-[var(--rpg-red)] text-sm">
-          {listAction.error}
-        </div>
-      )}
+      {listAction.error && <ErrorBanner message={listAction.error} />}
 
       {templates.length === 0 ? (
         <PixelCard>

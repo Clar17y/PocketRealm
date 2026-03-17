@@ -11,7 +11,7 @@ export function useAsyncAction() {
     key?: string,
   ) => {
     setLoading(true);
-    if (key !== undefined) setLoadingKey(key);
+    setLoadingKey(key ?? null);
     setError(null);
     try {
       const res = await action();

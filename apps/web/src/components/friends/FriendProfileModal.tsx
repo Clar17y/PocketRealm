@@ -104,8 +104,8 @@ export function FriendProfileModal({
 
   // Close confirm dialog on error so the error message is visible
   useEffect(() => {
-    if (action.error) setConfirmAction(null);
-  }, [action.error]);
+    if (action.error && confirmAction !== null) setConfirmAction(null);
+  }, [action.error, confirmAction]);
 
   // Confirm dialog for unfriend / block
   if (confirmAction && profile) {
