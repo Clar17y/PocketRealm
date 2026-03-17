@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack -H 0.0.0.0 -p 3002",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run"
@@ -12,10 +12,12 @@
   "dependencies": {
     "@pocketrealm/game-engine": "*",
     "@pocketrealm/shared": "*",
+    "@serwist/next": "^9.5.7",
     "eslint": "9.39.2",
     "next": "^16.1.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "serwist": "^9.5.7",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
