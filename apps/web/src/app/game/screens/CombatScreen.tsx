@@ -16,6 +16,7 @@ import { Pagination } from '@/components/common/Pagination';
 import { EventBadges } from '@/components/common/EventBadge';
 import type { CombatActiveEvent } from '@/lib/api';
 import { formatCombatShareText, resolveMobMaxHp } from '@/lib/combatShare';
+import { CopyButton } from '@/components/common/CopyButton';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
@@ -124,7 +125,6 @@ export function CombatScreen({
   manaState,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [strategyModalSite, setStrategyModalSite] = useState<PendingEncounter | null>(null);
   const [lowHpPendingSite, setLowHpPendingSite] = useState<PendingEncounter | null>(null);
   const [lastCombatFightIndex, setLastCombatFightIndex] = useState(0);
@@ -195,20 +195,6 @@ export function CombatScreen({
       rewards: lastCombat.rewards,
     });
   }, [lastCombat, displayedFight, mobMaxHp, outcomeLabel, playerMaxHp]);
-
-  const handleCopyShare = useCallback(async () => {
-    const text = buildShareText();
-    if (!text) return;
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopyState('copied');
-      setTimeout(() => setCopyState('idle'), 1500);
-    } catch {
-      setCopyState('error');
-      setTimeout(() => setCopyState('idle'), 2000);
-    }
-  }, [buildShareText]);
 
   return (
     <ScreenContainer>
@@ -402,14 +388,7 @@ export function CombatScreen({
               {!lastCombatCollapsed && (
                 <>
                   <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => void handleCopyShare()}
-                      className="px-2.5 py-1.5 rounded border border-[var(--rpg-border)] text-xs text-[var(--rpg-text-primary)]"
-                      title="Copy formatted log for sharing"
-                    >
-                      {copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Copy failed' : 'Copy Log'}
-                    </button>
+                    <CopyButton text={buildShareText()} />
                   </div>
 
                   <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
