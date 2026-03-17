@@ -131,6 +131,9 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
         zoneType: z.zoneType,
         zoneExitChance: discovered ? z.zoneExitChance : null,
         maxCraftingLevel: discovered ? z.maxCraftingLevel : null,
+        arrivalText: discovered ? z.arrivalText : null,
+        ambientTexts: discovered ? z.ambientTexts : null,
+        environmentalTexts: discovered ? z.environmentalTexts : null,
         exploration: z.zoneType === 'town' ? null : {
           turnsExplored: explorationByZoneId.get(z.id) ?? 0,
           turnsToExplore: z.turnsToExplore ?? null,

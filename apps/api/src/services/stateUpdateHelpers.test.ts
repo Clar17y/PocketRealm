@@ -38,6 +38,7 @@ describe('toInventoryItemDTO', () => {
       setId: null,
       description: 'A sturdy blade',
       subtype: null,
+      flavorText: null,
     },
   };
 
