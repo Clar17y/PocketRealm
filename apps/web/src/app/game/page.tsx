@@ -266,7 +266,7 @@ export default function GamePage() {
     handleClaimQuestReward,
     handleClaimDailyBonus,
     handleRerollQuest,
-    tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon,
+    tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon, starterWeaponType,
     loadAll,
     activeBuffs,
     combatLogPrefetch,
@@ -1133,6 +1133,7 @@ export default function GamePage() {
             onAllocate={handleAllocateSkillPoint}
             onRespec={handleRespecSkillPoints}
             onNavigate={setActiveScreen}
+            initialTree={starterWeaponType ?? undefined}
           />
         );
       case 'casino':

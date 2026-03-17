@@ -303,6 +303,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     initSettingsFromServer,
   } = playerSettings;
   const [tutorialStep, setTutorialStep] = useState<number>(TUTORIAL_COMPLETED);
+  const [starterWeaponType, setStarterWeaponType] = useState<'melee' | 'ranged' | 'magic' | null>(null);
   const combatLogPrefetch = useCombatLogPrefetch();
   const [playbackActive, setPlaybackActive] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
@@ -462,7 +463,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const res = await allocateSkillPoint(nodeId);
     if (res.data) {
       setSkillPointState(res.data);
-      if (tutorialStep === TUTORIAL_STEP_SKILL_POINTS) {
+      if (tutorialStep === TUTORIAL_STEP_SKILL_POINTS && res.data.availablePoints === 0) {
         const nextRes = await updateTutorialStep(TUTORIAL_STEP_SKILL_POINTS + 1);
         if (nextRes.data) setTutorialStep(nextRes.data.tutorialStep);
       }
@@ -616,6 +617,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const handleClaimStarterWeapon = useCallback(async (weaponType: 'melee' | 'ranged' | 'magic') => {
     const res = await claimStarterWeapon(weaponType);
     if (res.data?.success) {
+      setStarterWeaponType(weaponType);
       await loadAll();
       await advanceTutorial(TUTORIAL_STEP_STARTER_WEAPON);
     }
@@ -1648,7 +1650,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       const hpRes = await getHpState();
       if (hpRes.data) setHpState(hpRes.data);
 
-      if (tutorialStep === TUTORIAL_STEP_ATTRIBUTE_POINTS) {
+      if (tutorialStep === TUTORIAL_STEP_ATTRIBUTE_POINTS && res.data.attributePoints === 0) {
         advanceTutorial(TUTORIAL_STEP_ATTRIBUTE_POINTS);
       }
     });
@@ -1806,7 +1808,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleRerollQuest,
 
     // Tutorial
-    tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon,
+    tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon, starterWeaponType,
 
     // Combat log lazy loading
     combatLogPrefetch,
