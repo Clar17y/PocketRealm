@@ -62,6 +62,11 @@ export const HIT_CURVE_CONSTANTS = {
 
 export const STARTER_LOADOUT = {
   tutorialOffHandTemplateId: 'starter_wayfinder_buckler',
+  starterWeaponIds: {
+    melee: 'starter_training_sword',
+    ranged: 'starter_training_bow',
+    magic: 'starter_training_staff',
+  },
 } as const;
 
 export const CRIT_STAT_CONSTANTS = {

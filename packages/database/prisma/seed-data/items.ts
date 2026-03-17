@@ -297,6 +297,10 @@ const weapons = [
   weapon(IDS.wep.oakShortbow, 'Oak Shortbow', 1, 'ranged', 1, { rangedPower: 3 }),
   weapon(IDS.wep.oakStaff, 'Oak Staff', 1, 'magic', 1, { magicPower: 5 }),
   weapon(IDS.wep.copperDagger, 'Copper Dagger', 1, 'melee', 3, { attack: 5, dodge: 1 }),
+  // Starter weapons (granted by Kessa Ironweld during tutorial, soulbound)
+  it({ id: STARTER_LOADOUT.starterWeaponIds.melee, name: "Kessa's Training Sword", itemType: 'weapon', slot: 'main_hand', tier: 1, requiredSkill: 'melee', requiredLevel: 1, baseStats: { attack: 4 }, maxDurability: 70, sellPrice: 0 }),
+  it({ id: STARTER_LOADOUT.starterWeaponIds.ranged, name: "Kessa's Training Bow", itemType: 'weapon', slot: 'main_hand', tier: 1, requiredSkill: 'ranged', requiredLevel: 1, baseStats: { rangedPower: 3 }, maxDurability: 70, sellPrice: 0 }),
+  it({ id: STARTER_LOADOUT.starterWeaponIds.magic, name: "Kessa's Training Staff", itemType: 'weapon', slot: 'main_hand', tier: 1, requiredSkill: 'magic', requiredLevel: 1, baseStats: { magicPower: 5 }, maxDurability: 70, sellPrice: 0 }),
   // Tier 2
   weapon(IDS.wep.tinSword, 'Tin Sword', 2, 'melee', 5, { attack: 8 }),
   weapon(IDS.wep.mapleLongbow, 'Maple Longbow', 2, 'ranged', 5, { rangedPower: 7 }),
