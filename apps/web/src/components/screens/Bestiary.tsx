@@ -1,18 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { PixelCard } from '@/components/PixelCard';
-import { PixelButton } from '@/components/PixelButton';
-import { BookOpen, X, MapPin, Sword, Shield, Heart, Lock } from 'lucide-react';
+import { BookOpen, MapPin, Sword, Shield, Heart, Lock } from 'lucide-react';
 import Image from 'next/image';
 import { monsterImageSrc, uiIconSrc } from '@/lib/assets';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { getMobPrefixDefinition, getTierName } from '@pocketrealm/shared';
 import type { ExpeditionBestiaryTheme, WorldBossEntry } from '@/app/game/hooks/useBestiary';
 import { StatBar } from '@/components/StatBar';
-import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { BestiaryModalShell, RotationDisplay, MonsterStatBlock } from '../common/bestiary';
 
 interface MonsterDrop {
   name: string;
@@ -269,70 +267,46 @@ function ExpeditionBestiaryTab({ themes }: { themes: ExpeditionBestiaryTheme[] }
 
       {/* Detail Modal */}
       {selectedMob && (
-        <ModalOverlay opacity={80} onClose={() => setSelectedMob(null)}>
-          <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto">
-            <PixelCard>
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-3">
-                  <Image
-                    src={monsterImageSrc(selectedMob.name)}
-                    alt={selectedMob.name}
-                    width={56}
-                    height={56}
-                    className="image-rendering-pixelated"
-                  />
-                  <div>
-                    <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedMob.name}</h3>
-                    <span className={`text-xs ${ROLE_COLORS[selectedMob.role]}`}>{ROLE_LABELS[selectedMob.role]}</span>
-                    <div className="text-xs text-[var(--rpg-gold)] mt-1 font-pixel">x{selectedMob.killCount} defeated</div>
-                  </div>
-                </div>
-                <button onClick={() => setSelectedMob(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]" aria-label="Close">
-                  <X size={20} />
-                </button>
-              </div>
+        <BestiaryModalShell
+          imageSlot={
+            <Image
+              src={monsterImageSrc(selectedMob.name)}
+              alt={selectedMob.name}
+              width={56}
+              height={56}
+              className="image-rendering-pixelated"
+            />
+          }
+          headerInfo={
+            <>
+              <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedMob.name}</h3>
+              <span className={`text-xs ${ROLE_COLORS[selectedMob.role]}`}>{ROLE_LABELS[selectedMob.role]}</span>
+              <div className="text-xs text-[var(--rpg-gold)] mt-1 font-pixel">x{selectedMob.killCount} defeated</div>
+            </>
+          }
+          onClose={() => setSelectedMob(null)}
+        >
+          {selectedMob.stats ? (
+            <div className="mb-3">
+              <h4 className="text-sm font-semibold text-[var(--rpg-text-primary)] mb-1">Stats</h4>
+              <MonsterStatBlock
+                stats={[
+                  { icon: <Heart size={14} color="var(--rpg-green-light)" />, label: 'HP', value: selectedMob.stats.hp, valueColor: 'text-[var(--rpg-green-light)]' },
+                  { icon: <Sword size={14} color="var(--rpg-red)" />, label: 'ATK', value: selectedMob.stats.attack, valueColor: 'text-[var(--rpg-red)]' },
+                  { icon: <Shield size={14} color="var(--rpg-blue-light)" />, label: 'DEF', value: selectedMob.stats.defence, valueColor: 'text-[var(--rpg-blue-light)]' },
+                ]}
+              />
+            </div>
+          ) : (
+            <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {3 - selectedMob.killCount} more to reveal stats.</div>
+          )}
 
-              {selectedMob.stats ? (
-                <div className="mb-3 space-y-1">
-                  <h4 className="text-sm font-semibold text-[var(--rpg-text-primary)]">Stats</h4>
-                  <div className="flex items-center gap-3">
-                    <Heart size={14} color="var(--rpg-green-light)" />
-                    <span className="text-xs text-[var(--rpg-text-primary)]">HP: <span className="font-pixel text-[8px] text-[var(--rpg-green-light)]">{selectedMob.stats.hp}</span></span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Sword size={14} color="var(--rpg-red)" />
-                    <span className="text-xs text-[var(--rpg-text-primary)]">ATK: <span className="font-pixel text-[8px] text-[var(--rpg-red)]">{selectedMob.stats.attack}</span></span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Shield size={14} color="var(--rpg-blue-light)" />
-                    <span className="text-xs text-[var(--rpg-text-primary)]">DEF: <span className="font-pixel text-[8px] text-[var(--rpg-blue-light)]">{selectedMob.stats.defence}</span></span>
-                  </div>
-                </div>
-              ) : (
-                <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {3 - selectedMob.killCount} more to reveal stats.</div>
-              )}
-
-              {selectedMob.rotation ? (
-                <div className="mb-3">
-                  <h4 className="text-sm font-semibold text-[var(--rpg-text-primary)] mb-1">Rotation</h4>
-                  <div className="space-y-1">
-                    {selectedMob.rotation.map(a => (
-                      <div key={a.round} className="flex items-center gap-2 text-xs">
-                        <span className="text-[var(--rpg-text-secondary)] w-8">R{a.round}</span>
-                        <span className="text-[var(--rpg-text-primary)]">{a.actionName}</span>
-                        <span className="text-[var(--rpg-text-secondary)]">({a.targetMode === 'aoe' ? 'AoE' : 'Single'})</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : selectedMob.stats ? (
-                <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {5 - selectedMob.killCount} more to reveal rotation.</div>
-              ) : null}
-
-              <PixelButton variant="secondary" className="w-full" onClick={() => setSelectedMob(null)}>Close</PixelButton>
-            </PixelCard>
-          </div>
-        </ModalOverlay>
+          {selectedMob.rotation ? (
+            <RotationDisplay rotation={selectedMob.rotation} />
+          ) : selectedMob.stats ? (
+            <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {5 - selectedMob.killCount} more to reveal rotation.</div>
+          ) : null}
+        </BestiaryModalShell>
       )}
     </div>
   );
@@ -397,69 +371,48 @@ function WorldBossBestiaryTab({ bosses }: { bosses: WorldBossEntry[] }) {
 
       {/* Boss Detail Modal */}
       {selectedBoss && (
-        <ModalOverlay opacity={80} onClose={() => setSelectedBoss(null)}>
-          <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto">
-            <PixelCard>
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-3">
-                  <Image
-                    src={monsterImageSrc(selectedBoss.name)}
-                    alt={selectedBoss.name}
-                    width={56}
-                    height={56}
-                    className="image-rendering-pixelated"
-                  />
-                  <div>
-                    <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedBoss.name}</h3>
-                    <div className="text-xs text-[var(--rpg-gold)] font-pixel">x{selectedBoss.defeatCount} defeated</div>
-                  </div>
-                </div>
-                <button onClick={() => setSelectedBoss(null)} className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]" aria-label="Close">
-                  <X size={20} />
-                </button>
-              </div>
+        <BestiaryModalShell
+          imageSlot={
+            <Image
+              src={monsterImageSrc(selectedBoss.name)}
+              alt={selectedBoss.name}
+              width={56}
+              height={56}
+              className="image-rendering-pixelated"
+            />
+          }
+          headerInfo={
+            <>
+              <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedBoss.name}</h3>
+              <div className="text-xs text-[var(--rpg-gold)] font-pixel">x{selectedBoss.defeatCount} defeated</div>
+            </>
+          }
+          onClose={() => setSelectedBoss(null)}
+        >
+          {selectedBoss.hpPerParticipant !== null && (
+            <div className="mb-2 text-xs text-[var(--rpg-text-secondary)]">{selectedBoss.hpPerParticipant} HP / participant</div>
+          )}
 
-              {selectedBoss.hpPerParticipant !== null && (
-                <div className="mb-2 text-xs text-[var(--rpg-text-secondary)]">{selectedBoss.hpPerParticipant} HP / participant</div>
-              )}
+          {selectedBoss.stats ? (
+            <div className="mb-3">
+              <h4 className="text-sm font-semibold text-[var(--rpg-text-primary)] mb-1">Stats</h4>
+              <MonsterStatBlock
+                stats={[
+                  { icon: <Sword size={14} color="var(--rpg-red)" />, label: 'ACC', value: selectedBoss.stats.accuracy, valueColor: 'text-[var(--rpg-red)]' },
+                  { icon: <Shield size={14} color="var(--rpg-blue-light)" />, label: 'DEF', value: selectedBoss.stats.defence, valueColor: 'text-[var(--rpg-blue-light)]' },
+                ]}
+              />
+            </div>
+          ) : (
+            <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {3 - selectedBoss.defeatCount} more to reveal stats.</div>
+          )}
 
-              {selectedBoss.stats ? (
-                <div className="mb-3 space-y-1">
-                  <h4 className="text-sm font-semibold text-[var(--rpg-text-primary)]">Stats</h4>
-                  <div className="flex items-center gap-3">
-                    <Sword size={14} color="var(--rpg-red)" />
-                    <span className="text-xs text-[var(--rpg-text-primary)]">ACC: <span className="font-pixel text-[8px] text-[var(--rpg-red)]">{selectedBoss.stats.accuracy}</span></span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Shield size={14} color="var(--rpg-blue-light)" />
-                    <span className="text-xs text-[var(--rpg-text-primary)]">DEF: <span className="font-pixel text-[8px] text-[var(--rpg-blue-light)]">{selectedBoss.stats.defence}</span></span>
-                  </div>
-                </div>
-              ) : (
-                <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {3 - selectedBoss.defeatCount} more to reveal stats.</div>
-              )}
-
-              {selectedBoss.rotation ? (
-                <div className="mb-3">
-                  <h4 className="text-sm font-semibold text-[var(--rpg-text-primary)] mb-1">Rotation</h4>
-                  <div className="space-y-1">
-                    {selectedBoss.rotation.map(a => (
-                      <div key={a.round} className="flex items-center gap-2 text-xs">
-                        <span className="text-[var(--rpg-text-secondary)] w-8">R{a.round}</span>
-                        <span className={a.isTelegraphed ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text-primary)]'}>{a.actionName}</span>
-                        <span className="text-[var(--rpg-text-secondary)]">({a.targetMode === 'aoe' ? 'AoE' : 'Single'})</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : selectedBoss.stats ? (
-                <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {5 - selectedBoss.defeatCount} more to reveal rotation.</div>
-              ) : null}
-
-              <PixelButton variant="secondary" className="w-full" onClick={() => setSelectedBoss(null)}>Close</PixelButton>
-            </PixelCard>
-          </div>
-        </ModalOverlay>
+          {selectedBoss.rotation ? (
+            <RotationDisplay rotation={selectedBoss.rotation} />
+          ) : selectedBoss.stats ? (
+            <div className="mb-3 text-xs text-[var(--rpg-text-secondary)]">Defeat {5 - selectedBoss.defeatCount} more to reveal rotation.</div>
+          ) : null}
+        </BestiaryModalShell>
       )}
     </div>
   );
@@ -606,210 +559,182 @@ export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosse
 
           {/* Monster Detail Modal */}
           {selectedMonster && (
-            <ModalOverlay opacity={80} onClose={() => setSelectedMonster(null)}>
-              <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto">
-                <PixelCard>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-lg bg-[var(--rpg-background)] border-2 border-[var(--rpg-red)] flex items-center justify-center text-3xl">
-                        {selectedMonster.imageSrc ? (
-                          <Image
-                            src={selectedMonster.imageSrc}
-                            alt={selectedMonster.name}
-                            width={56}
-                            height={56}
-                            className="image-rendering-pixelated"
-                          />
-                        ) : (
-                          <Image
-                            src={uiIconSrc('attack')}
-                            alt={selectedMonster.name}
-                            width={56}
-                            height={56}
-                            className="image-rendering-pixelated"
-                          />
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedMonster.name}</h3>
-                        <div className="text-xs text-[var(--rpg-text-secondary)]">Level <span className="font-pixel text-[8px]">{selectedMonster.level}</span></div>
-                        <div className="text-xs text-[var(--rpg-gold)] mt-1">Defeated <span className="font-pixel text-[8px]">{selectedMonster.killCount}</span> times</div>
-                        {selectedMonster.explorationTier && (
-                          <span className="inline-flex items-center gap-1 text-xs bg-[var(--rpg-background)] px-2 py-0.5 rounded mt-1">
-                            {getTierName(selectedMonster.explorationTier)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setSelectedMonster(null)}
-                      className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
-                      aria-label="Close"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-
-                  <p className="text-sm text-[var(--rpg-text-secondary)] mb-4">{selectedMonster.description}</p>
-
-                  {/* Stats */}
-                  <div className="mb-4">
-                    <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm mb-2">
-                      Stats{' '}
-                      {selectedMonster.killCount < 10 && (
-                        <span className="text-xs text-[var(--rpg-text-secondary)]">(Partial)</span>
-                      )}
-                    </h4>
-                    <div className="space-y-2">
-                      {getStatsVisibility(selectedMonster.killCount).showHP ? (
-                        <div className="flex items-center gap-3">
-                          <Heart size={16} color="var(--rpg-green-light)" />
-                          <span className="text-sm text-[var(--rpg-text-primary)]">HP:</span>
-                          <span className="text-[12px] font-pixel text-[var(--rpg-green-light)]">{selectedMonster.stats.hp}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3 opacity-50">
-                          <Heart size={16} color="var(--rpg-text-secondary)" />
-                          <span className="text-sm text-[var(--rpg-text-secondary)]">HP: ???</span>
-                        </div>
-                      )}
-
-                      {getStatsVisibility(selectedMonster.killCount).showAccuracy ? (
-                        <div className="flex items-center gap-3">
-                          <Sword size={16} color="var(--rpg-red)" />
-                          <span className="text-sm text-[var(--rpg-text-primary)]">Accuracy:</span>
-                          <span className="text-[12px] font-pixel text-[var(--rpg-red)]">{selectedMonster.stats.accuracy}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3 opacity-50">
-                          <Sword size={16} color="var(--rpg-text-secondary)" />
-                          <span className="text-sm text-[var(--rpg-text-secondary)]">
-                            Accuracy: ??? <span className="text-xs">(Defeat 5+ times)</span>
-                          </span>
-                        </div>
-                      )}
-
-                      {getStatsVisibility(selectedMonster.killCount).showDefence ? (
-                        <div className="flex items-center gap-3">
-                          <Shield size={16} color="var(--rpg-blue-light)" />
-                          <span className="text-sm text-[var(--rpg-text-primary)]">Defence:</span>
-                          <span className="text-[12px] font-pixel text-[var(--rpg-blue-light)]">
-                            {selectedMonster.stats.defence}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3 opacity-50">
-                          <Shield size={16} color="var(--rpg-text-secondary)" />
-                          <span className="text-sm text-[var(--rpg-text-secondary)]">
-                            Defence: ??? <span className="text-xs">(Defeat 10+ times)</span>
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Locations */}
-                  <div className="mb-4">
-                    <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm mb-2">Found In</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedMonster.zones.map((zone, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-1 px-2 py-1 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded text-xs text-[var(--rpg-text-secondary)]"
-                        >
-                          <MapPin size={12} />
-                          {zone}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Known Drops */}
-                  {getStatsVisibility(selectedMonster.killCount).showDrops && (
-                    <div className="mb-4">
-                      <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm mb-2">Known Drops</h4>
-                      <div className="space-y-2">
-                        {selectedMonster.drops.map((drop, idx) => {
-                          return (
-                            <div key={idx} className="flex items-center gap-3">
-                              <div
-                                className="w-8 h-8 rounded border-2 flex items-center justify-center text-lg"
-                                style={{ borderColor: RARITY_COLORS[drop.rarity] }}
-                              >
-                                {drop.imageSrc ? (
-                                  <Image
-                                    src={drop.imageSrc}
-                                    alt={drop.name}
-                                    width={24}
-                                    height={24}
-                                    className="image-rendering-pixelated"
-                                  />
-                                ) : (
-                                  <span className="text-sm">❓</span>
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="text-sm text-[var(--rpg-text-primary)]">{drop.name}</div>
-                                <div className="text-xs text-[var(--rpg-text-secondary)]"><span className="font-pixel text-[8px]">{drop.dropRate}%</span> drop rate</div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+            <BestiaryModalShell
+              imageSlot={
+                <div className="w-16 h-16 rounded-lg bg-[var(--rpg-background)] border-2 border-[var(--rpg-red)] flex items-center justify-center text-3xl">
+                  {selectedMonster.imageSrc ? (
+                    <Image
+                      src={selectedMonster.imageSrc}
+                      alt={selectedMonster.name}
+                      width={56}
+                      height={56}
+                      className="image-rendering-pixelated"
+                    />
+                  ) : (
+                    <Image
+                      src={uiIconSrc('attack')}
+                      alt={selectedMonster.name}
+                      width={56}
+                      height={56}
+                      className="image-rendering-pixelated"
+                    />
                   )}
-
-                  {/* Boss Rotation */}
-                  {selectedMonster.bossRotation && (
-                    <div className="mb-4">
-                      <h4 className="text-sm font-bold text-[var(--rpg-gold)] mb-2">
-                        Boss Rotation ({selectedMonster.bossRotation.revealedRounds}/{selectedMonster.bossRotation.totalRounds} revealed)
-                      </h4>
-                      <StatBar
-                        current={selectedMonster.bossRotation.revealedRounds}
-                        max={selectedMonster.bossRotation.totalRounds}
-                        color="xp" size="sm"
-                        showNumbers={false}
-                      />
-                      <div className="mt-2 space-y-1">
-                        {Array.from({ length: selectedMonster.bossRotation.totalRounds }, (_, i) => {
-                          const action = selectedMonster.bossRotation!.actions.find(a => a.round === i + 1);
-                          return (
-                            <div key={i} className="flex items-center gap-2 text-xs">
-                              <span className="text-[var(--rpg-text-secondary)] w-8">R{i + 1}</span>
-                              {action ? (
-                                <>
-                                  <span className={action.isTelegraphed ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text)]'}>
-                                    {action.actionName}
-                                  </span>
-                                  <span className="text-[var(--rpg-text-secondary)]">
-                                    ({action.targetMode === 'aoe' ? 'AoE' : 'Single'})
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-[var(--rpg-text-secondary)]">???</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                </div>
+              }
+              headerInfo={
+                <>
+                  <h3 className="text-lg font-bold font-almendra text-[var(--rpg-text-primary)]">{selectedMonster.name}</h3>
+                  <div className="text-xs text-[var(--rpg-text-secondary)]">Level <span className="font-pixel text-[8px]">{selectedMonster.level}</span></div>
+                  <div className="text-xs text-[var(--rpg-gold)] mt-1">Defeated <span className="font-pixel text-[8px]">{selectedMonster.killCount}</span> times</div>
+                  {selectedMonster.explorationTier && (
+                    <span className="inline-flex items-center gap-1 text-xs bg-[var(--rpg-background)] px-2 py-0.5 rounded mt-1">
+                      {getTierName(selectedMonster.explorationTier)}
+                    </span>
                   )}
+                </>
+              }
+              headerGap="mb-4"
+              onClose={() => setSelectedMonster(null)}
+            >
+              <p className="text-sm text-[var(--rpg-text-secondary)] mb-4">{selectedMonster.description}</p>
 
-                  {/* Prefix Completion */}
-                  {selectedMonster.killCount > 0 && (
-                    <div className="mb-4">
-                      <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm mb-2">Prefix Variants</h4>
-                      <PrefixPipRow encountered={selectedMonster.prefixesEncountered} />
-                    </div>
+              {/* Stats */}
+              <div className="mb-4">
+                <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm mb-2">
+                  Stats{' '}
+                  {selectedMonster.killCount < 10 && (
+                    <span className="text-xs text-[var(--rpg-text-secondary)]">(Partial)</span>
                   )}
-
-                  <PixelButton variant="secondary" className="w-full" onClick={() => setSelectedMonster(null)}>
-                    Close
-                  </PixelButton>
-                </PixelCard>
+                </h4>
+                <MonsterStatBlock
+                  size="base"
+                  stats={[
+                    {
+                      icon: <Heart size={16} color="var(--rpg-green-light)" />,
+                      hiddenIcon: <Heart size={16} color="var(--rpg-text-secondary)" />,
+                      label: 'HP',
+                      value: selectedMonster.stats.hp,
+                      valueColor: 'text-[var(--rpg-green-light)]',
+                      hidden: !getStatsVisibility(selectedMonster.killCount).showHP,
+                    },
+                    {
+                      icon: <Sword size={16} color="var(--rpg-red)" />,
+                      hiddenIcon: <Sword size={16} color="var(--rpg-text-secondary)" />,
+                      label: 'Accuracy',
+                      value: selectedMonster.stats.accuracy,
+                      valueColor: 'text-[var(--rpg-red)]',
+                      hidden: !getStatsVisibility(selectedMonster.killCount).showAccuracy,
+                      hiddenHint: '(Defeat 5+ times)',
+                    },
+                    {
+                      icon: <Shield size={16} color="var(--rpg-blue-light)" />,
+                      hiddenIcon: <Shield size={16} color="var(--rpg-text-secondary)" />,
+                      label: 'Defence',
+                      value: selectedMonster.stats.defence,
+                      valueColor: 'text-[var(--rpg-blue-light)]',
+                      hidden: !getStatsVisibility(selectedMonster.killCount).showDefence,
+                      hiddenHint: '(Defeat 10+ times)',
+                    },
+                  ]}
+                />
               </div>
-            </ModalOverlay>
+
+              {/* Locations */}
+              <div className="mb-4">
+                <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm mb-2">Found In</h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedMonster.zones.map((zone, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1 px-2 py-1 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded text-xs text-[var(--rpg-text-secondary)]"
+                    >
+                      <MapPin size={12} />
+                      {zone}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Known Drops */}
+              {getStatsVisibility(selectedMonster.killCount).showDrops && (
+                <div className="mb-4">
+                  <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm mb-2">Known Drops</h4>
+                  <div className="space-y-2">
+                    {selectedMonster.drops.map((drop, idx) => {
+                      return (
+                        <div key={idx} className="flex items-center gap-3">
+                          <div
+                            className="w-8 h-8 rounded border-2 flex items-center justify-center text-lg"
+                            style={{ borderColor: RARITY_COLORS[drop.rarity] }}
+                          >
+                            {drop.imageSrc ? (
+                              <Image
+                                src={drop.imageSrc}
+                                alt={drop.name}
+                                width={24}
+                                height={24}
+                                className="image-rendering-pixelated"
+                              />
+                            ) : (
+                              <span className="text-sm">❓</span>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-sm text-[var(--rpg-text-primary)]">{drop.name}</div>
+                            <div className="text-xs text-[var(--rpg-text-secondary)]"><span className="font-pixel text-[8px]">{drop.dropRate}%</span> drop rate</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Boss Rotation — kept inline due to unique totalRounds/revealed pattern */}
+              {selectedMonster.bossRotation && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-bold text-[var(--rpg-gold)] mb-2">
+                    Boss Rotation ({selectedMonster.bossRotation.revealedRounds}/{selectedMonster.bossRotation.totalRounds} revealed)
+                  </h4>
+                  <StatBar
+                    current={selectedMonster.bossRotation.revealedRounds}
+                    max={selectedMonster.bossRotation.totalRounds}
+                    color="xp" size="sm"
+                    showNumbers={false}
+                  />
+                  <div className="mt-2 space-y-1">
+                    {Array.from({ length: selectedMonster.bossRotation.totalRounds }, (_, i) => {
+                      const action = selectedMonster.bossRotation!.actions.find(a => a.round === i + 1);
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span className="text-[var(--rpg-text-secondary)] w-8">R{i + 1}</span>
+                          {action ? (
+                            <>
+                              <span className={action.isTelegraphed ? 'text-[var(--rpg-red)] font-bold' : 'text-[var(--rpg-text)]'}>
+                                {action.actionName}
+                              </span>
+                              <span className="text-[var(--rpg-text-secondary)]">
+                                ({action.targetMode === 'aoe' ? 'AoE' : 'Single'})
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[var(--rpg-text-secondary)]">???</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Prefix Completion */}
+              {selectedMonster.killCount > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-semibold text-[var(--rpg-text-primary)] text-sm mb-2">Prefix Variants</h4>
+                  <PrefixPipRow encountered={selectedMonster.prefixesEncountered} />
+                </div>
+              )}
+            </BestiaryModalShell>
           )}
         </>
       ) : (
