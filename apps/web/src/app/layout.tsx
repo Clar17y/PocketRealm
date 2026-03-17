@@ -10,6 +10,15 @@ export const metadata: Metadata = {
   title: 'PocketRealm — Turn-Based Async RPG',
   description: 'A turn-based RPG that respects your time. Explore 11 zones, battle 80+ monsters, master 14 crafting skills, and raid world bosses. Play free or go Champion.',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/icons/icon-180.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'PocketRealm',
+  },
 };
 
 export const viewport: Viewport = {

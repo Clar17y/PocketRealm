@@ -23,6 +23,7 @@ import {
   type MobTemplate,
   type PotionConsumed,
   type QuestProgressUpdate,
+  TUTORIAL_STEP_EXPLORE,
 } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { refundPlayerTurns, spendPlayerTurnsTx } from '../../services/turnBankService';
@@ -188,7 +189,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       where: { id: playerId },
       select: { tutorialStep: true },
     });
-    const isTutorialExplore = playerRecord?.tutorialStep === 1;
+    const isTutorialExplore = playerRecord?.tutorialStep === TUTORIAL_STEP_EXPLORE;
 
     // Tutorial explore step: force 100 turns and a single guaranteed ambush
     const turnsToSpend = isTutorialExplore ? 100 : body.turns;

@@ -3,10 +3,14 @@ import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { RARITY_RANK } from '@/lib/rarity';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
-import { updateTutorialStep } from '@/lib/api';
+import { updateTutorialStep, claimStarterWeapon } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_STARTER_WEAPON,
+  TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_EXPLORE,
+  TUTORIAL_STEP_COMBAT,
   TUTORIAL_STEP_GATHER,
   TUTORIAL_STEP_TRAVEL,
   TUTORIAL_STEP_REFINE,
@@ -447,8 +451,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const handleAllocateSkillPoint = useCallback(async (nodeId: string) => {
     const res = await allocateSkillPoint(nodeId);
-    if (res.data) setSkillPointState(res.data);
-  }, []);
+    if (res.data) {
+      setSkillPointState(res.data);
+      if (tutorialStep === TUTORIAL_STEP_SKILL_POINTS) {
+        const nextRes = await updateTutorialStep(TUTORIAL_STEP_SKILL_POINTS + 1);
+        if (nextRes.data) setTutorialStep(nextRes.data.tutorialStep);
+      }
+    }
+  }, [tutorialStep]);
 
   const handleRespecSkillPoints = useCallback(async () => {
     const res = await respecSkillPoints();
@@ -593,6 +603,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const res = await updateTutorialStep(TUTORIAL_SKIPPED);
     if (res.data) setTutorialStep(res.data.tutorialStep);
   }, []);
+
+  const handleClaimStarterWeapon = useCallback(async (weaponType: 'melee' | 'ranged' | 'magic') => {
+    const res = await claimStarterWeapon(weaponType);
+    if (res.data?.success) {
+      await loadAll();
+      await advanceTutorial(TUTORIAL_STEP_STARTER_WEAPON);
+    }
+  }, [advanceTutorial, loadAll]);
 
   const combatPlayback = useCombatPlayback({
     combatLogPrefetch,
@@ -1616,6 +1634,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       const hpRes = await getHpState();
       if (hpRes.data) setHpState(hpRes.data);
+
+      if (tutorialStep === TUTORIAL_STEP_ATTRIBUTE_POINTS) {
+        advanceTutorial(TUTORIAL_STEP_ATTRIBUTE_POINTS);
+      }
     });
   };
 
@@ -1771,7 +1793,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleRerollQuest,
 
     // Tutorial
-    tutorialStep, skipTutorial, advanceTutorial,
+    tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon,
 
     // Combat log lazy loading
     combatLogPrefetch,
