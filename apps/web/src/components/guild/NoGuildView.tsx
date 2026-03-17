@@ -32,9 +32,8 @@ export function NoGuildView({
   const [searchResults, setSearchResults] = useState<GuildResponse[]>([]);
   const [searchTotal, setSearchTotal] = useState(0);
   const [searchPage, setSearchPage] = useState(1);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
   const { loading: actionLoading, error: actionError, run } = useAsyncAction();
+  const search = useAsyncAction();
   const [requestedGuildIds, setRequestedGuildIds] = useState<Set<string>>(new Set());
 
   // Create form
@@ -42,21 +41,13 @@ export function NoGuildView({
   const [tag, setTag] = useState('');
   const [description, setDescription] = useState('');
 
-  const handleSearch = useCallback(async (query: string, page = 1) => {
-    setSearching(true);
-    setSearchError(null);
-    try {
-      const res = await searchGuilds(query || undefined, page);
-      if (res.error) { setSearchError(res.error.message); return; }
-      setSearchResults(res.data?.guilds ?? []);
-      setSearchTotal(res.data?.total ?? 0);
+  const handleSearch = useCallback((query: string, page = 1) => {
+    search.run(() => searchGuilds(query || undefined, page), (data) => {
+      setSearchResults(data?.guilds ?? []);
+      setSearchTotal(data?.total ?? 0);
       setSearchPage(page);
-    } catch (err: unknown) {
-      setSearchError(err instanceof Error ? err.message : 'Search failed');
-    } finally {
-      setSearching(false);
-    }
-  }, []);
+    });
+  }, [search.run]);
 
   useEffect(() => {
     void handleSearch('', 1);
@@ -77,7 +68,7 @@ export function NoGuildView({
     <div className="space-y-4">
       <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Guild</h2>
 
-      {(error || actionError || searchError) && <ErrorBanner message={(error || actionError || searchError)!} />}
+      {(error || actionError || search.error) && <ErrorBanner message={(error || actionError || search.error)!} />}
 
       <PixelCard>
         <p className="text-sm text-[var(--rpg-text-secondary)] mb-3">
@@ -155,7 +146,7 @@ export function NoGuildView({
           placeholder="Search by name or tag..."
         />
 
-        {searching ? (
+        {search.loading ? (
           <p className="text-sm opacity-60">Searching...</p>
         ) : searchResults.length === 0 ? (
           <p className="text-sm text-[var(--rpg-text-secondary)]">No guilds found.</p>
