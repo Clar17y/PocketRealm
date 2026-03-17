@@ -36,6 +36,9 @@ interface Monster {
   drops: MonsterDrop[];
   zones: string[];
   description: string;
+  flavorAppearance?: string | null;
+  flavorBehavior?: string | null;
+  flavorLore?: string | null;
   prefixesEncountered: string[];
   explorationTier?: number;
   tierLocked?: boolean;
@@ -650,7 +653,42 @@ export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosse
                     </button>
                   </div>
 
-                  <p className="text-sm text-[var(--rpg-text-secondary)] mb-4">{selectedMonster.description}</p>
+                  {/* Progressive flavour text reveal */}
+                  <div className="space-y-3 mb-4">
+                    <div>
+                      <span className="text-xs font-semibold text-[var(--rpg-gold)] uppercase tracking-wide">Appearance</span>
+                      <p className="text-sm text-[var(--rpg-text-secondary)] mt-0.5">
+                        {selectedMonster.flavorAppearance ?? (
+                          <span className="opacity-50 flex items-center gap-1">
+                            <Lock size={12} />
+                            ??? (Defeat 1+)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-[var(--rpg-gold)] uppercase tracking-wide">Behaviour</span>
+                      <p className="text-sm text-[var(--rpg-text-secondary)] mt-0.5">
+                        {selectedMonster.flavorBehavior ?? (
+                          <span className="opacity-50 flex items-center gap-1">
+                            <Lock size={12} />
+                            ??? (Defeat 10+)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-[var(--rpg-gold)] uppercase tracking-wide">Lore</span>
+                      <p className="text-sm text-[var(--rpg-text-secondary)] mt-0.5">
+                        {selectedMonster.flavorLore ?? (
+                          <span className="opacity-50 flex items-center gap-1">
+                            <Lock size={12} />
+                            ??? (Defeat 25+)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
 
                   {/* Stats */}
                   <div className="mb-4">
