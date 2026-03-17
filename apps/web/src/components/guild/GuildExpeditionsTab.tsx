@@ -148,6 +148,10 @@ function HpBar({ current, max, label, color }: { current: number; max: number; l
       <div
         className="absolute inset-y-0 left-0 transition-all duration-300"
         style={{ width: `${pct}%`, backgroundColor: color }}
+        role="progressbar"
+        aria-valuenow={current}
+        aria-valuemin={0}
+        aria-valuemax={max}
       />
       <div className="absolute inset-0 flex items-center px-1.5">
         <span className="text-[8px] font-pixel text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
@@ -921,6 +925,10 @@ function InProgressView({
             <div
               className="h-full rounded-full transition-all"
               style={{ width: `${roomPct}%`, backgroundColor: 'var(--rpg-gold)' }}
+              role="progressbar"
+              aria-valuenow={expedition.currentRoom}
+              aria-valuemin={0}
+              aria-valuemax={expedition.totalRooms}
             />
           </div>
         </div>
@@ -992,8 +1000,9 @@ function InProgressView({
       {/* Template quick-switch */}
       {myMember && templates.length > 1 && (
         <div className="flex items-center gap-2">
-          <label className="text-xs text-[var(--rpg-text-secondary)] whitespace-nowrap">Template</label>
+          <label htmlFor="expedition-template-select" className="text-xs text-[var(--rpg-text-secondary)] whitespace-nowrap">Template</label>
           <select
+            id="expedition-template-select"
             className="flex-1 text-xs px-2 py-1.5 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] outline-none"
             value={templates.find(t => t.isActive)?.id ?? ''}
             onChange={(e) => onActivateTemplate(e.target.value)}

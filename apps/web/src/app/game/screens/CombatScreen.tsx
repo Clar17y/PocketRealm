@@ -368,6 +368,7 @@ export function CombatScreen({
                 type="button"
                 onClick={() => setLastCombatCollapsed(prev => !prev)}
                 className="flex items-center justify-between w-full text-left"
+                aria-expanded={!lastCombatCollapsed}
               >
                 <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold">
                   <img

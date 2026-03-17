@@ -297,6 +297,10 @@ function ActiveProjectCard({
           <div
             className="h-full rounded-full transition-all"
             style={{ width: `${turnsPercent}%`, backgroundColor: 'var(--rpg-gold)' }}
+            role="progressbar"
+            aria-valuenow={project.turnsContributed}
+            aria-valuemin={0}
+            aria-valuemax={project.memberTurnGoal}
           />
         </div>
       </div>
@@ -320,6 +324,10 @@ function ActiveProjectCard({
                   width: `${percent}%`,
                   backgroundColor: percent >= 100 ? 'var(--rpg-green-light)' : 'var(--rpg-blue-light)',
                 }}
+                role="progressbar"
+                aria-valuenow={current}
+                aria-valuemin={0}
+                aria-valuemax={cost.quantity}
               />
             </div>
           </div>
@@ -336,12 +344,14 @@ function ActiveProjectCard({
         <div className="flex gap-2">
           <PixelButton
             onClick={() => setShowContribute(showContribute === 'turns' ? null : 'turns')}
+            aria-expanded={showContribute === 'turns'}
           >
             Contribute Turns
           </PixelButton>
           {hasMaterialsNeeded && (
             <PixelButton
               onClick={() => setShowContribute(showContribute === 'materials' ? null : 'materials')}
+              aria-expanded={showContribute === 'materials'}
             >
               Contribute Materials
             </PixelButton>
@@ -352,10 +362,11 @@ function ActiveProjectCard({
           <div className="mt-3 p-3 bg-[var(--rpg-background)] rounded border border-[var(--rpg-border)]">
             <div className="flex gap-2 items-end">
               <div className="flex-1">
-                <label className="text-xs text-[var(--rpg-text-secondary)]">
+                <label htmlFor="contribute-turns-amount" className="text-xs text-[var(--rpg-text-secondary)]">
                   Amount (max {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP)} per project)
                 </label>
                 <input
+                  id="contribute-turns-amount"
                   type="number"
                   value={turnAmount}
                   onChange={(e) => setTurnAmount(e.target.value)}
@@ -378,8 +389,9 @@ function ActiveProjectCard({
             ) : (
               <div className="space-y-2">
                 <div>
-                  <label className="text-xs text-[var(--rpg-text-secondary)]">Material</label>
+                  <label htmlFor="contribute-material-select" className="text-xs text-[var(--rpg-text-secondary)]">Material</label>
                   <select
+                    id="contribute-material-select"
                     value={selectedTemplateId}
                     onChange={(e) => setSelectedTemplateId(e.target.value)}
                     className="w-full mt-1 p-2 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
@@ -393,8 +405,9 @@ function ActiveProjectCard({
                 </div>
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <label className="text-xs text-[var(--rpg-text-secondary)]">Quantity</label>
+                    <label htmlFor="contribute-material-quantity" className="text-xs text-[var(--rpg-text-secondary)]">Quantity</label>
                     <input
+                      id="contribute-material-quantity"
                       type="number"
                       value={materialQuantity}
                       onChange={(e) => setMaterialQuantity(e.target.value)}

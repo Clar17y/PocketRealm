@@ -307,6 +307,10 @@ export function Gathering({
                       <div
                         className="h-full bg-[var(--rpg-gold)] transition-all"
                         style={{ width: `${capacityPct}%` }}
+                        role="progressbar"
+                        aria-valuenow={node.remainingCapacity}
+                        aria-valuemin={0}
+                        aria-valuemax={node.maxCapacity}
                       />
                     </div>
                     <div className="flex items-center justify-between mt-1">

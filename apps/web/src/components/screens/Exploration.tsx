@@ -229,6 +229,10 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                 <div
                   className="h-full rounded-full bg-[var(--rpg-gold)] transition-all"
                   style={{ width: `${Math.min(100, explorationProgress.percent)}%` }}
+                  role="progressbar"
+                  aria-valuenow={explorationProgress.turnsExplored}
+                  aria-valuemin={0}
+                  aria-valuemax={explorationProgress.turnsToExplore}
                 />
               </div>
             </PixelCard>
