@@ -199,6 +199,7 @@ model ItemTemplate {
   stackable        Boolean @default(false)
   consumableEffect Json?   @map("consumable_effect")
   sellPrice       Int?    @map("sell_price")
+  flavorText      String? @map("flavor_text") @db.Text
 
   items           Item[]
   dropTables      DropTable[]
