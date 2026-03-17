@@ -758,7 +758,9 @@ export function Inventory({
               </button>
             </div>
 
-            <p className="text-sm text-[var(--rpg-text-secondary)] mb-4">{selectedItem.description}</p>
+            <p className={`text-sm text-[var(--rpg-text-secondary)] mb-4 ${
+  selectedItem.description !== selectedItem.type ? 'italic' : ''
+}`}>{selectedItem.description}</p>
 
             {(selectedItem.durability || hasAnyStats || hasAnyBonusStats || selectedItem.requiredSkill) && (
               <div className="space-y-3 mb-4">

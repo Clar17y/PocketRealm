@@ -563,7 +563,7 @@ export default function GamePage() {
                 imageSrc: itemImageSrc(item.template.name, item.template.itemType),
                 quantity: item.quantity,
                 rarity: item.rarity,
-                description: item.template.itemType,
+                description: item.template.flavorText || item.template.itemType,
                 type: item.template.itemType,
                 tier: item.template.tier,
                 weightClass: item.template.weightClass ?? null,
