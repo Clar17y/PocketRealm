@@ -746,6 +746,12 @@ export function Templates({
         </PixelButton>
       </div>
 
+      {listAction.error && (
+        <div className="p-2 rounded-lg bg-[var(--rpg-red)]/10 border border-[var(--rpg-red)] text-[var(--rpg-red)] text-sm">
+          {listAction.error}
+        </div>
+      )}
+
       {templates.length === 0 ? (
         <PixelCard>
           <p className="text-sm text-[var(--rpg-text-secondary)] text-center py-6">
