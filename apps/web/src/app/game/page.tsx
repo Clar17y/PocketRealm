@@ -28,6 +28,7 @@ import { WorldEvents } from '@/components/screens/WorldEvents';
 import { Achievements } from '@/components/screens/Achievements';
 import { AchievementToast } from '@/components/AchievementToast';
 import { QuestToast } from '@/components/QuestToast';
+import { ForgeResultToast } from '@/components/ForgeResultToast';
 import { RateLimitToast } from '@/components/RateLimitToast';
 import { useRateLimitToast } from './hooks/useRateLimitToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
@@ -1390,6 +1391,7 @@ export default function GamePage() {
       )}
       <AchievementToast onNavigate={(category) => { setAchievementCategory(category); setActiveScreen('achievements'); }} />
       <QuestToast />
+      <ForgeResultToast />
       <RateLimitToast />
     </>
   );

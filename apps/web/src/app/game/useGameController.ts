@@ -3,6 +3,7 @@ import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { RARITY_RANK } from '@/lib/rarity';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
+import type { ForgeResultData } from '@/components/ForgeResultToast';
 import { updateTutorialStep, claimStarterWeapon } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
@@ -124,6 +125,13 @@ function showQuestToasts(updates?: QuestProgressUpdate[]) {
     | undefined;
   if (!show) return;
   for (const update of updates) show(update);
+}
+
+function showForgeToast(data: ForgeResultData) {
+  const show = (window as unknown as Record<string, unknown>).__showForgeToast as
+    | ((data: ForgeResultData) => void)
+    | undefined;
+  if (show) show(data);
 }
 
 interface TravelRouteState {
@@ -1234,18 +1242,21 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           type: 'success',
           message: `Forge success: ${fromLabel} -> ${toLabel} (${chancePct}% chance).${buffTag} Sacrificial item consumed.`,
         });
+        showForgeToast({ type: 'upgrade_success', message: `Upgraded to ${toLabel}!` });
       } else if (data.forge.protected) {
         pushLog({
           timestamp: nowStamp(),
           type: 'info',
           message: `Forge failed at ${fromLabel} (${chancePct}% chance) but item was protected!${buffTag} Sacrifice consumed.`,
         });
+        showForgeToast({ type: 'upgrade_protected', message: `Failed but protected!` });
       } else {
         pushLog({
           timestamp: nowStamp(),
           type: 'info',
           message: `Forge failed at ${fromLabel} (${chancePct}% chance).${buffTag} Target and sacrifice consumed.`,
         });
+        showForgeToast({ type: 'upgrade_fail', message: `Upgrade failed — target and sacrifice consumed` });
       }
     });
 
@@ -1254,6 +1265,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setTurns(data.turns.currentTurns);
       const rarityLabel = data.forge.rarity.charAt(0).toUpperCase() + data.forge.rarity.slice(1);
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Re-rolled ${rarityLabel} item bonus stats. Sacrificial duplicate consumed.` });
+      showForgeToast({ type: 'reroll', message: `Stats rerolled!` });
     });
 
   const handleDestroyItem = (itemId: string) =>
