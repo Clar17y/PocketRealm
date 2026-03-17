@@ -67,13 +67,14 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole }: GuildSpe
   const errorBanner = (load.error || action.error) ? <ErrorBanner message={(load.error || action.error)!} /> : null;
 
   if (load.loading && status === undefined) {
-    return <LoadingCard />;
+    return <>{confirmModal}<LoadingCard /></>;
   }
 
   // Guild level too low
   if (guildLevel < GUILD_CONSTANTS.SPECIALIZATION_UNLOCK_LEVEL) {
     return (
       <div className="space-y-3">
+        {confirmModal}
         {errorBanner}
         <PixelCard>
           <p className="text-sm text-[var(--rpg-text-secondary)]">

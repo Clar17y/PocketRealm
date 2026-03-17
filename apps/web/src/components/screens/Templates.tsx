@@ -320,6 +320,8 @@ export function Templates({
       ...(s.condition && s.thenActionId ? { condition: s.condition, thenActionId: s.thenActionId } : {}),
     }));
 
+    if (!isNew && !editingTemplate) return;
+
     save.run(
       () => isNew ? createTemplate(editorName.trim(), slots) : updateTemplate(editingTemplate!.id, editorName.trim(), slots),
       () => { void onLoadTemplates(); setEditingTemplate(null); setIsNew(false); },
