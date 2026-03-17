@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
@@ -67,10 +67,19 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
+  const dialogueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerDialogueEvent = useCallback((event: DialogueEvent) => {
+    if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
+    setDialogueEvent(event);
+    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 4000);
+  }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDialogueEvent('idle'), 3000);
-    return () => clearTimeout(timer);
+    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 3000);
+    return () => {
+      if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -393,8 +402,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
             className="w-full"
             onClick={() => {
               onCraft(selectedRecipe.id, quantity);
-              setDialogueEvent('buy');
-              setTimeout(() => setDialogueEvent('idle'), 4000);
+              triggerDialogueEvent('buy');
             }}
             disabled={isOverEncumbered || isRecovering || noFacility || selectedMax < 1 || backpackFull}
           >

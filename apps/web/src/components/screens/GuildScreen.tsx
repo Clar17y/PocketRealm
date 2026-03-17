@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSilentRefresh } from '@/hooks/useSilentRefresh';
 import { RefreshingIndicator } from '@/components/common/RefreshingIndicator';
 import { getPlayerGuild, type PlayerGuildResponse } from '@/lib/api';
@@ -18,6 +18,8 @@ import { ExpeditionShopTab } from '@/components/guild/ExpeditionShopTab';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
+import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import type { DialogueEvent } from '@pocketrealm/shared';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 type GuildTab = 'overview' | 'members' | 'upgrades' | 'contracts' | 'projects' | 'expeditions' | 'shop' | 'specialization' | 'log' | 'settings';
@@ -37,6 +39,21 @@ export function GuildScreen({ playerId, characterLevel, onStateUpdates, onExpedi
   const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<GuildTab>('overview');
+  const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
+  const dialogueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerDialogueEvent = useCallback((event: DialogueEvent) => {
+    if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
+    setDialogueEvent(event);
+    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 4000);
+  }, []);
+
+  useEffect(() => {
+    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 3000);
+    return () => {
+      if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
+    };
+  }, []);
 
   const loadGuild = useCallback(async (silent = false) => {
     startLoad(silent);
@@ -100,6 +117,7 @@ export function GuildScreen({ playerId, characterLevel, onStateUpdates, onExpedi
 
   return (
     <ScreenContainer>
+      <NpcDialogueBanner npcKey="millbrook-guild-recruiter" event={dialogueEvent} />
 
       <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">
         [{guildData.guild.tag}] {guildData.guild.name}

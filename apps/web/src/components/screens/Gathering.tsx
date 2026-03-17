@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Pagination } from '@/components/common/Pagination';
@@ -18,6 +18,8 @@ import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import type { EventModifierBadge } from '@/lib/api';
 import { ItemIcon } from '@/components/common/ItemIcon';
+import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import type { DialogueEvent } from '@pocketrealm/shared';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface ResourceNode {
@@ -100,6 +102,16 @@ export function Gathering({
   backpackFull = false,
   ownedResourceNames,
 }: GatheringProps) {
+  const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
+  const dialogueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 3000);
+    return () => {
+      if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
+    };
+  }, []);
+
   const getEventYieldMultiplier = (node: ResourceNode) =>
     computeResourceYieldMultiplier(node.eventModifiers ?? []);
 
@@ -210,6 +222,8 @@ export function Gathering({
 
   return (
     <ScreenContainer>
+      <NpcDialogueBanner npcKey="millbrook-gathering-guide" event={dialogueEvent} />
+
       {/* Knockout Banner */}
       {isRecovering && (
         <KnockoutBanner action="gathering" recoveryCost={recoveryCost} />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ITEM_RARITY_CONSTANTS } from '@pocketrealm/shared';
 import type { DialogueEvent } from '@pocketrealm/shared';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
@@ -157,11 +157,20 @@ export function Forge({
   const [upgradePickerOpen, setUpgradePickerOpen] = useState(false);
   const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
   const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
+  const dialogueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noFacility = zoneCraftingLevel === 0;
 
+  const triggerDialogueEvent = useCallback((event: DialogueEvent) => {
+    if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
+    setDialogueEvent(event);
+    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 4000);
+  }, []);
+
   useEffect(() => {
-    const timer = setTimeout(() => setDialogueEvent('idle'), 3000);
-    return () => clearTimeout(timer);
+    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 3000);
+    return () => {
+      if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
+    };
   }, []);
 
   const tryForgeAction = (setConfirm: (v: boolean) => void, action: () => void | Promise<void>) => {
@@ -238,8 +247,7 @@ export function Forge({
     setBusy('upgrade');
     try {
       await onUpgrade(selected.id, selectedUpgradeSacrificeId);
-      setDialogueEvent('buy');
-      setTimeout(() => setDialogueEvent('idle'), 4000);
+      triggerDialogueEvent('buy');
     } finally {
       setBusy(null);
     }
@@ -250,8 +258,7 @@ export function Forge({
     setBusy('reroll');
     try {
       await onReroll(selected.id, selectedRerollSacrificeId);
-      setDialogueEvent('buy');
-      setTimeout(() => setDialogueEvent('idle'), 4000);
+      triggerDialogueEvent('buy');
     } finally {
       setBusy(null);
     }

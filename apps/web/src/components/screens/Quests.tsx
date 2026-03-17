@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
@@ -331,10 +331,19 @@ function ShopTab({
   const [mobTemplates, setMobTemplates] = useState<Array<{ id: string; name: string }>>([]);
   const [guildContracts, setGuildContracts] = useState<Array<{ id: string; name: string }>>([]);
   const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
+  const dialogueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerDialogueEvent = useCallback((event: DialogueEvent) => {
+    if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
+    setDialogueEvent(event);
+    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 4000);
+  }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDialogueEvent('idle'), 3000);
-    return () => clearTimeout(timer);
+    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 3000);
+    return () => {
+      if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
+    };
   }, []);
 
   const loadShop = useCallback(async () => {
@@ -406,8 +415,7 @@ function ShopTab({
         // Refresh player state (attributes, skills, etc. may have changed)
         onPurchase?.();
         // Show buy dialogue then return to idle
-        setDialogueEvent('buy');
-        setTimeout(() => setDialogueEvent('idle'), 4000);
+        triggerDialogueEvent('buy');
       } else if (res.error) {
         setPurchaseMessage(res.error.message);
       }
