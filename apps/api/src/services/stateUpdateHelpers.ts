@@ -135,6 +135,7 @@ export async function fetchItemDTOs(
 
 /**
  * Fetch all skills for a player, returned as DTOs.
+ * Applies XP window reset: dailyXpGained is zeroed when the 12h window has rolled over.
  */
 export async function fetchSkillDTOs(playerId: string): Promise<SkillStateDTO[]> {
   const now = new Date();
@@ -338,15 +339,16 @@ type StateUpdateField =
 /**
  * Extract skill levels from already-fetched skill DTOs to avoid a redundant
  * playerSkill query when resources are also requested.
+ * Only the four combat skills affect resource calculations (stamina/mana).
  */
 function extractSkillLevels(skillDTOs: SkillStateDTO[]): SkillLevels {
-  const map: Record<string, number> = {};
-  for (const s of skillDTOs) map[s.skillType] = s.level;
+  const map = new Map<string, number>();
+  for (const s of skillDTOs) map.set(s.skillType, s.level);
   return {
-    melee: map['melee'] ?? 1,
-    ranged: map['ranged'] ?? 1,
-    magic: map['magic'] ?? 1,
-    evasion: map['evasion'] ?? 1,
+    melee: map.get('melee') ?? 1,
+    ranged: map.get('ranged') ?? 1,
+    magic: map.get('magic') ?? 1,
+    evasion: map.get('evasion') ?? 1,
   };
 }
 
@@ -365,8 +367,9 @@ export async function buildStateUpdates(
   const needsInventoryMeta =
     fieldSet.has('inventoryUsedSlots') || fieldSet.has('inventoryCapacity');
 
-  // When both skills and resources are requested, fetch skills first so we can
-  // pass skill levels to fetchResourceState and avoid a redundant DB query.
+  // When both skills and resources are requested, fetch skills first (serial)
+  // so we can pass skill levels to fetchResourceState. This trades one extra
+  // round-trip for eliminating a redundant playerSkill query inside getResourceState.
   let skills: SkillStateDTO[] | undefined;
   if (needsSkills && needsResources) {
     skills = await fetchSkillDTOs(playerId);
