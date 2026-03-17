@@ -13,6 +13,7 @@ import {
 import type { Screen } from '@/app/game/gameController.types';
 import { handleKeyActivate } from '@/lib/utils';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@pocketrealm/shared';
 import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
@@ -195,8 +196,9 @@ export function Templates({
   const [editorName, setEditorName] = useState('');
   const [editorSlots, setEditorSlots] = useState<EditorSlot[]>([]);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const listAction = useAsyncAction();
+  const save = useAsyncAction();
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [expandedSlot, setExpandedSlot] = useState<number | null>(null);
   const confirmDelete = useConfirmAction<string>();
 
@@ -206,23 +208,13 @@ export function Templates({
 
   // -- List actions --
 
-  const handleActivate = useCallback(async (id: string) => {
-    try {
-      await activateTemplate(id);
-      await onLoadTemplates();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to activate template');
-    }
-  }, [onLoadTemplates]);
+  const handleActivate = useCallback((id: string) =>
+    listAction.run(() => activateTemplate(id), () => void onLoadTemplates()),
+  [onLoadTemplates, listAction.run]);
 
-  const handleDelete = useCallback(async (id: string) => {
-    try {
-      await deleteTemplate(id);
-      await onLoadTemplates();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete template');
-    }
-  }, [onLoadTemplates]);
+  const handleDelete = useCallback((id: string) =>
+    listAction.run(() => deleteTemplate(id), () => void onLoadTemplates()),
+  [onLoadTemplates, listAction.run]);
 
   const handleNewTemplate = useCallback(() => {
     setIsNew(true);
@@ -230,7 +222,7 @@ export function Templates({
     setEditorName('New Template');
     setEditorSlots([]);
     setExpandedSlot(null);
-    setError(null);
+    setValidationError(null);
   }, []);
 
   const handleEdit = useCallback((t: CombatTemplateData) => {
@@ -243,7 +235,7 @@ export function Templates({
       thenActionId: s.thenActionId,
     })));
     setExpandedSlot(null);
-    setError(null);
+    setValidationError(null);
   }, []);
 
   const handleCancel = useCallback(() => {
@@ -251,7 +243,7 @@ export function Templates({
     setIsNew(false);
     setPickerTarget(null);
     setExpandedSlot(null);
-    setError(null);
+    setValidationError(null);
   }, []);
 
   // -- Editor actions --
@@ -314,34 +306,24 @@ export function Templates({
     }));
   }, []);
 
-  const handleSave = useCallback(async () => {
-    if (!editorName.trim()) { setError('Name is required'); return; }
-    if (editorSlots.length === 0) { setError('Add at least one action'); return; }
-    // Validate: conditional slots must have thenActionId
+  const handleSave = useCallback(() => {
+    setValidationError(null);
+    if (!editorName.trim()) { setValidationError('Name is required'); return; }
+    if (editorSlots.length === 0) { setValidationError('Add at least one action'); return; }
     const incomplete = editorSlots.some(s => s.condition && !s.thenActionId);
-    if (incomplete) { setError('All conditions need a "then" action'); return; }
-    setSaving(true);
-    setError(null);
-    try {
-      const slots: Omit<CombatTemplateSlotData, 'id'>[] = editorSlots.map((s, i) => ({
-        sortOrder: i,
-        actionId: s.actionId,
-        ...(s.condition && s.thenActionId ? { condition: s.condition, thenActionId: s.thenActionId } : {}),
-      }));
-      if (isNew) {
-        await createTemplate(editorName.trim(), slots);
-      } else if (editingTemplate) {
-        await updateTemplate(editingTemplate.id, editorName.trim(), slots);
-      }
-      await onLoadTemplates();
-      setEditingTemplate(null);
-      setIsNew(false);
-    } catch {
-      setError('Failed to save template');
-    } finally {
-      setSaving(false);
-    }
-  }, [editorName, editorSlots, isNew, editingTemplate, onLoadTemplates]);
+    if (incomplete) { setValidationError('All conditions need a "then" action'); return; }
+
+    const slots: Omit<CombatTemplateSlotData, 'id'>[] = editorSlots.map((s, i) => ({
+      sortOrder: i,
+      actionId: s.actionId,
+      ...(s.condition && s.thenActionId ? { condition: s.condition, thenActionId: s.thenActionId } : {}),
+    }));
+
+    save.run(
+      () => isNew ? createTemplate(editorName.trim(), slots) : updateTemplate(editingTemplate!.id, editorName.trim(), slots),
+      () => { void onLoadTemplates(); setEditingTemplate(null); setIsNew(false); },
+    );
+  }, [editorName, editorSlots, isNew, editingTemplate, onLoadTemplates, save.run]);
 
   // -- Resource sustainability calc (worst-case per slot) --
 
@@ -459,9 +441,9 @@ export function Templates({
           </h2>
         </div>
 
-        {error && (
+        {(validationError || save.error || listAction.error) && (
           <div className="p-2 rounded-lg bg-[var(--rpg-red)]/10 border border-[var(--rpg-red)] text-[var(--rpg-red)] text-sm">
-            {error}
+            {validationError || save.error || listAction.error}
           </div>
         )}
 
@@ -745,8 +727,8 @@ export function Templates({
           <PixelButton variant="secondary" onClick={handleCancel} className="flex-1">
             Cancel
           </PixelButton>
-          <PixelButton variant="primary" onClick={handleSave} disabled={saving} className="flex-1">
-            {saving ? 'Saving...' : 'Save'}
+          <PixelButton variant="primary" onClick={handleSave} disabled={save.loading} className="flex-1">
+            {save.loading ? 'Saving...' : 'Save'}
           </PixelButton>
         </div>
       </div>
