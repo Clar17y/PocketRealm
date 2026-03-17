@@ -44,6 +44,10 @@ interface SettingsProps {
   lootRevealRarity: ConfirmRarity;
   onLootRevealRarityChange: (value: ConfirmRarity) => void;
 
+  // Notifications
+  pushState: 'loading' | 'unsupported' | 'denied' | 'subscribed' | 'unsubscribed';
+  onPushToggle: () => void;
+
   // Account
   onLogout: () => void;
 }
@@ -76,6 +80,8 @@ export function Settings({
   onConfirmRarityChange,
   lootRevealRarity,
   onLootRevealRarityChange,
+  pushState,
+  onPushToggle,
   onLogout,
 }: SettingsProps) {
   return (
@@ -223,6 +229,28 @@ export function Settings({
           />
         </div>
       </PixelCard>
+
+      {/* Notifications */}
+      {pushState !== 'unsupported' && (
+        <PixelCard>
+          <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Notifications</h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[var(--rpg-text-secondary)]">Push Notifications</p>
+              {pushState === 'denied' && (
+                <p className="text-xs text-[var(--rpg-red)] mt-0.5">Blocked in browser settings</p>
+              )}
+            </div>
+            <ToggleSwitch
+              checked={pushState === 'subscribed'}
+              onChange={onPushToggle}
+            />
+          </div>
+          <p className="text-xs text-[var(--rpg-text-secondary)] mt-1">
+            Get notified when you&apos;re attacked in PvP or a boss round resolves.
+          </p>
+        </PixelCard>
+      )}
 
       {/* Account */}
       <button

@@ -33,6 +33,7 @@ import { useRateLimitToast } from './hooks/useRateLimitToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
 import { Settings } from '@/components/screens/Settings';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { TrainingGrounds } from '@/components/screens/TrainingGrounds';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -298,6 +299,7 @@ export default function GamePage() {
   } = useGameController({ isAuthenticated });
 
   useRateLimitToast();
+  const { state: pushState, toggle: pushToggle } = usePushNotifications();
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
   const [expeditionContext, setExpeditionContext] = useState<ExpeditionContext | null>(null);
@@ -1041,6 +1043,8 @@ export default function GamePage() {
             onLootRevealRarityChange={handleSetLootRevealRarity}
             forgeConfirmRarity={forgeConfirmRarity}
             onForgeConfirmRarityChange={handleSetForgeConfirmRarity}
+            pushState={pushState}
+            onPushToggle={pushToggle}
             onLogout={() => { logout(); router.push('/'); }}
           />
         );
