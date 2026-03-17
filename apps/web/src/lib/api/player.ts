@@ -277,3 +277,13 @@ export async function recoverFromKnockout() {
     method: 'POST',
   });
 }
+
+export async function claimStarterWeapon(weaponType: 'melee' | 'ranged' | 'magic') {
+  return fetchApi<{ success: true; itemId: string; weaponType: string }>(
+    '/api/v1/player/starter-weapon',
+    {
+      method: 'POST',
+      body: JSON.stringify({ weaponType }),
+    },
+  );
+}

@@ -42,6 +42,9 @@ const itemNameOverrides: Record<string, string> = {
   // Seeded / common names that don't have 1:1 assets
   'leather_cap': 'iron_helmet',
   'cleansing_potion': 'antivenom_potion',
+  'kessas_training_sword': 'wooden_sword',
+  'kessas_training_bow': 'oak_shortbow',
+  'kessas_training_staff': 'oak_staff',
 };
 
 export function itemImageSrc(itemName: string, itemType: string): string {

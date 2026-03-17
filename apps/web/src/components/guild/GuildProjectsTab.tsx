@@ -9,9 +9,9 @@ import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import {
   getGuildProjects, startGuildProject, contributeProjectTurns, contributeProjectMaterials,
-  GUILD_MODIFIER_LABELS,
   type GuildProjectResponse, type GuildProjectAvailableResponse, type GuildProjectsListResponse,
 } from '@/lib/api/guild';
+import { PerkBadges } from '@/components/common/PerkBadges';
 import { getInventory } from '@/lib/api/items';
 import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS, getCategoryForTemplate, type StateUpdates } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
@@ -173,11 +173,7 @@ export function GuildProjectsTab({ guildId, myRole, onStateUpdates }: GuildProje
                   </span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {proj.perks.map((perk, i) => (
-                    <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
-                      +{Math.round(perk.value * 100)}% {GUILD_MODIFIER_LABELS[perk.effectType] ?? perk.effectType}
-                    </span>
-                  ))}
+                  <PerkBadges perks={proj.perks} variant="gold" size="md" />
                 </div>
               </PixelCard>
             ))}
@@ -267,6 +263,10 @@ function ActiveProjectCard({
           <div
             className="h-full rounded-full transition-all"
             style={{ width: `${turnsPercent}%`, backgroundColor: 'var(--rpg-gold)' }}
+            role="progressbar"
+            aria-valuenow={project.turnsContributed}
+            aria-valuemin={0}
+            aria-valuemax={project.memberTurnGoal}
           />
         </div>
       </div>
@@ -290,6 +290,10 @@ function ActiveProjectCard({
                   width: `${percent}%`,
                   backgroundColor: percent >= 100 ? 'var(--rpg-green-light)' : 'var(--rpg-blue-light)',
                 }}
+                role="progressbar"
+                aria-valuenow={current}
+                aria-valuemin={0}
+                aria-valuemax={cost.quantity}
               />
             </div>
           </div>
@@ -298,11 +302,7 @@ function ActiveProjectCard({
 
       {/* Perks */}
       <div className="mt-3 flex flex-wrap gap-2">
-        {project.perks.map((perk, i) => (
-          <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]">
-            +{Math.round(perk.value * 100)}% {GUILD_MODIFIER_LABELS[perk.effectType] ?? perk.effectType}
-          </span>
-        ))}
+        <PerkBadges perks={project.perks} variant="surface" size="md" />
       </div>
 
       {/* Contribute Section */}
@@ -310,12 +310,14 @@ function ActiveProjectCard({
         <div className="flex gap-2">
           <PixelButton
             onClick={() => setShowContribute(showContribute === 'turns' ? null : 'turns')}
+            aria-expanded={showContribute === 'turns'}
           >
             Contribute Turns
           </PixelButton>
           {hasMaterialsNeeded && (
             <PixelButton
               onClick={() => setShowContribute(showContribute === 'materials' ? null : 'materials')}
+              aria-expanded={showContribute === 'materials'}
             >
               Contribute Materials
             </PixelButton>
@@ -326,10 +328,11 @@ function ActiveProjectCard({
           <div className="mt-3 p-3 bg-[var(--rpg-background)] rounded border border-[var(--rpg-border)]">
             <div className="flex gap-2 items-end">
               <div className="flex-1">
-                <label className="text-xs text-[var(--rpg-text-secondary)]">
+                <label htmlFor="contribute-turns-amount" className="text-xs text-[var(--rpg-text-secondary)]">
                   Amount (max {formatNumber(GUILD_PROJECT_CONSTANTS.PER_PROJECT_TURN_CAP)} per project)
                 </label>
                 <input
+                  id="contribute-turns-amount"
                   type="number"
                   value={turnAmount}
                   onChange={(e) => setTurnAmount(e.target.value)}
@@ -352,8 +355,9 @@ function ActiveProjectCard({
             ) : (
               <div className="space-y-2">
                 <div>
-                  <label className="text-xs text-[var(--rpg-text-secondary)]">Material</label>
+                  <label htmlFor="contribute-material-select" className="text-xs text-[var(--rpg-text-secondary)]">Material</label>
                   <select
+                    id="contribute-material-select"
                     value={selectedTemplateId}
                     onChange={(e) => setSelectedTemplateId(e.target.value)}
                     className="w-full mt-1 p-2 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-sm text-[var(--rpg-text-primary)]"
@@ -367,8 +371,9 @@ function ActiveProjectCard({
                 </div>
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <label className="text-xs text-[var(--rpg-text-secondary)]">Quantity</label>
+                    <label htmlFor="contribute-material-quantity" className="text-xs text-[var(--rpg-text-secondary)]">Quantity</label>
                     <input
+                      id="contribute-material-quantity"
                       type="number"
                       value={materialQuantity}
                       onChange={(e) => setMaterialQuantity(e.target.value)}
@@ -444,11 +449,7 @@ function AvailableProjectCard({
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1">
-        {project.perks.map((perk, i) => (
-          <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)]">
-            +{Math.round(perk.value * 100)}% {GUILD_MODIFIER_LABELS[perk.effectType] ?? perk.effectType}
-          </span>
-        ))}
+        <PerkBadges perks={project.perks} variant="gold" size="sm" goldOpacity={10} />
       </div>
     </PixelCard>
   );
