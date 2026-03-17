@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID, EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
+import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID, EXPLORATION_CONSTANTS, TUTORIAL_COMPLETED, TUTORIAL_SKIPPED } from '@pocketrealm/shared';
 import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -192,7 +192,7 @@ playerRouter.patch('/settings', asyncHandler(async (req, res) => {
 }));
 
 const tutorialSchema = z.object({
-  step: z.number().int().min(-1).max(9),
+  step: z.number().int().min(TUTORIAL_SKIPPED).max(TUTORIAL_COMPLETED),
 });
 
 /**
@@ -219,7 +219,7 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
   }
 
   // Don't allow changes once tutorial is completed or skipped
-  if (player.tutorialStep >= 9 || player.tutorialStep === -1) {
+  if (player.tutorialStep >= TUTORIAL_COMPLETED || player.tutorialStep === TUTORIAL_SKIPPED) {
     throw new AppError(400, 'Tutorial already completed', 'TUTORIAL_COMPLETE');
   }
 
@@ -229,7 +229,7 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
   });
 
   // Grant achievement for completing the tutorial (not skipping)
-  if (body.step === 9 && !isSkip) {
+  if (body.step === TUTORIAL_COMPLETED && !isSkip) {
     await trackAchievements(playerId, { tutorialCompleted: 1 });
   }
 
