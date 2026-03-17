@@ -5,6 +5,8 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
+import { ErrorBanner } from '@/components/common/ErrorBanner';
 import {
   getGuildProjects, startGuildProject, contributeProjectTurns, contributeProjectMaterials,
   GUILD_MODIFIER_LABELS,
@@ -17,7 +19,6 @@ import { formatNumber } from '@/lib/format';
 interface GuildProjectsTabProps {
   guildId: string;
   myRole: string;
-  setError: (err: string | null) => void;
   onStateUpdates?: (updates: StateUpdates) => void;
 }
 
@@ -28,10 +29,11 @@ interface ResourceItem {
   category: string;
 }
 
-export function GuildProjectsTab({ guildId, myRole, setError, onStateUpdates }: GuildProjectsTabProps) {
+export function GuildProjectsTab({ guildId, myRole, onStateUpdates }: GuildProjectsTabProps) {
   const [data, setData] = useState<GuildProjectsListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const load = useAsyncAction();
+  const action = useAsyncAction();
+  const resourceLoad = useAsyncAction();
   const [turnAmount, setTurnAmount] = useState('1000');
   const [showContribute, setShowContribute] = useState<string | null>(null);
   const [resourceItems, setResourceItems] = useState<ResourceItem[]>([]);
@@ -41,27 +43,18 @@ export function GuildProjectsTab({ guildId, myRole, setError, onStateUpdates }: 
 
   const isOfficer = myRole === 'leader' || myRole === 'officer';
 
-  const loadProjects = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await getGuildProjects(guildId);
-      if (res.data) setData(res.data);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load projects');
-    } finally {
-      setLoading(false);
-    }
-  }, [guildId, setError]);
+  const loadProjects = useCallback(() => {
+    load.run(() => getGuildProjects(guildId), (data) => { if (data) setData(data); });
+  }, [guildId, load.run]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
 
   // Load resource items when materials contribute panel opens
-  const loadResourceItems = useCallback(async (neededCategories: string[]) => {
-    try {
-      const res = await getInventory();
-      if (!res.data) return;
+  const loadResourceItems = useCallback((neededCategories: string[]) => {
+    resourceLoad.run(() => getInventory(), (data) => {
+      if (!data) return;
       const resources: ResourceItem[] = [];
-      for (const item of res.data.items) {
+      for (const item of data.items) {
         if (item.template.itemType !== 'resource' || item.quantity <= 0) continue;
         const cat = getCategoryForTemplate(item.template.name);
         if (cat && neededCategories.includes(cat)) {
@@ -77,52 +70,26 @@ export function GuildProjectsTab({ guildId, myRole, setError, onStateUpdates }: 
       if (resources.length > 0 && !selectedTemplateId) {
         setSelectedTemplateId(resources[0].templateId);
       }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load materials');
-    }
-  }, [selectedTemplateId, setError]);
+    });
+  }, [selectedTemplateId, resourceLoad.run]);
 
-  const handleStartProject = async (projectKey: string) => {
-    setActionLoading(true);
-    setError(null);
-    try {
-      const res = await startGuildProject(guildId, projectKey);
-      if (res.error) { setError(res.error.message); return; }
-      void loadProjects();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to start project');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const handleStartProject = (projectKey: string) =>
+    action.run(() => startGuildProject(guildId, projectKey), () => void loadProjects());
 
-  const handleContributeTurns = async (projectId: string) => {
+  const handleContributeTurns = (projectId: string) => {
     const amount = parseInt(turnAmount);
     if (!amount || amount <= 0) return;
-    setActionLoading(true);
-    setError(null);
-    try {
-      const res = await contributeProjectTurns(guildId, projectId, amount);
-      if (res.error) { setError(res.error.message); return; }
-      if (res.data?.stateUpdates) onStateUpdates?.(res.data.stateUpdates);
+    action.run(() => contributeProjectTurns(guildId, projectId, amount), (data) => {
+      if (data?.stateUpdates) onStateUpdates?.(data.stateUpdates);
       void loadProjects();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to contribute turns');
-    } finally {
-      setActionLoading(false);
-    }
+    });
   };
 
-  const handleContributeMaterials = async (projectId: string) => {
+  const handleContributeMaterials = (projectId: string) => {
     const qty = parseInt(materialQuantity);
     if (!qty || qty <= 0 || !selectedTemplateId) return;
-    setActionLoading(true);
-    setError(null);
-    try {
-      const res = await contributeProjectMaterials(guildId, projectId, selectedTemplateId, qty);
-      if (res.error) { setError(res.error.message); return; }
+    action.run(() => contributeProjectMaterials(guildId, projectId, selectedTemplateId, qty), () => {
       void loadProjects();
-      // Refresh resource items
       const activeProject = data?.projects.find((p) => p.status === 'active');
       if (activeProject) {
         const neededCategories = activeProject.materialCosts
@@ -130,14 +97,10 @@ export function GuildProjectsTab({ guildId, myRole, setError, onStateUpdates }: 
           .map((c) => c.category);
         void loadResourceItems(neededCategories);
       }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to contribute materials');
-    } finally {
-      setActionLoading(false);
-    }
+    });
   };
 
-  if (loading && !data) return <LoadingCard />;
+  if (load.loading && !data) return <LoadingCard />;
 
   const activeProject = data?.projects.find((p) => p.status === 'active');
   const completedProjects = data?.projects.filter((p) => p.status === 'completed') ?? [];
@@ -145,6 +108,9 @@ export function GuildProjectsTab({ guildId, myRole, setError, onStateUpdates }: 
 
   return (
     <div className="space-y-4">
+      {(load.error || action.error || resourceLoad.error) && (
+        <ErrorBanner message={(load.error || action.error || resourceLoad.error)!} />
+      )}
       {/* Active Project */}
       {activeProject && (
         <ActiveProjectCard
@@ -161,7 +127,7 @@ export function GuildProjectsTab({ guildId, myRole, setError, onStateUpdates }: 
           }}
           turnAmount={turnAmount}
           setTurnAmount={setTurnAmount}
-          actionLoading={actionLoading}
+          actionLoading={action.loading}
           onContributeTurns={() => handleContributeTurns(activeProject.id)}
           resourceItems={resourceItems}
           selectedTemplateId={selectedTemplateId}
@@ -182,7 +148,7 @@ export function GuildProjectsTab({ guildId, myRole, setError, onStateUpdates }: 
                 key={proj.key}
                 project={proj}
                 isOfficer={isOfficer}
-                actionLoading={actionLoading}
+                actionLoading={action.loading}
                 onStart={() => setShowStartConfirm(proj.key)}
               />
             ))}
