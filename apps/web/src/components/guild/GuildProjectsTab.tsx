@@ -7,9 +7,9 @@ import { LoadingCard } from '@/components/common/LoadingCard';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import {
   getGuildProjects, startGuildProject, contributeProjectTurns, contributeProjectMaterials,
-  GUILD_MODIFIER_LABELS,
   type GuildProjectResponse, type GuildProjectAvailableResponse, type GuildProjectsListResponse,
 } from '@/lib/api/guild';
+import { PerkBadges } from '@/components/common/PerkBadges';
 import { getInventory } from '@/lib/api/items';
 import { GUILD_PROJECT_DEFINITIONS, GUILD_PROJECT_CONSTANTS, getCategoryForTemplate, type StateUpdates } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
@@ -207,11 +207,7 @@ export function GuildProjectsTab({ guildId, myRole, setError, onStateUpdates }: 
                   </span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {proj.perks.map((perk, i) => (
-                    <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
-                      +{Math.round(perk.value * 100)}% {GUILD_MODIFIER_LABELS[perk.effectType] ?? perk.effectType}
-                    </span>
-                  ))}
+                  <PerkBadges perks={proj.perks} variant="gold" size="md" />
                 </div>
               </PixelCard>
             ))}
@@ -332,11 +328,7 @@ function ActiveProjectCard({
 
       {/* Perks */}
       <div className="mt-3 flex flex-wrap gap-2">
-        {project.perks.map((perk, i) => (
-          <span key={i} className="text-xs px-2 py-0.5 rounded bg-[var(--rpg-surface)] text-[var(--rpg-text-secondary)]">
-            +{Math.round(perk.value * 100)}% {GUILD_MODIFIER_LABELS[perk.effectType] ?? perk.effectType}
-          </span>
-        ))}
+        <PerkBadges perks={project.perks} variant="surface" size="md" />
       </div>
 
       {/* Contribute Section */}
@@ -478,11 +470,7 @@ function AvailableProjectCard({
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1">
-        {project.perks.map((perk, i) => (
-          <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)]">
-            +{Math.round(perk.value * 100)}% {GUILD_MODIFIER_LABELS[perk.effectType] ?? perk.effectType}
-          </span>
-        ))}
+        <PerkBadges perks={project.perks} variant="gold" size="sm" goldOpacity={10} />
       </div>
     </PixelCard>
   );
