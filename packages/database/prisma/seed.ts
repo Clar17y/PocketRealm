@@ -7,6 +7,7 @@ import { getAllItemTemplates } from './seed-data/items';
 import { ITEM_FLAVOR_TEXT } from './seed-data/flavorText';
 import { getAllMobTemplates } from './seed-data/mobs';
 import { MOB_FLAVOR_TEXT, MOB_FAMILY_FLAVOR } from './seed-data/mobFlavorText';
+import { ZONE_FLAVOR_TEXT } from './seed-data/zoneFlavorText';
 import { getAllMobFamilies, getAllMobFamilyMembers, getAllZoneMobFamilies } from './seed-data/families';
 import { getAllResourceNodes } from './seed-data/resources';
 import { getAllDropTables } from './seed-data/drops';
@@ -89,8 +90,23 @@ async function seedZones() {
     { id: IDS.zones.sunkenRuins, name: 'Sunken Ruins', description: 'Ancient ruins half-submerged in brackish water. Unspeakable things dwell in the depths.', difficulty: 5, travelCost: 600, isStarter: false, zoneType: 'wild', zoneExitChance: null, turnsToExplore: 100000, explorationTiers },
   ];
 
-  await prisma.zone.createMany({ data: zones });
+  const zonesWithFlavor = zones.map(z => {
+    const flavor = ZONE_FLAVOR_TEXT[z.name!];
+    return {
+      ...z,
+      arrivalText: flavor?.arrivalText ?? null,
+      ambientTexts: flavor?.ambientTexts ?? Prisma.JsonNull,
+      environmentalTexts: flavor?.environmentalTexts ?? Prisma.JsonNull,
+    };
+  });
+  await prisma.zone.createMany({ data: zonesWithFlavor });
   console.log(`  ${zones.length} zones created.`);
+
+  // Log unmatched zone flavour text entries
+  const zoneNames = new Set(zones.map(z => z.name));
+  for (const name of Object.keys(ZONE_FLAVOR_TEXT)) {
+    if (!zoneNames.has(name)) console.warn(`  ⚠ Unmatched zone flavour text: "${name}"`);
+  }
 }
 
 // ============================================================================
