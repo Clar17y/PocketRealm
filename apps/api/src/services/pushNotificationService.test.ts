@@ -11,6 +11,9 @@ vi.mock('@pocketrealm/database', () => ({
       findMany: vi.fn(),
       delete: vi.fn(),
     },
+    player: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
@@ -87,6 +90,7 @@ describe('pushNotificationService', () => {
 
   describe('sendPush', () => {
     it('sends notification to all player subscriptions', async () => {
+      vi.mocked(prisma.player.findUnique).mockResolvedValue({ notifyPvpAttack: true } as never);
       const subs = [
         { id: 's1', endpoint: 'https://push.example.com/1', p256dh: 'key1', auth: 'auth1' },
         { id: 's2', endpoint: 'https://push.example.com/2', p256dh: 'key2', auth: 'auth2' },
@@ -94,12 +98,22 @@ describe('pushNotificationService', () => {
       vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue(subs as never);
       vi.mocked(webpush.sendNotification).mockResolvedValue({} as never);
 
-      await sendPush(PLAYER_ID, { title: 'Test', body: 'Hello' });
+      await sendPush(PLAYER_ID, 'pvpAttack', { title: 'Test', body: 'Hello' });
 
       expect(webpush.sendNotification).toHaveBeenCalledTimes(2);
     });
 
+    it('skips sending when preference is disabled', async () => {
+      vi.mocked(prisma.player.findUnique).mockResolvedValue({ notifyPvpAttack: false } as never);
+
+      await sendPush(PLAYER_ID, 'pvpAttack', { title: 'Test', body: 'Hello' });
+
+      expect(prisma.pushSubscription.findMany).not.toHaveBeenCalled();
+      expect(webpush.sendNotification).not.toHaveBeenCalled();
+    });
+
     it('removes expired subscriptions on 410', async () => {
+      vi.mocked(prisma.player.findUnique).mockResolvedValue({ notifyBossKilled: true } as never);
       const subs = [
         { id: 's1', endpoint: 'https://push.example.com/1', p256dh: 'key1', auth: 'auth1' },
       ];
@@ -109,7 +123,7 @@ describe('pushNotificationService', () => {
       error.statusCode = 410;
       vi.mocked(webpush.sendNotification).mockRejectedValue(error);
 
-      await sendPush(PLAYER_ID, { title: 'Test', body: 'Hello' });
+      await sendPush(PLAYER_ID, 'bossKilled', { title: 'Test', body: 'Hello' });
 
       expect(prisma.pushSubscription.delete).toHaveBeenCalledWith({ where: { id: 's1' } });
     });

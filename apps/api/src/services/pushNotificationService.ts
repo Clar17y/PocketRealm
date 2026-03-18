@@ -14,6 +14,25 @@ interface PushPayload {
   data?: Record<string, unknown>;
 }
 
+export type NotificationType =
+  | 'pvpAttack'
+  | 'pvpScout'
+  | 'bossAppeared'
+  | 'bossKilled'
+  | 'turnBankFull'
+  | 'expeditionStarted'
+  | 'expeditionFinished';
+
+const PREF_COLUMN: Record<NotificationType, string> = {
+  pvpAttack: 'notifyPvpAttack',
+  pvpScout: 'notifyPvpScout',
+  bossAppeared: 'notifyBossAppeared',
+  bossKilled: 'notifyBossKilled',
+  turnBankFull: 'notifyTurnBankFull',
+  expeditionStarted: 'notifyExpeditionStarted',
+  expeditionFinished: 'notifyExpeditionFinished',
+};
+
 function initVapid(): void {
   const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT } = process.env;
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) return;
@@ -61,8 +80,20 @@ export async function getSubscriptionStatus(playerId: string): Promise<boolean> 
   return sub !== null;
 }
 
-export async function sendPush(playerId: string, payload: PushPayload): Promise<void> {
+export async function sendPush(
+  playerId: string,
+  notificationType: NotificationType,
+  payload: PushPayload,
+): Promise<void> {
   ensureVapid();
+
+  // Check player's notification preference for this type
+  const prefColumn = PREF_COLUMN[notificationType];
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { [prefColumn]: true },
+  });
+  if (!player || player[prefColumn] === false) return;
 
   const subs = await prisma.pushSubscription.findMany({
     where: { playerId },
