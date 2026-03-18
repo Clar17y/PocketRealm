@@ -67,6 +67,8 @@ self.addEventListener("notificationclick", (event) => {
     targetPath = "/game?screen=arena";
   } else if (data?.type === "boss") {
     targetPath = "/game?screen=boss";
+  } else if (data?.type === "expedition") {
+    targetPath = "/game?screen=guild";
   }
 
   event.waitUntil(

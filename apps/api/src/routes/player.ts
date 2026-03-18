@@ -146,6 +146,8 @@ const SETTINGS_FIELDS = [
   'autoSkipKnownCombat', 'defaultExploreTurns', 'quickRestHealPercent', 'defaultRefiningMax',
   'lowHpWarning', 'confirmRarity', 'lootRevealRarity', 'forgeConfirmRarity',
   'homeTownId',
+  'notifyPvpAttack', 'notifyPvpScout', 'notifyBossAppeared', 'notifyBossKilled',
+  'notifyTurnBankFull', 'notifyExpeditionStarted', 'notifyExpeditionFinished',
 ] as const;
 
 const RARITY_ENUM = ['none', 'common', 'uncommon', 'rare', 'epic', 'legendary'] as const;

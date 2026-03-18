@@ -764,6 +764,20 @@ export async function checkAndResolveExpeditionRounds(io: Server | null): Promis
           `Tier ${exp.tier} expedition started with ${memberCount} members`,
           { expeditionId: exp.id },
         );
+
+        // Notify expedition members
+        const members = await prisma.guildExpeditionMember.findMany({
+          where: { expeditionId: exp.id },
+          select: { playerId: true },
+        });
+        for (const { playerId } of members) {
+          sendPush(playerId, 'expeditionStarted', {
+            title: 'Expedition Started!',
+            body: `Your Tier ${exp.tier} guild expedition has begun!`,
+            tag: 'expedition-started',
+            data: { type: 'expedition', expeditionId: exp.id },
+          }).catch(() => {});
+        }
       } else {
         // Not enough players, fail the expedition
         await prisma.guildExpedition.update({
