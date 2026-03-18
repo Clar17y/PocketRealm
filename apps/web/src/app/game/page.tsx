@@ -811,6 +811,7 @@ export default function GamePage() {
               ))}
             </div>
             <Crafting
+              skillType={activeCraftingSkill}
               skillName={activeCraftingSkillMeta?.name ?? 'Crafting'}
               skillLevel={activeCraftingSkillData?.level ?? 1}
               xpRate={Math.round(calculateEfficiency(activeCraftingSkillData?.dailyXpGained ?? 0, activeCraftingSkill as SkillType) * 100)}
@@ -918,6 +919,7 @@ export default function GamePage() {
               ))}
             </div>
             <Gathering
+              skillType={activeGatheringSkill}
               skillName={activeGatheringSkillMeta?.name ?? 'Gathering'}
               skillLevel={activeGatheringSkillData?.level ?? 1}
               xpRate={Math.round(calculateEfficiency(activeGatheringSkillData?.dailyXpGained ?? 0, activeGatheringSkill as SkillType) * 100)}

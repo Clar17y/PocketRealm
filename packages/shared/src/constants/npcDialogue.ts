@@ -359,6 +359,149 @@ export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
       ],
     },
   },
+
+  // =========================================================================
+  // Skill-specific NPC variants
+  // Same NPC, different lines depending on which crafting/gathering skill
+  // =========================================================================
+
+  'kessa-weaponsmithing': {
+    name: 'Kessa Ironweld',
+    location: 'The Forge, Crafting Quarter',
+    personality: 'Direct, proud, and perpetually overheated.',
+    lines: {
+      greeting: [
+        'Weapons, is it? Good. That is what I do best. Everything else is just practice for this.',
+        'You want a blade? Tell me what you are fighting and I will tell you what you need. Skip that step and you get what you deserve.',
+      ],
+      idle: [
+        'A sword is just a conversation between steel and stone. My job is to make sure the steel wins.',
+        'Every weapon has a weak point. The trick is knowing where it is before your enemy does. I build mine so only I know.',
+        'The difference between a good blade and a great one is about two hundred hammer strikes. Most smiths stop at a hundred and fifty.',
+      ],
+      buy: [
+        'Good steel finds good hands. Or at least it finds hands. Yours will do.',
+        'There you go. Swing it before you trust it. Every blade has a personality, and some of them are disagreeable.',
+      ],
+      farewell: [
+        'Go on, then. Hit something with it. That is what it is for.',
+        'Stay sharp out there. And I mean that literally. Bring a whetstone.',
+      ],
+    },
+  },
+
+  'kessa-armorsmithing': {
+    name: 'Kessa Ironweld',
+    location: 'The Forge, Crafting Quarter',
+    personality: 'Direct, proud, and perpetually overheated.',
+    lines: {
+      greeting: [
+        'Armour? Smart. Most people come in wanting something pointy. The clever ones ask for something that stops pointy things.',
+        'You want to survive out there? Good priorities. Let me see what I can hammer out for you.',
+      ],
+      idle: [
+        'The best armour is the kind you forget you are wearing. Until something hits you and you remember why you paid for it.',
+        'Plate, chain, scale. Each has a purpose. Plate stops the big hits. Chain handles the slashes. Scale is for people who want to look impressive while doing both poorly.',
+        'I test every piece myself. If it dents when I hit it, it is not ready. If it dents when the Forest Edge hits it, that is your problem. But it will not dent when I hit it.',
+      ],
+      buy: [
+        'Wear it in. Walk around town for a day before you go out there. New armour needs to learn your shape.',
+        'Sold. If something gets through that, it was not the armour\'s fault.',
+      ],
+      farewell: [
+        'Keep your guard up. The armour does its job; make sure you do yours.',
+        'Try not to come back with too many new dents. I charge for straightening.',
+      ],
+    },
+  },
+
+  'kessa-refining': {
+    name: 'Kessa Ironweld',
+    location: 'The Forge, Crafting Quarter',
+    personality: 'Direct, proud, and perpetually overheated.',
+    lines: {
+      greeting: [
+        'Refining? The foundation of everything I do. Bring me raw ore and I will show you what is hiding inside it.',
+        'Good. Nobody appreciates the refiner until they run out of ingots. Then suddenly everyone wants to be your friend.',
+      ],
+      idle: [
+        'Copper melts at a gentle heat. Iron takes commitment. Dark iron takes stubbornness and a furnace that wants to cooperate. Mine does not.',
+        'You can tell the quality of an ingot by the sound it makes when you tap it. Clear ring means clean metal. Dull thud means impurities. Silence means you are tapping a rock.',
+        'Refining is patience. The ore does not care about your schedule. It melts when it is ready, and not a moment before.',
+      ],
+      buy: [
+        'Clean bars, good weight. That is what comes out when you do not rush the process.',
+        'There you go. Every ingot I produce is worth the wait. Ask anyone. Or don\'t. I know I am right.',
+      ],
+      farewell: [
+        'Keep bringing me ore. The furnace gets lonely.',
+        'Off you go. Try to bring back something worth smelting this time.',
+      ],
+    },
+  },
+
+  'rowan-mining': {
+    name: 'Rowan Delk',
+    location: 'Just outside Millbrook\'s gate',
+    personality: 'Weathered, terse, and quietly competent.',
+    lines: {
+      greeting: [
+        'Mining, eh? Good. The veins in these hills have been generous this season. Just follow the colour in the rock and swing steady.',
+        'You want to pull copper out of stone? I can teach you that. The trick is knowing which stone to hit and which one to leave alone.',
+      ],
+      idle: [
+        'A copper vein looks like a green stain in grey rock. Iron shows as dark streaks with a reddish tint. Learn the colours and the pickaxe does the rest.',
+        'The Deep Mines have ore you have never seen. Dark iron, mythril, things that glow when you hit them. But the caves down there have other things too. Hungrier things.',
+        'Most miners swing too hard. The rock does not care how strong you are. It cares about where you hit it. Find the grain, follow the seam.',
+      ],
+      farewell: [
+        'Keep your pickaxe sharp and your lantern lit. Veins do not announce themselves in the dark.',
+        'Off to the mines? Watch your footing. The ore will wait. The floor might not.',
+      ],
+    },
+  },
+
+  'rowan-woodcutting': {
+    name: 'Rowan Delk',
+    location: 'Just outside Millbrook\'s gate',
+    personality: 'Weathered, terse, and quietly competent.',
+    lines: {
+      greeting: [
+        'Woodcutting? Right. Grab an axe, find an oak, and remember: you are not fighting the tree. You are negotiating.',
+        'The forests around Millbrook grow fast and thick. Good timber if you know where to look. I know where to look.',
+      ],
+      idle: [
+        'Oak is reliable. Willow is flexible. Darkwood is stubborn and will ruin your axe if you come at it wrong. Respect the grain.',
+        'Millbrook\'s bowyer gets his best wood from the trees at the Forest Edge, where the soil is richer. The deep forest trees grow harder but more brittle. Different wood for different work.',
+        'A clean cut heals. The tree grows back. A ragged cut rots, and then you have a dead tree and a dull axe. Take your time.',
+      ],
+      farewell: [
+        'Swing with the grain, not against it. The forest will teach you the rest.',
+        'Keep your axe oiled and your back straight. Woodcutting is a young person\'s game until it is not.',
+      ],
+    },
+  },
+
+  'rowan-foraging': {
+    name: 'Rowan Delk',
+    location: 'Just outside Millbrook\'s gate',
+    personality: 'Weathered, terse, and quietly competent.',
+    lines: {
+      greeting: [
+        'Foraging? Good eye. Most people walk right past what the land is offering. Herbs, mushrooms, roots. It is all there if you know how to look.',
+        'The forest floor has more to give than the trees above it. You just need to get your knees dirty.',
+      ],
+      idle: [
+        'Forest Sage grows in patches where the canopy thins. The peppery smell gives it away before you see it. Follow your nose.',
+        'Mushrooms after rain. Herbs at dawn. Roots in autumn. Everything has a season. Learn the rhythm and the land provides.',
+        'Vesper keeps asking me to find her specific herbs in specific conditions. "Morning-harvested Moonpetal only, Rowan." As if the Moonpetal cares what time I pick it. It does, apparently. She tested.',
+      ],
+      farewell: [
+        'Watch where you step. The best finds are always right where someone is about to put their boot.',
+        'Take only what you need. The forest remembers greed.',
+      ],
+    },
+  },
 };
 
 /** Valid NPC keys — derived from NPC_DIALOGUE for compile-time safety. */

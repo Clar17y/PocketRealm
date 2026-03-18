@@ -20,7 +20,14 @@ import type { EventModifierBadge } from '@/lib/api';
 import { ItemIcon } from '@/components/common/ItemIcon';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
+import type { NpcKey } from '@pocketrealm/shared';
 import { ScreenContainer } from '../common/ScreenContainer';
+
+const GATHERING_NPC_MAP: Record<string, NpcKey> = {
+  mining: 'rowan-mining',
+  woodcutting: 'rowan-woodcutting',
+  foraging: 'rowan-foraging',
+};
 
 interface ResourceNode {
   id: string;
@@ -40,6 +47,7 @@ interface ResourceNode {
 }
 
 interface GatheringProps {
+  skillType?: string;
   skillName: string;
   skillLevel: number;
   xpRate: number;
@@ -77,6 +85,7 @@ interface GatheringProps {
 }
 
 export function Gathering({
+  skillType,
   skillName,
   skillLevel,
   xpRate,
@@ -103,6 +112,7 @@ export function Gathering({
   ownedResourceNames,
 }: GatheringProps) {
   const { dialogueEvent } = useNpcDialogue();
+  const npcKey = skillType ? GATHERING_NPC_MAP[skillType] : undefined;
 
   const getEventYieldMultiplier = (node: ResourceNode) =>
     computeResourceYieldMultiplier(node.eventModifiers ?? []);
@@ -214,7 +224,7 @@ export function Gathering({
 
   return (
     <ScreenContainer>
-      <NpcDialogueBanner npcKey="millbrook-gathering-guide" event={dialogueEvent} />
+      {npcKey && <NpcDialogueBanner npcKey={npcKey} event={dialogueEvent} />}
 
       {/* Knockout Banner */}
       {isRecovering && (

@@ -1,15 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getNpcLine, getNpcName, type DialogueEvent, type NpcKey } from '@pocketrealm/shared';
+import { getNpcLine, getNpcName, NPC_DIALOGUE_CONSTANTS, type DialogueEvent, type NpcKey } from '@pocketrealm/shared';
 
 interface NpcDialogueBannerProps {
   npcKey: NpcKey;
   event: DialogueEvent;
-  idleIntervalMs?: number;
 }
 
-export function NpcDialogueBanner({ npcKey, event, idleIntervalMs = 15000 }: NpcDialogueBannerProps) {
+export function NpcDialogueBanner({ npcKey, event }: NpcDialogueBannerProps) {
   const name = getNpcName(npcKey);
   const [line, setLine] = useState<string | null>(() => getNpcLine(npcKey, event));
 
@@ -23,9 +22,9 @@ export function NpcDialogueBanner({ npcKey, event, idleIntervalMs = 15000 }: Npc
     if (event !== 'idle') return;
     const interval = setInterval(() => {
       setLine(getNpcLine(npcKey, 'idle'));
-    }, idleIntervalMs);
+    }, NPC_DIALOGUE_CONSTANTS.IDLE_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [event, npcKey, idleIntervalMs]);
+  }, [event, npcKey]);
 
   if (!name || !line) return null;
 

@@ -43,7 +43,17 @@ interface Recipe {
   rarity: Rarity;
 }
 
+import type { NpcKey } from '@pocketrealm/shared';
+
+const CRAFTING_NPC_MAP: Record<string, NpcKey> = {
+  weaponsmithing: 'kessa-weaponsmithing',
+  armorsmithing: 'kessa-armorsmithing',
+  refining: 'kessa-refining',
+  alchemy: 'millbrook-herbalist',
+};
+
 interface CraftingProps {
+  skillType?: string;
   skillName: string;
   skillLevel: number;
   xpRate: number;
@@ -62,10 +72,11 @@ interface CraftingProps {
 }
 
 
-export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, availableSlots = 0 }: CraftingProps) {
+export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, availableSlots = 0 }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
+  const npcKey = skillType ? CRAFTING_NPC_MAP[skillType] : undefined;
 
   useEffect(() => {
     if (recipes.length === 0) {
@@ -119,7 +130,7 @@ export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, acti
 
   return (
     <ScreenContainer>
-      <NpcDialogueBanner npcKey="millbrook-blacksmith" event={dialogueEvent} />
+      {npcKey && <NpcDialogueBanner npcKey={npcKey} event={dialogueEvent} />}
 
       {/* Knockout Banner */}
       {isRecovering && (

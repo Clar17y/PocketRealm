@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getNpcLine, getNpcName, NPC_DIALOGUE } from '../npcDialogue';
+import { getNpcLine, getNpcName, NPC_DIALOGUE, type NpcKey } from '../npcDialogue';
 
 describe('getNpcLine', () => {
   it('returns a string for valid NPC and event', () => {
@@ -9,7 +9,7 @@ describe('getNpcLine', () => {
   });
 
   it('returns null for unknown NPC', () => {
-    expect(getNpcLine('nonexistent-npc', 'greeting')).toBeNull();
+    expect(getNpcLine('nonexistent-npc' as NpcKey, 'greeting')).toBeNull();
   });
 
   it('returns null for NPC with no lines for a specific event', () => {
@@ -33,7 +33,7 @@ describe('getNpcName', () => {
   });
 
   it('returns null for unknown NPC', () => {
-    expect(getNpcName('nonexistent')).toBeNull();
+    expect(getNpcName('nonexistent' as NpcKey)).toBeNull();
   });
 
   it('returns correct names for all major NPCs', () => {
@@ -85,7 +85,16 @@ describe('NPC_DIALOGUE completeness', () => {
     }
   });
 
-  it('has exactly 12 NPC entries', () => {
-    expect(Object.keys(NPC_DIALOGUE).length).toBe(12);
+  it('has skill-specific variants for Kessa and Rowan', () => {
+    expect(getNpcName('kessa-weaponsmithing')).toBe('Kessa Ironweld');
+    expect(getNpcName('kessa-armorsmithing')).toBe('Kessa Ironweld');
+    expect(getNpcName('kessa-refining')).toBe('Kessa Ironweld');
+    expect(getNpcName('rowan-mining')).toBe('Rowan Delk');
+    expect(getNpcName('rowan-woodcutting')).toBe('Rowan Delk');
+    expect(getNpcName('rowan-foraging')).toBe('Rowan Delk');
+  });
+
+  it('has expected number of NPC entries (12 base + 6 skill-specific)', () => {
+    expect(Object.keys(NPC_DIALOGUE).length).toBe(18);
   });
 });
