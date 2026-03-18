@@ -4,7 +4,7 @@
 
 **Goal:** Replace the sequential 1v1 encounter site combat UI with an expedition-style combat view for a solo player, extracting shared components from `GuildExpeditionsTab` so both features compose from the same building blocks.
 
-**Architecture:** Extract 8 shared combat components from `GuildExpeditionsTab` into `apps/web/src/components/common/combat/`. Build `EncounterSiteCombatView` composing these components with a 4-state machine (room_preview → auto_playback/manual_combat → room_result). Add backend support for `activeEncounterSiteId` lockout and per-round snapshots in auto-resolve responses.
+**Architecture:** Extract 7 shared combat components from `GuildExpeditionsTab` (1882 lines) into `apps/web/src/components/common/combat/`. `HealTargetSelector` extraction deferred — it is expedition-only with no second consumer yet. Build `EncounterSiteCombatView` composing these components with a 4-state machine (room_preview → auto_playback/manual_combat → room_result). Add backend support for `activeEncounterSiteId` lockout and per-round snapshots in auto-resolve responses.
 
 **Tech Stack:** TypeScript, React, Next.js, Prisma 6, Vitest, Zod
 
@@ -525,10 +525,10 @@ export function RoundLogContent({ roundLog, playerId, multiRoom }: RoundLogConte
 
 - [ ] **Step 2: Move RoundLogAttackRow**
 
-Move `apps/web/src/components/guild/guildExpeditionRoundLogView.tsx` (or its contents) to `apps/web/src/components/common/combat/RoundLogAttackRow.tsx`. Update the old location to re-export for backwards compatibility if other files import from the old path:
+Move `apps/web/src/components/guild/guildExpeditionRoundLogView.tsx` (or its contents) to `apps/web/src/components/common/combat/RoundLogAttackRow.tsx`. Update the barrel re-export for backwards compatibility — other files import from `guildExpeditionRoundLog.ts` (not `guildExpeditionRoundLogView.tsx`):
 
 ```typescript
-// apps/web/src/components/guild/guildExpeditionRoundLogView.tsx
+// apps/web/src/components/guild/guildExpeditionRoundLog.ts
 export { RoundLogAttackRow } from '@/components/common/combat/RoundLogAttackRow';
 ```
 
@@ -608,7 +608,6 @@ export interface ThreatEntry {
   id: string;
   label: string;
   threatValue: number;
-  isCurrentPlayer?: boolean;
 }
 
 export interface ThreatMeterProps {
@@ -616,10 +615,35 @@ export interface ThreatMeterProps {
 }
 
 export function ThreatMeter({ entries }: ThreatMeterProps) {
-  // Extract lines 1684-1746
-  // Adapt from using ExpeditionMemberData[] directly to the generic ThreatEntry interface
-  // so both expedition (player threat) and encounter (mob threat) can use it
+  // Extract lines 1684-1746, replacing ExpeditionMemberData[] with ThreatEntry[]
+  // The component internally sorts by threatValue descending and highlights the highest entry
+  // (the "aggro holder"). Keep this internal computation — callers just provide entries.
+  const sorted = [...entries].sort((a, b) => b.threatValue - a.threatValue);
+  const maxThreat = sorted[0]?.threatValue ?? 0;
+  // ... rest of existing rendering with sorted entries and maxThreat for bar width %
 }
+```
+
+**Expedition adapter code** — in `GuildExpeditionsTab.tsx` where ThreatMeter is used (inside MemberList), convert members to entries:
+
+```tsx
+<ThreatMeter
+  entries={members
+    .filter(m => m.threatValue > 0)
+    .map(m => ({
+      id: m.playerId,
+      label: m.username ?? m.playerId,
+      threatValue: m.threatValue,
+    }))}
+/>
+```
+
+**Encounter site adapter** — in `EncounterSiteCombatView`, threat shows the player's threat per mob (from the round log threat data if available), but initially can just show the player as a single entry:
+
+```tsx
+<ThreatMeter
+  entries={[{ id: 'self', label: 'You', threatValue: 100 }]}
+/>
 ```
 
 - [ ] **Step 2: Create PlayerResourceBars.tsx**
@@ -855,6 +879,7 @@ export interface EncounterAutoResolveResponse {
     materials: Array<{ itemTemplateId: string; name: string; quantity: number }>;
     recipe?: { recipeId: string; name: string } | null;
   };
+  stateUpdates?: StateUpdates; // turns consumed, HP changes, XP, loot
 }
 
 export interface EncounterStartRoomResponse {
@@ -870,6 +895,7 @@ export interface EncounterStartRoomResponse {
   }>;
   turnCost: number;
   playerState: EncounterPlayerState;
+  stateUpdates?: StateUpdates;
 }
 
 export interface EncounterManualRoundResponse {
@@ -879,6 +905,7 @@ export interface EncounterManualRoundResponse {
   roomCleared: boolean;
   defeated: boolean;
   chestReward?: EncounterAutoResolveResponse['chestReward'];
+  stateUpdates?: StateUpdates;
 }
 ```
 
@@ -924,7 +951,7 @@ export async function abandonEncounterSite(siteId: string): Promise<{ success: b
 
 - [ ] **Step 3: Add import for shared types**
 
-Ensure `ExpeditionRoundLog` and `BossActiveEffect` are imported from `@pocketrealm/shared` at the top of the file.
+Ensure `ExpeditionRoundLog`, `BossActiveEffect`, and `StateUpdates` are imported from `@pocketrealm/shared` at the top of the file.
 
 - [ ] **Step 4: Build web**
 
@@ -991,6 +1018,13 @@ interface EncounterSiteCombatViewProps {
   onStartRoom: () => Promise<EncounterStartRoomResponse>;
   onResolveRound: (action: { action: string; targetMobSlot?: number }) => Promise<EncounterManualRoundResponse>;
   onAbandon: () => Promise<void>;
+  onAdvanceRoom: () => Promise<{
+    currentRoom: number;
+    mobs: ExpeditionMobInfo[];
+    playerState: EncounterPlayerState;
+    hasDecayedMobs: boolean;
+  }>; // called when player continues to next room — parent refetches site data
+  onRetryRoom: () => Promise<EncounterStartRoomResponse>; // resets room server-side, returns fresh state
   onComplete: () => void; // called when player exits combat view
   onActivateTemplate: (templateId: string) => void;
 }
@@ -1053,7 +1087,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
           />
           <TemplateQuickSwitch
             templates={props.templates}
-            activeTemplateId={props.templates[0]?.id ?? null}
+            activeTemplateId={props.templates.find(t => t.isActive)?.id ?? props.templates[0]?.id ?? null}
             onActivate={props.onActivateTemplate}
           />
         </>
@@ -1148,7 +1182,8 @@ async function handleAutoResolve() {
     // Start animated playback
     playRounds(result.rounds);
   } catch (err) {
-    // Handle error — show toast or inline error
+    // Use the project's toast queue: window.showToast?.({ message: (err as Error).message, type: 'error' })
+    window.showToast?.({ message: (err as Error).message ?? 'Auto-resolve failed', type: 'error' });
   } finally {
     setLoading(false);
   }
@@ -1167,8 +1202,11 @@ async function playRounds(rounds: EncounterRoundSnapshot[]) {
     setRoundLogs(prev => [...prev, snapshot.log]);
 
     // Update mob HP bars
+    // Mob IDs follow the pattern "encounter-mob-{slot}" (set by buildEncounterRaidMob in game-engine).
+    // The slot number is embedded in the ID, and mobStates[].slot matches it.
     setMobs(prev => prev.map(mob => {
-      const mobState = snapshot.mobStates.find(ms => ms.slot === /* map mob id to slot */);
+      const slot = parseInt(mob.id.replace('encounter-mob-', ''), 10);
+      const mobState = snapshot.mobStates.find(ms => ms.slot === slot);
       if (!mobState) return mob;
       return { ...mob, hp: mobState.hp, maxHp: mobState.maxHp, activeEffects: mobState.activeEffects };
     }));
@@ -1204,7 +1242,8 @@ function handleSkipPlayback() {
   if (lastRound) {
     setRoundLogs(playbackRounds.map(r => r.log));
     setMobs(prev => prev.map(mob => {
-      const mobState = lastRound.mobStates.find(ms => ms.slot === /* map */);
+      const slot = parseInt(mob.id.replace('encounter-mob-', ''), 10);
+      const mobState = lastRound.mobStates.find(ms => ms.slot === slot);
       if (!mobState) return mob;
       return { ...mob, hp: mobState.hp, maxHp: mobState.maxHp, activeEffects: mobState.activeEffects };
     }));
@@ -1250,7 +1289,7 @@ async function handleStartManual() {
     setPlayerState(result.playerState);
     setState('manual_combat');
   } catch (err) {
-    // Handle error
+    window.showToast?.({ message: (err as Error).message ?? 'Failed to start room', type: 'error' });
   } finally {
     setLoading(false);
   }
@@ -1264,9 +1303,11 @@ async function handleNextRound() {
   setLoading(true);
   try {
     // Build action from selected target and active template
+    // Mob IDs follow "encounter-mob-{slot}" pattern, so extract slot from ID
+    const targetSlot = targetMobId ? parseInt(targetMobId.replace('encounter-mob-', ''), 10) : undefined;
     const action = {
       action: 'template', // uses the player's active template
-      targetMobSlot: targetMobId ? /* map id to slot */ undefined : undefined,
+      targetMobSlot: targetSlot,
     };
     const result = await props.onResolveRound(action);
 
@@ -1275,7 +1316,8 @@ async function handleNextRound() {
 
     // Update mob states
     setMobs(prev => prev.map(mob => {
-      const mobState = result.mobStates.find(ms => ms.slot === /* map */);
+      const slot = parseInt(mob.id.replace('encounter-mob-', ''), 10);
+      const mobState = result.mobStates.find(ms => ms.slot === slot);
       if (!mobState) return mob;
       return { ...mob, hp: mobState.hp, maxHp: mobState.maxHp, activeEffects: mobState.activeEffects };
     }));
@@ -1293,7 +1335,7 @@ async function handleNextRound() {
       setState('room_result');
     }
   } catch (err) {
-    // Handle error
+    window.showToast?.({ message: (err as Error).message ?? 'Failed to resolve round', type: 'error' });
   } finally {
     setLoading(false);
   }
@@ -1382,28 +1424,61 @@ git commit -am "feat: implement manual combat round-by-round in EncounterSiteCom
 - [ ] **Step 2: Implement handleContinue**
 
 ```typescript
-function handleContinue() {
-  // Reset state for next room — parent re-renders with updated currentRoom and mobs
-  setRoundLogs([]);
-  setOutcome(null);
-  setChestReward(null);
-  setTargetMobId(null);
-  setState('room_preview');
-  // Parent component fetches updated site state and passes new initialMobs/currentRoom
+async function handleContinue() {
+  setLoading(true);
+  try {
+    // Parent refetches site data and returns next room's state
+    const nextRoom = await props.onAdvanceRoom();
+    setMobs(nextRoom.mobs.map(m => ({
+      id: m.id ?? `encounter-mob-${m.slot}`,
+      name: m.name,
+      prefix: m.prefix,
+      hp: m.hp,
+      maxHp: m.maxHp,
+      activeEffects: [],
+    })));
+    setPlayerState(nextRoom.playerState);
+    setRoundLogs([]);
+    setOutcome(null);
+    setChestReward(null);
+    setTargetMobId(null);
+    setState('room_preview');
+  } catch (err) {
+    window.showToast?.({ message: 'Failed to advance room', type: 'error' });
+  } finally {
+    setLoading(false);
+  }
 }
 ```
 
 - [ ] **Step 3: Implement handleRetry**
 
+Retry calls the server to reset the room. The server clears carry state and resets mobs to alive. Using stale props would be incorrect since the player's carry HP from previous rooms is not the right "retry" state.
+
 ```typescript
-function handleRetry() {
-  // Reset state for same room — mobs back to full HP
-  setMobs(props.initialMobs);
-  setPlayerState(props.playerState);
-  setRoundLogs([]);
-  setOutcome(null);
-  setTargetMobId(null);
-  setState('room_preview');
+async function handleRetry() {
+  setLoading(true);
+  try {
+    // Server resets room mobs to alive, clears carry state, charges turn cost again
+    const result = await props.onRetryRoom();
+    setMobs(result.mobs.map(m => ({
+      id: m.id,
+      name: m.name,
+      prefix: m.prefix,
+      hp: m.hp,
+      maxHp: m.maxHp,
+      activeEffects: [],
+    })));
+    setPlayerState(result.playerState);
+    setRoundLogs([]);
+    setOutcome(null);
+    setTargetMobId(null);
+    setState('room_preview');
+  } catch (err) {
+    window.showToast?.({ message: 'Failed to retry room', type: 'error' });
+  } finally {
+    setLoading(false);
+  }
 }
 ```
 
@@ -1501,10 +1576,40 @@ In `CombatScreen.tsx`, when `activeEncounterSiteId` is set, render the combat vi
     playerState={encounterCombatData.playerState}
     templates={templates}
     hasDecayedMobs={encounterCombatData.hasDecayedMobs}
-    onAutoResolve={() => autoResolveEncounterRoom(activeEncounterSiteId)}
-    onStartRoom={() => startEncounterRoom(activeEncounterSiteId)}
-    onResolveRound={(action) => resolveEncounterRound(activeEncounterSiteId, action)}
-    onAbandon={async () => { await abandonEncounterSite(activeEncounterSiteId); setActiveEncounterSiteId(null); setEncounterCombatData(null); }}
+    onAutoResolve={async () => {
+      const result = await autoResolveEncounterRoom(activeEncounterSiteId);
+      if (result.stateUpdates) onStateUpdates(result.stateUpdates); // apply turns, HP, XP changes
+      return result;
+    }}
+    onStartRoom={async () => {
+      const result = await startEncounterRoom(activeEncounterSiteId);
+      if (result.stateUpdates) onStateUpdates(result.stateUpdates);
+      return result;
+    }}
+    onResolveRound={async (action) => {
+      const result = await resolveEncounterRound(activeEncounterSiteId, action);
+      if (result.stateUpdates) onStateUpdates(result.stateUpdates);
+      return result;
+    }}
+    onAbandon={async () => {
+      const result = await abandonEncounterSite(activeEncounterSiteId);
+      if (result.stateUpdates) onStateUpdates(result.stateUpdates);
+      setActiveEncounterSiteId(null); setEncounterCombatData(null);
+    }}
+    onAdvanceRoom={async () => {
+      // Refetch site data for next room
+      const sites = await getEncounterSites();
+      const site = sites.sites.find(s => s.id === activeEncounterSiteId);
+      if (!site) throw new Error('Site not found');
+      // Build next room data from updated site
+      return { currentRoom: site.currentRoom, mobs: /* build mob info from site.mobs */, playerState: /* from site.roomCarryState */, hasDecayedMobs: /* check decayed count in current room */ };
+    }}
+    onRetryRoom={async () => {
+      // Call start-room again — server resets mobs, charges turns
+      const result = await startEncounterRoom(activeEncounterSiteId);
+      if (result.stateUpdates) onStateUpdates(result.stateUpdates);
+      return result;
+    }}
     onComplete={() => { setActiveEncounterSiteId(null); setEncounterCombatData(null); refreshPendingEncounters(); }}
     onActivateTemplate={handleActivateTemplate}
   />
