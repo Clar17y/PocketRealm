@@ -11,10 +11,7 @@ function makeSetters(): StateSetters {
     setInventoryCapacity: vi.fn(),
     setInventoryUsedSlots: vi.fn(),
     setEquipment: vi.fn(),
-    updateEquipmentItems: vi.fn((updater) => {
-      if (typeof updater === 'function') return updater([]);
-      return updater;
-    }),
+    patchEquipmentDurability: vi.fn(),
     setSkills: vi.fn(),
     setHpState: vi.fn(),
     setStaminaState: vi.fn(),

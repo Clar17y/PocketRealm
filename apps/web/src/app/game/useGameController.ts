@@ -397,7 +397,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         item,
       })),
     ),
-    updateEquipmentItems: (updater) => setEquipment(updater),
+    patchEquipmentDurability: (patches) => setEquipment((prev) => {
+      let changed = false;
+      const next = prev.map((slot) => {
+        if (!slot.item || !slot.itemId) return slot;
+        const patch = patches.get(slot.itemId);
+        if (!patch) return slot;
+        changed = true;
+        return { ...slot, item: { ...slot.item, currentDurability: patch.currentDurability, maxDurability: patch.maxDurability } };
+      });
+      return changed ? next : prev;
+    }),
     setSkills,
     setHpState: (hp) => { setHpState(hp); hpStateRef.current = hp; },
     setStaminaState: (partial) => setStaminaState((prev) => ({ ...prev, ...partial })),
