@@ -25,6 +25,8 @@ interface EncounterSiteChestRewards {
   recipeUnlocked: RecipeUnlockReward | null;
   overflow: DropGrantResult['overflow'];
   slotsConsumed: number;
+  newItemIds: string[];
+  updatedItemIds: string[];
 }
 
 export async function grantEncounterSiteChestRewardsTx(
@@ -126,5 +128,7 @@ export async function grantEncounterSiteChestRewardsTx(
     recipeUnlocked,
     overflow: dropResult.overflow,
     slotsConsumed: dropResult.slotsConsumed,
+    newItemIds: dropResult.newItemIds,
+    updatedItemIds: dropResult.updatedItemIds,
   };
 }

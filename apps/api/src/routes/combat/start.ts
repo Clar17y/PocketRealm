@@ -420,9 +420,15 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const siteCompletionRewards = txResult.siteCompletionRewards;
   const sitePotionDeductResult = txResult.potionDeductResult;
 
-  // Collect chest overflow
+  // Collect chest overflow + granted item IDs
   if (siteCompletionRewards?.overflow?.length) {
     allSiteOverflow.push(...siteCompletionRewards.overflow);
+  }
+  if (siteCompletionRewards?.newItemIds?.length) {
+    allSiteNewItemIds.push(...siteCompletionRewards.newItemIds);
+  }
+  if (siteCompletionRewards?.updatedItemIds?.length) {
+    allSiteUpdatedItemIds.push(...siteCompletionRewards.updatedItemIds);
   }
 
   // Store all overflow as a single pending loot session

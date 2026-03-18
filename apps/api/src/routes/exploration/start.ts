@@ -898,6 +898,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         });
         availableSlots = Math.max(0, availableSlots - cacheLoot.slotsConsumed);
         allCacheOverflow.push(...cacheLoot.overflow);
+        allNewItemIds.push(...cacheLoot.newItemIds);
+        allUpdatedItemIds.push(...cacheLoot.updatedItemIds);
 
         const lootSummary = cacheLoot.materials.map(m => ({
           itemTemplateId: m.itemTemplateId,
