@@ -38,6 +38,7 @@ describe('toInventoryItemDTO', () => {
       setId: null,
       description: 'A sturdy blade',
       subtype: null,
+      flavorText: null,
     },
   };
 
@@ -66,6 +67,7 @@ describe('toInventoryItemDTO', () => {
         maxDurability: 100,
         stackable: false,
         sellPrice: 50,
+        flavorText: null,
       },
       equippedSlot: null,
     });

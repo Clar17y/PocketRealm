@@ -5,6 +5,7 @@ export interface StateSetters {
   setInventoryCapacity: (n: number) => void;
   setInventoryUsedSlots: (n: number) => void;
   setEquipment: (eq: Record<string, InventoryItemDTO | null>) => void;
+  patchEquipmentDurability: (patches: Map<string, { currentDurability: number | null; maxDurability: number | null }>) => void;
   setSkills: (skills: SkillStateDTO[]) => void;
   setHpState: (hp: HpState) => void;
   setStaminaState: (partial: Partial<ResourceStateDTO>) => void;
@@ -37,6 +38,15 @@ export function applyStateUpdates(
       }
       return next;
     });
+  }
+
+  // Sync equipment state when inventoryUpdated includes equipped items (e.g. after repair)
+  if (updates.inventoryUpdated) {
+    const patches = new Map<string, { currentDurability: number | null; maxDurability: number | null }>();
+    for (const item of updates.inventoryUpdated) {
+      patches.set(item.id, { currentDurability: item.currentDurability, maxDurability: item.maxDurability });
+    }
+    setters.patchEquipmentDurability(patches);
   }
 
   if (updates.equipment !== undefined) setters.setEquipment(updates.equipment);

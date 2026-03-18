@@ -191,6 +191,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     zoneType: string;
     zoneExitChance: number | null;
     maxCraftingLevel: number | null;
+    arrivalText: string | null;
+    ambientTexts: Record<string, string> | null;
+    environmentalTexts: Record<string, string> | null;
     exploration: {
       turnsExplored: number;
       turnsToExplore: number | null;
@@ -394,6 +397,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         item,
       })),
     ),
+    patchEquipmentDurability: (patches) => setEquipment((prev) => {
+      let changed = false;
+      const next = prev.map((slot) => {
+        if (!slot.item || !slot.itemId) return slot;
+        const patch = patches.get(slot.itemId);
+        if (!patch) return slot;
+        changed = true;
+        return { ...slot, item: { ...slot.item, currentDurability: patch.currentDurability, maxDurability: patch.maxDurability } };
+      });
+      return changed ? next : prev;
+    }),
     setSkills,
     setHpState: (hp) => { setHpState(hp); hpStateRef.current = hp; },
     setStaminaState: (partial) => setStaminaState((prev) => ({ ...prev, ...partial })),

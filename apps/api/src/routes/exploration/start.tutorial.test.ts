@@ -84,6 +84,10 @@ vi.mock('../../services/persistedMobService', () => ({
 }));
 vi.mock('../../services/stateUpdateHelpers', () => ({
   buildStateUpdates: vi.fn().mockResolvedValue({}),
+  fetchItemDTOs: vi.fn().mockResolvedValue([]),
+  fetchInventoryMeta: vi.fn().mockResolvedValue({ inventoryUsedSlots: 0, inventoryCapacity: 24 }),
+  fetchMaterialTotals: vi.fn().mockResolvedValue({}),
+  mergeLootIntoStateUpdates: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../services/potionService', () => ({
   buildPotionPool: vi.fn().mockResolvedValue([]),
@@ -184,7 +188,7 @@ vi.mock('../../services/combatOrchestrationService', () => ({
     actionDefinitions: {},
   })),
   processCombatVictoryRewards: vi.fn().mockResolvedValue({
-    loot: [], overflow: [], pendingLootSessionId: null, xpGrants: [{ skillType: 'melee', xpResult: { xpGained: 10, xpAfterEfficiency: 10, efficiency: 1, leveledUp: false, newLevel: 1, atDailyCap: false }, newTotalXp: 10, newDailyXpGained: 10, characterXpGain: 5, characterXpAfter: 5, characterLevelBefore: 1, characterLevelAfter: 1, attributePointsAfter: 0, characterLeveledUp: false }],
+    loot: [], overflow: [], pendingLootSessionId: null, newItemIds: [], updatedItemIds: [], xpGrants: [{ skillType: 'melee', xpResult: { xpGained: 10, xpAfterEfficiency: 10, efficiency: 1, leveledUp: false, newLevel: 1, atDailyCap: false }, newTotalXp: 10, newDailyXpGained: 10, characterXpGain: 5, characterXpAfter: 5, characterLevelBefore: 1, characterLevelAfter: 1, attributePointsAfter: 0, characterLeveledUp: false }],
     questProgress: [],
   }),
   buildCombatLogResult: vi.fn(() => ({})),

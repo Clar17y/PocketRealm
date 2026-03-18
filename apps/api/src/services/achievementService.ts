@@ -152,6 +152,7 @@ export async function getPlayerAchievements(playerId: string): Promise<{
       category: def.category,
       title,
       description,
+      flavorText: isUnlocked ? def.flavorText : undefined,
       titleReward: isUnlocked ? def.titleReward : undefined,
       threshold: def.threshold,
       secret: def.secret,

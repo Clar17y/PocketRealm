@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ITEM_RARITY_CONSTANTS } from '@pocketrealm/shared';
+import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@pocketrealm/game-engine';
 import { Anvil, Sparkles, TrendingUp } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
@@ -154,6 +156,7 @@ export function Forge({
   const [confirmReroll, setConfirmReroll] = useState(false);
   const [upgradePickerOpen, setUpgradePickerOpen] = useState(false);
   const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
   const noFacility = zoneCraftingLevel === 0;
 
   const tryForgeAction = (setConfirm: (v: boolean) => void, action: () => void | Promise<void>) => {
@@ -230,6 +233,7 @@ export function Forge({
     setBusy('upgrade');
     try {
       await onUpgrade(selected.id, selectedUpgradeSacrificeId);
+      triggerDialogueEvent('buy');
     } finally {
       setBusy(null);
     }
@@ -240,6 +244,7 @@ export function Forge({
     setBusy('reroll');
     try {
       await onReroll(selected.id, selectedRerollSacrificeId);
+      triggerDialogueEvent('buy');
     } finally {
       setBusy(null);
     }
@@ -265,6 +270,7 @@ export function Forge({
 
   return (
     <ScreenContainer>
+      <NpcDialogueBanner npcKey="millbrook-blacksmith" event={dialogueEvent} />
       <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 

@@ -4,6 +4,7 @@ import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import type { PendingLootItem } from './pendingLootService';
+import type { GrantedItemIds } from './stateUpdateHelpers';
 
 /** Converts Prisma Decimal-like values to plain numbers. */
 export function decimalLikeToNumber(value: unknown): number {
@@ -46,7 +47,7 @@ export function createLootAccumulator() {
   };
 }
 
-export interface DropGrantResult {
+export interface DropGrantResult extends GrantedItemIds {
   loot: LootDrop[];
   overflow: PendingLootItem[];
   slotsConsumed: number;
@@ -66,6 +67,8 @@ export async function rollAndGrantDropsTx(
 ): Promise<DropGrantResult> {
   const accumulator = createLootAccumulator();
   const overflow: PendingLootItem[] = [];
+  const newItemIds: string[] = [];
+  const updatedItemIds: string[] = [];
   const initialSlots = availableSlots ?? Infinity;
   let remainingSlots = initialSlots;
 
@@ -109,7 +112,8 @@ export async function rollAndGrantDropsTx(
 
       if (needsNewSlot) remainingSlots--;
       grantedStackableTemplates.add(picked.itemTemplateId);
-      await addStackableItemTx(tx, playerId, picked.itemTemplateId, quantity);
+      const stackResult = await addStackableItemTx(tx, playerId, picked.itemTemplateId, quantity);
+      (stackResult.created ? newItemIds : updatedItemIds).push(stackResult.itemId);
       accumulator.add({ itemTemplateId: picked.itemTemplateId, quantity, rarity });
       continue;
     }
@@ -124,7 +128,7 @@ export async function rollAndGrantDropsTx(
         continue;
       }
       remainingSlots--;
-      await tx.item.create({
+      const created = await tx.item.create({
         data: {
           ownerId: playerId,
           templateId: picked.itemTemplateId,
@@ -133,11 +137,13 @@ export async function rollAndGrantDropsTx(
           maxDurability,
           currentDurability: maxDurability,
         },
+        select: { id: true },
       });
+      newItemIds.push(created.id);
     }
     accumulator.add({ itemTemplateId: picked.itemTemplateId, quantity, rarity });
   }
 
   const slotsConsumed = initialSlots === Infinity ? 0 : Math.max(0, initialSlots - remainingSlots);
-  return { loot: accumulator.toArray(), overflow, slotsConsumed };
+  return { loot: accumulator.toArray(), overflow, slotsConsumed, newItemIds: [...new Set(newItemIds)], updatedItemIds: [...new Set(updatedItemIds)] };
 }

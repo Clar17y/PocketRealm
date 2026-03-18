@@ -1465,6 +1465,20 @@ export const BESTIARY_UNLOCK_CONSTANTS = {
   DISCOVERED_THRESHOLD: 1,
   STATS_THRESHOLD: 3,
   ROTATION_THRESHOLD: 5,
+  FLAVOR_APPEARANCE_THRESHOLD: 1,
+  FLAVOR_BEHAVIOR_THRESHOLD: 10,
+  FLAVOR_LORE_THRESHOLD: 25,
+} as const;
+
+export const NPC_DIALOGUE_CONSTANTS = {
+  /** ms before greeting switches to idle */
+  GREETING_DURATION_MS: 10000,
+  /** ms between idle line rotations */
+  IDLE_INTERVAL_MS: 20000,
+  /** ms to show buy/sell reaction before returning to idle */
+  ACTION_DURATION_MS: 10000,
+  /** ms after page load before farewell line appears */
+  FAREWELL_DELAY_MS: 60000,
 } as const;
 
 export const EXPEDITION_TOKEN_CONSTANTS = {

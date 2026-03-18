@@ -53,7 +53,7 @@ import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
 import { getMainHandAttackSkill } from '../../services/combatStatsService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
-import { buildStateUpdates } from '../../services/stateUpdateHelpers';
+import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers';
 import {
   startSchema,
   pickWeighted,
@@ -195,6 +195,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const turnsToSpend = isTutorialExplore ? 100 : body.turns;
     const allPotionsConsumed: PotionConsumed[] = [];
     const ambushPendingLootSessionIds: string[] = [];
+    const allNewItemIds: string[] = [];
+    const allUpdatedItemIds: string[] = [];
     const allQuestProgress: QuestProgressUpdate[] = [];
 
     // Spend turns and apply guild tax atomically
@@ -396,6 +398,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           });
           loot = rewards.loot;
+          allNewItemIds.push(...rewards.newItemIds);
+          allUpdatedItemIds.push(...rewards.updatedItemIds);
           if (rewards.pendingLootSessionId) {
             ambushPendingLootSessionIds.push(rewards.pendingLootSessionId);
           }
@@ -894,6 +898,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         });
         availableSlots = Math.max(0, availableSlots - cacheLoot.slotsConsumed);
         allCacheOverflow.push(...cacheLoot.overflow);
+        allNewItemIds.push(...cacheLoot.newItemIds);
+        allUpdatedItemIds.push(...cacheLoot.updatedItemIds);
 
         const lootSummary = cacheLoot.materials.map(m => ({
           itemTemplateId: m.itemTemplateId,
@@ -1044,7 +1050,10 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       });
     }
 
-    const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+    const [stateUpdates] = await Promise.all([
+      buildStateUpdates(playerId, ['hp', 'resources']),
+    ]);
+    await mergeLootIntoStateUpdates(playerId, allNewItemIds, allUpdatedItemIds, stateUpdates);
 
     res.json({
       logId: persisted.logId,

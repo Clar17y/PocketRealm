@@ -3,6 +3,7 @@ import { HIDDEN_CACHE_CONSTANTS, GEM_CONSTANTS, levelToGemTier } from '@pocketre
 import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
 import type { PendingLootItem } from './pendingLootService';
+import type { GrantedItemIds } from './stateUpdateHelpers';
 
 interface CacheMaterialDrop {
   itemTemplateId: string;
@@ -10,7 +11,7 @@ interface CacheMaterialDrop {
   quantity: number;
 }
 
-interface CacheLootResult {
+interface CacheLootResult extends GrantedItemIds {
   materials: CacheMaterialDrop[];
   soulboundItem: { itemTemplateId: string; name: string; rarity: string } | null;
   overflow: PendingLootItem[];
@@ -50,14 +51,14 @@ async function grantSoulboundFromRecipes(
   luck: number,
   remainingSlots: number,
   overflow: PendingLootItem[],
-): Promise<{ soulboundItem: CacheLootResult['soulboundItem']; slotsUsed: number }> {
+): Promise<{ soulboundItem: CacheLootResult['soulboundItem']; slotsUsed: number; newItemId: string | null }> {
   const picked = recipes[randomIntInclusive(0, recipes.length - 1)]!;
   const rarity = rollRarityWithLuck(luck);
   const isEquipment = picked.resultTemplate.itemType === 'weapon' || picked.resultTemplate.itemType === 'armor';
   const maxDurability = isEquipment ? picked.resultTemplate.maxDurability : null;
 
   if (remainingSlots > 0) {
-    await tx.item.create({
+    const created = await tx.item.create({
       data: {
         ownerId: playerId,
         templateId: picked.resultTemplateId,
@@ -66,10 +67,12 @@ async function grantSoulboundFromRecipes(
         maxDurability,
         currentDurability: maxDurability,
       },
+      select: { id: true },
     });
     return {
       soulboundItem: { itemTemplateId: picked.resultTemplateId, name: picked.resultTemplate.name, rarity },
       slotsUsed: 1,
+      newItemId: created.id,
     };
   }
 
@@ -85,6 +88,7 @@ async function grantSoulboundFromRecipes(
   return {
     soulboundItem: { itemTemplateId: picked.resultTemplateId, name: picked.resultTemplate.name, rarity },
     slotsUsed: 0,
+    newItemId: null,
   };
 }
 
@@ -150,6 +154,8 @@ export async function grantCacheLootTx(
   // Roll 2-4 cut gems from the available pool (random picks with replacement)
   const materials: CacheMaterialDrop[] = [];
   const overflow: PendingLootItem[] = [];
+  const newItemIds: string[] = [];
+  const updatedItemIds: string[] = [];
   const initialSlots = params.availableSlots ?? Infinity;
   let remainingSlots = initialSlots;
 
@@ -192,7 +198,8 @@ export async function grantCacheLootTx(
         }
       } else {
         if (needsNewSlot) remainingSlots--;
-        await addStackableItemTx(tx, params.playerId, picked.templateId, 1);
+        const stackResult = await addStackableItemTx(tx, params.playerId, picked.templateId, 1);
+        (stackResult.created ? newItemIds : updatedItemIds).push(stackResult.itemId);
 
         const existing = materialMap.get(picked.templateId);
         if (existing) {
@@ -224,6 +231,7 @@ export async function grantCacheLootTx(
       const grant = await grantSoulboundFromRecipes(tx, soulboundRecipes, params.playerId, params.luck, remainingSlots, overflow);
       soulboundItem = grant.soulboundItem;
       remainingSlots -= grant.slotsUsed;
+      if (grant.newItemId) newItemIds.push(grant.newItemId);
     }
   }
 
@@ -245,5 +253,5 @@ export async function grantCacheLootTx(
   }
 
   const slotsConsumed = initialSlots === Infinity ? 0 : Math.max(0, initialSlots - remainingSlots);
-  return { materials, soulboundItem, overflow, slotsConsumed };
+  return { materials, soulboundItem, overflow, slotsConsumed, newItemIds: [...new Set(newItemIds)], updatedItemIds: [...new Set(updatedItemIds)] };
 }

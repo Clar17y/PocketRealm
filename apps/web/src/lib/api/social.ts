@@ -343,6 +343,7 @@ export interface PlayerAchievementProgress {
   category: string;
   title: string;
   description: string;
+  flavorText?: string;
   titleReward?: string;
   threshold: number;
   secret?: boolean;

@@ -58,7 +58,7 @@ import { serializeXpGrant, toMobTemplate, assertCanAct, assertInZone, trackAchie
 import { getCombatBuffs, getCombatBuffsWithUses, applyCombatBuffs, consumeCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges } from '../../services/buffService';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
-import { buildStateUpdates, fetchItemDTOs, fetchMaterialTotals } from '../../services/stateUpdateHelpers.js';
+import { buildStateUpdates, fetchItemDTOs, fetchMaterialTotals, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers.js';
 import {
   startSchema,
   pickWeighted,
@@ -187,6 +187,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
   let sitePendingLootSessionId: string | null = null;
   const allSiteOverflow: import('../../services/pendingLootService').PendingLootItem[] = [];
+  const allSiteNewItemIds: string[] = [];
+  const allSiteUpdatedItemIds: string[] = [];
   const allQuestProgress: QuestProgressUpdate[] = [];
   const fightResults: FightResult[] = [];
   let lastCombatResult: ReturnType<typeof runTemplateCombat> | null = null;
@@ -281,6 +283,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         });
         mobLoot = await enrichLootWithNames(rewards.loot);
         allSiteOverflow.push(...rewards.overflow);
+        allSiteNewItemIds.push(...rewards.newItemIds);
+        allSiteUpdatedItemIds.push(...rewards.updatedItemIds);
         allQuestProgress.push(...rewards.questProgress);
         mobXpGrants = rewards.xpGrants;
       }
@@ -416,9 +420,15 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   const siteCompletionRewards = txResult.siteCompletionRewards;
   const sitePotionDeductResult = txResult.potionDeductResult;
 
-  // Collect chest overflow
+  // Collect chest overflow + granted item IDs
   if (siteCompletionRewards?.overflow?.length) {
     allSiteOverflow.push(...siteCompletionRewards.overflow);
+  }
+  if (siteCompletionRewards?.newItemIds?.length) {
+    allSiteNewItemIds.push(...siteCompletionRewards.newItemIds);
+  }
+  if (siteCompletionRewards?.updatedItemIds?.length) {
+    allSiteUpdatedItemIds.push(...siteCompletionRewards.updatedItemIds);
   }
 
   // Store all overflow as a single pending loot session
@@ -608,12 +618,11 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   // --- Build stateUpdates ---
   const damagedItemIds = [...new Set(aggregatedDurabilityLost.map(d => d.itemId))];
-  const updatedItemIds = [...new Set([...damagedItemIds, ...sitePotionDeductResult.partiallyConsumedIds])];
-  const [siteStateUpdates, inventoryUpdated, materialTotals] = await Promise.all([
+  const allUpdatedIds = [...new Set([...damagedItemIds, ...sitePotionDeductResult.partiallyConsumedIds, ...allSiteUpdatedItemIds])];
+  const [siteStateUpdates] = await Promise.all([
     buildStateUpdates(playerId, ['hp', 'skills', 'resources', 'characterProgression', 'buffs']),
-    fetchItemDTOs(updatedItemIds),
-    fetchMaterialTotals(playerId),
   ]);
+  await mergeLootIntoStateUpdates(playerId, allSiteNewItemIds, allUpdatedIds, siteStateUpdates);
 
   // --- Response with fights[] array ---
   const lastFightResult = fightResults[fightResults.length - 1]!;
@@ -698,8 +707,6 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     stateUpdates: {
       ...siteStateUpdates,
       ...(sitePotionDeductResult.fullyConsumedIds.length > 0 ? { inventoryRemoved: sitePotionDeductResult.fullyConsumedIds } : {}),
-      ...(inventoryUpdated.length > 0 ? { inventoryUpdated } : {}),
-      materialTotals,
     },
   });
 }

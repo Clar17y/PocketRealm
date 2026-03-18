@@ -10,6 +10,7 @@ import {
 import { FULL_CLEAR_CONSTANTS, type LootDrop } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantDropsTx, type DropTableEntry, type DropGrantResult } from './dropRollingService';
+import type { GrantedItemIds } from './stateUpdateHelpers';
 
 interface RecipeUnlockReward {
   recipeId: string;
@@ -18,7 +19,7 @@ interface RecipeUnlockReward {
   soulbound: boolean;
 }
 
-interface EncounterSiteChestRewards {
+interface EncounterSiteChestRewards extends GrantedItemIds {
   chestRarity: ChestRarity;
   materialRolls: number;
   loot: LootDrop[];
@@ -126,5 +127,7 @@ export async function grantEncounterSiteChestRewardsTx(
     recipeUnlocked,
     overflow: dropResult.overflow,
     slotsConsumed: dropResult.slotsConsumed,
+    newItemIds: dropResult.newItemIds,
+    updatedItemIds: dropResult.updatedItemIds,
   };
 }

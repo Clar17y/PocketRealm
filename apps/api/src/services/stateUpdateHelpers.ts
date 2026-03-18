@@ -6,6 +6,19 @@ import { getResourceState, type SkillLevels } from './resourceService.js';
 import { getInventoryState } from './inventoryService.js';
 
 // ---------------------------------------------------------------------------
+// GrantedItemIds
+// ---------------------------------------------------------------------------
+
+/**
+ * Common shape returned by loot-granting services to indicate which item IDs
+ * were newly created vs. updated (quantity increment).
+ */
+export interface GrantedItemIds {
+  newItemIds: string[];
+  updatedItemIds: string[];
+}
+
+// ---------------------------------------------------------------------------
 // Prisma item+template join type
 // ---------------------------------------------------------------------------
 
@@ -56,6 +69,7 @@ export function toInventoryItemDTO(
       maxDurability: item.template.maxDurability,
       stackable: item.template.stackable,
       sellPrice: item.template.sellPrice,
+      flavorText: item.template.flavorText ?? null,
     },
     equippedSlot,
   };
@@ -415,4 +429,39 @@ export async function buildStateUpdates(
   if (materialTotals !== undefined) result.materialTotals = materialTotals;
 
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// mergeLootIntoStateUpdates
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch loot item DTOs and merge into stateUpdates.
+ * Deduplicates IDs and filters updatedItemIds to exclude any in newItemIds.
+ */
+export async function mergeLootIntoStateUpdates(
+  playerId: string,
+  newItemIds: string[],
+  updatedItemIds: string[],
+  stateUpdates: Partial<StateUpdates>,
+): Promise<void> {
+  const uniqueNewIds = [...new Set(newItemIds)];
+  const newIdSet = new Set(uniqueNewIds);
+  const uniqueUpdatedIds = [...new Set(updatedItemIds)].filter(id => !newIdSet.has(id));
+  if (uniqueNewIds.length === 0 && uniqueUpdatedIds.length === 0) return;
+
+  const allIds = [...uniqueNewIds, ...uniqueUpdatedIds];
+  const [allDTOs, invMeta, materialTotals] = await Promise.all([
+    fetchItemDTOs(allIds),
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
+
+  const newDTOs = allDTOs.filter(dto => newIdSet.has(dto.id));
+  const updatedDTOs = allDTOs.filter(dto => !newIdSet.has(dto.id));
+
+  if (newDTOs.length > 0) stateUpdates.inventoryAdded = newDTOs;
+  if (updatedDTOs.length > 0) stateUpdates.inventoryUpdated = updatedDTOs;
+  stateUpdates.inventoryUsedSlots = invMeta.inventoryUsedSlots;
+  stateUpdates.materialTotals = materialTotals;
 }

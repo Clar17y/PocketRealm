@@ -7,6 +7,7 @@ import { calculateExplorationPercent } from '../services/zoneExplorationService'
 import { asyncHandler } from '../utils/asyncHandler';
 import { getExpeditionBestiary } from '../services/expeditionBestiaryService';
 import { getWorldBossBestiary } from '../services/bossBestiaryService';
+import { getBestiaryFlavorText } from '../services/bestiaryService';
 
 export const bestiaryRouter = Router();
 
@@ -93,6 +94,10 @@ bestiaryRouter.get('/', asyncHandler(async (req, res) => {
 
       const isHidden = tierLocked && kills === 0;
 
+      const flavor = isHidden
+        ? { flavorAppearance: null, flavorBehavior: null, flavorLore: null }
+        : getBestiaryFlavorText(mob, kills);
+
       return {
         id: mob.id,
         name: isHidden ? '???' : mob.name,
@@ -107,7 +112,10 @@ bestiaryRouter.get('/', asyncHandler(async (req, res) => {
           defence: mob.defence,
         },
         zones: [mob.zone.name],
-        description: isHidden ? null : `A creature found in ${mob.zone.name}.`,
+        description: isHidden ? null : (flavor.flavorAppearance || `A creature found in ${mob.zone.name}.`),
+        flavorAppearance: flavor.flavorAppearance,
+        flavorBehavior: flavor.flavorBehavior,
+        flavorLore: flavor.flavorLore,
         drops: isHidden ? [] : mob.dropTables.map((dt: typeof mob.dropTables[number]) => ({
           item: dt.itemTemplate,
           rarity: rarityFromTier(dt.itemTemplate.tier),

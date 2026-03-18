@@ -16,6 +16,7 @@ import {
 } from '@pocketrealm/shared';
 import { Prisma } from '@pocketrealm/database';
 import { rollAndGrantLootWithCapacity } from './lootService';
+import type { GrantedItemIds } from './stateUpdateHelpers';
 import type { PendingLootItem } from './pendingLootService';
 import { grantSkillXp, type GrantXpResult } from './xpService';
 import { recordBestiaryKill } from '../utils/routeHelpers.js';
@@ -195,7 +196,7 @@ interface VictoryRewardParams {
   includeBestiary?: boolean;
 }
 
-interface VictoryRewardResult {
+interface VictoryRewardResult extends GrantedItemIds {
   loot: LootDrop[];
   overflow: PendingLootItem[];
   pendingLootSessionId: string | null;
@@ -247,6 +248,8 @@ export async function processCombatVictoryRewards(
     loot: lootResult.drops,
     overflow: lootResult.overflow,
     pendingLootSessionId: lootResult.pendingLootSessionId,
+    newItemIds: lootResult.newItemIds,
+    updatedItemIds: lootResult.updatedItemIds,
     xpGrants,
     questProgress,
   };

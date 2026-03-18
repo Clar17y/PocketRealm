@@ -4,7 +4,10 @@ import { Prisma, PrismaClient } from '@prisma/client';
 
 import { IDS } from './seed-data/ids';
 import { getAllItemTemplates } from './seed-data/items';
+import { ITEM_FLAVOR_TEXT } from './seed-data/flavorText';
 import { getAllMobTemplates } from './seed-data/mobs';
+import { MOB_FLAVOR_TEXT, MOB_FAMILY_FLAVOR } from './seed-data/mobFlavorText';
+import { ZONE_FLAVOR_TEXT } from './seed-data/zoneFlavorText';
 import { getAllMobFamilies, getAllMobFamilyMembers, getAllZoneMobFamilies } from './seed-data/families';
 import { getAllResourceNodes } from './seed-data/resources';
 import { getAllDropTables } from './seed-data/drops';
@@ -13,6 +16,13 @@ import { getAllChestDropTables } from './seed-data/chests';
 import { generateBotPlayers } from './seed-data/bots';
 
 const prisma = new PrismaClient();
+
+/** Log any flavour text keys that don't match a seeded record name. */
+function warnUnmatched(flavorMap: Record<string, unknown>, seededNames: Set<string | undefined>, label: string) {
+  for (const name of Object.keys(flavorMap)) {
+    if (!seededNames.has(name)) console.warn(`  ⚠ Unmatched ${label} flavour text: "${name}"`);
+  }
+}
 
 // ============================================================================
 // Cleanup — delete all template data (preserves player accounts)
@@ -87,8 +97,19 @@ async function seedZones() {
     { id: IDS.zones.sunkenRuins, name: 'Sunken Ruins', description: 'Ancient ruins half-submerged in brackish water. Unspeakable things dwell in the depths.', difficulty: 5, travelCost: 600, isStarter: false, zoneType: 'wild', zoneExitChance: null, turnsToExplore: 100000, explorationTiers },
   ];
 
-  await prisma.zone.createMany({ data: zones });
+  const zonesWithFlavor = zones.map(z => {
+    const flavor = ZONE_FLAVOR_TEXT[z.name!];
+    return {
+      ...z,
+      arrivalText: flavor?.arrivalText ?? null,
+      ambientTexts: flavor?.ambientTexts ?? Prisma.JsonNull,
+      environmentalTexts: flavor?.environmentalTexts ?? Prisma.JsonNull,
+    };
+  });
+  await prisma.zone.createMany({ data: zonesWithFlavor });
   console.log(`  ${zones.length} zones created.`);
+
+  warnUnmatched(ZONE_FLAVOR_TEXT, new Set(zones.map(z => z.name)), 'zone');
 }
 
 // ============================================================================
@@ -129,9 +150,14 @@ async function seedZoneConnections() {
 
 async function seedItemTemplates() {
   console.log('  Seeding item templates...');
-  const items = getAllItemTemplates();
+  const items = getAllItemTemplates().map(item => ({
+    ...item,
+    flavorText: ITEM_FLAVOR_TEXT[item.name] ?? null,
+  }));
   await prisma.itemTemplate.createMany({ data: items });
   console.log(`  ${items.length} item templates created.`);
+
+  warnUnmatched(ITEM_FLAVOR_TEXT, new Set(items.map(i => i.name)), 'item');
 }
 
 // ============================================================================
@@ -140,9 +166,19 @@ async function seedItemTemplates() {
 
 async function seedMobs() {
   console.log('  Seeding mob templates...');
-  const mobs = getAllMobTemplates();
+  const mobs = getAllMobTemplates().map(mob => {
+    const flavor = MOB_FLAVOR_TEXT[mob.name];
+    return {
+      ...mob,
+      flavorAppearance: flavor?.appearance ?? null,
+      flavorBehavior: flavor?.behavior ?? null,
+      flavorLore: flavor?.lore ?? null,
+    };
+  });
   await prisma.mobTemplate.createMany({ data: mobs });
   console.log(`  ${mobs.length} mob templates created.`);
+
+  warnUnmatched(MOB_FLAVOR_TEXT, new Set(mobs.map(m => m.name)), 'mob');
 }
 
 // ============================================================================
@@ -153,9 +189,14 @@ async function seedMobFamilies() {
   console.log('  Seeding mob families...');
   const p = prisma as any;
 
-  const families = getAllMobFamilies();
+  const families = getAllMobFamilies().map(f => ({
+    ...f,
+    flavorOverview: MOB_FAMILY_FLAVOR[f.name] ?? null,
+  }));
   await p.mobFamily.createMany({ data: families });
   console.log(`  ${families.length} mob families created.`);
+
+  warnUnmatched(MOB_FAMILY_FLAVOR, new Set(families.map(f => f.name)), 'family');
 
   const members = getAllMobFamilyMembers();
   await p.mobFamilyMember.createMany({ data: members });

@@ -5,6 +5,8 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Coins, Clock, History, Users } from 'lucide-react';
 import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
+import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import * as api from '@/lib/api';
 import {
   CASINO_CONSTANTS,
@@ -161,6 +163,8 @@ export function Casino({
   trackBet,
   playerName,
 }: CasinoProps) {
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
+
   // Gold exchange state
   const [exchangeTurns, setExchangeTurns] = useState(100);
   const [isExchanging, setIsExchanging] = useState(false);
@@ -295,10 +299,17 @@ export function Casino({
         payout: myWinnings,
         isBigWin: myWinnings >= CASINO_CONSTANTS.BIG_WIN_THRESHOLD,
       });
+      triggerDialogueEvent('buy');
       const timer = setTimeout(() => setWinAnimation(null), 2500);
       return () => clearTimeout(timer);
+    } else {
+      // Player had bets but lost
+      const myBets = sessionBets.filter((b) => b.payout === 0 || (b.payout !== null && b.payout < b.amount));
+      if (myBets.length > 0) {
+        triggerDialogueEvent('sell');
+      }
     }
-  }, [lastResult, playerName]);
+  }, [lastResult, playerName, sessionBets, triggerDialogueEvent]);
 
   // Gold exchange handler
   const handleExchange = async () => {
@@ -369,6 +380,7 @@ export function Casino({
   return (
     <ScreenContainer>
       {winAnimation && <WinCelebration {...winAnimation} />}
+      <NpcDialogueBanner npcKey="millbrook-casino" event={dialogueEvent} />
       <FirstVisitHowTo
         storageKey="howto_casino"
         title="Casino"
