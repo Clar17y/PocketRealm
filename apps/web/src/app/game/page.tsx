@@ -34,6 +34,7 @@ import { useRateLimitToast } from './hooks/useRateLimitToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
 import { Settings } from '@/components/screens/Settings';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { TrainingGrounds } from '@/components/screens/TrainingGrounds';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -245,6 +246,8 @@ export default function GamePage() {
     guildTaxRate,
     homeTownId,
     handleSetHomeTown,
+    notificationPrefs,
+    handleSetNotificationPref,
     showChangelog,
     dismissChangelog,
     openChangelog,
@@ -298,6 +301,20 @@ export default function GamePage() {
   } = useGameController({ isAuthenticated });
 
   useRateLimitToast();
+  const { state: pushState, toggle: pushToggle } = usePushNotifications();
+
+  // Navigate to screen from query param (e.g. push notification deep link)
+  const [deepLinkTab, setDeepLinkTab] = useState<string | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const screen = params.get('screen');
+    if (screen) {
+      setActiveScreen(screen as Screen);
+      setDeepLinkTab(params.get('tab'));
+      window.history.replaceState(null, '', '/game');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
   const [expeditionContext, setExpeditionContext] = useState<ExpeditionContext | null>(null);
@@ -1041,6 +1058,10 @@ export default function GamePage() {
             onLootRevealRarityChange={handleSetLootRevealRarity}
             forgeConfirmRarity={forgeConfirmRarity}
             onForgeConfirmRarityChange={handleSetForgeConfirmRarity}
+            pushState={pushState}
+            onPushToggle={pushToggle}
+            notificationPrefs={notificationPrefs}
+            onNotificationPrefChange={handleSetNotificationPref}
             onLogout={() => { logout(); router.push('/'); }}
           />
         );
@@ -1087,6 +1108,7 @@ export default function GamePage() {
           <GuildScreen
             playerId={player?.id ?? null}
             characterLevel={characterProgression.characterLevel}
+            initialTab={activeScreen === 'guild' && deepLinkTab ? deepLinkTab as 'expeditions' : undefined}
             onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onExpeditionContextChange={setExpeditionContext}
           />

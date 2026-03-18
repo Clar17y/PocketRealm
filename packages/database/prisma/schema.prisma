@@ -55,6 +55,15 @@ model Player {
   lootRevealRarity    String  @default("uncommon") @map("loot_reveal_rarity") @db.VarChar(16)
   forgeConfirmRarity  String  @default("rare") @map("forge_confirm_rarity") @db.VarChar(16)
 
+  // Notification preferences
+  notifyPvpAttack          Boolean @default(true) @map("notify_pvp_attack")
+  notifyPvpScout           Boolean @default(true) @map("notify_pvp_scout")
+  notifyBossAppeared       Boolean @default(true) @map("notify_boss_appeared")
+  notifyBossKilled         Boolean @default(true) @map("notify_boss_killed")
+  notifyTurnBankFull       Boolean @default(true) @map("notify_turn_bank_full")
+  notifyExpeditionStarted  Boolean @default(true) @map("notify_expedition_started")
+  notifyExpeditionFinished Boolean @default(true) @map("notify_expedition_finished")
+
   // Zone / Travel
   currentZoneId          String? @map("current_zone_id")
   lastTravelledFromZoneId String? @map("last_travelled_from_zone_id")
@@ -109,6 +118,7 @@ model Player {
   blocksReceived      PlayerBlock[] @relation("PlayerBlockBlocked")
   friendMailsSent     FriendMail[]  @relation("FriendMailSender")
   friendMailsReceived FriendMail[]  @relation("FriendMailRecipient")
+  pushSubscriptions   PushSubscription[]
 
   // Expeditions
   expeditionTokens          Int                        @default(0) @map("expedition_tokens")
@@ -1071,6 +1081,25 @@ model FriendMail {
   @@index([recipientId, isDeletedByRecipient, isRead])
   @@index([senderId, isDeletedBySender])
   @@map("friend_mails")
+}
+
+// =============================================================================
+// PUSH NOTIFICATIONS
+// =============================================================================
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  playerId  String   @map("player_id")
+  endpoint  String   @db.Text
+  p256dh    String   @db.VarChar(255)
+  auth      String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, endpoint])
+  @@index([playerId])
+  @@map("push_subscriptions")
 }
 
 // =============================================================================

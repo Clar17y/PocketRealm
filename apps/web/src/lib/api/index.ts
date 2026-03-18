@@ -139,6 +139,8 @@ export type {
   LeaderboardCategoriesResponse,
 } from './social';
 
+export { getNotificationStatus, subscribePush, unsubscribePush } from './notifications';
+
 export { getResources } from './resources';
 export type { CombatResourceResponse } from './resources';
 

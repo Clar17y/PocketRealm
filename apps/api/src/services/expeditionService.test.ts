@@ -64,6 +64,9 @@ vi.mock('./combatStatsService', () => ({
 vi.mock('./combatTemplateService', () => ({
   getActiveTemplate: vi.fn().mockResolvedValue([{ id: 'slot-0', sortOrder: 0, actionId: 'normal_attack' }]),
 }));
+vi.mock('./pushNotificationService', () => ({
+  sendPush: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@pocketrealm/game-engine', async () => {
   const actual = await vi.importActual<typeof import('@pocketrealm/game-engine')>('@pocketrealm/game-engine');
   return {
@@ -237,6 +240,7 @@ describe('expeditionService', () => {
   describe('launchExpedition', () => {
     it('creates expedition with recruiting status and deducts treasury', async () => {
       mockPrisma.guildMember.findUnique.mockResolvedValue(makeMembershipRow());
+      mockPrisma.guildMember.findMany.mockResolvedValue([{ playerId: PLAYER_ID }]);
       mockPrisma.guildExpedition.findFirst.mockResolvedValue(null); // no active, no weekly, no 24h
       mockPrisma.mobTemplate.findMany.mockResolvedValue([makeMobTemplate()]);
       mockPrisma.guild.update.mockResolvedValue(makeGuildRow());

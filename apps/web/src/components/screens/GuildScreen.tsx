@@ -28,15 +28,16 @@ import type { StateUpdates } from '@pocketrealm/shared';
 interface GuildScreenProps {
   playerId: string | null;
   characterLevel: number;
+  initialTab?: GuildTab;
   onStateUpdates?: (updates: StateUpdates) => void;
   onExpeditionContextChange?: (ctx: ExpeditionContext | null) => void;
 }
 
-export function GuildScreen({ playerId, characterLevel, onStateUpdates, onExpeditionContextChange }: GuildScreenProps) {
+export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdates, onExpeditionContextChange }: GuildScreenProps) {
   const [guildData, setGuildData] = useState<PlayerGuildResponse | null>(null);
   const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<GuildTab>('overview');
+  const [activeTab, setActiveTab] = useState<GuildTab>(initialTab ?? 'overview');
 
   const loadGuild = useCallback(async (silent = false) => {
     startLoad(silent);

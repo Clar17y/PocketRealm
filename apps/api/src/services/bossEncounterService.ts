@@ -39,6 +39,7 @@ import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.
 import { distributeBossLoot } from './bossLootService';
 import { redis } from '../redis';
 import { parseJsonArray, parseJsonRecord } from '../utils/jsonColumnSchemas';
+import { sendPush } from './pushNotificationService';
 import { validateEnum } from '../utils/validateEnum';
 
 const VALID_ENCOUNTER_STATUSES = new Set<BossEncounterStatus>(['waiting', 'in_progress', 'defeated', 'expired']);
@@ -652,6 +653,16 @@ async function resolveBossRoundInner(
         io, 'zone', `zone:${encounter.event.zoneId}`,
         `${encounter.mobTemplate.name} has been slain! ${killerName} dealt the final blow.`,
       );
+    }
+
+    // Push notification to all boss participants
+    for (const playerId of contributorMap.keys()) {
+      void sendPush(playerId, 'bossKilled', {
+        title: 'Boss Defeated!',
+        body: `${encounter.mobTemplate.name} has been slain!`,
+        tag: 'boss-killed',
+        data: { type: 'boss', encounterId },
+      });
     }
   } else {
     const hpPercent = Math.round((result.bossHpAfter / encounter.maxHp) * 100);
