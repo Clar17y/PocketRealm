@@ -75,7 +75,6 @@ export interface NpcDialogue {
 }
 
 export interface ContextLine {
-  condition: 'topZoneToday';
   zoneKeyword: string; // zone ID substring match, e.g. 'deep-forest'
   lines: string[];
 }
@@ -88,15 +87,20 @@ function recordTurnsSpent(zoneId: string, count: number): void
 // Increments sessionStorage key `turns-spent:{zoneId}` by count
 
 function getTopZoneToday(): string | null
-// Scans all `turns-spent:*` sessionStorage keys, returns zoneId with highest count
+// Iterates sessionStorage.key(i) for all keys, filters by `turns-spent:` prefix,
+// returns the zoneId with the highest count. Lightweight — bounded by zone count (~15-20).
 ```
+
+**Alternative considered:** storing all zone counts in a single JSON object key (`activity-turns-by-zone`) to avoid iteration. Rejected — the iteration is cheap and separate keys are simpler to update atomically.
 
 **Where to record:** `useGameController` — after processing exploration/combat/gathering results that include turn costs, call `recordTurnsSpent(currentZoneId, turnsUsed)`.
 
 **Line selection priority:**
-1. If `getTopZoneToday()` returns a zone, check `contextLines[event]` for a matching `zoneKeyword`
-2. If match found, pick from context lines (with same no-repeat rotation)
+1. If `getTopZoneToday()` returns a zone, check `contextLines[event]` for entries whose `zoneKeyword` is a substring of the zone ID
+2. If match found, pick from that entry's lines (with same no-repeat rotation)
 3. If no match or no context lines defined, fall back to generic `lines[event]` pool
+
+**Idle rotation:** The idle interval timer in `NpcDialogueBanner` also uses `getNextNpcLine` (which calls `getTopZoneToday()` on each rotation). This is fine — `getTopZoneToday()` scans ~15-20 sessionStorage keys synchronously, negligible cost.
 
 **Session boundary:** Counters live in `sessionStorage` — reset on tab close. No date checking needed.
 
@@ -116,16 +120,22 @@ showBestiaryLore     Boolean @default(true) @map("show_bestiary_lore")
 
 ### 2b. API Changes
 
-Add the 3 fields to the existing PATCH `/players/me/preferences` endpoint's Zod schema. They already come down with the player data fetch — no new endpoints needed.
+**File:** `apps/api/src/routes/player.ts`
 
-**File:** `apps/api/src/routes/players.ts`
+The GET `/api/v1/player` route uses an explicit `select` clause (lines 31-63) that enumerates every field. New columns do NOT appear automatically. Three places to update:
+
+1. **`SETTINGS_FIELDS` array** (line 144) — add the 3 new field names
+2. **`settingsSchema` Zod object** (line 155) — add `showNpcDialogue: z.boolean().optional()`, etc.
+3. **GET `/api/v1/player` select clause** (line 31) — add the 3 fields so they're returned on login
+
+**Migration:** A Prisma migration will be generated via `npm run db:migrate` — `packages/database/prisma/migrations/<timestamp>_add_flavour_text_preferences/migration.sql`
 
 ### 2c. Frontend Consumption
 
 The player object is available via the game controller. Components check the relevant flag:
 
-- **`NpcDialogueBanner`** — early return `null` if `!player.showNpcDialogue`
-- **Inventory item tooltips** — skip rendering `flavorText` if `!player.showItemFlavourText`
+- **`NpcDialogueBanner`** — add a `showDialogue?: boolean` prop (defaults to `true`). Early return `null` if `false`. Each call site passes `player.showNpcDialogue` from the game controller. The banner is used in 6+ panels so a prop is cleaner than importing player state into the banner itself.
+- **Item flavour text** — in `apps/web/src/app/game/page.tsx` (line 587), the data mapping sets `description: item.template.flavorText || item.template.itemType`. When `showItemFlavourText` is false, always use `item.template.itemType` instead.
 - **Bestiary detail** — hide progressive appearance/behaviour/lore sections if `!player.showBestiaryLore`, show original one-line description instead
 
 ### 2d. Settings UI
@@ -160,6 +170,7 @@ Behaviour:
 - If no stored value, uses `defaultExpanded` (false = collapsed)
 - Smooth CSS transition on max-height for expand/collapse animation
 - Writes toggle state back to `sessionStorage` on every toggle
+- ARIA attributes: `aria-expanded` on header, `aria-controls` pointing to content ID, `role="button"` on clickable header
 
 ### 3b. Where Applied
 
@@ -197,14 +208,14 @@ Behaviour:
 |------|--------|
 | `packages/shared/src/constants/npcDialogue.ts` | Expand to 8-12 lines per event, add `contextLines` interface + data |
 | `packages/database/prisma/schema.prisma` | Add 3 boolean preference fields |
-| `apps/api/src/routes/players.ts` | Add 3 fields to preferences Zod schema |
+| `packages/database/prisma/migrations/...` | **Generated** — migration for 3 new columns |
+| `apps/api/src/routes/player.ts` | Add 3 fields to `SETTINGS_FIELDS`, `settingsSchema`, and GET select clause |
 | `apps/web/src/lib/npcLineRotation.ts` | **New** — no-repeat line selection with sessionStorage |
 | `apps/web/src/lib/activityTracker.ts` | **New** — turns-per-zone tracking in sessionStorage |
-| `apps/web/src/components/common/CollapsibleLoreSection.tsx` | **New** — reusable collapsible wrapper |
-| `apps/web/src/components/common/NpcDialogueBanner.tsx` | Use rotation, respect preference, add collapsible |
-| `apps/web/src/hooks/useNpcDialogue.ts` | Pass context to line selection |
+| `apps/web/src/components/common/CollapsibleLoreSection.tsx` | **New** — reusable collapsible wrapper with ARIA attributes (`aria-expanded`, `aria-controls`) |
+| `apps/web/src/components/common/NpcDialogueBanner.tsx` | Use rotation, add `showDialogue` prop, add collapsible |
 | `apps/web/src/components/screens/ZoneMap.tsx` | Wrap zone text in collapsible |
-| `apps/web/src/components/screens/Inventory.tsx` | Respect `showItemFlavourText` preference |
+| `apps/web/src/app/game/page.tsx` | Respect `showItemFlavourText` in item description mapping |
 | `apps/web/src/components/screens/Bestiary.tsx` | Respect `showBestiaryLore` preference, add collapsible sections |
 | `apps/web/src/components/screens/Settings.tsx` | Add "Lore & Flavour" toggle section |
 | `apps/web/src/app/game/useGameController.ts` | Call `recordTurnsSpent()` after turn-consuming actions |
