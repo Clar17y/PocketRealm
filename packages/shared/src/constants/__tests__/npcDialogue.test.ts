@@ -51,6 +51,21 @@ describe('getNpcName', () => {
   });
 });
 
+describe('contextLines', () => {
+  it('NPCs with contextLines have valid structure', () => {
+    for (const [key, npc] of Object.entries(NPC_DIALOGUE)) {
+      if (!npc.contextLines) continue;
+      for (const [event, contextEntries] of Object.entries(npc.contextLines)) {
+        for (const entry of contextEntries) {
+          expect(entry.zoneKeyword).toBeTruthy();
+          expect(entry.lines.length).toBeGreaterThan(0);
+          entry.lines.forEach(line => expect(typeof line).toBe('string'));
+        }
+      }
+    }
+  });
+});
+
 describe('NPC_DIALOGUE completeness', () => {
   it('has entries for all expected NPC keys', () => {
     const expectedKeys = [

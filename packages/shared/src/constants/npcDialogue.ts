@@ -5,11 +5,17 @@ export type DialogueEvent =
   | 'sell'
   | 'farewell';
 
+export interface ContextLine {
+  zoneKeyword: string;
+  lines: string[];
+}
+
 export interface NpcDialogue {
   name: string;
   location: string;
   personality: string;
   lines: Partial<Record<DialogueEvent, string[]>>;
+  contextLines?: Partial<Record<DialogueEvent, ContextLine[]>>;
 }
 
 export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
