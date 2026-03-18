@@ -240,16 +240,14 @@ router.post('/items/grant', asyncHandler(async (req, res) => {
     items.push(item);
   }
   const itemIds = items.map(i => i.id);
-  const [addedDTOs, inventoryMeta, materialTotals] = await Promise.all([
+  const [addedDTOs, inventoryMeta] = await Promise.all([
     fetchItemDTOs(itemIds),
     fetchInventoryMeta(playerId),
-    fetchMaterialTotals(playerId),
   ]);
   await adminAudit(playerId, 'grant_item', { templateId, templateName: template.name, rarity, quantity, itemCount: items.length });
   const stateUpdates = buildInventoryStateUpdates({
     added: addedDTOs,
     inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
-    materialTotals,
   });
   res.json({ success: true, items, stateUpdates });
 }));

@@ -206,12 +206,9 @@ function PlayerTab({ onStateUpdates, setTurns: setGameTurns }: { onStateUpdates:
           <PixelButton size="sm" disabled={busy || selectedSkills.size === 0}
             onClick={async () => {
               const skills = [...selectedSkills];
-              let data;
-              if (skills.length === 1) {
-                data = await act(`Set ${skills[0]} to ${skillLevel}`, () => adminSetSkillLevel(skills[0], skillLevel), `Set ${skills[0]} to level ${skillLevel}?`);
-              } else {
-                data = await act(`Set ${skills.length} skills to ${skillLevel}`, () => adminSetSkillLevels(skills, skillLevel), `Set ${skills.length} skills to level ${skillLevel}?`);
-              }
+              const data = skills.length === 1
+                ? await act(`Set ${skills[0]} to ${skillLevel}`, () => adminSetSkillLevel(skills[0], skillLevel), `Set ${skills[0]} to level ${skillLevel}?`)
+                : await act(`Set ${skills.length} skills to ${skillLevel}`, () => adminSetSkillLevels(skills, skillLevel), `Set ${skills.length} skills to level ${skillLevel}?`);
               if (data?.stateUpdates) onStateUpdates(data.stateUpdates);
             }}>
             Set Level
