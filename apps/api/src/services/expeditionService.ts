@@ -342,6 +342,20 @@ export async function launchExpedition(
     return created;
   });
 
+  // Notify all guild members about the new expedition
+  const guildMembers = await prisma.guildMember.findMany({
+    where: { guildId },
+    select: { playerId: true },
+  });
+  for (const { playerId: memberId } of guildMembers) {
+    void sendPush(memberId, 'expeditionStarted', {
+      title: 'Expedition Launched!',
+      body: `A Tier ${tier} guild expedition is recruiting — sign up now!`,
+      tag: 'expedition-recruiting',
+      data: { type: 'expedition', expeditionId: expedition.id },
+    });
+  }
+
   return toExpeditionData(expedition);
 }
 
