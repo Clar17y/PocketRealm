@@ -328,7 +328,7 @@ export function Templates({
       () => isNew ? createTemplate(editorName.trim(), slots) : updateTemplate(editingTemplate!.id, editorName.trim(), slots),
       () => { void onLoadTemplates(); setEditingTemplate(null); setIsNew(false); onTemplateSaved?.(); },
     );
-  }, [editorName, editorSlots, isNew, editingTemplate, onLoadTemplates, save.run]);
+  }, [editorName, editorSlots, isNew, editingTemplate, onLoadTemplates, onTemplateSaved, save.run]);
 
   // -- Resource sustainability calc (worst-case per slot) --
 

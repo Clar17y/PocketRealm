@@ -1381,8 +1381,8 @@ export default function GamePage() {
           } else if (tutorialStep === TUTORIAL_STEP_DONE) {
             advanceTutorial(TUTORIAL_STEP_DONE);
           }
-          // SKILL_POINTS and ATTRIBUTE_POINTS do NOT advance on dismiss —
-          // they advance automatically when all points are spent.
+          // Only WELCOME and DONE advance on dialog dismiss.
+          // All other steps advance via their own completion triggers.
         }}
       />
       {tutorialStep === TUTORIAL_STEP_STARTER_WEAPON && (
