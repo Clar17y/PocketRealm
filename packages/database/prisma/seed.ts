@@ -17,6 +17,13 @@ import { generateBotPlayers } from './seed-data/bots';
 
 const prisma = new PrismaClient();
 
+/** Log any flavour text keys that don't match a seeded record name. */
+function warnUnmatched(flavorMap: Record<string, unknown>, seededNames: Set<string | undefined>, label: string) {
+  for (const name of Object.keys(flavorMap)) {
+    if (!seededNames.has(name)) console.warn(`  ⚠ Unmatched ${label} flavour text: "${name}"`);
+  }
+}
+
 // ============================================================================
 // Cleanup — delete all template data (preserves player accounts)
 // ============================================================================
@@ -102,11 +109,7 @@ async function seedZones() {
   await prisma.zone.createMany({ data: zonesWithFlavor });
   console.log(`  ${zones.length} zones created.`);
 
-  // Log unmatched zone flavour text entries
-  const zoneNames = new Set(zones.map(z => z.name));
-  for (const name of Object.keys(ZONE_FLAVOR_TEXT)) {
-    if (!zoneNames.has(name)) console.warn(`  ⚠ Unmatched zone flavour text: "${name}"`);
-  }
+  warnUnmatched(ZONE_FLAVOR_TEXT, new Set(zones.map(z => z.name)), 'zone');
 }
 
 // ============================================================================
@@ -154,11 +157,7 @@ async function seedItemTemplates() {
   await prisma.itemTemplate.createMany({ data: items });
   console.log(`  ${items.length} item templates created.`);
 
-  // Log unmatched flavour text entries
-  const itemNames = new Set(items.map(i => i.name));
-  for (const name of Object.keys(ITEM_FLAVOR_TEXT)) {
-    if (!itemNames.has(name)) console.warn(`  ⚠ Unmatched item flavour text: "${name}"`);
-  }
+  warnUnmatched(ITEM_FLAVOR_TEXT, new Set(items.map(i => i.name)), 'item');
 }
 
 // ============================================================================
@@ -179,11 +178,7 @@ async function seedMobs() {
   await prisma.mobTemplate.createMany({ data: mobs });
   console.log(`  ${mobs.length} mob templates created.`);
 
-  // Log unmatched mob flavour text entries
-  const mobNames = new Set(mobs.map(m => m.name));
-  for (const name of Object.keys(MOB_FLAVOR_TEXT)) {
-    if (!mobNames.has(name)) console.warn(`  ⚠ Unmatched mob flavour text: "${name}"`);
-  }
+  warnUnmatched(MOB_FLAVOR_TEXT, new Set(mobs.map(m => m.name)), 'mob');
 }
 
 // ============================================================================
@@ -201,11 +196,7 @@ async function seedMobFamilies() {
   await p.mobFamily.createMany({ data: families });
   console.log(`  ${families.length} mob families created.`);
 
-  // Log unmatched family flavour text entries
-  const familyNames = new Set(families.map(f => f.name));
-  for (const name of Object.keys(MOB_FAMILY_FLAVOR)) {
-    if (!familyNames.has(name)) console.warn(`  ⚠ Unmatched family flavour text: "${name}"`);
-  }
+  warnUnmatched(MOB_FAMILY_FLAVOR, new Set(families.map(f => f.name)), 'family');
 
   const members = getAllMobFamilyMembers();
   await p.mobFamilyMember.createMany({ data: members });

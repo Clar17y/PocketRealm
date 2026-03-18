@@ -7,7 +7,7 @@ import { BookOpen, X, MapPin, Sword, Shield, Heart, Lock } from 'lucide-react';
 import Image from 'next/image';
 import { monsterImageSrc, uiIconSrc } from '@/lib/assets';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
-import { getMobPrefixDefinition, getTierName } from '@pocketrealm/shared';
+import { getMobPrefixDefinition, getTierName, BESTIARY_UNLOCK_CONSTANTS } from '@pocketrealm/shared';
 import type { ExpeditionBestiaryTheme, WorldBossEntry } from '@/app/game/hooks/useBestiary';
 import { StatBar } from '@/components/StatBar';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
@@ -661,7 +661,7 @@ export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosse
                         {selectedMonster.flavorAppearance ?? (
                           <span className="opacity-50 flex items-center gap-1">
                             <Lock size={12} />
-                            ??? (Defeat 1+)
+                            ??? (Defeat {BESTIARY_UNLOCK_CONSTANTS.FLAVOR_APPEARANCE_THRESHOLD}+)
                           </span>
                         )}
                       </p>
@@ -672,7 +672,7 @@ export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosse
                         {selectedMonster.flavorBehavior ?? (
                           <span className="opacity-50 flex items-center gap-1">
                             <Lock size={12} />
-                            ??? (Defeat 10+)
+                            ??? (Defeat {BESTIARY_UNLOCK_CONSTANTS.FLAVOR_BEHAVIOR_THRESHOLD}+)
                           </span>
                         )}
                       </p>
@@ -683,7 +683,7 @@ export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosse
                         {selectedMonster.flavorLore ?? (
                           <span className="opacity-50 flex items-center gap-1">
                             <Lock size={12} />
-                            ??? (Defeat 25+)
+                            ??? (Defeat {BESTIARY_UNLOCK_CONSTANTS.FLAVOR_LORE_THRESHOLD}+)
                           </span>
                         )}
                       </p>

@@ -211,11 +211,12 @@ export function ZoneMap({
   );
   const selectedZone = selectedZoneId ? zoneById.get(selectedZoneId) : undefined;
 
-  const ambientText = useMemo(() => {
-    if (!selectedZone?.ambientTexts) return null;
+  const [ambientText, setAmbientText] = useState<string | null>(null);
+  useEffect(() => {
+    if (!selectedZone?.ambientTexts) { setAmbientText(null); return; }
     const texts = selectedZone.ambientTexts as Record<string, string>;
     const keys = Object.keys(texts);
-    return keys.length > 0 ? texts[keys[Math.floor(Math.random() * keys.length)]] : null;
+    setAmbientText(keys.length > 0 ? texts[keys[Math.floor(Math.random() * keys.length)]] : null);
   }, [selectedZone?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const currentZone = zoneById.get(currentZoneId);
   const selectedRouteIds = useMemo(() => {

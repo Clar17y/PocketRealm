@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { LoadingCard } from '@/components/common/LoadingCard';
@@ -8,7 +8,7 @@ import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { SubNav } from '@/components/common/SubNav';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
-import type { DialogueEvent } from '@pocketrealm/shared';
+import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import {
   Sword, Compass, Hammer, Pickaxe, Swords, Coins, Gift, RefreshCw,
   Wrench, Zap, Package, Crown, Shield,
@@ -330,21 +330,7 @@ function ShopTab({
   const [targetSelections, setTargetSelections] = useState<Record<string, string>>({});
   const [mobTemplates, setMobTemplates] = useState<Array<{ id: string; name: string }>>([]);
   const [guildContracts, setGuildContracts] = useState<Array<{ id: string; name: string }>>([]);
-  const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
-  const dialogueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const triggerDialogueEvent = useCallback((event: DialogueEvent) => {
-    if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
-    setDialogueEvent(event);
-    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 4000);
-  }, []);
-
-  useEffect(() => {
-    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 3000);
-    return () => {
-      if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
-    };
-  }, []);
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
 
   const loadShop = useCallback(async () => {
     setShopLoading(true);

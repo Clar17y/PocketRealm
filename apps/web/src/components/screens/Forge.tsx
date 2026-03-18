@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ITEM_RARITY_CONSTANTS } from '@pocketrealm/shared';
-import type { DialogueEvent } from '@pocketrealm/shared';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@pocketrealm/game-engine';
 import { Anvil, Sparkles, TrendingUp } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
@@ -156,22 +156,8 @@ export function Forge({
   const [confirmReroll, setConfirmReroll] = useState(false);
   const [upgradePickerOpen, setUpgradePickerOpen] = useState(false);
   const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
-  const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
-  const dialogueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
   const noFacility = zoneCraftingLevel === 0;
-
-  const triggerDialogueEvent = useCallback((event: DialogueEvent) => {
-    if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
-    setDialogueEvent(event);
-    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 4000);
-  }, []);
-
-  useEffect(() => {
-    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 3000);
-    return () => {
-      if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
-    };
-  }, []);
 
   const tryForgeAction = (setConfirm: (v: boolean) => void, action: () => void | Promise<void>) => {
     if (selected && rarityMeetsThreshold(selected.rarity, forgeConfirmRarity)) {

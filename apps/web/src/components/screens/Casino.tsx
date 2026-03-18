@@ -6,6 +6,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { Coins, Clock, History, Users } from 'lucide-react';
 import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import * as api from '@/lib/api';
 import {
   CASINO_CONSTANTS,
@@ -18,7 +19,6 @@ import type {
   RouletteHistoryEntry,
   RoulettePublicBet,
   CasinoResultEvent,
-  DialogueEvent,
 } from '@pocketrealm/shared';
 import type { SessionBet } from '@/hooks/useCasinoSocket';
 import { ScreenContainer } from '../common/ScreenContainer';
@@ -163,22 +163,7 @@ export function Casino({
   trackBet,
   playerName,
 }: CasinoProps) {
-  // NPC dialogue state
-  const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
-  const dialogueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const triggerDialogueEvent = useCallback((event: DialogueEvent) => {
-    if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
-    setDialogueEvent(event);
-    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 4000);
-  }, []);
-
-  useEffect(() => {
-    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 3000);
-    return () => {
-      if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
-    };
-  }, []);
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
 
   // Gold exchange state
   const [exchangeTurns, setExchangeTurns] = useState(100);

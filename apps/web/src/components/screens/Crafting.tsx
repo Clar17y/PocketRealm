@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
-import type { DialogueEvent } from '@pocketrealm/shared';
+import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import { Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { ActivityLog } from '@/components/ActivityLog';
@@ -66,21 +66,7 @@ interface CraftingProps {
 export function Crafting({ skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, availableSlots = 0 }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
-  const dialogueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const triggerDialogueEvent = useCallback((event: DialogueEvent) => {
-    if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
-    setDialogueEvent(event);
-    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 4000);
-  }, []);
-
-  useEffect(() => {
-    dialogueTimerRef.current = setTimeout(() => setDialogueEvent('idle'), 3000);
-    return () => {
-      if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
-    };
-  }, []);
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
 
   useEffect(() => {
     if (recipes.length === 0) {

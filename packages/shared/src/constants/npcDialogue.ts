@@ -361,7 +361,10 @@ export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
   },
 };
 
-export function getNpcLine(npcKey: string, event: DialogueEvent): string | null {
+/** Valid NPC keys — derived from NPC_DIALOGUE for compile-time safety. */
+export type NpcKey = keyof typeof NPC_DIALOGUE;
+
+export function getNpcLine(npcKey: NpcKey, event: DialogueEvent): string | null {
   const npc = NPC_DIALOGUE[npcKey];
   if (!npc) return null;
   const lines = npc.lines[event];
@@ -369,6 +372,6 @@ export function getNpcLine(npcKey: string, event: DialogueEvent): string | null 
   return lines[Math.floor(Math.random() * lines.length)];
 }
 
-export function getNpcName(npcKey: string): string | null {
+export function getNpcName(npcKey: NpcKey): string | null {
   return NPC_DIALOGUE[npcKey]?.name ?? null;
 }

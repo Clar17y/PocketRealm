@@ -226,17 +226,19 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
                       {achievement.description}
                     </p>
                     {achievement.flavorText && achievement.unlocked && (
-                      <button
-                        className="text-xs text-[var(--rpg-gold)] hover:text-[var(--rpg-text-primary)] mt-1"
-                        onClick={() => setExpandedId(expandedId === achievement.id ? null : achievement.id)}
-                      >
-                        {expandedId === achievement.id ? '▾ Hide lore' : '▸ Read more...'}
-                      </button>
-                    )}
-                    {expandedId === achievement.id && achievement.flavorText && (
-                      <p className="text-sm italic text-[var(--rpg-text-secondary)] mt-1 pl-3 border-l-2 border-[var(--rpg-gold)]">
-                        {achievement.flavorText}
-                      </p>
+                      <>
+                        <button
+                          className="text-xs text-[var(--rpg-gold)] hover:text-[var(--rpg-text-primary)] mt-1"
+                          onClick={() => setExpandedId(expandedId === achievement.id ? null : achievement.id)}
+                        >
+                          {expandedId === achievement.id ? '▾ Hide lore' : '▸ Read more...'}
+                        </button>
+                        {expandedId === achievement.id && (
+                          <p className="text-sm italic text-[var(--rpg-text-secondary)] mt-1 pl-3 border-l-2 border-[var(--rpg-gold)]">
+                            {achievement.flavorText}
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                   {isClaimable && (
