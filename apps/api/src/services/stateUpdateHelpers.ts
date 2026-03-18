@@ -465,3 +465,28 @@ export async function mergeLootIntoStateUpdates(
   stateUpdates.inventoryUsedSlots = invMeta.inventoryUsedSlots;
   stateUpdates.materialTotals = materialTotals;
 }
+
+// ---------------------------------------------------------------------------
+// buildInventoryStateUpdates
+// ---------------------------------------------------------------------------
+
+/**
+ * Pure assembly helper — builds the inventory portion of a StateUpdates object
+ * from already-fetched data. Omits empty arrays to keep responses lean.
+ */
+export function buildInventoryStateUpdates(opts: {
+  removed?: string[];
+  added?: InventoryItemDTO[];
+  updated?: InventoryItemDTO[];
+  inventoryUsedSlots: number;
+  materialTotals?: Record<string, number>;
+}): Partial<StateUpdates> {
+  const result: Partial<StateUpdates> = {
+    inventoryUsedSlots: opts.inventoryUsedSlots,
+  };
+  if (opts.removed && opts.removed.length > 0) result.inventoryRemoved = opts.removed;
+  if (opts.added && opts.added.length > 0) result.inventoryAdded = opts.added;
+  if (opts.updated && opts.updated.length > 0) result.inventoryUpdated = opts.updated;
+  if (opts.materialTotals !== undefined) result.materialTotals = opts.materialTotals;
+  return result;
+}
