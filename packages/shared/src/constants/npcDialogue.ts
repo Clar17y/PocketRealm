@@ -180,9 +180,9 @@ export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
         'Back again. Good. Most people try gathering once, decide it is boring, and go back to hitting rats. The ones who stick with it are the ones who eat regularly. Coincidence? No.',
       ],
       idle: [
-        'See that tree line? I have worked every node between here and the Deep Mines. Twenty years of gathering. Still have all my fingers. That is not luck. That is technique.',
+        'I have worked every node between here and the Deep Mines. Twenty years of gathering. Still have all my fingers. That is not luck. That is technique.',
         'Bram thinks gathering is just the supply side of his business. Kessa thinks it is just the part before the forge. They are both wrong. Gathering is the part where you listen, and the Pocketrealm decides what to give you.',
-        'The gems come when they come. You cannot force a ruby out of a copper vein any more than you can force a good day out of a bad one. Swing steady. Pay attention. The rest is between you and the stone.',
+        'You cannot force the land to give up what it is not ready to part with. Work steady. Pay attention. The rest is between you and the node.',
       ],
       farewell: [
         'Now go out there and practice. The nodes will not gather themselves. Well. The mushrooms might. But the ore definitely will not.',

@@ -18,6 +18,8 @@ import { ActivityLog } from '@/components/ActivityLog';
 import type { ActivityLogEntry } from '@/app/game/gameController.types';
 import type { EventModifierBadge } from '@/lib/api';
 import { ItemIcon } from '@/components/common/ItemIcon';
+import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 interface ResourceNode {
@@ -100,6 +102,8 @@ export function Gathering({
   backpackFull = false,
   ownedResourceNames,
 }: GatheringProps) {
+  const { dialogueEvent } = useNpcDialogue();
+
   const getEventYieldMultiplier = (node: ResourceNode) =>
     computeResourceYieldMultiplier(node.eventModifiers ?? []);
 
@@ -210,6 +214,8 @@ export function Gathering({
 
   return (
     <ScreenContainer>
+      <NpcDialogueBanner npcKey="millbrook-gathering-guide" event={dialogueEvent} />
+
       {/* Knockout Banner */}
       {isRecovering && (
         <KnockoutBanner action="gathering" recoveryCost={recoveryCost} />

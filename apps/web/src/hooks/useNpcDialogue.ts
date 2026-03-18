@@ -18,7 +18,7 @@ export function useNpcDialogue() {
   }, []);
 
   useEffect(() => {
-    timerRef.current = setTimeout(() => setDialogueEvent('idle'), 5000);
+    timerRef.current = setTimeout(() => setDialogueEvent('idle'), 10000);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
