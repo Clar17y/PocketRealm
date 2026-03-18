@@ -3,10 +3,16 @@ import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { RARITY_RANK } from '@/lib/rarity';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
-import { updateTutorialStep } from '@/lib/api';
+import type { ForgeResultData } from '@/components/ForgeResultToast';
+import { updateTutorialStep, claimStarterWeapon } from '@/lib/api';
 import {
   TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_STARTER_WEAPON,
+  TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_SAVE_TEMPLATE,
+  TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_EXPLORE,
+  TUTORIAL_STEP_COMBAT,
   TUTORIAL_STEP_GATHER,
   TUTORIAL_STEP_TRAVEL,
   TUTORIAL_STEP_REFINE,
@@ -120,6 +126,14 @@ function showQuestToasts(updates?: QuestProgressUpdate[]) {
     | undefined;
   if (!show) return;
   for (const update of updates) show(update);
+}
+
+function showForgeToast(data: ForgeResultData) {
+  const show = (window as unknown as Record<string, unknown>).__showForgeToast as
+    | ((data: ForgeResultData) => void)
+    | undefined;
+  if (!show) return;
+  show(data);
 }
 
 interface TravelRouteState {
@@ -293,6 +307,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     initSettingsFromServer,
   } = playerSettings;
   const [tutorialStep, setTutorialStep] = useState<number>(TUTORIAL_COMPLETED);
+  const [starterWeaponType, setStarterWeaponType] = useState<'melee' | 'ranged' | 'magic' | null>(null);
   const combatLogPrefetch = useCombatLogPrefetch();
   const [playbackActive, setPlaybackActive] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
@@ -450,8 +465,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const handleAllocateSkillPoint = useCallback(async (nodeId: string) => {
     const res = await allocateSkillPoint(nodeId);
-    if (res.data) setSkillPointState(res.data);
-  }, []);
+    if (res.data) {
+      setSkillPointState(res.data);
+      if (tutorialStep === TUTORIAL_STEP_SKILL_POINTS && res.data.availablePoints === 0) {
+        const nextRes = await updateTutorialStep(TUTORIAL_STEP_SKILL_POINTS + 1);
+        if (nextRes.data) setTutorialStep(nextRes.data.tutorialStep);
+      }
+    }
+  }, [tutorialStep]);
 
   const handleRespecSkillPoints = useCallback(async () => {
     const res = await respecSkillPoints();
@@ -596,6 +617,21 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const res = await updateTutorialStep(TUTORIAL_SKIPPED);
     if (res.data) setTutorialStep(res.data.tutorialStep);
   }, []);
+
+  const handleTemplateSaved = useCallback(() => {
+    if (tutorialStep === TUTORIAL_STEP_SAVE_TEMPLATE) {
+      void advanceTutorial(TUTORIAL_STEP_SAVE_TEMPLATE);
+    }
+  }, [tutorialStep, advanceTutorial]);
+
+  const handleClaimStarterWeapon = useCallback(async (weaponType: 'melee' | 'ranged' | 'magic') => {
+    const res = await claimStarterWeapon(weaponType);
+    if (res.data?.success) {
+      setStarterWeaponType(weaponType);
+      await loadAll();
+      await advanceTutorial(TUTORIAL_STEP_STARTER_WEAPON);
+    }
+  }, [advanceTutorial, loadAll]);
 
   const combatPlayback = useCombatPlayback({
     combatLogPrefetch,
@@ -1219,18 +1255,21 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
           type: 'success',
           message: `Forge success: ${fromLabel} -> ${toLabel} (${chancePct}% chance).${buffTag} Sacrificial item consumed.`,
         });
+        showForgeToast({ type: 'upgrade_success', message: `Upgraded to ${toLabel}!` });
       } else if (data.forge.protected) {
         pushLog({
           timestamp: nowStamp(),
           type: 'info',
           message: `Forge failed at ${fromLabel} (${chancePct}% chance) but item was protected!${buffTag} Sacrifice consumed.`,
         });
+        showForgeToast({ type: 'upgrade_protected', message: `Failed but protected!` });
       } else {
         pushLog({
           timestamp: nowStamp(),
           type: 'info',
           message: `Forge failed at ${fromLabel} (${chancePct}% chance).${buffTag} Target and sacrifice consumed.`,
         });
+        showForgeToast({ type: 'upgrade_fail', message: `Upgrade failed — target and sacrifice consumed` });
       }
     });
 
@@ -1239,6 +1278,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setTurns(data.turns.currentTurns);
       const rarityLabel = data.forge.rarity.charAt(0).toUpperCase() + data.forge.rarity.slice(1);
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Re-rolled ${rarityLabel} item bonus stats. Sacrificial duplicate consumed.` });
+      showForgeToast({ type: 'reroll', message: `Stats rerolled!` });
     });
 
   const handleDestroyItem = (itemId: string) =>
@@ -1619,6 +1659,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       const hpRes = await getHpState();
       if (hpRes.data) setHpState(hpRes.data);
+
+      if (tutorialStep === TUTORIAL_STEP_ATTRIBUTE_POINTS && res.data.attributePoints === 0) {
+        advanceTutorial(TUTORIAL_STEP_ATTRIBUTE_POINTS);
+      }
     });
   };
 
@@ -1726,6 +1770,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleRespecSkillPoints,
     templates,
     handleLoadTemplates,
+    handleTemplateSaved,
     pvpNotificationCount,
     incomingFriendRequestCount,
     mailUnreadCount,
@@ -1774,7 +1819,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleRerollQuest,
 
     // Tutorial
-    tutorialStep, skipTutorial, advanceTutorial,
+    tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon, starterWeaponType,
 
     // Combat log lazy loading
     combatLogPrefetch,
@@ -1785,6 +1830,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Home Town
     homeTownId: playerSettings.homeTownId,
     handleSetHomeTown: playerSettings.handleSetHomeTown,
+
+    // Notification preferences
+    notificationPrefs: playerSettings.notificationPrefs,
+    handleSetNotificationPref: playerSettings.handleSetNotificationPref,
 
     // Changelog
     showChangelog,

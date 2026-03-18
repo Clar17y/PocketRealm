@@ -28,11 +28,13 @@ import { WorldEvents } from '@/components/screens/WorldEvents';
 import { Achievements } from '@/components/screens/Achievements';
 import { AchievementToast } from '@/components/AchievementToast';
 import { QuestToast } from '@/components/QuestToast';
+import { ForgeResultToast } from '@/components/ForgeResultToast';
 import { RateLimitToast } from '@/components/RateLimitToast';
 import { useRateLimitToast } from './hooks/useRateLimitToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
 import { Settings } from '@/components/screens/Settings';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { TrainingGrounds } from '@/components/screens/TrainingGrounds';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -44,10 +46,12 @@ import { calculateEfficiency, xpForLevel } from '@pocketrealm/game-engine';
 import { Sword, Shield, Crosshair, Sparkles, Pickaxe, Hammer, Leaf, FlaskConical, Axe, Scissors, Anvil, Gem } from 'lucide-react';
 import { TutorialBanner } from '@/components/TutorialBanner';
 import { TutorialDialog } from '@/components/TutorialDialog';
+import { StarterWeaponPopup } from '@/components/StarterWeaponPopup';
 import {
   isTutorialActive,
   TUTORIAL_STEPS,
   TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_STARTER_WEAPON,
   TUTORIAL_STEP_EXPLORE,
   TUTORIAL_STEP_DONE,
 } from '@/lib/tutorial';
@@ -173,6 +177,7 @@ export default function GamePage() {
     handleRespecSkillPoints,
     templates,
     handleLoadTemplates,
+    handleTemplateSaved,
     pvpNotificationCount,
     incomingFriendRequestCount,
     mailUnreadCount,
@@ -241,6 +246,8 @@ export default function GamePage() {
     guildTaxRate,
     homeTownId,
     handleSetHomeTown,
+    notificationPrefs,
+    handleSetNotificationPref,
     showChangelog,
     dismissChangelog,
     openChangelog,
@@ -261,7 +268,7 @@ export default function GamePage() {
     handleClaimQuestReward,
     handleClaimDailyBonus,
     handleRerollQuest,
-    tutorialStep, skipTutorial, advanceTutorial,
+    tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon, starterWeaponType,
     loadAll,
     activeBuffs,
     combatLogPrefetch,
@@ -294,6 +301,20 @@ export default function GamePage() {
   } = useGameController({ isAuthenticated });
 
   useRateLimitToast();
+  const { state: pushState, toggle: pushToggle } = usePushNotifications();
+
+  // Navigate to screen from query param (e.g. push notification deep link)
+  const [deepLinkTab, setDeepLinkTab] = useState<string | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const screen = params.get('screen');
+    if (screen) {
+      setActiveScreen(screen as Screen);
+      setDeepLinkTab(params.get('tab'));
+      window.history.replaceState(null, '', '/game');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
   const [expeditionContext, setExpeditionContext] = useState<ExpeditionContext | null>(null);
@@ -1039,6 +1060,10 @@ export default function GamePage() {
             onLootRevealRarityChange={handleSetLootRevealRarity}
             forgeConfirmRarity={forgeConfirmRarity}
             onForgeConfirmRarityChange={handleSetForgeConfirmRarity}
+            pushState={pushState}
+            onPushToggle={pushToggle}
+            notificationPrefs={notificationPrefs}
+            onNotificationPrefChange={handleSetNotificationPref}
             onLogout={() => { logout(); router.push('/'); }}
           />
         );
@@ -1085,6 +1110,7 @@ export default function GamePage() {
           <GuildScreen
             playerId={player?.id ?? null}
             characterLevel={characterProgression.characterLevel}
+            initialTab={activeScreen === 'guild' && deepLinkTab ? deepLinkTab as 'expeditions' : undefined}
             onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onExpeditionContextChange={setExpeditionContext}
           />
@@ -1120,6 +1146,7 @@ export default function GamePage() {
             manaState={manaState}
             onLoadTemplates={handleLoadTemplates}
             onNavigate={setActiveScreen}
+            onTemplateSaved={handleTemplateSaved}
           />
         );
       case 'talentTree':
@@ -1130,6 +1157,7 @@ export default function GamePage() {
             onAllocate={handleAllocateSkillPoint}
             onRespec={handleRespecSkillPoints}
             onNavigate={setActiveScreen}
+            initialTree={starterWeaponType ?? undefined}
           />
         );
       case 'casino':
@@ -1377,10 +1405,16 @@ export default function GamePage() {
           } else if (tutorialStep === TUTORIAL_STEP_DONE) {
             advanceTutorial(TUTORIAL_STEP_DONE);
           }
+          // Only WELCOME and DONE advance on dialog dismiss.
+          // All other steps advance via their own completion triggers.
         }}
       />
+      {tutorialStep === TUTORIAL_STEP_STARTER_WEAPON && (
+        <StarterWeaponPopup onSelect={handleClaimStarterWeapon} />
+      )}
       <AchievementToast onNavigate={(category) => { setAchievementCategory(category); setActiveScreen('achievements'); }} />
       <QuestToast />
+      <ForgeResultToast />
       <RateLimitToast />
     </>
   );

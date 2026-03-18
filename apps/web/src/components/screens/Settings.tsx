@@ -8,6 +8,26 @@ import { RaritySelector } from '../common/RaritySelector';
 import { ScreenContainer } from '../common/ScreenContainer';
 import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 
+export interface NotificationPrefs {
+  notifyPvpAttack: boolean;
+  notifyPvpScout: boolean;
+  notifyBossAppeared: boolean;
+  notifyBossKilled: boolean;
+  notifyTurnBankFull: boolean;
+  notifyExpeditionStarted: boolean;
+  notifyExpeditionFinished: boolean;
+}
+
+const NOTIFICATION_LABELS: { key: keyof NotificationPrefs; label: string }[] = [
+  { key: 'notifyPvpAttack', label: 'PvP attacks' },
+  { key: 'notifyPvpScout', label: 'PvP scouts' },
+  { key: 'notifyBossAppeared', label: 'Boss appeared' },
+  { key: 'notifyBossKilled', label: 'Boss defeated' },
+  { key: 'notifyTurnBankFull', label: 'Turn bank full' },
+  { key: 'notifyExpeditionStarted', label: 'Expedition recruiting' },
+  { key: 'notifyExpeditionFinished', label: 'Expedition finished' },
+];
+
 interface SettingsProps {
   username: string | undefined;
 
@@ -44,6 +64,12 @@ interface SettingsProps {
   lootRevealRarity: ConfirmRarity;
   onLootRevealRarityChange: (value: ConfirmRarity) => void;
 
+  // Notifications
+  pushState: 'loading' | 'unsupported' | 'denied' | 'subscribed' | 'unsubscribed';
+  onPushToggle: () => void;
+  notificationPrefs: NotificationPrefs;
+  onNotificationPrefChange: (key: keyof NotificationPrefs, value: boolean) => void;
+
   // Account
   onLogout: () => void;
 }
@@ -76,6 +102,10 @@ export function Settings({
   onConfirmRarityChange,
   lootRevealRarity,
   onLootRevealRarityChange,
+  pushState,
+  onPushToggle,
+  notificationPrefs,
+  onNotificationPrefChange,
   onLogout,
 }: SettingsProps) {
   return (
@@ -223,6 +253,40 @@ export function Settings({
           />
         </div>
       </PixelCard>
+
+      {/* Notifications */}
+      {pushState !== 'unsupported' && (
+        <PixelCard>
+          <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Notifications</h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[var(--rpg-text-secondary)]">Push Notifications</p>
+              {pushState === 'denied' && (
+                <p className="text-xs text-[var(--rpg-red)] mt-0.5">Blocked in browser settings</p>
+              )}
+            </div>
+            <ToggleSwitch
+              checked={pushState === 'subscribed'}
+              onChange={onPushToggle}
+            />
+          </div>
+          {pushState === 'subscribed' && (
+            <div className="mt-3 space-y-2 border-t border-[var(--rpg-border)] pt-3">
+              {NOTIFICATION_LABELS.map(({ key, label }) => (
+                <label key={key} className="flex items-center justify-between cursor-pointer">
+                  <span className="text-xs text-[var(--rpg-text-secondary)]">{label}</span>
+                  <input
+                    type="checkbox"
+                    checked={notificationPrefs[key]}
+                    onChange={(e) => onNotificationPrefChange(key, e.target.checked)}
+                    className="accent-[var(--rpg-gold)] w-4 h-4"
+                  />
+                </label>
+              ))}
+            </div>
+          )}
+        </PixelCard>
+      )}
 
       {/* Account */}
       <button

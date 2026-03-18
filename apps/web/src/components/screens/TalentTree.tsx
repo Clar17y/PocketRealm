@@ -18,6 +18,7 @@ interface TalentTreeProps {
   onAllocate: (nodeId: string) => Promise<void>;
   onRespec: () => Promise<void>;
   onNavigate: (screen: Screen) => void;
+  initialTree?: TalentTreeName;
 }
 
 const TREE_TABS: { id: TalentTreeName; label: string; color: string }[] = [
@@ -59,8 +60,9 @@ export function TalentTree({
   onAllocate,
   onRespec,
   onNavigate,
+  initialTree,
 }: TalentTreeProps) {
-  const [activeTree, setActiveTree] = useState<TalentTreeName>('melee');
+  const [activeTree, setActiveTree] = useState<TalentTreeName>(initialTree ?? 'melee');
   const [allocating, setAllocating] = useState<string | null>(null);
   const [confirmRespec, setConfirmRespec] = useState(false);
   const [respeccing, setRespeccing] = useState(false);

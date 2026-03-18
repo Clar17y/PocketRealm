@@ -8,6 +8,7 @@ import {
 import { expireStaleEvents, spawnWorldEvent } from './worldEventService';
 import { createBossEncounter, checkAndResolveDueBossRounds } from './bossEncounterService';
 import { emitSystemMessage } from './systemMessageService';
+import { sendPush } from './pushNotificationService';
 import { pickWeighted } from '../utils/pickWeighted.js';
 
 let lastRunAt = 0;
@@ -246,6 +247,20 @@ async function trySpawnBoss(io: SocketServer | null, zoneId: string, zoneName: s
 
   await emitSystemMessage(io, 'world', 'world', `A boss has appeared in ${zoneName}: ${bossMob.name}!`);
   await emitSystemMessage(io, 'zone', `zone:${zoneId}`, `A boss has appeared: ${bossMob.name}! Sign up for the raid!`);
+
+  // Push notification to all subscribed players
+  const subscribedPlayers = await prisma.pushSubscription.findMany({
+    select: { playerId: true },
+    distinct: ['playerId'],
+  });
+  for (const { playerId } of subscribedPlayers) {
+    void sendPush(playerId, 'bossAppeared', {
+      title: 'Boss Appeared!',
+      body: `${bossMob.name} has appeared in ${zoneName}!`,
+      tag: 'boss-appeared',
+      data: { type: 'boss' },
+    });
+  }
 
   return true;
 }

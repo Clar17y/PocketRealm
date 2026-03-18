@@ -8,6 +8,7 @@ import { refundPlayerTurns } from '../services/turnBankService';
 import { addStackableItem, addStackableItemTx } from '../services/inventoryService';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
+import { sendPush } from '../services/pushNotificationService';
 import { normalizePlayerAttributes } from '../services/attributesService';
 import { createActivityLog } from '../services/activityLogService';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity } from '@pocketrealm/game-engine';
@@ -386,6 +387,23 @@ router.post('/boss/spawn', asyncHandler(async (req, res) => {
 
   const encounter = await createBossEncounter(event.id, mobTemplateId, mob.bossBaseHp ?? mob.hp);
   await adminAudit(req.player!.playerId, 'spawn_boss', { mobTemplateId, mobName: mob.name, zoneId, eventId: event.id });
+
+  // Push notification to all subscribed players
+  const zone = await prisma.zone.findUnique({ where: { id: zoneId }, select: { name: true } });
+  const zoneName = zone?.name ?? 'unknown';
+  const subscribedPlayers = await prisma.pushSubscription.findMany({
+    select: { playerId: true },
+    distinct: ['playerId'],
+  });
+  for (const { playerId } of subscribedPlayers) {
+    void sendPush(playerId, 'bossAppeared', {
+      title: 'Boss Appeared!',
+      body: `${mob.name} has appeared in ${zoneName}!`,
+      tag: 'boss-appeared',
+      data: { type: 'boss' },
+    });
+  }
+
   res.json({ success: true, event, encounter });
 }));
 

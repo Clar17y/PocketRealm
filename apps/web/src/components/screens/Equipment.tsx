@@ -4,12 +4,12 @@ import { useMemo, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
-import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, Target, X, Zap } from 'lucide-react';
+import { X } from 'lucide-react';
 import { RARITY_COLORS, type Rarity } from '@/lib/rarity';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
 import { repairTurnCost } from '@pocketrealm/shared';
 import { getStaggerDelay } from '@/lib/animations';
-import { numStat, formatSignedStatValue, prettyStatName, prettyWeightClass } from '@/lib/statFormat';
+import { numStat, formatSignedStatValue, prettyStatName, prettyWeightClass, statDisplayMeta, type StatDisplayMeta } from '@/lib/statFormat';
 import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { Divider } from '@/components/common/Divider';
 import { ItemIcon } from '@/components/common/ItemIcon';
@@ -99,6 +99,11 @@ const COMPARE_STATS = [
   { key: 'critChance', label: 'Crit Chance' },
   { key: 'critDamage', label: 'Crit Damage' },
 ] as const;
+
+/** Extract only the fields StatBlock expects from StatDisplayMeta (uses cssVar format). */
+function pickStatBlock(meta: StatDisplayMeta) {
+  return { icon: meta.icon, label: meta.label, color: meta.cssVar };
+}
 
 function prettySlot(slot: string) {
   return titleCaseFromSnake(slot);
@@ -328,26 +333,32 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
                     )}
 
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <StatLine icon={Sword} label="Attack" statKey="attack" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'attack')} color="text-[var(--rpg-red)]" />
-                      <StatLine icon={Shield} label="Armor" statKey="armor" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'armor')} color="text-[var(--rpg-blue-light)]" />
-                      <StatLine icon={Sparkles} label="Magic Def" statKey="magicDefence" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicDefence')} color="text-[var(--rpg-purple)]" />
-                      <StatLine icon={Heart} label="HP" statKey="health" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'health')} color="text-[var(--rpg-green-light)]" />
-                      <StatLine icon={Zap} label="Dodge" statKey="dodge" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'dodge')} color="text-[var(--rpg-gold)]" />
-                      <StatLine icon={Crosshair} label="Accuracy" statKey="accuracy" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'accuracy')} color="text-[var(--rpg-blue-light)]" />
-                      <StatLine icon={Sparkles} label="Magic Power" statKey="magicPower" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'magicPower')} color="text-[var(--rpg-purple)]" />
-                      <StatLine icon={Target} label="Ranged Power" statKey="rangedPower" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'rangedPower')} color="text-[var(--rpg-green-light)]" />
-                      <StatLine icon={Zap} label="Luck" statKey="luck" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'luck')} color="text-[var(--rpg-gold)]" />
-                      <StatLine icon={Zap} label="Crit Chance" statKey="critChance" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'critChance')} color="text-[var(--rpg-gold)]" />
-                      <StatLine icon={Zap} label="Crit Damage" statKey="critDamage" value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'critDamage')} color="text-[var(--rpg-gold)]" />
-                      {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'inventorySlots') !== 0 && (
-                        <div className="flex items-center gap-2">
-                          <Backpack size={16} className="text-[var(--rpg-gold)]" />
-                          <span className="text-[var(--rpg-text-secondary)]">Inventory Slots</span>
-                          <span className="ml-auto font-pixel text-[12px] text-[var(--rpg-gold)]">
-                            +{totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'inventorySlots')}
-                          </span>
-                        </div>
-                      )}
+                      {(['attack', 'armor', 'magicDefence', 'health', 'dodge', 'accuracy', 'magicPower', 'rangedPower', 'luck', 'critChance', 'critDamage'] as const).map((statKey) => {
+                        const meta = statDisplayMeta(statKey);
+                        return (
+                          <StatLine
+                            key={statKey}
+                            icon={meta.icon}
+                            label={meta.label}
+                            statKey={statKey}
+                            value={totalStatValue(currentItem.baseStats, currentItem.bonusStats, statKey)}
+                            color={meta.cssClass}
+                          />
+                        );
+                      })}
+                      {totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'inventorySlots') !== 0 && (() => {
+                        const slotsMeta = statDisplayMeta('inventorySlots');
+                        const SlotIcon = slotsMeta.icon;
+                        return (
+                          <div className="flex items-center gap-2">
+                            <SlotIcon size={16} className={slotsMeta.cssClass} />
+                            <span className="text-[var(--rpg-text-secondary)]">{slotsMeta.label}</span>
+                            <span className={`ml-auto font-pixel text-[12px] ${slotsMeta.cssClass}`}>
+                              +{totalStatValue(currentItem.baseStats, currentItem.bonusStats, 'inventorySlots')}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {(() => {
@@ -586,18 +597,18 @@ export function Equipment({ slots, inventoryItems, onEquip, onUnequip, onRepairI
         <h3 className="font-semibold font-almendra text-[var(--rpg-text-primary)] mb-4">Total Stats</h3>
         <div className="grid grid-cols-2 gap-4">
           {([
-            { icon: Sword, label: 'Attack', value: String(stats.attack), color: 'var(--rpg-red)' },
-            { icon: Shield, label: 'Defence', value: String(stats.defence), color: 'var(--rpg-blue-light)' },
-            { icon: Sparkles, label: 'Magic Def', value: String(stats.magicDefence), color: 'var(--rpg-purple)' },
-            { icon: Heart, label: 'HP', value: String(stats.hp), color: 'var(--rpg-green-light)' },
-            { icon: Zap, label: 'Dodge', value: String(stats.dodge), color: 'var(--rpg-gold)' },
-            { icon: Crosshair, label: 'Accuracy', value: String(stats.accuracy), color: 'var(--rpg-blue-light)' },
-            ...(stats.magicPower ? [{ icon: Sparkles, label: 'Magic Power', value: String(stats.magicPower), color: 'var(--rpg-purple)' }] as const : []),
-            ...(stats.rangedPower ? [{ icon: Target, label: 'Ranged Power', value: String(stats.rangedPower), color: 'var(--rpg-green-light)' }] as const : []),
-            ...(stats.luck ? [{ icon: Zap, label: 'Luck', value: String(stats.luck), color: 'var(--rpg-gold)' }] as const : []),
-            { icon: Zap, label: 'Crit Chance', value: `${Math.round((0.05 + stats.critChance) * 100)}%`, color: 'var(--rpg-gold)' },
-            { icon: Zap, label: 'Crit Damage', value: `${Math.round((1.5 + stats.critDamage) * 100)}%`, color: 'var(--rpg-gold)' },
-          ] as const).map((s) => (
+            { ...pickStatBlock(statDisplayMeta('attack')),      value: String(stats.attack) },
+            { ...pickStatBlock(statDisplayMeta('defence')),     value: String(stats.defence) },
+            { ...pickStatBlock(statDisplayMeta('magicDefence')),value: String(stats.magicDefence) },
+            { ...pickStatBlock(statDisplayMeta('hp')),          value: String(stats.hp) },
+            { ...pickStatBlock(statDisplayMeta('dodge')),       value: String(stats.dodge) },
+            { ...pickStatBlock(statDisplayMeta('accuracy')),    value: String(stats.accuracy) },
+            ...(stats.magicPower ? [{ ...pickStatBlock(statDisplayMeta('magicPower')), value: String(stats.magicPower) }] : []),
+            ...(stats.rangedPower ? [{ ...pickStatBlock(statDisplayMeta('rangedPower')), value: String(stats.rangedPower) }] : []),
+            ...(stats.luck ? [{ ...pickStatBlock(statDisplayMeta('luck')), value: String(stats.luck) }] : []),
+            { ...pickStatBlock(statDisplayMeta('critChance')),  value: `${Math.round((0.05 + stats.critChance) * 100)}%` },
+            { ...pickStatBlock(statDisplayMeta('critDamage')),  value: `${Math.round((1.5 + stats.critDamage) * 100)}%` },
+          ]).map((s) => (
             <StatBlock key={s.label} icon={s.icon} label={s.label} value={s.value} color={s.color} />
           ))}
         </div>

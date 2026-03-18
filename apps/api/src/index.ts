@@ -35,6 +35,7 @@ import { questsRouter } from './routes/quests';
 import { expeditionRouter } from './routes/expedition';
 import { shopRouter } from './routes/shop';
 import { friendsRouter } from './routes/friends';
+import { notificationsRouter } from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
 import { createSocketServer, getIo } from './socket';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
@@ -153,6 +154,7 @@ app.use('/api/v1/quests', questsRouter);
 app.use('/api/v1/expedition', expeditionRouter);
 app.use('/api/v1/shop', shopRouter);
 app.use('/api/v1/friends', friendsRouter);
+app.use('/api/v1/notifications', notificationsRouter);
 
 // Error handler
 app.use(errorHandler);

@@ -15,6 +15,13 @@ export interface ServerSettingsPayload {
   lootRevealRarity?: ConfirmRarity | null;
   forgeConfirmRarity?: ConfirmRarity | null;
   homeTownId?: string | null;
+  notifyPvpAttack?: boolean | null;
+  notifyPvpScout?: boolean | null;
+  notifyBossAppeared?: boolean | null;
+  notifyBossKilled?: boolean | null;
+  notifyTurnBankFull?: boolean | null;
+  notifyExpeditionStarted?: boolean | null;
+  notifyExpeditionFinished?: boolean | null;
 }
 
 export function usePlayerSettings() {
@@ -30,6 +37,15 @@ export function usePlayerSettings() {
   const [forgeConfirmRarity, setForgeConfirmRarity] = useState<ConfirmRarity>('rare');
   const [guildTaxRate, setGuildTaxRate] = useState(0);
   const [homeTownId, setHomeTownId] = useState<string | null>(null);
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    notifyPvpAttack: true,
+    notifyPvpScout: true,
+    notifyBossAppeared: true,
+    notifyBossKilled: true,
+    notifyTurnBankFull: true,
+    notifyExpeditionStarted: true,
+    notifyExpeditionFinished: true,
+  });
 
   // --- generic persist helper ---------------------------------------------------
 
@@ -64,6 +80,13 @@ export function usePlayerSettings() {
   const handleSetHomeTown = (zoneId: string) =>
     handleSetSetting('homeTownId', zoneId, setHomeTownId, homeTownId);
 
+  const handleSetNotificationPref = async (key: keyof typeof notificationPrefs, value: boolean) => {
+    const prev = notificationPrefs[key];
+    setNotificationPrefs((p) => ({ ...p, [key]: value }));
+    const res = await updatePlayerSettings({ [key]: value });
+    if (!res.data) setNotificationPrefs((p) => ({ ...p, [key]: prev }));
+  };
+
   // --- server hydration ---------------------------------------------------------
 
   const initSettingsFromServer = (s: ServerSettingsPayload) => {
@@ -78,6 +101,15 @@ export function usePlayerSettings() {
     setLootRevealRarity(s.lootRevealRarity ?? 'uncommon');
     setForgeConfirmRarity(s.forgeConfirmRarity ?? 'rare');
     setHomeTownId(s.homeTownId ?? null);
+    setNotificationPrefs({
+      notifyPvpAttack: s.notifyPvpAttack ?? true,
+      notifyPvpScout: s.notifyPvpScout ?? true,
+      notifyBossAppeared: s.notifyBossAppeared ?? true,
+      notifyBossKilled: s.notifyBossKilled ?? true,
+      notifyTurnBankFull: s.notifyTurnBankFull ?? true,
+      notifyExpeditionStarted: s.notifyExpeditionStarted ?? true,
+      notifyExpeditionFinished: s.notifyExpeditionFinished ?? true,
+    });
   };
 
   return {
@@ -114,6 +146,8 @@ export function usePlayerSettings() {
     handleSetLootRevealRarity,
     handleSetForgeConfirmRarity,
     handleSetHomeTown,
+    notificationPrefs,
+    handleSetNotificationPref,
 
     // Initialization
     initSettingsFromServer,

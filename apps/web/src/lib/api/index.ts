@@ -19,6 +19,7 @@ export {
   restEstimate,
   rest,
   recoverFromKnockout,
+  claimStarterWeapon,
 } from './player';
 export type { PlayerSettings } from './player';
 
@@ -137,6 +138,8 @@ export type {
   LeaderboardCategoryGroup,
   LeaderboardCategoriesResponse,
 } from './social';
+
+export { getNotificationStatus, subscribePush, unsubscribePush } from './notifications';
 
 export { getResources } from './resources';
 export type { CombatResourceResponse } from './resources';

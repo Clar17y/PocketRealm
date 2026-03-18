@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID, EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
+import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID, EXPLORATION_CONSTANTS, TUTORIAL_COMPLETED, TUTORIAL_SKIPPED, STARTER_LOADOUT } from '@pocketrealm/shared';
 import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -53,6 +53,13 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       activeTitle: true,
       gold: true,
       homeTownId: true,
+      notifyPvpAttack: true,
+      notifyPvpScout: true,
+      notifyBossAppeared: true,
+      notifyBossKilled: true,
+      notifyTurnBankFull: true,
+      notifyExpeditionStarted: true,
+      notifyExpeditionFinished: true,
     },
   });
 
@@ -139,6 +146,8 @@ const SETTINGS_FIELDS = [
   'autoSkipKnownCombat', 'defaultExploreTurns', 'quickRestHealPercent', 'defaultRefiningMax',
   'lowHpWarning', 'confirmRarity', 'lootRevealRarity', 'forgeConfirmRarity',
   'homeTownId',
+  'notifyPvpAttack', 'notifyPvpScout', 'notifyBossAppeared', 'notifyBossKilled',
+  'notifyTurnBankFull', 'notifyExpeditionStarted', 'notifyExpeditionFinished',
 ] as const;
 
 const RARITY_ENUM = ['none', 'common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
@@ -155,6 +164,13 @@ const settingsSchema = z.object({
   lootRevealRarity: z.enum(RARITY_ENUM).optional(),
   forgeConfirmRarity: z.enum(RARITY_ENUM).optional(),
   homeTownId: z.string().uuid().optional(),
+  notifyPvpAttack: z.boolean().optional(),
+  notifyPvpScout: z.boolean().optional(),
+  notifyBossAppeared: z.boolean().optional(),
+  notifyBossKilled: z.boolean().optional(),
+  notifyTurnBankFull: z.boolean().optional(),
+  notifyExpeditionStarted: z.boolean().optional(),
+  notifyExpeditionFinished: z.boolean().optional(),
 }).refine(data => Object.values(data).some(v => v !== undefined), { message: 'At least one setting required' });
 
 /**
@@ -192,7 +208,7 @@ playerRouter.patch('/settings', asyncHandler(async (req, res) => {
 }));
 
 const tutorialSchema = z.object({
-  step: z.number().int().min(-1).max(9),
+  step: z.number().int().min(TUTORIAL_SKIPPED).max(TUTORIAL_COMPLETED),
 });
 
 /**
@@ -211,7 +227,7 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
   if (!player) throw new AppError(404, 'Player not found', 'NOT_FOUND');
 
   // Allow skip (-1) from any state, or advance by exactly 1
-  const isSkip = body.step === -1;
+  const isSkip = body.step === TUTORIAL_SKIPPED;
   const isNextStep = body.step === player.tutorialStep + 1;
 
   if (!isSkip && !isNextStep) {
@@ -219,7 +235,7 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
   }
 
   // Don't allow changes once tutorial is completed or skipped
-  if (player.tutorialStep >= 9 || player.tutorialStep === -1) {
+  if (player.tutorialStep >= TUTORIAL_COMPLETED || player.tutorialStep === TUTORIAL_SKIPPED) {
     throw new AppError(400, 'Tutorial already completed', 'TUTORIAL_COMPLETE');
   }
 
@@ -229,11 +245,60 @@ playerRouter.patch('/tutorial', asyncHandler(async (req, res) => {
   });
 
   // Grant achievement for completing the tutorial (not skipping)
-  if (body.step === 9 && !isSkip) {
+  if (body.step === TUTORIAL_COMPLETED && !isSkip) {
     await trackAchievements(playerId, { tutorialCompleted: 1 });
   }
 
   res.json({ tutorialStep: body.step });
+}));
+
+const starterWeaponSchema = z.object({
+  weaponType: z.enum(['melee', 'ranged', 'magic']),
+});
+
+/**
+ * POST /api/v1/player/starter-weapon
+ * Claim a starter weapon from Kessa Ironweld. One-time only.
+ */
+playerRouter.post('/starter-weapon', asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+  const { weaponType } = starterWeaponSchema.parse(req.body);
+
+  const templateId = STARTER_LOADOUT.starterWeaponIds[weaponType];
+
+  // Check if player already claimed a starter weapon (any of the 3 types)
+  const allStarterIds = Object.values(STARTER_LOADOUT.starterWeaponIds);
+  const existingClaim = await prisma.item.findFirst({
+    where: { ownerId: playerId, templateId: { in: allStarterIds } },
+    select: { id: true },
+  });
+
+  if (existingClaim) {
+    throw new AppError(400, 'Starter weapon already claimed', 'ALREADY_CLAIMED');
+  }
+
+  const template = await prisma.itemTemplate.findUnique({
+    where: { id: templateId },
+    select: { id: true, maxDurability: true },
+  });
+
+  if (!template) {
+    throw new AppError(500, 'Starter weapon template missing', 'MISSING_TEMPLATE');
+  }
+
+  const item = await prisma.item.create({
+    data: {
+      ownerId: playerId,
+      templateId,
+      rarity: 'common',
+      quantity: 1,
+      maxDurability: template.maxDurability,
+      currentDurability: template.maxDurability,
+    },
+    select: { id: true },
+  });
+
+  res.json({ success: true, itemId: item.id, weaponType });
 }));
 
 // GET /api/v1/player/buffs — list active buffs

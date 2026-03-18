@@ -24,6 +24,13 @@ export async function getPlayer() {
       lootRevealRarity: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
       gold: number;
       homeTownId: string | null;
+      notifyPvpAttack: boolean;
+      notifyPvpScout: boolean;
+      notifyBossAppeared: boolean;
+      notifyBossKilled: boolean;
+      notifyTurnBankFull: boolean;
+      notifyExpeditionStarted: boolean;
+      notifyExpeditionFinished: boolean;
       attributes: {
         vitality: number;
         strength: number;
@@ -48,6 +55,13 @@ export interface PlayerSettings {
   lootRevealRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   forgeConfirmRarity?: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   homeTownId?: string;
+  notifyPvpAttack?: boolean;
+  notifyPvpScout?: boolean;
+  notifyBossAppeared?: boolean;
+  notifyBossKilled?: boolean;
+  notifyTurnBankFull?: boolean;
+  notifyExpeditionStarted?: boolean;
+  notifyExpeditionFinished?: boolean;
 }
 
 export async function updatePlayerSettings(settings: PlayerSettings) {
@@ -279,4 +293,14 @@ export async function recoverFromKnockout() {
   }>('/api/v1/hp/recover', {
     method: 'POST',
   });
+}
+
+export async function claimStarterWeapon(weaponType: 'melee' | 'ranged' | 'magic') {
+  return fetchApi<{ success: true; itemId: string; weaponType: string }>(
+    '/api/v1/player/starter-weapon',
+    {
+      method: 'POST',
+      body: JSON.stringify({ weaponType }),
+    },
+  );
 }

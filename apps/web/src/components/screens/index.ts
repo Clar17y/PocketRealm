@@ -1,6 +1,5 @@
 export { Dashboard } from './Dashboard';
 export { Exploration } from './Exploration';
-export { CombatLog } from './CombatLog';
 export { Inventory } from './Inventory';
 export { Equipment } from './Equipment';
 export { Skills } from './Skills';
