@@ -35,7 +35,22 @@ vi.mock('../middleware/admin', () => ({
   requireAdmin: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
 vi.mock('../services/stateUpdateHelpers', () => ({
-  buildStateUpdates: vi.fn().mockResolvedValue({ characterProgression: { characterXp: 1000, characterLevel: 10, attributePoints: 5 } }),
+  buildStateUpdates: vi.fn().mockImplementation((_playerId: string, fields: string[]) => {
+    const result: Record<string, unknown> = {};
+    if (fields.includes('characterProgression')) {
+      result.characterProgression = { characterXp: 1000, characterLevel: 10, attributePoints: 5 };
+    }
+    if (fields.includes('skills')) {
+      result.skills = [{ id: 's1', skillType: 'mining', level: 20, xp: 0, dailyXpGained: 0 }];
+    }
+    if (fields.includes('resources')) {
+      result.resources = { stamina: { current: 100, max: 100, regenPerSecond: 1, lastRegenAt: new Date().toISOString() }, mana: { current: 50, max: 50, regenPerSecond: 0.5, lastRegenAt: new Date().toISOString() } };
+    }
+    if (fields.includes('hp')) {
+      result.hp = { currentHp: 100, maxHp: 100, lastRegenAt: new Date().toISOString() };
+    }
+    return Promise.resolve(result);
+  }),
   fetchItemDTOs: vi.fn().mockResolvedValue([]),
   fetchInventoryMeta: vi.fn().mockResolvedValue({ inventoryCapacity: 50, inventoryUsedSlots: 10 }),
   fetchMaterialTotals: vi.fn().mockResolvedValue({}),
@@ -362,7 +377,13 @@ describe('admin routes', () => {
       await handler(req, res, vi.fn());
 
       expect(buildStateUpdates).toHaveBeenCalledWith('p1', ['skills', 'resources']);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, stateUpdates: expect.any(Object) }));
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        stateUpdates: expect.objectContaining({
+          skills: expect.any(Array),
+          resources: expect.any(Object),
+        }),
+      }));
     });
   });
 
@@ -376,12 +397,18 @@ describe('admin routes', () => {
       await handler(req, res, vi.fn());
 
       expect(buildStateUpdates).toHaveBeenCalledWith('p1', ['skills', 'resources']);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, stateUpdates: expect.any(Object) }));
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        stateUpdates: expect.objectContaining({
+          skills: expect.any(Array),
+          resources: expect.any(Object),
+        }),
+      }));
     });
   });
 
   describe('POST /player/attributes', () => {
-    it('sets attributes and returns stateUpdates with hp and resources', async () => {
+    it('sets attributes and returns stateUpdates with hp, resources, and characterProgression', async () => {
       mockPrisma.player.findUniqueOrThrow.mockResolvedValue({ attributes: null, attributePoints: 5 });
       mockPrisma.player.update.mockResolvedValue({});
 
@@ -390,8 +417,15 @@ describe('admin routes', () => {
       const handler = findHandler('post', '/player/attributes');
       await handler(req, res, vi.fn());
 
-      expect(buildStateUpdates).toHaveBeenCalledWith('p1', ['hp', 'resources']);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, stateUpdates: expect.any(Object) }));
+      expect(buildStateUpdates).toHaveBeenCalledWith('p1', ['hp', 'resources', 'characterProgression']);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        stateUpdates: expect.objectContaining({
+          hp: expect.any(Object),
+          resources: expect.any(Object),
+          characterProgression: expect.objectContaining({ attributePoints: expect.any(Number) }),
+        }),
+      }));
     });
   });
 });

@@ -167,7 +167,7 @@ router.post('/player/attributes', asyncHandler(async (req, res) => {
 
   await prisma.player.update({ where: { id: req.player!.playerId }, data });
   await adminAudit(req.player!.playerId, 'set_attributes', { attributes: merged, attributePoints: body.attributePoints });
-  const stateUpdates = await buildStateUpdates(req.player!.playerId, ['hp', 'resources']);
+  const stateUpdates = await buildStateUpdates(req.player!.playerId, ['hp', 'resources', 'characterProgression']);
   res.json({ success: true, attributes: merged, attributePoints: body.attributePoints ?? player.attributePoints, stateUpdates });
 }));
 
@@ -240,14 +240,16 @@ router.post('/items/grant', asyncHandler(async (req, res) => {
     items.push(item);
   }
   const itemIds = items.map(i => i.id);
-  const [addedDTOs, inventoryMeta] = await Promise.all([
+  const [addedDTOs, inventoryMeta, materialTotals] = await Promise.all([
     fetchItemDTOs(itemIds),
     fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
   ]);
   await adminAudit(playerId, 'grant_item', { templateId, templateName: template.name, rarity, quantity, itemCount: items.length });
   const stateUpdates = buildInventoryStateUpdates({
     added: addedDTOs,
     inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    materialTotals,
   });
   res.json({ success: true, items, stateUpdates });
 }));
