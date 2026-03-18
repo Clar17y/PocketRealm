@@ -44,6 +44,7 @@ import { getActiveTemplate } from './combatTemplateService';
 import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
 import { buildPotionPool, templateHasPotionActions, deductConsumedPotions } from './potionService';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
+import { validateEnum } from '../utils/validateEnum';
 
 // ---------------------------------------------------------------------------
 // Bot Cleanup — delete bot players created by admin /expedition/fill
@@ -64,8 +65,7 @@ async function cleanupExpeditionBots(expeditionId: string): Promise<void> {
 const VALID_EXPEDITION_STATUSES = new Set<ExpeditionStatus>(['recruiting', 'in_progress', 'completed', 'failed']);
 
 function validateExpeditionStatus(status: string): ExpeditionStatus {
-  if (VALID_EXPEDITION_STATUSES.has(status as ExpeditionStatus)) return status as ExpeditionStatus;
-  return 'failed';
+  return validateEnum(status, VALID_EXPEDITION_STATUSES, 'failed');
 }
 
 // ---------------------------------------------------------------------------

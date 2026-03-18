@@ -20,12 +20,12 @@ import type {
   CasinoPhaseEvent,
 } from '@pocketrealm/shared';
 import { activeRoundSchema, resolvedRoundSchema, safeParseRedisJson } from '../utils/jsonColumnSchemas';
+import { validateEnum } from '../utils/validateEnum';
 
 const VALID_BET_TYPES = new Set<RouletteBetType>(['straight', 'split', 'red', 'black', 'odd', 'even', 'dozen', 'column', 'corner']);
 
 function validateBetType(value: string): RouletteBetType {
-  if (VALID_BET_TYPES.has(value as RouletteBetType)) return value as RouletteBetType;
-  return 'straight'; // fallback for corrupted data
+  return validateEnum(value, VALID_BET_TYPES, 'straight');
 }
 
 export interface GoldExchangeResult {
