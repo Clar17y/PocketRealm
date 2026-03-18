@@ -41,8 +41,12 @@ const NOTIFICATION_SELECT = Object.fromEntries(
 
 function initVapid(): void {
   const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT } = process.env;
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) return;
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) {
+    console.warn('[push] VAPID env vars missing — push notifications disabled');
+    return;
+  }
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  console.log('[push] VAPID configured');
 }
 
 let vapidInitialized = false;
@@ -128,6 +132,8 @@ export async function sendPush(
         const statusCode = (err as { statusCode?: number }).statusCode;
         if (statusCode === 410 || statusCode === 404) {
           await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
+        } else {
+          console.error('[push] sendNotification failed:', (err as Error).message ?? err);
         }
       }
     }),

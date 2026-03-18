@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { itemImageSrc, monsterImageSrc, resourceImageSrc, screenBackgroundSrc, skillIconSrc, zoneImageSrc, type ExpeditionContext } from '@/lib/assets';
 import { AppShell } from '@/components/AppShell';
@@ -110,6 +110,7 @@ const CRAFTING_SKILL_TABS = [
 
 export default function GamePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { player, isLoading, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
@@ -302,6 +303,16 @@ export default function GamePage() {
 
   useRateLimitToast();
   const { state: pushState, toggle: pushToggle } = usePushNotifications();
+
+  // Navigate to screen from query param (e.g. push notification deep link)
+  useEffect(() => {
+    const screen = searchParams.get('screen');
+    if (screen && screen !== activeScreen) {
+      setActiveScreen(screen as Screen);
+      router.replace('/game', { scroll: false });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const [achievementCategory, setAchievementCategory] = useState<string | null>(null);
   const [expeditionContext, setExpeditionContext] = useState<ExpeditionContext | null>(null);
