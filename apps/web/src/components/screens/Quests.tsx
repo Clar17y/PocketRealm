@@ -315,11 +315,13 @@ function ShopTab({
   onPurchase,
   zones,
   homeTownId,
+  showNpcDialogue = true,
 }: {
   questTokens: number;
   onPurchase?: () => void;
   zones?: Array<{ id: string; name: string; zoneType: string }>;
   homeTownId?: string | null;
+  showNpcDialogue?: boolean;
 }) {
   const [shopItems, setShopItems] = useState<ShopItemData[]>([]);
   const [tokens, setTokens] = useState(questTokens);
@@ -608,7 +610,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
       <SubNav tabs={[...SHOP_TABS]} activeId={activeTab} onSelect={setActiveTab} />
 
       {activeTab === 'shop' ? (
-        <ShopTab questTokens={questState?.questTokens ?? 0} onPurchase={onShopPurchase} zones={zones} homeTownId={homeTownId} />
+        <ShopTab questTokens={questState?.questTokens ?? 0} onPurchase={onShopPurchase} zones={zones} homeTownId={homeTownId} showNpcDialogue={showNpcDialogue} />
       ) : (
         <>
           {/* Quest Token Balance + Daily Bonus */}
