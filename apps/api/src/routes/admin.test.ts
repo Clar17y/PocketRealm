@@ -4,7 +4,7 @@ vi.mock('../services/turnBankService', () => ({
   refundPlayerTurns: vi.fn().mockResolvedValue({ currentTurns: 5000 }),
 }));
 vi.mock('../services/inventoryService', () => ({
-  addStackableItem: vi.fn().mockResolvedValue({ id: 'item-1', quantity: 10 }),
+  addStackableItem: vi.fn().mockResolvedValue({ itemId: 'item-1', quantity: 10, created: false }),
 }));
 vi.mock('../services/worldEventService', () => ({
   spawnWorldEvent: vi.fn(),
@@ -34,12 +34,35 @@ vi.mock('../middleware/auth', () => ({
 vi.mock('../middleware/admin', () => ({
   requireAdmin: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
+vi.mock('../services/stateUpdateHelpers', () => ({
+  buildStateUpdates: vi.fn().mockImplementation((_playerId: string, fields: string[]) => {
+    const result: Record<string, unknown> = {};
+    if (fields.includes('characterProgression')) {
+      result.characterProgression = { characterXp: 1000, characterLevel: 10, attributePoints: 5 };
+    }
+    if (fields.includes('skills')) {
+      result.skills = [{ id: 's1', skillType: 'mining', level: 20, xp: 0, dailyXpGained: 0 }];
+    }
+    if (fields.includes('resources')) {
+      result.resources = { stamina: { current: 100, max: 100, regenPerSecond: 1, lastRegenAt: new Date().toISOString() }, mana: { current: 50, max: 50, regenPerSecond: 0.5, lastRegenAt: new Date().toISOString() } };
+    }
+    if (fields.includes('hp')) {
+      result.hp = { currentHp: 100, maxHp: 100, lastRegenAt: new Date().toISOString() };
+    }
+    return Promise.resolve(result);
+  }),
+  fetchItemDTOs: vi.fn().mockResolvedValue([]),
+  fetchInventoryMeta: vi.fn().mockResolvedValue({ inventoryCapacity: 50, inventoryUsedSlots: 10 }),
+  fetchMaterialTotals: vi.fn().mockResolvedValue({}),
+  buildInventoryStateUpdates: vi.fn().mockReturnValue({ inventoryUsedSlots: 10 }),
+}));
 
 import { mockPrisma } from '../__test__/setup';
 import { refundPlayerTurns } from '../services/turnBankService';
 import { addStackableItem } from '../services/inventoryService';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
+import { buildStateUpdates } from '../services/stateUpdateHelpers';
 import { adminRouter } from './admin';
 
 const mockSpawnWorldEvent = spawnWorldEvent as ReturnType<typeof vi.fn>;
@@ -94,7 +117,7 @@ describe('admin routes', () => {
           attributePoints: { increment: 5 },
         }),
       }));
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, level: 10 }));
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, level: 10, stateUpdates: expect.any(Object) }));
     });
   });
 
@@ -110,7 +133,7 @@ describe('admin routes', () => {
       await handler(req, res, vi.fn());
 
       expect(addStackableItem).toHaveBeenCalledWith('p1', 'tpl-1', 5);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, stateUpdates: expect.any(Object) }));
     });
 
     it('creates individual items for non-stackable templates', async () => {
@@ -126,7 +149,7 @@ describe('admin routes', () => {
       await handler(req, res, vi.fn());
 
       expect(mockPrisma.item.create).toHaveBeenCalledTimes(2);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, stateUpdates: expect.any(Object) }));
     });
   });
 
@@ -322,6 +345,86 @@ describe('admin routes', () => {
       });
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true, resourceType: 'iron_ore', capacity: 30,
+      }));
+    });
+  });
+
+  describe('POST /player/xp', () => {
+    it('grants XP and returns stateUpdates with characterProgression', async () => {
+      mockPrisma.player.findUniqueOrThrow.mockResolvedValue({ characterXp: BigInt(500), characterLevel: 5 });
+      mockPrisma.player.update.mockResolvedValue({});
+
+      const req = { player: { playerId: 'p1' }, body: { amount: 500 } } as any;
+      const res = mockRes();
+      const handler = findHandler('post', '/player/xp');
+      await handler(req, res, vi.fn());
+
+      expect(buildStateUpdates).toHaveBeenCalledWith('p1', ['characterProgression']);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        stateUpdates: expect.any(Object),
+      }));
+    });
+  });
+
+  describe('POST /set-skill-level', () => {
+    it('sets skill level and returns stateUpdates with skills and resources', async () => {
+      mockPrisma.playerSkill.upsert.mockResolvedValue({});
+
+      const req = { player: { playerId: 'p1' }, body: { skillType: 'mining', level: 20 } } as any;
+      const res = mockRes();
+      const handler = findHandler('post', '/set-skill-level');
+      await handler(req, res, vi.fn());
+
+      expect(buildStateUpdates).toHaveBeenCalledWith('p1', ['skills', 'resources']);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        stateUpdates: expect.objectContaining({
+          skills: expect.any(Array),
+          resources: expect.any(Object),
+        }),
+      }));
+    });
+  });
+
+  describe('POST /set-skill-levels', () => {
+    it('sets multiple skill levels and returns stateUpdates', async () => {
+      mockPrisma.$transaction.mockResolvedValue([]);
+
+      const req = { player: { playerId: 'p1' }, body: { skillTypes: ['melee', 'ranged'], level: 15 } } as any;
+      const res = mockRes();
+      const handler = findHandler('post', '/set-skill-levels');
+      await handler(req, res, vi.fn());
+
+      expect(buildStateUpdates).toHaveBeenCalledWith('p1', ['skills', 'resources']);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        stateUpdates: expect.objectContaining({
+          skills: expect.any(Array),
+          resources: expect.any(Object),
+        }),
+      }));
+    });
+  });
+
+  describe('POST /player/attributes', () => {
+    it('sets attributes and returns stateUpdates with hp, resources, and characterProgression', async () => {
+      mockPrisma.player.findUniqueOrThrow.mockResolvedValue({ attributes: null, attributePoints: 5 });
+      mockPrisma.player.update.mockResolvedValue({});
+
+      const req = { player: { playerId: 'p1' }, body: { attributes: { vitality: 10, strength: 10, dexterity: 5, intelligence: 5, luck: 5, evasion: 5 } } } as any;
+      const res = mockRes();
+      const handler = findHandler('post', '/player/attributes');
+      await handler(req, res, vi.fn());
+
+      expect(buildStateUpdates).toHaveBeenCalledWith('p1', ['hp', 'resources', 'characterProgression']);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        stateUpdates: expect.objectContaining({
+          hp: expect.any(Object),
+          resources: expect.any(Object),
+          characterProgression: expect.objectContaining({ attributePoints: expect.any(Number) }),
+        }),
       }));
     });
   });

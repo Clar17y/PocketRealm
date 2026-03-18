@@ -5,7 +5,7 @@ vi.mock('./hpService.js', () => ({ getHpState: vi.fn() }));
 vi.mock('./resourceService.js', () => ({ getResourceState: vi.fn() }));
 vi.mock('./inventoryService.js', () => ({ getInventoryState: vi.fn() }));
 
-import { toInventoryItemDTO, toSkillStateDTO } from './stateUpdateHelpers.js';
+import { toInventoryItemDTO, toSkillStateDTO, buildInventoryStateUpdates } from './stateUpdateHelpers.js';
 
 describe('toInventoryItemDTO', () => {
   const mockItem = {
@@ -139,6 +139,78 @@ describe('toSkillStateDTO', () => {
       level: 10,
       xp: 5000,
       dailyXpGained: 300,
+    });
+  });
+});
+
+describe('buildInventoryStateUpdates', () => {
+  const mockDTO = {
+    id: 'item-1', templateId: 'tpl-1', ownerId: 'p1', rarity: 'common' as const,
+    currentDurability: null, maxDurability: null, quantity: 1, bonusStats: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    template: { id: 'tpl-1', name: 'Ore', itemType: 'resource', weightClass: null, slot: null, tier: 1, baseStats: {}, requiredSkill: 'mining', requiredLevel: 1, maxDurability: 0, stackable: true, sellPrice: 5, flavorText: null },
+    equippedSlot: null,
+  };
+
+  it('always includes inventoryUsedSlots', () => {
+    const result = buildInventoryStateUpdates({ inventoryUsedSlots: 5 });
+    expect(result).toEqual({ inventoryUsedSlots: 5 });
+  });
+
+  it('includes removed when non-empty', () => {
+    const result = buildInventoryStateUpdates({ removed: ['id-1', 'id-2'], inventoryUsedSlots: 3 });
+    expect(result.inventoryRemoved).toEqual(['id-1', 'id-2']);
+  });
+
+  it('omits removed when empty', () => {
+    const result = buildInventoryStateUpdates({ removed: [], inventoryUsedSlots: 3 });
+    expect(result.inventoryRemoved).toBeUndefined();
+  });
+
+  it('includes added when non-empty', () => {
+    const result = buildInventoryStateUpdates({ added: [mockDTO], inventoryUsedSlots: 3 });
+    expect(result.inventoryAdded).toEqual([mockDTO]);
+  });
+
+  it('omits added when empty', () => {
+    const result = buildInventoryStateUpdates({ added: [], inventoryUsedSlots: 3 });
+    expect(result.inventoryAdded).toBeUndefined();
+  });
+
+  it('includes updated when non-empty', () => {
+    const result = buildInventoryStateUpdates({ updated: [mockDTO], inventoryUsedSlots: 3 });
+    expect(result.inventoryUpdated).toEqual([mockDTO]);
+  });
+
+  it('omits updated when empty', () => {
+    const result = buildInventoryStateUpdates({ updated: [], inventoryUsedSlots: 3 });
+    expect(result.inventoryUpdated).toBeUndefined();
+  });
+
+  it('includes materialTotals when provided', () => {
+    const result = buildInventoryStateUpdates({ inventoryUsedSlots: 3, materialTotals: { 'tpl-1': 10 } });
+    expect(result.materialTotals).toEqual({ 'tpl-1': 10 });
+  });
+
+  it('omits materialTotals when not provided', () => {
+    const result = buildInventoryStateUpdates({ inventoryUsedSlots: 3 });
+    expect(result.materialTotals).toBeUndefined();
+  });
+
+  it('assembles all fields together', () => {
+    const result = buildInventoryStateUpdates({
+      removed: ['old-id'],
+      added: [mockDTO],
+      updated: [{ ...mockDTO, id: 'item-2' }],
+      inventoryUsedSlots: 5,
+      materialTotals: { 'tpl-1': 10 },
+    });
+    expect(result).toEqual({
+      inventoryRemoved: ['old-id'],
+      inventoryAdded: [mockDTO],
+      inventoryUpdated: [{ ...mockDTO, id: 'item-2' }],
+      inventoryUsedSlots: 5,
+      materialTotals: { 'tpl-1': 10 },
     });
   });
 });

@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.44',
+    date: '2026-03-18',
+    title: 'Push Notifications',
+    summary:
+      "Stay in the loop even when you're away. The game now sends push notifications for PvP attacks, boss round results, world boss spawns, and guild expedition launches. Tapping a notification deep-links you straight to the relevant screen. Per-type notification preferences in Settings let you mute categories you don't care about, and notifications are automatically suppressed when the app is already in focus.",
+  },
+  {
     version: '0.43',
     date: '2026-03-16',
     title: 'UI Fixes & Quality of Life',
