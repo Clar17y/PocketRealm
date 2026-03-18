@@ -782,6 +782,9 @@ export default function GamePage() {
               stats: m.stats,
               zones: m.zones,
               description: m.description,
+              flavorAppearance: m.flavorAppearance,
+              flavorBehavior: m.flavorBehavior,
+              flavorLore: m.flavorLore,
               prefixesEncountered: m.prefixesEncountered,
               explorationTier: m.explorationTier,
               tierLocked: m.tierLocked,
@@ -796,6 +799,7 @@ export default function GamePage() {
             prefixSummary={bestiaryPrefixSummary}
             expeditionThemes={expeditionThemes}
             worldBosses={worldBosses}
+            showBestiaryLore={showBestiaryLore}
           />
         );
       case 'crafting':
