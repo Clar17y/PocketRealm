@@ -39,18 +39,11 @@ import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.
 import { distributeBossLoot } from './bossLootService';
 import { redis } from '../redis';
 import { parseJsonArray, parseJsonRecord } from '../utils/jsonColumnSchemas';
+import { sendPush } from './pushNotificationService';
 import { validateEnum } from '../utils/validateEnum';
 
 const VALID_ENCOUNTER_STATUSES = new Set<BossEncounterStatus>(['waiting', 'in_progress', 'defeated', 'expired']);
 const VALID_PARTICIPANT_STATUSES = new Set<BossParticipantStatus>(['alive', 'knocked_out']);
-
-function validateEncounterStatus(status: string): BossEncounterStatus {
-  return validateEnum(status, VALID_ENCOUNTER_STATUSES, 'waiting');
-}
-
-function validateParticipantStatus(status: string): BossParticipantStatus {
-  return validateEnum(status, VALID_PARTICIPANT_STATUSES, 'alive');
-}
 
 // --- Mappers ---
 
@@ -85,7 +78,7 @@ function toBossEncounterData(row: {
     bossEffects: parseJsonArray<BossActiveEffect>(row.bossEffects, 'bossEffects'),
     roundNumber: row.roundNumber,
     nextRoundAt: row.nextRoundAt?.toISOString() ?? null,
-    status: validateEncounterStatus(row.status),
+    status: validateEnum(row.status, VALID_ENCOUNTER_STATUSES, 'waiting'),
     killedBy: row.killedBy,
     roundSummaries: parsedSummaries,
     rewardsByPlayer: parsedRewards,
@@ -130,7 +123,7 @@ function toBossParticipantData(row: {
     threat: row.threat,
     damageAbsorbed: row.damageAbsorbed,
     templateRound: row.templateRound,
-    status: validateParticipantStatus(row.status),
+    status: validateEnum(row.status, VALID_PARTICIPANT_STATUSES, 'alive'),
   };
 }
 
@@ -660,6 +653,16 @@ async function resolveBossRoundInner(
         io, 'zone', `zone:${encounter.event.zoneId}`,
         `${encounter.mobTemplate.name} has been slain! ${killerName} dealt the final blow.`,
       );
+    }
+
+    // Push notification to all boss participants
+    for (const playerId of contributorMap.keys()) {
+      void sendPush(playerId, 'bossKilled', {
+        title: 'Boss Defeated!',
+        body: `${encounter.mobTemplate.name} has been slain!`,
+        tag: 'boss-killed',
+        data: { type: 'boss', encounterId },
+      });
     }
   } else {
     const hpPercent = Math.round((result.bossHpAfter / encounter.maxHp) * 100);

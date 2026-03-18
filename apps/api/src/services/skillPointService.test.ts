@@ -11,7 +11,7 @@ vi.mock('./turnBankService', () => ({
 }));
 
 import { mockPrisma } from '../__test__/setup';
-import { SKILL_POINT_CONSTANTS, ALWAYS_AVAILABLE_ACTION_IDS } from '@pocketrealm/shared';
+import { SKILL_POINT_CONSTANTS, CHARACTER_CONSTANTS, ALWAYS_AVAILABLE_ACTION_IDS } from '@pocketrealm/shared';
 import { spendPlayerTurnsTx } from './turnBankService';
 import {
   getSkillPoints,
@@ -56,36 +56,37 @@ describe('getSkillPoints', () => {
     const result = await getSkillPoints(PLAYER_ID);
 
     expect(result.playerId).toBe(PLAYER_ID);
-    expect(result.totalPointsEarned).toBe(0);
+    // All skills at level 1 → 0 leveling points + STARTING_SKILL_POINTS bonus
+    expect(result.totalPointsEarned).toBe(CHARACTER_CONSTANTS.STARTING_SKILL_POINTS);
     expect(result.totalPointsSpent).toBe(0);
-    expect(result.availablePoints).toBe(0);
+    expect(result.availablePoints).toBe(CHARACTER_CONSTANTS.STARTING_SKILL_POINTS);
     expect(result.allocations).toEqual({});
     expect(result.unlockedActions).toEqual([]);
   });
 
   it('returns correct state with existing allocations', async () => {
-    // 3 skills: levels 10, 5, 1 → (9+4+0)*1 = 13 points earned
+    // 3 skills: levels 10, 5, 1 → (9+4+0)*1 = 13 leveling points + starting bonus
     mockSkillLevels([10, 5, 1]);
     // melee_power_strike costs 5, unlocksAction 'power_strike'
     mockAllocation({ melee_power_strike: 5 });
 
     const result = await getSkillPoints(PLAYER_ID);
 
-    expect(result.totalPointsEarned).toBe(13);
+    expect(result.totalPointsEarned).toBe(13 + CHARACTER_CONSTANTS.STARTING_SKILL_POINTS);
     expect(result.totalPointsSpent).toBe(5);
-    expect(result.availablePoints).toBe(8);
+    expect(result.availablePoints).toBe(8 + CHARACTER_CONSTANTS.STARTING_SKILL_POINTS);
     expect(result.allocations).toEqual({ melee_power_strike: 5 });
     expect(result.unlockedActions).toEqual(['power_strike']);
   });
 
   it('calculates total points from sum of skill levels', async () => {
-    // levels 5, 3, 1 → (4+2+0)*1 = 6
+    // levels 5, 3, 1 → (4+2+0)*1 = 6 leveling points + starting bonus
     mockSkillLevels([5, 3, 1]);
     mockAllocation({});
 
     const result = await getSkillPoints(PLAYER_ID);
 
-    expect(result.totalPointsEarned).toBe(6);
+    expect(result.totalPointsEarned).toBe(6 + CHARACTER_CONSTANTS.STARTING_SKILL_POINTS);
   });
 
   it('creates allocation record if none exists', async () => {
@@ -123,7 +124,8 @@ describe('allocatePoints', () => {
       data: { allocations: { melee_power_strike: 5 } },
     });
     expect(result.totalPointsSpent).toBe(5);
-    expect(result.availablePoints).toBe(5);
+    // (11-1)*1 leveling + STARTING_SKILL_POINTS = 15 earned; 15 - 5 spent = 10 available
+    expect(result.availablePoints).toBe(10 + CHARACTER_CONSTANTS.STARTING_SKILL_POINTS - 5);
     expect(result.unlockedActions).toEqual(['power_strike']);
   });
 
@@ -137,11 +139,13 @@ describe('allocatePoints', () => {
   });
 
   it('rejects insufficient points', async () => {
-    mockSkillLevels([1]); // 0 points
-    mockAllocation({});
+    // All skills at level 1 → 0 leveling points + STARTING_SKILL_POINTS (5).
+    // Already spent 4 points → only 1 available, not enough for melee_power_strike (cost 5).
+    mockSkillLevels([1]);
+    mockAllocation({ some_cheap_node: 4 });
 
     await expect(allocatePoints(PLAYER_ID, 'melee_power_strike')).rejects.toThrow(
-      'Not enough skill points (need 5, have 0)',
+      'Not enough skill points (need 5, have 1)',
     );
   });
 
@@ -207,7 +211,8 @@ describe('respecPoints', () => {
       data: { allocations: {} },
     });
     expect(result.totalPointsSpent).toBe(0);
-    expect(result.availablePoints).toBe(10);
+    // (11-1)*1 leveling points + STARTING_SKILL_POINTS = 15 available after respec
+    expect(result.availablePoints).toBe(10 + CHARACTER_CONSTANTS.STARTING_SKILL_POINTS);
   });
 
   it('rejects when nothing to respec', async () => {

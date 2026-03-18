@@ -24,10 +24,6 @@ import { validateEnum } from '../utils/validateEnum';
 
 const VALID_BET_TYPES = new Set<RouletteBetType>(['straight', 'split', 'red', 'black', 'odd', 'even', 'dozen', 'column', 'corner']);
 
-function validateBetType(value: string): RouletteBetType {
-  return validateEnum(value, VALID_BET_TYPES, 'straight');
-}
-
 export interface GoldExchangeResult {
   turnsSpent: number;
   goldGained: number;
@@ -133,7 +129,7 @@ async function resolveRound(roundId: string): Promise<number> {
   });
 
   const updates = bets.map((bet) => {
-    const validatedBetType = validateBetType(bet.betType);
+    const validatedBetType = validateEnum(bet.betType, VALID_BET_TYPES, 'straight');
     const won = isWinningBet(validatedBetType, bet.betValue, result);
     const payout = won ? calculatePayout(validatedBetType, bet.amount) : 0;
     return { id: bet.id, playerId: bet.playerId, payout, won, username: bet.player.username, betType: bet.betType, betValue: bet.betValue, amount: bet.amount };
@@ -172,7 +168,7 @@ async function resolveRound(roundId: string): Promise<number> {
       .filter((b) => b.won)
       .map((b) => ({
         playerName: b.username,
-        betType: validateBetType(b.betType),
+        betType: validateEnum(b.betType, VALID_BET_TYPES, 'straight'),
         betValue: b.betValue,
         amount: b.amount,
         payout: b.payout,
@@ -331,7 +327,7 @@ async function getPublicBets(roundId: string): Promise<RoulettePublicBet[]> {
   });
   return bets.map((b) => ({
     playerName: b.player.username,
-    betType: validateBetType(b.betType),
+    betType: validateEnum(b.betType, VALID_BET_TYPES, 'straight'),
     betValue: b.betValue,
     amount: b.amount,
   }));

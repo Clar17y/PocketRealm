@@ -11,6 +11,7 @@ import {
 } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { buildPagination, trackAchievements } from '../utils/routeHelpers.js';
+import { safeUpsert } from '../utils/safeUpsert';
 import { calculateEloChange } from './eloService';
 import { getEquipmentStats } from './equipmentService';
 import { spendPlayerTurnsTx } from './turnBankService';
@@ -39,8 +40,8 @@ export function computeBracketBounds(rating: number): { lower: number; upper: nu
 // ---------------------------------------------------------------------------
 
 export async function getOrCreateRating(playerId: string) {
-  try {
-    return await prisma.pvpRating.upsert({
+  return safeUpsert(
+    () => prisma.pvpRating.upsert({
       where: { playerId },
       update: {},
       create: {
@@ -48,15 +49,9 @@ export async function getOrCreateRating(playerId: string) {
         rating: PVP_CONSTANTS.STARTING_RATING,
         bestRating: PVP_CONSTANTS.STARTING_RATING,
       },
-    });
-  } catch (err: unknown) {
-    // Prisma upsert race condition: two concurrent requests both try to INSERT.
-    // On unique constraint violation, the row now exists — just read it.
-    if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
-      return prisma.pvpRating.findUniqueOrThrow({ where: { playerId } });
-    }
-    throw err;
-  }
+    }),
+    () => prisma.pvpRating.findUniqueOrThrow({ where: { playerId } }),
+  );
 }
 
 // ---------------------------------------------------------------------------

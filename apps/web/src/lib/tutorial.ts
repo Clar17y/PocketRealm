@@ -1,20 +1,44 @@
-export const TUTORIAL_STEP_WELCOME = 0;
-export const TUTORIAL_STEP_EXPLORE = 1;
-export const TUTORIAL_STEP_COMBAT = 2;
-export const TUTORIAL_STEP_GATHER = 3;
-export const TUTORIAL_STEP_TRAVEL = 4;
-export const TUTORIAL_STEP_REFINE = 5;
-export const TUTORIAL_STEP_CRAFT = 6;
-export const TUTORIAL_STEP_EQUIP = 7;
-export const TUTORIAL_STEP_DONE = 8;
-export const TUTORIAL_COMPLETED = 9;
-export const TUTORIAL_SKIPPED = -1;
+import {
+  TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_STARTER_WEAPON,
+  TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_SAVE_TEMPLATE,
+  TUTORIAL_STEP_ATTRIBUTE_POINTS,
+  TUTORIAL_STEP_EXPLORE,
+  TUTORIAL_STEP_COMBAT,
+  TUTORIAL_STEP_GATHER,
+  TUTORIAL_STEP_TRAVEL,
+  TUTORIAL_STEP_REFINE,
+  TUTORIAL_STEP_CRAFT,
+  TUTORIAL_STEP_EQUIP,
+  TUTORIAL_STEP_DONE,
+  TUTORIAL_COMPLETED,
+  TUTORIAL_SKIPPED,
+} from '@pocketrealm/shared';
+
+export {
+  TUTORIAL_STEP_WELCOME,
+  TUTORIAL_STEP_STARTER_WEAPON,
+  TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_SAVE_TEMPLATE,
+  TUTORIAL_STEP_ATTRIBUTE_POINTS,
+  TUTORIAL_STEP_EXPLORE,
+  TUTORIAL_STEP_COMBAT,
+  TUTORIAL_STEP_GATHER,
+  TUTORIAL_STEP_TRAVEL,
+  TUTORIAL_STEP_REFINE,
+  TUTORIAL_STEP_CRAFT,
+  TUTORIAL_STEP_EQUIP,
+  TUTORIAL_STEP_DONE,
+  TUTORIAL_COMPLETED,
+  TUTORIAL_SKIPPED,
+};
 
 export type BottomTab = 'home' | 'explore' | 'inventory' | 'combat' | 'profile';
 
 export interface TutorialStepDef {
   banner: string;
-  dialog: { title: string; body: string };
+  dialog: { title: string; body: string } | null;
   pulseTab: BottomTab | null;
   navigateTo: string | null;
 }
@@ -28,6 +52,36 @@ export const TUTORIAL_STEPS: Record<number, TutorialStepDef> = {
     },
     pulseTab: null,
     navigateTo: null,
+  },
+  [TUTORIAL_STEP_STARTER_WEAPON]: {
+    banner: 'Kessa Ironweld has a weapon for you. Choose wisely!',
+    dialog: {
+      title: 'A Gift from the Forge',
+      body: "Kessa Ironweld, Millbrook\u2019s blacksmith, won\u2019t let you leave town bare-handed. Pick a weapon \u2014 sword, bow, or staff \u2014 and she\u2019ll see you off.",
+    },
+    pulseTab: null,
+    navigateTo: null,
+  },
+  [TUTORIAL_STEP_SKILL_POINTS]: {
+    banner: 'You have 5 skill points! Spend them all to continue.',
+    dialog: null,
+    pulseTab: 'combat',
+    navigateTo: 'talentTree',
+  },
+  [TUTORIAL_STEP_SAVE_TEMPLATE]: {
+    banner: 'Add your new ability to a combat template and save it!',
+    dialog: null,
+    pulseTab: 'combat',
+    navigateTo: 'templates',
+  },
+  [TUTORIAL_STEP_ATTRIBUTE_POINTS]: {
+    banner: 'You have 5 attribute points! Allocate them to shape your build.',
+    dialog: {
+      title: 'Attribute Points',
+      body: 'You start with 5 attribute points to allocate. Invest in Strength for melee power, Dexterity for ranged accuracy, Intelligence for magic damage, or spread them around. Your choices shape your character\u2019s strengths!',
+    },
+    pulseTab: 'home',
+    navigateTo: 'home',
   },
   [TUTORIAL_STEP_EXPLORE]: {
     banner: 'Use the turn slider to invest turns and explore your zone.',
@@ -84,10 +138,10 @@ export const TUTORIAL_STEPS: Record<number, TutorialStepDef> = {
     navigateTo: 'crafting',
   },
   [TUTORIAL_STEP_EQUIP]: {
-    banner: 'Tap your crafted gear and equip it to a slot.',
+    banner: 'Equip the weapon Kessa gave you!',
     dialog: {
       title: 'Equipment',
-      body: 'Go to your inventory and equip the gear you\u2019ve crafted or looted. Equipment boosts your stats for combat and improves your chances of survival in tougher zones.',
+      body: 'Open your inventory and equip the weapon Kessa gave you. Equipment boosts your stats for combat and improves your chances of survival.',
     },
     pulseTab: 'inventory',
     navigateTo: 'inventory',
@@ -96,7 +150,7 @@ export const TUTORIAL_STEPS: Record<number, TutorialStepDef> = {
     banner: 'Tutorial complete! You\u2019ve learned the core loop. Good luck out there!',
     dialog: {
       title: 'Tutorial Complete!',
-      body: 'You now know the core gameplay loop: Explore \u2192 Fight \u2192 Gather \u2192 Travel \u2192 Refine \u2192 Craft \u2192 Equip. Keep progressing your skills, discover new zones, and take on tougher challenges!',
+      body: 'You now know the core gameplay loop: Equip \u2192 Build \u2192 Explore \u2192 Fight \u2192 Gather \u2192 Travel \u2192 Refine \u2192 Craft. Keep progressing your skills, discover new zones, and take on tougher challenges!',
     },
     pulseTab: null,
     navigateTo: null,

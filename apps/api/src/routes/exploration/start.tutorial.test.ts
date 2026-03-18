@@ -225,6 +225,7 @@ vi.mock('@pocketrealm/game-engine', () => ({
   validateExplorationTurns: vi.fn(() => ({ valid: true })),
 }));
 
+import { TUTORIAL_STEP_EXPLORE, TUTORIAL_STEP_WELCOME } from '@pocketrealm/shared';
 import { mockPrisma } from '../../__test__/setup';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { applyMobPrefix, simulateExploration, runTemplateCombat } from '@pocketrealm/game-engine';
@@ -283,8 +284,8 @@ describe('exploration tutorial path', () => {
     vi.clearAllMocks();
   });
 
-  it('forces 100 turns when tutorialStep is 1 (regardless of body.turns)', async () => {
-    setupZoneAndMobs(1);
+  it('forces 100 turns when tutorialStep is TUTORIAL_STEP_EXPLORE (regardless of body.turns)', async () => {
+    setupZoneAndMobs(TUTORIAL_STEP_EXPLORE);
 
     const req = baseReq({ body: { zoneId: ZONE_ID, turns: 500 } });
     const res = mockRes();
@@ -296,7 +297,7 @@ describe('exploration tutorial path', () => {
   });
 
   it('produces exactly one ambush at turn 50 and does not call simulateExploration', async () => {
-    setupZoneAndMobs(1);
+    setupZoneAndMobs(TUTORIAL_STEP_EXPLORE);
 
     const req = baseReq();
     const res = mockRes();
@@ -310,7 +311,7 @@ describe('exploration tutorial path', () => {
   });
 
   it('selects Field Mouse by name and applies no prefix', async () => {
-    setupZoneAndMobs(1);
+    setupZoneAndMobs(TUTORIAL_STEP_EXPLORE);
 
     const req = baseReq();
     const res = mockRes();
@@ -325,7 +326,7 @@ describe('exploration tutorial path', () => {
   });
 
   it('falls back to first mob if Field Mouse not found', async () => {
-    setupZoneAndMobs(1);
+    setupZoneAndMobs(TUTORIAL_STEP_EXPLORE);
     // Override mobs to not include Field Mouse
     mockPrisma.mobTemplate.findMany.mockResolvedValue([
       { id: 'mob-rat', name: 'Giant Rat', level: 2, hp: 30, attack: 5, accuracy: 5, defence: 3, magicDefence: 0, speed: 4, xpReward: 15, encounterWeight: 100, explorationTier: 1, zoneId: ZONE_ID, dropChanceMultiplier: 1, spellPattern: [] },
@@ -342,8 +343,8 @@ describe('exploration tutorial path', () => {
     );
   });
 
-  it('uses simulateExploration for non-tutorial players (tutorialStep !== 1)', async () => {
-    setupZoneAndMobs(0);
+  it('uses simulateExploration for non-tutorial players (tutorialStep !== TUTORIAL_STEP_EXPLORE)', async () => {
+    setupZoneAndMobs(TUTORIAL_STEP_WELCOME);
     mockSimulateExploration.mockReturnValue([]);
 
     const req = baseReq({ body: { zoneId: ZONE_ID, turns: 500 } });
@@ -358,7 +359,7 @@ describe('exploration tutorial path', () => {
   });
 
   it('combat victory during tutorial grants XP and loot normally', async () => {
-    setupZoneAndMobs(1);
+    setupZoneAndMobs(TUTORIAL_STEP_EXPLORE);
 
     const req = baseReq();
     const res = mockRes();

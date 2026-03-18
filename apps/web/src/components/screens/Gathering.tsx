@@ -6,8 +6,8 @@ import { PixelButton } from '@/components/PixelButton';
 import { Pagination } from '@/components/common/Pagination';
 import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
-import { titleCaseFromSnake, xpRateColor } from '@/lib/format';
-import { XpRateTooltip } from '@/components/common/XpRateTooltip';
+import { titleCaseFromSnake } from '@/lib/format';
+import { SkillHeader } from '@/components/common/SkillHeader';
 import { Pickaxe, MapPin } from 'lucide-react';
 import { TurnPresets } from '@/components/common/TurnPresets';
 import { GATHERING_CONSTANTS } from '@pocketrealm/shared';
@@ -216,21 +216,7 @@ export function Gathering({
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">{skillName}</h2>
-          <div className="px-2 py-1 bg-[var(--rpg-gold)] rounded text-[var(--rpg-background)] text-[12px] font-pixel">
-            Lv. {skillLevel}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-xs text-[var(--rpg-text-secondary)] flex items-center justify-end gap-1">
-            XP Rate
-            <XpRateTooltip />
-          </div>
-          <div className="text-[12px] font-pixel" style={{ color: xpRateColor(xpRate) }}>{xpRate}%</div>
-        </div>
-      </div>
+      <SkillHeader skillName={skillName} skillLevel={skillLevel} xpRate={xpRate} />
 
       {/* Resource Nodes */}
       <div className="space-y-2">
@@ -321,6 +307,10 @@ export function Gathering({
                       <div
                         className="h-full bg-[var(--rpg-gold)] transition-all"
                         style={{ width: `${capacityPct}%` }}
+                        role="progressbar"
+                        aria-valuenow={node.remainingCapacity}
+                        aria-valuemin={0}
+                        aria-valuemax={node.maxCapacity}
                       />
                     </div>
                     <div className="flex items-center justify-between mt-1">

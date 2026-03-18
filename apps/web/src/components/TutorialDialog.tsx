@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { ModalOverlay } from './common/ModalOverlay';
 import {
   TUTORIAL_STEPS,
-  TUTORIAL_STEP_WELCOME,
-  TUTORIAL_STEP_DONE,
   isTutorialActive,
 } from '@/lib/tutorial';
 
@@ -34,14 +32,11 @@ export function TutorialDialog({ tutorialStep, onDismiss }: TutorialDialogProps)
   if (!visible || shownForStep === null) return null;
 
   const stepDef = TUTORIAL_STEPS[shownForStep];
-  if (!stepDef) return null;
+  if (!stepDef?.dialog) return null;
 
   const handleGotIt = () => {
     setVisible(false);
-    // For welcome and done steps, dismissing the dialog IS the completion trigger
-    if (shownForStep === TUTORIAL_STEP_WELCOME || shownForStep === TUTORIAL_STEP_DONE) {
-      onDismiss();
-    }
+    onDismiss();
   };
 
   return (
