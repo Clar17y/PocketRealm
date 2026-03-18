@@ -17,6 +17,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { assertNotRecovering, getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
+import { fetchItemDTOs, fetchInventoryMeta } from '../../services/stateUpdateHelpers';
 import {
   isItemType,
   parseItemRarity,
@@ -171,6 +172,11 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       // Consume forge_luck on success (it modified the chance); forge_protection not consumed (wasn't needed)
       if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
 
+      const [updatedDTOs, inventoryMeta] = await Promise.all([
+        fetchItemDTOs([item.id]),
+        fetchInventoryMeta(playerId),
+      ]);
+
       res.json({
         logId: log.id,
         turns: turnSpend,
@@ -192,6 +198,11 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
           buffUsed: forgeLuckBonus > 0 ? 'forge_luck' : hasForgeProtection ? 'forge_protection' : null,
         },
         tax: taxInfoFromResult(taxResult),
+        stateUpdates: {
+          inventoryRemoved: [sacrificial.id],
+          ...(updatedDTOs.length > 0 && { inventoryUpdated: updatedDTOs }),
+          inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        },
       });
       return;
     }
@@ -239,6 +250,9 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
     if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
     if (hasForgeProtection) await consumeBuffStandalone(playerId, 'forge_protection');
 
+    const removedIds = [sacrificial.id, ...(destroyed ? [item.id] : [])];
+    const inventoryMeta = await fetchInventoryMeta(playerId);
+
     res.json({
       logId: log.id,
       turns: turnSpend,
@@ -257,6 +271,10 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         buffUsed: hasForgeProtection ? 'forge_protection' : forgeLuckBonus > 0 ? 'forge_luck' : null,
       },
       tax: taxInfoFromResult(taxResult),
+      stateUpdates: {
+        inventoryRemoved: removedIds,
+        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      },
     });
 }));
 
@@ -347,6 +365,11 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
       },
     });
 
+    const [updatedDTOs, inventoryMeta] = await Promise.all([
+      fetchItemDTOs([item.id]),
+      fetchInventoryMeta(playerId),
+    ]);
+
     res.json({
       logId: log.id,
       turns: turnSpend,
@@ -359,5 +382,10 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
         bonusStats: rerolledBonusStats ?? null,
       },
       tax: taxInfoFromResult(taxResult),
+      stateUpdates: {
+        inventoryRemoved: [sacrificial.id],
+        ...(updatedDTOs.length > 0 && { inventoryUpdated: updatedDTOs }),
+        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      },
     });
 }));
