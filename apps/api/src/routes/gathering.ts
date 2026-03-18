@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma, prisma } from '@pocketrealm/database';
 import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONSTANTS, levelToGemTier, type SkillType } from '@pocketrealm/shared';
-import { createActivityLog } from '../services/activityLogService';
+import { createActivityLog, type ActivityType } from '../services/activityLogService';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from '../services/turnBankService';
@@ -493,7 +493,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
 
   const log = await createActivityLog({
     playerId,
-    activityType: skillRequired,
+    activityType: skillRequired as ActivityType,
     turnsSpent: turnSpend.spent,
     result: {
       zoneId: template.zoneId,

@@ -40,14 +40,13 @@ describe('POST /starter-weapon', () => {
     vi.clearAllMocks();
   });
 
-  it('creates and equips a melee starter weapon', async () => {
+  it('creates a melee starter weapon in inventory (not equipped)', async () => {
     const templateId = STARTER_LOADOUT.starterWeaponIds.melee;
     mockPrisma.itemTemplate.findUnique.mockResolvedValue({
       id: templateId, maxDurability: 70,
     });
     mockPrisma.item.findFirst.mockResolvedValue(null);
     mockPrisma.item.create.mockResolvedValue({ id: 'item-1' });
-    mockPrisma.playerEquipment.upsert.mockResolvedValue({});
 
     const req = { player: { playerId: 'p1' }, body: { weaponType: 'melee' } } as any;
     const res = mockRes();
@@ -64,13 +63,10 @@ describe('POST /starter-weapon', () => {
       }),
       select: { id: true },
     });
-    expect(mockPrisma.playerEquipment.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { playerId_slot: { playerId: 'p1', slot: 'main_hand' } },
-      }),
-    );
+    // Weapon should NOT be auto-equipped — player equips it manually during tutorial
+    expect(mockPrisma.playerEquipment.upsert).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ success: true, itemId: 'item-1' }),
+      expect.objectContaining({ success: true, itemId: 'item-1', weaponType: 'melee' }),
     );
   });
 

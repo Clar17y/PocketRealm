@@ -5,12 +5,12 @@ import { PixelCard } from '@/components/PixelCard';
 import { ItemCard } from '@/components/ItemCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
-import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, Target, X, Zap, Coins } from 'lucide-react';
+import { X, Coins } from 'lucide-react';
 import { CRAFTING_CONSTANTS, repairTurnCost } from '@pocketrealm/shared';
 import { useBatchMode } from '@/hooks/useBatchMode';
 import { BatchActionBar, BatchCheckboxOverlay, BatchDimOverlay } from '@/components/common/BatchActionBar';
 import { titleCaseFromSnake, fmtDur } from '@/lib/format';
-import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass, statEntries } from '@/lib/statFormat';
+import { numStat, prettyStatName, formatSignedStatValue, signedClass, prettyWeightClass, statEntries, statDisplayMeta } from '@/lib/statFormat';
 import { getStash } from '@/lib/api/items';
 import { itemImageSrc } from '@/lib/assets';
 import { rarityMeetsThreshold, type Rarity, type ConfirmRarity } from '@/lib/rarity';
@@ -84,21 +84,6 @@ function prettySlot(slot: string) {
   return titleCaseFromSnake(slot);
 }
 
-function statDisplay(stat: string) {
-  if (stat === 'attack') return { Icon: Sword, color: 'text-[var(--rpg-red)]', label: 'Attack' };
-  if (stat === 'armor') return { Icon: Shield, color: 'text-[var(--rpg-blue-light)]', label: 'Armor' };
-  if (stat === 'magicDefence') return { Icon: Sparkles, color: 'text-[var(--rpg-purple)]', label: 'Magic Def' };
-  if (stat === 'health') return { Icon: Heart, color: 'text-[var(--rpg-green-light)]', label: 'HP' };
-  if (stat === 'dodge') return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: 'Dodge' };
-  if (stat === 'accuracy') return { Icon: Crosshair, color: 'text-[var(--rpg-blue-light)]', label: 'Accuracy' };
-  if (stat === 'magicPower') return { Icon: Sparkles, color: 'text-[var(--rpg-purple)]', label: 'Magic Power' };
-  if (stat === 'rangedPower') return { Icon: Target, color: 'text-[var(--rpg-green-light)]', label: 'Ranged Power' };
-  if (stat === 'luck') return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: 'Luck' };
-  if (stat === 'critChance') return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: 'Crit Chance' };
-  if (stat === 'critDamage') return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: 'Crit Damage' };
-  if (stat === 'inventorySlots') return { Icon: Backpack, color: 'text-[var(--rpg-gold)]', label: 'Inventory Slots' };
-  return { Icon: Zap, color: 'text-[var(--rpg-gold)]', label: prettyStatName(stat) };
-}
 
 export function Inventory({
   items, capacity, usedSlots, gold, isInTown,
@@ -791,27 +776,29 @@ export function Inventory({
                 {hasAnyStats && (
                   <div className="grid grid-cols-2 gap-2">
                     {baseEntries.map(([stat, value]) => {
-                      const { Icon, color, label } = statDisplay(stat);
+                      const { icon: Icon, cssClass, label } = statDisplayMeta(stat);
                       return (
                         <div key={stat} className="flex items-center gap-2 text-sm">
-                          <Icon size={16} className={color} />
+                          <Icon size={16} className={cssClass} />
                           <span className="text-[var(--rpg-text-secondary)]">{label}</span>
-                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(value, color)}`}>
+                          <span className={`ml-auto font-pixel text-[12px] ${signedClass(value, cssClass)}`}>
                             {formatSignedStatValue(stat, value)}
                           </span>
                         </div>
                       );
                     })}
                     {typeof inventorySlots === 'number' && inventorySlots !== 0 && (() => {
+                      const slotsMeta = statDisplayMeta('inventorySlots');
+                      const SlotIcon = slotsMeta.icon;
                       const rarityBonus = isBackpack
                         ? ({ common: 0, uncommon: 2, rare: 4, epic: 6, legendary: 8 }[selectedItem?.rarity ?? 'common'] ?? 0)
                         : 0;
                       const totalSlots = inventorySlots + rarityBonus;
                       return (
                         <div className="flex items-center gap-2 text-sm">
-                          <Backpack size={16} className="text-[var(--rpg-gold)]" />
-                          <span className="text-[var(--rpg-text-secondary)]">Inventory Slots</span>
-                          <span className="ml-auto font-pixel text-[12px] text-[var(--rpg-gold)]">
+                          <SlotIcon size={16} className={slotsMeta.cssClass} />
+                          <span className="text-[var(--rpg-text-secondary)]">{slotsMeta.label}</span>
+                          <span className={`ml-auto font-pixel text-[12px] ${slotsMeta.cssClass}`}>
                             +{totalSlots}{rarityBonus > 0 && <span className="text-xs text-[var(--rpg-text-secondary)]"> ({inventorySlots}+{rarityBonus})</span>}
                           </span>
                         </div>
@@ -825,12 +812,12 @@ export function Inventory({
                     <div className="text-xs font-semibold text-[var(--rpg-gold)]">Bonus Stats</div>
                     <div className="grid grid-cols-2 gap-2">
                       {bonusEntries.map(([stat, value]) => {
-                        const { Icon, color, label } = statDisplay(stat);
+                        const { icon: Icon, cssClass, label } = statDisplayMeta(stat);
                         return (
                           <div key={stat} className="flex items-center gap-2 text-sm">
-                            <Icon size={16} className={color} />
+                            <Icon size={16} className={cssClass} />
                             <span className="text-[var(--rpg-text-secondary)]">{label}</span>
-                            <span className={`ml-auto font-pixel text-[12px] ${value < 0 ? 'text-[var(--rpg-red)]' : color}`}>
+                            <span className={`ml-auto font-pixel text-[12px] ${value < 0 ? 'text-[var(--rpg-red)]' : cssClass}`}>
                               {formatSignedStatValue(stat, value)}
                             </span>
                           </div>

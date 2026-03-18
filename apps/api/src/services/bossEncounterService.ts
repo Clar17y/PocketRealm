@@ -40,19 +40,10 @@ import { distributeBossLoot } from './bossLootService';
 import { redis } from '../redis';
 import { parseJsonArray, parseJsonRecord } from '../utils/jsonColumnSchemas';
 import { sendPush } from './pushNotificationService';
+import { validateEnum } from '../utils/validateEnum';
 
 const VALID_ENCOUNTER_STATUSES = new Set<BossEncounterStatus>(['waiting', 'in_progress', 'defeated', 'expired']);
 const VALID_PARTICIPANT_STATUSES = new Set<BossParticipantStatus>(['alive', 'knocked_out']);
-
-function validateEncounterStatus(status: string): BossEncounterStatus {
-  if (VALID_ENCOUNTER_STATUSES.has(status as BossEncounterStatus)) return status as BossEncounterStatus;
-  return 'waiting';
-}
-
-function validateParticipantStatus(status: string): BossParticipantStatus {
-  if (VALID_PARTICIPANT_STATUSES.has(status as BossParticipantStatus)) return status as BossParticipantStatus;
-  return 'alive';
-}
 
 // --- Mappers ---
 
@@ -87,7 +78,7 @@ function toBossEncounterData(row: {
     bossEffects: parseJsonArray<BossActiveEffect>(row.bossEffects, 'bossEffects'),
     roundNumber: row.roundNumber,
     nextRoundAt: row.nextRoundAt?.toISOString() ?? null,
-    status: validateEncounterStatus(row.status),
+    status: validateEnum(row.status, VALID_ENCOUNTER_STATUSES, 'waiting'),
     killedBy: row.killedBy,
     roundSummaries: parsedSummaries,
     rewardsByPlayer: parsedRewards,
@@ -132,7 +123,7 @@ function toBossParticipantData(row: {
     threat: row.threat,
     damageAbsorbed: row.damageAbsorbed,
     templateRound: row.templateRound,
-    status: validateParticipantStatus(row.status),
+    status: validateEnum(row.status, VALID_PARTICIPANT_STATUSES, 'alive'),
   };
 }
 

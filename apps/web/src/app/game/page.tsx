@@ -28,6 +28,7 @@ import { WorldEvents } from '@/components/screens/WorldEvents';
 import { Achievements } from '@/components/screens/Achievements';
 import { AchievementToast } from '@/components/AchievementToast';
 import { QuestToast } from '@/components/QuestToast';
+import { ForgeResultToast } from '@/components/ForgeResultToast';
 import { RateLimitToast } from '@/components/RateLimitToast';
 import { useRateLimitToast } from './hooks/useRateLimitToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
@@ -50,8 +51,6 @@ import {
   isTutorialActive,
   TUTORIAL_STEPS,
   TUTORIAL_STEP_WELCOME,
-  TUTORIAL_STEP_SKILL_POINTS,
-  TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_STARTER_WEAPON,
   TUTORIAL_STEP_EXPLORE,
   TUTORIAL_STEP_DONE,
@@ -178,6 +177,7 @@ export default function GamePage() {
     handleRespecSkillPoints,
     templates,
     handleLoadTemplates,
+    handleTemplateSaved,
     pvpNotificationCount,
     incomingFriendRequestCount,
     mailUnreadCount,
@@ -266,7 +266,7 @@ export default function GamePage() {
     handleClaimQuestReward,
     handleClaimDailyBonus,
     handleRerollQuest,
-    tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon,
+    tutorialStep, skipTutorial, advanceTutorial, handleClaimStarterWeapon, starterWeaponType,
     loadAll,
     activeBuffs,
     combatLogPrefetch,
@@ -1126,6 +1126,7 @@ export default function GamePage() {
             manaState={manaState}
             onLoadTemplates={handleLoadTemplates}
             onNavigate={setActiveScreen}
+            onTemplateSaved={handleTemplateSaved}
           />
         );
       case 'talentTree':
@@ -1136,6 +1137,7 @@ export default function GamePage() {
             onAllocate={handleAllocateSkillPoint}
             onRespec={handleRespecSkillPoints}
             onNavigate={setActiveScreen}
+            initialTree={starterWeaponType ?? undefined}
           />
         );
       case 'casino':
@@ -1380,13 +1382,11 @@ export default function GamePage() {
         onDismiss={() => {
           if (tutorialStep === TUTORIAL_STEP_WELCOME) {
             advanceTutorial(TUTORIAL_STEP_WELCOME);
-          } else if (tutorialStep === TUTORIAL_STEP_SKILL_POINTS) {
-            advanceTutorial(TUTORIAL_STEP_SKILL_POINTS);
-          } else if (tutorialStep === TUTORIAL_STEP_ATTRIBUTE_POINTS) {
-            advanceTutorial(TUTORIAL_STEP_ATTRIBUTE_POINTS);
           } else if (tutorialStep === TUTORIAL_STEP_DONE) {
             advanceTutorial(TUTORIAL_STEP_DONE);
           }
+          // Only WELCOME and DONE advance on dialog dismiss.
+          // All other steps advance via their own completion triggers.
         }}
       />
       {tutorialStep === TUTORIAL_STEP_STARTER_WEAPON && (
@@ -1394,6 +1394,7 @@ export default function GamePage() {
       )}
       <AchievementToast onNavigate={(category) => { setAchievementCategory(category); setActiveScreen('achievements'); }} />
       <QuestToast />
+      <ForgeResultToast />
       <RateLimitToast />
     </>
   );
