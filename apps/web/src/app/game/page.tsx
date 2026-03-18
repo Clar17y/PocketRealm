@@ -304,11 +304,13 @@ export default function GamePage() {
   const { state: pushState, toggle: pushToggle } = usePushNotifications();
 
   // Navigate to screen from query param (e.g. push notification deep link)
+  const [deepLinkTab, setDeepLinkTab] = useState<string | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const screen = params.get('screen');
     if (screen) {
       setActiveScreen(screen as Screen);
+      setDeepLinkTab(params.get('tab'));
       window.history.replaceState(null, '', '/game');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1106,6 +1108,7 @@ export default function GamePage() {
           <GuildScreen
             playerId={player?.id ?? null}
             characterLevel={characterProgression.characterLevel}
+            initialTab={activeScreen === 'guild' && deepLinkTab ? deepLinkTab as 'expeditions' : undefined}
             onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onExpeditionContextChange={setExpeditionContext}
           />
