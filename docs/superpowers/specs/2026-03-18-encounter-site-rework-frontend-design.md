@@ -57,7 +57,7 @@ New component: `EncounterSiteCombatView` — renders when the player has entered
 
 The view has four states:
 
-**`room_preview`** — Player just entered a room. Mob cards visible at full HP. Action buttons: "Auto-Resolve" and "Fight Manually". Template quick-switch visible.
+**`room_preview`** — Player just entered a room. Mob cards visible at full HP (or carry HP for rooms after the first). Action buttons: "Auto-Resolve" and "Fight Manually". Template quick-switch visible. If any mobs in the room have decayed, a warning badge shows: "Decayed mobs — auto-resolve bonus disabled for this room." The auto-resolve button still works but the bonus indicator is absent.
 
 **`auto_playback`** — Auto-resolve fired, server returned all rounds, client animating them one by one. Sticky playback container active. Skip button visible. Mob HP bars and player resource bars update in sync with each animated round. See "Animated Auto-Resolve Playback" section.
 
@@ -98,16 +98,16 @@ Skip button visible throughout playback. On press:
 
 ```typescript
 interface AutoResolveResponse {
-  outcome: 'clear' | 'defeat';
+  outcome: 'cleared' | 'defeated';
   rounds: Array<{
     roundNumber: number;
-    log: RaidRoundLog;
+    log: ExpeditionRoundLog;
     mobStates: Array<{
       slot: number;
       hp: number;
       maxHp: number;
       alive: boolean;
-      activeEffects: Effect[];
+      activeEffects: BossActiveEffect[];
     }>;
     playerState: {
       hp: number;
@@ -116,7 +116,7 @@ interface AutoResolveResponse {
       maxStamina: number;
       mana: number;
       maxMana: number;
-      activeEffects: Effect[];
+      activeEffects: BossActiveEffect[];
     };
   }>;
   chestReward?: ChestReward; // only on site clear (final room)
@@ -124,6 +124,8 @@ interface AutoResolveResponse {
 ```
 
 Per-round snapshots avoid the client needing to compute intermediate states — the server provides everything needed for the animation.
+
+**Note:** The per-round `mobStates` and `playerState` snapshots are a new backend requirement not covered by the existing backend spec or the expedition auto-resolve pattern (which returns only `roundLogs`). The backend spec's auto-resolve endpoint needs to be updated to include these snapshots. The `ExpeditionRoundLog` and `BossActiveEffect` types are reused from `packages/shared/src/types/expedition.types.ts`. Outcome values use `'cleared' | 'defeated'` to match expedition terminology.
 
 ## Room Transitions & Site Completion
 
@@ -149,7 +151,7 @@ When the final room is cleared:
 ### Defeat
 
 - "Defeated in Room X" message
-- "Retry Room" button — returns to `room_preview` for same room, mobs reset to alive, carry state cleared
+- "Retry Room" button — returns to `room_preview` for same room, mobs reset to alive, carry state cleared. Retrying charges the turn cost again.
 - "Abandon Site" button — exits combat entirely, site remains with normal decay
 
 ## API Endpoints
@@ -176,7 +178,7 @@ POST /api/v1/combat/encounter-sites/:id/round
 - Precondition: site exists, current room in manual combat
 - Request body: `{ action: ActionType, targetMobSlot?: number }`
 - Resolves one round via `resolveRaidRound()` with crowded debuff + splash cascade
-- Response: `{ roundResult, mobStates, playerState, roomCleared, defeated }`
+- Response: `{ roundLog: ExpeditionRoundLog, mobStates, playerState, roomCleared: boolean, defeated: boolean }`
 
 ### Auto-Resolve
 
@@ -212,6 +214,28 @@ The API returns `activeEncounterSiteId: string | null` as part of the standard p
 - On refresh/reconnect, detects active encounter and re-enters the combat view automatically
 
 Server-side checks remain as a safety net, but the UI prevents the player from hitting them.
+
+## Schema Changes
+
+Add to the `Player` model in `packages/database/prisma/schema.prisma`:
+
+```prisma
+activeEncounterSiteId String? @map("active_encounter_site_id")
+```
+
+Set by `start-room` and `auto-resolve` endpoints. Cleared by `abandon`, site completion (all rooms cleared), and defeat-abandon. Also cleared if the referenced encounter site is deleted (e.g., full decay).
+
+This field is included in the standard player state response (alongside `isKnockedOut`, `isOverencumbered`) so the frontend can render the lockout without making extra queries.
+
+## Reconnect / Browser Refresh
+
+If the player refreshes mid-combat:
+
+- **Between rooms** (in `room_preview` or `room_result`): The client sees `activeEncounterSiteId` in player state, fetches the site via the existing `GET /api/v1/combat/sites` list endpoint (which already returns `currentRoom`, mob states, carry state), and re-enters `room_preview` for the current room.
+- **Mid-manual-combat**: Manual rooms are not persisted (backend spec: "no per-round state persistence"). A refresh resets the room — mobs return to alive at full HP, turn cost for that room is lost. The client re-enters `room_preview` for the same room. The player sees a brief notice: "Combat session expired — room reset."
+- **Mid-auto-resolve-playback**: The server already resolved all rounds and persisted final state. The room is either cleared or the player was defeated. The client re-enters `room_result` showing the final outcome. The animated playback is skipped.
+
+The existing site list endpoint response should be expanded to include `roomCarryState` (hp/stamina/mana) and `roomStrategy` (per-room auto/manual history) so the client can reconstruct the full combat view state on reconnect.
 
 ## Combat History
 
