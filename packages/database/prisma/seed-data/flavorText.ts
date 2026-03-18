@@ -3,6 +3,16 @@
  * Extracted from docs/loop-v2/lore/ files.
  */
 export const ITEM_FLAVOR_TEXT: Record<string, string> = {
+  // ── Starter Weapons (Kessa's tutorial gifts) ──────────────────────────────
+  "Kessa's Training Sword":
+    'Kessa made this one herself, which she will remind you of every time you visit. The balance is surprisingly good for something she calls "practice grade." The nick on the crossguard is from her testing it on the doorframe. She says it adds character.',
+  "Kessa's Training Bow":
+    'Kessa does not make bows. She is very clear about this. She "assembled" this one from parts the carpenter left behind, and she will not discuss the process further. It shoots straight enough, which is more than she expected.',
+  "Kessa's Training Staff":
+    'Kessa wrapped the grip herself, though she refuses to call it enchanting. "I just bound the heartwood properly," she says. The faint warmth in the grain suggests the oak disagrees with her definition.',
+  'Wayfinder Buckler':
+    'A small, battered shield that has seen more forearms than battlefields. Kessa keeps a stack of them by the door for new arrivals. "You will lose this within a week," she says. "Try to prove me wrong."',
+
   // ── T1 Weapons ─────────────────────────────────────────────────────────────
   'Wooden Sword':
     'Carved from a single plank by someone who clearly valued enthusiasm over craftsmanship. The edge is about as sharp as a strong opinion, but it will do until something tries to eat you.',
