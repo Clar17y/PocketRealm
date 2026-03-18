@@ -17,7 +17,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { assertNotRecovering, getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
-import { toInventoryItemDTO, fetchInventoryMeta, fetchBuffDTOs } from '../../services/stateUpdateHelpers';
+import { toInventoryItemDTO, fetchInventoryMeta, fetchBuffDTOs, buildInventoryStateUpdates } from '../../services/stateUpdateHelpers';
 import {
   isItemType,
   parseItemRarity,
@@ -203,9 +203,11 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         },
         tax: taxInfoFromResult(taxResult),
         stateUpdates: {
-          inventoryRemoved: [sacrificial.id],
-          inventoryUpdated: [updatedDTO],
-          inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+          ...buildInventoryStateUpdates({
+            removed: [sacrificial.id],
+            updated: [updatedDTO],
+            inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+          }),
           ...(buffs && { buffs }),
         },
       });
@@ -281,8 +283,10 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       },
       tax: taxInfoFromResult(taxResult),
       stateUpdates: {
-        inventoryRemoved: removedIds,
-        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        ...buildInventoryStateUpdates({
+          removed: removedIds,
+          inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        }),
         ...(buffs && { buffs }),
       },
     });
@@ -395,10 +399,10 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
         bonusStats: rerolledBonusStats ?? null,
       },
       tax: taxInfoFromResult(taxResult),
-      stateUpdates: {
-        inventoryRemoved: [sacrificial.id],
-        inventoryUpdated: [updatedDTO],
+      stateUpdates: buildInventoryStateUpdates({
+        removed: [sacrificial.id],
+        updated: [updatedDTO],
         inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
-      },
+      }),
     });
 }));
