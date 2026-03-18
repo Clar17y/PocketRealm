@@ -19,6 +19,9 @@ vi.mock('../services/attributesService', () => ({
 vi.mock('../services/activityLogService', () => ({
   createActivityLog: vi.fn().mockResolvedValue({ id: 'log-1' }),
 }));
+vi.mock('../services/pushNotificationService', () => ({
+  sendPush: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@pocketrealm/game-engine', () => ({
   xpForLevel: vi.fn((lvl: number) => lvl * 100),
   characterLevelFromXp: vi.fn((xp: number) => Math.floor(xp / 100)),
@@ -204,6 +207,8 @@ describe('admin routes', () => {
       mockPrisma.mobTemplate.findUniqueOrThrow.mockResolvedValue({ id: 'mob-1', name: 'Dragon', hp: 1000, bossBaseHp: 5000 });
       mockSpawnWorldEvent.mockResolvedValue({ id: 'evt-boss' });
       mockPrisma.worldEvent.update.mockResolvedValue({});
+      mockPrisma.zone.findUnique.mockResolvedValue({ name: 'Test Zone' });
+      mockPrisma.pushSubscription.findMany.mockResolvedValue([]);
 
       const req = {
         player: { playerId: 'p1' },

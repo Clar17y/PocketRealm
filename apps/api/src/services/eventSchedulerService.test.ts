@@ -11,6 +11,9 @@ vi.mock('./bossEncounterService', () => ({
 vi.mock('./systemMessageService', () => ({
   emitSystemMessage: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('./pushNotificationService', () => ({
+  sendPush: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { mockPrisma } from '../__test__/setup';
 import { checkAndSpawnEvents, _resetBossSpawnTimer } from './eventSchedulerService';
