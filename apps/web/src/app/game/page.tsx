@@ -859,6 +859,7 @@ export default function GamePage() {
               guildTaxRate={guildTaxRate}
               backpackFull={backpackFull}
               availableSlots={Math.max(0, inventoryCapacity - inventoryUsedSlots)}
+              showNpcDialogue={showNpcDialogue}
             />
           </div>
         );
@@ -900,6 +901,7 @@ export default function GamePage() {
             forgeLuckUses={activeBuffs.find(b => b.buffType === 'forge_luck')?.remainingUses ?? 0}
             forgeProtectionUses={activeBuffs.find(b => b.buffType === 'forge_protection')?.remainingUses ?? 0}
             forgeConfirmRarity={forgeConfirmRarity}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       }
@@ -964,6 +966,7 @@ export default function GamePage() {
               ownedResourceNames={ownedResourceNames}
               recoveryCost={hpState.recoveryCost}
               guildTaxRate={guildTaxRate}
+              showNpcDialogue={showNpcDialogue}
             />
           </div>
         );
@@ -1115,6 +1118,7 @@ export default function GamePage() {
             onShopPurchase={loadAll}
             zones={zones.filter(z => z.discovered).map(z => ({ id: z.id, name: z.name, zoneType: z.zoneType }))}
             homeTownId={homeTownId}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       case 'leaderboard':
@@ -1127,6 +1131,7 @@ export default function GamePage() {
             initialTab={activeScreen === 'guild' && deepLinkTab ? deepLinkTab as 'expeditions' : undefined}
             onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onExpeditionContextChange={setExpeditionContext}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       case 'friends':
@@ -1190,6 +1195,7 @@ export default function GamePage() {
             lastResult={casinoSocket.lastResult}
             trackBet={casinoSocket.trackBet}
             playerName={player?.username ?? null}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       case 'training':

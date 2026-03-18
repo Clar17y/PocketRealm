@@ -82,6 +82,7 @@ interface GatheringProps {
   isOverEncumbered?: boolean;
   backpackFull?: boolean;
   ownedResourceNames?: Set<string>;
+  showNpcDialogue?: boolean;
 }
 
 export function Gathering({
@@ -110,6 +111,7 @@ export function Gathering({
   isOverEncumbered = false,
   backpackFull = false,
   ownedResourceNames,
+  showNpcDialogue = true,
 }: GatheringProps) {
   const { dialogueEvent } = useNpcDialogue();
   const npcKey = skillType ? GATHERING_NPC_MAP[skillType] : undefined;
@@ -224,7 +226,7 @@ export function Gathering({
 
   return (
     <ScreenContainer>
-      {npcKey && <NpcDialogueBanner npcKey={npcKey} event={dialogueEvent} />}
+      {npcKey && <NpcDialogueBanner npcKey={npcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />}
 
       {/* Knockout Banner */}
       {isRecovering && (

@@ -122,6 +122,7 @@ interface ForgeProps {
   forgeLuckUses?: number;
   forgeProtectionUses?: number;
   forgeConfirmRarity?: ConfirmRarity;
+  showNpcDialogue?: boolean;
 }
 
 function titleCaseRarity(rarity: Rarity): string {
@@ -147,6 +148,7 @@ export function Forge({
   forgeLuckUses = 0,
   forgeProtectionUses = 0,
   forgeConfirmRarity = 'rare',
+  showNpcDialogue = true,
 }: ForgeProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(items[0]?.id ?? null);
   const [selectedUpgradeSacrificeId, setSelectedUpgradeSacrificeId] = useState<string | null>(null);
@@ -270,7 +272,7 @@ export function Forge({
 
   return (
     <ScreenContainer>
-      <NpcDialogueBanner npcKey="millbrook-blacksmith" event={dialogueEvent} />
+      <NpcDialogueBanner npcKey="millbrook-blacksmith" event={dialogueEvent} showDialogue={showNpcDialogue} />
       <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 

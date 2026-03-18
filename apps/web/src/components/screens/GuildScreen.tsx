@@ -33,9 +33,10 @@ interface GuildScreenProps {
   initialTab?: GuildTab;
   onStateUpdates?: (updates: StateUpdates) => void;
   onExpeditionContextChange?: (ctx: ExpeditionContext | null) => void;
+  showNpcDialogue?: boolean;
 }
 
-export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdates, onExpeditionContextChange }: GuildScreenProps) {
+export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdates, onExpeditionContextChange, showNpcDialogue = true }: GuildScreenProps) {
   const [guildData, setGuildData] = useState<PlayerGuildResponse | null>(null);
   const { loading, refreshing, startLoad, endLoad } = useSilentRefresh();
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +105,7 @@ export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdat
 
   return (
     <ScreenContainer>
-      <NpcDialogueBanner npcKey="millbrook-guild-recruiter" event={dialogueEvent} />
+      <NpcDialogueBanner npcKey="millbrook-guild-recruiter" event={dialogueEvent} showDialogue={showNpcDialogue} />
 
       <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">
         [{guildData.guild.tag}] {guildData.guild.name}
