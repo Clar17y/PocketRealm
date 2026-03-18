@@ -5,7 +5,7 @@ import { getResourceState, restStamina, restMana } from '../services/resourceSer
 import { getTurnState } from '../services/turnBankService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
-import { createActivityLog } from '../services/activityLogService';
+import { createActivityLog, type ActivityType } from '../services/activityLogService';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
 
 export const resourcesRouter = Router();
@@ -45,7 +45,7 @@ resourcesRouter.post('/rest', asyncHandler(async (req, res) => {
 
   await createActivityLog({
     playerId,
-    activityType: `rest_${body.type}`,
+    activityType: `rest_${body.type}` as ActivityType,
     turnsSpent: taxResult.preTaxAmount,
     result: {
       type: body.type,

@@ -282,12 +282,6 @@ playerRouter.post('/starter-weapon', asyncHandler(async (req, res) => {
     select: { id: true },
   });
 
-  await prisma.playerEquipment.upsert({
-    where: { playerId_slot: { playerId, slot: 'main_hand' } },
-    create: { playerId, slot: 'main_hand', itemId: item.id },
-    update: { itemId: item.id },
-  });
-
   res.json({ success: true, itemId: item.id, weaponType });
 }));
 

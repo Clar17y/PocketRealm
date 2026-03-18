@@ -13,6 +13,7 @@ import {
 import { AppError } from '../middleware/errorHandler';
 import { getDayStart, getWeekStart, getNextDayStart, getWeekEnd, getLevelBracket, selectWithCategorySpread } from '../utils/dateHelpers';
 import { randomIntInclusive } from '../utils/random';
+import { safeUpsert } from '../utils/safeUpsert';
 
 // ---------------------------------------------------------------------------
 // Unlock condition checks
@@ -101,8 +102,8 @@ function toQuestData(row: {
 // ---------------------------------------------------------------------------
 
 export async function getOrCreateQuestState(playerId: string) {
-  try {
-    return await prisma.playerQuestState.upsert({
+  return safeUpsert(
+    () => prisma.playerQuestState.upsert({
       where: { playerId },
       create: {
         playerId,
@@ -112,15 +113,9 @@ export async function getOrCreateQuestState(playerId: string) {
         lastWeeklyReset: new Date('2000-01-01T00:00:00Z'),
       },
       update: {},
-    });
-  } catch (err: unknown) {
-    // Prisma upsert race: two concurrent requests both try to INSERT.
-    // On unique constraint violation, the row now exists — just read it.
-    if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
-      return prisma.playerQuestState.findUniqueOrThrow({ where: { playerId } });
-    }
-    throw err;
-  }
+    }),
+    () => prisma.playerQuestState.findUniqueOrThrow({ where: { playerId } }),
+  );
 }
 
 // ---------------------------------------------------------------------------

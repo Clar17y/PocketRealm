@@ -1,4 +1,4 @@
-import { prisma } from '@pocketrealm/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import type { EquipmentSlot, SkillType } from '@pocketrealm/shared';
 import { ALL_EQUIPMENT_SLOTS, ALL_SKILLS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
@@ -30,8 +30,12 @@ export function isSkillType(value: string): value is SkillType {
   return ALL_SKILLS.includes(value as SkillType);
 }
 
-export async function ensureEquipmentSlots(playerId: string): Promise<void> {
-  const existing = await prisma.playerEquipment.findMany({
+export async function ensureEquipmentSlots(
+  playerId: string,
+  tx?: Prisma.TransactionClient,
+): Promise<void> {
+  const db = tx ?? prisma;
+  const existing = await db.playerEquipment.findMany({
     where: { playerId },
     select: { slot: true },
   });
@@ -40,7 +44,7 @@ export async function ensureEquipmentSlots(playerId: string): Promise<void> {
   const missing = ALL_EQUIPMENT_SLOTS.filter((slot) => !existingSlots.has(slot));
   if (missing.length === 0) return;
 
-  await prisma.playerEquipment.createMany({
+  await db.playerEquipment.createMany({
     data: missing.map((slot) => ({ playerId, slot, itemId: null })),
   });
 }

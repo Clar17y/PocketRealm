@@ -1,3 +1,44 @@
+import type { LucideIcon } from 'lucide-react';
+import { Backpack, Crosshair, Heart, Shield, Sparkles, Sword, Target, Zap } from 'lucide-react';
+
+export interface StatDisplayMeta {
+  icon: LucideIcon;
+  /** Tailwind class form: text-[var(--rpg-red)] */
+  cssClass: string;
+  /** Raw CSS var form: var(--rpg-red) */
+  cssVar: string;
+  label: string;
+}
+
+const META: Record<string, StatDisplayMeta> = {
+  attack:      { icon: Sword,     cssClass: 'text-[var(--rpg-red)]',         cssVar: 'var(--rpg-red)',         label: 'Attack' },
+  armor:       { icon: Shield,    cssClass: 'text-[var(--rpg-blue-light)]',  cssVar: 'var(--rpg-blue-light)',  label: 'Armor' },
+  magicDefence:{ icon: Sparkles,  cssClass: 'text-[var(--rpg-purple)]',      cssVar: 'var(--rpg-purple)',      label: 'Magic Def' },
+  health:      { icon: Heart,     cssClass: 'text-[var(--rpg-green-light)]', cssVar: 'var(--rpg-green-light)', label: 'HP' },
+  dodge:       { icon: Zap,       cssClass: 'text-[var(--rpg-gold)]',        cssVar: 'var(--rpg-gold)',        label: 'Dodge' },
+  accuracy:    { icon: Crosshair, cssClass: 'text-[var(--rpg-blue-light)]',  cssVar: 'var(--rpg-blue-light)',  label: 'Accuracy' },
+  magicPower:  { icon: Sparkles,  cssClass: 'text-[var(--rpg-purple)]',      cssVar: 'var(--rpg-purple)',      label: 'Magic Power' },
+  rangedPower: { icon: Target,    cssClass: 'text-[var(--rpg-green-light)]', cssVar: 'var(--rpg-green-light)', label: 'Ranged Power' },
+  luck:        { icon: Zap,       cssClass: 'text-[var(--rpg-gold)]',        cssVar: 'var(--rpg-gold)',        label: 'Luck' },
+  critChance:  { icon: Zap,       cssClass: 'text-[var(--rpg-gold)]',        cssVar: 'var(--rpg-gold)',        label: 'Crit Chance' },
+  critDamage:  { icon: Zap,       cssClass: 'text-[var(--rpg-gold)]',        cssVar: 'var(--rpg-gold)',        label: 'Crit Damage' },
+  evasion:     { icon: Zap,       cssClass: 'text-[var(--rpg-gold)]',        cssVar: 'var(--rpg-gold)',        label: 'Evasion' },
+  inventorySlots: { icon: Backpack, cssClass: 'text-[var(--rpg-gold)]',      cssVar: 'var(--rpg-gold)',        label: 'Inventory Slots' },
+};
+// Aliases for Equipment.tsx total stats panel which uses different property names
+META.defence = META.armor;
+META.hp = META.health;
+
+const FALLBACK_META: Omit<StatDisplayMeta, 'label'> = {
+  icon: Zap,
+  cssClass: 'text-[var(--rpg-text-secondary)]',
+  cssVar: 'var(--rpg-text-secondary)',
+};
+
+export function statDisplayMeta(stat: string): StatDisplayMeta {
+  return META[stat] ?? { ...FALLBACK_META, label: prettyStatName(stat) };
+}
+
 export const PERCENT_STATS = new Set(['critChance', 'critDamage']);
 
 export const STAT_ORDER = [

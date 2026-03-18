@@ -2,6 +2,7 @@ import {
   TUTORIAL_STEP_WELCOME,
   TUTORIAL_STEP_STARTER_WEAPON,
   TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_SAVE_TEMPLATE,
   TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_EXPLORE,
   TUTORIAL_STEP_COMBAT,
@@ -19,6 +20,7 @@ export {
   TUTORIAL_STEP_WELCOME,
   TUTORIAL_STEP_STARTER_WEAPON,
   TUTORIAL_STEP_SKILL_POINTS,
+  TUTORIAL_STEP_SAVE_TEMPLATE,
   TUTORIAL_STEP_ATTRIBUTE_POINTS,
   TUTORIAL_STEP_EXPLORE,
   TUTORIAL_STEP_COMBAT,
@@ -36,7 +38,7 @@ export type BottomTab = 'home' | 'explore' | 'inventory' | 'combat' | 'profile';
 
 export interface TutorialStepDef {
   banner: string;
-  dialog: { title: string; body: string };
+  dialog: { title: string; body: string } | null;
   pulseTab: BottomTab | null;
   navigateTo: string | null;
 }
@@ -61,13 +63,16 @@ export const TUTORIAL_STEPS: Record<number, TutorialStepDef> = {
     navigateTo: null,
   },
   [TUTORIAL_STEP_SKILL_POINTS]: {
-    banner: 'You have 5 skill points! Open your abilities and unlock a combat skill.',
-    dialog: {
-      title: 'Skill Points',
-      body: 'You start with 5 skill points to spend on combat abilities. Open the Combat tab and visit Talents to unlock a powerful ability like Fireball, Aimed Shot, or Power Strike. This will transform your first fight!',
-    },
+    banner: 'You have 5 skill points! Spend them all to continue.',
+    dialog: null,
     pulseTab: 'combat',
-    navigateTo: 'combat',
+    navigateTo: 'talentTree',
+  },
+  [TUTORIAL_STEP_SAVE_TEMPLATE]: {
+    banner: 'Add your new ability to a combat template and save it!',
+    dialog: null,
+    pulseTab: 'combat',
+    navigateTo: 'templates',
   },
   [TUTORIAL_STEP_ATTRIBUTE_POINTS]: {
     banner: 'You have 5 attribute points! Allocate them to shape your build.',
@@ -75,8 +80,8 @@ export const TUTORIAL_STEPS: Record<number, TutorialStepDef> = {
       title: 'Attribute Points',
       body: 'You start with 5 attribute points to allocate. Invest in Strength for melee power, Dexterity for ranged accuracy, Intelligence for magic damage, or spread them around. Your choices shape your character\u2019s strengths!',
     },
-    pulseTab: 'profile',
-    navigateTo: 'profile',
+    pulseTab: 'home',
+    navigateTo: 'home',
   },
   [TUTORIAL_STEP_EXPLORE]: {
     banner: 'Use the turn slider to invest turns and explore your zone.',
