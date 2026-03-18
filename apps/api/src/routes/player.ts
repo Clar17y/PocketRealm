@@ -53,6 +53,13 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       activeTitle: true,
       gold: true,
       homeTownId: true,
+      notifyPvpAttack: true,
+      notifyPvpScout: true,
+      notifyBossAppeared: true,
+      notifyBossKilled: true,
+      notifyTurnBankFull: true,
+      notifyExpeditionStarted: true,
+      notifyExpeditionFinished: true,
     },
   });
 
@@ -155,6 +162,13 @@ const settingsSchema = z.object({
   lootRevealRarity: z.enum(RARITY_ENUM).optional(),
   forgeConfirmRarity: z.enum(RARITY_ENUM).optional(),
   homeTownId: z.string().uuid().optional(),
+  notifyPvpAttack: z.boolean().optional(),
+  notifyPvpScout: z.boolean().optional(),
+  notifyBossAppeared: z.boolean().optional(),
+  notifyBossKilled: z.boolean().optional(),
+  notifyTurnBankFull: z.boolean().optional(),
+  notifyExpeditionStarted: z.boolean().optional(),
+  notifyExpeditionFinished: z.boolean().optional(),
 }).refine(data => Object.values(data).some(v => v !== undefined), { message: 'At least one setting required' });
 
 /**

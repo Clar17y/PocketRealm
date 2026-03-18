@@ -1828,6 +1828,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     homeTownId: playerSettings.homeTownId,
     handleSetHomeTown: playerSettings.handleSetHomeTown,
 
+    // Notification preferences
+    notificationPrefs: playerSettings.notificationPrefs,
+    handleSetNotificationPref: playerSettings.handleSetNotificationPref,
+
     // Changelog
     showChangelog,
     dismissChangelog,

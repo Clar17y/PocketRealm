@@ -246,6 +246,8 @@ export default function GamePage() {
     guildTaxRate,
     homeTownId,
     handleSetHomeTown,
+    notificationPrefs,
+    handleSetNotificationPref,
     showChangelog,
     dismissChangelog,
     openChangelog,
@@ -1045,6 +1047,8 @@ export default function GamePage() {
             onForgeConfirmRarityChange={handleSetForgeConfirmRarity}
             pushState={pushState}
             onPushToggle={pushToggle}
+            notificationPrefs={notificationPrefs}
+            onNotificationPrefChange={handleSetNotificationPref}
             onLogout={() => { logout(); router.push('/'); }}
           />
         );
