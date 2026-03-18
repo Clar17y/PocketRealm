@@ -18,7 +18,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { consumeItemsByTemplateTx, getTotalQuantityByTemplate, getInventoryState } from '../../services/inventoryService';
-import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchInventoryMeta, fetchMaterialTotals } from '../../services/stateUpdateHelpers';
+import { fetchItemDTOs, fetchSkillDTOs, fetchCharacterProgression, fetchInventoryMeta, fetchMaterialTotals, buildInventoryStateUpdates } from '../../services/stateUpdateHelpers';
 import { grantSkillXp } from '../../services/xpService';
 import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
@@ -338,13 +338,15 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       ...(craftQuestProgress.length > 0 ? { questProgress: craftQuestProgress } : {}),
       ...(craftingBuffBadges.length > 0 ? { activeEvents: craftingBuffBadges } : {}),
       stateUpdates: {
-        inventoryAdded,
-        inventoryRemoved: fullyConsumedIds,
-        inventoryUpdated,
+        ...buildInventoryStateUpdates({
+          removed: fullyConsumedIds,
+          added: inventoryAdded,
+          updated: inventoryUpdated,
+          inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+          materialTotals,
+        }),
         skills,
         characterProgression,
-        inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
-        materialTotals,
       },
     });
 }));
