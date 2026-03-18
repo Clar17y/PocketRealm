@@ -323,8 +323,9 @@ function WorldTab({ onAction }: { onAction?: () => void }) {
     });
     adminGetMobs().then((r) => {
       if (r.data) {
-        setMobs(r.data.mobs);
-        if (r.data.mobs.length > 0) setBossMobId(r.data.mobs[0].id);
+        const bossMobs = r.data.mobs.filter((m) => m.bossBaseHp !== null);
+        setMobs(bossMobs);
+        if (bossMobs.length > 0) setBossMobId(bossMobs[0].id);
       }
     });
   }, []);
