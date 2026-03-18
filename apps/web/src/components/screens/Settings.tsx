@@ -24,7 +24,7 @@ const NOTIFICATION_LABELS: { key: keyof NotificationPrefs; label: string }[] = [
   { key: 'notifyBossAppeared', label: 'Boss appeared' },
   { key: 'notifyBossKilled', label: 'Boss defeated' },
   { key: 'notifyTurnBankFull', label: 'Turn bank full' },
-  { key: 'notifyExpeditionStarted', label: 'Expedition started' },
+  { key: 'notifyExpeditionStarted', label: 'Expedition recruiting' },
   { key: 'notifyExpeditionFinished', label: 'Expedition finished' },
 ];
 

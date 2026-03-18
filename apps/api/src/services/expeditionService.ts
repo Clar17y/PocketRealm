@@ -510,16 +510,6 @@ export async function forceStartExpedition(
     { expeditionId },
   );
 
-  // Notify expedition members (reuse snapshot.members from getMembers)
-  for (const { playerId } of snapshot.members) {
-    void sendPush(playerId, 'expeditionStarted', {
-      title: 'Expedition Started!',
-      body: `Your Tier ${expedition.tier} guild expedition has begun!`,
-      tag: 'expedition-started',
-      data: { type: 'expedition', expeditionId },
-    });
-  }
-
   return { success: true, message: 'Expedition started' };
 }
 
@@ -775,15 +765,6 @@ export async function checkAndResolveExpeditionRounds(io: Server | null): Promis
           { expeditionId: exp.id },
         );
 
-        // Notify expedition members (reuse snapshot.members from getMembers)
-        for (const { playerId } of snapshot.members) {
-          void sendPush(playerId, 'expeditionStarted', {
-            title: 'Expedition Started!',
-            body: `Your Tier ${exp.tier} guild expedition has begun!`,
-            tag: 'expedition-started',
-            data: { type: 'expedition', expeditionId: exp.id },
-          });
-        }
       } else {
         // Not enough players, fail the expedition
         await prisma.guildExpedition.update({
