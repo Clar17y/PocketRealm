@@ -294,6 +294,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     lootRevealRarity,
     forgeConfirmRarity,
     guildTaxRate, setGuildTaxRate,
+    showNpcDialogue,
+    showItemFlavourText,
+    showBestiaryLore,
     handleSetCombatLogSpeed,
     handleSetExplorationSpeed,
     handleSetAutoSkipKnownCombat,
@@ -1841,6 +1844,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Home Town
     homeTownId: playerSettings.homeTownId,
     handleSetHomeTown: playerSettings.handleSetHomeTown,
+
+    // Lore & Flavour preferences
+    showNpcDialogue,
+    showItemFlavourText,
+    showBestiaryLore,
+    handleSetShowNpcDialogue: playerSettings.handleSetShowNpcDialogue,
+    handleSetShowItemFlavourText: playerSettings.handleSetShowItemFlavourText,
+    handleSetShowBestiaryLore: playerSettings.handleSetShowBestiaryLore,
 
     // Notification preferences
     notificationPrefs: playerSettings.notificationPrefs,

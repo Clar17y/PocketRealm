@@ -31,6 +31,9 @@ export async function getPlayer() {
       notifyTurnBankFull: boolean;
       notifyExpeditionStarted: boolean;
       notifyExpeditionFinished: boolean;
+      showNpcDialogue: boolean;
+      showItemFlavourText: boolean;
+      showBestiaryLore: boolean;
       attributes: {
         vitality: number;
         strength: number;
@@ -62,6 +65,9 @@ export interface PlayerSettings {
   notifyTurnBankFull?: boolean;
   notifyExpeditionStarted?: boolean;
   notifyExpeditionFinished?: boolean;
+  showNpcDialogue?: boolean;
+  showItemFlavourText?: boolean;
+  showBestiaryLore?: boolean;
 }
 
 export async function updatePlayerSettings(settings: PlayerSettings) {

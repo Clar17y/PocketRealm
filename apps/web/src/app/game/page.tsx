@@ -246,6 +246,12 @@ export default function GamePage() {
     guildTaxRate,
     homeTownId,
     handleSetHomeTown,
+    showNpcDialogue,
+    showItemFlavourText,
+    showBestiaryLore,
+    handleSetShowNpcDialogue,
+    handleSetShowItemFlavourText,
+    handleSetShowBestiaryLore,
     notificationPrefs,
     handleSetNotificationPref,
     showChangelog,
@@ -1062,6 +1068,12 @@ export default function GamePage() {
             onLootRevealRarityChange={handleSetLootRevealRarity}
             forgeConfirmRarity={forgeConfirmRarity}
             onForgeConfirmRarityChange={handleSetForgeConfirmRarity}
+            showNpcDialogue={showNpcDialogue}
+            onShowNpcDialogueChange={handleSetShowNpcDialogue}
+            showItemFlavourText={showItemFlavourText}
+            onShowItemFlavourTextChange={handleSetShowItemFlavourText}
+            showBestiaryLore={showBestiaryLore}
+            onShowBestiaryLoreChange={handleSetShowBestiaryLore}
             pushState={pushState}
             onPushToggle={pushToggle}
             notificationPrefs={notificationPrefs}

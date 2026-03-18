@@ -64,6 +64,14 @@ interface SettingsProps {
   lootRevealRarity: ConfirmRarity;
   onLootRevealRarityChange: (value: ConfirmRarity) => void;
 
+  // Lore & Flavour
+  showNpcDialogue: boolean;
+  onShowNpcDialogueChange: (value: boolean) => void;
+  showItemFlavourText: boolean;
+  onShowItemFlavourTextChange: (value: boolean) => void;
+  showBestiaryLore: boolean;
+  onShowBestiaryLoreChange: (value: boolean) => void;
+
   // Notifications
   pushState: 'loading' | 'unsupported' | 'denied' | 'subscribed' | 'unsubscribed';
   onPushToggle: () => void;
@@ -102,6 +110,12 @@ export function Settings({
   onConfirmRarityChange,
   lootRevealRarity,
   onLootRevealRarityChange,
+  showNpcDialogue,
+  onShowNpcDialogueChange,
+  showItemFlavourText,
+  onShowItemFlavourTextChange,
+  showBestiaryLore,
+  onShowBestiaryLoreChange,
   pushState,
   onPushToggle,
   notificationPrefs,
