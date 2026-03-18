@@ -662,19 +662,21 @@ async function resolveBossRoundInner(
     );
   }
 
-  // Fire-and-forget push notifications to round participants
-  const bossName = encounter.mobTemplate.name;
-  const pushBody = result.bossDefeated
-    ? `${bossName} has been defeated!`
-    : `A new round against ${bossName} has been resolved.`;
-  const uniquePlayerIds = [...new Set(signups.map((s) => s.playerId))];
-  for (const pid of uniquePlayerIds) {
-    sendPush(pid, {
-      title: 'Boss Encounter',
-      body: pushBody,
-      tag: 'boss-round',
-      data: { type: 'boss', encounterId },
-    }).catch(() => {});
+  // Push notification only when boss is killed — notify all participants
+  if (result.bossDefeated) {
+    const allParticipantIds = await prisma.bossParticipant.findMany({
+      where: { encounterId },
+      select: { playerId: true },
+      distinct: ['playerId'],
+    });
+    for (const { playerId } of allParticipantIds) {
+      sendPush(playerId, 'bossKilled', {
+        title: 'Boss Defeated!',
+        body: `${encounter.mobTemplate.name} has been slain!`,
+        tag: 'boss-killed',
+        data: { type: 'boss', encounterId },
+      }).catch(() => {});
+    }
   }
 
   return { bossDefeated: result.bossDefeated, roundResult: result };

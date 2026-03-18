@@ -45,6 +45,7 @@ import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrche
 import { buildPotionPool, templateHasPotionActions, deductConsumedPotions } from './potionService';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
 import { validateEnum } from '../utils/validateEnum';
+import { sendPush } from './pushNotificationService';
 
 // ---------------------------------------------------------------------------
 // Bot Cleanup — delete bot players created by admin /expedition/fill
@@ -494,6 +495,20 @@ export async function forceStartExpedition(
     `Tier ${expedition.tier} expedition force-started with ${expedition._count.members} members`,
     { expeditionId },
   );
+
+  // Notify expedition members
+  const members = await prisma.guildExpeditionMember.findMany({
+    where: { expeditionId },
+    select: { playerId: true },
+  });
+  for (const { playerId } of members) {
+    sendPush(playerId, 'expeditionStarted', {
+      title: 'Expedition Started!',
+      body: `Your Tier ${expedition.tier} guild expedition has begun!`,
+      tag: 'expedition-started',
+      data: { type: 'expedition', expeditionId },
+    }).catch(() => {});
+  }
 
   return { success: true, message: 'Expedition started' };
 }
@@ -1287,6 +1302,17 @@ export async function handleWipe(expeditionId: string): Promise<void> {
       `Expedition failed after ${newWipeCount} attempts`,
       { expeditionId, wipeCount: newWipeCount },
     );
+
+    // Notify expedition members of failure
+    for (const member of expedition.members) {
+      sendPush(member.playerId, 'expeditionFinished', {
+        title: 'Expedition Failed',
+        body: `Your Tier ${expedition.tier} expedition failed after ${newWipeCount} attempts.`,
+        tag: 'expedition-finished',
+        data: { type: 'expedition', expeditionId },
+      }).catch(() => {});
+    }
+
     await cleanupExpeditionBots(expeditionId);
     return;
   }
@@ -1492,6 +1518,16 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
     `Tier ${expedition.tier} expedition completed!`,
     { expeditionId },
   );
+
+  // Notify expedition members
+  for (const member of expedition.members) {
+    sendPush(member.playerId, 'expeditionFinished', {
+      title: 'Expedition Complete!',
+      body: `Your Tier ${expedition.tier} expedition was victorious!`,
+      tag: 'expedition-finished',
+      data: { type: 'expedition', expeditionId },
+    }).catch(() => {});
+  }
 
   await cleanupExpeditionBots(expeditionId);
 }

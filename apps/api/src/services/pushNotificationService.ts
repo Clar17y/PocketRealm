@@ -33,6 +33,16 @@ const PREF_COLUMN: Record<NotificationType, string> = {
   expeditionFinished: 'notifyExpeditionFinished',
 };
 
+const NOTIFICATION_SELECT = {
+  notifyPvpAttack: true,
+  notifyPvpScout: true,
+  notifyBossAppeared: true,
+  notifyBossKilled: true,
+  notifyTurnBankFull: true,
+  notifyExpeditionStarted: true,
+  notifyExpeditionFinished: true,
+} as const;
+
 function initVapid(): void {
   const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT } = process.env;
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) return;
@@ -88,12 +98,12 @@ export async function sendPush(
   ensureVapid();
 
   // Check player's notification preference for this type
-  const prefColumn = PREF_COLUMN[notificationType];
+  const prefColumn = PREF_COLUMN[notificationType] as keyof typeof NOTIFICATION_SELECT;
   const player = await prisma.player.findUnique({
     where: { id: playerId },
-    select: { [prefColumn]: true },
+    select: NOTIFICATION_SELECT,
   });
-  if (!player || player[prefColumn] === false) return;
+  if (!player || !player[prefColumn]) return;
 
   const subs = await prisma.pushSubscription.findMany({
     where: { playerId },

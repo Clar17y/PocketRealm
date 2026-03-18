@@ -80,6 +80,15 @@ pvpRouter.post('/scout', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = scoutSchema.parse(req.body);
   const result = await scoutOpponent(playerId, body.targetId);
+
+  // Fire-and-forget push notification to scouted player
+  sendPush(body.targetId, 'pvpScout', {
+    title: 'PvP Scout',
+    body: `${req.player!.username} is sizing you up in the arena!`,
+    tag: 'pvp-scout',
+    data: { type: 'pvp' },
+  }).catch(() => {});
+
   const stateUpdates = await buildStateUpdates(playerId, ['resources']);
   res.json({ ...result, stateUpdates });
 }));
@@ -120,7 +129,7 @@ pvpRouter.post('/challenge', asyncHandler(async (req, res) => {
   }
 
   // Fire-and-forget push notification to defender
-  sendPush(result.defenderId, {
+  sendPush(result.defenderId, 'pvpAttack', {
     title: 'PvP Attack!',
     body: `${result.attackerName} challenged you in the arena!`,
     tag: 'pvp-attack',
