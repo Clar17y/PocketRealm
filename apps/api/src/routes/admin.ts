@@ -6,6 +6,7 @@ import { requireAdmin } from '../middleware/admin';
 import { asyncHandler } from '../utils/asyncHandler';
 import { refundPlayerTurns } from '../services/turnBankService';
 import { addStackableItem, addStackableItemTx } from '../services/inventoryService';
+import { buildStateUpdates, fetchItemDTOs, fetchInventoryMeta, fetchMaterialTotals, buildInventoryStateUpdates } from '../services/stateUpdateHelpers';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { sendPush } from '../services/pushNotificationService';
@@ -70,7 +71,8 @@ router.post('/player/level', asyncHandler(async (req, res) => {
     },
   });
   await adminAudit(req.player!.playerId, 'set_level', { level });
-  res.json({ success: true, level, characterXp: xp });
+  const stateUpdates = await buildStateUpdates(req.player!.playerId, ['characterProgression']);
+  res.json({ success: true, level, characterXp: xp, stateUpdates });
 }));
 
 const setSkillLevelSchema = z.object({
@@ -89,7 +91,8 @@ router.post('/set-skill-level', asyncHandler(async (req, res) => {
   });
 
   await adminAudit(req.player!.playerId, 'set_skill_level', { skillType, level });
-  res.json({ success: true, skillType, level });
+  const stateUpdates = await buildStateUpdates(req.player!.playerId, ['skills', 'resources']);
+  res.json({ success: true, skillType, level, stateUpdates });
 }));
 
 const setSkillLevelsSchema = z.object({
@@ -113,7 +116,8 @@ router.post('/set-skill-levels', asyncHandler(async (req, res) => {
   );
 
   await adminAudit(req.player!.playerId, 'set_skill_levels', { skillTypes, level });
-  res.json({ success: true, skillTypes, level });
+  const stateUpdates = await buildStateUpdates(req.player!.playerId, ['skills', 'resources']);
+  res.json({ success: true, skillTypes, level, stateUpdates });
 }));
 
 const grantXpSchema = z.object({ amount: z.number().int().min(1) });
@@ -137,7 +141,8 @@ router.post('/player/xp', asyncHandler(async (req, res) => {
     },
   });
   await adminAudit(req.player!.playerId, 'grant_xp', { amount, newLevel, levelUps });
-  res.json({ success: true, characterXp: newXp, characterLevel: newLevel, levelUps });
+  const stateUpdates = await buildStateUpdates(req.player!.playerId, ['characterProgression']);
+  res.json({ success: true, characterXp: newXp, characterLevel: newLevel, levelUps, stateUpdates });
 }));
 
 const setAttributesSchema = z.object({
@@ -162,7 +167,8 @@ router.post('/player/attributes', asyncHandler(async (req, res) => {
 
   await prisma.player.update({ where: { id: req.player!.playerId }, data });
   await adminAudit(req.player!.playerId, 'set_attributes', { attributes: merged, attributePoints: body.attributePoints });
-  res.json({ success: true, attributes: merged, attributePoints: body.attributePoints ?? player.attributePoints });
+  const stateUpdates = await buildStateUpdates(req.player!.playerId, ['hp', 'resources']);
+  res.json({ success: true, attributes: merged, attributePoints: body.attributePoints ?? player.attributePoints, stateUpdates });
 }));
 
 // ---------------------------------------------------------------------------
@@ -197,8 +203,18 @@ router.post('/items/grant', asyncHandler(async (req, res) => {
 
   if (template.stackable) {
     const result = await addStackableItem(playerId, templateId, quantity);
+    const [addedDTOs, inventoryMeta, materialTotals] = await Promise.all([
+      fetchItemDTOs([result.itemId]),
+      fetchInventoryMeta(playerId),
+      fetchMaterialTotals(playerId),
+    ]);
     await adminAudit(playerId, 'grant_item', { templateId, templateName: template.name, rarity, quantity, stackable: true });
-    res.json({ success: true, item: result });
+    const stateUpdates = buildInventoryStateUpdates({
+      ...(result.created ? { added: addedDTOs } : { updated: addedDTOs }),
+      inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+      materialTotals,
+    });
+    res.json({ success: true, item: result, stateUpdates });
     return;
   }
 
@@ -223,8 +239,19 @@ router.post('/items/grant', asyncHandler(async (req, res) => {
     });
     items.push(item);
   }
+  const itemIds = items.map(i => i.id);
+  const [addedDTOs, inventoryMeta, materialTotals] = await Promise.all([
+    fetchItemDTOs(itemIds),
+    fetchInventoryMeta(playerId),
+    fetchMaterialTotals(playerId),
+  ]);
   await adminAudit(playerId, 'grant_item', { templateId, templateName: template.name, rarity, quantity, itemCount: items.length });
-  res.json({ success: true, items });
+  const stateUpdates = buildInventoryStateUpdates({
+    added: addedDTOs,
+    inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+    materialTotals,
+  });
+  res.json({ success: true, items, stateUpdates });
 }));
 
 // ---------------------------------------------------------------------------
