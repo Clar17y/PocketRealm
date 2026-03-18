@@ -38,7 +38,7 @@ export async function rollAndGrantLootWithCapacity(
   mobLevel: number,
   dropChanceMultiplier = 1,
   capacityOverride?: number,
-): Promise<{ drops: LootDrop[]; overflow: PendingLootItem[]; pendingLootSessionId: string | null }> {
+): Promise<{ drops: LootDrop[]; overflow: PendingLootItem[]; pendingLootSessionId: string | null; newItemIds: string[]; updatedItemIds: string[] }> {
   const entries = await getDropTable(mobTemplateId);
 
   let usedSlots: number;
@@ -66,6 +66,10 @@ export async function rollAndGrantLootWithCapacity(
   let slotsUsed = usedSlots;
   const drops: LootDrop[] = [];
   const overflow: PendingLootItem[] = [];
+  /** IDs of newly created items (for frontend inventoryAdded). */
+  const newItemIds: string[] = [];
+  /** IDs of existing items with updated quantity (for frontend inventoryUpdated). */
+  const updatedItemIds: string[] = [];
 
   for (const entry of entries) {
     const chance = Math.min(1, Math.max(0, Number(entry.dropChance)));
@@ -94,6 +98,7 @@ export async function rollAndGrantLootWithCapacity(
           data: { quantity: { increment: quantity } },
         });
         existingStack.quantity += quantity; // update local state for subsequent same-template drops
+        updatedItemIds.push(existingStack.id);
       } else {
         const newItem = await prisma.item.create({
           data: { ownerId: playerId, templateId: entry.itemTemplateId, quantity, rarity: 'common' },
@@ -101,6 +106,7 @@ export async function rollAndGrantLootWithCapacity(
         });
         stackMap.set(entry.itemTemplateId, newItem);
         slotsUsed++;
+        newItemIds.push(newItem.id);
       }
       drops.push({ itemTemplateId: entry.itemTemplateId, quantity, rarity: 'common' });
       continue;
@@ -131,7 +137,7 @@ export async function rollAndGrantLootWithCapacity(
         continue;
       }
 
-      await prisma.item.create({
+      const newItem = await prisma.item.create({
         data: {
           ownerId: playerId,
           templateId: entry.itemTemplateId,
@@ -143,6 +149,7 @@ export async function rollAndGrantLootWithCapacity(
         },
       });
       slotsUsed++;
+      newItemIds.push(newItem.id);
       drops.push({ itemTemplateId: entry.itemTemplateId, quantity: 1, rarity });
     }
   }
@@ -152,7 +159,7 @@ export async function rollAndGrantLootWithCapacity(
     pendingLootSessionId = await storePendingLoot(playerId, overflow);
   }
 
-  return { drops, overflow, pendingLootSessionId };
+  return { drops, overflow, pendingLootSessionId, newItemIds, updatedItemIds };
 }
 
 export async function enrichLootWithNames(

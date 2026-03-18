@@ -53,7 +53,7 @@ import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
 import { getMainHandAttackSkill } from '../../services/combatStatsService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
-import { buildStateUpdates } from '../../services/stateUpdateHelpers';
+import { buildStateUpdates, fetchItemDTOs, fetchInventoryMeta, fetchMaterialTotals } from '../../services/stateUpdateHelpers';
 import {
   startSchema,
   pickWeighted,
@@ -195,6 +195,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     const turnsToSpend = isTutorialExplore ? 100 : body.turns;
     const allPotionsConsumed: PotionConsumed[] = [];
     const ambushPendingLootSessionIds: string[] = [];
+    const allNewItemIds: string[] = [];
+    const allUpdatedItemIds: string[] = [];
     const allQuestProgress: QuestProgressUpdate[] = [];
 
     // Spend turns and apply guild tax atomically
@@ -396,6 +398,8 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             resourceCostByScalingStat: combatResult.resourceCostByScalingStat,
           });
           loot = rewards.loot;
+          allNewItemIds.push(...rewards.newItemIds);
+          allUpdatedItemIds.push(...rewards.updatedItemIds);
           if (rewards.pendingLootSessionId) {
             ambushPendingLootSessionIds.push(rewards.pendingLootSessionId);
           }
@@ -1044,7 +1048,20 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       });
     }
 
-    const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+    const uniqueNewItemIds = [...new Set(allNewItemIds)];
+    const uniqueUpdatedItemIds = [...new Set(allUpdatedItemIds)];
+    const hasLootChanges = uniqueNewItemIds.length > 0 || uniqueUpdatedItemIds.length > 0;
+    const [stateUpdates, newItemDTOs, updatedItemDTOs, invMeta, materialTotals] = await Promise.all([
+      buildStateUpdates(playerId, ['hp', 'resources']),
+      uniqueNewItemIds.length > 0 ? fetchItemDTOs(uniqueNewItemIds) : Promise.resolve([]),
+      uniqueUpdatedItemIds.length > 0 ? fetchItemDTOs(uniqueUpdatedItemIds) : Promise.resolve([]),
+      hasLootChanges ? fetchInventoryMeta(playerId) : Promise.resolve(null),
+      hasLootChanges ? fetchMaterialTotals(playerId) : Promise.resolve(null),
+    ]);
+    if (newItemDTOs.length > 0) stateUpdates.inventoryAdded = newItemDTOs;
+    if (updatedItemDTOs.length > 0) stateUpdates.inventoryUpdated = updatedItemDTOs;
+    if (invMeta) stateUpdates.inventoryUsedSlots = invMeta.inventoryUsedSlots;
+    if (materialTotals) stateUpdates.materialTotals = materialTotals;
 
     res.json({
       logId: persisted.logId,

@@ -187,6 +187,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
   // Fight loop — iterate rooms (full clear) or single room (room-by-room)
   let sitePendingLootSessionId: string | null = null;
   const allSiteOverflow: import('../../services/pendingLootService').PendingLootItem[] = [];
+  const allSiteNewItemIds: string[] = [];
+  const allSiteUpdatedItemIds: string[] = [];
   const allQuestProgress: QuestProgressUpdate[] = [];
   const fightResults: FightResult[] = [];
   let lastCombatResult: ReturnType<typeof runTemplateCombat> | null = null;
@@ -281,6 +283,8 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
         });
         mobLoot = await enrichLootWithNames(rewards.loot);
         allSiteOverflow.push(...rewards.overflow);
+        allSiteNewItemIds.push(...rewards.newItemIds);
+        allSiteUpdatedItemIds.push(...rewards.updatedItemIds);
         allQuestProgress.push(...rewards.questProgress);
         mobXpGrants = rewards.xpGrants;
       }
@@ -608,10 +612,12 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   // --- Build stateUpdates ---
   const damagedItemIds = [...new Set(aggregatedDurabilityLost.map(d => d.itemId))];
-  const updatedItemIds = [...new Set([...damagedItemIds, ...sitePotionDeductResult.partiallyConsumedIds])];
-  const [siteStateUpdates, inventoryUpdated, materialTotals] = await Promise.all([
+  const durabilityUpdatedIds = [...new Set([...damagedItemIds, ...sitePotionDeductResult.partiallyConsumedIds, ...allSiteUpdatedItemIds])];
+  const uniqueSiteNewIds = [...new Set(allSiteNewItemIds)];
+  const [siteStateUpdates, inventoryUpdated, newLootDTOs, materialTotals] = await Promise.all([
     buildStateUpdates(playerId, ['hp', 'skills', 'resources', 'characterProgression', 'buffs']),
-    fetchItemDTOs(updatedItemIds),
+    fetchItemDTOs(durabilityUpdatedIds),
+    uniqueSiteNewIds.length > 0 ? fetchItemDTOs(uniqueSiteNewIds) : Promise.resolve([]),
     fetchMaterialTotals(playerId),
   ]);
 
@@ -699,6 +705,7 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
       ...siteStateUpdates,
       ...(sitePotionDeductResult.fullyConsumedIds.length > 0 ? { inventoryRemoved: sitePotionDeductResult.fullyConsumedIds } : {}),
       ...(inventoryUpdated.length > 0 ? { inventoryUpdated } : {}),
+      ...(newLootDTOs.length > 0 ? { inventoryAdded: newLootDTOs } : {}),
       materialTotals,
     },
   });

@@ -199,6 +199,8 @@ interface VictoryRewardResult {
   loot: LootDrop[];
   overflow: PendingLootItem[];
   pendingLootSessionId: string | null;
+  newItemIds: string[];
+  updatedItemIds: string[];
   xpGrants: GrantXpResult[];
   questProgress: QuestProgressUpdate[];
 }
@@ -247,6 +249,8 @@ export async function processCombatVictoryRewards(
     loot: lootResult.drops,
     overflow: lootResult.overflow,
     pendingLootSessionId: lootResult.pendingLootSessionId,
+    newItemIds: lootResult.newItemIds,
+    updatedItemIds: lootResult.updatedItemIds,
     xpGrants,
     questProgress,
   };
