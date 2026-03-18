@@ -17,7 +17,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { assertNotRecovering, getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
-import { fetchItemDTOs, fetchInventoryMeta } from '../../services/stateUpdateHelpers';
+import { toInventoryItemDTO, fetchInventoryMeta } from '../../services/stateUpdateHelpers';
 import {
   isItemType,
   parseItemRarity,
@@ -142,40 +142,43 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         },
       });
 
-      const log = await createActivityLog({
-        playerId,
-        activityType: 'forge_upgrade',
-        turnsSpent: turnSpend.spent,
-        result: {
-          itemId: item.id,
-          templateId: item.templateId,
-          fromRarity: currentRarity,
-          toRarity: nextRarity,
-          success: true,
-          successChance,
-          adjustedChance,
-          roll,
-          luckStat: equipmentStats.luck,
-          buffUsed: forgeLuckBonus > 0 ? 'forge_luck' : hasForgeProtection ? 'forge_protection' : null,
-          sacrificialItem: {
-            itemId: sacrificial.id,
-            templateId: sacrificial.templateId,
-            rarity: sacrificial.rarity,
-          },
-          previousBonusStats: item.bonusStats ?? null,
-          addedBonusStat: newRoll.stat,
-          addedBonusValue: newRoll.value,
-          bonusStats: upgradedBonusStats,
-        },
-      });
-
       // Consume forge_luck on success (it modified the chance); forge_protection not consumed (wasn't needed)
-      if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
-
-      const [updatedDTOs, inventoryMeta] = await Promise.all([
-        fetchItemDTOs([item.id]),
+      const [log, inventoryMeta] = await Promise.all([
+        createActivityLog({
+          playerId,
+          activityType: 'forge_upgrade',
+          turnsSpent: turnSpend.spent,
+          result: {
+            itemId: item.id,
+            templateId: item.templateId,
+            fromRarity: currentRarity,
+            toRarity: nextRarity,
+            success: true,
+            successChance,
+            adjustedChance,
+            roll,
+            luckStat: equipmentStats.luck,
+            buffUsed: forgeLuckBonus > 0 ? 'forge_luck' : hasForgeProtection ? 'forge_protection' : null,
+            sacrificialItem: {
+              itemId: sacrificial.id,
+              templateId: sacrificial.templateId,
+              rarity: sacrificial.rarity,
+            },
+            previousBonusStats: item.bonusStats ?? null,
+            addedBonusStat: newRoll.stat,
+            addedBonusValue: newRoll.value,
+            bonusStats: upgradedBonusStats,
+          },
+        }),
         fetchInventoryMeta(playerId),
       ]);
+
+      if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
+
+      const updatedDTO = toInventoryItemDTO(
+        { ...item, rarity: nextRarity, bonusStats: upgradedBonusStats },
+        null,
+      );
 
       res.json({
         logId: log.id,
@@ -200,7 +203,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
         tax: taxInfoFromResult(taxResult),
         stateUpdates: {
           inventoryRemoved: [sacrificial.id],
-          ...(updatedDTOs.length > 0 && { inventoryUpdated: updatedDTOs }),
+          inventoryUpdated: [updatedDTO],
           inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
         },
       });
@@ -221,37 +224,39 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       await prisma.item.delete({ where: { id: item.id } });
     }
 
-    const log = await createActivityLog({
-      playerId,
-      activityType: 'forge_upgrade',
-      turnsSpent: turnSpend.spent,
-      result: {
-        itemId: item.id,
-        templateId: item.templateId,
-        fromRarity: currentRarity,
-        toRarity: nextRarity,
-        success: false,
-        successChance,
-        adjustedChance,
-        roll,
-        luckStat: equipmentStats.luck,
-        buffUsed: hasForgeProtection ? 'forge_protection' : forgeLuckBonus > 0 ? 'forge_luck' : null,
-        sacrificialItem: {
-          itemId: sacrificial.id,
-          templateId: sacrificial.templateId,
-          rarity: sacrificial.rarity,
+    const removedIds = [sacrificial.id, ...(destroyed ? [item.id] : [])];
+
+    const [log, inventoryMeta] = await Promise.all([
+      createActivityLog({
+        playerId,
+        activityType: 'forge_upgrade',
+        turnsSpent: turnSpend.spent,
+        result: {
+          itemId: item.id,
+          templateId: item.templateId,
+          fromRarity: currentRarity,
+          toRarity: nextRarity,
+          success: false,
+          successChance,
+          adjustedChance,
+          roll,
+          luckStat: equipmentStats.luck,
+          buffUsed: hasForgeProtection ? 'forge_protection' : forgeLuckBonus > 0 ? 'forge_luck' : null,
+          sacrificialItem: {
+            itemId: sacrificial.id,
+            templateId: sacrificial.templateId,
+            rarity: sacrificial.rarity,
+          },
+          outcome: destroyed ? 'destroyed' : 'protected',
+          destroyedItem: destroyed ? destroyedItemSnapshot : undefined,
         },
-        outcome: destroyed ? 'destroyed' : 'protected',
-        destroyedItem: destroyed ? destroyedItemSnapshot : undefined,
-      },
-    });
+      }),
+      fetchInventoryMeta(playerId),
+    ]);
 
     // Consume buffs after failed forge
     if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
     if (hasForgeProtection) await consumeBuffStandalone(playerId, 'forge_protection');
-
-    const removedIds = [sacrificial.id, ...(destroyed ? [item.id] : [])];
-    const inventoryMeta = await fetchInventoryMeta(playerId);
 
     res.json({
       logId: log.id,
@@ -347,28 +352,31 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
       },
     });
 
-    const log = await createActivityLog({
-      playerId,
-      activityType: 'forge_reroll',
-      turnsSpent: turnSpend.spent,
-      result: {
-        itemId: item.id,
-        templateId: item.templateId,
-        rarity,
-        sacrificialItem: {
-          itemId: sacrificial.id,
-          templateId: sacrificial.templateId,
-          rarity: sacrificial.rarity,
+    const [log, inventoryMeta] = await Promise.all([
+      createActivityLog({
+        playerId,
+        activityType: 'forge_reroll',
+        turnsSpent: turnSpend.spent,
+        result: {
+          itemId: item.id,
+          templateId: item.templateId,
+          rarity,
+          sacrificialItem: {
+            itemId: sacrificial.id,
+            templateId: sacrificial.templateId,
+            rarity: sacrificial.rarity,
+          },
+          previousBonusStats: item.bonusStats ?? null,
+          bonusStats: rerolledBonusStats ?? null,
         },
-        previousBonusStats: item.bonusStats ?? null,
-        bonusStats: rerolledBonusStats ?? null,
-      },
-    });
-
-    const [updatedDTOs, inventoryMeta] = await Promise.all([
-      fetchItemDTOs([item.id]),
+      }),
       fetchInventoryMeta(playerId),
     ]);
+
+    const updatedDTO = toInventoryItemDTO(
+      { ...item, bonusStats: rerolledBonusStats ?? null },
+      null,
+    );
 
     res.json({
       logId: log.id,
@@ -384,7 +392,7 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
       tax: taxInfoFromResult(taxResult),
       stateUpdates: {
         inventoryRemoved: [sacrificial.id],
-        ...(updatedDTOs.length > 0 && { inventoryUpdated: updatedDTOs }),
+        inventoryUpdated: [updatedDTO],
         inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
       },
     });
