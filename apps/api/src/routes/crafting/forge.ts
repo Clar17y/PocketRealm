@@ -177,7 +177,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       const buffs = (forgeLuckBonus > 0) ? await fetchBuffDTOs(playerId) : undefined;
 
       const updatedDTO = toInventoryItemDTO(
-        { ...item, rarity: nextRarity, bonusStats: upgradedBonusStats },
+        { ...item, rarity: nextRarity, bonusStats: upgradedBonusStats as Record<string, number> },
         null,
       );
 
@@ -379,7 +379,7 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
     ]);
 
     const updatedDTO = toInventoryItemDTO(
-      { ...item, bonusStats: rerolledBonusStats ?? null },
+      { ...item, bonusStats: (rerolledBonusStats as Record<string, number> | null) ?? null },
       null,
     );
 
