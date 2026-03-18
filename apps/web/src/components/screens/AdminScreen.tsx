@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { StateUpdates } from '@pocketrealm/shared';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import {
@@ -52,22 +53,23 @@ function StatusMsg({ msg }: { msg: { text: string; ok: boolean } | null }) {
   );
 }
 
-function useAdminAction(onAction?: () => void) {
+function useAdminAction() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  const act = async (label: string, fn: () => Promise<{ data?: unknown; error?: { message: string } }>, confirm?: string) => {
-    if (busy) return;
-    if (confirm && !window.confirm(confirm)) return;
+  const act = async <T,>(label: string, fn: () => Promise<{ data?: T; error?: { message: string } }>, confirm?: string): Promise<T | null> => {
+    if (busy) return null;
+    if (confirm && !window.confirm(confirm)) return null;
     setBusy(true);
     setMsg(null);
     try {
       const res = await fn();
-      if (res.error) setMsg({ text: `${label} failed: ${res.error.message}`, ok: false });
-      else {
-        setMsg({ text: `${label} succeeded`, ok: true });
-        onAction?.();
+      if (res.error) {
+        setMsg({ text: `${label} failed: ${res.error.message}`, ok: false });
+        return null;
       }
+      setMsg({ text: `${label} succeeded`, ok: true });
+      return res.data ?? null;
     } finally {
       setBusy(false);
     }
@@ -78,7 +80,7 @@ function useAdminAction(onAction?: () => void) {
 
 // ── Player Tab ──────────────────────────────────────────────────────────────
 
-function PlayerTab({ onAction }: { onAction?: () => void }) {
+function PlayerTab({ onStateUpdates, setTurns: setGameTurns }: { onStateUpdates: (u: StateUpdates) => void; setTurns: (n: number) => void }) {
   const [turns, setTurns] = useState(10000);
   const [tokens, setTokens] = useState(500);
   const [level, setLevel] = useState(10);
@@ -87,7 +89,7 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
   const [attrs, setAttrs] = useState({ vitality: 0, strength: 0, dexterity: 0, intelligence: 0, luck: 0, evasion: 0 });
   const [selectedSkills, setSelectedSkills] = useState<Set<string>>(new Set());
   const [skillLevel, setSkillLevel] = useState(10);
-  const { busy, msg, act } = useAdminAction(onAction);
+  const { busy, msg, act } = useAdminAction();
 
   return (
     <div className="space-y-4">
@@ -96,7 +98,10 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
         <div className="flex items-center gap-2">
           <input type="number" value={turns} onChange={(e) => setTurns(Number(e.target.value))}
             className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-32 text-[var(--rpg-text-primary)]" />
-          <PixelButton size="sm" disabled={busy} onClick={() => act('Grant turns', () => adminGrantTurns(turns))}>Grant</PixelButton>
+          <PixelButton size="sm" disabled={busy} onClick={async () => {
+            const data = await act('Grant turns', () => adminGrantTurns(turns));
+            if (data) setGameTurns(data.currentTurns);
+          }}>Grant</PixelButton>
         </div>
       </PixelCard>
 
@@ -114,7 +119,10 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
         <div className="flex items-center gap-2">
           <input type="number" value={level} onChange={(e) => setLevel(Number(e.target.value))} min={1} max={100}
             className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-24 text-[var(--rpg-text-primary)]" />
-          <PixelButton size="sm" disabled={busy} onClick={() => act('Set level', () => adminSetLevel(level), `Set character level to ${level}?`)}>
+          <PixelButton size="sm" disabled={busy} onClick={async () => {
+            const data = await act('Set level', () => adminSetLevel(level), `Set character level to ${level}?`);
+            if (data?.stateUpdates) onStateUpdates(data.stateUpdates);
+          }}>
             Set Level
           </PixelButton>
         </div>
@@ -125,7 +133,10 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
         <div className="flex items-center gap-2">
           <input type="number" value={xp} onChange={(e) => setXp(Number(e.target.value))}
             className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-32 text-[var(--rpg-text-primary)]" />
-          <PixelButton size="sm" disabled={busy} onClick={() => act('Grant XP', () => adminGrantXp(xp))}>Grant XP</PixelButton>
+          <PixelButton size="sm" disabled={busy} onClick={async () => {
+            const data = await act('Grant XP', () => adminGrantXp(xp));
+            if (data?.stateUpdates) onStateUpdates(data.stateUpdates);
+          }}>Grant XP</PixelButton>
         </div>
       </PixelCard>
 
@@ -134,7 +145,10 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
         <div className="flex items-center gap-2">
           <input type="number" value={attrPoints} onChange={(e) => setAttrPoints(Number(e.target.value))} min={0}
             className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-24 text-[var(--rpg-text-primary)]" />
-          <PixelButton size="sm" disabled={busy} onClick={() => act('Set points', () => adminSetAttributes({ attributePoints: attrPoints }))}>
+          <PixelButton size="sm" disabled={busy} onClick={async () => {
+            const data = await act('Set points', () => adminSetAttributes({ attributePoints: attrPoints }));
+            if (data?.stateUpdates) onStateUpdates(data.stateUpdates);
+          }}>
             Set Points
           </PixelButton>
         </div>
@@ -153,7 +167,10 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
           ))}
         </div>
         <PixelButton size="sm" className="mt-3" disabled={busy}
-          onClick={() => act('Set attributes', () => adminSetAttributes({ attributes: attrs }), 'Overwrite all attribute values?')}>
+          onClick={async () => {
+            const data = await act('Set attributes', () => adminSetAttributes({ attributes: attrs }), 'Overwrite all attribute values?');
+            if (data?.stateUpdates) onStateUpdates(data.stateUpdates);
+          }}>
           Set Attributes
         </PixelButton>
       </PixelCard>
@@ -187,13 +204,15 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
             onChange={(e) => setSkillLevel(Number(e.target.value))}
             className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-20 text-[var(--rpg-text-primary)]" />
           <PixelButton size="sm" disabled={busy || selectedSkills.size === 0}
-            onClick={() => {
+            onClick={async () => {
               const skills = [...selectedSkills];
+              let data;
               if (skills.length === 1) {
-                act(`Set ${skills[0]} to ${skillLevel}`, () => adminSetSkillLevel(skills[0], skillLevel), `Set ${skills[0]} to level ${skillLevel}?`);
+                data = await act(`Set ${skills[0]} to ${skillLevel}`, () => adminSetSkillLevel(skills[0], skillLevel), `Set ${skills[0]} to level ${skillLevel}?`);
               } else {
-                act(`Set ${skills.length} skills to ${skillLevel}`, () => adminSetSkillLevels(skills, skillLevel), `Set ${skills.length} skills to level ${skillLevel}?`);
+                data = await act(`Set ${skills.length} skills to ${skillLevel}`, () => adminSetSkillLevels(skills, skillLevel), `Set ${skills.length} skills to level ${skillLevel}?`);
               }
+              if (data?.stateUpdates) onStateUpdates(data.stateUpdates);
             }}>
             Set Level
           </PixelButton>
@@ -207,7 +226,7 @@ function PlayerTab({ onAction }: { onAction?: () => void }) {
 
 // ── Items Tab ───────────────────────────────────────────────────────────────
 
-function ItemsTab({ onAction }: { onAction?: () => void }) {
+function ItemsTab({ onStateUpdates }: { onStateUpdates: (u: StateUpdates) => void }) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [templates, setTemplates] = useState<AdminItemTemplate[]>([]);
@@ -215,7 +234,7 @@ function ItemsTab({ onAction }: { onAction?: () => void }) {
   const [rarity, setRarity] = useState('common');
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
-  const { busy, msg, act } = useAdminAction(onAction);
+  const { busy, msg, act } = useAdminAction();
 
   const loadTemplates = async () => {
     setLoading(true);
@@ -281,7 +300,10 @@ function ItemsTab({ onAction }: { onAction?: () => void }) {
             </select>
             <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} min={1} max={1000}
               className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded px-2 py-1 text-sm w-20 text-[var(--rpg-text-primary)]" />
-            <PixelButton size="sm" disabled={busy} onClick={() => act('Grant item', () => adminGrantItem(selectedId, rarity, quantity))}>
+            <PixelButton size="sm" disabled={busy} onClick={async () => {
+              const data = await act('Grant item', () => adminGrantItem(selectedId, rarity, quantity));
+              if (data?.stateUpdates) onStateUpdates(data.stateUpdates);
+            }}>
               Grant
             </PixelButton>
           </div>
@@ -295,7 +317,7 @@ function ItemsTab({ onAction }: { onAction?: () => void }) {
 
 // ── World Tab ───────────────────────────────────────────────────────────────
 
-function WorldTab({ onAction }: { onAction?: () => void }) {
+function WorldTab() {
   const [eventTemplates, setEventTemplates] = useState<AdminEventTemplate[]>([]);
   const [activeEvents, setActiveEvents] = useState<AdminActiveEvent[]>([]);
   const [zones, setZones] = useState<AdminZone[]>([]);
@@ -307,7 +329,7 @@ function WorldTab({ onAction }: { onAction?: () => void }) {
   const [bossMobId, setBossMobId] = useState('');
   const [targetOptions, setTargetOptions] = useState<string[]>([]);
   const [selectedTarget, setSelectedTarget] = useState('');
-  const { busy, msg, setMsg, act } = useAdminAction(onAction);
+  const { busy, msg, setMsg, act } = useAdminAction();
 
   useEffect(() => {
     adminGetEventTemplates().then((r) => { if (r.data) setEventTemplates(r.data.templates); });
@@ -461,13 +483,13 @@ function WorldTab({ onAction }: { onAction?: () => void }) {
 
 // ── Zones Tab ───────────────────────────────────────────────────────────────
 
-function ZonesTab({ onAction }: { onAction?: () => void }) {
+function ZonesTab() {
   const [zones, setZones] = useState<AdminZone[]>([]);
   const [families, setFamilies] = useState<AdminMobFamily[]>([]);
   const [encZoneId, setEncZoneId] = useState('');
   const [encFamilyId, setEncFamilyId] = useState('');
   const [encSize, setEncSize] = useState<'small' | 'medium' | 'large'>('medium');
-  const { busy, msg, act } = useAdminAction(onAction);
+  const { busy, msg, act } = useAdminAction();
 
   useEffect(() => {
     adminGetZones().then((r) => {
@@ -546,13 +568,13 @@ function ZonesTab({ onAction }: { onAction?: () => void }) {
 
 // ── Resources Tab ────────────────────────────────────────────────────────────
 
-function ResourcesTab({ onAction }: { onAction?: () => void }) {
+function ResourcesTab() {
   const [zones, setZones] = useState<AdminZone[]>([]);
   const [nodes, setNodes] = useState<AdminResourceNode[]>([]);
   const [zoneId, setZoneId] = useState('');
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [capacity, setCapacity] = useState('');
-  const { busy, msg, act } = useAdminAction(onAction);
+  const { busy, msg, act } = useAdminAction();
 
   useEffect(() => {
     adminGetZones().then((r) => {
@@ -630,9 +652,9 @@ function ResourcesTab({ onAction }: { onAction?: () => void }) {
 
 // ── Guild Tab ────────────────────────────────────────────────────────────────
 
-function GuildTab({ onAction }: { onAction?: () => void }) {
+function GuildTab() {
   const [treasuryAmount, setTreasuryAmount] = useState(500000);
-  const { busy, msg, act } = useAdminAction(onAction);
+  const { busy, msg, act } = useAdminAction();
 
   return (
     <div className="space-y-4">
@@ -678,7 +700,12 @@ const TABS: { id: AdminTab; label: string }[] = [
   { id: 'guild', label: 'Guild' },
 ];
 
-export default function AdminScreen({ onAction }: { onAction?: () => void }) {
+interface AdminScreenProps {
+  onStateUpdates: (updates: StateUpdates) => void;
+  setTurns: (n: number) => void;
+}
+
+export default function AdminScreen({ onStateUpdates, setTurns: setGameTurns }: AdminScreenProps) {
   const [tab, setTab] = useState<AdminTab>('player');
 
   return (
@@ -701,12 +728,12 @@ export default function AdminScreen({ onAction }: { onAction?: () => void }) {
         ))}
       </div>
 
-      {tab === 'player' && <PlayerTab onAction={onAction} />}
-      {tab === 'items' && <ItemsTab onAction={onAction} />}
-      {tab === 'world' && <WorldTab onAction={onAction} />}
-      {tab === 'zones' && <ZonesTab onAction={onAction} />}
-      {tab === 'resources' && <ResourcesTab onAction={onAction} />}
-      {tab === 'guild' && <GuildTab onAction={onAction} />}
+      {tab === 'player' && <PlayerTab onStateUpdates={onStateUpdates} setTurns={setGameTurns} />}
+      {tab === 'items' && <ItemsTab onStateUpdates={onStateUpdates} />}
+      {tab === 'world' && <WorldTab />}
+      {tab === 'zones' && <ZonesTab />}
+      {tab === 'resources' && <ResourcesTab />}
+      {tab === 'guild' && <GuildTab />}
     </ScreenContainer>
   );
 }
