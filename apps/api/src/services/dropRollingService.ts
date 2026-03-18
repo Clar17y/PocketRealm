@@ -4,6 +4,7 @@ import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
 import { pickWeighted } from '../utils/pickWeighted.js';
 import type { PendingLootItem } from './pendingLootService';
+import type { GrantedItemIds } from './stateUpdateHelpers';
 
 /** Converts Prisma Decimal-like values to plain numbers. */
 export function decimalLikeToNumber(value: unknown): number {
@@ -46,12 +47,10 @@ export function createLootAccumulator() {
   };
 }
 
-export interface DropGrantResult {
+export interface DropGrantResult extends GrantedItemIds {
   loot: LootDrop[];
   overflow: PendingLootItem[];
   slotsConsumed: number;
-  newItemIds: string[];
-  updatedItemIds: string[];
 }
 
 /**

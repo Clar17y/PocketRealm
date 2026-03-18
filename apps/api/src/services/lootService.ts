@@ -5,6 +5,7 @@ import { randomIntInclusive } from '../utils/random';
 import { cachedQuery } from './cacheService';
 import { getInventoryState } from './inventoryService';
 import { storePendingLoot, type PendingLootItem } from './pendingLootService';
+import type { GrantedItemIds } from './stateUpdateHelpers';
 
 async function getDropTable(mobTemplateId: string) {
   return cachedQuery(
@@ -38,7 +39,7 @@ export async function rollAndGrantLootWithCapacity(
   mobLevel: number,
   dropChanceMultiplier = 1,
   capacityOverride?: number,
-): Promise<{ drops: LootDrop[]; overflow: PendingLootItem[]; pendingLootSessionId: string | null; newItemIds: string[]; updatedItemIds: string[] }> {
+): Promise<{ drops: LootDrop[]; overflow: PendingLootItem[]; pendingLootSessionId: string | null } & GrantedItemIds> {
   const entries = await getDropTable(mobTemplateId);
 
   let usedSlots: number;
@@ -159,7 +160,7 @@ export async function rollAndGrantLootWithCapacity(
     pendingLootSessionId = await storePendingLoot(playerId, overflow);
   }
 
-  return { drops, overflow, pendingLootSessionId, newItemIds, updatedItemIds };
+  return { drops, overflow, pendingLootSessionId, newItemIds: [...new Set(newItemIds)], updatedItemIds: [...new Set(updatedItemIds)] };
 }
 
 export async function enrichLootWithNames(

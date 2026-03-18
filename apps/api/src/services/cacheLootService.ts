@@ -3,6 +3,7 @@ import { HIDDEN_CACHE_CONSTANTS, GEM_CONSTANTS, levelToGemTier } from '@pocketre
 import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
 import type { PendingLootItem } from './pendingLootService';
+import type { GrantedItemIds } from './stateUpdateHelpers';
 
 interface CacheMaterialDrop {
   itemTemplateId: string;
@@ -10,13 +11,11 @@ interface CacheMaterialDrop {
   quantity: number;
 }
 
-interface CacheLootResult {
+interface CacheLootResult extends GrantedItemIds {
   materials: CacheMaterialDrop[];
   soulboundItem: { itemTemplateId: string; name: string; rarity: string } | null;
   overflow: PendingLootItem[];
   slotsConsumed: number;
-  newItemIds: string[];
-  updatedItemIds: string[];
 }
 
 export function rollRarityWithLuck(luck: number): 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' {

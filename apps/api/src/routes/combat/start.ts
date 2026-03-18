@@ -58,7 +58,7 @@ import { serializeXpGrant, toMobTemplate, assertCanAct, assertInZone, trackAchie
 import { getCombatBuffs, getCombatBuffsWithUses, applyCombatBuffs, consumeCombatBuffs, consumeBuffChargesPerMob, buildCombatBuffBadges } from '../../services/buffService';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
-import { buildStateUpdates, fetchItemDTOs, fetchMaterialTotals } from '../../services/stateUpdateHelpers.js';
+import { buildStateUpdates, fetchItemDTOs, fetchMaterialTotals, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers.js';
 import {
   startSchema,
   pickWeighted,
@@ -618,14 +618,11 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
 
   // --- Build stateUpdates ---
   const damagedItemIds = [...new Set(aggregatedDurabilityLost.map(d => d.itemId))];
-  const durabilityUpdatedIds = [...new Set([...damagedItemIds, ...sitePotionDeductResult.partiallyConsumedIds, ...allSiteUpdatedItemIds])];
-  const uniqueSiteNewIds = [...new Set(allSiteNewItemIds)];
-  const [siteStateUpdates, inventoryUpdated, newLootDTOs, materialTotals] = await Promise.all([
+  const allUpdatedIds = [...new Set([...damagedItemIds, ...sitePotionDeductResult.partiallyConsumedIds, ...allSiteUpdatedItemIds])];
+  const [siteStateUpdates] = await Promise.all([
     buildStateUpdates(playerId, ['hp', 'skills', 'resources', 'characterProgression', 'buffs']),
-    fetchItemDTOs(durabilityUpdatedIds),
-    uniqueSiteNewIds.length > 0 ? fetchItemDTOs(uniqueSiteNewIds) : Promise.resolve([]),
-    fetchMaterialTotals(playerId),
   ]);
+  await mergeLootIntoStateUpdates(playerId, allSiteNewItemIds, allUpdatedIds, siteStateUpdates);
 
   // --- Response with fights[] array ---
   const lastFightResult = fightResults[fightResults.length - 1]!;
@@ -710,9 +707,6 @@ async function handleEncounterSiteRoomCombat(req: Request, res: Response, player
     stateUpdates: {
       ...siteStateUpdates,
       ...(sitePotionDeductResult.fullyConsumedIds.length > 0 ? { inventoryRemoved: sitePotionDeductResult.fullyConsumedIds } : {}),
-      ...(inventoryUpdated.length > 0 ? { inventoryUpdated } : {}),
-      ...(newLootDTOs.length > 0 ? { inventoryAdded: newLootDTOs } : {}),
-      materialTotals,
     },
   });
 }

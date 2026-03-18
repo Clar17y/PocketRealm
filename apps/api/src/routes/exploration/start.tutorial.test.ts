@@ -87,6 +87,7 @@ vi.mock('../../services/stateUpdateHelpers', () => ({
   fetchItemDTOs: vi.fn().mockResolvedValue([]),
   fetchInventoryMeta: vi.fn().mockResolvedValue({ inventoryUsedSlots: 0, inventoryCapacity: 24 }),
   fetchMaterialTotals: vi.fn().mockResolvedValue({}),
+  mergeLootIntoStateUpdates: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../services/potionService', () => ({
   buildPotionPool: vi.fn().mockResolvedValue([]),

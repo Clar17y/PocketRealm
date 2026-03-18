@@ -53,7 +53,7 @@ import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
 import { getMainHandAttackSkill } from '../../services/combatStatsService';
 import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
-import { buildStateUpdates, fetchItemDTOs, fetchInventoryMeta, fetchMaterialTotals } from '../../services/stateUpdateHelpers';
+import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers';
 import {
   startSchema,
   pickWeighted,
@@ -1050,20 +1050,10 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       });
     }
 
-    const uniqueNewItemIds = [...new Set(allNewItemIds)];
-    const uniqueUpdatedItemIds = [...new Set(allUpdatedItemIds)];
-    const hasLootChanges = uniqueNewItemIds.length > 0 || uniqueUpdatedItemIds.length > 0;
-    const [stateUpdates, newItemDTOs, updatedItemDTOs, invMeta, materialTotals] = await Promise.all([
+    const [stateUpdates] = await Promise.all([
       buildStateUpdates(playerId, ['hp', 'resources']),
-      uniqueNewItemIds.length > 0 ? fetchItemDTOs(uniqueNewItemIds) : Promise.resolve([]),
-      uniqueUpdatedItemIds.length > 0 ? fetchItemDTOs(uniqueUpdatedItemIds) : Promise.resolve([]),
-      hasLootChanges ? fetchInventoryMeta(playerId) : Promise.resolve(null),
-      hasLootChanges ? fetchMaterialTotals(playerId) : Promise.resolve(null),
     ]);
-    if (newItemDTOs.length > 0) stateUpdates.inventoryAdded = newItemDTOs;
-    if (updatedItemDTOs.length > 0) stateUpdates.inventoryUpdated = updatedItemDTOs;
-    if (invMeta) stateUpdates.inventoryUsedSlots = invMeta.inventoryUsedSlots;
-    if (materialTotals) stateUpdates.materialTotals = materialTotals;
+    await mergeLootIntoStateUpdates(playerId, allNewItemIds, allUpdatedItemIds, stateUpdates);
 
     res.json({
       logId: persisted.logId,
