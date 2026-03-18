@@ -1,4 +1,5 @@
 import { fetchApi } from './core';
+import type { StateUpdates } from '@pocketrealm/shared';
 
 export interface AdminItemTemplate {
   id: string;
@@ -74,35 +75,35 @@ export async function adminGrantTurns(amount: number) {
 }
 
 export async function adminSetLevel(level: number) {
-  return fetchApi<{ success: boolean; level: number; characterXp: number }>('/api/v1/admin/player/level', {
+  return fetchApi<{ success: boolean; level: number; characterXp: number; stateUpdates?: StateUpdates }>('/api/v1/admin/player/level', {
     method: 'POST',
     body: JSON.stringify({ level }),
   });
 }
 
 export async function adminGrantXp(amount: number) {
-  return fetchApi<{ success: boolean; characterXp: number; characterLevel: number }>('/api/v1/admin/player/xp', {
+  return fetchApi<{ success: boolean; characterXp: number; characterLevel: number; stateUpdates?: StateUpdates }>('/api/v1/admin/player/xp', {
     method: 'POST',
     body: JSON.stringify({ amount }),
   });
 }
 
 export async function adminSetAttributes(data: { attributePoints?: number; attributes?: Record<string, number> }) {
-  return fetchApi<{ success: boolean }>('/api/v1/admin/player/attributes', {
+  return fetchApi<{ success: boolean; stateUpdates?: StateUpdates }>('/api/v1/admin/player/attributes', {
     method: 'POST',
     body: JSON.stringify(data),
   });
 }
 
 export async function adminSetSkillLevel(skillType: string, level: number) {
-  return fetchApi<{ success: boolean }>('/api/v1/admin/set-skill-level', {
+  return fetchApi<{ success: boolean; stateUpdates?: StateUpdates }>('/api/v1/admin/set-skill-level', {
     method: 'POST',
     body: JSON.stringify({ skillType, level }),
   });
 }
 
 export async function adminSetSkillLevels(skillTypes: string[], level: number) {
-  return fetchApi<{ success: boolean }>('/api/v1/admin/set-skill-levels', {
+  return fetchApi<{ success: boolean; stateUpdates?: StateUpdates }>('/api/v1/admin/set-skill-levels', {
     method: 'POST',
     body: JSON.stringify({ skillTypes, level }),
   });
@@ -117,7 +118,7 @@ export async function adminGetItemTemplates(search?: string, type?: string) {
 }
 
 export async function adminGrantItem(templateId: string, rarity: string, quantity: number) {
-  return fetchApi<{ success: boolean }>('/api/v1/admin/items/grant', {
+  return fetchApi<{ success: boolean; stateUpdates?: StateUpdates }>('/api/v1/admin/items/grant', {
     method: 'POST',
     body: JSON.stringify({ templateId, rarity, quantity }),
   });
