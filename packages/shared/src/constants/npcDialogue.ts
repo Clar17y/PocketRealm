@@ -85,6 +85,26 @@ export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
         'Take care. And if you don\'t take care, at least take supplies. Same result, different approach.',
       ],
     },
+    contextLines: {
+      greeting: [
+        { zoneKeyword: 'deep-forest', lines: [
+          'Back from the Deep Forest? You smell like mushrooms and regret.',
+          'Deep Forest again? You adventurers are either brave or terrible at finding other hobbies.',
+        ]},
+        { zoneKeyword: 'crystal-caves', lines: [
+          'Crystal Caves, eh? Let me guess — your pack\'s full of shiny rocks and your coin purse is light.',
+          'Careful with those cave crystals. Last adventurer who brought one in set off every ward in the shop.',
+        ]},
+        { zoneKeyword: 'forest-edge', lines: [
+          'Forest Edge run? I hope you brought me something better than rat pelts this time.',
+          'Back from the Edge? At least you didn\'t track mud in. This time.',
+        ]},
+        { zoneKeyword: 'mountain-pass', lines: [
+          'Mountain Pass? You\'ve got altitude written all over your face. And gravel in your boots, I\'d wager.',
+          'Back from the Pass? Good. The cold up there does things to gear. Let\'s see what\'s worth salvaging.',
+        ]},
+      ],
+    },
   },
 
   'millbrook-blacksmith': {
@@ -153,6 +173,26 @@ export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
         'Back before sundown if you want repairs. After sundown, the forge is mine and I don\'t share.',
       ],
     },
+    contextLines: {
+      greeting: [
+        { zoneKeyword: 'deep-forest', lines: [
+          'Deep Forest again? Show me your blade. Thorns and beasts in there make a mess of edges.',
+          'I can always tell someone\'s been in the Deep Forest. The gear tells the story before they do.',
+        ]},
+        { zoneKeyword: 'crystal-caves', lines: [
+          'Crystal Caves? Get over here. That crystalline dust gets into the joints of armour and grinds it apart from the inside.',
+          'You\'ve got cave dust on your gorget. That stuff is worse than rust — it\'s slow and it\'s quiet. Let me look at that.',
+        ]},
+        { zoneKeyword: 'forest-edge', lines: [
+          'Forest Edge? Your blade\'s dull. Rat bones are small but there\'s a lot of them. Dulls an edge faster than you\'d think.',
+          'Back from the Edge? The work\'s easy out there, but easy work done wrong still ruins good steel. Let me sharpen that for you.',
+        ]},
+        { zoneKeyword: 'thornwall', lines: [
+          'Thornwall. I can see it. The thorn-catch on the crossguard is packed solid. Sit down and let me clear that out.',
+          'Nothing ruins armour joints like Thornwall bramble. It works its way in like it\'s got a grudge. Hold still.',
+        ]},
+      ],
+    },
   },
 
   'millbrook-tavern': {
@@ -207,6 +247,26 @@ export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
         'Until next time, love. The stew pot\'s always on and the fire\'s always going. That\'s my promise to Millbrook.',
         'Go on, then. The Antler will be here when you get back. Creaky floors, crooked antler, and all.',
         'Safe travels. And remember, if you hear something interesting out there, I want to hear it first. Before Aldric gets it for his reports. Information has a shelf life, and mine is a tavern.',
+      ],
+    },
+    contextLines: {
+      greeting: [
+        { zoneKeyword: 'deep-forest', lines: [
+          'Deep Forest? There are rumours about what lives in there now. Nothing confirmed, but the miners who pass through get a look in their eyes. Sit down and tell me what you actually saw.',
+          'You\'ve been in the Deep Forest. I can always tell — there\'s a particular kind of tired that only comes from trees that are older than this town. What\'ll you have?',
+        ]},
+        { zoneKeyword: 'crystal-caves', lines: [
+          'The mining folk were in here just last night talking about the Crystal Caves. Something about new tunnels opening up. You\'ve just come from there — what\'s the word?',
+          'Caves again? You\'re braver than the miners, and they go in for pay. Sit. You\'ve earned a warm drink and I\'ve earned an update.',
+        ]},
+        { zoneKeyword: 'forest-edge', lines: [
+          'Forest Edge? At this point you\'re practically a local out there. Pull up a stool — I\'ll have your usual ready before you\'ve got your boots off.',
+          'Back from the Edge again. You know, I\'ve started keeping a tally. You might have cleared that stretch more times than anyone in Millbrook. Aldric\'s got a report about it somewhere, I\'m sure.',
+        ]},
+        { zoneKeyword: 'swamp', lines: [
+          'The swamp. Brave. Or unlucky. Sit down and let me get you something warm — I assume you\'re waterlogged.',
+          'You\'ve been in the swamp. I know that look. It\'s the look of someone who wants a fire and a drink and to never smell bog water again. I can help with at least two of those.',
+        ]},
       ],
     },
   },
@@ -275,6 +335,26 @@ export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
         'Stay hydrated. Stay alert. And if anything bites you, note the colour, the size, and the number of legs. Accurate descriptions save lives. Inaccurate descriptions waste my time and my antivenom.',
         'Until next time. Bring ingredients if you can, injuries if you must, and stories if you have nothing else. I collect all three.',
         'Take care. The world outside my bench is chaotic, unpredictable, and poorly documented. Everything I dislike about it is everything you seem to enjoy. How peculiar.',
+      ],
+    },
+    contextLines: {
+      greeting: [
+        { zoneKeyword: 'deep-forest', lines: [
+          'You have been in the Deep Forest. The shade-grown herbs in that zone are extraordinary — I hope you collected samples. If not, I am mildly disappointed but willing to forgive.',
+          'Deep Forest? Good. The rare fungi from that region are only viable for a few hours after harvest. Empty your pack on the bench. Let\'s see what survived the journey.',
+        ]},
+        { zoneKeyword: 'crystal-caves', lines: [
+          'Ah, the Crystal Caves. The luminous moss in the lower chambers contains mineral salts I cannot replicate in any laboratory. Please tell me you have some.',
+          'You\'ve come from the Caves. I can tell by the mineral dust on your collar. That same dust, properly extracted, is a key stabilizer in three of my best preparations. Did you think to collect any?',
+        ]},
+        { zoneKeyword: 'swamp', lines: [
+          'The swamp. Fascinating place. The bog reeds there have unusual cellular density, and the murk-lily is the only plant I know of that synthesizes its own mild anticoagulant. Please tell me you gathered something.',
+          'You\'ve been in the swamp. I won\'t ask how you feel about the smell — that\'s a personal matter. But did you notice any murk-lily near the northern bank? I\'ve been waiting on a fresh supply.',
+        ]},
+        { zoneKeyword: 'mountain-pass', lines: [
+          'Mountain Pass. The altitude herbs up there are hardy beyond anything I can grow locally. If you found any frost-grey sage, I need it. Urgently and in quantity.',
+          'You look like the Pass. That particular shade of windburn is distinctive. Did you happen to notice any alpine growth? The elevation changes the alkaloid profile entirely.',
+        ]},
       ],
     },
   },
