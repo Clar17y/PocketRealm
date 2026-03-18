@@ -23,7 +23,7 @@ export type NotificationType =
   | 'expeditionStarted'
   | 'expeditionFinished';
 
-const PREF_COLUMN: Record<NotificationType, string> = {
+const PREF_COLUMN = {
   pvpAttack: 'notifyPvpAttack',
   pvpScout: 'notifyPvpScout',
   bossAppeared: 'notifyBossAppeared',
@@ -31,17 +31,13 @@ const PREF_COLUMN: Record<NotificationType, string> = {
   turnBankFull: 'notifyTurnBankFull',
   expeditionStarted: 'notifyExpeditionStarted',
   expeditionFinished: 'notifyExpeditionFinished',
-};
+} as const satisfies Record<NotificationType, string>;
 
-const NOTIFICATION_SELECT = {
-  notifyPvpAttack: true,
-  notifyPvpScout: true,
-  notifyBossAppeared: true,
-  notifyBossKilled: true,
-  notifyTurnBankFull: true,
-  notifyExpeditionStarted: true,
-  notifyExpeditionFinished: true,
-} as const;
+type PrefColumn = (typeof PREF_COLUMN)[NotificationType];
+
+const NOTIFICATION_SELECT = Object.fromEntries(
+  Object.values(PREF_COLUMN).map((col) => [col, true]),
+) as Record<PrefColumn, true>;
 
 function initVapid(): void {
   const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT } = process.env;
@@ -98,7 +94,7 @@ export async function sendPush(
   ensureVapid();
 
   // Check player's notification preference for this type
-  const prefColumn = PREF_COLUMN[notificationType] as keyof typeof NOTIFICATION_SELECT;
+  const prefColumn = PREF_COLUMN[notificationType];
   const player = await prisma.player.findUnique({
     where: { id: playerId },
     select: NOTIFICATION_SELECT,

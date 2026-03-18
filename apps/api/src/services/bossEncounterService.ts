@@ -654,29 +654,22 @@ async function resolveBossRoundInner(
         `${encounter.mobTemplate.name} has been slain! ${killerName} dealt the final blow.`,
       );
     }
+
+    // Push notification to all boss participants
+    for (const playerId of contributorMap.keys()) {
+      void sendPush(playerId, 'bossKilled', {
+        title: 'Boss Defeated!',
+        body: `${encounter.mobTemplate.name} has been slain!`,
+        tag: 'boss-killed',
+        data: { type: 'boss', encounterId },
+      });
+    }
   } else {
     const hpPercent = Math.round((result.bossHpAfter / encounter.maxHp) * 100);
     await emitSystemMessage(
       io, 'zone', `zone:${encounter.event.zoneId}`,
       `Boss round ${nextRound}: ${totalPlayerDmg} damage dealt to ${encounter.mobTemplate.name} (${hpPercent}% HP remaining)`,
     );
-  }
-
-  // Push notification only when boss is killed — notify all participants
-  if (result.bossDefeated) {
-    const allParticipantIds = await prisma.bossParticipant.findMany({
-      where: { encounterId },
-      select: { playerId: true },
-      distinct: ['playerId'],
-    });
-    for (const { playerId } of allParticipantIds) {
-      sendPush(playerId, 'bossKilled', {
-        title: 'Boss Defeated!',
-        body: `${encounter.mobTemplate.name} has been slain!`,
-        tag: 'boss-killed',
-        data: { type: 'boss', encounterId },
-      }).catch(() => {});
-    }
   }
 
   return { bossDefeated: result.bossDefeated, roundResult: result };

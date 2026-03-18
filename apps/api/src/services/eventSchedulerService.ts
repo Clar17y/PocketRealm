@@ -254,12 +254,12 @@ async function trySpawnBoss(io: SocketServer | null, zoneId: string, zoneName: s
     distinct: ['playerId'],
   });
   for (const { playerId } of subscribedPlayers) {
-    sendPush(playerId, 'bossAppeared', {
+    void sendPush(playerId, 'bossAppeared', {
       title: 'Boss Appeared!',
       body: `${bossMob.name} has appeared in ${zoneName}!`,
       tag: 'boss-appeared',
       data: { type: 'boss' },
-    }).catch(() => {});
+    });
   }
 
   return true;

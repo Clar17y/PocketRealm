@@ -496,18 +496,14 @@ export async function forceStartExpedition(
     { expeditionId },
   );
 
-  // Notify expedition members
-  const members = await prisma.guildExpeditionMember.findMany({
-    where: { expeditionId },
-    select: { playerId: true },
-  });
-  for (const { playerId } of members) {
-    sendPush(playerId, 'expeditionStarted', {
+  // Notify expedition members (reuse snapshot.members from getMembers)
+  for (const { playerId } of snapshot.members) {
+    void sendPush(playerId, 'expeditionStarted', {
       title: 'Expedition Started!',
       body: `Your Tier ${expedition.tier} guild expedition has begun!`,
       tag: 'expedition-started',
       data: { type: 'expedition', expeditionId },
-    }).catch(() => {});
+    });
   }
 
   return { success: true, message: 'Expedition started' };
@@ -765,18 +761,14 @@ export async function checkAndResolveExpeditionRounds(io: Server | null): Promis
           { expeditionId: exp.id },
         );
 
-        // Notify expedition members
-        const members = await prisma.guildExpeditionMember.findMany({
-          where: { expeditionId: exp.id },
-          select: { playerId: true },
-        });
-        for (const { playerId } of members) {
-          sendPush(playerId, 'expeditionStarted', {
+        // Notify expedition members (reuse snapshot.members from getMembers)
+        for (const { playerId } of snapshot.members) {
+          void sendPush(playerId, 'expeditionStarted', {
             title: 'Expedition Started!',
             body: `Your Tier ${exp.tier} guild expedition has begun!`,
             tag: 'expedition-started',
             data: { type: 'expedition', expeditionId: exp.id },
-          }).catch(() => {});
+          });
         }
       } else {
         // Not enough players, fail the expedition
@@ -1319,12 +1311,12 @@ export async function handleWipe(expeditionId: string): Promise<void> {
 
     // Notify expedition members of failure
     for (const member of expedition.members) {
-      sendPush(member.playerId, 'expeditionFinished', {
+      void sendPush(member.playerId, 'expeditionFinished', {
         title: 'Expedition Failed',
         body: `Your Tier ${expedition.tier} expedition failed after ${newWipeCount} attempts.`,
         tag: 'expedition-finished',
         data: { type: 'expedition', expeditionId },
-      }).catch(() => {});
+      });
     }
 
     await cleanupExpeditionBots(expeditionId);
@@ -1535,12 +1527,12 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
 
   // Notify expedition members
   for (const member of expedition.members) {
-    sendPush(member.playerId, 'expeditionFinished', {
+    void sendPush(member.playerId, 'expeditionFinished', {
       title: 'Expedition Complete!',
       body: `Your Tier ${expedition.tier} expedition was victorious!`,
       tag: 'expedition-finished',
       data: { type: 'expedition', expeditionId },
-    }).catch(() => {});
+    });
   }
 
   await cleanupExpeditionBots(expeditionId);

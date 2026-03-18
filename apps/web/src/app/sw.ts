@@ -66,7 +66,7 @@ self.addEventListener("notificationclick", (event) => {
   if (data?.type === "pvp") {
     targetPath = "/game?screen=arena";
   } else if (data?.type === "boss") {
-    targetPath = "/game?screen=boss";
+    targetPath = "/game?screen=worldEvents";
   } else if (data?.type === "expedition") {
     targetPath = "/game?screen=guild";
   }
