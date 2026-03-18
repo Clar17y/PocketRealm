@@ -33,7 +33,7 @@ const serwist = new Serwist({
 
 serwist.addEventListeners();
 
-// Push notification handler
+// Push notification handler — skip if app is focused
 self.addEventListener("push", (event) => {
   if (!event.data) return;
 
@@ -41,12 +41,17 @@ self.addEventListener("push", (event) => {
   const { title, body, icon, tag, data } = payload;
 
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: icon ?? "/icons/icon-192.png",
-      tag,
-      data,
-      badge: "/icons/icon-96.png",
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      const isFocused = clients.some((c) => c.visibilityState === "visible");
+      if (isFocused) return;
+
+      return self.registration.showNotification(title, {
+        body,
+        icon: icon ?? "/icons/icon-192.png",
+        tag,
+        data,
+        badge: "/icons/icon-96.png",
+      });
     }),
   );
 });
