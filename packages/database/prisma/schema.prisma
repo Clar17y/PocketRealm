@@ -55,6 +55,11 @@ model Player {
   lootRevealRarity    String  @default("uncommon") @map("loot_reveal_rarity") @db.VarChar(16)
   forgeConfirmRarity  String  @default("rare") @map("forge_confirm_rarity") @db.VarChar(16)
 
+  // Flavour text preferences
+  showNpcDialogue      Boolean @default(true) @map("show_npc_dialogue")
+  showItemFlavourText  Boolean @default(true) @map("show_item_flavour_text")
+  showBestiaryLore     Boolean @default(true) @map("show_bestiary_lore")
+
   // Notification preferences
   notifyPvpAttack          Boolean @default(true) @map("notify_pvp_attack")
   notifyPvpScout           Boolean @default(true) @map("notify_pvp_scout")
