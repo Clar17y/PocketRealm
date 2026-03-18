@@ -1,10 +1,17 @@
 import type { StateUpdates, InventoryItemDTO, HpState, SkillStateDTO, PlayerBuffData, ResourceStateDTO } from '@pocketrealm/shared';
 
+export interface EquipmentSlotState {
+  slot: string;
+  itemId: string | null;
+  item: { id: string; currentDurability: number | null; maxDurability: number | null; [key: string]: unknown } | null;
+}
+
 export interface StateSetters {
   setInventory: (updater: (prev: InventoryItemDTO[]) => InventoryItemDTO[]) => void;
   setInventoryCapacity: (n: number) => void;
   setInventoryUsedSlots: (n: number) => void;
   setEquipment: (eq: Record<string, InventoryItemDTO | null>) => void;
+  updateEquipmentItems: (updater: (prev: EquipmentSlotState[]) => EquipmentSlotState[]) => void;
   setSkills: (skills: SkillStateDTO[]) => void;
   setHpState: (hp: HpState) => void;
   setStaminaState: (partial: Partial<ResourceStateDTO>) => void;
@@ -36,6 +43,25 @@ export function applyStateUpdates(
         next.push(...updates.inventoryAdded);
       }
       return next;
+    });
+  }
+
+  // Sync equipment state when inventoryUpdated includes equipped items (e.g. after repair)
+  if (updates.inventoryUpdated) {
+    const updateMap = new Map(updates.inventoryUpdated.map((i) => [i.id, i]));
+    setters.updateEquipmentItems((prev) => {
+      let changed = false;
+      const next = prev.map((slot) => {
+        if (!slot.item || !slot.itemId) return slot;
+        const updated = updateMap.get(slot.itemId);
+        if (!updated) return slot;
+        changed = true;
+        return {
+          ...slot,
+          item: { ...slot.item, currentDurability: updated.currentDurability, maxDurability: updated.maxDurability, bonusStats: updated.bonusStats, rarity: updated.rarity },
+        };
+      });
+      return changed ? next : prev;
     });
   }
 

@@ -397,6 +397,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         item,
       })),
     ),
+    updateEquipmentItems: (updater) => setEquipment(updater),
     setSkills,
     setHpState: (hp) => { setHpState(hp); hpStateRef.current = hp; },
     setStaminaState: (partial) => setStaminaState((prev) => ({ ...prev, ...partial })),
