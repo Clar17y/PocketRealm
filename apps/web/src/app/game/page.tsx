@@ -1198,7 +1198,7 @@ export default function GamePage() {
           />
         );
       case 'admin':
-        return <AdminScreen onAction={loadAll} />;
+        return <AdminScreen onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)} setTurns={setTurns} />;
       default:
         return null;
     }

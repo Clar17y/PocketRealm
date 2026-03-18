@@ -7,7 +7,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { addStackableItemTx } from '../../services/inventoryService';
-import { fetchItemDTOs, fetchInventoryMeta, fetchMaterialTotals } from '../../services/stateUpdateHelpers';
+import { fetchItemDTOs, fetchInventoryMeta, fetchMaterialTotals, buildInventoryStateUpdates } from '../../services/stateUpdateHelpers';
 import {
   getZoneCraftingLevel,
   assertZoneAllowsCrafting,
@@ -180,13 +180,13 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
         })),
       },
       tax: taxInfoFromResult(taxResult),
-      stateUpdates: {
-        inventoryRemoved: [item.id],
-        ...(addedDTOs.length > 0 && { inventoryAdded: addedDTOs }),
-        ...(updatedDTOs.length > 0 && { inventoryUpdated: updatedDTOs }),
+      stateUpdates: buildInventoryStateUpdates({
+        removed: [item.id],
+        added: addedDTOs,
+        updated: updatedDTOs,
         inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
         materialTotals,
-      },
+      }),
     });
 }));
 
@@ -380,12 +380,12 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
       returnedMaterials: returned,
       totalTurnCost,
       tax: taxInfoFromResult(taxResult),
-      stateUpdates: {
-        inventoryRemoved: salvagedItemIds,
-        ...(addedDTOs.length > 0 && { inventoryAdded: addedDTOs }),
-        ...(updatedDTOs.length > 0 && { inventoryUpdated: updatedDTOs }),
+      stateUpdates: buildInventoryStateUpdates({
+        removed: salvagedItemIds,
+        added: addedDTOs,
+        updated: updatedDTOs,
         inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
         materialTotals: matTotals,
-      },
+      }),
     });
 }));
