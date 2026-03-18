@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useId, useRef } from 'react';
+import { useId } from 'react';
 import { ChevronRight } from 'lucide-react';
+import { useSessionStorageToggle } from '../../hooks/useSessionStorageToggle';
 
 interface CollapsibleLoreSectionProps {
   title: string;
@@ -17,21 +18,7 @@ export function CollapsibleLoreSection({
   defaultExpanded = false,
 }: CollapsibleLoreSectionProps) {
   const contentId = useId();
-  const fullKey = `lore-collapsed:${storageKey}`;
-  const isFirstRender = useRef(true);
-
-  const [expanded, setExpanded] = useState(() => {
-    if (typeof window === 'undefined') return defaultExpanded;
-    const stored = sessionStorage.getItem(fullKey);
-    if (stored !== null) return stored === 'true';
-    return defaultExpanded;
-  });
-
-  // Persist only on user-initiated toggles, not on mount
-  useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
-    sessionStorage.setItem(fullKey, String(expanded));
-  }, [expanded, fullKey]);
+  const [expanded, setExpanded] = useSessionStorageToggle(`lore-collapsed:${storageKey}`, defaultExpanded);
 
   return (
     <div>

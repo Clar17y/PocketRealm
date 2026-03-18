@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { getNpcName, NPC_DIALOGUE_CONSTANTS, type DialogueEvent, type NpcKey } from '@pocketrealm/shared';
 import { getNextNpcLine } from '../../lib/npcLineRotation';
+import { useSessionStorageToggle } from '../../hooks/useSessionStorageToggle';
 import { ChevronRight } from 'lucide-react';
 
 interface NpcDialogueBannerProps {
@@ -14,15 +15,7 @@ interface NpcDialogueBannerProps {
 export function NpcDialogueBanner({ npcKey, event, showDialogue = true }: NpcDialogueBannerProps) {
   const name = getNpcName(npcKey);
   const [line, setLine] = useState<string | null>(null);
-  const storageKey = `lore-collapsed:npc-banner:${npcKey}`;
-  const isFirstExpandRender = useRef(true);
-
-  const [expanded, setExpanded] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    const stored = sessionStorage.getItem(storageKey);
-    if (stored !== null) return stored === 'true';
-    return false;
-  });
+  const [expanded, setExpanded] = useSessionStorageToggle(`lore-collapsed:npc-banner:${npcKey}`, false);
 
   // Set initial line and update when event/npcKey changes
   useEffect(() => {
@@ -37,12 +30,6 @@ export function NpcDialogueBanner({ npcKey, event, showDialogue = true }: NpcDia
     }, NPC_DIALOGUE_CONSTANTS.IDLE_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [event, npcKey]);
-
-  // Persist collapsed state only on user-initiated toggles
-  useEffect(() => {
-    if (isFirstExpandRender.current) { isFirstExpandRender.current = false; return; }
-    sessionStorage.setItem(storageKey, String(expanded));
-  }, [expanded, storageKey]);
 
   if (!showDialogue || !name || !line) return null;
 

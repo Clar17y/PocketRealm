@@ -36,7 +36,10 @@ function getLinePool(npcKey: NpcKey, event: DialogueEvent): LinePool | null {
 function pickWithoutRepeat(pool: LinePool): string {
   const storageKey = `${SHOWN_KEY_PREFIX}${pool.storageKeySuffix}`;
   const shownJson = sessionStorage.getItem(storageKey);
-  let shown: number[] = shownJson ? JSON.parse(shownJson) : [];
+  let shown: number[] = [];
+  if (shownJson) {
+    try { shown = JSON.parse(shownJson); } catch { /* corrupted, reset */ }
+  }
 
   // Get indices not yet shown
   const available = pool.lines

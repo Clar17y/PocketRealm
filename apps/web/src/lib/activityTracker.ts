@@ -1,6 +1,7 @@
 const TURNS_SPENT_PREFIX = 'turns-spent:';
 
 export function recordTurnsSpent(zoneId: string, count: number): void {
+  if (count <= 0) return;
   const key = `${TURNS_SPENT_PREFIX}${zoneId}`;
   const current = parseInt(sessionStorage.getItem(key) ?? '0', 10);
   sessionStorage.setItem(key, String(current + count));
