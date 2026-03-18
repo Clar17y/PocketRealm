@@ -94,6 +94,7 @@ export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPl
 import { buildLastCombat, isMobKnown } from './combatHelpers';
 export { isMobKnown } from './combatHelpers';
 import { useActivityLog, nowStamp } from './hooks/useActivityLog';
+import { recordTurnsSpent } from '../../lib/activityTracker';
 import { usePlayerSettings } from './hooks/usePlayerSettings';
 import { useBestiary } from './hooks/useBestiary';
 import { useGathering } from './hooks/useGathering';
@@ -799,6 +800,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       setTurns(data.turns.currentTurns);
       showQuestToasts(data.questProgress);
+      recordTurnsSpent(currentZone.id, turnSpend);
 
       // Always trigger animated playback — even empty results get a brief progress bar
       setExplorationPlaybackData({
@@ -976,6 +978,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         if (combatLogId) combatLogPrefetch.prefetch(combatLogId);
       }
       setPlaybackActive(true);
+      if (activeZoneId) recordTurnsSpent(activeZoneId, 1);
 
       if (data.rewards.siteCompletion) {
         siteJustClearedRef.current = true;
@@ -1089,6 +1092,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       setTurns(data.turns.currentTurns);
       showQuestToasts(data.questProgress);
+      recordTurnsSpent(activeZoneId, turnSpend);
 
       const newLogs: ActivityLogEntry[] = [];
       const gatheredSkillName = data.xp?.skillType
