@@ -268,6 +268,34 @@ export function Settings({
         </div>
       </PixelCard>
 
+      {/* Lore & Flavour */}
+      <PixelCard>
+        <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Lore & Flavour</h3>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[var(--rpg-text-secondary)]">NPC Dialogue</p>
+              <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Show NPC dialogue banners on crafting, gathering, and other screens</p>
+            </div>
+            <ToggleSwitch checked={showNpcDialogue} onChange={onShowNpcDialogueChange} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[var(--rpg-text-secondary)]">Item Flavour Text</p>
+              <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Show flavour text descriptions in your inventory</p>
+            </div>
+            <ToggleSwitch checked={showItemFlavourText} onChange={onShowItemFlavourTextChange} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[var(--rpg-text-secondary)]">Bestiary Lore</p>
+              <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Show appearance, behaviour, and lore sections in bestiary entries</p>
+            </div>
+            <ToggleSwitch checked={showBestiaryLore} onChange={onShowBestiaryLoreChange} />
+          </div>
+        </div>
+      </PixelCard>
+
       {/* Notifications */}
       {pushState !== 'unsupported' && (
         <PixelCard>
