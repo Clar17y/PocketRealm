@@ -17,7 +17,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { assertNotRecovering, getOwnedItem, trackAchievements } from '../../utils/routeHelpers.js';
-import { toInventoryItemDTO, fetchInventoryMeta } from '../../services/stateUpdateHelpers';
+import { toInventoryItemDTO, fetchInventoryMeta, fetchBuffDTOs } from '../../services/stateUpdateHelpers';
 import {
   isItemType,
   parseItemRarity,
@@ -174,6 +174,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       ]);
 
       if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
+      const buffs = (forgeLuckBonus > 0) ? await fetchBuffDTOs(playerId) : undefined;
 
       const updatedDTO = toInventoryItemDTO(
         { ...item, rarity: nextRarity, bonusStats: upgradedBonusStats },
@@ -205,6 +206,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
           inventoryRemoved: [sacrificial.id],
           inventoryUpdated: [updatedDTO],
           inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+          ...(buffs && { buffs }),
         },
       });
       return;
@@ -255,8 +257,10 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
     ]);
 
     // Consume buffs after failed forge
+    const consumedBuff = forgeLuckBonus > 0 || hasForgeProtection;
     if (forgeLuckBonus > 0) await consumeBuffStandalone(playerId, 'forge_luck');
     if (hasForgeProtection) await consumeBuffStandalone(playerId, 'forge_protection');
+    const buffs = consumedBuff ? await fetchBuffDTOs(playerId) : undefined;
 
     res.json({
       logId: log.id,
@@ -279,6 +283,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       stateUpdates: {
         inventoryRemoved: removedIds,
         inventoryUsedSlots: inventoryMeta.inventoryUsedSlots,
+        ...(buffs && { buffs }),
       },
     });
 }));
