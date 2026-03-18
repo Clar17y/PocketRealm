@@ -2,8 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Prisma } from '@pocketrealm/database';
 import { HIDDEN_CACHE_CONSTANTS } from '@pocketrealm/shared';
 
+let addStackableCallCount = 0;
 vi.mock('./inventoryService', () => ({
-  addStackableItemTx: vi.fn().mockResolvedValue(undefined),
+  addStackableItemTx: vi.fn().mockImplementation(() => {
+    addStackableCallCount++;
+    return Promise.resolve({ itemId: `cache-item-${addStackableCallCount}`, quantity: 1, created: true });
+  }),
 }));
 
 import { rollRarityWithLuck, grantCacheLootTx } from './cacheLootService';
@@ -11,6 +15,7 @@ import { addStackableItemTx } from './inventoryService';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  addStackableCallCount = 0;
 });
 
 afterEach(() => {
@@ -66,7 +71,7 @@ describe('rollRarityWithLuck', () => {
 // ---------------------------------------------------------------------------
 describe('grantCacheLootTx', () => {
   const mockTx = {
-    item: { create: vi.fn().mockResolvedValue({}) },
+    item: { create: vi.fn().mockResolvedValue({ id: 'soulbound-item-1' }) },
   } as unknown as Prisma.TransactionClient;
   const mockTxAny = mockTx as unknown as Record<string, any>;
 

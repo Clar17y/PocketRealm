@@ -271,7 +271,7 @@ describe('achievementService', () => {
       const result = await getPlayerAchievements('p1');
       const secretStreak = result.achievements.find((a) => a.id === 'combat_streak_10');
       expect(secretStreak!.title).toBe('Unstoppable');
-      expect(secretStreak!.description).toBe('Achieve a 10 PvP win streak');
+      expect(secretStreak!.description).toBe('Ten in a row. They stopped trying to beat you and started trying to survive. There is a difference, and you taught it to them.');
       expect(secretStreak!.unlocked).toBe(true);
     });
 

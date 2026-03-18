@@ -11,6 +11,9 @@ interface BestiaryMob {
   stats: { hp: number; accuracy: number; defence: number };
   zones: string[];
   description: string;
+  flavorAppearance: string | null;
+  flavorBehavior: string | null;
+  flavorLore: string | null;
   drops: Array<{
     item: { id: string; name: string; itemType: string; tier: number };
     rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';

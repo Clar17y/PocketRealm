@@ -34,7 +34,7 @@ import { calculateExplorationPercent, getExplorationPercent } from '../services/
 import { asyncHandler } from '../utils/asyncHandler';
 import { assertNotOverEncumbered } from '../services/inventoryService';
 import { spendWithTaxTx, taxInfoFromResult } from '../services/guildTaxService';
-import { buildStateUpdates } from '../services/stateUpdateHelpers';
+import { buildStateUpdates, mergeLootIntoStateUpdates } from '../services/stateUpdateHelpers';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 import { trackProgress } from '../services/progressService';
@@ -131,6 +131,9 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
         zoneType: z.zoneType,
         zoneExitChance: discovered ? z.zoneExitChance : null,
         maxCraftingLevel: discovered ? z.maxCraftingLevel : null,
+        arrivalText: discovered ? z.arrivalText : null,
+        ambientTexts: discovered ? z.ambientTexts : null,
+        environmentalTexts: discovered ? z.environmentalTexts : null,
         exploration: z.zoneType === 'town' ? null : {
           turnsExplored: explorationByZoneId.get(z.id) ?? 0,
           turnsToExplore: z.turnsToExplore ?? null,
@@ -299,6 +302,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
 
   // 10. Run travel ambushes (only for wild traversal)
   let travelPendingLootSessionId: string | null = null;
+  const allTravelNewItemIds: string[] = [];
+  const allTravelUpdatedItemIds: string[] = [];
 
   if (!isTownDeparture) {
     const ambushes = simulateTravelAmbushes(guildReducedCost);
@@ -416,6 +421,8 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           });
           const loot = rewards.loot;
           allTravelOverflow.push(...rewards.overflow);
+          allTravelNewItemIds.push(...rewards.newItemIds);
+          allTravelUpdatedItemIds.push(...rewards.updatedItemIds);
           const xpGain = rewards.xpGrants.reduce((sum, g) => sum + g.boostedXpAfterEfficiency, 0);
           await setHp(playerId, currentHp);
 
@@ -684,7 +691,10 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     await trackAchievements(playerId, travelCounters, { statKeys: travelAchKeys, familyIds: ambushMobFamilyIds });
   }
 
-  const travelStateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+  const [travelStateUpdates] = await Promise.all([
+    buildStateUpdates(playerId, ['hp', 'resources']),
+  ]);
+  await mergeLootIntoStateUpdates(playerId, allTravelNewItemIds, allTravelUpdatedItemIds, travelStateUpdates);
   res.json({
     zone: { id: destinationZone.id, name: destinationZone.name, zoneType: destinationZone.zoneType },
     turns: await getTurnSnapshot(),

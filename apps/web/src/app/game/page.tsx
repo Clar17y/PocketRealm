@@ -584,7 +584,7 @@ export default function GamePage() {
                 imageSrc: itemImageSrc(item.template.name, item.template.itemType),
                 quantity: item.quantity,
                 rarity: item.rarity,
-                description: item.template.itemType,
+                description: item.template.flavorText || item.template.itemType,
                 type: item.template.itemType,
                 tier: item.template.tier,
                 weightClass: item.template.weightClass ?? null,
@@ -722,6 +722,8 @@ export default function GamePage() {
               zoneType: z.zoneType ?? 'wild',
               imageSrc: z.discovered && z.name !== '???' ? zoneImageSrc(z.name) : undefined,
               exploration: z.exploration ?? null,
+              arrivalText: z.arrivalText ?? null,
+              ambientTexts: z.ambientTexts ?? null,
             }))}
             connections={zoneConnections}
             currentZoneId={activeZoneId ?? ''}
@@ -809,6 +811,7 @@ export default function GamePage() {
               ))}
             </div>
             <Crafting
+              skillType={activeCraftingSkill}
               skillName={activeCraftingSkillMeta?.name ?? 'Crafting'}
               skillLevel={activeCraftingSkillData?.level ?? 1}
               xpRate={Math.round(calculateEfficiency(activeCraftingSkillData?.dailyXpGained ?? 0, activeCraftingSkill as SkillType) * 100)}
@@ -916,6 +919,7 @@ export default function GamePage() {
               ))}
             </div>
             <Gathering
+              skillType={activeGatheringSkill}
               skillName={activeGatheringSkillMeta?.name ?? 'Gathering'}
               skillLevel={activeGatheringSkillData?.level ?? 1}
               xpRate={Math.round(calculateEfficiency(activeGatheringSkillData?.dailyXpGained ?? 0, activeGatheringSkill as SkillType) * 100)}

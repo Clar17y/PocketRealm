@@ -32,6 +32,9 @@ export async function getZones() {
       zoneType: string;
       zoneExitChance: number | null;
       maxCraftingLevel: number | null;
+      arrivalText: string | null;
+      ambientTexts: Record<string, string> | null;
+      environmentalTexts: Record<string, string> | null;
       exploration: {
         turnsExplored: number;
         turnsToExplore: number | null;

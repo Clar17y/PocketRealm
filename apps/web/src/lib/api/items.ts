@@ -17,6 +17,7 @@ export interface InventoryItemTemplate {
   maxDurability: number;
   stackable: boolean;
   sellPrice: number | null;
+  flavorText: string | null;
 }
 
 export interface InventoryItem {

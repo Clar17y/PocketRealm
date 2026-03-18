@@ -25,6 +25,7 @@ export interface InventoryItemDTO {
     maxDurability: number;
     stackable: boolean;
     sellPrice: number | null;
+    flavorText: string | null;
   };
   equippedSlot: string | null;
 }

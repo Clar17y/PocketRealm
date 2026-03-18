@@ -11,6 +11,7 @@ function makeSetters(): StateSetters {
     setInventoryCapacity: vi.fn(),
     setInventoryUsedSlots: vi.fn(),
     setEquipment: vi.fn(),
+    patchEquipmentDurability: vi.fn(),
     setSkills: vi.fn(),
     setHpState: vi.fn(),
     setStaminaState: vi.fn(),

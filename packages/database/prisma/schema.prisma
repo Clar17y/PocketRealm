@@ -209,6 +209,7 @@ model ItemTemplate {
   stackable        Boolean @default(false)
   consumableEffect Json?   @map("consumable_effect")
   sellPrice       Int?    @map("sell_price")
+  flavorText      String? @map("flavor_text") @db.Text
 
   items           Item[]
   dropTables      DropTable[]
@@ -247,6 +248,9 @@ model Zone {
   id          String  @id @default(uuid())
   name        String  @db.VarChar(64)
   description String? @db.Text
+  arrivalText        String? @map("arrival_text") @db.Text
+  ambientTexts       Json?   @map("ambient_texts")
+  environmentalTexts Json?   @map("environmental_texts")
   difficulty  Int     @default(1)
   travelCost  Int     @map("travel_cost")
   isStarter   Boolean @default(false) @map("is_starter")
@@ -338,6 +342,9 @@ model MobTemplate {
   isBoss          Boolean @default(false) @map("is_boss")
   bossAoeDmg      Int?    @map("boss_aoe_dmg")
   bossBaseHp      Int?    @map("boss_base_hp")
+  flavorAppearance String? @map("flavor_appearance") @db.Text
+  flavorBehavior   String? @map("flavor_behavior") @db.Text
+  flavorLore       String? @map("flavor_lore") @db.Text
 
   zone              Zone               @relation(fields: [zoneId], references: [id])
   dropTables        DropTable[]
@@ -500,6 +507,7 @@ model MobFamily {
   siteNounSmall  String @map("site_noun_small") @db.VarChar(64)
   siteNounMedium String @map("site_noun_medium") @db.VarChar(64)
   siteNounLarge  String @map("site_noun_large") @db.VarChar(64)
+  flavorOverview String? @map("flavor_overview") @db.Text
 
   members        MobFamilyMember[]
   zoneMappings   ZoneMobFamily[]

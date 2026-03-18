@@ -22,6 +22,7 @@ export interface AchievementDef {
   category: AchievementCategory;
   title: string;
   description: string;
+  flavorText?: string;
   titleReward?: string;
   rewards?: AchievementReward[];
   secret?: boolean;
@@ -36,6 +37,7 @@ export interface PlayerAchievementProgress {
   category: AchievementCategory;
   title: string;
   description: string;
+  flavorText?: string;
   titleReward?: string;
   threshold: number;
   secret?: boolean;

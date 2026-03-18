@@ -274,6 +274,7 @@ describe('rollAndGrantDropsTx', () => {
         maxDurability: 100,
         currentDurability: 100,
       }),
+      select: { id: true },
     });
     expect(result.loot).toHaveLength(1);
     expect(result.loot[0].itemTemplateId).toBe('sword-1');
@@ -291,6 +292,7 @@ describe('rollAndGrantDropsTx', () => {
         maxDurability: 80,
         currentDurability: 80,
       }),
+      select: { id: true },
     });
     expect(result.loot[0].itemTemplateId).toBe('helm-1');
   });
@@ -307,6 +309,7 @@ describe('rollAndGrantDropsTx', () => {
         maxDurability: null,
         currentDurability: null,
       }),
+      select: { id: true },
     });
     expect(result.loot[0].itemTemplateId).toBe('gem-1');
   });
