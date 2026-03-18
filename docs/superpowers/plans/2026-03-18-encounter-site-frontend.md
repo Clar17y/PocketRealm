@@ -4,7 +4,7 @@
 
 **Goal:** Replace the sequential 1v1 encounter site combat UI with an expedition-style combat view for a solo player, extracting shared components from `GuildExpeditionsTab` so both features compose from the same building blocks.
 
-**Architecture:** Extract 7 shared combat components from `GuildExpeditionsTab` (1882 lines) into `apps/web/src/components/common/combat/`. `HealTargetSelector` extraction deferred — it is expedition-only with no second consumer yet. Build `EncounterSiteCombatView` composing these components with a 4-state machine (room_preview → auto_playback/manual_combat → room_result). Add backend support for `activeEncounterSiteId` lockout and per-round snapshots in auto-resolve responses.
+**Architecture:** Extract 10 shared combat UI components from `GuildExpeditionsTab` (1882 lines) into `apps/web/src/components/common/combat/` (HpBar, EffectPill, RoomProgressBar, MobCardGrid, RoundLogContent, CombatRoundLog, ThreatMeter, PlayerResourceBars, CombatActionButtons, TemplateQuickSwitch — plus RoundLogAttackRow move and combatHelpers utility). `HealTargetSelector` extraction deferred — expedition-only with no second consumer yet. Build `EncounterSiteCombatView` composing these components with a 4-state machine (room_preview → auto_playback/manual_combat → room_result). Add backend support for `activeEncounterSiteId` lockout and per-round snapshots in auto-resolve responses.
 
 **Tech Stack:** TypeScript, React, Next.js, Prisma 6, Vitest, Zod
 
@@ -940,8 +940,8 @@ export async function resolveEncounterRound(
   return res.data;
 }
 
-export async function abandonEncounterSite(siteId: string): Promise<{ success: boolean }> {
-  const res = await fetchApi<{ success: boolean }>(`/combat/encounter-sites/${siteId}/abandon`, {
+export async function abandonEncounterSite(siteId: string): Promise<{ success: boolean; stateUpdates?: StateUpdates }> {
+  const res = await fetchApi<{ success: boolean; stateUpdates?: StateUpdates }>(`/combat/encounter-sites/${siteId}/abandon`, {
     method: 'POST',
   });
   if (!res.data) throw new Error(res.error?.message ?? 'Failed to abandon');
@@ -1491,7 +1491,7 @@ async function handleAbandon() {
     await props.onAbandon();
     props.onComplete();
   } catch (err) {
-    // Handle error
+    window.showToast?.({ message: 'Failed to abandon site', type: 'error' });
   } finally {
     setLoading(false);
   }
