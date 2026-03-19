@@ -446,7 +446,10 @@ export async function autoResolveEncounterRoom(
   // Load site and verify ownership
   const site = await prisma.encounterSite.findFirst({
     where: { id: siteId, playerId },
-    include: { mobFamily: { select: { name: true } } },
+    include: {
+      mobFamily: { select: { name: true } },
+      zone: { select: { name: true } },
+    },
   });
   if (!site) throw new AppError(404, 'Encounter site not found', 'NOT_FOUND');
 
@@ -597,6 +600,40 @@ export async function autoResolveEncounterRoom(
     // Deduct consumed potions
     const potionDeductResult = await deductConsumedPotions(playerId, combatResult.potionsConsumed, tx);
 
+    // Log room combat to activity history
+    await tx.activityLog.create({
+      data: {
+        playerId,
+        activityType: 'combat',
+        turnsSpent: totalTurnCost,
+        result: {
+          source: 'encounter_site_room',
+          siteId,
+          siteName: site.name,
+          mobFamilyName: site.mobFamily.name,
+          mobFamilyId: site.mobFamilyId,
+          zoneId: site.zoneId,
+          zoneName: site.zone.name,
+          room: currentRoom,
+          totalRooms: site.totalRooms ?? 1,
+          outcome: combatResult.outcome,
+          mode: 'auto',
+          roundsResolved: combatResult.roundsResolved,
+          rounds: combatResult.rounds,
+          initialMobs: expeditionMobs.map(m => ({
+            mobId: m.id,
+            slot: parseEncounterMobSlot(m.id) ?? 0,
+            name: m.name,
+            prefix: m.prefix,
+            hp: m.hp,
+            maxHp: m.maxHp,
+          })),
+          siteCleared,
+          chestReward: completionRewards,
+        } as unknown as Prisma.InputJsonObject,
+      },
+    });
+
     return { turnSpend: spent, completionRewards, potionDeductResult, siteCleared, newCurrentRoom };
   });
 
@@ -659,6 +696,11 @@ interface ManualCombatState {
   totalRooms: number;
   mobFamilyId: string;
   createdAt: number;
+  siteName: string;
+  zoneId: string;
+  zoneName: string;
+  mobFamilyName: string;
+  initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
 }
 
 // Redis key prefix for manual combat sessions
@@ -765,6 +807,10 @@ export async function startManualEncounterRoom(
 
   const site = await prisma.encounterSite.findFirst({
     where: { id: siteId, playerId },
+    include: {
+      zone: { select: { name: true } },
+      mobFamily: { select: { name: true } },
+    },
   });
   if (!site) throw new AppError(404, 'Encounter site not found', 'NOT_FOUND');
 
@@ -820,6 +866,18 @@ export async function startManualEncounterRoom(
     totalRooms: site.totalRooms ?? 1,
     mobFamilyId: site.mobFamilyId,
     createdAt: Date.now(),
+    siteName: site.name,
+    zoneId: site.zoneId,
+    zoneName: site.zone.name,
+    mobFamilyName: site.mobFamily.name,
+    initialMobs: expeditionMobs.map(m => ({
+      mobId: m.id,
+      slot: parseEncounterMobSlot(m.id) ?? 0,
+      name: m.name,
+      prefix: m.prefix,
+      hp: m.hp,
+      maxHp: m.maxHp,
+    })),
   });
 
   return {
@@ -1033,6 +1091,37 @@ export async function resolveManualEncounterRound(
     }
 
     const potionDeductResult = await deductConsumedPotions(playerId, state.allPotionsConsumed, tx);
+
+    // Build full round log: accumulated prior rounds + this round
+    const allRounds = [...(state.roundLogs ?? []), result.roundLog];
+
+    // Log room combat to activity history
+    await tx.activityLog.create({
+      data: {
+        playerId,
+        activityType: 'combat',
+        turnsSpent: state.turnCostCharged,
+        result: {
+          source: 'encounter_site_room',
+          siteId: state.siteId,
+          siteName: state.siteName ?? 'Unknown Site',
+          mobFamilyName: state.mobFamilyName ?? 'Unknown',
+          mobFamilyId: state.mobFamilyId,
+          zoneId: state.zoneId ?? '',
+          zoneName: state.zoneName ?? 'Unknown Zone',
+          room: state.currentRoom,
+          totalRooms: state.totalRooms,
+          outcome: roomCleared ? 'cleared' : 'defeated',
+          mode: 'manual',
+          roundsResolved: state.roundNumber,
+          rounds: allRounds,
+          initialMobs: state.initialMobs ?? [],
+          siteCleared,
+          chestReward: completionRewards,
+        } as unknown as Prisma.InputJsonObject,
+      },
+    });
+
     return { turnSpend: spent, completionRewards, potionDeductResult, siteCleared, newCurrentRoom };
   });
 
