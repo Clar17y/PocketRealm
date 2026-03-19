@@ -12,6 +12,7 @@ import { LootReveal } from '@/components/common/LootReveal';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { SubNav } from '@/components/common/SubNav';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
 import { Exploration } from '@/components/screens/Exploration';
@@ -35,6 +36,7 @@ import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
 import { Settings } from '@/components/screens/Settings';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { ConnectionBanner } from '@/components/common/ConnectionBanner';
 import { TrainingGrounds } from '@/components/screens/TrainingGrounds';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -635,6 +637,7 @@ export default function GamePage() {
             }}
             zoneCraftingLevel={zoneCraftingLevel}
             confirmRarity={confirmRarity}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       }
@@ -758,6 +761,8 @@ export default function GamePage() {
             playerMaxMana={manaState.max}
             homeTownId={homeTownId}
             onSetHomeTown={(zoneId) => void handleSetHomeTown(zoneId)}
+            showNpcDialogue={showNpcDialogue}
+            isInTown={currentZone?.zoneType === 'town'}
           />
         );
       case 'bestiary':
@@ -902,6 +907,7 @@ export default function GamePage() {
             isRecovering={hpState.isRecovering}
             recoveryCost={hpState.recoveryCost}
             zoneCraftingLevel={zoneCraftingLevel}
+            zoneName={zoneCraftingName}
             guildTaxRate={guildTaxRate}
             forgeLuckUses={activeBuffs.find(b => b.buffType === 'forge_luck')?.remainingUses ?? 0}
             forgeProtectionUses={activeBuffs.find(b => b.buffType === 'forge_protection')?.remainingUses ?? 0}
@@ -1234,6 +1240,8 @@ export default function GamePage() {
 
   return (
     <>
+      <ConnectionBanner />
+      <ErrorBoundary>
       {showChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
       {confirmAbandonLoot && (
         <ConfirmModal
@@ -1446,6 +1454,7 @@ export default function GamePage() {
       <QuestToast />
       <ForgeResultToast />
       <RateLimitToast />
+    </ErrorBoundary>
     </>
   );
 }

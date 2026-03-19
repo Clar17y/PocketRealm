@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
-import { LoadingCard } from '@/components/common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import {
   getGuildSpecialization, selectGuildSpecialization, respecGuildSpecialization,
@@ -67,7 +67,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole }: GuildSpe
   const errorBanner = (load.error || action.error) ? <ErrorBanner message={(load.error || action.error)!} /> : null;
 
   if (load.loading && status === undefined) {
-    return <>{confirmModal}<LoadingCard /></>;
+    return <>{confirmModal}<SkeletonCard count={2} /></>;
   }
 
   // Guild level too low

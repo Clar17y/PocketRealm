@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { Pagination } from '@/components/common/Pagination';
-import { LoadingCard } from '@/components/common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { getGuildLog, type GuildLogResponse } from '@/lib/api';
 import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 
@@ -33,7 +33,7 @@ export function GuildActivityLog({ guildId }: GuildActivityLogProps) {
   }, [loadLog]);
 
   if (loading && !logData) {
-    return <LoadingCard />;
+    return <SkeletonCard count={2} />;
   }
 
   return (

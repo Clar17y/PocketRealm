@@ -11,10 +11,13 @@ const {
 
 /**
  * Manages NPC dialogue event lifecycle:
- *   greeting (10s) -> idle (rotating) -> farewell (after 30s total)
+ *   greeting (10s) -> idle (rotating) -> farewell (after 60s total)
  * Action triggers (buy/sell) briefly interrupt idle before returning.
+ *
+ * Pass a `resetKey` (e.g., the npcKey) to restart the greeting cycle
+ * when the NPC changes without the component remounting.
  */
-export function useNpcDialogue() {
+export function useNpcDialogue(resetKey?: string) {
   const [dialogueEvent, setDialogueEvent] = useState<DialogueEvent>('greeting');
   const actionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const farewellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -25,21 +28,22 @@ export function useNpcDialogue() {
     actionTimerRef.current = setTimeout(() => setDialogueEvent('idle'), ACTION_DURATION_MS);
   }, []);
 
-  // Greeting -> idle transition
+  // Greeting -> idle transition (restarts when resetKey changes)
   useEffect(() => {
+    setDialogueEvent('greeting');
     actionTimerRef.current = setTimeout(() => setDialogueEvent('idle'), GREETING_DURATION_MS);
     return () => {
       if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
     };
-  }, []);
+  }, [resetKey]);
 
-  // Farewell after extended time on page
+  // Farewell after extended time (restarts when resetKey changes)
   useEffect(() => {
     farewellTimerRef.current = setTimeout(() => setDialogueEvent('farewell'), FAREWELL_DELAY_MS);
     return () => {
       if (farewellTimerRef.current) clearTimeout(farewellTimerRef.current);
     };
-  }, []);
+  }, [resetKey]);
 
   return { dialogueEvent, triggerDialogueEvent } as const;
 }

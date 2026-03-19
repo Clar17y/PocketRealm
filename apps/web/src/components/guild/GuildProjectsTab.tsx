@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
-import { LoadingCard } from '@/components/common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
@@ -100,7 +100,7 @@ export function GuildProjectsTab({ guildId, myRole, onStateUpdates }: GuildProje
     });
   };
 
-  if (load.loading && !data) return <LoadingCard />;
+  if (load.loading && !data) return <SkeletonCard count={2} />;
 
   const activeProject = data?.projects.find((p) => p.status === 'active');
   const completedProjects = data?.projects.filter((p) => p.status === 'completed') ?? [];
