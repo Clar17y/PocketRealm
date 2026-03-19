@@ -6,6 +6,10 @@ import {
   getUpgradedChestSize,
   rollChestMaterialRolls,
   rollEncounterChestRecipeDrop,
+  getChestRarityForRoomCount,
+  getChestMaterialRollRangeForRoomCount,
+  getChestRecipeChanceForRoomCount,
+  rollChestMaterialRollsByRoomCount,
 } from './encounterChest';
 
 describe('encounterChest', () => {
@@ -52,5 +56,43 @@ describe('getUpgradedChestSize', () => {
   });
   it('keeps large as large', () => {
     expect(getUpgradedChestSize('large')).toBe('large');
+  });
+});
+
+describe('getChestRarityForRoomCount', () => {
+  it('returns common for 1 room', () => {
+    expect(getChestRarityForRoomCount(1)).toBe('common');
+  });
+  it('returns uncommon for 2 rooms', () => {
+    expect(getChestRarityForRoomCount(2)).toBe('uncommon');
+  });
+  it('returns rare for 3 rooms', () => {
+    expect(getChestRarityForRoomCount(3)).toBe('rare');
+  });
+  it('returns epic for 4 rooms', () => {
+    expect(getChestRarityForRoomCount(4)).toBe('epic');
+  });
+  it('returns epic for 5+ rooms', () => {
+    expect(getChestRarityForRoomCount(5)).toBe('epic');
+  });
+});
+
+describe('getChestMaterialRollRangeForRoomCount', () => {
+  it('returns epic range for 4 rooms', () => {
+    expect(getChestMaterialRollRangeForRoomCount(4)).toEqual({ min: 5, max: 9 });
+  });
+});
+
+describe('getChestRecipeChanceForRoomCount', () => {
+  it('returns epic chance for 4 rooms', () => {
+    expect(getChestRecipeChanceForRoomCount(4)).toBe(0.08);
+  });
+});
+
+describe('rollChestMaterialRollsByRoomCount', () => {
+  it('rolls within epic range for 4 rooms', () => {
+    const result = rollChestMaterialRollsByRoomCount(4, () => 0.5);
+    expect(result).toBeGreaterThanOrEqual(5);
+    expect(result).toBeLessThanOrEqual(9);
   });
 });
