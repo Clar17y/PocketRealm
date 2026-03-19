@@ -172,7 +172,7 @@ describe('resolveEncounterRoomCombat', () => {
 
     const result = resolveEncounterRoomCombat(participant, mobs);
 
-    expect(result.roundLogs.length).toBe(result.roundsResolved);
+    expect(result.rounds.length).toBe(result.roundsResolved);
   });
 
   it('crowded debuff reduces mob damage and accuracy proportionally', () => {

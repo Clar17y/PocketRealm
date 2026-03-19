@@ -76,7 +76,6 @@ export interface RoundSnapshot {
 export interface EncounterRoomCombatResult {
   outcome: 'cleared' | 'defeated';
   roundsResolved: number;
-  roundLogs: unknown[];
   rounds: RoundSnapshot[];
   playerHpAfter: number;
   playerStaminaAfter: number;
@@ -88,7 +87,6 @@ export interface EncounterRoomCombatResult {
 export interface AutoResolveEncounterResult {
   outcome: 'cleared' | 'defeated' | 'site_cleared';
   roundsResolved: number;
-  roundLogs: unknown[];
   rounds: RoundSnapshot[];
   playerHpAfter: number;
   playerStaminaAfter: number;
@@ -130,7 +128,6 @@ export function resolveEncounterRoomCombat(
   let aliveMobList = [...mobs];
   let currentParticipant = { ...participant };
   let threatTable: RaidThreatEntry[] = initThreatTable([participant.playerId]);
-  const roundLogs: unknown[] = [];
   const roundSnapshots: RoundSnapshot[] = [];
   const allPotionsConsumed: PotionConsumed[] = [];
   let roundsResolved = 0;
@@ -193,15 +190,15 @@ export function resolveEncounterRoomCombat(
     // Next round uses the surviving mobs from the result
     aliveMobList = result.mobsAfter;
     threatTable = result.threatTableAfter;
-    roundLogs.push(result.roundLog);
 
     // Capture per-round snapshot for frontend playback
+    const survivingMap = new Map(result.mobsAfter.map(s => [s.id, s]));
     roundSnapshots.push({
       roundNumber: round,
       log: result.roundLog,
       mobStates: mobs.map(m => {
         const hp = mobHpById.get(m.id) ?? 0;
-        const surviving = result.mobsAfter.find(s => s.id === m.id);
+        const surviving = survivingMap.get(m.id);
         const slotMatch = m.id.match(/^encounter-mob-(\d+)$/);
         const slot = slotMatch ? parseInt(slotMatch[1]!, 10) : 0;
         return {
@@ -228,7 +225,6 @@ export function resolveEncounterRoomCombat(
   return {
     outcome: allMobsCleared ? 'cleared' : 'defeated',
     roundsResolved,
-    roundLogs,
     rounds: roundSnapshots,
     playerHpAfter: currentParticipant.hp,
     playerStaminaAfter: currentParticipant.stamina,
@@ -615,7 +611,6 @@ export async function autoResolveEncounterRoom(
   return {
     outcome: finalOutcome,
     roundsResolved: combatResult.roundsResolved,
-    roundLogs: combatResult.roundLogs,
     rounds: combatResult.rounds,
     playerHpAfter: combatResult.playerHpAfter,
     playerStaminaAfter: combatResult.playerStaminaAfter,
@@ -683,7 +678,9 @@ export interface StartManualRoomResult {
   playerHp: number;
   playerMaxHp: number;
   playerStamina: number;
+  playerMaxStamina: number;
   playerMana: number;
+  playerMaxMana: number;
 }
 
 /**
@@ -770,7 +767,9 @@ export async function startManualEncounterRoom(
     playerHp: participant.hp,
     playerMaxHp: participant.maxHp,
     playerStamina: participant.stamina,
+    playerMaxStamina: participant.maxStamina,
     playerMana: participant.mana,
+    playerMaxMana: participant.maxMana,
   };
 }
 
@@ -778,8 +777,11 @@ export interface ManualRoundResult {
   roundNumber: number;
   roundLog: unknown;
   playerHpAfter: number;
+  playerMaxHp: number;
   playerStaminaAfter: number;
+  playerMaxStamina: number;
   playerManaAfter: number;
+  playerMaxMana: number;
   mobs: Array<{ mobId: string; alive: boolean; hpRemaining: number }>;
   outcome: 'ongoing' | 'cleared' | 'defeated' | 'site_cleared';
   siteCleared: boolean;
@@ -863,8 +865,11 @@ export async function resolveManualEncounterRound(
       roundNumber: state.roundNumber,
       roundLog: result.roundLog,
       playerHpAfter: state.participant.hp,
+      playerMaxHp: state.maxHp,
       playerStaminaAfter: state.participant.stamina,
+      playerMaxStamina: state.participant.maxStamina,
       playerManaAfter: state.participant.mana,
+      playerMaxMana: state.participant.maxMana,
       mobs: mobsSnapshot,
       outcome: 'ongoing',
       siteCleared: false,
@@ -988,8 +993,11 @@ export async function resolveManualEncounterRound(
     roundNumber: state.roundNumber,
     roundLog: result.roundLog,
     playerHpAfter: state.participant.hp,
+    playerMaxHp: state.maxHp,
     playerStaminaAfter: state.participant.stamina,
+    playerMaxStamina: state.participant.maxStamina,
     playerManaAfter: state.participant.mana,
+    playerMaxMana: state.participant.maxMana,
     mobs: mobsSnapshot,
     outcome,
     siteCleared: txResult.siteCleared,

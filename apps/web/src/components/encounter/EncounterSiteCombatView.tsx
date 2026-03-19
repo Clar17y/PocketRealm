@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import {
@@ -48,6 +48,8 @@ export interface EncounterSiteCombatViewProps {
   setError: (msg: string | null) => void;
 }
 
+const EMPTY_TARGET_COUNTS = new Map<string, number>();
+
 function parseMobSlot(mobId: string): number {
   return parseInt(mobId.replace('encounter-mob-', ''), 10);
 }
@@ -93,6 +95,11 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
   const [playbackRounds, setPlaybackRounds] = useState<EncounterRoundSnapshot[]>([]);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const isPlayingBackRef = useRef(false);
+
+  // Cancel playback on unmount to prevent setState on unmounted component
+  useEffect(() => {
+    return () => { isPlayingBackRef.current = false; };
+  }, []);
 
   // --- Handlers ---
 
@@ -360,7 +367,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
       <MobCardGrid
         mobs={mobs}
         myTargetMobId={targetMobId}
-        targetCounts={new Map()}
+        targetCounts={EMPTY_TARGET_COUNTS}
         onSetTarget={setTargetMobId}
         disabled={state === 'auto_playback' || state === 'room_result'}
       />
