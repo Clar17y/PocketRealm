@@ -18,6 +18,7 @@ import type {
   EncounterRoundSnapshot,
   EncounterPlayerState,
 } from '@/lib/api/combat';
+import { parseEncounterMobSlot } from '@pocketrealm/shared';
 import type { ExpeditionMobInfo, ExpeditionRoundLog, CombatTemplateData } from '@pocketrealm/shared';
 
 type CombatState = 'room_preview' | 'auto_playback' | 'manual_combat' | 'room_result';
@@ -42,7 +43,6 @@ export interface EncounterSiteCombatViewProps {
     playerState: EncounterPlayerState;
     hasDecayedMobs: boolean;
   }>;
-  onRetryRoom: () => Promise<EncounterStartRoomResponse>;
   onComplete: (outcome: 'cleared' | 'defeated' | 'abandoned') => void;
   onActivateTemplate: (templateId: string) => void;
   setError: (msg: string | null) => void;
@@ -53,7 +53,7 @@ export interface EncounterSiteCombatViewProps {
 const EMPTY_TARGET_COUNTS = new Map<string, number>();
 
 function parseMobSlot(mobId: string): number {
-  return parseInt(mobId.replace('encounter-mob-', ''), 10);
+  return parseEncounterMobSlot(mobId) ?? 0;
 }
 
 function updateMobsFromSnapshot(
@@ -97,10 +97,14 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
   const [playbackRounds, setPlaybackRounds] = useState<EncounterRoundSnapshot[]>([]);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const isPlayingBackRef = useRef(false);
+  const playbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cancel playback on unmount to prevent setState on unmounted component
   useEffect(() => {
-    return () => { isPlayingBackRef.current = false; };
+    return () => {
+      isPlayingBackRef.current = false;
+      if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
+    };
   }, []);
 
   // On mount, if resuming, probe for an existing manual combat session
@@ -116,11 +120,13 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
           // Resuming an existing session — jump to manual_combat
           setMobs(startRoomMobsToExpeditionMobs(result.mobs));
           setPlayerState(result.playerState);
+          setRoundLogs(result.roundLogs ?? []);
           setState('manual_combat');
         } else {
           // Fresh session was created by the probe — update mobs with server data
           setMobs(startRoomMobsToExpeditionMobs(result.mobs));
           setPlayerState(result.playerState);
+          setRoundLogs(result.roundLogs ?? []);
         }
       } catch {
         // No session exists or site error — stay in room_preview
@@ -164,7 +170,9 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
         setMobs(prev => updateMobsFromSnapshot(prev, snapshot.mobStates));
         setPlayerState(snapshot.playerState);
 
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        await new Promise<void>(resolve => {
+          playbackTimerRef.current = setTimeout(() => { playbackTimerRef.current = null; resolve(); }, 1200);
+        });
       }
 
       isPlayingBackRef.current = false;
@@ -178,6 +186,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
 
   const handleSkipPlayback = useCallback(() => {
     isPlayingBackRef.current = false;
+    if (playbackTimerRef.current) { clearTimeout(playbackTimerRef.current); playbackTimerRef.current = null; }
     const lastRound = playbackRounds[playbackRounds.length - 1];
     if (lastRound) {
       setRoundLogs(playbackRounds.map(r => r.log));
@@ -252,7 +261,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
   const handleRetry = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await props.onRetryRoom();
+      const result = await props.onStartRoom();
       setMobs(startRoomMobsToExpeditionMobs(result.mobs));
       setPlayerState(result.playerState);
       setRoundLogs([]);
@@ -264,7 +273,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [props.onRetryRoom]);
+  }, [props.onStartRoom]);
 
   const handleAbandon = useCallback(async () => {
     setLoading(true);

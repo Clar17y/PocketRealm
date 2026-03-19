@@ -561,6 +561,7 @@ export interface EncounterStartRoomResponse {
   playerState: EncounterPlayerState;
   /** 0 = fresh start, >0 = resuming an existing session */
   roundNumber: number;
+  roundLogs?: ExpeditionRoundLog[];
   stateUpdates?: StateUpdates;
 }
 

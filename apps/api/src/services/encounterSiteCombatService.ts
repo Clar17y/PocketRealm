@@ -5,10 +5,14 @@ import {
   COMBAT_CONSTANTS,
   BASE_ACTION_DEFINITIONS,
   ALWAYS_AVAILABLE_ACTION_IDS,
+  makeEncounterMobId,
+  parseEncounterMobSlot,
   type RaidRoundInput,
   type RaidParticipant,
   type RaidThreatEntry,
   type ExpeditionMobState,
+  type ExpeditionRoundLog,
+  type BossActiveEffect,
   type ActionDefinition,
   type CombatPotion,
   type PotionConsumed,
@@ -49,19 +53,22 @@ import {
   applyEncounterSiteDecayInMemory,
 } from '../routes/combat/helpers';
 
+// Re-export for route handler convenience
+export { parseEncounterMobSlot, makeEncounterMobId };
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface RoundSnapshot {
   roundNumber: number;
-  log: unknown;
+  log: ExpeditionRoundLog;
   mobStates: Array<{
     slot: number;
     hp: number;
     maxHp: number;
     alive: boolean;
-    activeEffects: unknown[];
+    activeEffects: BossActiveEffect[];
   }>;
   playerState: {
     hp: number;
@@ -70,7 +77,7 @@ export interface RoundSnapshot {
     maxStamina: number;
     mana: number;
     maxMana: number;
-    activeEffects: unknown[];
+    activeEffects: BossActiveEffect[];
   };
 }
 
@@ -184,9 +191,10 @@ export function resolveEncounterRoomCombat(
       mobHpById.set(mob.id, mob.hp);
     }
     // Any mob not in mobsAfter is dead (hp = 0)
-    const survivingIds = new Set(result.mobsAfter.map(m => m.id));
+    // Build surviving map (used for both dead-mob zeroing and snapshot active effects)
+    const survivingMap = new Map(result.mobsAfter.map(s => [s.id, s]));
     for (const [id] of mobHpById) {
-      if (!survivingIds.has(id)) mobHpById.set(id, 0);
+      if (!survivingMap.has(id)) mobHpById.set(id, 0);
     }
 
     // Next round uses the surviving mobs from the result
@@ -194,17 +202,14 @@ export function resolveEncounterRoomCombat(
     threatTable = result.threatTableAfter;
 
     // Capture per-round snapshot for frontend playback
-    const survivingMap = new Map(result.mobsAfter.map(s => [s.id, s]));
     roundSnapshots.push({
       roundNumber: round,
       log: result.roundLog,
       mobStates: mobs.map(m => {
         const hp = mobHpById.get(m.id) ?? 0;
         const surviving = survivingMap.get(m.id);
-        const slotMatch = m.id.match(/^encounter-mob-(\d+)$/);
-        const slot = slotMatch ? parseInt(slotMatch[1]!, 10) : 0;
         return {
-          slot,
+          slot: parseEncounterMobSlot(m.id) ?? 0,
           hp,
           maxHp: m.maxHp,
           alive: hp > 0,
@@ -492,7 +497,7 @@ export async function autoResolveEncounterRoom(
   // Determine which slots were cleared
   const clearedSlotsByMobId = new Map<string, number>(); // mobId -> slot
   for (const slot of roomMobs) {
-    const mobId = `encounter-mob-${slot.slot}`;
+    const mobId = makeEncounterMobId(slot.slot);
     clearedSlotsByMobId.set(mobId, slot.slot);
   }
 
@@ -619,11 +624,9 @@ export async function autoResolveEncounterRoom(
     outcome: finalOutcome,
     roundsResolved: combatResult.roundsResolved,
     rounds: combatResult.rounds,
-    initialMobs: expeditionMobs.map(m => {
-      const slotMatch = m.id.match(/^encounter-mob-(\d+)$/);
-      const slot = slotMatch ? parseInt(slotMatch[1]!, 10) : 0;
-      return { mobId: m.id, slot, name: m.name, prefix: m.prefix, hp: m.hp, maxHp: m.maxHp };
-    }),
+    initialMobs: expeditionMobs.map(m => ({
+      mobId: m.id, slot: parseEncounterMobSlot(m.id) ?? 0, name: m.name, prefix: m.prefix, hp: m.hp, maxHp: m.maxHp,
+    })),
     playerHpAfter: combatResult.playerHpAfter,
     playerStaminaAfter: combatResult.playerStaminaAfter,
     playerManaAfter: combatResult.playerManaAfter,
@@ -649,8 +652,8 @@ interface ManualCombatState {
   mobs: ExpeditionMobState[];
   threatTable: RaidThreatEntry[];
   roundNumber: number;
+  roundLogs: ExpeditionRoundLog[];
   allPotionsConsumed: PotionConsumed[];
-  roundLogs: unknown[];
   maxHp: number;
   turnCostCharged: number;
   totalRooms: number;
@@ -724,6 +727,7 @@ export interface StartManualRoomResult {
   playerMaxMana: number;
   /** Number of rounds already resolved (0 = fresh start, >0 = resuming) */
   roundNumber: number;
+  roundLogs: ExpeditionRoundLog[];
 }
 
 /**
@@ -755,6 +759,7 @@ export async function startManualEncounterRoom(
       playerMana: existingState.participant.mana,
       playerMaxMana: existingState.participant.maxMana,
       roundNumber: existingState.roundNumber,
+      roundLogs: (existingState as { roundLogs?: ExpeditionRoundLog[] }).roundLogs ?? [],
     };
   }
 
@@ -808,8 +813,8 @@ export async function startManualEncounterRoom(
     mobs: expeditionMobs,
     threatTable: initThreatTable([playerId]),
     roundNumber: 0,
-    allPotionsConsumed: [],
     roundLogs: [],
+    allPotionsConsumed: [],
     maxHp: hpState.maxHp,
     turnCostCharged,
     totalRooms: site.totalRooms ?? 1,
@@ -834,19 +839,20 @@ export async function startManualEncounterRoom(
     playerMana: participant.mana,
     playerMaxMana: participant.maxMana,
     roundNumber: 0,
+    roundLogs: [],
   };
 }
 
 export interface ManualRoundResult {
   roundNumber: number;
-  roundLog: unknown;
+  roundLog: ExpeditionRoundLog;
   playerHpAfter: number;
   playerMaxHp: number;
   playerStaminaAfter: number;
   playerMaxStamina: number;
   playerManaAfter: number;
   playerMaxMana: number;
-  mobs: Array<{ mobId: string; alive: boolean; hpRemaining: number }>;
+  mobs: Array<{ mobId: string; alive: boolean; hpRemaining: number; maxHp: number; activeEffects: BossActiveEffect[] }>;
   outcome: 'ongoing' | 'cleared' | 'defeated' | 'site_cleared';
   siteCleared: boolean;
   completionRewards: Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>> | null;
@@ -976,10 +982,8 @@ export async function resolveManualEncounterRound(
     // Mark defeated mobs
     if (roomCleared) {
       for (const mob of state.mobs) {
-        // Extract slot from mob id "encounter-mob-{slot}"
-        const slotMatch = mob.id.match(/^encounter-mob-(\d+)$/);
-        if (!slotMatch) continue;
-        const slot = parseInt(slotMatch[1]!, 10);
+        const slot = parseEncounterMobSlot(mob.id);
+        if (slot === null) continue;
         const target = mobs.find(m => m.slot === slot && (m.room ?? 1) === state.currentRoom);
         if (target && target.status === 'alive') target.status = 'defeated';
       }

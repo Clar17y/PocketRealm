@@ -15,6 +15,7 @@ import {
   startManualEncounterRoom,
   resolveManualEncounterRound,
   clearManualCombatSession,
+  parseEncounterMobSlot,
 } from '../../services/encounterSiteCombatService';
 
 const abandonSchema = z.object({
@@ -340,6 +341,7 @@ export function registerSiteRoutes(router: Router): void {
           activeEffects: [],
         },
         roundNumber: result.roundNumber,
+        roundLogs: result.roundLogs,
       });
   }));
 
@@ -359,17 +361,13 @@ export function registerSiteRoutes(router: Router): void {
       }
 
       // Transform mobs to mobStates with slot info
-      const mobStates = result.mobs.map(m => {
-        const slotMatch = m.mobId.match(/^encounter-mob-(\d+)$/);
-        const slot = slotMatch ? parseInt(slotMatch[1]!, 10) : 0;
-        return {
-          slot,
-          hp: m.hpRemaining,
-          maxHp: m.maxHp,
-          alive: m.alive,
-          activeEffects: m.activeEffects ?? [],
-        };
-      });
+      const mobStates = result.mobs.map(m => ({
+        slot: parseEncounterMobSlot(m.mobId) ?? 0,
+        hp: m.hpRemaining,
+        maxHp: m.maxHp,
+        alive: m.alive,
+        activeEffects: m.activeEffects ?? [],
+      }));
 
       res.json({
         roundNumber: result.roundNumber,
