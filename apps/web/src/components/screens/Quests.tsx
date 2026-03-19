@@ -538,7 +538,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [rerollingId, setRerollingId] = useState<string | null>(null);
   const [claimingBonus, setClaimingBonus] = useState(false);
-  const { dialogueEvent } = useNpcDialogue();
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
 
   const dailyQuests = quests.filter((q) => q.cadence === 'daily');
   const weeklyQuests = quests.filter((q) => q.cadence === 'weekly');
@@ -551,6 +551,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
     setClaimingId(questId);
     try {
       await onClaimReward(questId);
+      triggerDialogueEvent('sell');
     } finally {
       setClaimingId(null);
     }
@@ -569,6 +570,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
     setClaimingBonus(true);
     try {
       await onClaimBonus();
+      triggerDialogueEvent('sell');
     } finally {
       setClaimingBonus(false);
     }

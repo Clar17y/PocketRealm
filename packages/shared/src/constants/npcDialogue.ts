@@ -367,7 +367,7 @@ export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
       greeting: [
         'Ah, there you are. The board has been updated since this morning. Three new dailies, one weekly, and something that Bram insists is \'urgent\' but which I suspect is just another rat problem. Have a look.',
         'Quests. Bounties. Tasks. Whatever you want to call them, I have them, they need doing, and you need tokens. Let us proceed with mutual benefit and minimal small talk.',
-        'Good, a capable one. I can tell by the fact that you are standing upright and not bleeding. The board is to your left. Pick what suits you. I will handle the paperwork.',
+        'Good, a capable one. I can tell by the fact that you are standing upright and not bleeding. Your assignments are posted. I will handle the paperwork.',
         'The board is current as of this morning. If something has changed since then, the board does not know and neither do I. Work with what is posted.',
         'You again. Good. Returning adventurers mean completed tasks, and completed tasks mean I can update the ledger. The ledger is the only thing in this town that never disappoints me.',
         'Welcome. I have reorganized the board by difficulty. Left side is survivable. Right side is ambitious. The middle is where I put the ones I cannot classify because the descriptions were too vague.',
