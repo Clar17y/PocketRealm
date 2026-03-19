@@ -189,7 +189,7 @@ export function Inventory({
     try {
       if (type === 'drop' && onDrop) await onDrop(itemId);
       else if (type === 'salvage' && onSalvage) await onSalvage(itemId);
-      else if (type === 'sell' && onSell) { triggerDialogueEvent('sell'); await onSell(itemId); }
+      else if (type === 'sell' && onSell) { await onSell(itemId); triggerDialogueEvent('sell'); }
       setSelectedItem(null);
     } finally {
       setBusy(false);

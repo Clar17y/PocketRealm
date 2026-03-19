@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
@@ -19,7 +19,7 @@ import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { ScreenContainer } from '../common/ScreenContainer';
-import { getNpcLine } from '@pocketrealm/shared';
+import { getNpcLine, NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared';
 
 interface ExplorationProps {
   currentZone: {
@@ -78,14 +78,14 @@ interface ExplorationProps {
 }
 
 export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
-  const strangerLineRef = useRef<string | null>(null);
+  const [strangerLine, setStrangerLine] = useState<string | null>(null);
 
   useEffect(() => {
-    if (playbackData) {
-      strangerLineRef.current = Math.random() < 0.05
+    setStrangerLine(
+      playbackData && Math.random() < NPC_DIALOGUE_CONSTANTS.MYSTERIOUS_STRANGER_CHANCE
         ? getNpcLine('mysterious-stranger', 'idle')
-        : null;
-    }
+        : null,
+    );
   }, [playbackData]);
 
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
@@ -221,7 +221,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
             playerStartMana={currentMana}
             playerMaxStamina={maxStamina}
             playerMaxMana={maxMana}
-            strangerLine={strangerLineRef.current}
+            strangerLine={strangerLine}
             embedded
           />
         </PlaybackSurface>

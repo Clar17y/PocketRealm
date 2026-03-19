@@ -80,6 +80,7 @@ interface ZoneMapProps {
   homeTownId?: string | null;
   onSetHomeTown?: (zoneId: string) => void;
   showNpcDialogue?: boolean;
+  isInTown?: boolean;
 }
 
 type ZoneMapZone = ZoneMapProps['zones'][number];
@@ -146,10 +147,10 @@ export function ZoneMap({
   playerMaxMana,
   homeTownId,
   onSetHomeTown,
-  showNpcDialogue,
+  showNpcDialogue = true,
+  isInTown,
 }: ZoneMapProps) {
   const { dialogueEvent } = useNpcDialogue();
-  const isInTown = zones.find(z => z.id === currentZoneId)?.zoneType === 'town';
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
   // After travel playback finishes, auto-select the zone the player ended up in
@@ -259,7 +260,7 @@ export function ZoneMap({
 
   return (
     <ScreenContainer>
-      {isInTown && <NpcDialogueBanner npcKey="town-guard" event={dialogueEvent} showDialogue={showNpcDialogue ?? true} />}
+      {isInTown && <NpcDialogueBanner npcKey="town-guard" event={dialogueEvent} showDialogue={showNpcDialogue} />}
       <FeatureTutorial storageKey="howto_zones" title="Zone Map">
         <p>
           The world is made up of connected zones. <strong>Travel</strong> between them

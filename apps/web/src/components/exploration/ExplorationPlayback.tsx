@@ -218,7 +218,7 @@ export function ExplorationPlayback({
       )}
 
       {phase === 'complete' && strangerLine && (
-        <div className="flex items-start gap-2 text-sm animate-fade-in mt-2">
+        <div className="flex items-start gap-2 text-sm animate-fadeIn mt-2">
           <span className="text-[var(--rpg-purple)]">&#x1F441;</span>
           <span className="italic text-[var(--rpg-purple)]">{strangerLine}</span>
         </div>

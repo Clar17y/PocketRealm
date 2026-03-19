@@ -275,7 +275,7 @@ export function Forge({
 
   return (
     <ScreenContainer>
-      <NpcDialogueBanner npcKey={forgeNpcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />
+      {forgeNpcKey && <NpcDialogueBanner npcKey={forgeNpcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />}
       <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 

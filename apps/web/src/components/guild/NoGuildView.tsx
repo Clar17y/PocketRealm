@@ -29,7 +29,7 @@ export function NoGuildView({
   characterLevel,
   error,
   onGuildJoined,
-  showNpcDialogue,
+  showNpcDialogue = true,
 }: NoGuildViewProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,7 +71,7 @@ export function NoGuildView({
 
   return (
     <div className="space-y-4">
-      <NpcDialogueBanner npcKey="millbrook-guild-recruiter" event={dialogueEvent} showDialogue={showNpcDialogue ?? true} />
+      <NpcDialogueBanner npcKey="millbrook-guild-recruiter" event={dialogueEvent} showDialogue={showNpcDialogue} />
       <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Guild</h2>
 
       {(error || actionError || search.error) && <ErrorBanner message={(error || actionError || search.error)!} />}

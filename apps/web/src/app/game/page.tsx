@@ -759,6 +759,7 @@ export default function GamePage() {
             homeTownId={homeTownId}
             onSetHomeTown={(zoneId) => void handleSetHomeTown(zoneId)}
             showNpcDialogue={showNpcDialogue}
+            isInTown={currentZone?.zoneType === 'town'}
           />
         );
       case 'bestiary':
