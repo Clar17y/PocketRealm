@@ -308,6 +308,7 @@ export default function GamePage() {
     refreshPendingEncounters,
     setActionError,
     activeEncounterSiteId,
+    setActiveEncounterSiteId,
   } = useGameController({ isAuthenticated });
 
   useRateLimitToast();
@@ -1036,6 +1037,7 @@ export default function GamePage() {
             manaState={manaState}
             advanceTutorial={advanceTutorial}
             activeEncounterSiteId={activeEncounterSiteId}
+            onActiveEncounterSiteIdChange={setActiveEncounterSiteId}
           />
         );
       }

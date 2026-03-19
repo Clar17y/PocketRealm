@@ -98,6 +98,7 @@ interface CombatScreenProps {
   refreshPendingEncounters?: () => void;
   setError?: (msg: string | null) => void;
   activeEncounterSiteId?: string | null;
+  onActiveEncounterSiteIdChange?: (id: string | null) => void;
   advanceTutorial?: (step: number) => void;
 }
 
@@ -143,6 +144,7 @@ export function CombatScreen({
   refreshPendingEncounters,
   setError,
   activeEncounterSiteId: externalActiveEncounterSiteId,
+  onActiveEncounterSiteIdChange,
   advanceTutorial,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
@@ -196,6 +198,7 @@ export function CombatScreen({
         activeEffects: [],
       })),
     });
+    onActiveEncounterSiteIdChange?.(site.encounterSiteId);
   };
 
   const handleFightClick = (site: PendingEncounter) => {
@@ -364,6 +367,7 @@ export function CombatScreen({
             }}
             onComplete={(combatOutcome) => {
               setActiveSiteCombat(null);
+              onActiveEncounterSiteIdChange?.(null);
               refreshPendingEncounters?.();
               if (combatOutcome === 'cleared') {
                 advanceTutorial?.(TUTORIAL_STEP_COMBAT);
