@@ -4,7 +4,9 @@ import { getSocket } from '@/lib/socket';
 type ConnectionState = 'connected' | 'disconnected' | 'reconnecting' | 'failed';
 
 export function useConnectionStatus(): ConnectionState {
-  const [state, setState] = useState<ConnectionState>('connected');
+  const [state, setState] = useState<ConnectionState>(() =>
+    getSocket().connected ? 'connected' : 'disconnected',
+  );
 
   useEffect(() => {
     const socket = getSocket();
@@ -18,9 +20,6 @@ export function useConnectionStatus(): ConnectionState {
     socket.on('disconnect', onDisconnect);
     socket.io.on('reconnect_attempt', onReconnecting);
     socket.io.on('reconnect_failed', onReconnectFailed);
-
-    // Set initial state
-    if (!socket.connected) setState('disconnected');
 
     return () => {
       socket.off('connect', onConnect);
