@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
-import { LoadingCard } from '@/components/common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { SubNav } from '@/components/common/SubNav';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
@@ -444,7 +444,7 @@ function ShopTab({
   }
 
   if (shopLoading) {
-    return <LoadingCard message="Loading shop..." />;
+    return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
   }
 
   if (shopError) {
@@ -578,7 +578,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
   };
 
   if (loading) {
-    return <LoadingCard message="Loading quests..." />;
+    return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
   }
 
   if (error) {

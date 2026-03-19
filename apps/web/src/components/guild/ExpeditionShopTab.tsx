@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
-import { LoadingCard } from '@/components/common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { getExpeditionShop, purchaseExpeditionItem } from '@/lib/api/expedition';
 import type { ExpeditionShopItem, ExpeditionSetId } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
@@ -104,7 +104,7 @@ export function ExpeditionShopTab({ onRefresh }: ExpeditionShopTabProps) {
       itemId,
     );
 
-  if (load.loading && !shopData) return <LoadingCard />;
+  if (load.loading && !shopData) return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
 
   if (!shopData) return null;
 

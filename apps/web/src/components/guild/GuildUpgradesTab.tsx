@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
-import { LoadingCard } from '@/components/common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { getGuildUpgrades, activateGuildUpgrade, type GuildUpgradesResponse } from '@/lib/api';
 import { formatNumber, formatDuration, formatTimeRemaining } from '@/lib/format';
 
@@ -57,7 +57,7 @@ export function GuildUpgradesTab({
     }
   };
 
-  if (loading && !data) return <LoadingCard />;
+  if (loading && !data) return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
 
   return (
     <div className="space-y-3">

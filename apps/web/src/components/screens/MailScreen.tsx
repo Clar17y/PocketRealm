@@ -16,7 +16,7 @@ import { ScreenContainer } from '../common/ScreenContainer';
 import { SubNav } from '../common/SubNav';
 import { PixelCard } from '../PixelCard';
 import { PixelButton } from '../PixelButton';
-import { LoadingCard } from '../common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { ErrorBanner } from '../common/ErrorBanner';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
@@ -254,7 +254,10 @@ export function MailScreen({
     return (
       <ScreenContainer>
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Mail</h2>
-        <LoadingCard />
+        <div className="space-y-3">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       </ScreenContainer>
     );
   }
