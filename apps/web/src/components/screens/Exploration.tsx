@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
@@ -78,15 +78,17 @@ interface ExplorationProps {
 }
 
 export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
-  const [strangerLine, setStrangerLine] = useState<string | null>(null);
+  const strangerLineRef = useRef<string | null>(null);
+  const prevPlaybackDataRef = useRef(playbackData);
 
-  useEffect(() => {
-    setStrangerLine(
-      playbackData && Math.random() < NPC_DIALOGUE_CONSTANTS.MYSTERIOUS_STRANGER_CHANCE
-        ? getNpcLine('mysterious-stranger', 'idle')
-        : null,
-    );
-  }, [playbackData]);
+  if (playbackData !== prevPlaybackDataRef.current) {
+    prevPlaybackDataRef.current = playbackData;
+    strangerLineRef.current = playbackData && Math.random() < NPC_DIALOGUE_CONSTANTS.MYSTERIOUS_STRANGER_CHANCE
+      ? getNpcLine('mysterious-stranger', 'idle')
+      : null;
+  }
+
+  const strangerLine = strangerLineRef.current;
 
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);

@@ -17,6 +17,16 @@ import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import type { NpcKey } from '@pocketrealm/shared';
 import { ScreenContainer } from '../common/ScreenContainer';
 
+const GUARD_NPC_MAP: Record<string, NpcKey> = {
+  millbrook: 'town-guard',
+  thornwall: 'thornwall-guard',
+};
+
+function getGuardNpc(zoneName: string | null | undefined): NpcKey {
+  const key = (zoneName ?? '').toLowerCase();
+  return GUARD_NPC_MAP[key] ?? GUARD_NPC_MAP['millbrook'];
+}
+
 function getMilestoneHint(percent: number): ReactNode {
   if (percent >= 75) return <p className="text-xs text-amber-400 mt-1 italic">Apex — The apex predator stirs...</p>;
   if (percent >= 50) return <p className="text-xs text-red-400 mt-1 italic">Depths — Dangerous creatures lurk ahead...</p>;
@@ -152,7 +162,7 @@ export function ZoneMap({
   isInTown,
 }: ZoneMapProps) {
   const currentZoneName = zones.find(z => z.id === currentZoneId)?.name;
-  const guardNpcKey: NpcKey = currentZoneName?.toLowerCase() === 'thornwall' ? 'thornwall-guard' : 'town-guard';
+  const guardNpcKey = getGuardNpc(currentZoneName);
   const { dialogueEvent } = useNpcDialogue(guardNpcKey);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 

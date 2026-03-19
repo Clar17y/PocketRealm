@@ -160,8 +160,8 @@ export function Forge({
   const [confirmReroll, setConfirmReroll] = useState(false);
   const [upgradePickerOpen, setUpgradePickerOpen] = useState(false);
   const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
-  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
   const forgeNpcKey: NpcKey = zoneName?.toLowerCase() === 'thornwall' ? 'thornwall-blacksmith' : 'millbrook-blacksmith';
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue(forgeNpcKey);
   const noFacility = zoneCraftingLevel === 0;
 
   const tryForgeAction = (setConfirm: (v: boolean) => void, action: () => void | Promise<void>) => {
@@ -275,7 +275,7 @@ export function Forge({
 
   return (
     <ScreenContainer>
-      {forgeNpcKey && <NpcDialogueBanner npcKey={forgeNpcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />}
+      <NpcDialogueBanner npcKey={forgeNpcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />
       <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 
