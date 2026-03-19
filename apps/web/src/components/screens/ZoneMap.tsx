@@ -12,7 +12,20 @@ import { inflateCost } from '@/lib/taxCalc';
 import { buildZoneAdjacency, findShortestZonePath } from '@/lib/zoneRoutes';
 import { CollapsibleLoreSection } from '../common/CollapsibleLoreSection';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
+import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import { useNpcDialogue } from '@/hooks/useNpcDialogue';
+import type { NpcKey } from '@pocketrealm/shared';
 import { ScreenContainer } from '../common/ScreenContainer';
+
+const GUARD_NPC_MAP: Record<string, NpcKey> = {
+  millbrook: 'town-guard',
+  thornwall: 'thornwall-guard',
+};
+
+function getGuardNpc(zoneName: string | null | undefined): NpcKey {
+  const key = (zoneName ?? '').toLowerCase();
+  return GUARD_NPC_MAP[key] ?? GUARD_NPC_MAP['millbrook'];
+}
 
 function getMilestoneHint(percent: number): ReactNode {
   if (percent >= 75) return <p className="text-xs text-amber-400 mt-1 italic">Apex — The apex predator stirs...</p>;
@@ -77,6 +90,8 @@ interface ZoneMapProps {
   playerMaxMana?: number;
   homeTownId?: string | null;
   onSetHomeTown?: (zoneId: string) => void;
+  showNpcDialogue?: boolean;
+  isInTown?: boolean;
 }
 
 type ZoneMapZone = ZoneMapProps['zones'][number];
@@ -143,7 +158,12 @@ export function ZoneMap({
   playerMaxMana,
   homeTownId,
   onSetHomeTown,
+  showNpcDialogue = true,
+  isInTown,
 }: ZoneMapProps) {
+  const currentZoneName = zones.find(z => z.id === currentZoneId)?.name;
+  const guardNpcKey = getGuardNpc(currentZoneName);
+  const { dialogueEvent } = useNpcDialogue(guardNpcKey);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
   // After travel playback finishes, auto-select the zone the player ended up in
@@ -253,6 +273,7 @@ export function ZoneMap({
 
   return (
     <ScreenContainer>
+      {isInTown && <NpcDialogueBanner npcKey={guardNpcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />}
       <FeatureTutorial storageKey="howto_zones" title="Zone Map">
         <p>
           The world is made up of connected zones. <strong>Travel</strong> between them

@@ -24,7 +24,7 @@ import { relativeTime } from '@/lib/format';
 import { handleKeyActivate } from '@/lib/utils';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
 import { SubNav } from '@/components/common/SubNav';
-import { LoadingCard } from '@/components/common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -367,7 +367,7 @@ export function FriendsScreen({
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">
           Friends
         </h2>
-        <LoadingCard />
+        <SkeletonCard count={2} />
       </ScreenContainer>
     );
   }

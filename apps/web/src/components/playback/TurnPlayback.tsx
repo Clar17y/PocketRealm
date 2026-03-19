@@ -44,6 +44,7 @@ interface TurnPlaybackProps {
   playerMaxStamina?: number;
   playerMaxMana?: number;
   embedded?: boolean;
+  strangerLine?: string | null;
 }
 
 export function TurnPlayback({
@@ -67,6 +68,7 @@ export function TurnPlayback({
   playerMaxStamina,
   playerMaxMana,
   embedded = false,
+  strangerLine,
 }: TurnPlaybackProps) {
   const [combatEvent, setCombatEvent] = useState<ExplorationPlaybackEvent | null>(null);
   const [resumeFromCombat, setResumeFromCombat] = useState(false);
@@ -209,6 +211,7 @@ export function TurnPlayback({
       onCombatStart={handleCombatStart}
       onComplete={onComplete}
       onSkip={onSkip}
+      strangerLine={strangerLine}
     />
   );
 

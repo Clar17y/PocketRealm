@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
-import { LoadingCard } from '@/components/common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { getGuildContracts, type GuildContractsResponse } from '@/lib/api';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
 
@@ -26,7 +26,7 @@ export function GuildContractsTab({ guildId }: GuildContractsTabProps) {
 
   useEffect(() => { void loadContracts(); }, [loadContracts]);
 
-  if (loading && !data) return <LoadingCard />;
+  if (loading && !data) return <SkeletonCard count={2} />;
 
   if (!data?.contracts.length) {
     return <PixelCard><p className="text-sm text-[var(--rpg-text-secondary)]">No active contracts this week.</p></PixelCard>;

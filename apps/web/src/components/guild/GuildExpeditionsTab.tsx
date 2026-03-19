@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { monsterImageSrc, type ExpeditionContext } from '@/lib/assets';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
-import { LoadingCard } from '@/components/common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import {
   getActiveExpedition,
@@ -563,7 +563,7 @@ export function GuildExpeditionsTab({
   }
 
   // Active tab
-  if (loading) return <>{tabBar}<LoadingCard /></>;
+  if (loading) return <>{tabBar}<SkeletonCard count={2} /></>;
 
   if (!expedition) {
     return (
@@ -1471,7 +1471,7 @@ function HistoryView({ guildId, playerId }: { guildId: string; playerId: string 
     if (detail.data) setExpandedDetail(detail.data);
   };
 
-  if (loading) return <LoadingCard />;
+  if (loading) return <SkeletonCard count={2} />;
 
   if (expeditions.length === 0) {
     return (
