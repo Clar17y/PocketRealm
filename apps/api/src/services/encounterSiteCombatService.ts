@@ -11,6 +11,7 @@ import {
   type ActionDefinition,
   type CombatPotion,
   type PotionConsumed,
+  type RoomStrategyEntry,
 } from '@pocketrealm/shared';
 import {
   resolveRaidRound,
@@ -24,7 +25,7 @@ import { AppError } from '../middleware/errorHandler';
 import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
 import { handleCombatDefeat, assertCanAct, assertInZone } from '../utils/routeHelpers';
 import { spendPlayerTurnsTx } from './turnBankService';
-import { setHp, getHpState } from './hpService';
+import { getHpState } from './hpService';
 import { setAllResources } from './resourceService';
 import { grantEncounterSiteChestRewardsTx } from './chestService';
 import { getInventoryState } from './inventoryService';
@@ -409,6 +410,7 @@ export async function autoResolveEncounterRoom(
       select: {
         id: true, playerId: true, mobFamilyId: true, size: true,
         discoveredAt: true, mobs: true, currentRoom: true, totalRooms: true,
+        roomStrategy: true,
       },
     });
     if (!freshSite) {
@@ -455,14 +457,21 @@ export async function autoResolveEncounterRoom(
       }
     }
 
+    // Record this room in roomStrategy
+    const existingStrategy = (Array.isArray(freshSite.roomStrategy) ? freshSite.roomStrategy : []) as unknown as RoomStrategyEntry[];
+    const updatedStrategy: RoomStrategyEntry[] = [
+      ...existingStrategy,
+      { room: currentRoom, mode: 'auto', bonusEligible: true },
+    ];
+
     if (siteCleared) {
-      // Count rooms that were auto-resolved (all of them for this endpoint)
       const totalRoomsCount = freshSite.totalRooms ?? 1;
+      const autoResolvedCount = updatedStrategy.filter(e => e.mode === 'auto').length;
       completionRewards = await grantEncounterSiteChestRewardsTx(tx, {
         playerId,
         mobFamilyId: freshSite.mobFamilyId,
         totalRooms: totalRoomsCount,
-        autoResolvedBonusRooms: totalRoomsCount,
+        autoResolvedBonusRooms: autoResolvedCount,
         availableSlots: chestAvailableSlots,
       });
       await tx.encounterSite.deleteMany({ where: { id: siteId, playerId } });
@@ -472,6 +481,7 @@ export async function autoResolveEncounterRoom(
         data: {
           mobs: serializeEncounterSiteMobs(mobs),
           currentRoom: newCurrentRoom,
+          roomStrategy: updatedStrategy as unknown as Prisma.InputJsonValue,
         },
       });
     }
@@ -823,6 +833,7 @@ export async function resolveManualEncounterRound(
       select: {
         id: true, playerId: true, mobFamilyId: true, size: true,
         discoveredAt: true, mobs: true, currentRoom: true, totalRooms: true,
+        roomStrategy: true,
       },
     });
     if (!freshSite) {
@@ -866,13 +877,20 @@ export async function resolveManualEncounterRound(
       }
     }
 
+    // Record this room in roomStrategy as manual
+    const existingStrategy = (Array.isArray(freshSite.roomStrategy) ? freshSite.roomStrategy : []) as unknown as RoomStrategyEntry[];
+    const updatedStrategy: RoomStrategyEntry[] = roomCleared
+      ? [...existingStrategy, { room: state.currentRoom, mode: 'manual', bonusEligible: false }]
+      : existingStrategy;
+
     if (siteCleared) {
       const totalRoomsCount = freshSite.totalRooms ?? 1;
+      const autoResolvedCount = updatedStrategy.filter(e => e.mode === 'auto').length;
       completionRewards = await grantEncounterSiteChestRewardsTx(tx, {
         playerId,
         mobFamilyId: freshSite.mobFamilyId,
         totalRooms: totalRoomsCount,
-        autoResolvedBonusRooms: 0, // manual combat — no auto-resolve bonus
+        autoResolvedBonusRooms: autoResolvedCount,
         availableSlots: chestAvailableSlots,
       });
       await tx.encounterSite.deleteMany({ where: { id: siteId, playerId } });
@@ -882,6 +900,7 @@ export async function resolveManualEncounterRound(
         data: {
           mobs: serializeEncounterSiteMobs(mobs),
           currentRoom: newCurrentRoom,
+          ...(roomCleared ? { roomStrategy: updatedStrategy as unknown as Prisma.InputJsonValue } : {}),
         },
       });
     }
