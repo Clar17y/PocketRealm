@@ -1,4 +1,5 @@
 import { Prisma, prisma } from '@pocketrealm/database';
+import { redis } from '../redis';
 import {
   ENCOUNTER_SITE_CONSTANTS,
   COMBAT_CONSTANTS,
@@ -433,8 +434,7 @@ export async function autoResolveEncounterRoom(
   username: string,
 ): Promise<AutoResolveEncounterResult> {
   // If a manual session exists, reject auto-resolve — player must continue manually or abandon
-  const existingKey = manualKey(playerId, siteId);
-  if (manualCombatStore.has(existingKey)) {
+  if (await hasCombatSession(playerId, siteId)) {
     throw new AppError(409, 'Manual combat session in progress. Continue fighting or abandon the site.', 'MANUAL_SESSION_ACTIVE');
   }
 
@@ -638,7 +638,7 @@ export async function autoResolveEncounterRoom(
 }
 
 // ---------------------------------------------------------------------------
-// Manual combat (in-memory state between start-room and round calls)
+// Manual combat (Redis-backed state between start-room and round calls)
 // ---------------------------------------------------------------------------
 
 interface ManualCombatState {
@@ -658,28 +658,52 @@ interface ManualCombatState {
   createdAt: number;
 }
 
-// Module-level store for in-progress manual combat sessions
-// Key: `${playerId}:${siteId}`
-const manualCombatStore = new Map<string, ManualCombatState>();
+// Redis key prefix for manual combat sessions
+const COMBAT_SESSION_PREFIX = 'encounter-combat:';
+// TTL matches encounter site decay — 4 hours (single mob decays in ~4h at 0.25/hr)
+const COMBAT_SESSION_TTL_SECONDS = 4 * 60 * 60;
 
-const MANUAL_COMBAT_TTL_MS = 30 * 60 * 1000; // 30 minutes
+function combatSessionKey(playerId: string, siteId: string): string {
+  return `${COMBAT_SESSION_PREFIX}${playerId}:${siteId}`;
+}
 
-function cleanupStaleSessions(): void {
-  const now = Date.now();
-  for (const [key, state] of manualCombatStore) {
-    if (now - state.createdAt > MANUAL_COMBAT_TTL_MS) {
-      manualCombatStore.delete(key);
-    }
+async function getCombatSession(playerId: string, siteId: string): Promise<ManualCombatState | null> {
+  try {
+    const data = await redis.get(combatSessionKey(playerId, siteId));
+    if (!data) return null;
+    return JSON.parse(data) as ManualCombatState;
+  } catch {
+    return null;
   }
 }
 
-function manualKey(playerId: string, siteId: string): string {
-  return `${playerId}:${siteId}`;
+async function setCombatSession(playerId: string, siteId: string, state: ManualCombatState): Promise<void> {
+  try {
+    await redis.set(combatSessionKey(playerId, siteId), JSON.stringify(state), 'EX', COMBAT_SESSION_TTL_SECONDS);
+  } catch {
+    // Best-effort — fall through, combat will fail on next round if Redis is down
+  }
 }
 
-/** Clear any in-memory manual combat session for this player+site (used by abandon). */
-export function clearManualCombatSession(playerId: string, siteId: string): void {
-  manualCombatStore.delete(manualKey(playerId, siteId));
+async function deleteCombatSession(playerId: string, siteId: string): Promise<void> {
+  try {
+    await redis.del(combatSessionKey(playerId, siteId));
+  } catch {
+    // Best-effort
+  }
+}
+
+async function hasCombatSession(playerId: string, siteId: string): Promise<boolean> {
+  try {
+    return (await redis.exists(combatSessionKey(playerId, siteId))) === 1;
+  } catch {
+    return false;
+  }
+}
+
+/** Clear any combat session for this player+site (used by abandon). */
+export async function clearManualCombatSession(playerId: string, siteId: string): Promise<void> {
+  await deleteCombatSession(playerId, siteId);
 }
 
 export interface StartManualRoomResult {
@@ -709,11 +733,8 @@ export async function startManualEncounterRoom(
   siteId: string,
   username: string,
 ): Promise<StartManualRoomResult> {
-  cleanupStaleSessions();
-
   // If an active session exists for this player+site, resume it instead of creating a new one
-  const existingKey = manualKey(playerId, siteId);
-  const existingState = manualCombatStore.get(existingKey);
+  const existingState = await getCombatSession(playerId, siteId);
   if (existingState) {
     return {
       currentRoom: existingState.currentRoom,
@@ -774,10 +795,9 @@ export async function startManualEncounterRoom(
     hpState.maxHp,
   );
 
-  const key = manualKey(playerId, siteId);
   const turnCostCharged = roomMobs.length * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST;
 
-  manualCombatStore.set(key, {
+  await setCombatSession(playerId, siteId, {
     playerId,
     siteId,
     currentRoom,
@@ -839,11 +859,10 @@ export async function resolveManualEncounterRound(
   siteId: string,
   _body: { action?: string; targetMobSlot?: number },
 ): Promise<ManualRoundResult> {
-  cleanupStaleSessions();
-
-  const key = manualKey(playerId, siteId);
-  const state = manualCombatStore.get(key);
+  const state = await getCombatSession(playerId, siteId);
   if (!state) {
+    // Session expired or server restarted — clear stale lockout
+    await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } }).catch(() => {});
     throw new AppError(400, 'No active manual combat session. Call start-room first.', 'NO_COMBAT_SESSION');
   }
 
@@ -901,8 +920,9 @@ export async function resolveManualEncounterRound(
     activeEffects: m.activeEffects,
   }));
 
-  // If combat is still ongoing, return without persisting
+  // If combat is still ongoing, save state back to Redis and return
   if (!roomCleared && !playerDefeated) {
+    await setCombatSession(playerId, siteId, state);
     return {
       roundNumber: state.roundNumber,
       roundLog: result.roundLog,
@@ -921,8 +941,8 @@ export async function resolveManualEncounterRound(
     };
   }
 
-  // Room resolved — persist to DB
-  manualCombatStore.delete(key);
+  // Room resolved — remove session from Redis and persist to DB
+  await deleteCombatSession(playerId, siteId);
 
   const { availableSlots: chestAvailableSlots } = await getInventoryState(playerId);
 

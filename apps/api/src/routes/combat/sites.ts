@@ -269,7 +269,7 @@ export function registerSiteRoutes(router: Router): void {
       const playerId = req.player!.playerId;
 
       // Clear any in-memory manual combat session
-      clearManualCombatSession(playerId, siteId);
+      await clearManualCombatSession(playerId, siteId);
 
       const result = await prisma.encounterSite.deleteMany({
         where: { id: siteId, playerId },
