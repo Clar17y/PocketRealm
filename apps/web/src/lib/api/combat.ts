@@ -216,7 +216,7 @@ export interface SkillXpGrantResponse {
 }
 
 export type CombatOutcomeResponse = 'victory' | 'defeat' | 'fled' | 'draw';
-export type CombatSourceResponse = 'zone_combat' | 'encounter_site' | 'exploration_ambush' | 'travel_ambush';
+export type CombatSourceResponse = 'zone_combat' | 'encounter_site' | 'encounter_site_room' | 'exploration_ambush' | 'travel_ambush';
 
 export interface CombatResultResponse {
   zoneId: string;
@@ -368,6 +368,10 @@ export interface CombatHistoryListItemResponse {
   fightCount: number;
   encounterSiteId: string | null;
   mobFamilyName: string | null;
+  siteName: string | null;
+  siteRoom: number | null;
+  siteTotalRooms: number | null;
+  siteMode: string | null;
 }
 
 export interface EncounterSiteFightSummary {

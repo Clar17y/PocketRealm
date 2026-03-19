@@ -16,6 +16,8 @@ import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
+import { RoundLogContent } from '@/components/common/combat';
+import type { ExpeditionRoundLog } from '@pocketrealm/shared';
 import { EventBadges } from '@/components/common/EventBadge';
 import { CopyButton } from '@/components/common/CopyButton';
 import { FightNavigationBar } from '@/components/common/FightNavigationBar';
@@ -49,6 +51,7 @@ function outcomeColor(outcome: string | null): string {
 
 function formatCombatSource(source: string | null | undefined): string {
   if (source === 'encounter_site') return 'Encounter Site';
+  if (source === 'encounter_site_room') return 'Encounter Room';
   if (source === 'exploration_ambush') return 'Ambush (Exploring)';
   if (source === 'travel_ambush') return 'Ambush (Travel)';
   if (source === 'zone_combat') return 'Direct Encounter';
@@ -373,33 +376,54 @@ export function CombatHistory() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-sm text-[var(--rpg-text-primary)] font-semibold truncate">
-                    {entry.mobName && (
-                      <img
-                        src={monsterImageSrc(entry.mobName)}
-                        alt={entry.mobName}
-                        className="w-8 h-8 rounded object-cover shrink-0"
-                      />
-                    )}
-                    <span className="truncate">
-                      <span className={outcomeColor(entry.outcome)}>{outcomeIcon(entry.outcome)}</span>
-                      {' '}
-                      {entry.source === 'encounter_site' && entry.fightCount > 1
-                        ? (entry.mobFamilyName ?? entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')
-                        : (entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')}
-                    </span>
-                    {entry.source === 'encounter_site' && entry.fightCount > 1 && (
-                      <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)] font-pixel font-normal">
-                        {entry.fightCount} fights
-                      </span>
+                    {entry.source === 'encounter_site_room' ? (
+                      <>
+                        <span className="truncate">
+                          <span className={outcomeColor(entry.outcome)}>{outcomeIcon(entry.outcome)}</span>
+                          {' '}
+                          {entry.siteName ?? 'Unknown Site'}
+                        </span>
+                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--rpg-blue-light)]/10 text-[var(--rpg-blue-light)] font-pixel font-normal">
+                          Room {entry.siteRoom}/{entry.siteTotalRooms}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {entry.mobName && (
+                          <img
+                            src={monsterImageSrc(entry.mobName)}
+                            alt={entry.mobName}
+                            className="w-8 h-8 rounded object-cover shrink-0"
+                          />
+                        )}
+                        <span className="truncate">
+                          <span className={outcomeColor(entry.outcome)}>{outcomeIcon(entry.outcome)}</span>
+                          {' '}
+                          {entry.source === 'encounter_site' && entry.fightCount > 1
+                            ? (entry.mobFamilyName ?? entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')
+                            : (entry.mobDisplayName ?? entry.mobName ?? 'Unknown Mob')}
+                        </span>
+                        {entry.source === 'encounter_site' && entry.fightCount > 1 && (
+                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-[var(--rpg-gold)]/10 text-[var(--rpg-gold)] font-pixel font-normal">
+                            {entry.fightCount} fights
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
                   <div className={`text-xs font-semibold ${outcomeColor(entry.outcome)}`}>
                     {formatOutcome(entry.outcome)}
                   </div>
                 </div>
-                <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">
-                  {entry.zoneName ?? 'Unknown Zone'} | {relativeTime(entry.createdAt)}
-                </div>
+                {entry.source === 'encounter_site_room' ? (
+                  <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">
+                    {entry.mobFamilyName ?? 'Unknown'} | {entry.siteMode === 'auto' ? 'Auto' : 'Manual'} | {entry.zoneName ?? 'Unknown Zone'} | {relativeTime(entry.createdAt)}
+                  </div>
+                ) : (
+                  <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">
+                    {entry.zoneName ?? 'Unknown Zone'} | {relativeTime(entry.createdAt)}
+                  </div>
+                )}
                 <div className="text-xs text-[var(--rpg-text-secondary)] mt-1">
                   Source: {formatCombatSource(entry.source)} | Rounds: <span className="font-pixel text-[8px]">{entry.roundCount}</span> | XP: <span className="font-pixel text-[8px]">{entry.xpGained.toLocaleString()}</span>
                 </div>
@@ -461,23 +485,41 @@ export function CombatHistory() {
                 />
               )}
 
-              <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
-                {selectedDetail.log.map((entry, index) => (
-                  <CombatLogEntry
-                    key={index}
-                    entry={entry}
-                    playerMaxHp={playerMaxHp}
-                    mobMaxHp={mobMaxHp}
-                  />
-                ))}
-              </div>
+              {selectedEntry.source === 'encounter_site_room' ? (
+                <div className="max-h-96 overflow-y-auto space-y-3 border-t border-[var(--rpg-border)] pt-2">
+                  {((selectedDetail as unknown as { rounds?: ExpeditionRoundLog[] }).rounds ?? []).map((roundLog, i) => (
+                    <div key={i}>
+                      <p className="text-xs font-bold text-[var(--rpg-text-secondary)] mb-1">Round {roundLog.round}</p>
+                      <RoundLogContent log={roundLog} playerId={null} />
+                    </div>
+                  ))}
+                  {!!(selectedDetail as unknown as { chestReward?: unknown }).chestReward && (
+                    <div className="border-t border-[var(--rpg-border)] pt-2 text-xs text-[var(--rpg-gold)]">
+                      Chest reward received on site completion
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="max-h-72 overflow-y-auto space-y-0.5 border-t border-[var(--rpg-border)] pt-2">
+                    {selectedDetail.log.map((entry, index) => (
+                      <CombatLogEntry
+                        key={index}
+                        entry={entry}
+                        playerMaxHp={playerMaxHp}
+                        mobMaxHp={mobMaxHp}
+                      />
+                    ))}
+                  </div>
 
-              <div className="border-t border-[var(--rpg-border)] pt-2">
-                <CombatRewardsSummary
-                  rewards={summaryRewards ?? selectedDetail.rewards}
-                  outcome={selectedDetail.outcome}
-                />
-              </div>
+                  <div className="border-t border-[var(--rpg-border)] pt-2">
+                    <CombatRewardsSummary
+                      rewards={summaryRewards ?? selectedDetail.rewards}
+                      outcome={selectedDetail.outcome}
+                    />
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
