@@ -88,6 +88,7 @@ export interface AutoResolveEncounterResult {
   outcome: 'cleared' | 'defeated' | 'site_cleared';
   roundsResolved: number;
   rounds: RoundSnapshot[];
+  initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
   playerHpAfter: number;
   playerStaminaAfter: number;
   playerManaAfter: number;
@@ -612,6 +613,11 @@ export async function autoResolveEncounterRoom(
     outcome: finalOutcome,
     roundsResolved: combatResult.roundsResolved,
     rounds: combatResult.rounds,
+    initialMobs: expeditionMobs.map(m => {
+      const slotMatch = m.id.match(/^encounter-mob-(\d+)$/);
+      const slot = slotMatch ? parseInt(slotMatch[1]!, 10) : 0;
+      return { mobId: m.id, slot, name: m.name, prefix: m.prefix, hp: m.hp, maxHp: m.maxHp };
+    }),
     playerHpAfter: combatResult.playerHpAfter,
     playerStaminaAfter: combatResult.playerStaminaAfter,
     playerManaAfter: combatResult.playerManaAfter,

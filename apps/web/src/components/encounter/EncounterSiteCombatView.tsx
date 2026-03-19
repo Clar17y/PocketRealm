@@ -107,6 +107,19 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
     setLoading(true);
     try {
       const result = await props.onAutoResolve();
+
+      // Seed mob list from auto-resolve response (mobs weren't loaded in preview)
+      if (result.initialMobs) {
+        setMobs(result.initialMobs.map(m => ({
+          id: m.mobId,
+          name: m.name,
+          prefix: m.prefix,
+          hp: m.hp,
+          maxHp: m.maxHp,
+          activeEffects: [],
+        })));
+      }
+
       setPlaybackRounds(result.rounds);
       setPlaybackIndex(0);
       isPlayingBackRef.current = true;

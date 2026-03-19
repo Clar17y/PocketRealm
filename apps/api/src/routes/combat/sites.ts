@@ -25,13 +25,24 @@ const roundSchema = z.object({
   targetMobSlot: z.number().int().optional(),
 });
 
-function mapChestRewardDTO(completionRewards: Awaited<ReturnType<typeof autoResolveEncounterRoom>>['completionRewards']) {
+async function mapChestRewardDTO(completionRewards: Awaited<ReturnType<typeof autoResolveEncounterRoom>>['completionRewards']) {
   if (!completionRewards) return undefined;
+
+  // Look up item template names for the loot
+  const templateIds = [...new Set(completionRewards.loot.map(l => l.itemTemplateId))];
+  const templates = templateIds.length > 0
+    ? await prisma.itemTemplate.findMany({
+        where: { id: { in: templateIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const nameMap = new Map(templates.map(t => [t.id, t.name]));
+
   return {
     rarity: completionRewards.chestRarity,
     materials: completionRewards.loot.map(l => ({
       itemTemplateId: l.itemTemplateId,
-      name: l.itemTemplateId,
+      name: nameMap.get(l.itemTemplateId) ?? l.itemTemplateId,
       quantity: l.quantity,
     })),
     recipe: completionRewards.recipeUnlocked
@@ -266,7 +277,8 @@ export function registerSiteRoutes(router: Router): void {
         res.json({
           outcome: result.outcome,
           rounds: result.rounds,
-          chestReward: mapChestRewardDTO(result.completionRewards),
+          initialMobs: result.initialMobs,
+          chestReward: await mapChestRewardDTO(result.completionRewards),
         });
       } finally {
         // Clear lockout when combat resolves (or throws)
@@ -350,7 +362,7 @@ export function registerSiteRoutes(router: Router): void {
         defeated: result.outcome === 'defeated',
         roomCleared: result.outcome === 'cleared' || result.outcome === 'site_cleared',
         siteCleared: result.siteCleared,
-        chestReward: mapChestRewardDTO(result.completionRewards),
+        chestReward: await mapChestRewardDTO(result.completionRewards),
       });
   }));
 }

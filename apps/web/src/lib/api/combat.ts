@@ -538,6 +538,7 @@ export interface EncounterRoundSnapshot {
 export interface EncounterAutoResolveResponse {
   outcome: 'cleared' | 'defeated' | 'site_cleared';
   rounds: EncounterRoundSnapshot[];
+  initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
   chestReward?: {
     rarity: string;
     materials: Array<{ itemTemplateId: string; name: string; quantity: number }>;
