@@ -115,8 +115,8 @@ interface CraftingProps {
 export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, availableSlots = 0, showNpcDialogue = true }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
   const npcKey = skillType ? getCraftingNpc(skillType, zoneName) : undefined;
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue(npcKey);
 
   useEffect(() => {
     if (recipes.length === 0) {
