@@ -1233,8 +1233,9 @@ export default function GamePage() {
   };
 
   return (
-    <ErrorBoundary>
+    <>
       <ConnectionBanner />
+      <ErrorBoundary>
       {showChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
       {confirmAbandonLoot && (
         <ConfirmModal
@@ -1448,6 +1449,7 @@ export default function GamePage() {
       <ForgeResultToast />
       <RateLimitToast />
     </ErrorBoundary>
+    </>
   );
 }
 

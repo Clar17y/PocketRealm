@@ -67,7 +67,7 @@ export function GuildSpecializationTab({ guildId, guildLevel, myRole }: GuildSpe
   const errorBanner = (load.error || action.error) ? <ErrorBanner message={(load.error || action.error)!} /> : null;
 
   if (load.loading && status === undefined) {
-    return <>{confirmModal}<div className="space-y-3"><SkeletonCard /><SkeletonCard /></div></>;
+    return <>{confirmModal}<SkeletonCard count={2} /></>;
   }
 
   // Guild level too low

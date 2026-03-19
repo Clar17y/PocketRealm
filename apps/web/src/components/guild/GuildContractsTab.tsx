@@ -26,7 +26,7 @@ export function GuildContractsTab({ guildId }: GuildContractsTabProps) {
 
   useEffect(() => { void loadContracts(); }, [loadContracts]);
 
-  if (loading && !data) return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
+  if (loading && !data) return <SkeletonCard count={2} />;
 
   if (!data?.contracts.length) {
     return <PixelCard><p className="text-sm text-[var(--rpg-text-secondary)]">No active contracts this week.</p></PixelCard>;

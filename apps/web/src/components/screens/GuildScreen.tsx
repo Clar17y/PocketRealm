@@ -67,10 +67,7 @@ export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdat
     return (
       <ScreenContainer>
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Guild</h2>
-        <div className="space-y-3">
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
+        <SkeletonCard count={2} />
       </ScreenContainer>
     );
   }

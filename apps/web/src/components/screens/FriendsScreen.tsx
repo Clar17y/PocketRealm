@@ -367,10 +367,7 @@ export function FriendsScreen({
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">
           Friends
         </h2>
-        <div className="space-y-3">
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
+        <SkeletonCard count={2} />
       </ScreenContainer>
     );
   }

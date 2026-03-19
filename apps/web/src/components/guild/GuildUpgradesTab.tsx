@@ -57,7 +57,7 @@ export function GuildUpgradesTab({
     }
   };
 
-  if (loading && !data) return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
+  if (loading && !data) return <SkeletonCard count={2} />;
 
   return (
     <div className="space-y-3">

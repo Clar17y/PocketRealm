@@ -33,7 +33,7 @@ export function GuildActivityLog({ guildId }: GuildActivityLogProps) {
   }, [loadLog]);
 
   if (loading && !logData) {
-    return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
+    return <SkeletonCard count={2} />;
   }
 
   return (

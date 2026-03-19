@@ -563,7 +563,7 @@ export function GuildExpeditionsTab({
   }
 
   // Active tab
-  if (loading) return <>{tabBar}<div className="space-y-3"><SkeletonCard /><SkeletonCard /></div></>;
+  if (loading) return <>{tabBar}<SkeletonCard count={2} /></>;
 
   if (!expedition) {
     return (
@@ -1471,7 +1471,7 @@ function HistoryView({ guildId, playerId }: { guildId: string; playerId: string 
     if (detail.data) setExpandedDetail(detail.data);
   };
 
-  if (loading) return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
+  if (loading) return <SkeletonCard count={2} />;
 
   if (expeditions.length === 0) {
     return (

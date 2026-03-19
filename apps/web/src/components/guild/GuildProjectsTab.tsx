@@ -100,7 +100,7 @@ export function GuildProjectsTab({ guildId, myRole, onStateUpdates }: GuildProje
     });
   };
 
-  if (load.loading && !data) return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
+  if (load.loading && !data) return <SkeletonCard count={2} />;
 
   const activeProject = data?.projects.find((p) => p.status === 'active');
   const completedProjects = data?.projects.filter((p) => p.status === 'completed') ?? [];

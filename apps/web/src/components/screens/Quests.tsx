@@ -444,7 +444,7 @@ function ShopTab({
   }
 
   if (shopLoading) {
-    return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
+    return <SkeletonCard count={2} />;
   }
 
   if (shopError) {
@@ -578,7 +578,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
   };
 
   if (loading) {
-    return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
+    return <SkeletonCard count={2} />;
   }
 
   if (error) {

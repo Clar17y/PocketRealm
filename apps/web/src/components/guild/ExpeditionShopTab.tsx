@@ -104,7 +104,7 @@ export function ExpeditionShopTab({ onRefresh }: ExpeditionShopTabProps) {
       itemId,
     );
 
-  if (load.loading && !shopData) return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
+  if (load.loading && !shopData) return <SkeletonCard count={2} />;
 
   if (!shopData) return null;
 
