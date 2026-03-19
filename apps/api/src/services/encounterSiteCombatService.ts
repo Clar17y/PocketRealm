@@ -12,6 +12,7 @@ import {
   type CombatPotion,
   type PotionConsumed,
   type RoomStrategyEntry,
+  type EncounterMobSlot,
 } from '@pocketrealm/shared';
 import {
   resolveRaidRound,
@@ -19,7 +20,6 @@ import {
   applyCrowdedDebuff,
   buildPlayerCombatStats,
   initThreatTable,
-  calculateMaxHp,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
@@ -190,6 +190,111 @@ export function resolveEncounterRoomCombat(
 }
 
 // ---------------------------------------------------------------------------
+// Shared private helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Advance to the first room with alive mobs after decay.
+ * If the current room is already populated, returns it immediately.
+ * Otherwise scans forward and persists the new currentRoom to the DB.
+ */
+async function advanceToFirstAliveRoom(
+  site: { id: string; currentRoom: number },
+  decayedMobs: EncounterMobSlot[],
+  totalRooms: number,
+): Promise<{ currentRoom: number; roomMobs: EncounterMobSlot[] }> {
+  let currentRoom = site.currentRoom;
+  let roomMobs = getAllAliveMobsInRoom(decayedMobs, currentRoom);
+  if (roomMobs.length > 0) return { currentRoom, roomMobs };
+
+  for (let r = currentRoom + 1; r <= totalRooms; r++) {
+    const candidate = getAllAliveMobsInRoom(decayedMobs, r);
+    if (candidate.length > 0) {
+      currentRoom = r;
+      roomMobs = candidate;
+      await prisma.encounterSite.update({ where: { id: site.id }, data: { currentRoom: r } });
+      return { currentRoom, roomMobs };
+    }
+  }
+  throw new AppError(410, 'No alive mobs in encounter site', 'SITE_DECAYED');
+}
+
+/**
+ * Load mob templates for a set of encounter mob slots, apply zone event
+ * modifiers, and convert them to ExpeditionMobState[] via buildEncounterRaidMob.
+ */
+async function loadRoomMobsAsRaidState(
+  roomMobs: EncounterMobSlot[],
+  zoneId: string,
+  mobFamilyId: string,
+): Promise<ExpeditionMobState[]> {
+  const mobTemplateIds = [...new Set(roomMobs.map(m => m.mobTemplateId))];
+  const mobTemplateRows = await prisma.mobTemplate.findMany({
+    where: { id: { in: mobTemplateIds } },
+    select: {
+      id: true, name: true, hp: true, accuracy: true, defence: true,
+      magicDefence: true, evasion: true, damageMin: true, damageMax: true,
+      damageType: true,
+    },
+  });
+  const mobTemplateById = new Map(mobTemplateRows.map(t => [t.id, t]));
+
+  const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
+    getActiveEventsForZone(zoneId),
+    getActiveWorldWideEvents(),
+  ]);
+  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, { mobFamilyId });
+
+  const defaultActionTemplate = [{ actionId: 'boss_physical_attack', targetMode: 'single_target' as const }];
+
+  const expeditionMobs: ExpeditionMobState[] = [];
+  for (const slot of roomMobs) {
+    const template = mobTemplateById.get(slot.mobTemplateId);
+    if (!template) continue;
+    const modifiedTemplate = {
+      ...template,
+      damageType: template.damageType as import('@pocketrealm/shared').DamageType,
+      hp: Math.max(1, Math.round(template.hp * Math.max(0.1, zoneModifiers.mobHpMultiplier))),
+      damageMin: Math.max(1, Math.round(template.damageMin * Math.max(0.1, zoneModifiers.mobDamageMultiplier))),
+      damageMax: Math.max(1, Math.round(template.damageMax * Math.max(0.1, zoneModifiers.mobDamageMultiplier))),
+      actionTemplate: defaultActionTemplate,
+    };
+    expeditionMobs.push(buildEncounterRaidMob(slot, modifiedTemplate));
+  }
+  return expeditionMobs;
+}
+
+/**
+ * Handle player defeat: fetch progression, call handleCombatDefeat, and
+ * reshape the result into the flat fleeResult/respawnedTo structure used
+ * by both auto-resolve and manual combat responses.
+ */
+async function handleEncounterDefeat(
+  playerId: string,
+  maxHp: number,
+): Promise<{
+  fleeResult: AutoResolveEncounterResult['fleeResult'];
+  respawnedTo: { townId: string; townName: string } | null;
+}> {
+  const progression = await getPlayerProgressionState(playerId);
+  const defeatResult = await handleCombatDefeat(playerId, {
+    evasionLevel: progression.attributes.evasion,
+    mobLevel: 1, // encounter site mobs don't have a single level; use 1 as fallback
+    maxHp,
+  });
+  const fleeResult: AutoResolveEncounterResult['fleeResult'] = defeatResult.fleeResult
+    ? {
+        outcome: defeatResult.fleeResult.outcome,
+        remainingHp: defeatResult.fleeResult.remainingHp,
+        goldLost: defeatResult.fleeResult.goldLost,
+        isRecovering: defeatResult.fleeResult.outcome === 'knockout',
+        recoveryCost: defeatResult.fleeResult.recoveryCost,
+      }
+    : null;
+  return { fleeResult, respawnedTo: defeatResult.respawnedTo };
+}
+
+// ---------------------------------------------------------------------------
 // Build RaidParticipant from player data (mirrors buildRaidParticipant in expeditionService)
 // ---------------------------------------------------------------------------
 
@@ -300,74 +405,16 @@ export async function autoResolveEncounterRoom(
   }, new Date());
   if (!decayed) throw new AppError(410, 'Encounter site has decayed', 'SITE_DECAYED');
 
-  // Get current room
-  let currentRoom = site.currentRoom ?? 1;
-  let roomMobs = getAllAliveMobsInRoom(decayed.mobs, currentRoom);
+  // Advance to first room with alive mobs (decay may have wiped the current room)
+  const totalRoomsForAdvance = site.totalRooms || new Set(decayed.mobs.map(m => m.room)).size || 1;
+  const { currentRoom, roomMobs } = await advanceToFirstAliveRoom(
+    { id: site.id, currentRoom: site.currentRoom ?? 1 },
+    decayed.mobs,
+    totalRoomsForAdvance,
+  );
 
-  // Advance room if current is empty (decay may have wiped it)
-  if (roomMobs.length === 0) {
-    const totalRooms = site.totalRooms || new Set(decayed.mobs.map(m => m.room)).size || 1;
-    let advanced = false;
-    for (let r = currentRoom + 1; r <= totalRooms; r++) {
-      const candidate = getAllAliveMobsInRoom(decayed.mobs, r);
-      if (candidate.length > 0) {
-        currentRoom = r;
-        roomMobs = candidate;
-        advanced = true;
-        await prisma.encounterSite.update({
-          where: { id: site.id },
-          data: { currentRoom: r },
-        });
-        break;
-      }
-    }
-    if (!advanced) throw new AppError(410, 'No alive mobs in encounter site', 'SITE_DECAYED');
-  }
-
-  // Batch-load mob templates
-  const mobTemplateIds = [...new Set(roomMobs.map(m => m.mobTemplateId))];
-  const mobTemplateRows = await prisma.mobTemplate.findMany({
-    where: { id: { in: mobTemplateIds } },
-    select: {
-      id: true, name: true, hp: true, accuracy: true, defence: true,
-      magicDefence: true, evasion: true, damageMin: true, damageMax: true,
-      damageType: true,
-    },
-  });
-  const mobTemplateById = new Map(mobTemplateRows.map(t => [t.id, t]));
-
-  // Get zone event modifiers
-  const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
-    getActiveEventsForZone(site.zoneId),
-    getActiveWorldWideEvents(),
-  ]);
-  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, {
-    mobFamilyId: site.mobFamilyId,
-  });
-
-  // Default action template for encounter site mobs (single physical attack)
-  const defaultActionTemplate = [{ actionId: 'boss_physical_attack', targetMode: 'single_target' as const }];
-
-  // Convert EncounterMobSlot[] to ExpeditionMobState[]
-  const expeditionMobs: ExpeditionMobState[] = [];
-  for (const slot of roomMobs) {
-    const template = mobTemplateById.get(slot.mobTemplateId);
-    if (!template) continue;
-
-    // Apply event modifiers to the template stats (affects hp/dmg)
-    const modifiedTemplate = {
-      ...template,
-      damageType: template.damageType as import('@pocketrealm/shared').DamageType,
-      hp: Math.max(1, Math.round(template.hp * Math.max(0.1, zoneModifiers.mobHpMultiplier))),
-      damageMin: Math.max(1, Math.round(template.damageMin * Math.max(0.1, zoneModifiers.mobDamageMultiplier))),
-      damageMax: Math.max(1, Math.round(template.damageMax * Math.max(0.1, zoneModifiers.mobDamageMultiplier))),
-      actionTemplate: defaultActionTemplate,
-    };
-
-    const raidMob = buildEncounterRaidMob(slot, modifiedTemplate);
-    expeditionMobs.push(raidMob);
-  }
-
+  // Load mob templates, apply zone modifiers, build ExpeditionMobState[]
+  const expeditionMobs = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
   if (expeditionMobs.length === 0) {
     throw new AppError(410, 'No valid mobs in encounter room', 'SITE_DECAYED');
   }
@@ -505,25 +552,7 @@ export async function autoResolveEncounterRoom(
   let respawnedTo: { townId: string; townName: string } | null = null;
 
   if (combatResult.outcome === 'defeated') {
-    const [equipStats, progression] = await Promise.all([
-      getEquipmentStats(playerId),
-      getPlayerProgressionState(playerId),
-    ]);
-    const defeatResult = await handleCombatDefeat(playerId, {
-      evasionLevel: progression.attributes.evasion,
-      mobLevel: 1, // encounter site mobs don't have a single level; use 1 as fallback
-      maxHp: hpState.maxHp,
-    });
-    fleeResult = defeatResult.fleeResult
-      ? {
-          outcome: defeatResult.fleeResult.outcome,
-          remainingHp: defeatResult.fleeResult.remainingHp,
-          goldLost: defeatResult.fleeResult.goldLost,
-          isRecovering: defeatResult.fleeResult.outcome === 'knockout',
-          recoveryCost: defeatResult.fleeResult.recoveryCost,
-        }
-      : null;
-    respawnedTo = defeatResult.respawnedTo;
+    ({ fleeResult, respawnedTo } = await handleEncounterDefeat(playerId, hpState.maxHp));
   }
 
   const finalOutcome: AutoResolveEncounterResult['outcome'] = txResult.siteCleared
@@ -559,18 +588,29 @@ interface ManualCombatState {
   mobs: ExpeditionMobState[];
   threatTable: RaidThreatEntry[];
   roundNumber: number;
-  potionsConsumed: PotionConsumed[];
   allPotionsConsumed: PotionConsumed[];
   roundLogs: unknown[];
   maxHp: number;
   turnCostCharged: number;
   totalRooms: number;
   mobFamilyId: string;
+  createdAt: number;
 }
 
 // Module-level store for in-progress manual combat sessions
 // Key: `${playerId}:${siteId}`
 const manualCombatStore = new Map<string, ManualCombatState>();
+
+const MANUAL_COMBAT_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+function cleanupStaleSessions(): void {
+  const now = Date.now();
+  for (const [key, state] of manualCombatStore) {
+    if (now - state.createdAt > MANUAL_COMBAT_TTL_MS) {
+      manualCombatStore.delete(key);
+    }
+  }
+}
 
 function manualKey(playerId: string, siteId: string): string {
   return `${playerId}:${siteId}`;
@@ -601,6 +641,8 @@ export async function startManualEncounterRoom(
   siteId: string,
   username: string,
 ): Promise<StartManualRoomResult> {
+  cleanupStaleSessions();
+
   const site = await prisma.encounterSite.findFirst({
     where: { id: siteId, playerId },
   });
@@ -620,62 +662,16 @@ export async function startManualEncounterRoom(
   }, new Date());
   if (!decayed) throw new AppError(410, 'Encounter site has decayed', 'SITE_DECAYED');
 
-  let currentRoom = site.currentRoom ?? 1;
-  let roomMobs = getAllAliveMobsInRoom(decayed.mobs, currentRoom);
-  if (roomMobs.length === 0) {
-    const totalRooms = site.totalRooms || new Set(decayed.mobs.map(m => m.room)).size || 1;
-    let advanced = false;
-    for (let r = currentRoom + 1; r <= totalRooms; r++) {
-      const candidate = getAllAliveMobsInRoom(decayed.mobs, r);
-      if (candidate.length > 0) {
-        currentRoom = r;
-        roomMobs = candidate;
-        advanced = true;
-        await prisma.encounterSite.update({ where: { id: site.id }, data: { currentRoom: r } });
-        break;
-      }
-    }
-    if (!advanced) throw new AppError(410, 'No alive mobs in encounter site', 'SITE_DECAYED');
-  }
+  // Advance to first room with alive mobs (decay may have wiped the current room)
+  const totalRoomsForAdvance = site.totalRooms || new Set(decayed.mobs.map(m => m.room)).size || 1;
+  const { currentRoom, roomMobs } = await advanceToFirstAliveRoom(
+    { id: site.id, currentRoom: site.currentRoom ?? 1 },
+    decayed.mobs,
+    totalRoomsForAdvance,
+  );
 
-  // Load mob templates
-  const mobTemplateIds = [...new Set(roomMobs.map(m => m.mobTemplateId))];
-  const mobTemplateRows = await prisma.mobTemplate.findMany({
-    where: { id: { in: mobTemplateIds } },
-    select: {
-      id: true, name: true, hp: true, accuracy: true, defence: true,
-      magicDefence: true, evasion: true, damageMin: true, damageMax: true,
-      damageType: true,
-    },
-  });
-  const mobTemplateById = new Map(mobTemplateRows.map(t => [t.id, t]));
-
-  const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
-    getActiveEventsForZone(site.zoneId),
-    getActiveWorldWideEvents(),
-  ]);
-  const zoneModifiers = computeZoneModifiers(cachedZoneEvents, cachedWorldEvents, {
-    mobFamilyId: site.mobFamilyId,
-  });
-
-  // Default action template for encounter site mobs (single physical attack)
-  const defaultActionTemplate = [{ actionId: 'boss_physical_attack', targetMode: 'single_target' as const }];
-
-  const expeditionMobs: ExpeditionMobState[] = [];
-  for (const slot of roomMobs) {
-    const template = mobTemplateById.get(slot.mobTemplateId);
-    if (!template) continue;
-    const modifiedTemplate = {
-      ...template,
-      damageType: template.damageType as import('@pocketrealm/shared').DamageType,
-      hp: Math.max(1, Math.round(template.hp * Math.max(0.1, zoneModifiers.mobHpMultiplier))),
-      damageMin: Math.max(1, Math.round(template.damageMin * Math.max(0.1, zoneModifiers.mobDamageMultiplier))),
-      damageMax: Math.max(1, Math.round(template.damageMax * Math.max(0.1, zoneModifiers.mobDamageMultiplier))),
-      actionTemplate: defaultActionTemplate,
-    };
-    expeditionMobs.push(buildEncounterRaidMob(slot, modifiedTemplate));
-  }
-
+  // Load mob templates, apply zone modifiers, build ExpeditionMobState[]
+  const expeditionMobs = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
   if (expeditionMobs.length === 0) {
     throw new AppError(410, 'No valid mobs in encounter room', 'SITE_DECAYED');
   }
@@ -698,13 +694,13 @@ export async function startManualEncounterRoom(
     mobs: expeditionMobs,
     threatTable: initThreatTable([playerId]),
     roundNumber: 0,
-    potionsConsumed: [],
     allPotionsConsumed: [],
     roundLogs: [],
     maxHp: hpState.maxHp,
     turnCostCharged,
     totalRooms: site.totalRooms ?? 1,
     mobFamilyId: site.mobFamilyId,
+    createdAt: Date.now(),
   });
 
   return {
@@ -747,6 +743,8 @@ export async function resolveManualEncounterRound(
   siteId: string,
   _body: { action?: string; targetMobSlot?: number },
 ): Promise<ManualRoundResult> {
+  cleanupStaleSessions();
+
   const key = manualKey(playerId, siteId);
   const state = manualCombatStore.get(key);
   if (!state) {
@@ -922,23 +920,8 @@ export async function resolveManualEncounterRound(
   let respawnedTo: { townId: string; townName: string } | null = null;
 
   if (playerDefeated) {
-    const progression = await getPlayerProgressionState(playerId);
     const hpState = await getHpState(playerId);
-    const defeatResult = await handleCombatDefeat(playerId, {
-      evasionLevel: progression.attributes.evasion,
-      mobLevel: 1,
-      maxHp: hpState.maxHp,
-    });
-    fleeResult = defeatResult.fleeResult
-      ? {
-          outcome: defeatResult.fleeResult.outcome,
-          remainingHp: defeatResult.fleeResult.remainingHp,
-          goldLost: defeatResult.fleeResult.goldLost,
-          isRecovering: defeatResult.fleeResult.outcome === 'knockout',
-          recoveryCost: defeatResult.fleeResult.recoveryCost,
-        }
-      : null;
-    respawnedTo = defeatResult.respawnedTo;
+    ({ fleeResult, respawnedTo } = await handleEncounterDefeat(playerId, hpState.maxHp));
   }
 
   const outcome: ManualRoundResult['outcome'] = txResult.siteCleared
