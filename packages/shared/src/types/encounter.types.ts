@@ -10,3 +10,17 @@ export interface EncounterMobSlot {
   status: EncounterMobStatus;
   room: number;
 }
+
+export type RoomMode = 'auto' | 'manual';
+
+export interface RoomStrategyEntry {
+  room: number;
+  mode: RoomMode;
+  bonusEligible: boolean;
+}
+
+export interface RoomCarryState {
+  hp: number;
+  stamina: number;
+  mana: number;
+}
