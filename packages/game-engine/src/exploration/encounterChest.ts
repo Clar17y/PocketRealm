@@ -76,5 +76,7 @@ export function getChestRecipeChanceForRoomCount(rooms: number): number {
 
 export function rollChestMaterialRollsByRoomCount(rooms: number, rng: () => number = Math.random): number {
   const range = getChestMaterialRollRangeForRoomCount(rooms);
-  return range.min + Math.floor(rng() * (range.max - range.min + 1));
+  if (range.min >= range.max) return range.min;
+  const roll = Math.max(0, Math.min(1, rng()));
+  return Math.floor(roll * (range.max - range.min + 1)) + range.min;
 }
