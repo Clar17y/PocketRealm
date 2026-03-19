@@ -660,8 +660,8 @@ interface ManualCombatState {
 
 // Redis key prefix for manual combat sessions
 const COMBAT_SESSION_PREFIX = 'encounter-combat:';
-// TTL matches encounter site decay — 4 hours (single mob decays in ~4h at 0.25/hr)
-const COMBAT_SESSION_TTL_SECONDS = 4 * 60 * 60;
+// TTL covers worst-case decay — 80h for 20 mobs at 0.25/hr, rounded to 3.5 days
+const COMBAT_SESSION_TTL_SECONDS = 84 * 60 * 60;
 
 function combatSessionKey(playerId: string, siteId: string): string {
   return `${COMBAT_SESSION_PREFIX}${playerId}:${siteId}`;
