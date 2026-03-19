@@ -5,6 +5,7 @@ import type {
   PlayerAttackEntry,
   PlayerRoundActionEntry,
 } from '@pocketrealm/shared';
+import { formatHitBreakdown } from '../../combat/combatLogEntryUtils';
 
 function isExhaustedActionEntry(action: PlayerRoundActionEntry): action is ExhaustedActionEntry {
   return action.entryType === 'exhausted';
@@ -26,15 +27,16 @@ function exhaustedReasonLabel(reason: ExhaustedActionReason): string {
 }
 
 function AttackDetail({ attack }: { attack: PlayerAttackEntry }) {
-  const sampleValue = attack.hitRollValue !== undefined
-    ? (attack.hitRollValue / 100).toFixed(2)
-    : null;
+  const hitText = formatHitBreakdown({
+    hitChance: attack.hitChance,
+    hitRollValue: attack.hitRollValue,
+    attackerHitScore: attack.attackerHitScore,
+    defenderAvoidScore: attack.defenderAvoidScore,
+  });
 
   return (
     <div className="ml-2 mt-0.5 text-[var(--rpg-text-secondary)] opacity-80 space-y-0.5">
-      <div>
-        Roll: {attack.hitRollValue ?? '?'} + {attack.attackerHitScore} ACC | {Math.round(attack.hitChance * 100)}% chance ({attack.attackerHitScore} hit vs {attack.defenderAvoidScore} avoid){sampleValue && `, sample ${sampleValue}`} =&gt; {attack.hit ? (attack.crit ? 'Crit' : 'Hit') : 'Miss'}
-      </div>
+      {hitText && <div>{hitText}</div>}
       {attack.hit && attack.totalDamage !== undefined && (
         <div>
           Damage: {attack.damageRoll ?? attack.totalDamage} raw
