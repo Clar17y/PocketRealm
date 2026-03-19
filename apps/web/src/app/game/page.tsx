@@ -634,6 +634,7 @@ export default function GamePage() {
             }}
             zoneCraftingLevel={zoneCraftingLevel}
             confirmRarity={confirmRarity}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       }

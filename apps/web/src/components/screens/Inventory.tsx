@@ -80,6 +80,7 @@ interface InventoryProps {
   getSalvageCost?: (templateId: string) => number | null;
   zoneCraftingLevel?: number | null;
   confirmRarity?: ConfirmRarity;
+  showNpcDialogue?: boolean;
 }
 
 function prettySlot(slot: string) {
@@ -90,7 +91,7 @@ function prettySlot(slot: string) {
 export function Inventory({
   items, capacity, usedSlots, gold, isInTown,
   onDrop, onSalvage, onSalvageBatch, onRepair, onEquip, onUnequip, onUse, onSell, onSellBatch, onDeposit, onDepositBatch, onWithdraw, onWithdrawBatch,
-  getSalvageCost, zoneCraftingLevel, confirmRarity = 'uncommon',
+  getSalvageCost, zoneCraftingLevel, confirmRarity = 'uncommon', showNpcDialogue = true,
 }: InventoryProps) {
   const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -257,7 +258,7 @@ export function Inventory({
 
   return (
     <ScreenContainer>
-      {isInTown && <NpcDialogueBanner npcKey="millbrook-general-store" event={dialogueEvent} showDialogue={true} />}
+      {isInTown && <NpcDialogueBanner npcKey="millbrook-general-store" event={dialogueEvent} showDialogue={showNpcDialogue} />}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Inventory</h2>
         <div className="flex items-center gap-3">
