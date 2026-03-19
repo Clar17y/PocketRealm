@@ -109,8 +109,8 @@ describe('NPC_DIALOGUE completeness', () => {
     expect(getNpcName('rowan-foraging')).toBe('Rowan Delk');
   });
 
-  it('has expected number of NPC entries (12 base + 6 skill-specific)', () => {
-    expect(Object.keys(NPC_DIALOGUE).length).toBe(18);
+  it('has expected number of NPC entries (18 base + 16 zone-specific)', () => {
+    expect(Object.keys(NPC_DIALOGUE).length).toBe(34);
   });
 
   it('each NPC has at least 8 lines per populated event', () => {
