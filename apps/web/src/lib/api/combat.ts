@@ -455,7 +455,6 @@ export interface EncounterSitesResponse {
     nextMobPrefix: string | null;
     nextMobDisplayName: string | null;
     discoveredAt: string;
-    clearStrategy: string | null;
     currentRoom: number;
     totalRooms: number;
     roomMobCounts: Array<{ room: number; alive: number; total: number }>;

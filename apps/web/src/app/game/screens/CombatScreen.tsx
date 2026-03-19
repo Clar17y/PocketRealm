@@ -187,7 +187,7 @@ export function CombatScreen({
       currentRoom: site.currentRoom,
       totalRooms: site.totalRooms,
       hasDecayedMobs: site.decayedMobs > 0,
-      mobs: site.currentRoomMobs.map(m => ({
+      mobs: (site.currentRoomMobs ?? []).map(m => ({
         id: `encounter-mob-${m.slot}`,
         name: m.name,
         prefix: m.prefix,
