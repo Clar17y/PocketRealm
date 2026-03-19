@@ -9,7 +9,7 @@ export function ConnectionBanner() {
   const [wasDisconnected, setWasDisconnected] = useState(false);
 
   useEffect(() => {
-    if (status === 'disconnected' || status === 'reconnecting') {
+    if (status === 'disconnected' || status === 'reconnecting' || status === 'failed') {
       setWasDisconnected(true);
     } else if (status === 'connected' && wasDisconnected) {
       setShowReconnected(true);
@@ -23,8 +23,19 @@ export function ConnectionBanner() {
 
   if (showReconnected) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-[var(--rpg-green-dark)] text-[var(--rpg-text-primary)] text-center text-xs py-1 animate-[slideIn_0.3s_ease-out]">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-[var(--rpg-green-dark)] text-[var(--rpg-text-primary)] text-center text-xs py-1 animate-fadeIn">
         Connected
+      </div>
+    );
+  }
+
+  if (status === 'failed') {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-50 bg-[var(--rpg-red)] text-[var(--rpg-text-primary)] text-center text-xs py-1">
+        Connection lost.{' '}
+        <button onClick={() => window.location.reload()} className="underline">
+          Reload
+        </button>
       </div>
     );
   }
