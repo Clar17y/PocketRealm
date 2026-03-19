@@ -3,6 +3,7 @@ import type { EncounterSiteSize } from '@pocketrealm/shared';
 export type { EncounterSiteSize };
 export type ChestRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
+/** @deprecated Use getChestRarityForRoomCount instead */
 export function getChestRarityForEncounterSize(size: EncounterSiteSize): ChestRarity {
   if (size === 'small') return 'common';
   if (size === 'medium') return 'uncommon';
@@ -39,6 +40,7 @@ export function rollEncounterChestRecipeDrop(
   return rng() < chance;
 }
 
+/** @deprecated No longer used — tier upgrade removed */
 export function getUpgradedChestSize(size: EncounterSiteSize): EncounterSiteSize {
   if (size === 'small') return 'medium';
   if (size === 'medium') return 'large';

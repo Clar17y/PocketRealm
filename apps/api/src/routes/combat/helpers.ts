@@ -107,17 +107,6 @@ function getNextEncounterMob(mobs: EncounterMobSlot[]): EncounterMobSlot | null 
   return alive[0] ?? null;
 }
 
-function getNextEncounterMobInRoom(mobs: EncounterMobSlot[], roomNumber: number): EncounterMobSlot | null {
-  const alive = mobs.filter((mob) => mob.status === 'alive' && mob.room === roomNumber);
-  if (alive.length === 0) return null;
-  alive.sort((a, b) => {
-    const roleDiff = roleOrder(a.role) - roleOrder(b.role);
-    if (roleDiff !== 0) return roleDiff;
-    return a.slot - b.slot;
-  });
-  return alive[0] ?? null;
-}
-
 export function getAllAliveMobsInRoom(mobs: EncounterMobSlot[], roomNumber: number): EncounterMobSlot[] {
   return mobs
     .filter((mob) => mob.status === 'alive' && mob.room === roomNumber)
