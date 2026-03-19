@@ -56,6 +56,18 @@ import {
 // Re-export for route handler convenience
 export { parseEncounterMobSlot, makeEncounterMobId };
 
+/** Snapshot of initial mob state for activity logs and return values. */
+function toInitialMobSnapshot(mobs: ExpeditionMobState[]) {
+  return mobs.map(m => ({
+    mobId: m.id,
+    slot: parseEncounterMobSlot(m.id) ?? 0,
+    name: m.name,
+    prefix: m.prefix,
+    hp: m.hp,
+    maxHp: m.maxHp,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -620,14 +632,7 @@ export async function autoResolveEncounterRoom(
           mode: 'auto',
           roundsResolved: combatResult.roundsResolved,
           rounds: combatResult.rounds,
-          initialMobs: expeditionMobs.map(m => ({
-            mobId: m.id,
-            slot: parseEncounterMobSlot(m.id) ?? 0,
-            name: m.name,
-            prefix: m.prefix,
-            hp: m.hp,
-            maxHp: m.maxHp,
-          })),
+          initialMobs: toInitialMobSnapshot(expeditionMobs),
           siteCleared,
           chestReward: completionRewards,
         } as unknown as Prisma.InputJsonObject,
@@ -661,9 +666,7 @@ export async function autoResolveEncounterRoom(
     outcome: finalOutcome,
     roundsResolved: combatResult.roundsResolved,
     rounds: combatResult.rounds,
-    initialMobs: expeditionMobs.map(m => ({
-      mobId: m.id, slot: parseEncounterMobSlot(m.id) ?? 0, name: m.name, prefix: m.prefix, hp: m.hp, maxHp: m.maxHp,
-    })),
+    initialMobs: toInitialMobSnapshot(expeditionMobs),
     playerHpAfter: combatResult.playerHpAfter,
     playerStaminaAfter: combatResult.playerStaminaAfter,
     playerManaAfter: combatResult.playerManaAfter,
@@ -801,7 +804,7 @@ export async function startManualEncounterRoom(
       playerMana: existingState.participant.mana,
       playerMaxMana: existingState.participant.maxMana,
       roundNumber: existingState.roundNumber,
-      roundLogs: (existingState as { roundLogs?: ExpeditionRoundLog[] }).roundLogs ?? [],
+      roundLogs: existingState.roundLogs ?? [],
     };
   }
 
@@ -870,14 +873,7 @@ export async function startManualEncounterRoom(
     zoneId: site.zoneId,
     zoneName: site.zone.name,
     mobFamilyName: site.mobFamily.name,
-    initialMobs: expeditionMobs.map(m => ({
-      mobId: m.id,
-      slot: parseEncounterMobSlot(m.id) ?? 0,
-      name: m.name,
-      prefix: m.prefix,
-      hp: m.hp,
-      maxHp: m.maxHp,
-    })),
+    initialMobs: toInitialMobSnapshot(expeditionMobs),
   });
 
   return {
@@ -1092,8 +1088,8 @@ export async function resolveManualEncounterRound(
 
     const potionDeductResult = await deductConsumedPotions(playerId, state.allPotionsConsumed, tx);
 
-    // Build full round log: accumulated prior rounds + this round
-    const allRounds = [...(state.roundLogs ?? []), result.roundLog];
+    // state.roundLogs already includes this round (pushed at line 977)
+    const allRounds = state.roundLogs;
 
     // Log room combat to activity history
     await tx.activityLog.create({

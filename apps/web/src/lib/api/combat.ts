@@ -235,6 +235,10 @@ export interface CombatResultResponse {
   playerStartMana?: number;
   mobMaxHp: number;
   log: CombatLogEntryResponse[];
+  /** Encounter site room combat: round-by-round logs (replaces `log` for this source type). */
+  rounds?: ExpeditionRoundLog[];
+  /** Encounter site room combat: chest reward data if site was cleared. */
+  chestReward?: unknown;
   eventModifiers?: EventModifierBadge[];
   rewards: {
     xp: number;

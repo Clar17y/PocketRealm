@@ -17,7 +17,6 @@ import { relativeTime } from '@/lib/format';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { RoundLogContent } from '@/components/common/combat';
-import type { ExpeditionRoundLog } from '@pocketrealm/shared';
 import { EventBadges } from '@/components/common/EventBadge';
 import { CopyButton } from '@/components/common/CopyButton';
 import { FightNavigationBar } from '@/components/common/FightNavigationBar';
@@ -487,13 +486,13 @@ export function CombatHistory() {
 
               {selectedEntry.source === 'encounter_site_room' ? (
                 <div className="max-h-96 overflow-y-auto space-y-3 border-t border-[var(--rpg-border)] pt-2">
-                  {((selectedDetail as unknown as { rounds?: ExpeditionRoundLog[] }).rounds ?? []).map((roundLog, i) => (
+                  {(selectedDetail.rounds ?? []).map((roundLog, i) => (
                     <div key={i}>
                       <p className="text-xs font-bold text-[var(--rpg-text-secondary)] mb-1">Round {roundLog.round}</p>
                       <RoundLogContent log={roundLog} playerId={null} />
                     </div>
                   ))}
-                  {!!(selectedDetail as unknown as { chestReward?: unknown }).chestReward && (
+                  {!!selectedDetail.chestReward && (
                     <div className="border-t border-[var(--rpg-border)] pt-2 text-xs text-[var(--rpg-gold)]">
                       Chest reward received on site completion
                     </div>
