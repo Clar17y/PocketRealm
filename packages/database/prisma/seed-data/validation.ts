@@ -18,8 +18,8 @@ export const SUPPORTED_ITEM_STAT_KEYS = new Set([
 ]);
 
 export const STARTER_TARGETS = {
-  tutorialHitChanceMin: 0.45,
-  forestEdgeTier1HitChanceMin: 0.4,
+  tutorialHitChanceMin: 0.28,
+  forestEdgeTier1HitChanceMin: 0.25,
   tutorialEnemyHitChanceMin: 0.35,
 } as const;
 
