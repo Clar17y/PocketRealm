@@ -43,7 +43,7 @@ export interface EncounterSiteCombatViewProps {
     hasDecayedMobs: boolean;
   }>;
   onRetryRoom: () => Promise<EncounterStartRoomResponse>;
-  onComplete: () => void;
+  onComplete: (outcome: 'cleared' | 'defeated' | 'abandoned') => void;
   onActivateTemplate: (templateId: string) => void;
   setError: (msg: string | null) => void;
 }
@@ -243,7 +243,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
     setLoading(true);
     try {
       await props.onAbandon();
-      props.onComplete();
+      props.onComplete('abandoned');
     } catch (err) {
       props.setError('Failed to abandon site');
     } finally {
@@ -354,7 +354,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
                 </div>
               )}
               <div className="mt-2">
-                <PixelButton onClick={props.onComplete}>Done</PixelButton>
+                <PixelButton onClick={() => props.onComplete('cleared')}>Done</PixelButton>
               </div>
             </>
           )}

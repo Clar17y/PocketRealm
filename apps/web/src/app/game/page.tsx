@@ -1027,6 +1027,7 @@ export default function GamePage() {
             combatXpRate={primaryCombatXpRate}
             staminaState={staminaState}
             manaState={manaState}
+            advanceTutorial={advanceTutorial}
           />
         );
       }

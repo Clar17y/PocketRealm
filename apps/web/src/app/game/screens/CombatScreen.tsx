@@ -19,7 +19,7 @@ import { CopyButton } from '@/components/common/CopyButton';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
-import { getMobPrefixDefinition, HP_CONSTANTS } from '@pocketrealm/shared';
+import { getMobPrefixDefinition, HP_CONSTANTS, TUTORIAL_STEP_COMBAT } from '@pocketrealm/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../gameController.types';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
 import { SubNav } from '@/components/common/SubNav';
@@ -98,6 +98,7 @@ interface CombatScreenProps {
   refreshPendingEncounters?: () => void;
   setError?: (msg: string | null) => void;
   activeEncounterSiteId?: string | null;
+  advanceTutorial?: (step: number) => void;
 }
 
 export function CombatScreen({
@@ -142,6 +143,7 @@ export function CombatScreen({
   refreshPendingEncounters,
   setError,
   activeEncounterSiteId: externalActiveEncounterSiteId,
+  advanceTutorial,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
   const [lowHpPendingSite, setLowHpPendingSite] = useState<PendingEncounter | null>(null);
@@ -358,9 +360,12 @@ export function CombatScreen({
               if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
               return result;
             }}
-            onComplete={() => {
+            onComplete={(combatOutcome) => {
               setActiveSiteCombat(null);
               refreshPendingEncounters?.();
+              if (combatOutcome === 'cleared') {
+                advanceTutorial?.(TUTORIAL_STEP_COMBAT);
+              }
             }}
             onActivateTemplate={onActivateTemplate ?? (() => {})}
             setError={setError ?? (() => {})}
