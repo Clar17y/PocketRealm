@@ -33,11 +33,48 @@ function AttackDetail({ attack }: { attack: PlayerAttackEntry }) {
     attackerHitScore: attack.attackerHitScore,
     defenderAvoidScore: attack.defenderAvoidScore,
   });
+  const cascade = attack.splashCascade;
+  const cascadeHit = cascade?.find(c => c.hit);
 
   return (
     <div className="ml-2 mt-0.5 text-[var(--rpg-text-secondary)] opacity-80 space-y-0.5">
       {hitText && <div>{hitText}</div>}
-      {attack.hit && attack.totalDamage !== undefined && (
+      {cascade && cascade.length > 0 && (
+        <div className="space-y-0.5">
+          {cascade.map((c, i) => {
+            const cascadeHitText = formatHitBreakdown({
+              hitChance: c.hitChance,
+              hitRollValue: c.hitRollValue,
+              attackerHitScore: c.attackerHitScore,
+              defenderAvoidScore: c.defenderAvoidScore,
+            });
+            return (
+              <div key={i} className="ml-1 border-l border-[var(--rpg-border)] pl-1.5">
+                <div>
+                  Splash {i + 1} {'>'} {c.targetMobName} |{' '}
+                  {c.hit ? (
+                    <>
+                      <span className={c.crit ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-green-light)]'}>
+                        {c.crit ? 'CRIT' : 'HIT'}
+                      </span>
+                      {c.totalDamage !== undefined && <span className="text-[var(--rpg-red)]"> {c.totalDamage} dmg</span>}
+                    </>
+                  ) : (
+                    <span className="text-[var(--rpg-text-secondary)]">MISS</span>
+                  )}
+                </div>
+                {cascadeHitText && <div className="ml-2">{cascadeHitText}</div>}
+                {c.hit && c.totalDamage !== undefined && c.damageRoll !== undefined && (
+                  <div className="ml-2">
+                    Damage: {c.damageRoll} raw{c.crit && ' \u00d7 1.5 crit'} = {c.totalDamage} final
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {!cascade && attack.hit && attack.totalDamage !== undefined && (
         <div>
           Damage: {attack.damageRoll ?? attack.totalDamage} raw
           {attack.crit && ' \u00d7 1.5 crit'}
@@ -90,7 +127,27 @@ export function RoundLogAttackRow({
   }
 
   const isMe = attack.playerId === currentPlayerId;
-  const outcomeNode = !attack.hit ? (
+  const hasCascade = attack.splashCascade && attack.splashCascade.length > 0;
+  const cascadeHit = attack.splashCascade?.find(c => c.hit);
+
+  const outcomeNode = hasCascade ? (
+    // Cascade: original target was missed, show cascade result
+    cascadeHit ? (
+      <>
+        <span className="text-[var(--rpg-text-secondary)]">MISS</span>
+        <span className="text-[var(--rpg-text-secondary)]"> {'>'} </span>
+        <span className={cascadeHit.crit ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-green-light)]'}>
+          {cascadeHit.targetMobName}
+        </span>
+        {cascadeHit.totalDamage !== undefined && (
+          <span className="text-[var(--rpg-red)]"> {cascadeHit.totalDamage} dmg</span>
+        )}
+        <span className="text-[var(--rpg-text-secondary)] text-[9px]"> (splash)</span>
+      </>
+    ) : (
+      <span className="text-[var(--rpg-text-secondary)]">MISS</span>
+    )
+  ) : !attack.hit ? (
     <span className="text-[var(--rpg-text-secondary)]">MISS</span>
   ) : (
     <>

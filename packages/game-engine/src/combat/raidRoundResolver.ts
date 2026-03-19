@@ -162,6 +162,7 @@ function resolvePlayerOffensive(
       // Splash hit cascade: on miss, try other alive mobs in order
       if (ctx.splashCascade && !isAoe) {
         const otherMobs = aliveMobs.filter(m => m.id !== target.id && m.hp > 0);
+        const cascadeAttempts: import('@pocketrealm/shared').SplashCascadeAttempt[] = [];
         let cascadeTarget: typeof target | null = null;
         for (const candidateMob of otherMobs) {
           const cascadeAvoid = calculateAvoidScore(candidateMob.stats);
@@ -175,47 +176,66 @@ function resolvePlayerOffensive(
               });
           if (cascadeResult.didHit) {
             cascadeTarget = candidateMob;
+            // Cascade hit: compute damage against cascade target
+            s.hit = true;
+            const rawDmg = ctx.roll.rollDamage(p.stats.damageMin, p.stats.damageMax);
+            const scaledDmg = Math.floor(rawDmg * (def.damageMultiplier ?? 1.0));
+            const crit = ctx.roll.rollCrit(p.stats.critChance ?? 0);
+            if (crit) s.isCritical = true;
+            const isMagicAttack = def.damageType === 'magic' || p.stats.damageType === 'magic';
+            const effectiveDefence = isMagicAttack
+              ? getEffectiveStatValue(candidateMob.stats.magicDefence, candidateMob.activeEffects, 'magicDefence')
+              : getEffectiveStatValue(candidateMob.stats.defence, candidateMob.activeEffects, 'defence');
+            const { damage } = calculateFinalDamage(scaledDmg, effectiveDefence, crit, p.stats.critDamage ?? 0);
+            candidateMob.hp = Math.max(0, candidateMob.hp - damage);
+            totalDamageDealt += damage;
+            if (def.effect?.isDebuff && candidateMob.hp > 0) {
+              const dotFlat = def.effect.damagePerRound ?? 0;
+              const dotPct = def.effect.damagePerRoundPercent ?? 0;
+              const resolvedDot = dotFlat + Math.floor((dotPct / 100) * damage);
+              candidateMob.activeEffects.push({
+                name: def.effect.name,
+                stat: def.effect.stat,
+                modifier: def.effect.modifier,
+                roundsRemaining: def.effect.duration,
+                ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
+              });
+            }
+            cascadeAttempts.push({
+              targetMobName: mobDisplayName(candidateMob),
+              hitChance: cascadeResult.hitChance,
+              hitRollValue: cascadeResult.hitRollValue,
+              attackerHitScore: cascadeResult.hitScore,
+              defenderAvoidScore: cascadeAvoid,
+              hit: true,
+              crit,
+              damageRoll: rawDmg,
+              totalDamage: damage,
+            });
             break;
-          }
-        }
-        if (cascadeTarget) {
-          // Cascade hit: compute damage against cascade target and push a hit entry
-          s.hit = true;
-          const rawDmg = ctx.roll.rollDamage(p.stats.damageMin, p.stats.damageMax);
-          const scaledDmg = Math.floor(rawDmg * (def.damageMultiplier ?? 1.0));
-          const crit = ctx.roll.rollCrit(p.stats.critChance ?? 0);
-          if (crit) s.isCritical = true;
-          const isMagicAttack = def.damageType === 'magic' || p.stats.damageType === 'magic';
-          const effectiveDefence = isMagicAttack
-            ? getEffectiveStatValue(cascadeTarget.stats.magicDefence, cascadeTarget.activeEffects, 'magicDefence')
-            : getEffectiveStatValue(cascadeTarget.stats.defence, cascadeTarget.activeEffects, 'defence');
-          const { damage } = calculateFinalDamage(scaledDmg, effectiveDefence, crit, p.stats.critDamage ?? 0);
-          cascadeTarget.hp = Math.max(0, cascadeTarget.hp - damage);
-          totalDamageDealt += damage;
-          if (def.effect?.isDebuff && cascadeTarget.hp > 0) {
-            const dotFlat = def.effect.damagePerRound ?? 0;
-            const dotPct = def.effect.damagePerRoundPercent ?? 0;
-            const resolvedDot = dotFlat + Math.floor((dotPct / 100) * damage);
-            cascadeTarget.activeEffects.push({
-              name: def.effect.name,
-              stat: def.effect.stat,
-              modifier: def.effect.modifier,
-              roundsRemaining: def.effect.duration,
-              ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
+          } else {
+            cascadeAttempts.push({
+              targetMobName: mobDisplayName(candidateMob),
+              hitChance: cascadeResult.hitChance,
+              hitRollValue: cascadeResult.hitRollValue,
+              attackerHitScore: cascadeResult.hitScore,
+              defenderAvoidScore: cascadeAvoid,
+              hit: false,
             });
           }
-          entries.push({
-            ...baseEntry,
-            targetMobId: cascadeTarget.id,
-            targetMobName: mobDisplayName(cascadeTarget),
-            defenderAvoidScore: calculateAvoidScore(cascadeTarget.stats),
-            hit: true,
-            crit,
-            damageRoll: rawDmg,
-            totalDamage: damage,
-          });
-          continue;
         }
+        // Log entry shows original miss + cascade chain
+        entries.push({
+          ...baseEntry,
+          hit: !!cascadeTarget,
+          crit: cascadeTarget ? cascadeAttempts[cascadeAttempts.length - 1]?.crit ?? false : false,
+          ...(cascadeTarget ? {
+            damageRoll: cascadeAttempts[cascadeAttempts.length - 1]?.damageRoll,
+            totalDamage: cascadeAttempts[cascadeAttempts.length - 1]?.totalDamage,
+          } : {}),
+          splashCascade: cascadeAttempts,
+        });
+        continue;
       }
 
       entries.push({ ...baseEntry, hit: false, crit: false });
