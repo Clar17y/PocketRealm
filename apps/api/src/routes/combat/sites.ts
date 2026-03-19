@@ -102,6 +102,7 @@ export function registerSiteRoutes(router: Router): void {
         currentRoom: number;
         totalRooms: number;
         roomMobCounts: Array<{ room: number; alive: number; total: number }>;
+        currentRoomMobs: Array<{ slot: number; mobTemplateId: string; prefix: string | null; status: string }>;
       }> = [];
 
       for (const site of sites) {
@@ -123,6 +124,11 @@ export function registerSiteRoutes(router: Router): void {
           };
         });
 
+        const currentRoomNumber = site.currentRoom ?? 1;
+        const currentRoomMobs = decayed.mobs
+          .filter(m => (m.room ?? 1) === currentRoomNumber && m.status === 'alive')
+          .map(m => ({ slot: m.slot, mobTemplateId: m.mobTemplateId, prefix: m.prefix ?? null, status: m.status }));
+
         activeSites.push({
           encounterSiteId: site.id,
           zoneId: site.zoneId,
@@ -138,22 +144,27 @@ export function registerSiteRoutes(router: Router): void {
           nextMobTemplateId: decayed.nextMob?.mobTemplateId ?? null,
           nextMobPrefix: decayed.nextMob?.prefix ?? null,
           discoveredAt: site.discoveredAt.toISOString(),
-          currentRoom: site.currentRoom ?? 1,
+          currentRoom: currentRoomNumber,
           totalRooms: site.totalRooms ?? roomNumbers.length,
           roomMobCounts,
+          currentRoomMobs,
         });
       }
 
-      const nextMobTemplateIds = Array.from(
-        new Set(activeSites.map((site) => site.nextMobTemplateId).filter((id): id is string => Boolean(id)))
-      );
-      const nextMobRows = nextMobTemplateIds.length > 0
+      // Collect all mob template IDs (next mob + current room mobs) for name/HP lookup
+      const allMobTemplateIds = new Set<string>();
+      for (const site of activeSites) {
+        if (site.nextMobTemplateId) allMobTemplateIds.add(site.nextMobTemplateId);
+        for (const mob of site.currentRoomMobs) allMobTemplateIds.add(mob.mobTemplateId);
+      }
+      const mobTemplateRows = allMobTemplateIds.size > 0
         ? await prisma.mobTemplate.findMany({
-            where: { id: { in: nextMobTemplateIds } },
-            select: { id: true, name: true },
+            where: { id: { in: [...allMobTemplateIds] } },
+            select: { id: true, name: true, hp: true },
           })
         : [];
-      const nextMobNameById = new Map(nextMobRows.map((row) => [row.id, row.name]));
+      const mobTemplateById = new Map(mobTemplateRows.map((row) => [row.id, row]));
+      const nextMobNameById = new Map(mobTemplateRows.map((row) => [row.id, row.name]));
 
       activeSites.sort((a, b) => {
         if (query.sort === 'danger') {
@@ -208,6 +219,16 @@ export function registerSiteRoutes(router: Router): void {
             totalRooms: site.totalRooms,
             currentRoom: site.currentRoom,
             roomMobCounts: site.roomMobCounts,
+            currentRoomMobs: site.currentRoomMobs.map(m => {
+              const template = mobTemplateById.get(m.mobTemplateId);
+              return {
+                slot: m.slot,
+                name: template?.name ?? 'Unknown',
+                prefix: m.prefix,
+                hp: template?.hp ?? 0,
+                maxHp: template?.hp ?? 0,
+              };
+            }),
             eventModifiers: badgeCache.get(`${site.zoneId}:${site.mobFamilyId}`) ?? [],
             totalTurnCost: site.aliveMobs * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
           };

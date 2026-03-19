@@ -158,6 +158,7 @@ export function CombatScreen({
     currentRoom: number;
     totalRooms: number;
     hasDecayedMobs: boolean;
+    mobs: ExpeditionMobInfo[];
   } | null>(null);
 
   // Sync with external activeEncounterSiteId on mount (reconnect)
@@ -166,14 +167,7 @@ export function CombatScreen({
       // Find the site in pending encounters for metadata
       const site = pendingEncounters.find(e => e.encounterSiteId === externalActiveEncounterSiteId);
       if (site) {
-        setActiveSiteCombat({
-          siteId: site.encounterSiteId,
-          siteName: site.siteName,
-          mobFamilyName: site.mobFamilyName,
-          currentRoom: site.currentRoom,
-          totalRooms: site.totalRooms,
-          hasDecayedMobs: site.decayedMobs > 0,
-        });
+        enterEncounterCombat(site);
       }
     }
   }, [externalActiveEncounterSiteId, pendingEncounters]);
@@ -193,6 +187,14 @@ export function CombatScreen({
       currentRoom: site.currentRoom,
       totalRooms: site.totalRooms,
       hasDecayedMobs: site.decayedMobs > 0,
+      mobs: site.currentRoomMobs.map(m => ({
+        id: `encounter-mob-${m.slot}`,
+        name: m.name,
+        prefix: m.prefix,
+        hp: m.hp,
+        maxHp: m.maxHp,
+        activeEffects: [],
+      })),
     });
   };
 
@@ -305,7 +307,7 @@ export function CombatScreen({
             mobFamilyName={activeSiteCombat.mobFamilyName}
             currentRoom={activeSiteCombat.currentRoom}
             totalRooms={activeSiteCombat.totalRooms}
-            initialMobs={[]}
+            initialMobs={activeSiteCombat.mobs}
             playerState={{
               hp: hpState.currentHp,
               maxHp: hpState.maxHp,
