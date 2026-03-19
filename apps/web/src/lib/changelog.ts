@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.46',
+    date: '2026-03-19',
+    title: 'NPC Expansion & Zone-Aware Dialogue',
+    summary:
+      'Thornwall and Millbrook now have their own distinct NPCs. Crafting benches show the correct town\'s smith, artisan, or jeweller depending on where you are. Eight new characters join the world: Nella Sable (Millbrook artisan), Orin Facet (Millbrook jeweller), Dorren Ashforge (Thornwall blacksmith), Sera Voss (Thornwall artisan), Maren Glint (Thornwall jeweller), Callum Dross (Thornwall herbalist), and Sergeant Hale (Thornwall guard). Aldric Voss now runs the Quest Board, Bram Holloway comments on your sales in the Inventory, Gavrik greets you when joining a guild, and Captain Darrow watches over the Zone Map. A mysterious figure may occasionally appear during exploration. Nearly 200 items now have flavour text, covering all armor sets, resources, and consumables.',
+  },
+  {
     version: '0.45',
     date: '2026-03-19',
     title: 'Lore & Flavour Text',
