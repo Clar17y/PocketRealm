@@ -12,6 +12,7 @@ import { LootReveal } from '@/components/common/LootReveal';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { SubNav } from '@/components/common/SubNav';
 import { XpRateTutorial } from '@/components/common/XpRateTutorial';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { BottomNav } from '@/components/BottomNav';
 import { Dashboard } from '@/components/screens/Dashboard';
 import { Exploration } from '@/components/screens/Exploration';
@@ -1232,7 +1233,7 @@ export default function GamePage() {
   };
 
   return (
-    <>
+    <ErrorBoundary>
       <ConnectionBanner />
       {showChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
       {confirmAbandonLoot && (
@@ -1446,7 +1447,7 @@ export default function GamePage() {
       <QuestToast />
       <ForgeResultToast />
       <RateLimitToast />
-    </>
+    </ErrorBoundary>
   );
 }
 
