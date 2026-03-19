@@ -203,15 +203,11 @@ function resolvePlayerOffensive(
               ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
             });
           }
-          const cascadeAvoidForLog = calculateAvoidScore(cascadeTarget.stats);
-          const cascadeResForLog = def.alwaysHits
-            ? guaranteedHitResult(hitScore, cascadeAvoidForLog)
-            : guaranteedHitResult(hitScore, cascadeAvoidForLog); // log as guaranteed hit since we know it hit
           entries.push({
             ...baseEntry,
             targetMobId: cascadeTarget.id,
             targetMobName: mobDisplayName(cascadeTarget),
-            defenderAvoidScore: cascadeAvoidForLog,
+            defenderAvoidScore: calculateAvoidScore(cascadeTarget.stats),
             hit: true,
             crit,
             damageRoll: rawDmg,
