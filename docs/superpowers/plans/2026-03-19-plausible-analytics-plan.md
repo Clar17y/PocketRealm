@@ -99,10 +99,13 @@ import Script from 'next/script';
 
 Update the return to:
 
+Note: Next.js App Router manages `<head>` via the `metadata` export. Adding an explicit `<head>` tag alongside `metadata` can cause conflicts. Instead, place the `Script` inside `<body>` — `next/script` with `strategy="afterInteractive"` injects into the document regardless of placement.
+
 ```tsx
 return (
   <html lang="en">
-    <head>
+    <body className={`${almendra.variable} ${crimsonText.variable} ${silkscreen.variable}`}>
+      {children}
       {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
         <Script
           defer
@@ -111,8 +114,7 @@ return (
           strategy="afterInteractive"
         />
       )}
-    </head>
-    <body className={`${almendra.variable} ${crimsonText.variable} ${silkscreen.variable}`}>{children}</body>
+    </body>
   </html>
 );
 ```
@@ -168,30 +170,23 @@ In `apps/web/src/app/game/useGameController.ts`, add import at top (after the ex
 import { trackEvent, trackOnce } from '@/lib/analytics';
 ```
 
-In the main initialization `useEffect` (line 679), after `void loadAll();`, the session_start event should fire after the player data is loaded. Add a new `useEffect` that depends on `characterLevel` and `isAuthenticated`:
+The session_start event should fire once per page load after the player data is loaded. The character level lives in `characterProgression.characterLevel` (set via `setCharacterProgression` in `loadAll()`). The `Player` interface in `useAuth.ts` does not include `createdAt`, so `daysSinceSignup` will be `0` for now — a future PR can add `createdAt` to the auth response to enable retention cohort analysis.
 
-Find a suitable location after the initialization effect (around line 693) and add:
+Add a ref near the other refs at the top of the hook:
 
 ```typescript
-// Analytics: track session start once per page load
 const sessionTrackedRef = useRef(false);
 ```
 
-Add this ref near the other refs at the top of the hook. Then add a `useEffect`:
+Add a new `useEffect` after the initialization effect (around line 693):
 
 ```typescript
 useEffect(() => {
-  if (!isAuthenticated || sessionTrackedRef.current || characterLevel === 0) return;
+  if (!isAuthenticated || sessionTrackedRef.current || characterProgression.characterLevel === 0) return;
   sessionTrackedRef.current = true;
-  const createdAt = localStorage.getItem('playerCreatedAt');
-  const daysSinceSignup = createdAt
-    ? Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000)
-    : 0;
-  trackEvent('session_start', { characterLevel, daysSinceSignup });
-}, [isAuthenticated, characterLevel]);
+  trackEvent('session_start', { characterLevel: characterProgression.characterLevel, daysSinceSignup: 0 });
+}, [isAuthenticated, characterProgression.characterLevel]);
 ```
-
-Note: `playerCreatedAt` is set during login/register via `setTokens`. Check if the player object includes `createdAt` — if so, store it in localStorage during `setTokens`. If not available, pass `0` for `daysSinceSignup` and skip that prop. Adapt to whatever the player object provides.
 
 - [ ] **Step 3: Verify typecheck**
 
@@ -353,10 +348,11 @@ git commit -m "feat: wire crafting analytics events (action, first_craft, level_
 
 ---
 
-### Task 8: Wire Exploration, Forge, Salvage, Rest Events
+### Task 8: Wire Exploration, Forge, Salvage, Rest, PvP Events
 
 **Files:**
 - Modify: `apps/web/src/app/game/useGameController.ts`
+- Modify: `apps/web/src/app/game/screens/ArenaScreen.tsx`
 
 - [ ] **Step 1: Add analytics to exploration**
 
@@ -395,20 +391,20 @@ const finalizeExplorationPlayback = async () => {
 
 - [ ] **Step 2: Add analytics to forge upgrade**
 
-In `handleForgeUpgrade()` (line 1259), after the success/protected/fail log branches, add before the closing `});`:
+In `handleForgeUpgrade()` (line 1259), the callback receives `data` which includes `data.turns`. The turn cost is available as the difference between turns before and after, but the simplest approach is to use the `data.forge` response. Since `simpleAction` receives `data`, add before the closing `});`:
 
 ```typescript
-trackEvent('action', { type: 'forge_upgrade', turns: 100 });
+trackEvent('action', { type: 'forge_upgrade', turns: data.forge.turnCost ?? 100 });
 ```
 
-The turn cost varies by rarity but a constant approximation is fine for analytics — the exact turns are tracked server-side in ActivityLog.
+If `data.forge.turnCost` is not in the response, fall back to the constant. Check the actual response shape during implementation.
 
 - [ ] **Step 3: Add analytics to forge reroll**
 
 In `handleForgeReroll()` (line 1294), before the closing `});`, add:
 
 ```typescript
-trackEvent('action', { type: 'forge_reroll', turns: 75 });
+trackEvent('action', { type: 'forge_reroll', turns: data.forge.turnCost ?? 75 });
 ```
 
 - [ ] **Step 4: Add analytics to salvage**
@@ -416,7 +412,7 @@ trackEvent('action', { type: 'forge_reroll', turns: 75 });
 In `handleSalvageItem()` (line 1245), before the closing `});`, add:
 
 ```typescript
-trackEvent('action', { type: 'salvage', turns: 50 });
+trackEvent('action', { type: 'salvage', turns: data.salvage.turnCost ?? 50 });
 ```
 
 In `handleSalvageBatch()` (line 1252), before the closing `});`, add:
@@ -433,16 +429,32 @@ In `handleQuickRest()` (line 1687), after `pushLog(...)` (line 1704), add:
 trackEvent('action', { type: 'rest', turns: actualTurns });
 ```
 
-- [ ] **Step 6: Verify typecheck**
+- [ ] **Step 6: Add analytics to PvP challenge**
+
+In `apps/web/src/app/game/screens/ArenaScreen.tsx`, add import at top:
+
+```typescript
+import { trackEvent } from '@/lib/analytics';
+```
+
+In `handleChallenge()` (line 134), after `if (result.data) {` and after `setPvpPlaybackActive(true);` (around line 142), add:
+
+```typescript
+trackEvent('action', { type: 'pvp_challenge', turns: 500 });
+```
+
+The PvP challenge cost is 500 turns (`SCOUTING_CONSTANTS` / `PVP_CONSTANTS`). If the exact cost is available in `result.data`, use that instead.
+
+- [ ] **Step 7: Verify typecheck**
 
 Run: `cd apps/web && npx tsc --noEmit --pretty 2>&1 | head -20`
 Expected: no new errors
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add apps/web/src/app/game/useGameController.ts
-git commit -m "feat: wire exploration, forge, salvage, rest analytics events"
+git add apps/web/src/app/game/useGameController.ts apps/web/src/app/game/screens/ArenaScreen.tsx
+git commit -m "feat: wire exploration, forge, salvage, rest, pvp analytics events"
 ```
 
 ---
@@ -609,7 +621,7 @@ export async function getBalanceReport(period: string): Promise<BalanceReport> {
       WHERE ps.player_id IN (
         SELECT DISTINCT player_id FROM activity_logs WHERE created_at >= ${cutoff}
       )
-      AND ps.level > 1
+      AND ps.level >= 1
       GROUP BY ps.skill_type
       ORDER BY ps.skill_type
     `;
@@ -661,14 +673,18 @@ export async function getBalanceReport(period: string): Promise<BalanceReport> {
     }>>`
       SELECT category, COALESCE(SUM(xp), 0) as total_xp, COALESCE(SUM(turns_spent), 0) as total_turns
       FROM (
-        -- Combat XP (from skillXpGrants array)
+        -- Combat XP (sum all skillXpGrants entries, not just first)
         SELECT
           'combat' as category,
-          COALESCE((result->'rewards'->'skillXpGrants'->0->>'xpAfterEfficiency')::numeric, 0) as xp,
-          turns_spent
-        FROM activity_logs
-        WHERE activity_type = 'combat'
-          AND created_at >= ${cutoff}
+          COALESCE(g.xp, 0) as xp,
+          a.turns_spent
+        FROM activity_logs a
+        LEFT JOIN LATERAL (
+          SELECT SUM((elem->>'xpAfterEfficiency')::numeric) as xp
+          FROM jsonb_array_elements(a.result->'rewards'->'skillXpGrants') as elem
+        ) g ON true
+        WHERE a.activity_type = 'combat'
+          AND a.created_at >= ${cutoff}
 
         UNION ALL
 
