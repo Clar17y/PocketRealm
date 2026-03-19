@@ -562,10 +562,10 @@ model EncounterSite {
   discoveredAt DateTime @default(now()) @map("discovered_at")
   sourceLogId String?  @map("source_log_id")
 
-  clearStrategy    String?  @map("clear_strategy") @db.VarChar(16)
   currentRoom      Int      @default(1) @map("current_room")
-  fullClearActive  Boolean  @default(true) @map("full_clear_active")
-  roomCarryHp      Int?     @map("room_carry_hp")
+  roomStrategy    Json?     @map("room_strategy")
+  roomCarryState  Json?     @map("room_carry_state")
+  totalRooms      Int       @default(1) @map("total_rooms")
 
   player    Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
   zone      Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
