@@ -757,6 +757,7 @@ export default function GamePage() {
             playerMaxMana={manaState.max}
             homeTownId={homeTownId}
             onSetHomeTown={(zoneId) => void handleSetHomeTown(zoneId)}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       case 'bestiary':

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
@@ -19,6 +19,7 @@ import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { getNpcLine } from '@pocketrealm/shared';
 
 interface ExplorationProps {
   currentZone: {
@@ -77,6 +78,16 @@ interface ExplorationProps {
 }
 
 export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
+  const strangerLineRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (playbackData) {
+      strangerLineRef.current = Math.random() < 0.05
+        ? getNpcLine('mysterious-stranger', 'idle')
+        : null;
+    }
+  }, [playbackData]);
+
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
@@ -210,6 +221,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
             playerStartMana={currentMana}
             playerMaxStamina={maxStamina}
             playerMaxMana={maxMana}
+            strangerLine={strangerLineRef.current}
             embedded
           />
         </PlaybackSurface>

@@ -470,7 +470,7 @@ function ShopTab({
 
   return (
     <div className="space-y-4">
-      <NpcDialogueBanner npcKey="millbrook-general-store" event={dialogueEvent} showDialogue={showNpcDialogue} />
+      <NpcDialogueBanner npcKey="millbrook-quest-board" event={dialogueEvent} showDialogue={showNpcDialogue} />
 
       {/* Token balance */}
       <PixelCard padding="sm">

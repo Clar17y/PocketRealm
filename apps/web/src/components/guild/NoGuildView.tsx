@@ -13,12 +13,15 @@ import {
 import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 import { formatNumber } from '@/lib/format';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
+import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
+import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 
 interface NoGuildViewProps {
   playerId: string | null;
   characterLevel: number;
   error: string | null;
   onGuildJoined: () => void;
+  showNpcDialogue?: boolean;
 }
 
 export function NoGuildView({
@@ -26,6 +29,7 @@ export function NoGuildView({
   characterLevel,
   error,
   onGuildJoined,
+  showNpcDialogue,
 }: NoGuildViewProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,6 +38,7 @@ export function NoGuildView({
   const [searchPage, setSearchPage] = useState(1);
   const { loading: actionLoading, error: actionError, run } = useAsyncAction();
   const search = useAsyncAction();
+  const { dialogueEvent } = useNpcDialogue();
   const [requestedGuildIds, setRequestedGuildIds] = useState<Set<string>>(new Set());
 
   // Create form
@@ -66,6 +71,7 @@ export function NoGuildView({
 
   return (
     <div className="space-y-4">
+      <NpcDialogueBanner npcKey="millbrook-guild-recruiter" event={dialogueEvent} showDialogue={showNpcDialogue ?? true} />
       <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Guild</h2>
 
       {(error || actionError || search.error) && <ErrorBanner message={(error || actionError || search.error)!} />}

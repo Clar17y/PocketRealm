@@ -98,6 +98,7 @@ export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdat
           characterLevel={characterLevel}
           error={error}
           onGuildJoined={() => { refreshGuild(); }}
+          showNpcDialogue={showNpcDialogue}
         />
       </>
     );
