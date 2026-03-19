@@ -634,6 +634,7 @@ export default function GamePage() {
             }}
             zoneCraftingLevel={zoneCraftingLevel}
             confirmRarity={confirmRarity}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       }
@@ -757,6 +758,8 @@ export default function GamePage() {
             playerMaxMana={manaState.max}
             homeTownId={homeTownId}
             onSetHomeTown={(zoneId) => void handleSetHomeTown(zoneId)}
+            showNpcDialogue={showNpcDialogue}
+            isInTown={currentZone?.zoneType === 'town'}
           />
         );
       case 'bestiary':
@@ -901,6 +904,7 @@ export default function GamePage() {
             isRecovering={hpState.isRecovering}
             recoveryCost={hpState.recoveryCost}
             zoneCraftingLevel={zoneCraftingLevel}
+            zoneName={zoneCraftingName}
             guildTaxRate={guildTaxRate}
             forgeLuckUses={activeBuffs.find(b => b.buffType === 'forge_luck')?.remainingUses ?? 0}
             forgeProtectionUses={activeBuffs.find(b => b.buffType === 'forge_protection')?.remainingUses ?? 0}

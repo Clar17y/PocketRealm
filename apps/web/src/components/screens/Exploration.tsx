@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
@@ -19,6 +19,7 @@ import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameController.types';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { getNpcLine, NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared';
 
 interface ExplorationProps {
   currentZone: {
@@ -77,6 +78,18 @@ interface ExplorationProps {
 }
 
 export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
+  const strangerLineRef = useRef<string | null>(null);
+  const prevPlaybackDataRef = useRef(playbackData);
+
+  if (playbackData !== prevPlaybackDataRef.current) {
+    prevPlaybackDataRef.current = playbackData;
+    strangerLineRef.current = playbackData && Math.random() < NPC_DIALOGUE_CONSTANTS.MYSTERIOUS_STRANGER_CHANCE
+      ? getNpcLine('mysterious-stranger', 'idle')
+      : null;
+  }
+
+  const strangerLine = strangerLineRef.current;
+
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
@@ -210,6 +223,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
             playerStartMana={currentMana}
             playerMaxStamina={maxStamina}
             playerMaxMana={maxMana}
+            strangerLine={strangerLine}
             embedded
           />
         </PlaybackSurface>

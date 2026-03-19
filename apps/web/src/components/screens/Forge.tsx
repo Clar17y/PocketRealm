@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ITEM_RARITY_CONSTANTS } from '@pocketrealm/shared';
+import { ITEM_RARITY_CONSTANTS, type NpcKey } from '@pocketrealm/shared';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@pocketrealm/game-engine';
@@ -118,6 +118,7 @@ interface ForgeProps {
   isRecovering?: boolean;
   recoveryCost?: number | null;
   zoneCraftingLevel: number | null;
+  zoneName?: string | null;
   guildTaxRate?: number;
   forgeLuckUses?: number;
   forgeProtectionUses?: number;
@@ -144,6 +145,7 @@ export function Forge({
   isRecovering = false,
   recoveryCost,
   zoneCraftingLevel,
+  zoneName,
   guildTaxRate = 0,
   forgeLuckUses = 0,
   forgeProtectionUses = 0,
@@ -158,7 +160,8 @@ export function Forge({
   const [confirmReroll, setConfirmReroll] = useState(false);
   const [upgradePickerOpen, setUpgradePickerOpen] = useState(false);
   const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
-  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
+  const forgeNpcKey: NpcKey = zoneName?.toLowerCase() === 'thornwall' ? 'thornwall-blacksmith' : 'millbrook-blacksmith';
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue(forgeNpcKey);
   const noFacility = zoneCraftingLevel === 0;
 
   const tryForgeAction = (setConfirm: (v: boolean) => void, action: () => void | Promise<void>) => {
@@ -272,7 +275,7 @@ export function Forge({
 
   return (
     <ScreenContainer>
-      <NpcDialogueBanner npcKey="millbrook-blacksmith" event={dialogueEvent} showDialogue={showNpcDialogue} />
+      <NpcDialogueBanner npcKey={forgeNpcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />
       <ForgeTutorial />
       {isRecovering && <KnockoutBanner action="forge" recoveryCost={recoveryCost} />}
 

@@ -45,12 +45,51 @@ interface Recipe {
 
 import type { NpcKey } from '@pocketrealm/shared';
 
-const CRAFTING_NPC_MAP: Record<string, NpcKey> = {
-  weaponsmithing: 'kessa-weaponsmithing',
-  armorsmithing: 'kessa-armorsmithing',
-  refining: 'kessa-refining',
-  alchemy: 'millbrook-herbalist',
+const CRAFTING_NPC_MAP: Record<string, Record<string, NpcKey>> = {
+  weaponsmithing: {
+    millbrook: 'kessa-weaponsmithing',
+    thornwall: 'thornwall-weaponsmithing',
+  },
+  armorsmithing: {
+    millbrook: 'kessa-armorsmithing',
+    thornwall: 'thornwall-armorsmithing',
+  },
+  refining: {
+    millbrook: 'kessa-refining',
+    thornwall: 'thornwall-refining',
+  },
+  alchemy: {
+    millbrook: 'millbrook-herbalist',
+    thornwall: 'thornwall-herbalist',
+  },
+  leatherworking: {
+    millbrook: 'millbrook-artisan-leatherworking',
+    thornwall: 'thornwall-artisan-leatherworking',
+  },
+  tailoring: {
+    millbrook: 'millbrook-artisan-tailoring',
+    thornwall: 'thornwall-artisan-tailoring',
+  },
+  jewelcrafting: {
+    millbrook: 'millbrook-jeweller',
+    thornwall: 'thornwall-jeweller',
+  },
+  weaving: {
+    millbrook: 'millbrook-artisan-weaving',
+    thornwall: 'thornwall-artisan-weaving',
+  },
+  tanning: {
+    millbrook: 'millbrook-artisan-tanning',
+    thornwall: 'thornwall-artisan-tanning',
+  },
 };
+
+function getCraftingNpc(skillType: string, zoneName: string | null): NpcKey | undefined {
+  const zoneMap = CRAFTING_NPC_MAP[skillType];
+  if (!zoneMap) return undefined;
+  const key = (zoneName ?? '').toLowerCase();
+  return zoneMap[key] ?? zoneMap['millbrook'];
+}
 
 interface CraftingProps {
   skillType?: string;
@@ -76,8 +115,8 @@ interface CraftingProps {
 export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, availableSlots = 0, showNpcDialogue = true }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
-  const npcKey = skillType ? CRAFTING_NPC_MAP[skillType] : undefined;
+  const npcKey = skillType ? getCraftingNpc(skillType, zoneName) : undefined;
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue(npcKey);
 
   useEffect(() => {
     if (recipes.length === 0) {

@@ -24,6 +24,7 @@ interface ExplorationPlaybackProps {
   onSkip: () => void;
   speedMs?: number;
   resumeFromCombat?: boolean;
+  strangerLine?: string | null;
 }
 
 function getEventDisplay(type: string): { icon: string; color: string } {
@@ -56,6 +57,7 @@ export function ExplorationPlayback({
   onSkip,
   speedMs = 800,
   resumeFromCombat,
+  strangerLine,
 }: ExplorationPlaybackProps) {
   const [currentTurn, setCurrentTurn] = useState(0);
   const [revealedEventCount, setRevealedEventCount] = useState(0);
@@ -212,6 +214,13 @@ export function ExplorationPlayback({
           >
             Skip
           </button>
+        </div>
+      )}
+
+      {phase === 'complete' && strangerLine && (
+        <div className="flex items-start gap-2 text-sm animate-fadeIn mt-2">
+          <span className="text-[var(--rpg-purple)]">&#x1F441;</span>
+          <span className="italic text-[var(--rpg-purple)]">{strangerLine}</span>
         </div>
       )}
     </div>

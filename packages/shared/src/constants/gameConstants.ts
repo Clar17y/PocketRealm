@@ -1479,6 +1479,8 @@ export const NPC_DIALOGUE_CONSTANTS = {
   ACTION_DURATION_MS: 10000,
   /** ms after page load before farewell line appears */
   FAREWELL_DELAY_MS: 60000,
+  /** Chance (0-1) for Mysterious Stranger to appear after exploration */
+  MYSTERIOUS_STRANGER_CHANCE: 0.05,
 } as const;
 
 export const EXPEDITION_TOKEN_CONSTANTS = {

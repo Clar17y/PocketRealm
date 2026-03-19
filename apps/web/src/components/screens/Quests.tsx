@@ -315,13 +315,11 @@ function ShopTab({
   onPurchase,
   zones,
   homeTownId,
-  showNpcDialogue = true,
 }: {
   questTokens: number;
   onPurchase?: () => void;
   zones?: Array<{ id: string; name: string; zoneType: string }>;
   homeTownId?: string | null;
-  showNpcDialogue?: boolean;
 }) {
   const [shopItems, setShopItems] = useState<ShopItemData[]>([]);
   const [tokens, setTokens] = useState(questTokens);
@@ -333,7 +331,6 @@ function ShopTab({
   const [targetSelections, setTargetSelections] = useState<Record<string, string>>({});
   const [mobTemplates, setMobTemplates] = useState<Array<{ id: string; name: string }>>([]);
   const [guildContracts, setGuildContracts] = useState<Array<{ id: string; name: string }>>([]);
-  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
 
   const loadShop = useCallback(async () => {
     setShopLoading(true);
@@ -403,8 +400,6 @@ function ShopTab({
         void loadShop();
         // Refresh player state (attributes, skills, etc. may have changed)
         onPurchase?.();
-        // Show buy dialogue then return to idle
-        triggerDialogueEvent('buy');
       } else if (res.error) {
         setPurchaseMessage(res.error.message);
       }
@@ -470,8 +465,6 @@ function ShopTab({
 
   return (
     <div className="space-y-4">
-      <NpcDialogueBanner npcKey="millbrook-general-store" event={dialogueEvent} showDialogue={showNpcDialogue} />
-
       {/* Token balance */}
       <PixelCard padding="sm">
         <div className="flex items-center gap-2">
@@ -545,6 +538,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [rerollingId, setRerollingId] = useState<string | null>(null);
   const [claimingBonus, setClaimingBonus] = useState(false);
+  const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
 
   const dailyQuests = quests.filter((q) => q.cadence === 'daily');
   const weeklyQuests = quests.filter((q) => q.cadence === 'weekly');
@@ -557,6 +551,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
     setClaimingId(questId);
     try {
       await onClaimReward(questId);
+      triggerDialogueEvent('sell');
     } finally {
       setClaimingId(null);
     }
@@ -566,6 +561,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
     setRerollingId(questId);
     try {
       await onReroll(questId);
+      triggerDialogueEvent('buy');
     } finally {
       setRerollingId(null);
     }
@@ -575,6 +571,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
     setClaimingBonus(true);
     try {
       await onClaimBonus();
+      triggerDialogueEvent('sell');
     } finally {
       setClaimingBonus(false);
     }
@@ -610,9 +607,10 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
       <SubNav tabs={[...SHOP_TABS]} activeId={activeTab} onSelect={setActiveTab} />
 
       {activeTab === 'shop' ? (
-        <ShopTab questTokens={questState?.questTokens ?? 0} onPurchase={onShopPurchase} zones={zones} homeTownId={homeTownId} showNpcDialogue={showNpcDialogue} />
+        <ShopTab questTokens={questState?.questTokens ?? 0} onPurchase={onShopPurchase} zones={zones} homeTownId={homeTownId} />
       ) : (
         <>
+          <NpcDialogueBanner npcKey="millbrook-quest-board" event={dialogueEvent} showDialogue={showNpcDialogue} />
           {/* Quest Token Balance + Daily Bonus */}
           <PixelCard padding="sm">
             <div className="flex items-center justify-between">
