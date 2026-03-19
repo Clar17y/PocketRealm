@@ -1,7 +1,56 @@
 'use client';
 
-import type { ExpeditionRoundLog } from '@pocketrealm/shared';
+import { useState } from 'react';
+import type { ExpeditionRoundLog, MobActionLogEntry } from '@pocketrealm/shared';
+import { formatHitBreakdown } from '../../combat/combatLogEntryUtils';
 import { RoundLogAttackRow } from './RoundLogAttackRow';
+
+function MobTargetRow({ target }: { target: MobActionLogEntry['targets'][number] }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasDetail = target.hitChance !== undefined || target.blocked;
+
+  const hitText = !target.blocked ? formatHitBreakdown({
+    hitChance: target.hitChance,
+    hitRollValue: target.hitRollValue,
+    attackerHitScore: target.mobHitScore,
+    defenderAvoidScore: target.playerAvoidScore,
+  }) : null;
+
+  return (
+    <div
+      className={`text-[var(--rpg-text-secondary)] ${hasDetail ? 'cursor-pointer hover:bg-[var(--rpg-surface)]/50 rounded px-1 -mx-1' : ''}`}
+      onClick={hasDetail ? () => setExpanded(!expanded) : undefined}
+    >
+      <div className="flex items-center gap-0.5">
+        <span>
+          {target.username}: {target.blocked ? (
+            <span className="text-[var(--rpg-blue-light)]">BLOCKED</span>
+          ) : target.dodged ? (
+            <span className="text-[var(--rpg-green-light)]">DODGED</span>
+          ) : (
+            <>
+              <span className="text-[var(--rpg-red)]">-{target.damageTaken} HP</span>
+              {target.knockedOut && <span className="text-[var(--rpg-red)] font-bold"> KO!</span>}
+            </>
+          )}
+        </span>
+        {hasDetail && (
+          <span className="text-[var(--rpg-text-secondary)] ml-auto text-[10px]">{expanded ? '▲' : '▼'}</span>
+        )}
+      </div>
+      {expanded && (
+        <div className="ml-2 mt-0.5 text-[var(--rpg-text-secondary)] opacity-80 space-y-0.5">
+          {target.blocked && <div>Blocked (hit check skipped)</div>}
+          {hitText && <div>{hitText}</div>}
+          {!target.blocked && !hitText && target.damageTaken > 0 && <div>Guaranteed Hit</div>}
+          {target.damageTaken > 0 && target.damageRoll !== undefined && (
+            <div>Damage: {target.damageRoll} raw = {target.damageTaken} final</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export interface RoundLogContentProps {
   log: ExpeditionRoundLog;
@@ -77,18 +126,7 @@ export function RoundLogContent({ log, playerId }: RoundLogContentProps) {
               {ma.targets.length > 0 && (
                 <div className="ml-2 mt-0.5">
                   {ma.targets.map((t, k) => (
-                    <div key={k} className="text-[var(--rpg-text-secondary)]">
-                      {t.username}: {t.blocked ? (
-                        <span className="text-[var(--rpg-blue-light)]">BLOCKED</span>
-                      ) : t.dodged ? (
-                        <span className="text-[var(--rpg-green-light)]">DODGED</span>
-                      ) : (
-                        <>
-                          <span className="text-[var(--rpg-red)]">-{t.damageTaken} HP</span>
-                          {t.knockedOut && <span className="text-[var(--rpg-red)] font-bold"> KO!</span>}
-                        </>
-                      )}
-                    </div>
+                    <MobTargetRow key={k} target={t} />
                   ))}
                 </div>
               )}
