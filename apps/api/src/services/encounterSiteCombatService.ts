@@ -921,7 +921,7 @@ export interface ManualRoundResult {
 export async function resolveManualEncounterRound(
   playerId: string,
   siteId: string,
-  _body: { action?: string; targetMobSlot?: number },
+  body: { action?: string; targetMobSlot?: number },
 ): Promise<ManualRoundResult> {
   const state = await getCombatSession(playerId, siteId);
   if (!state) {
@@ -929,6 +929,11 @@ export async function resolveManualEncounterRound(
     await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } }).catch(() => {});
     throw new AppError(400, 'No active manual combat session. Call start-room first.', 'NO_COMBAT_SESSION');
   }
+
+  // Apply player's target selection
+  state.participant.targetMobId = body.targetMobSlot !== undefined
+    ? makeEncounterMobId(body.targetMobSlot)
+    : null;
 
   state.roundNumber++;
   const aliveMobs = state.mobs.filter(m => m.hp > 0);
