@@ -14,6 +14,7 @@ import {
   autoResolveEncounterRoom,
   startManualEncounterRoom,
   resolveManualEncounterRound,
+  clearManualCombatSession,
 } from '../../services/encounterSiteCombatService';
 
 const abandonSchema = z.object({
@@ -266,6 +267,9 @@ export function registerSiteRoutes(router: Router): void {
   router.post('/sites/:id/abandon', asyncHandler(async (req, res) => {
       const siteId = z.string().uuid().parse(req.params.id);
       const playerId = req.player!.playerId;
+
+      // Clear any in-memory manual combat session
+      clearManualCombatSession(playerId, siteId);
 
       const result = await prisma.encounterSite.deleteMany({
         where: { id: siteId, playerId },

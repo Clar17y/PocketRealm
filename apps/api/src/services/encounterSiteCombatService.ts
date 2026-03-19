@@ -432,6 +432,12 @@ export async function autoResolveEncounterRoom(
   siteId: string,
   username: string,
 ): Promise<AutoResolveEncounterResult> {
+  // If a manual session exists, reject auto-resolve — player must continue manually or abandon
+  const existingKey = manualKey(playerId, siteId);
+  if (manualCombatStore.has(existingKey)) {
+    throw new AppError(409, 'Manual combat session in progress. Continue fighting or abandon the site.', 'MANUAL_SESSION_ACTIVE');
+  }
+
   // Load site and verify ownership
   const site = await prisma.encounterSite.findFirst({
     where: { id: siteId, playerId },
@@ -671,6 +677,11 @@ function manualKey(playerId: string, siteId: string): string {
   return `${playerId}:${siteId}`;
 }
 
+/** Clear any in-memory manual combat session for this player+site (used by abandon). */
+export function clearManualCombatSession(playerId: string, siteId: string): void {
+  manualCombatStore.delete(manualKey(playerId, siteId));
+}
+
 export interface StartManualRoomResult {
   currentRoom: number;
   totalRooms: number;
@@ -699,6 +710,29 @@ export async function startManualEncounterRoom(
   username: string,
 ): Promise<StartManualRoomResult> {
   cleanupStaleSessions();
+
+  // If an active session exists for this player+site, resume it instead of creating a new one
+  const existingKey = manualKey(playerId, siteId);
+  const existingState = manualCombatStore.get(existingKey);
+  if (existingState) {
+    return {
+      currentRoom: existingState.currentRoom,
+      totalRooms: existingState.totalRooms,
+      mobs: existingState.mobs.map(m => ({
+        mobId: m.id,
+        name: m.name,
+        prefix: m.prefix,
+        hp: m.hp,
+        maxHp: m.maxHp,
+      })),
+      playerHp: existingState.participant.hp,
+      playerMaxHp: existingState.participant.maxHp,
+      playerStamina: existingState.participant.stamina,
+      playerMaxStamina: existingState.participant.maxStamina,
+      playerMana: existingState.participant.mana,
+      playerMaxMana: existingState.participant.maxMana,
+    };
+  }
 
   const site = await prisma.encounterSite.findFirst({
     where: { id: siteId, playerId },
