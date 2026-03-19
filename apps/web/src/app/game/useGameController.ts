@@ -51,7 +51,6 @@ import {
   restEstimate,
   salvage,
   salvageBatch,
-  selectSiteStrategy,
   useItem,
   startCombatFromEncounterSite,
   startExploration,
@@ -1031,21 +1030,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
-  const handleSelectStrategy = useCallback(async (
-    encounterSiteId: string,
-    strategy: 'full_clear' | 'room_by_room'
-  ) => {
-    setBusyAction('strategy');
-    try {
-      await selectSiteStrategy(encounterSiteId, strategy);
-      await refreshPendingEncounters();
-    } catch (err) {
-      pushLog({ timestamp: nowStamp(), type: 'danger', message: `Failed to select strategy: ${(err as Error).message}` });
-    } finally {
-      setBusyAction(null);
-    }
-  }, [refreshPendingEncounters]);
-
   const handleNavigate = (screen: string) => {
     // Auto-skip any active playback when navigating away
     if (playbackActive) {
@@ -1878,7 +1862,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleExplorationPlaybackComplete,
     handlePlaybackSkip,
     handleStartCombat,
-    handleSelectStrategy,
     handleCombatPlaybackComplete,
     handleTravelPlaybackComplete,
     handleTravelPlaybackSkip,
@@ -1931,5 +1914,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Loot reveal
     lootRevealItems,
     handleDismissLootReveal,
+
+    // Encounter site combat
+    refreshPendingEncounters,
   };
 }

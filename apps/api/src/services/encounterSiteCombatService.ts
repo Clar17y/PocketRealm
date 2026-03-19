@@ -52,10 +52,32 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
+export interface RoundSnapshot {
+  roundNumber: number;
+  log: unknown;
+  mobStates: Array<{
+    slot: number;
+    hp: number;
+    maxHp: number;
+    alive: boolean;
+    activeEffects: unknown[];
+  }>;
+  playerState: {
+    hp: number;
+    maxHp: number;
+    stamina: number;
+    maxStamina: number;
+    mana: number;
+    maxMana: number;
+    activeEffects: unknown[];
+  };
+}
+
 export interface EncounterRoomCombatResult {
   outcome: 'cleared' | 'defeated';
   roundsResolved: number;
   roundLogs: unknown[];
+  rounds: RoundSnapshot[];
   playerHpAfter: number;
   playerStaminaAfter: number;
   playerManaAfter: number;
@@ -67,6 +89,7 @@ export interface AutoResolveEncounterResult {
   outcome: 'cleared' | 'defeated' | 'site_cleared';
   roundsResolved: number;
   roundLogs: unknown[];
+  rounds: RoundSnapshot[];
   playerHpAfter: number;
   playerStaminaAfter: number;
   playerManaAfter: number;
@@ -108,6 +131,7 @@ export function resolveEncounterRoomCombat(
   let currentParticipant = { ...participant };
   let threatTable: RaidThreatEntry[] = initThreatTable([participant.playerId]);
   const roundLogs: unknown[] = [];
+  const roundSnapshots: RoundSnapshot[] = [];
   const allPotionsConsumed: PotionConsumed[] = [];
   let roundsResolved = 0;
 
@@ -170,6 +194,34 @@ export function resolveEncounterRoomCombat(
     aliveMobList = result.mobsAfter;
     threatTable = result.threatTableAfter;
     roundLogs.push(result.roundLog);
+
+    // Capture per-round snapshot for frontend playback
+    roundSnapshots.push({
+      roundNumber: round,
+      log: result.roundLog,
+      mobStates: mobs.map(m => {
+        const hp = mobHpById.get(m.id) ?? 0;
+        const surviving = result.mobsAfter.find(s => s.id === m.id);
+        const slotMatch = m.id.match(/^encounter-mob-(\d+)$/);
+        const slot = slotMatch ? parseInt(slotMatch[1]!, 10) : 0;
+        return {
+          slot,
+          hp,
+          maxHp: m.maxHp,
+          alive: hp > 0,
+          activeEffects: surviving?.activeEffects ?? [],
+        };
+      }),
+      playerState: {
+        hp: currentParticipant.hp,
+        maxHp: currentParticipant.maxHp,
+        stamina: currentParticipant.stamina,
+        maxStamina: currentParticipant.maxStamina,
+        mana: currentParticipant.mana,
+        maxMana: currentParticipant.maxMana,
+        activeEffects: currentParticipant.activeEffects,
+      },
+    });
   }
 
   const allMobsCleared = [...mobHpById.values()].every(hp => hp <= 0);
@@ -177,6 +229,7 @@ export function resolveEncounterRoomCombat(
     outcome: allMobsCleared ? 'cleared' : 'defeated',
     roundsResolved,
     roundLogs,
+    rounds: roundSnapshots,
     playerHpAfter: currentParticipant.hp,
     playerStaminaAfter: currentParticipant.stamina,
     playerManaAfter: currentParticipant.mana,
@@ -563,6 +616,7 @@ export async function autoResolveEncounterRoom(
     outcome: finalOutcome,
     roundsResolved: combatResult.roundsResolved,
     roundLogs: combatResult.roundLogs,
+    rounds: combatResult.rounds,
     playerHpAfter: combatResult.playerHpAfter,
     playerStaminaAfter: combatResult.playerStaminaAfter,
     playerManaAfter: combatResult.playerManaAfter,

@@ -125,6 +125,9 @@ model Player {
   friendMailsReceived FriendMail[]  @relation("FriendMailRecipient")
   pushSubscriptions   PushSubscription[]
 
+  // Encounter site lockout
+  activeEncounterSiteId String? @map("active_encounter_site_id")
+
   // Expeditions
   expeditionTokens          Int                        @default(0) @map("expedition_tokens")
   expeditionsLaunched       GuildExpedition[]           @relation("ExpeditionLauncher")

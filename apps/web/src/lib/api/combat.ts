@@ -1,4 +1,4 @@
-import type { QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
+import type { QuestProgressUpdate, StateUpdates, BossActiveEffect, ExpeditionRoundLog } from '@pocketrealm/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 import type { CombatAction } from '@pocketrealm/shared';
 
@@ -506,6 +506,109 @@ export async function abandonEncounterSites(zoneId?: string) {
     method: 'POST',
     body: JSON.stringify(zoneId ? { zoneId } : {}),
   });
+}
+
+// --- Encounter Site Room Combat Types ---
+
+export interface EncounterRoomMobState {
+  slot: number;
+  hp: number;
+  maxHp: number;
+  alive: boolean;
+  activeEffects: BossActiveEffect[];
+}
+
+export interface EncounterPlayerState {
+  hp: number;
+  maxHp: number;
+  stamina: number;
+  maxStamina: number;
+  mana: number;
+  maxMana: number;
+  activeEffects: BossActiveEffect[];
+}
+
+export interface EncounterRoundSnapshot {
+  roundNumber: number;
+  log: ExpeditionRoundLog;
+  mobStates: EncounterRoomMobState[];
+  playerState: EncounterPlayerState;
+}
+
+export interface EncounterAutoResolveResponse {
+  outcome: 'cleared' | 'defeated' | 'site_cleared';
+  rounds: EncounterRoundSnapshot[];
+  chestReward?: {
+    rarity: string;
+    materials: Array<{ itemTemplateId: string; name: string; quantity: number }>;
+    recipe?: { recipeId: string; name: string } | null;
+  };
+  stateUpdates?: StateUpdates;
+}
+
+export interface EncounterStartRoomResponse {
+  currentRoom: number;
+  totalRooms: number;
+  mobs: Array<{
+    mobId: string;
+    name: string;
+    prefix: string | null;
+    hp: number;
+    maxHp: number;
+    mobTemplateId: string;
+  }>;
+  playerState: EncounterPlayerState;
+  stateUpdates?: StateUpdates;
+}
+
+export interface EncounterManualRoundResponse {
+  roundNumber: number;
+  roundLog: ExpeditionRoundLog;
+  mobStates: EncounterRoomMobState[];
+  playerState: EncounterPlayerState;
+  outcome: 'ongoing' | 'cleared' | 'defeated' | 'site_cleared';
+  siteCleared: boolean;
+  chestReward?: EncounterAutoResolveResponse['chestReward'];
+  completionRewards?: Record<string, unknown>;
+  stateUpdates?: StateUpdates;
+}
+
+// --- Encounter Site Room Combat API Functions ---
+
+export async function autoResolveEncounterRoom(siteId: string): Promise<EncounterAutoResolveResponse> {
+  const res = await fetchApi<EncounterAutoResolveResponse>(`/api/v1/combat/sites/${siteId}/auto-resolve`, {
+    method: 'POST',
+  });
+  if (!res.data) throw new Error(res.error?.message ?? 'Auto-resolve failed');
+  return res.data;
+}
+
+export async function startEncounterRoom(siteId: string): Promise<EncounterStartRoomResponse> {
+  const res = await fetchApi<EncounterStartRoomResponse>(`/api/v1/combat/sites/${siteId}/start-room`, {
+    method: 'POST',
+  });
+  if (!res.data) throw new Error(res.error?.message ?? 'Failed to start room');
+  return res.data;
+}
+
+export async function resolveEncounterRound(
+  siteId: string,
+  action: { action: string; targetMobSlot?: number },
+): Promise<EncounterManualRoundResponse> {
+  const res = await fetchApi<EncounterManualRoundResponse>(`/api/v1/combat/sites/${siteId}/round`, {
+    method: 'POST',
+    body: JSON.stringify(action),
+  });
+  if (!res.data) throw new Error(res.error?.message ?? 'Failed to resolve round');
+  return res.data;
+}
+
+export async function abandonEncounterSite(siteId: string): Promise<{ success: boolean; stateUpdates?: StateUpdates }> {
+  const res = await fetchApi<{ success: boolean; stateUpdates?: StateUpdates }>(`/api/v1/combat/sites/${siteId}/abandon`, {
+    method: 'POST',
+  });
+  if (!res.data) throw new Error(res.error?.message ?? 'Failed to abandon');
+  return res.data;
 }
 
 export async function getCombatLog(id: string) {

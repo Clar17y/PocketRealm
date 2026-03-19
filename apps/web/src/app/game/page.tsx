@@ -195,7 +195,6 @@ export default function GamePage() {
     handleExplorationPlaybackComplete,
     handlePlaybackSkip,
     handleStartCombat,
-    handleSelectStrategy,
     handleCombatPlaybackComplete,
     handleTravelPlaybackComplete,
     handleTravelPlaybackSkip,
@@ -304,6 +303,7 @@ export default function GamePage() {
     lootRevealItems,
     handleDismissLootReveal,
     stateSetters,
+    refreshPendingEncounters,
   } = useGameController({ isAuthenticated });
 
   useRateLimitToast();
@@ -997,7 +997,10 @@ export default function GamePage() {
             lastCombat={lastCombat}
             bestiaryMobs={bestiaryMobs.map((mob) => ({ id: mob.id, isDiscovered: mob.isDiscovered }))}
             onStartCombat={handleStartCombat}
-            onSelectStrategy={handleSelectStrategy}
+            templates={templates}
+            onActivateTemplate={handleTemplateSaved}
+            onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
+            refreshPendingEncounters={refreshPendingEncounters}
             onPendingEncounterPageChange={handlePendingEncounterPageChange}
             onPendingEncounterZoneFilterChange={handlePendingEncounterZoneFilterChange}
             onPendingEncounterMobFilterChange={handlePendingEncounterMobFilterChange}

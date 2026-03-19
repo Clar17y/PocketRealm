@@ -70,4 +70,5 @@ export interface StateUpdates {
     characterLevel: number;
     attributePoints: number;
   };
+  activeEncounterSiteId?: string | null;
 }
