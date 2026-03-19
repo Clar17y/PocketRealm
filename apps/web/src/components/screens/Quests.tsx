@@ -561,6 +561,7 @@ export function Quests({ quests, questState, loading, error, onClaimReward, onCl
     setRerollingId(questId);
     try {
       await onReroll(questId);
+      triggerDialogueEvent('buy');
     } finally {
       setRerollingId(null);
     }
