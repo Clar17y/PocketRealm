@@ -15,7 +15,7 @@ import { GuildSpecializationTab } from '@/components/guild/GuildSpecializationTa
 import { GuildSettings } from '@/components/guild/GuildSettings';
 import { GuildExpeditionsTab } from '@/components/guild/GuildExpeditionsTab';
 import { ExpeditionShopTab } from '@/components/guild/ExpeditionShopTab';
-import { LoadingCard } from '@/components/common/LoadingCard';
+import { SkeletonCard } from '@/components/common/LoadingSkeleton';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
@@ -67,7 +67,7 @@ export function GuildScreen({ playerId, characterLevel, initialTab, onStateUpdat
     return (
       <ScreenContainer>
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Guild</h2>
-        <LoadingCard />
+        <SkeletonCard count={2} />
       </ScreenContainer>
     );
   }
