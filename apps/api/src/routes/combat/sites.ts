@@ -10,13 +10,19 @@ import {
   listEncounterSitesQuerySchema,
   applyEncounterSiteDecayAndPersist,
 } from './helpers';
+import {
+  autoResolveEncounterRoom,
+  startManualEncounterRoom,
+  resolveManualEncounterRound,
+} from '../../services/encounterSiteCombatService';
 
 const abandonSchema = z.object({
   zoneId: z.string().uuid().optional(),
 });
 
-const strategySchema = z.object({
-  strategy: z.enum(['full_clear', 'room_by_room']),
+const roundSchema = z.object({
+  action: z.string().optional(),
+  targetMobSlot: z.number().int().optional(),
 });
 
 export function registerSiteRoutes(router: Router): void {
@@ -67,7 +73,6 @@ export function registerSiteRoutes(router: Router): void {
         nextMobTemplateId: string | null;
         nextMobPrefix: string | null;
         discoveredAt: string;
-        clearStrategy: string | null;
         currentRoom: number;
         totalRooms: number;
         roomMobCounts: Array<{ room: number; alive: number; total: number }>;
@@ -107,9 +112,8 @@ export function registerSiteRoutes(router: Router): void {
           nextMobTemplateId: decayed.nextMob?.mobTemplateId ?? null,
           nextMobPrefix: decayed.nextMob?.prefix ?? null,
           discoveredAt: site.discoveredAt.toISOString(),
-          clearStrategy: site.clearStrategy ?? null,
           currentRoom: site.currentRoom ?? 1,
-          totalRooms: roomNumbers.length,
+          totalRooms: site.totalRooms ?? roomNumbers.length,
           roomMobCounts,
         });
       }
@@ -175,9 +179,8 @@ export function registerSiteRoutes(router: Router): void {
             nextMobPrefix: site.nextMobPrefix,
             nextMobDisplayName,
             discoveredAt: site.discoveredAt,
-            clearStrategy: site.clearStrategy,
-            currentRoom: site.currentRoom,
             totalRooms: site.totalRooms,
+            currentRoom: site.currentRoom,
             roomMobCounts: site.roomMobCounts,
             eventModifiers: badgeCache.get(`${site.zoneId}:${site.mobFamilyId}`) ?? [],
             totalTurnCost: site.aliveMobs * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
@@ -210,38 +213,38 @@ export function registerSiteRoutes(router: Router): void {
   }));
 
   /**
-   * POST /api/v1/combat/sites/:id/strategy
-   * Select clearing strategy for an encounter site.
+   * POST /api/v1/combat/sites/:id/auto-resolve
+   * Auto-resolve the current room of an encounter site using the raid resolver.
    */
-  router.post('/sites/:id/strategy', asyncHandler(async (req, res) => {
-      const playerId = req.player!.playerId;
+  router.post('/sites/:id/auto-resolve', asyncHandler(async (req, res) => {
       const siteId = z.string().uuid().parse(req.params.id);
-      const body = strategySchema.parse(req.body);
+      const playerId = req.player!.playerId;
+      const username = req.player!.username;
+      const result = await autoResolveEncounterRoom(playerId, siteId, username);
+      res.json(result);
+  }));
 
-      const site = await prisma.encounterSite.findFirst({
-        where: { id: siteId, playerId },
-      });
+  /**
+   * POST /api/v1/combat/sites/:id/start-room
+   * Initialize manual combat for the current room of an encounter site.
+   */
+  router.post('/sites/:id/start-room', asyncHandler(async (req, res) => {
+      const siteId = z.string().uuid().parse(req.params.id);
+      const playerId = req.player!.playerId;
+      const username = req.player!.username;
+      const result = await startManualEncounterRoom(playerId, siteId, username);
+      res.json(result);
+  }));
 
-      if (!site) {
-        throw new AppError(404, 'Encounter site not found', 'NOT_FOUND');
-      }
-
-      if (site.clearStrategy) {
-        throw new AppError(400, 'Strategy already selected for this site', 'STRATEGY_ALREADY_SET');
-      }
-
-      await prisma.encounterSite.update({
-        where: { id: siteId },
-        data: {
-          clearStrategy: body.strategy,
-          fullClearActive: body.strategy === 'full_clear',
-        },
-      });
-
-      res.json({
-        success: true,
-        encounterSiteId: siteId,
-        strategy: body.strategy,
-      });
+  /**
+   * POST /api/v1/combat/sites/:id/round
+   * Resolve one round of manual encounter site combat.
+   */
+  router.post('/sites/:id/round', asyncHandler(async (req, res) => {
+      const siteId = z.string().uuid().parse(req.params.id);
+      const body = roundSchema.parse(req.body ?? {});
+      const playerId = req.player!.playerId;
+      const result = await resolveManualEncounterRound(playerId, siteId, body);
+      res.json(result);
   }));
 }
