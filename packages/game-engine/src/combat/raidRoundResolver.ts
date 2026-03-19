@@ -44,6 +44,7 @@ import {
   calculateAvoidScore,
   calculateFinalDamage,
 } from './damageCalculator';
+import type { HitResolution } from './damageCalculator';
 import type { CombatMode } from '@pocketrealm/shared';
 
 // --- RNG Interface ---
@@ -863,6 +864,10 @@ export function resolveRaidRound(
         const targetIdx = pState.findIndex(ps => ps.playerId === targetId);
         const stance = defStances.get(targetId);
 
+        // Compute hit scores for all attacks (needed for log entries)
+        const mobHitScore = mob.stats.accuracy + (mActionDef.accuracyModifier ?? 0);
+        const playerAvoidScore = calculateAvoidScore(targetParticipant.stats);
+
         // Counter avoids physical, Ward avoids magic
         const blocked = (stance?.avoidsPhysical && isPhysical) || (stance?.resistsMagic && isMagic);
         if (blocked) {
@@ -873,15 +878,16 @@ export function resolveRaidRound(
             blocked: true,
             dodged: false,
             knockedOut: false,
+            mobHitScore,
+            playerAvoidScore,
           });
           continue;
         }
 
         // Hit resolution: normal attacks can be dodged, boss specials (alwaysHits) cannot
+        let hitResult: HitResolution | undefined;
         if (!mActionDef.alwaysHits) {
-          const mobHitScore = mob.stats.accuracy + (mActionDef.accuracyModifier ?? 0);
-          const playerAvoidScore = calculateAvoidScore(targetParticipant.stats);
-          const hitResult = resolveHitCheck({
+          hitResult = resolveHitCheck({
             combatMode,
             hitScore: mobHitScore,
             avoidScore: playerAvoidScore,
@@ -907,6 +913,10 @@ export function resolveRaidRound(
               blocked: false,
               dodged: true,
               knockedOut: false,
+              hitChance: hitResult.hitChance,
+              hitRollValue: hitResult.hitRollValue,
+              mobHitScore,
+              playerAvoidScore,
             });
             continue;
           }
@@ -967,6 +977,11 @@ export function resolveRaidRound(
           blocked: false,
           dodged: false,
           knockedOut: targetState.hp <= 0,
+          hitChance: hitResult?.hitChance,
+          hitRollValue: hitResult?.hitRollValue,
+          mobHitScore,
+          playerAvoidScore,
+          damageRoll: dmgRaw,
         });
 
         // Apply mob debuff/DoT effects to player on hit

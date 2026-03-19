@@ -249,6 +249,11 @@ export interface MobActionLogEntry {
     blocked: boolean;
     dodged: boolean;
     knockedOut: boolean;
+    hitChance?: number;
+    hitRollValue?: number;
+    mobHitScore?: number;
+    playerAvoidScore?: number;
+    damageRoll?: number;
   }[];
 }
 
