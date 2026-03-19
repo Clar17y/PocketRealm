@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type {
   CombatantStats,
   RaidParticipant,
@@ -6,6 +6,31 @@ import type {
 } from '@pocketrealm/shared';
 import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 import { initThreatTable } from '@pocketrealm/game-engine';
+
+// Mock DB modules so tests don't require JWT_SECRET / DB connection
+vi.mock('@pocketrealm/database', () => ({ prisma: {}, Prisma: {} }));
+vi.mock('../middleware/errorHandler', () => ({ AppError: class extends Error { constructor(s: number, m: string) { super(m); } } }));
+vi.mock('./combatOrchestrationService', () => ({}));
+vi.mock('../utils/routeHelpers', () => ({}));
+vi.mock('./turnBankService', () => ({}));
+vi.mock('./hpService', () => ({}));
+vi.mock('./resourceService', () => ({}));
+vi.mock('./chestService', () => ({}));
+vi.mock('./inventoryService', () => ({}));
+vi.mock('./pendingLootService', () => ({}));
+vi.mock('./activityLogService', () => ({}));
+vi.mock('./potionService', () => ({}));
+vi.mock('./stateUpdateHelpers', () => ({}));
+vi.mock('./worldEventService', () => ({}));
+vi.mock('./durabilityService', () => ({}));
+vi.mock('./xpService', () => ({}));
+vi.mock('./buffService', () => ({}));
+vi.mock('./zoneExplorationService', () => ({}));
+vi.mock('./statsService', () => ({}));
+vi.mock('./equipmentService', () => ({}));
+vi.mock('./attributesService', () => ({}));
+vi.mock('../routes/combat/helpers', () => ({}));
+
 import { resolveEncounterRoomCombat } from './encounterSiteCombatService';
 
 // ---------------------------------------------------------------------------
