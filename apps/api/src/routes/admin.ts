@@ -12,12 +12,11 @@ import { createBossEncounter } from '../services/bossEncounterService';
 import { sendPush } from '../services/pushNotificationService';
 import { normalizePlayerAttributes } from '../services/attributesService';
 import { createActivityLog } from '../services/activityLogService';
-import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity } from '@pocketrealm/game-engine';
+import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import {
   CHARACTER_CONSTANTS,
   SKILL_CONSTANTS,
-  EXPLORATION_CONSTANTS,
   EXPEDITION_CONSTANTS,
   WORLD_EVENT_TEMPLATES,
   ALL_SKILLS,
@@ -510,48 +509,53 @@ router.post('/encounter/spawn', asyncHandler(async (req, res) => {
     include: { members: { include: { mobTemplate: true } } },
   });
 
-  const sizeConfig = {
-    small: EXPLORATION_CONSTANTS.ENCOUNTER_SIZE_SMALL,
-    medium: EXPLORATION_CONSTANTS.ENCOUNTER_SIZE_MEDIUM,
-    large: EXPLORATION_CONSTANTS.ENCOUNTER_SIZE_LARGE,
-  }[size];
-  const mobCount = Math.floor(Math.random() * (sizeConfig.max - sizeConfig.min + 1)) + sizeConfig.min;
-
   const members = family.members;
   if (members.length === 0) {
     res.status(400).json({ error: { message: 'Mob family has no members', code: 'NO_MEMBERS' } });
     return;
   }
 
+  const roomAssignments = generateRoomAssignments(size);
   const pickMember = () => members[Math.floor(Math.random() * members.length)];
 
-  const mobs: Array<{ slot: number; mobTemplateId: string; role: string; prefix: string | null; status: string }> = [];
+  const mobs: Array<{ slot: number; room: number; mobTemplateId: string; role: string; prefix: string | null; status: string }> = [];
   let slot = 0;
 
-  if (size === 'large') {
-    const boss = pickMember();
-    mobs.push({ slot: slot++, mobTemplateId: boss.mobTemplate.id, role: 'boss', prefix: rollMobPrefix(), status: 'alive' });
-    for (let i = 0; i < 2 && slot < mobCount; i++) {
+  for (const room of roomAssignments.rooms) {
+    const roomNumber = room.roomNumber;
+    const mobsInRoom = room.mobCount;
+    const isLastRoom = roomNumber === roomAssignments.rooms.length;
+
+    if (isLastRoom && size === 'large') {
+      const boss = pickMember();
+      mobs.push({ slot: slot++, room: roomNumber, mobTemplateId: boss.mobTemplate.id, role: 'boss', prefix: rollMobPrefix(), status: 'alive' });
+      for (let i = 1; i < mobsInRoom; i++) {
+        const elite = pickMember();
+        mobs.push({ slot: slot++, room: roomNumber, mobTemplateId: elite.mobTemplate.id, role: 'elite', prefix: rollMobPrefix(), status: 'alive' });
+      }
+    } else if (isLastRoom && size === 'medium') {
       const elite = pickMember();
-      mobs.push({ slot: slot++, mobTemplateId: elite.mobTemplate.id, role: 'elite', prefix: rollMobPrefix(), status: 'alive' });
+      mobs.push({ slot: slot++, room: roomNumber, mobTemplateId: elite.mobTemplate.id, role: 'elite', prefix: rollMobPrefix(), status: 'alive' });
+      for (let i = 1; i < mobsInRoom; i++) {
+        const trash = pickMember();
+        mobs.push({ slot: slot++, room: roomNumber, mobTemplateId: trash.mobTemplate.id, role: 'trash', prefix: rollMobPrefix(), status: 'alive' });
+      }
+    } else {
+      for (let i = 0; i < mobsInRoom; i++) {
+        const trash = pickMember();
+        mobs.push({ slot: slot++, room: roomNumber, mobTemplateId: trash.mobTemplate.id, role: 'trash', prefix: rollMobPrefix(), status: 'alive' });
+      }
     }
-  } else if (size === 'medium') {
-    const elite = pickMember();
-    mobs.push({ slot: slot++, mobTemplateId: elite.mobTemplate.id, role: 'elite', prefix: rollMobPrefix(), status: 'alive' });
   }
 
-  while (slot < mobCount) {
-    const trash = pickMember();
-    mobs.push({ slot: slot++, mobTemplateId: trash.mobTemplate.id, role: 'trash', prefix: rollMobPrefix(), status: 'alive' });
-  }
-
+  const totalRooms = roomAssignments.rooms.length;
   const sizeNounField = size === 'small' ? 'siteNounSmall' : size === 'medium' ? 'siteNounMedium' : 'siteNounLarge';
   const noun = family[sizeNounField];
   const namePrefix = size === 'small' ? 'Small ' : size === 'large' ? 'Large ' : '';
   const siteName = `${namePrefix}${family.name} ${noun}`;
 
   const site = await prisma.encounterSite.create({
-    data: { playerId, zoneId, mobFamilyId, name: siteName, size, mobs: { mobs } },
+    data: { playerId, zoneId, mobFamilyId, name: siteName, size, mobs: { mobs }, totalRooms },
   });
 
   await adminAudit(playerId, 'spawn_encounter', { siteId: site.id, siteName, zoneId, size, mobCount: mobs.length });
