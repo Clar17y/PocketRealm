@@ -450,10 +450,8 @@ export async function autoResolveEncounterRoom(
   siteId: string,
   username: string,
 ): Promise<AutoResolveEncounterResult> {
-  // If a manual session exists, reject auto-resolve — player must continue manually or abandon
-  if (await hasCombatSession(playerId, siteId)) {
-    throw new AppError(409, 'Manual combat session in progress. Continue fighting or abandon the site.', 'MANUAL_SESSION_ACTIVE');
-  }
+  // Clear any stale manual session — player chose to auto-resolve instead of continuing manually
+  await deleteCombatSession(playerId, siteId);
 
   // Load site and verify ownership
   const site = await prisma.encounterSite.findFirst({
