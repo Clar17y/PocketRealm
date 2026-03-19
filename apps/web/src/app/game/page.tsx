@@ -901,6 +901,7 @@ export default function GamePage() {
             isRecovering={hpState.isRecovering}
             recoveryCost={hpState.recoveryCost}
             zoneCraftingLevel={zoneCraftingLevel}
+            zoneName={zoneCraftingName}
             guildTaxRate={guildTaxRate}
             forgeLuckUses={activeBuffs.find(b => b.buffType === 'forge_luck')?.remainingUses ?? 0}
             forgeProtectionUses={activeBuffs.find(b => b.buffType === 'forge_protection')?.remainingUses ?? 0}
