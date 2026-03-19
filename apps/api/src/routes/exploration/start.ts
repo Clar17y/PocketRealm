@@ -853,7 +853,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             name: discovery.siteName,
             size: discovery.size,
             mobs: { mobs: discovery.mobs } as unknown as Prisma.InputJsonValue,
-            ...(distinctRooms <= 1 ? { clearStrategy: 'full_clear', fullClearActive: true } : {}),
+            totalRooms: distinctRooms,
           },
           select: {
             id: true,
