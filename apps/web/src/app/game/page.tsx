@@ -304,6 +304,7 @@ export default function GamePage() {
     handleDismissLootReveal,
     stateSetters,
     refreshPendingEncounters,
+    setActionError,
   } = useGameController({ isAuthenticated });
 
   useRateLimitToast();
@@ -1001,6 +1002,7 @@ export default function GamePage() {
             onActivateTemplate={handleTemplateSaved}
             onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             refreshPendingEncounters={refreshPendingEncounters}
+            setError={setActionError}
             onPendingEncounterPageChange={handlePendingEncounterPageChange}
             onPendingEncounterZoneFilterChange={handlePendingEncounterZoneFilterChange}
             onPendingEncounterMobFilterChange={handlePendingEncounterMobFilterChange}

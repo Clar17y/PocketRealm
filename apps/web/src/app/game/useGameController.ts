@@ -1917,5 +1917,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
     // Encounter site combat
     refreshPendingEncounters,
+    setActionError,
   };
 }
