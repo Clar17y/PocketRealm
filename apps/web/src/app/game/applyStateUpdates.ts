@@ -14,6 +14,7 @@ export interface StateSetters {
   setActiveBuffs: (b: PlayerBuffData[]) => void;
   setCharacterProgression: (cp: NonNullable<StateUpdates['characterProgression']>) => void;
   setMaterialTotals: (mt: Record<string, number>) => void;
+  setActiveEncounterSiteId: (id: string | null) => void;
 }
 
 export function applyStateUpdates(
@@ -62,4 +63,5 @@ export function applyStateUpdates(
   if (updates.inventoryUsedSlots !== undefined) setters.setInventoryUsedSlots(updates.inventoryUsedSlots);
   if (updates.characterProgression !== undefined) setters.setCharacterProgression(updates.characterProgression);
   if (updates.materialTotals !== undefined) setters.setMaterialTotals(updates.materialTotals);
+  if (updates.activeEncounterSiteId !== undefined) setters.setActiveEncounterSiteId(updates.activeEncounterSiteId);
 }

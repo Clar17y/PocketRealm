@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type {
   ExhaustedActionEntry,
   ExhaustedActionReason,
@@ -24,9 +25,7 @@ function formatRoundLogAttackRow(
     actorNameText: attack.playerId === currentPlayerId ? null : attack.username,
     actionText: attack.actionLabel,
     targetText: attack.targetMobName,
-    rollText: attack.playerId === currentPlayerId
-      ? `${Math.round(attack.hitChance * 100)}% hit (${attack.attackerHitScore} vs ${attack.defenderAvoidScore})`
-      : null,
+    rollText: `${Math.round(attack.hitChance * 100)}% hit (${attack.attackerHitScore} vs ${attack.defenderAvoidScore})`,
     outcomeText: attack.hit ? (attack.crit ? 'CRIT' : 'HIT') : 'MISS',
     damageText: attack.hit && attack.totalDamage !== undefined ? `${attack.totalDamage} dmg` : null,
   };
@@ -84,6 +83,20 @@ export function RoundLogAttackRow({
   }
 
   const formattedAttack = formatRoundLogAttackRow(attack, currentPlayerId);
+  const [expanded, setExpanded] = useState(formattedAttack.isCurrentPlayer);
+
+  const outcomeNode = formattedAttack.outcomeText === 'MISS' ? (
+    <span className="text-[var(--rpg-text-secondary)]">MISS</span>
+  ) : (
+    <>
+      <span className={attack.crit ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-green-light)]'}>
+        {formattedAttack.outcomeText}
+      </span>
+      {formattedAttack.damageText && (
+        <span className="text-[var(--rpg-red)]"> {formattedAttack.damageText}</span>
+      )}
+    </>
+  );
 
   if (formattedAttack.isCurrentPlayer) {
     return (
@@ -102,43 +115,31 @@ export function RoundLogAttackRow({
           </>
         )}
         {' | '}
-        {formattedAttack.outcomeText === 'MISS' ? (
-          <span className="text-[var(--rpg-text-secondary)]">MISS</span>
-        ) : (
-          <>
-            <span className={attack.crit ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-green-light)]'}>
-              {formattedAttack.outcomeText}
-            </span>
-            {formattedAttack.damageText && (
-              <span className="text-[var(--rpg-red)]"> {formattedAttack.damageText}</span>
-            )}
-          </>
-        )}
+        {outcomeNode}
       </div>
     );
   }
 
   return (
-    <div className="text-xs ml-2 text-[var(--rpg-text-secondary)]">
+    <div
+      className="text-xs ml-2 text-[var(--rpg-text-secondary)] cursor-pointer hover:bg-[var(--rpg-surface)]/50 rounded px-1 -mx-1"
+      onClick={() => setExpanded(!expanded)}
+    >
       <span className="text-[var(--rpg-text-primary)]">{formattedAttack.actorNameText}</span>
       {': '}
       {formattedAttack.actionText}
-      {' → '}
       {formattedAttack.targetText && (
         <>
+          {' → '}
           {formattedAttack.targetText}
-          {' | '}
         </>
       )}
-      {formattedAttack.outcomeText === 'MISS' ? (
-        'MISS'
-      ) : (
-        <>
-          <span className={attack.crit ? 'text-[var(--rpg-gold)]' : 'text-[var(--rpg-green-light)]'}>
-            {formattedAttack.outcomeText}
-          </span>
-          {formattedAttack.damageText && ` ${formattedAttack.damageText}`}
-        </>
+      {' | '}
+      {outcomeNode}
+      {expanded && formattedAttack.rollText && (
+        <div className="ml-2 mt-0.5 text-[var(--rpg-text-secondary)] opacity-70">
+          {formattedAttack.rollText}
+        </div>
       )}
     </div>
   );

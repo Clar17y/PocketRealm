@@ -267,6 +267,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [actionError, setActionError] = useState<string | null>(null);
   const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, expeditionThemes, worldBosses, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
+  const [activeEncounterSiteId, setActiveEncounterSiteId] = useState<string | null>(null);
   const [staminaState, setStaminaState] = useState<ResourceState>({
     current: STAMINA_CONSTANTS.BASE_POOL, max: STAMINA_CONSTANTS.BASE_POOL,
     regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 5
@@ -419,6 +420,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setActiveBuffs: setActiveBuffs,
     setCharacterProgression: (cp) => setCharacterProgression((prev) => ({ ...prev, ...cp })),
     setMaterialTotals,
+    setActiveEncounterSiteId,
   }), []);
   // All useState setters are stable references, so empty deps is correct
 
@@ -523,6 +525,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         attributes: playerRes.data.player.attributes,
       });
       setGold(playerRes.data.player.gold ?? 0);
+      setActiveEncounterSiteId(playerRes.data.player.activeEncounterSiteId ?? null);
       initSettingsFromServer(playerRes.data.player);
       const serverTutorialStep = playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED;
       setTutorialStep(serverTutorialStep);
@@ -1918,5 +1921,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Encounter site combat
     refreshPendingEncounters,
     setActionError,
+    activeEncounterSiteId,
   };
 }

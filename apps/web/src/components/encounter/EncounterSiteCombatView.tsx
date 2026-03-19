@@ -61,7 +61,7 @@ function updateMobsFromSnapshot(
   return mobs.map(mob => {
     const slot = parseMobSlot(mob.id);
     const ms = mobStates.find(s => s.slot === slot);
-    if (!ms) return mob;
+    if (!ms) return { ...mob, hp: 0, activeEffects: [] }; // Not in response = dead
     return { ...mob, hp: ms.hp, maxHp: ms.maxHp, activeEffects: ms.activeEffects };
   });
 }
