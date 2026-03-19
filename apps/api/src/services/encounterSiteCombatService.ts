@@ -863,6 +863,8 @@ export async function resolveManualEncounterRound(
     mobId: m.id,
     alive: m.hp > 0,
     hpRemaining: m.hp,
+    maxHp: m.maxHp,
+    activeEffects: m.activeEffects,
   }));
 
   // If combat is still ongoing, return without persisting

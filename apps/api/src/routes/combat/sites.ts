@@ -360,9 +360,9 @@ export function registerSiteRoutes(router: Router): void {
         return {
           slot,
           hp: m.hpRemaining,
-          maxHp: m.hpRemaining, // maxHp not tracked per-round; use current as approximation
+          maxHp: m.maxHp,
           alive: m.alive,
-          activeEffects: [],
+          activeEffects: m.activeEffects ?? [],
         };
       });
 
