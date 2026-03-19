@@ -35,6 +35,7 @@ import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
 import { Settings } from '@/components/screens/Settings';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { ConnectionBanner } from '@/components/common/ConnectionBanner';
 import { TrainingGrounds } from '@/components/screens/TrainingGrounds';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
@@ -1232,6 +1233,7 @@ export default function GamePage() {
 
   return (
     <>
+      <ConnectionBanner />
       {showChangelog && <ChangelogModal onDismiss={dismissChangelog} />}
       {confirmAbandonLoot && (
         <ConfirmModal
