@@ -47,6 +47,7 @@ export interface RaidRoundInput {
   roundNumber: number;
   environmentalDotPercent?: number;
   summonPool?: ExpeditionMobState[];
+  splashCascade?: boolean;
 }
 
 export interface RaidParticipant {

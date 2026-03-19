@@ -84,6 +84,7 @@ interface OffensiveAttackContext {
   mobState: { id: string; hp: number; maxHp: number; stats: CombatantStats; activeEffects: BossActiveEffect[]; name: string; prefix: string | null }[];
   playerActionDefs: Record<string, ActionDefinition>;
   getUsername: (id: string) => string;
+  splashCascade?: boolean;
 }
 
 /**
@@ -156,6 +157,70 @@ function resolvePlayerOffensive(
           roundsRemaining: def.effect.duration,
         });
       }
+
+      // Splash hit cascade: on miss, try other alive mobs in order
+      if (ctx.splashCascade && !isAoe) {
+        const otherMobs = aliveMobs.filter(m => m.id !== target.id && m.hp > 0);
+        let cascadeTarget: typeof target | null = null;
+        for (const candidateMob of otherMobs) {
+          const cascadeAvoid = calculateAvoidScore(candidateMob.stats);
+          const cascadeResult = def.alwaysHits
+            ? guaranteedHitResult(hitScore, cascadeAvoid)
+            : resolveHitCheck({
+                combatMode: ctx.combatMode,
+                hitScore,
+                avoidScore: cascadeAvoid,
+                hitRollValue: ctx.roll.rollHitChance(),
+              });
+          if (cascadeResult.didHit) {
+            cascadeTarget = candidateMob;
+            break;
+          }
+        }
+        if (cascadeTarget) {
+          // Cascade hit: compute damage against cascade target and push a hit entry
+          s.hit = true;
+          const rawDmg = ctx.roll.rollDamage(p.stats.damageMin, p.stats.damageMax);
+          const scaledDmg = Math.floor(rawDmg * (def.damageMultiplier ?? 1.0));
+          const crit = ctx.roll.rollCrit(p.stats.critChance ?? 0);
+          if (crit) s.isCritical = true;
+          const isMagicAttack = def.damageType === 'magic' || p.stats.damageType === 'magic';
+          const effectiveDefence = isMagicAttack
+            ? getEffectiveStatValue(cascadeTarget.stats.magicDefence, cascadeTarget.activeEffects, 'magicDefence')
+            : getEffectiveStatValue(cascadeTarget.stats.defence, cascadeTarget.activeEffects, 'defence');
+          const { damage } = calculateFinalDamage(scaledDmg, effectiveDefence, crit, p.stats.critDamage ?? 0);
+          cascadeTarget.hp = Math.max(0, cascadeTarget.hp - damage);
+          totalDamageDealt += damage;
+          if (def.effect?.isDebuff && cascadeTarget.hp > 0) {
+            const dotFlat = def.effect.damagePerRound ?? 0;
+            const dotPct = def.effect.damagePerRoundPercent ?? 0;
+            const resolvedDot = dotFlat + Math.floor((dotPct / 100) * damage);
+            cascadeTarget.activeEffects.push({
+              name: def.effect.name,
+              stat: def.effect.stat,
+              modifier: def.effect.modifier,
+              roundsRemaining: def.effect.duration,
+              ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
+            });
+          }
+          const cascadeAvoidForLog = calculateAvoidScore(cascadeTarget.stats);
+          const cascadeResForLog = def.alwaysHits
+            ? guaranteedHitResult(hitScore, cascadeAvoidForLog)
+            : guaranteedHitResult(hitScore, cascadeAvoidForLog); // log as guaranteed hit since we know it hit
+          entries.push({
+            ...baseEntry,
+            targetMobId: cascadeTarget.id,
+            targetMobName: mobDisplayName(cascadeTarget),
+            defenderAvoidScore: cascadeAvoidForLog,
+            hit: true,
+            crit,
+            damageRoll: rawDmg,
+            totalDamage: damage,
+          });
+          continue;
+        }
+      }
+
       entries.push({ ...baseEntry, hit: false, crit: false });
       continue;
     }
@@ -342,7 +407,7 @@ export function resolveRaidRound(
   }
 
   // --- Step 4: Player offensive phase ---
-  const offensiveCtx: OffensiveAttackContext = { combatMode, roll, mobState, playerActionDefs, getUsername };
+  const offensiveCtx: OffensiveAttackContext = { combatMode, roll, mobState, playerActionDefs, getUsername, splashCascade: input.splashCascade };
 
   for (let i = 0; i < input.participants.length; i++) {
     const p = input.participants[i];
