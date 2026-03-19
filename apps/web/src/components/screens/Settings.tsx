@@ -64,6 +64,14 @@ interface SettingsProps {
   lootRevealRarity: ConfirmRarity;
   onLootRevealRarityChange: (value: ConfirmRarity) => void;
 
+  // Lore & Flavour
+  showNpcDialogue: boolean;
+  onShowNpcDialogueChange: (value: boolean) => void;
+  showItemFlavourText: boolean;
+  onShowItemFlavourTextChange: (value: boolean) => void;
+  showBestiaryLore: boolean;
+  onShowBestiaryLoreChange: (value: boolean) => void;
+
   // Notifications
   pushState: 'loading' | 'unsupported' | 'denied' | 'subscribed' | 'unsubscribed';
   onPushToggle: () => void;
@@ -102,6 +110,12 @@ export function Settings({
   onConfirmRarityChange,
   lootRevealRarity,
   onLootRevealRarityChange,
+  showNpcDialogue,
+  onShowNpcDialogueChange,
+  showItemFlavourText,
+  onShowItemFlavourTextChange,
+  showBestiaryLore,
+  onShowBestiaryLoreChange,
   pushState,
   onPushToggle,
   notificationPrefs,
@@ -251,6 +265,34 @@ export function Settings({
             value={lootRevealRarity}
             onChange={onLootRevealRarityChange}
           />
+        </div>
+      </PixelCard>
+
+      {/* Lore & Flavour */}
+      <PixelCard>
+        <h3 className="text-sm font-bold text-[var(--rpg-text-primary)] mb-3">Lore & Flavour</h3>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[var(--rpg-text-secondary)]">NPC Dialogue</p>
+              <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Show NPC dialogue banners on crafting, gathering, and other screens</p>
+            </div>
+            <ToggleSwitch checked={showNpcDialogue} onChange={onShowNpcDialogueChange} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[var(--rpg-text-secondary)]">Item Flavour Text</p>
+              <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Show flavour text descriptions in your inventory</p>
+            </div>
+            <ToggleSwitch checked={showItemFlavourText} onChange={onShowItemFlavourTextChange} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[var(--rpg-text-secondary)]">Bestiary Lore</p>
+              <p className="text-xs text-[var(--rpg-text-secondary)] opacity-60">Show appearance, behaviour, and lore sections in bestiary entries</p>
+            </div>
+            <ToggleSwitch checked={showBestiaryLore} onChange={onShowBestiaryLoreChange} />
+          </div>
         </div>
       </PixelCard>
 

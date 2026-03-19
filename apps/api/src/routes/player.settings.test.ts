@@ -16,6 +16,9 @@ const settingsSchema = z.object({
   lootRevealRarity: z.enum(RARITY_ENUM).optional(),
   forgeConfirmRarity: z.enum(RARITY_ENUM).optional(),
   homeTownId: z.string().uuid().optional(),
+  showNpcDialogue: z.boolean().optional(),
+  showItemFlavourText: z.boolean().optional(),
+  showBestiaryLore: z.boolean().optional(),
 }).refine(data => Object.values(data).some(v => v !== undefined), { message: 'At least one setting required' });
 
 describe('player settings', () => {
@@ -59,6 +62,12 @@ describe('player settings', () => {
     it('accepts boolean settings', () => {
       expect(() => settingsSchema.parse({ autoSkipKnownCombat: true })).not.toThrow();
       expect(() => settingsSchema.parse({ defaultRefiningMax: false })).not.toThrow();
+    });
+
+    it('accepts flavour text toggle settings', () => {
+      expect(() => settingsSchema.parse({ showNpcDialogue: false })).not.toThrow();
+      expect(() => settingsSchema.parse({ showItemFlavourText: true })).not.toThrow();
+      expect(() => settingsSchema.parse({ showBestiaryLore: false })).not.toThrow();
     });
 
     it('accepts multiple settings at once', () => {

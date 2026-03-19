@@ -37,6 +37,7 @@ interface CasinoProps {
   lastResult: CasinoResultEvent | null;
   trackBet: (betType: RouletteBetType, betValue: string, amount: number, roundId: string) => void;
   playerName: string | null;
+  showNpcDialogue?: boolean;
 }
 
 // Helpers
@@ -162,6 +163,7 @@ export function Casino({
   lastResult,
   trackBet,
   playerName,
+  showNpcDialogue = true,
 }: CasinoProps) {
   const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
 
@@ -380,7 +382,7 @@ export function Casino({
   return (
     <ScreenContainer>
       {winAnimation && <WinCelebration {...winAnimation} />}
-      <NpcDialogueBanner npcKey="millbrook-casino" event={dialogueEvent} />
+      <NpcDialogueBanner npcKey="millbrook-casino" event={dialogueEvent} showDialogue={showNpcDialogue} />
       <FirstVisitHowTo
         storageKey="howto_casino"
         title="Casino"

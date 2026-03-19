@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.45',
+    date: '2026-03-19',
+    title: 'Lore & Flavour Text',
+    summary:
+      "NPCs now have much more to say. Every shopkeeper, crafter, and guide in Millbrook has expanded dialogue with lines that rotate without repeating. Visit a zone often enough and NPCs will comment on where you've been. Three new settings toggles (NPC Dialogue, Item Flavour Text, Bestiary Lore) let you disable any flavour text you find distracting. Zone descriptions, NPC speech bubbles, and bestiary lore sections are now collapsible to keep the UI clean on smaller screens.",
+  },
+  {
     version: '0.44',
     date: '2026-03-18',
     title: 'Push Notifications',

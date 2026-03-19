@@ -22,6 +22,9 @@ export interface ServerSettingsPayload {
   notifyTurnBankFull?: boolean | null;
   notifyExpeditionStarted?: boolean | null;
   notifyExpeditionFinished?: boolean | null;
+  showNpcDialogue?: boolean | null;
+  showItemFlavourText?: boolean | null;
+  showBestiaryLore?: boolean | null;
 }
 
 export function usePlayerSettings() {
@@ -37,6 +40,10 @@ export function usePlayerSettings() {
   const [forgeConfirmRarity, setForgeConfirmRarity] = useState<ConfirmRarity>('rare');
   const [guildTaxRate, setGuildTaxRate] = useState(0);
   const [homeTownId, setHomeTownId] = useState<string | null>(null);
+  const [showNpcDialogue, setShowNpcDialogue] = useState(true);
+  const [showItemFlavourText, setShowItemFlavourText] = useState(true);
+  const [showBestiaryLore, setShowBestiaryLore] = useState(true);
+
   const [notificationPrefs, setNotificationPrefs] = useState({
     notifyPvpAttack: true,
     notifyPvpScout: true,
@@ -79,6 +86,12 @@ export function usePlayerSettings() {
     handleSetSetting('forgeConfirmRarity', value, setForgeConfirmRarity, forgeConfirmRarity);
   const handleSetHomeTown = (zoneId: string) =>
     handleSetSetting('homeTownId', zoneId, setHomeTownId, homeTownId);
+  const handleSetShowNpcDialogue = (value: boolean) =>
+    handleSetSetting('showNpcDialogue', value, setShowNpcDialogue, showNpcDialogue);
+  const handleSetShowItemFlavourText = (value: boolean) =>
+    handleSetSetting('showItemFlavourText', value, setShowItemFlavourText, showItemFlavourText);
+  const handleSetShowBestiaryLore = (value: boolean) =>
+    handleSetSetting('showBestiaryLore', value, setShowBestiaryLore, showBestiaryLore);
 
   const handleSetNotificationPref = async (key: keyof typeof notificationPrefs, value: boolean) => {
     const prev = notificationPrefs[key];
@@ -101,6 +114,9 @@ export function usePlayerSettings() {
     setLootRevealRarity(s.lootRevealRarity ?? 'uncommon');
     setForgeConfirmRarity(s.forgeConfirmRarity ?? 'rare');
     setHomeTownId(s.homeTownId ?? null);
+    setShowNpcDialogue(s.showNpcDialogue ?? true);
+    setShowItemFlavourText(s.showItemFlavourText ?? true);
+    setShowBestiaryLore(s.showBestiaryLore ?? true);
     setNotificationPrefs({
       notifyPvpAttack: s.notifyPvpAttack ?? true,
       notifyPvpScout: s.notifyPvpScout ?? true,
@@ -127,6 +143,10 @@ export function usePlayerSettings() {
     guildTaxRate,
     homeTownId,
 
+    showNpcDialogue,
+    showItemFlavourText,
+    showBestiaryLore,
+
     // Raw setters for optimistic / external updates
     setCombatLogSpeedMs,
     setExplorationSpeedMs,
@@ -146,6 +166,9 @@ export function usePlayerSettings() {
     handleSetLootRevealRarity,
     handleSetForgeConfirmRarity,
     handleSetHomeTown,
+    handleSetShowNpcDialogue,
+    handleSetShowItemFlavourText,
+    handleSetShowBestiaryLore,
     notificationPrefs,
     handleSetNotificationPref,
 

@@ -246,6 +246,12 @@ export default function GamePage() {
     guildTaxRate,
     homeTownId,
     handleSetHomeTown,
+    showNpcDialogue,
+    showItemFlavourText,
+    showBestiaryLore,
+    handleSetShowNpcDialogue,
+    handleSetShowItemFlavourText,
+    handleSetShowBestiaryLore,
     notificationPrefs,
     handleSetNotificationPref,
     showChangelog,
@@ -584,7 +590,7 @@ export default function GamePage() {
                 imageSrc: itemImageSrc(item.template.name, item.template.itemType),
                 quantity: item.quantity,
                 rarity: item.rarity,
-                description: item.template.flavorText || item.template.itemType,
+                description: (showItemFlavourText && item.template.flavorText) || item.template.itemType,
                 type: item.template.itemType,
                 tier: item.template.tier,
                 weightClass: item.template.weightClass ?? null,
@@ -776,6 +782,9 @@ export default function GamePage() {
               stats: m.stats,
               zones: m.zones,
               description: m.description,
+              flavorAppearance: m.flavorAppearance,
+              flavorBehavior: m.flavorBehavior,
+              flavorLore: m.flavorLore,
               prefixesEncountered: m.prefixesEncountered,
               explorationTier: m.explorationTier,
               tierLocked: m.tierLocked,
@@ -790,6 +799,7 @@ export default function GamePage() {
             prefixSummary={bestiaryPrefixSummary}
             expeditionThemes={expeditionThemes}
             worldBosses={worldBosses}
+            showBestiaryLore={showBestiaryLore}
           />
         );
       case 'crafting':
@@ -853,6 +863,7 @@ export default function GamePage() {
               guildTaxRate={guildTaxRate}
               backpackFull={backpackFull}
               availableSlots={Math.max(0, inventoryCapacity - inventoryUsedSlots)}
+              showNpcDialogue={showNpcDialogue}
             />
           </div>
         );
@@ -894,6 +905,7 @@ export default function GamePage() {
             forgeLuckUses={activeBuffs.find(b => b.buffType === 'forge_luck')?.remainingUses ?? 0}
             forgeProtectionUses={activeBuffs.find(b => b.buffType === 'forge_protection')?.remainingUses ?? 0}
             forgeConfirmRarity={forgeConfirmRarity}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       }
@@ -958,6 +970,7 @@ export default function GamePage() {
               ownedResourceNames={ownedResourceNames}
               recoveryCost={hpState.recoveryCost}
               guildTaxRate={guildTaxRate}
+              showNpcDialogue={showNpcDialogue}
             />
           </div>
         );
@@ -1062,6 +1075,12 @@ export default function GamePage() {
             onLootRevealRarityChange={handleSetLootRevealRarity}
             forgeConfirmRarity={forgeConfirmRarity}
             onForgeConfirmRarityChange={handleSetForgeConfirmRarity}
+            showNpcDialogue={showNpcDialogue}
+            onShowNpcDialogueChange={handleSetShowNpcDialogue}
+            showItemFlavourText={showItemFlavourText}
+            onShowItemFlavourTextChange={handleSetShowItemFlavourText}
+            showBestiaryLore={showBestiaryLore}
+            onShowBestiaryLoreChange={handleSetShowBestiaryLore}
             pushState={pushState}
             onPushToggle={pushToggle}
             notificationPrefs={notificationPrefs}
@@ -1103,6 +1122,7 @@ export default function GamePage() {
             onShopPurchase={loadAll}
             zones={zones.filter(z => z.discovered).map(z => ({ id: z.id, name: z.name, zoneType: z.zoneType }))}
             homeTownId={homeTownId}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       case 'leaderboard':
@@ -1115,6 +1135,7 @@ export default function GamePage() {
             initialTab={activeScreen === 'guild' && deepLinkTab ? deepLinkTab as 'expeditions' : undefined}
             onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
             onExpeditionContextChange={setExpeditionContext}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       case 'friends':
@@ -1178,6 +1199,7 @@ export default function GamePage() {
             lastResult={casinoSocket.lastResult}
             trackBet={casinoSocket.trackBet}
             playerName={player?.username ?? null}
+            showNpcDialogue={showNpcDialogue}
           />
         );
       case 'training':
