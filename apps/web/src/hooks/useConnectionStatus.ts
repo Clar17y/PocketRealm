@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
 import { getSocket } from '@/lib/socket';
 
-type ConnectionState = 'connected' | 'disconnected' | 'reconnecting' | 'failed';
+export type ConnectionState = 'connected' | 'disconnected' | 'reconnecting' | 'failed';
 
 export function useConnectionStatus(): ConnectionState {
-  const [state, setState] = useState<ConnectionState>(() =>
-    getSocket().connected ? 'connected' : 'disconnected',
-  );
+  const [state, setState] = useState<ConnectionState>(() => {
+    if (typeof window === 'undefined') return 'disconnected';
+    return getSocket().connected ? 'connected' : 'disconnected';
+  });
 
   useEffect(() => {
     const socket = getSocket();
+
+    // Sync any state change that occurred between render and effect commit
+    setState(socket.connected ? 'connected' : 'disconnected');
 
     const onConnect = () => setState('connected');
     const onDisconnect = () => setState('disconnected');

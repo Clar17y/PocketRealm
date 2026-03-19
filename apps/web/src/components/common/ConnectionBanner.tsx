@@ -1,29 +1,31 @@
 'use client';
 
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const bannerBase = 'fixed top-0 left-0 right-0 z-50 text-[var(--rpg-text-primary)] text-center text-xs py-1';
 
 export function ConnectionBanner() {
   const status = useConnectionStatus();
   const [showReconnected, setShowReconnected] = useState(false);
-  const [wasDisconnected, setWasDisconnected] = useState(false);
+  const wasDisconnectedRef = useRef(false);
 
   useEffect(() => {
     if (status === 'disconnected' || status === 'reconnecting' || status === 'failed') {
-      setWasDisconnected(true);
-    } else if (status === 'connected' && wasDisconnected) {
+      wasDisconnectedRef.current = true;
+    } else if (status === 'connected' && wasDisconnectedRef.current) {
+      wasDisconnectedRef.current = false;
       setShowReconnected(true);
-      setWasDisconnected(false);
       const t = setTimeout(() => setShowReconnected(false), 2000);
       return () => clearTimeout(t);
     }
-  }, [status, wasDisconnected]);
+  }, [status]);
 
   if (status === 'connected' && !showReconnected) return null;
 
   if (showReconnected) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-[var(--rpg-green-dark)] text-[var(--rpg-text-primary)] text-center text-xs py-1 animate-fadeIn">
+      <div className={`${bannerBase} bg-[var(--rpg-green-dark)] animate-fadeIn`}>
         Connected
       </div>
     );
@@ -31,7 +33,7 @@ export function ConnectionBanner() {
 
   if (status === 'failed') {
     return (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-[var(--rpg-red)] text-[var(--rpg-text-primary)] text-center text-xs py-1">
+      <div className={`${bannerBase} bg-[var(--rpg-red)]`}>
         Connection lost.{' '}
         <button onClick={() => window.location.reload()} className="underline">
           Reload
@@ -41,7 +43,7 @@ export function ConnectionBanner() {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-[var(--rpg-red)] text-[var(--rpg-text-primary)] text-center text-xs py-1">
+    <div className={`${bannerBase} bg-[var(--rpg-red)]`}>
       {status === 'reconnecting' ? 'Reconnecting...' : 'Connection lost. Reconnecting...'}
     </div>
   );
