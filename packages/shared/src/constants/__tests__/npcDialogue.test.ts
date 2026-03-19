@@ -51,6 +51,21 @@ describe('getNpcName', () => {
   });
 });
 
+describe('contextLines', () => {
+  it('NPCs with contextLines have valid structure', () => {
+    for (const [key, npc] of Object.entries(NPC_DIALOGUE)) {
+      if (!npc.contextLines) continue;
+      for (const [event, contextEntries] of Object.entries(npc.contextLines)) {
+        for (const entry of contextEntries) {
+          expect(entry.zoneKeyword).toBeTruthy();
+          expect(entry.lines.length).toBeGreaterThan(0);
+          entry.lines.forEach(line => expect(typeof line).toBe('string'));
+        }
+      }
+    }
+  });
+});
+
 describe('NPC_DIALOGUE completeness', () => {
   it('has entries for all expected NPC keys', () => {
     const expectedKeys = [
@@ -96,5 +111,13 @@ describe('NPC_DIALOGUE completeness', () => {
 
   it('has expected number of NPC entries (12 base + 6 skill-specific)', () => {
     expect(Object.keys(NPC_DIALOGUE).length).toBe(18);
+  });
+
+  it('each NPC has at least 8 lines per populated event', () => {
+    for (const [key, npc] of Object.entries(NPC_DIALOGUE)) {
+      for (const [event, lines] of Object.entries(npc.lines)) {
+        expect(lines.length, `${key}.${event} has ${lines.length} lines, expected >= 8`).toBeGreaterThanOrEqual(8);
+      }
+    }
   });
 });

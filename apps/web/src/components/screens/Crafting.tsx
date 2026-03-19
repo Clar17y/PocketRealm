@@ -69,10 +69,11 @@ interface CraftingProps {
   backpackFull?: boolean;
   isOverEncumbered?: boolean;
   availableSlots?: number;
+  showNpcDialogue?: boolean;
 }
 
 
-export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, availableSlots = 0 }: CraftingProps) {
+export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, availableSlots = 0, showNpcDialogue = true }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
@@ -130,7 +131,7 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
 
   return (
     <ScreenContainer>
-      {npcKey && <NpcDialogueBanner npcKey={npcKey} event={dialogueEvent} />}
+      {npcKey && <NpcDialogueBanner npcKey={npcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />}
 
       {/* Knockout Banner */}
       {isRecovering && (

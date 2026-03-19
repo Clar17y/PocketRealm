@@ -10,6 +10,7 @@ import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { MapPin, Star, Hourglass, Lock, Home } from 'lucide-react';
 import { inflateCost } from '@/lib/taxCalc';
 import { buildZoneAdjacency, findShortestZonePath } from '@/lib/zoneRoutes';
+import { CollapsibleLoreSection } from '../common/CollapsibleLoreSection';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { ScreenContainer } from '../common/ScreenContainer';
 
@@ -336,22 +337,24 @@ export function ZoneMap({
             </div>
           </div>
 
-          {selectedZone.description && (
-            <p className="text-sm leading-snug text-[var(--rpg-text-secondary)] mb-2">
-              {selectedZone.description}
-            </p>
-          )}
-
-          {selectedZone.arrivalText && (
-            <p className="text-sm italic leading-snug text-[var(--rpg-text-secondary)] mb-2 border-l-2 border-[var(--rpg-gold)] pl-3">
-              {selectedZone.arrivalText}
-            </p>
-          )}
-
-          {ambientText && (
-            <p className="text-xs italic leading-snug text-[var(--rpg-text-secondary)] opacity-70 mb-2">
-              {ambientText}
-            </p>
+          {(selectedZone.description || selectedZone.arrivalText || ambientText) && (
+            <CollapsibleLoreSection title="Zone Lore" storageKey="zone-description">
+              {selectedZone.description && (
+                <p className="text-sm leading-snug text-[var(--rpg-text-secondary)] mb-2">
+                  {selectedZone.description}
+                </p>
+              )}
+              {selectedZone.arrivalText && (
+                <p className="text-sm italic leading-snug text-[var(--rpg-text-secondary)] mb-2 border-l-2 border-[var(--rpg-gold)] pl-3">
+                  {selectedZone.arrivalText}
+                </p>
+              )}
+              {ambientText && (
+                <p className="text-xs italic leading-snug text-[var(--rpg-text-secondary)] opacity-70 mb-2">
+                  {ambientText}
+                </p>
+              )}
+            </CollapsibleLoreSection>
           )}
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mb-3">

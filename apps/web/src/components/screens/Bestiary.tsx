@@ -9,6 +9,7 @@ import { getMobPrefixDefinition, getTierName, BESTIARY_UNLOCK_CONSTANTS } from '
 import type { ExpeditionBestiaryTheme, WorldBossEntry } from '@/app/game/hooks/useBestiary';
 import { StatBar } from '@/components/StatBar';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
+import { CollapsibleLoreSection } from '../common/CollapsibleLoreSection';
 import { ScreenContainer } from '../common/ScreenContainer';
 import { BestiaryModalShell, RotationDisplay, MonsterStatBlock } from '../common/bestiary';
 
@@ -64,6 +65,7 @@ interface BestiaryProps {
   prefixSummary: PrefixSummaryEntry[];
   expeditionThemes: ExpeditionBestiaryTheme[];
   worldBosses: WorldBossEntry[];
+  showBestiaryLore?: boolean;
 }
 
 const PREFIX_ORDER = ['weak', 'frail', 'tough', 'gigantic', 'swift', 'ferocious', 'shaman', 'venomous', 'ancient', 'spectral'];
@@ -421,7 +423,7 @@ function WorldBossBestiaryTab({ bosses }: { bosses: WorldBossEntry[] }) {
   );
 }
 
-export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosses }: BestiaryProps) {
+export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosses, showBestiaryLore = true }: BestiaryProps) {
   const [selectedMonster, setSelectedMonster] = useState<Monster | null>(null);
   const [activeView, setActiveView] = useState<'monsters' | 'expeditions' | 'bosses' | 'prefixes'>('monsters');
   const sortedMonsters = useMemo(
@@ -603,41 +605,42 @@ export function Bestiary({ monsters, prefixSummary, expeditionThemes, worldBosse
               onClose={() => setSelectedMonster(null)}
             >
               {/* Progressive flavour text reveal */}
-              <div className="space-y-3 mb-4">
-                <div>
-                  <span className="text-xs font-semibold text-[var(--rpg-gold)] uppercase tracking-wide">Appearance</span>
-                  <p className="text-sm text-[var(--rpg-text-secondary)] mt-0.5">
-                    {selectedMonster.flavorAppearance ?? (
-                      <span className="opacity-50 flex items-center gap-1">
-                        <Lock size={12} />
-                        ??? (Defeat {BESTIARY_UNLOCK_CONSTANTS.FLAVOR_APPEARANCE_THRESHOLD}+)
-                      </span>
-                    )}
-                  </p>
+              {showBestiaryLore ? (
+                <div className="space-y-3 mb-4">
+                  <CollapsibleLoreSection title="Appearance" storageKey={`bestiary-appearance:${selectedMonster.id}`}>
+                    <p className="text-sm text-[var(--rpg-text-secondary)]">
+                      {selectedMonster.flavorAppearance ?? (
+                        <span className="opacity-50 flex items-center gap-1">
+                          <Lock size={12} />
+                          ??? (Defeat {BESTIARY_UNLOCK_CONSTANTS.FLAVOR_APPEARANCE_THRESHOLD}+)
+                        </span>
+                      )}
+                    </p>
+                  </CollapsibleLoreSection>
+                  <CollapsibleLoreSection title="Behaviour" storageKey={`bestiary-behaviour:${selectedMonster.id}`}>
+                    <p className="text-sm text-[var(--rpg-text-secondary)]">
+                      {selectedMonster.flavorBehavior ?? (
+                        <span className="opacity-50 flex items-center gap-1">
+                          <Lock size={12} />
+                          ??? (Defeat {BESTIARY_UNLOCK_CONSTANTS.FLAVOR_BEHAVIOR_THRESHOLD}+)
+                        </span>
+                      )}
+                    </p>
+                  </CollapsibleLoreSection>
+                  <CollapsibleLoreSection title="Lore" storageKey={`bestiary-lore:${selectedMonster.id}`}>
+                    <p className="text-sm text-[var(--rpg-text-secondary)]">
+                      {selectedMonster.flavorLore ?? (
+                        <span className="opacity-50 flex items-center gap-1">
+                          <Lock size={12} />
+                          ??? (Defeat {BESTIARY_UNLOCK_CONSTANTS.FLAVOR_LORE_THRESHOLD}+)
+                        </span>
+                      )}
+                    </p>
+                  </CollapsibleLoreSection>
                 </div>
-                <div>
-                  <span className="text-xs font-semibold text-[var(--rpg-gold)] uppercase tracking-wide">Behaviour</span>
-                  <p className="text-sm text-[var(--rpg-text-secondary)] mt-0.5">
-                    {selectedMonster.flavorBehavior ?? (
-                      <span className="opacity-50 flex items-center gap-1">
-                        <Lock size={12} />
-                        ??? (Defeat {BESTIARY_UNLOCK_CONSTANTS.FLAVOR_BEHAVIOR_THRESHOLD}+)
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-xs font-semibold text-[var(--rpg-gold)] uppercase tracking-wide">Lore</span>
-                  <p className="text-sm text-[var(--rpg-text-secondary)] mt-0.5">
-                    {selectedMonster.flavorLore ?? (
-                      <span className="opacity-50 flex items-center gap-1">
-                        <Lock size={12} />
-                        ??? (Defeat {BESTIARY_UNLOCK_CONSTANTS.FLAVOR_LORE_THRESHOLD}+)
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
+              ) : (
+                <p className="text-sm text-[var(--rpg-text-secondary)] mb-4">{selectedMonster.description}</p>
+              )}
 
               {/* Stats */}
               <div className="mb-4">
