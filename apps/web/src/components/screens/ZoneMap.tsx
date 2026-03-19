@@ -14,6 +14,7 @@ import { CollapsibleLoreSection } from '../common/CollapsibleLoreSection';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
+import type { NpcKey } from '@pocketrealm/shared';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 function getMilestoneHint(percent: number): ReactNode {
@@ -150,7 +151,9 @@ export function ZoneMap({
   showNpcDialogue = true,
   isInTown,
 }: ZoneMapProps) {
-  const { dialogueEvent } = useNpcDialogue();
+  const currentZoneName = zones.find(z => z.id === currentZoneId)?.name;
+  const guardNpcKey: NpcKey = currentZoneName?.toLowerCase() === 'thornwall' ? 'thornwall-guard' : 'town-guard';
+  const { dialogueEvent } = useNpcDialogue(guardNpcKey);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
   // After travel playback finishes, auto-select the zone the player ended up in
@@ -260,7 +263,7 @@ export function ZoneMap({
 
   return (
     <ScreenContainer>
-      {isInTown && <NpcDialogueBanner npcKey="town-guard" event={dialogueEvent} showDialogue={showNpcDialogue} />}
+      {isInTown && <NpcDialogueBanner npcKey={guardNpcKey} event={dialogueEvent} showDialogue={showNpcDialogue} />}
       <FeatureTutorial storageKey="howto_zones" title="Zone Map">
         <p>
           The world is made up of connected zones. <strong>Travel</strong> between them

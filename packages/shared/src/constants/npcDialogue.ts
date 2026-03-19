@@ -1821,6 +1821,54 @@ export const NPC_DIALOGUE: Record<string, NpcDialogue> = {
       ],
     },
   },
+
+  'thornwall-guard': {
+    name: 'Sergeant Hale',
+    location: 'Thornwall\'s eastern gate, overlooking the Haunted Marsh approach',
+    personality: 'Hardened, blunt, professional. Has seen real threats beyond the walls and carries that weight without complaint.',
+    lines: {
+      greeting: [
+        'You made it to Thornwall. That means the Whispering Plains did not take you, which puts you ahead of the last group. Welcome to the frontier.',
+        'Gate\'s open. I am Hale, I watch the eastern wall, and everything on the other side of it wants in. State your business or step through. Loitering draws attention we do not need.',
+        'Another one from the road. You look like you can handle yourself, which is good, because Thornwall does not babysit. The walls keep things out. Past the walls, you are on your own.',
+        'Welcome. If you came from Millbrook, forget what Darrow told you about danger. She watches a forest path. I watch a marsh that fights back. Different scale entirely.',
+        'Thornwall\'s eastern gate. Beyond this wall is the Haunted Marsh, and beyond that, things I do not discuss with people I have just met. Come in. Rest. Prepare.',
+        'You are either arriving or departing. If arriving, good; the barracks has supplies and the Market District has what the barracks does not. If departing, I have advice. You will not like it, but you will need it.',
+        'The wind changed an hour ago. When the wind comes from the east, it carries the smell of the Marsh. That smell is a warning. Everything in Thornwall is a warning, if you know how to read it.',
+        'I have been at this gate for nine years. Every morning I check the treeline, the waterline, and the wall. In that order. If all three are where I left them, it is a good day. Today is a good day. Enjoy it.',
+      ],
+      idle: [
+        'The eastern wall is reinforced twice a year. Not because it degrades, but because the things in the Marsh test it. They probe the mortar, the joints, the drainage grates. Methodical. That is what makes them dangerous; they learn.',
+        'Darrow runs Millbrook\'s gate with two volunteers and a forester who is not technically on payroll. I run this gate with a rotation of twelve, and some nights that is not enough. Different towns, different threats.',
+        'Lira Caravel keeps the supply depot stocked with equipment rated for deep-zone conditions. If you are heading into the Marsh or the Caverns, visit her first. Standard gear from that little town will not hold up.',
+        'Dorren Ashforge works the forge district. His steel is heavier than what Kessa produces in Millbrook, and there is a reason for that. The things beyond these walls do not go down easy. You need weight behind your strikes.',
+        'The Haunted Marsh is not haunted in the way tavern stories suggest. There are no ghosts rattling chains. There are things in the fog that are worse than ghosts, because ghosts do not eat.',
+        'Crystal Caverns, two days east. The formations are beautiful if you have time to look, which you will not, because the things living between the crystals do not appreciate visitors. Go prepared or do not go.',
+        'The Sunken Ruins are south of the Marsh, half-submerged and fully hostile. My patrols do not go there. The garrison does not go there. When something comes out of the Ruins, we deal with it at the wall. That tells you everything you need to know.',
+        'Every soldier in this garrison has a story about something they saw beyond the wall that they cannot fully explain. We do not share those stories with newcomers. Not to be secretive, but because the stories sound like lies until you have seen it yourself.',
+      ],
+      buy: [
+        'Heading into the Haunted Marsh? Stay on solid ground. If the ground feels soft, you have already made a mistake. Backtrack immediately. The Marsh does not give second chances, only deeper mud.',
+        'Crystal Caverns? Bring light sources, plural. The creatures down there shatter luminescent crystals to create darkness. If your only torch goes out, you will not find your way back. I have seen it.',
+        'The Sunken Ruins are partially flooded, and the water level changes without warning. If you insist on going, mark your entry point and watch the waterline. When it rises, leave. Do not investigate why it is rising.',
+        'If you are crossing the Marsh at night, do not follow lights. The will-o-wisps lead you off the paths and into the deep water. Every season we lose someone who thought they saw a campfire. It is never a campfire.',
+        'Travel in pairs if you can. The things in the deep zones target stragglers. They watch the roads and they count heads. Solo travellers are the first ones they move on.',
+        'Pack antivenom. The Marsh creatures carry toxins that village remedies cannot neutralize. Callum Dross at the Market District brews what you need. It is not cheap, but it is cheaper than dying.',
+        'The road east of Thornwall splits at the old watchtower. Left goes to the Caverns, right goes to the Marsh. There is no sign. If you do not know the fork, ask before you leave, not after you have walked half a day in the wrong direction.',
+        'Heading south toward the Ruins? The coastline is unstable. The old docks collapsed years ago and the rubble shifts with the tide. Watch your footing on the approach. The Ruins are dangerous enough without arriving injured.',
+      ],
+      farewell: [
+        'Stay alive out there. That is not a pleasantry; it is the only order I give that matters.',
+        'The gate will be here when you return. If you return. I say that not to be grim, but to be honest. The deep zones do not care about optimism.',
+        'Go well. And if something follows you back to the wall, shout before you reach the gate. We need time to prepare. Do not lead trouble through the door without warning.',
+        'Watch your back. The things beyond the wall are patient. They will follow you for hours before they commit. If you feel watched, you are.',
+        'Off you go. Thornwall will hold while you are gone. That is what we do. We hold the line so people like you can push past it.',
+        'Come back with intelligence. Troop movements, nest locations, water-level changes in the Ruins. Anything you see out there that I should know, report it at the gate. Information keeps this garrison alive.',
+        'Safe travels. Or as safe as the deep zones allow, which is not very. Keep your weapon close and your wits closer.',
+        'Until you return. And you will return, because the alternative is paperwork I do not want to file. Come back, adventurer.',
+      ],
+    },
+  },
 };
 
 /** Valid NPC keys — derived from NPC_DIALOGUE for compile-time safety. */
