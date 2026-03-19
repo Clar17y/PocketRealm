@@ -722,6 +722,8 @@ export interface StartManualRoomResult {
   playerMaxStamina: number;
   playerMana: number;
   playerMaxMana: number;
+  /** Number of rounds already resolved (0 = fresh start, >0 = resuming) */
+  roundNumber: number;
 }
 
 /**
@@ -752,6 +754,7 @@ export async function startManualEncounterRoom(
       playerMaxStamina: existingState.participant.maxStamina,
       playerMana: existingState.participant.mana,
       playerMaxMana: existingState.participant.maxMana,
+      roundNumber: existingState.roundNumber,
     };
   }
 
@@ -830,6 +833,7 @@ export async function startManualEncounterRoom(
     playerMaxStamina: participant.maxStamina,
     playerMana: participant.mana,
     playerMaxMana: participant.maxMana,
+    roundNumber: 0,
   };
 }
 

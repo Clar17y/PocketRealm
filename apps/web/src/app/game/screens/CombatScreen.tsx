@@ -161,15 +161,32 @@ export function CombatScreen({
     totalRooms: number;
     hasDecayedMobs: boolean;
     mobs: ExpeditionMobInfo[];
+    resumeSession?: boolean;
   } | null>(null);
 
   // Sync with external activeEncounterSiteId on mount (reconnect)
   useEffect(() => {
     if (externalActiveEncounterSiteId && !activeSiteCombat) {
-      // Find the site in pending encounters for metadata
       const site = pendingEncounters.find(e => e.encounterSiteId === externalActiveEncounterSiteId);
       if (site) {
-        enterEncounterCombat(site);
+        // Enter combat view with resumeSession flag so it probes for existing session
+        setActiveSiteCombat({
+          siteId: site.encounterSiteId,
+          siteName: site.siteName,
+          mobFamilyName: site.mobFamilyName,
+          currentRoom: site.currentRoom,
+          totalRooms: site.totalRooms,
+          hasDecayedMobs: site.decayedMobs > 0,
+          mobs: (site.currentRoomMobs ?? []).map(m => ({
+            id: `encounter-mob-${m.slot}`,
+            name: m.name,
+            prefix: m.prefix,
+            hp: m.hp,
+            maxHp: m.maxHp,
+            activeEffects: [],
+          })),
+          resumeSession: true,
+        });
       }
     }
   }, [externalActiveEncounterSiteId, pendingEncounters]);
@@ -375,6 +392,7 @@ export function CombatScreen({
             }}
             onActivateTemplate={onActivateTemplate ?? (() => {})}
             setError={setError ?? (() => {})}
+            resumeSession={activeSiteCombat.resumeSession}
           />
         ) : (
         <>

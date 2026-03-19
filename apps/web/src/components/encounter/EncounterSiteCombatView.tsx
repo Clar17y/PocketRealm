@@ -46,6 +46,8 @@ export interface EncounterSiteCombatViewProps {
   onComplete: (outcome: 'cleared' | 'defeated' | 'abandoned') => void;
   onActivateTemplate: (templateId: string) => void;
   setError: (msg: string | null) => void;
+  /** If true, probe for an existing combat session on mount and auto-resume */
+  resumeSession?: boolean;
 }
 
 const EMPTY_TARGET_COUNTS = new Map<string, number>();
@@ -100,6 +102,31 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
   useEffect(() => {
     return () => { isPlayingBackRef.current = false; };
   }, []);
+
+  // On mount, if resuming, probe for an existing manual combat session
+  const hasProbed = useRef(false);
+  useEffect(() => {
+    if (!props.resumeSession || hasProbed.current || state !== 'room_preview') return;
+    hasProbed.current = true;
+
+    (async () => {
+      try {
+        const result = await props.onStartRoom();
+        if (result.roundNumber > 0) {
+          // Resuming an existing session — jump to manual_combat
+          setMobs(startRoomMobsToExpeditionMobs(result.mobs));
+          setPlayerState(result.playerState);
+          setState('manual_combat');
+        } else {
+          // Fresh session was created by the probe — update mobs with server data
+          setMobs(startRoomMobsToExpeditionMobs(result.mobs));
+          setPlayerState(result.playerState);
+        }
+      } catch {
+        // No session exists or site error — stay in room_preview
+      }
+    })();
+  }, [props.resumeSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Handlers ---
 

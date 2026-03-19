@@ -339,6 +339,7 @@ export function registerSiteRoutes(router: Router): void {
           maxMana: result.playerMaxMana,
           activeEffects: [],
         },
+        roundNumber: result.roundNumber,
       });
   }));
 
