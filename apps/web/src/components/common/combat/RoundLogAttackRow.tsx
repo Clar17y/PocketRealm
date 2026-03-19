@@ -6,31 +6,6 @@ import type {
   PlayerRoundActionEntry,
 } from '@pocketrealm/shared';
 
-interface FormattedRoundLogAttackRow {
-  isCurrentPlayer: boolean;
-  actorNameText: string | null;
-  actionText: string;
-  targetText: string | null;
-  rollText: string | null;
-  outcomeText: 'CRIT' | 'HIT' | 'MISS';
-  damageText: string | null;
-}
-
-function formatRoundLogAttackRow(
-  attack: PlayerAttackEntry,
-  currentPlayerId: string | null,
-): FormattedRoundLogAttackRow {
-  return {
-    isCurrentPlayer: attack.playerId === currentPlayerId,
-    actorNameText: attack.playerId === currentPlayerId ? null : attack.username,
-    actionText: attack.actionLabel,
-    targetText: attack.targetMobName,
-    rollText: `${Math.round(attack.hitChance * 100)}% hit (${attack.attackerHitScore} vs ${attack.defenderAvoidScore})`,
-    outcomeText: attack.hit ? (attack.crit ? 'CRIT' : 'HIT') : 'MISS',
-    damageText: attack.hit && attack.totalDamage !== undefined ? `${attack.totalDamage} dmg` : null,
-  };
-}
-
 function isExhaustedActionEntry(action: PlayerRoundActionEntry): action is ExhaustedActionEntry {
   return action.entryType === 'exhausted';
 }
@@ -50,6 +25,34 @@ function exhaustedReasonLabel(reason: ExhaustedActionReason): string {
   }
 }
 
+function AttackDetail({ attack }: { attack: PlayerAttackEntry }) {
+  const sampleValue = attack.hitRollValue !== undefined
+    ? (attack.hitRollValue / 100).toFixed(2)
+    : null;
+
+  return (
+    <div className="ml-2 mt-0.5 text-[var(--rpg-text-secondary)] opacity-80 space-y-0.5">
+      <div>
+        Roll: {attack.hitRollValue ?? '?'} + {attack.attackerHitScore} ACC | {Math.round(attack.hitChance * 100)}% chance ({attack.attackerHitScore} hit vs {attack.defenderAvoidScore} avoid){sampleValue && `, sample ${sampleValue}`} =&gt; {attack.hit ? (attack.crit ? 'Crit' : 'Hit') : 'Miss'}
+      </div>
+      {attack.hit && attack.totalDamage !== undefined && (
+        <div>
+          Damage: {attack.damageRoll ?? attack.totalDamage} raw
+          {attack.crit && ' \u00d7 1.5 crit'}
+          {' = '}{attack.totalDamage} final
+        </div>
+      )}
+      {(attack.staminaCost > 0 || attack.manaCost > 0) && (
+        <div>
+          {attack.staminaCost > 0 && <span className="text-teal-400">-{attack.staminaCost} STA</span>}
+          {attack.staminaCost > 0 && attack.manaCost > 0 && ' / '}
+          {attack.manaCost > 0 && <span className="text-[var(--rpg-blue-light)]">-{attack.manaCost} MP</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function RoundLogAttackRow({
   attack,
   currentPlayerId,
@@ -57,13 +60,15 @@ export function RoundLogAttackRow({
   attack: PlayerRoundActionEntry;
   currentPlayerId: string | null;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   if (isExhaustedActionEntry(attack)) {
     return (
       <div className="text-xs ml-2 text-[var(--rpg-text-secondary)]">
         <span className="text-[var(--rpg-text-primary)]">{attack.username}</span>
         {': '}
         {attack.intendedActionLabel}
-        {' → '}
+        {' \u2192 '}
         {attack.fallbackActionLabel}
         {' '}
         <span className="text-[var(--rpg-gold)]">(Exhausted: {exhaustedReasonLabel(attack.reason)})</span>
@@ -82,65 +87,46 @@ export function RoundLogAttackRow({
     );
   }
 
-  const formattedAttack = formatRoundLogAttackRow(attack, currentPlayerId);
-  const [expanded, setExpanded] = useState(formattedAttack.isCurrentPlayer);
-
-  const outcomeNode = formattedAttack.outcomeText === 'MISS' ? (
+  const isMe = attack.playerId === currentPlayerId;
+  const outcomeNode = !attack.hit ? (
     <span className="text-[var(--rpg-text-secondary)]">MISS</span>
   ) : (
     <>
       <span className={attack.crit ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-green-light)]'}>
-        {formattedAttack.outcomeText}
+        {attack.crit ? 'CRIT' : 'HIT'}
       </span>
-      {formattedAttack.damageText && (
-        <span className="text-[var(--rpg-red)]"> {formattedAttack.damageText}</span>
+      {attack.totalDamage !== undefined && (
+        <span className="text-[var(--rpg-red)]"> {attack.totalDamage} dmg</span>
       )}
     </>
   );
 
-  if (formattedAttack.isCurrentPlayer) {
-    return (
-      <div className="text-xs ml-2 mb-0.5 p-1 rounded bg-[var(--rpg-surface)]">
-        <span className="text-[var(--rpg-gold)] font-bold">{formattedAttack.actionText}</span>
-        {formattedAttack.targetText && (
+  return (
+    <div
+      className={`text-xs ml-2 cursor-pointer rounded ${
+        isMe
+          ? 'mb-0.5 p-1 bg-[var(--rpg-surface)]'
+          : 'text-[var(--rpg-text-secondary)] hover:bg-[var(--rpg-surface)]/50 px-1 -mx-1'
+      }`}
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="flex items-center gap-0.5 flex-wrap">
+        <span className={isMe ? 'text-[var(--rpg-gold)] font-bold' : 'text-[var(--rpg-text-primary)]'}>
+          {isMe ? 'You' : attack.username}
+        </span>
+        {': '}
+        <span className={isMe ? 'text-[var(--rpg-gold)]' : ''}>{attack.actionLabel}</span>
+        {attack.targetMobName && (
           <>
-            {' → '}
-            <span className="text-[var(--rpg-text-primary)]">{formattedAttack.targetText}</span>
-          </>
-        )}
-        {formattedAttack.rollText && (
-          <>
-            {' | '}
-            <span className="text-[var(--rpg-text-secondary)]">{formattedAttack.rollText}</span>
+            {' \u2192 '}
+            <span className="text-[var(--rpg-text-primary)]">{attack.targetMobName}</span>
           </>
         )}
         {' | '}
         {outcomeNode}
+        <span className="text-[var(--rpg-text-secondary)] ml-auto text-[10px]">{expanded ? '\u25B2' : '\u25BC'}</span>
       </div>
-    );
-  }
-
-  return (
-    <div
-      className="text-xs ml-2 text-[var(--rpg-text-secondary)] cursor-pointer hover:bg-[var(--rpg-surface)]/50 rounded px-1 -mx-1"
-      onClick={() => setExpanded(!expanded)}
-    >
-      <span className="text-[var(--rpg-text-primary)]">{formattedAttack.actorNameText}</span>
-      {': '}
-      {formattedAttack.actionText}
-      {formattedAttack.targetText && (
-        <>
-          {' → '}
-          {formattedAttack.targetText}
-        </>
-      )}
-      {' | '}
-      {outcomeNode}
-      {expanded && formattedAttack.rollText && (
-        <div className="ml-2 mt-0.5 text-[var(--rpg-text-secondary)] opacity-70">
-          {formattedAttack.rollText}
-        </div>
-      )}
+      {expanded && <AttackDetail attack={attack} />}
     </div>
   );
 }
