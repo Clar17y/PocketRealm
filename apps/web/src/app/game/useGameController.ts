@@ -638,7 +638,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (tutorialStep !== fromStep) return;
     const nextStep = fromStep + 1;
     const res = await updateTutorialStep(nextStep);
-    if (res.data) setTutorialStep(res.data.tutorialStep);
+    if (res.data) {
+      setTutorialStep(res.data.tutorialStep);
+      if (res.data.tutorialStep === TUTORIAL_COMPLETED) {
+        trackEvent('tutorial_complete');
+      }
+    }
   }, [tutorialStep]);
 
   const skipTutorial = useCallback(async () => {
@@ -714,6 +719,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     sessionTrackedRef.current = true;
     trackEvent('session_start', { characterLevel: characterProgression.characterLevel, daysSinceSignup: 0 });
   }, [isAuthenticated, characterProgression.characterLevel]);
+
+  useEffect(() => {
+    const handler = () => trackEvent('pwa_install');
+    window.addEventListener('appinstalled', handler);
+    return () => window.removeEventListener('appinstalled', handler);
+  }, []);
 
   const getActiveTab = () => {
     if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'quests', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';

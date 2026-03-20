@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getNotificationStatus, subscribePush, unsubscribePush } from '@/lib/api/notifications';
+import { trackEvent } from '@/lib/analytics';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -55,6 +56,7 @@ export function usePushNotifications() {
     const json = subscription.toJSON();
     await subscribePush(json);
     setState('subscribed');
+    trackEvent('push_subscribe');
   }, [vapidKey]);
 
   const unsubscribe = useCallback(async () => {
