@@ -380,8 +380,8 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
           <CombatActionButtons
             loading={loading}
             actions={[
-              { key: 'auto', label: 'Auto-Resolve', subtext: 'Template locked — instant clear', onClick: handleAutoResolve },
-              { key: 'manual', label: 'Fight Manually', subtext: 'Round by round', onClick: handleStartManual },
+              { key: 'auto', label: 'Auto-Resolve', subtext: 'Uses active template — bonus loot chance', onClick: handleAutoResolve },
+              { key: 'manual', label: 'Fight Manually', subtext: 'Control each round — switch templates mid-fight', onClick: handleStartManual },
               { key: 'abandon', label: 'Abandon', onClick: handleAbandon, variant: 'danger' },
             ]}
           />
