@@ -52,12 +52,12 @@ function outcomeColor(outcome: string | null): string {
 }
 
 function formatCombatSource(source: string | null | undefined): string {
+  if (source === 'zone_combat') return 'Zone Combat';
   if (source === 'encounter_site') return 'Encounter Site';
   if (source === 'encounter_site_room') return 'Encounter Room';
   if (source === 'exploration_ambush') return 'Ambush (Exploring)';
   if (source === 'travel_ambush') return 'Ambush (Travel)';
-  if (source === 'zone_combat') return 'Direct Encounter';
-  return 'Unknown Source';
+  return 'Combat';
 }
 
 function fullTimestamp(iso: string): string {
@@ -333,9 +333,8 @@ export function CombatHistory() {
             className="px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-sm"
           >
             <option value="all">Source: All</option>
+            <option value="zone_combat">Zone Combat</option>
             <option value="encounter_site_room">Encounter Room</option>
-            <option value="encounter_site">Encounter Site</option>
-            <option value="zone_combat">Direct Encounter</option>
             <option value="exploration_ambush">Ambush (Exploring)</option>
             <option value="travel_ambush">Ambush (Travel)</option>
           </select>
