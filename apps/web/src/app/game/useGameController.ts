@@ -876,6 +876,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const finalizeExplorationPlayback = async () => {
     const pendingIds = explorationPlaybackData?.pendingLootSessionIds;
     const savedStateUpdates = explorationPlaybackData?.stateUpdates;
+
+    // Analytics: track exploration (before clearing playback data)
+    if (explorationPlaybackData) {
+      trackEvent('action', {
+        type: 'exploration',
+        turns: explorationPlaybackData.totalTurns,
+        zone: explorationPlaybackData.zoneName,
+      });
+    }
+
     setExplorationPlaybackData(null);
     combatLogPrefetch.clear();
     setPlaybackActive(false);
@@ -1121,6 +1131,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setTurns(data.turns.currentTurns);
       const materialSummary = data.salvage.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged item for: ${materialSummary}.` });
+      trackEvent('action', { type: 'salvage', turns: 50 });
     });
 
   const handleSalvageBatch = (itemIds: string[]) =>
@@ -1128,6 +1139,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setTurns(data.turns.currentTurns);
       const materialSummary = data.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged ${data.salvaged.length} items (${data.totalTurnCost} turns). Recovered: ${materialSummary}` });
+      trackEvent('action', { type: 'salvage', turns: data.totalTurnCost });
     });
 
   const handleForgeUpgrade = (itemId: string, sacrificialItemId: string) =>
@@ -1163,6 +1175,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
         showForgeToast({ type: 'upgrade_fail', message: `Upgrade failed — target and sacrifice consumed` });
       }
+      trackEvent('action', { type: 'forge_upgrade', turns: 100 });
     });
 
   const handleForgeReroll = (itemId: string, sacrificialItemId: string) =>
@@ -1171,6 +1184,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       const rarityLabel = data.forge.rarity.charAt(0).toUpperCase() + data.forge.rarity.slice(1);
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Re-rolled ${rarityLabel} item bonus stats. Sacrificial duplicate consumed.` });
       showForgeToast({ type: 'reroll', message: `Stats rerolled!` });
+      trackEvent('action', { type: 'forge_reroll', turns: 75 });
     });
 
   const handleDestroyItem = (itemId: string) =>
@@ -1576,6 +1590,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         setHpState(prev => ({ ...prev, currentHp: result.data!.currentHp, maxHp: result.data!.maxHp }));
         applyStateUpdates(result.data.stateUpdates, stateSetters);
         pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${actualTurns.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
+        trackEvent('action', { type: 'rest', turns: actualTurns });
       }
     });
   };
