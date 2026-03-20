@@ -275,6 +275,7 @@ export function CombatHistory() {
   const shareText = useMemo(() => {
     if (!selectedEntry || !selectedDetail) return '';
     if (selectedEntry.source === 'encounter_site_room') return '';
+    if (!selectedDetail.rewards || !selectedDetail.log) return '';
     return formatCombatShareText({
       outcome: formatOutcome(selectedDetail.outcome),
       mobName: selectedDetail.mobDisplayName ?? selectedEntry.mobDisplayName ?? selectedEntry.mobName ?? 'Unknown Mob',
@@ -447,20 +448,22 @@ export function CombatHistory() {
         <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg p-3 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-[var(--rpg-text-primary)] font-semibold font-almendra flex-wrap">
-              {(selectedDetail?.mobName ?? selectedEntry.mobName) && (
+              {selectedEntry.source !== 'encounter_site_room' && (selectedDetail?.mobName ?? selectedEntry.mobName) && (
                 <img
                   src={monsterImageSrc((selectedDetail?.mobName ?? selectedEntry.mobName)!)}
                   alt={selectedDetail?.mobDisplayName ?? selectedEntry.mobName ?? 'Mob'}
                   className="w-8 h-8 rounded object-cover shrink-0"
                 />
               )}
-              {selectedDetail?.mobDisplayName ?? selectedEntry.mobDisplayName ?? selectedEntry.mobName ?? 'Combat'} Log
+              {selectedEntry.source === 'encounter_site_room'
+                ? `${selectedEntry.siteName ?? 'Encounter Site'} — Room ${selectedEntry.siteRoom}/${selectedEntry.siteTotalRooms}`
+                : `${selectedDetail?.mobDisplayName ?? selectedEntry.mobDisplayName ?? selectedEntry.mobName ?? 'Combat'} Log`}
               {selectedDetail?.eventModifiers && selectedDetail.eventModifiers.length > 0 && (
                 <EventBadges inline modifiers={selectedDetail.eventModifiers} />
               )}
             </div>
             <div className="flex items-center gap-2">
-              <CopyButton text={shareText} disabled={!selectedDetail} />
+              <CopyButton text={shareText} disabled={!selectedDetail || !shareText} />
               <div className={`text-sm font-semibold ${outcomeColor(selectedEntry.outcome)}`}>
                 {formatOutcome(selectedEntry.outcome)}
               </div>
