@@ -1238,6 +1238,9 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
   });
   if (!expedition) return;
 
+  // Clear combat snapshots for the completed room
+  await clearRoomSnapshots(expeditionId, expedition.currentRoom);
+
   const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const currentRoomDef = rooms[expedition.currentRoom];
   const roomType = currentRoomDef?.roomType ?? 'trash';
@@ -1356,6 +1359,9 @@ export async function handleWipe(expeditionId: string): Promise<void> {
     include: { members: { include: { player: { select: { username: true } } } } },
   });
   if (!expedition) return;
+
+  // Clear combat snapshots for the current room
+  await clearRoomSnapshots(expeditionId, expedition.currentRoom);
 
   const newWipeCount = (expedition.wipeCount ?? 0) + 1;
   const newAttemptLogs = buildUpdatedAttemptLogs(expedition);
@@ -1562,6 +1568,9 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
     include: { members: { include: { player: { select: { username: true } } } } },
   });
   if (!expedition) return;
+
+  // Clear combat snapshots for the final room
+  await clearRoomSnapshots(expeditionId, expedition.currentRoom);
 
   // Archive final successful attempt's logs alongside previous wipe attempts
   const finalAttemptLogs = buildUpdatedAttemptLogs(expedition, { outcome: 'completed' });
