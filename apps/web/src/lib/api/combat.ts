@@ -558,6 +558,14 @@ export interface EncounterAutoResolveResponse {
   fleeResult?: EncounterFleeResult | null;
   respawnedTo?: { townId: string; townName: string } | null;
   stateUpdates?: StateUpdates;
+  skillXpGrants?: Array<{
+    skillType: string;
+    xpGained: number;
+    xpAfterEfficiency: number;
+    newLevel: number;
+    leveledUp: boolean;
+    characterLeveledUp?: boolean;
+  }>;
 }
 
 export interface EncounterStartRoomResponse {
@@ -593,6 +601,14 @@ export interface EncounterManualRoundResponse {
   fleeResult?: EncounterFleeResult | null;
   respawnedTo?: { townId: string; townName: string } | null;
   stateUpdates?: StateUpdates;
+  skillXpGrants?: Array<{
+    skillType: string;
+    xpGained: number;
+    xpAfterEfficiency: number;
+    newLevel: number;
+    leveledUp: boolean;
+    characterLeveledUp?: boolean;
+  }>;
 }
 
 // --- Encounter Site Room Combat API Functions ---

@@ -97,6 +97,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
   const [fleeResult, setFleeResult] = useState<EncounterFleeResult | null>(null);
   const [respawnedTo, setRespawnedTo] = useState<string | null>(null);
   const [hasDecayedMobs, setHasDecayedMobs] = useState(props.hasDecayedMobs);
+  const [xpGrants, setXpGrants] = useState<EncounterAutoResolveResponse['skillXpGrants']>([]);
 
   // Auto-playback state
   const [playbackRounds, setPlaybackRounds] = useState<EncounterRoundSnapshot[]>([]);
@@ -166,6 +167,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
       if (result.chestReward) setChestReward(result.chestReward);
       if (result.fleeResult) setFleeResult(result.fleeResult);
       if (result.respawnedTo) setRespawnedTo(result.respawnedTo.townName);
+      if (result.skillXpGrants) setXpGrants(result.skillXpGrants);
 
       // Start animated playback
       for (let i = 0; i < result.rounds.length; i++) {
@@ -233,6 +235,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
       if (result.outcome === 'cleared' || result.outcome === 'site_cleared') {
         setOutcome(result.outcome);
         if (result.chestReward) setChestReward(result.chestReward);
+        if (result.skillXpGrants) setXpGrants(result.skillXpGrants);
         setState('room_result');
       } else if (result.outcome === 'defeated') {
         setOutcome('defeated');
@@ -266,6 +269,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
       setChestReward(null);
       setFleeResult(null);
       setRespawnedTo(null);
+      setXpGrants([]);
       setTargetMobId(null);
       setState('room_preview');
     } catch (err) {
@@ -285,6 +289,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
       setOutcome(null);
       setFleeResult(null);
       setRespawnedTo(null);
+      setXpGrants([]);
       setTargetMobId(null);
       setState('room_preview');
     } catch (err) {
@@ -405,6 +410,16 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
               <p className="text-xs text-[var(--rpg-text-secondary)] mt-1">
                 {roundLogs.length} rounds — carry HP: {Math.floor(playerState.hp)}/{playerState.maxHp}
               </p>
+              {xpGrants && xpGrants.length > 0 && (
+                <div className="mt-1 space-y-0.5">
+                  {xpGrants.map(g => (
+                    <div key={g.skillType} className="text-xs text-[var(--rpg-text-primary)]">
+                      +{g.xpAfterEfficiency} {g.skillType.charAt(0).toUpperCase() + g.skillType.slice(1)} XP
+                      {g.leveledUp && <span className="text-[var(--rpg-gold)] ml-1">Level {g.newLevel}!</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="mt-2">
                 <PixelButton onClick={handleContinue} disabled={loading}>
                   Continue to Room {currentRoom + 1}
@@ -433,6 +448,16 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
                       Recipe: {chestReward.recipe.name}
                     </div>
                   )}
+                </div>
+              )}
+              {xpGrants && xpGrants.length > 0 && (
+                <div className="mt-1 space-y-0.5">
+                  {xpGrants.map(g => (
+                    <div key={g.skillType} className="text-xs text-[var(--rpg-text-primary)]">
+                      +{g.xpAfterEfficiency} {g.skillType.charAt(0).toUpperCase() + g.skillType.slice(1)} XP
+                      {g.leveledUp && <span className="text-[var(--rpg-gold)] ml-1">Level {g.newLevel}!</span>}
+                    </div>
+                  ))}
                 </div>
               )}
               <div className="mt-2">
