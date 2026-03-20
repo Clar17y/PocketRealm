@@ -596,6 +596,11 @@ export async function autoResolveEncounterRoom(
   // Inventory state for chest capacity
   const { availableSlots: chestAvailableSlots } = await getInventoryState(playerId);
 
+  // Pre-compute XP for the activity log (pure function — no DB needed)
+  const totalXpForLog = combatResult.outcome === 'cleared'
+    ? computeDefeatedMobXp(defeatedMobIds, roomMobs, mobXpByTemplateId)
+    : 0;
+
   // Persist in a DB transaction
   const txResult = await prisma.$transaction(async (tx) => {
     // Re-fetch site and validate it still exists
@@ -706,6 +711,7 @@ export async function autoResolveEncounterRoom(
           initialMobs: toInitialMobSnapshot(expeditionMobs),
           siteCleared,
           chestReward: completionRewards,
+          rewards: { xp: totalXpForLog },
         } as unknown as Prisma.InputJsonObject,
       },
     });
@@ -724,7 +730,7 @@ export async function autoResolveEncounterRoom(
   // Grant XP for defeated mobs (only on room clear, not on defeat)
   let xpGrants: GrantXpResult[] = [];
   if (combatResult.outcome === 'cleared') {
-    const totalXp = computeDefeatedMobXp(defeatedMobIds, roomMobs, mobXpByTemplateId);
+    const totalXp = totalXpForLog;
     if (totalXp > 0) {
       xpGrants = await splitAndGrantXp(
         playerId, totalXp, attackSkill,
@@ -1126,6 +1132,15 @@ export async function resolveManualEncounterRound(
   // Room resolved — remove session from Redis and persist to DB
   await deleteCombatSession(playerId, siteId);
 
+  // Pre-compute XP for the activity log (pure function — no DB needed)
+  const totalXpForLog = roomCleared
+    ? computeDefeatedMobXp(
+        new Set(state.roomMobSlots.map(s => makeEncounterMobId(s.slot))),
+        state.roomMobSlots,
+        state.mobXpByTemplateId,
+      )
+    : 0;
+
   const { availableSlots: chestAvailableSlots } = await getInventoryState(playerId);
 
   const txResult = await prisma.$transaction(async (tx) => {
@@ -1232,6 +1247,7 @@ export async function resolveManualEncounterRound(
           initialMobs: state.initialMobs ?? [],
           siteCleared,
           chestReward: completionRewards,
+          rewards: { xp: totalXpForLog },
         } as unknown as Prisma.InputJsonObject,
       },
     });
@@ -1250,9 +1266,7 @@ export async function resolveManualEncounterRound(
   // Grant XP for defeated mobs (only on room clear, not on defeat)
   let xpGrants: GrantXpResult[] = [];
   if (roomCleared) {
-    // All room mobs are killed — sum XP for every mob slot in the room
-    const allMobIds = new Set(state.roomMobSlots.map(s => makeEncounterMobId(s.slot)));
-    const totalXp = computeDefeatedMobXp(allMobIds, state.roomMobSlots, state.mobXpByTemplateId);
+    const totalXp = totalXpForLog;
     if (totalXp > 0) {
       xpGrants = await splitAndGrantXp(
         playerId, totalXp, state.attackSkill as AttackSkill,

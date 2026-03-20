@@ -522,11 +522,33 @@ export function CombatHistory() {
                       </div>
                     );
                   })}
-                  {!!selectedDetail.chestReward && (
-                    <div className="border-t border-[var(--rpg-border)] pt-2 text-xs text-[var(--rpg-gold)]">
-                      Chest reward received on site completion
+                  {selectedDetail.rewards?.xp > 0 && (
+                    <div className="border-t border-[var(--rpg-border)] pt-2 text-xs text-[var(--rpg-text-primary)]">
+                      +{selectedDetail.rewards.xp} XP
                     </div>
                   )}
+                  {!!selectedDetail.chestReward && (() => {
+                    const chest = selectedDetail.chestReward as Record<string, unknown>;
+                    return (
+                      <div className="border-t border-[var(--rpg-border)] pt-2 space-y-1">
+                        <span className="text-xs font-pixel text-[var(--rpg-gold)]">
+                          {chest.chestRarity
+                            ? `${String(chest.chestRarity).charAt(0).toUpperCase() + String(chest.chestRarity).slice(1)} Chest`
+                            : 'Chest Reward'}
+                        </span>
+                        {Array.isArray(chest.loot) && chest.loot.map((item: Record<string, unknown>, idx: number) => (
+                          <div key={idx} className="text-xs text-[var(--rpg-text-primary)]">
+                            {(item.name ?? item.itemTemplateId) as string} x{item.quantity as number}
+                          </div>
+                        ))}
+                        {!!chest.recipeUnlocked && (
+                          <div className="text-xs text-[var(--rpg-blue-light)]">
+                            Recipe: {(chest.recipeUnlocked as Record<string, unknown>).recipeName as string}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <>
