@@ -263,6 +263,7 @@ export {
   forceStartExpedition,
   forceNextRound,
   recoverFromExpeditionKO,
+  getExpeditionCooldowns,
   getExpeditionShop,
   purchaseExpeditionItem,
 } from './expedition';

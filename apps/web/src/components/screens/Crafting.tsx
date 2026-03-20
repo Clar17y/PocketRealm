@@ -107,12 +107,14 @@ interface CraftingProps {
   guildTaxRate?: number;
   backpackFull?: boolean;
   isOverEncumbered?: boolean;
+  isActivityLocked?: boolean;
+  activityLockReason?: 'encounter' | 'expedition' | null;
   availableSlots?: number;
   showNpcDialogue?: boolean;
 }
 
 
-export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, availableSlots = 0, showNpcDialogue = true }: CraftingProps) {
+export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, onCraft, activityLog, isRecovering = false, recoveryCost, zoneCraftingLevel, zoneName, defaultMaxQuantity = false, guildTaxRate = 0, backpackFull = false, isOverEncumbered = false, isActivityLocked = false, activityLockReason, availableSlots = 0, showNpcDialogue = true }: CraftingProps) {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const npcKey = skillType ? getCraftingNpc(skillType, zoneName) : undefined;
@@ -175,6 +177,14 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
       {/* Knockout Banner */}
       {isRecovering && (
         <KnockoutBanner action="crafting" recoveryCost={recoveryCost} />
+      )}
+
+      {/* Activity Lock Banner */}
+      {isActivityLocked && !isRecovering && (
+        <KnockoutBanner
+          title={activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
+          action="crafting"
+        />
       )}
 
       {/* Header */}
@@ -426,9 +436,11 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
               onCraft(selectedRecipe.id, quantity);
               triggerDialogueEvent('buy');
             }}
-            disabled={isOverEncumbered || isRecovering || noFacility || selectedMax < 1 || backpackFull}
+            disabled={isOverEncumbered || isRecovering || isActivityLocked || noFacility || selectedMax < 1 || backpackFull}
           >
-            {isOverEncumbered
+            {isActivityLocked
+              ? (activityLockReason === 'encounter' ? 'In Encounter Site' : 'In Expedition')
+              : isOverEncumbered
               ? 'Over-Encumbered'
               : isRecovering
               ? 'Recover First'

@@ -80,6 +80,8 @@ interface GatheringProps {
   recoveryCost?: number | null;
   guildTaxRate?: number;
   isOverEncumbered?: boolean;
+  isActivityLocked?: boolean;
+  activityLockReason?: 'encounter' | 'expedition' | null;
   backpackFull?: boolean;
   ownedResourceNames?: Set<string>;
   showNpcDialogue?: boolean;
@@ -109,6 +111,8 @@ export function Gathering({
   recoveryCost,
   guildTaxRate = 0,
   isOverEncumbered = false,
+  isActivityLocked = false,
+  activityLockReason,
   backpackFull = false,
   ownedResourceNames,
   showNpcDialogue = true,
@@ -233,6 +237,14 @@ export function Gathering({
         <KnockoutBanner action="gathering" recoveryCost={recoveryCost} />
       )}
 
+      {/* Activity Lock Banner */}
+      {isActivityLocked && !isRecovering && (
+        <KnockoutBanner
+          title={activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
+          action="gathering"
+        />
+      )}
+
       {/* Header */}
       <SkillHeader skillName={skillName} skillLevel={skillLevel} xpRate={xpRate} />
 
@@ -287,7 +299,7 @@ export function Gathering({
           const isInZone = currentZoneId === node.zoneId;
           const wouldStack = ownedResourceNames?.has(node.name) ?? false;
           const blockedByFull = backpackFull && !wouldStack;
-          const canSelect = canGather && isInZone && !isRecovering && !isOverEncumbered && !blockedByFull;
+          const canSelect = canGather && isInZone && !isRecovering && !isOverEncumbered && !isActivityLocked && !blockedByFull;
           const capacityPct = Math.round((node.remainingCapacity / node.maxCapacity) * 100);
 
           return (
@@ -445,11 +457,11 @@ export function Gathering({
             size="lg"
             className="w-full"
             onClick={() => onStartGathering(selectedNode.id, turnInvestment[0])}
-            disabled={isOverEncumbered || isRecovering || selectedBlockedByFull || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
+            disabled={isOverEncumbered || isRecovering || isActivityLocked || selectedBlockedByFull || turnInvestment[0] > availableTurns || turnInvestment[0] < sliderMin || nodesLoading || Boolean(nodesError) || skillLevel < selectedNode.levelRequired || currentZoneId !== selectedNode.zoneId}
           >
             <div className="flex items-center justify-center gap-2">
               <Pickaxe size={20} />
-              {isOverEncumbered ? 'Over-Encumbered' : isRecovering ? 'Recover First' : selectedBlockedByFull ? 'Backpack Full' : availableTurns < sliderMin ? `Need ${sliderMin} turns` : `Start ${skillName}`}
+              {isActivityLocked ? (activityLockReason === 'encounter' ? 'In Encounter Site' : 'In Expedition') : isOverEncumbered ? 'Over-Encumbered' : isRecovering ? 'Recover First' : selectedBlockedByFull ? 'Backpack Full' : availableTurns < sliderMin ? `Need ${sliderMin} turns` : `Start ${skillName}`}
             </div>
           </PixelButton>
         );

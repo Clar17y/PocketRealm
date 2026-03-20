@@ -58,6 +58,8 @@ interface ZoneMapProps {
   availableTurns: number;
   isRecovering: boolean;
   isOverEncumbered: boolean;
+  isActivityLocked?: boolean;
+  activityLockReason?: 'encounter' | 'expedition' | null;
   playbackActive?: boolean;
   travelPlaybackData?: {
     totalTurns: number;
@@ -137,6 +139,8 @@ export function ZoneMap({
   availableTurns,
   isRecovering,
   isOverEncumbered,
+  isActivityLocked = false,
+  activityLockReason,
   playbackActive,
   travelPlaybackData,
   onTravelPlaybackComplete,
@@ -268,6 +272,7 @@ export function ZoneMap({
     !!selectedRouteIds &&
     !isRecovering &&
     !isOverEncumbered &&
+    !isActivityLocked &&
     !playbackActive &&
     (firstHopInflatedCost === null || availableTurns >= firstHopInflatedCost);
 
@@ -509,6 +514,7 @@ export function ZoneMap({
             >
               {(() => {
                 if (!selectedRouteIds) return 'No route available';
+                if (isActivityLocked) return activityLockReason === 'encounter' ? 'In Encounter Site' : 'In Expedition';
                 if (isOverEncumbered) return 'Over-encumbered';
                 if (isRecovering) return 'Recover first to travel';
                 if (firstHopInflatedCost !== null && availableTurns < firstHopInflatedCost) {

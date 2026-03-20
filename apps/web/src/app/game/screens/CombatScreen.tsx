@@ -31,11 +31,14 @@ import {
   resolveEncounterRound,
   abandonEncounterSite,
 } from '@/lib/api/combat';
+import { makeEncounterMobId } from '@pocketrealm/shared';
 import type { CombatTemplateData, ExpeditionMobInfo, StateUpdates } from '@pocketrealm/shared';
 
 interface CombatScreenProps {
   hpState: HpState;
   isOverEncumbered?: boolean;
+  isActivityLocked?: boolean;
+  activityLockReason?: 'encounter' | 'expedition' | null;
   currentTurns: number;
   currentZoneId: string | null;
   pendingEncounters: PendingEncounter[];
@@ -61,7 +64,6 @@ interface CombatScreenProps {
   busyAction: string | null;
   lastCombat: LastCombat | null;
   bestiaryMobs: Array<{ id: string; isDiscovered: boolean }>;
-  onStartCombat: (encounterSiteId: string) => void | Promise<void>;
   onPendingEncounterPageChange: (page: number) => void;
   onPendingEncounterZoneFilterChange: (zoneId: string) => void;
   onPendingEncounterMobFilterChange: (mobTemplateId: string) => void;
@@ -105,6 +107,8 @@ interface CombatScreenProps {
 export function CombatScreen({
   hpState,
   isOverEncumbered,
+  isActivityLocked = false,
+  activityLockReason,
   currentTurns,
   currentZoneId,
   pendingEncounters,
@@ -120,7 +124,6 @@ export function CombatScreen({
   busyAction,
   lastCombat,
   bestiaryMobs,
-  onStartCombat,
   onPendingEncounterPageChange,
   onPendingEncounterZoneFilterChange,
   onPendingEncounterMobFilterChange,
@@ -169,24 +172,7 @@ export function CombatScreen({
     if (externalActiveEncounterSiteId && !activeSiteCombat) {
       const site = pendingEncounters.find(e => e.encounterSiteId === externalActiveEncounterSiteId);
       if (site) {
-        // Enter combat view with resumeSession flag so it probes for existing session
-        setActiveSiteCombat({
-          siteId: site.encounterSiteId,
-          siteName: site.siteName,
-          mobFamilyName: site.mobFamilyName,
-          currentRoom: site.currentRoom,
-          totalRooms: site.totalRooms,
-          hasDecayedMobs: site.decayedMobs > 0,
-          mobs: (site.currentRoomMobs ?? []).map(m => ({
-            id: `encounter-mob-${m.slot}`,
-            name: m.name,
-            prefix: m.prefix,
-            hp: m.hp,
-            maxHp: m.maxHp,
-            activeEffects: [],
-          })),
-          resumeSession: true,
-        });
+        enterEncounterCombat(site, { resumeSession: true });
       }
     }
   }, [externalActiveEncounterSiteId, pendingEncounters]);
@@ -198,7 +184,7 @@ export function CombatScreen({
 
   const displayedFight = lastCombat?.fights?.[lastCombatFightIndex] ?? lastCombat;
 
-  const enterEncounterCombat = (site: PendingEncounter) => {
+  const enterEncounterCombat = (site: PendingEncounter, opts?: { resumeSession?: boolean }) => {
     setActiveSiteCombat({
       siteId: site.encounterSiteId,
       siteName: site.siteName,
@@ -207,13 +193,14 @@ export function CombatScreen({
       totalRooms: site.totalRooms,
       hasDecayedMobs: site.decayedMobs > 0,
       mobs: (site.currentRoomMobs ?? []).map(m => ({
-        id: `encounter-mob-${m.slot}`,
+        id: makeEncounterMobId(m.slot),
         name: m.name,
         prefix: m.prefix,
         hp: m.hp,
         maxHp: m.maxHp,
         activeEffects: [],
       })),
+      resumeSession: opts?.resumeSession,
     });
     onActiveEncounterSiteIdChange?.(site.encounterSiteId);
   };
@@ -286,6 +273,14 @@ export function CombatScreen({
       {/* Knockout Banner */}
       {hpState.isRecovering && (
         <KnockoutBanner action="fighting" recoveryCost={hpState.recoveryCost} onClick={onNavigateToRest} />
+      )}
+
+      {/* Activity Lock Banner — only shown for expedition locks; encounter site locks don't block this screen */}
+      {isActivityLocked && activityLockReason === 'expedition' && !hpState.isRecovering && !combatPlaybackData && (
+        <KnockoutBanner
+          title="Active Expedition"
+          action="fighting encounter sites"
+        />
       )}
 
       {/* Resource Status */}
@@ -376,11 +371,6 @@ export function CombatScreen({
                 playerState: result.playerState,
                 hasDecayedMobs: false,
               };
-            }}
-            onRetryRoom={async () => {
-              const result = await startEncounterRoom(activeSiteCombat.siteId);
-              if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
-              return result;
             }}
             onComplete={(combatOutcome) => {
               setActiveSiteCombat(null);
@@ -588,7 +578,8 @@ export function CombatScreen({
                     ? (prefix ? `${prefix.displayName} ${e.nextMobName}` : e.nextMobName)
                     : null;
                   const isWrongZone = Boolean(currentZoneId) && e.zoneId !== currentZoneId;
-                  const isDisabled = isOverEncumbered || hpState.isRecovering || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData;
+                  const isExpeditionLocked = isActivityLocked && activityLockReason === 'expedition';
+                  const isDisabled = isOverEncumbered || hpState.isRecovering || isExpeditionLocked || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData;
                   return (
                     <div
                       key={e.encounterSiteId}
@@ -635,7 +626,9 @@ export function CombatScreen({
                             : 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
                         }`}
                       >
-                        {isOverEncumbered
+                        {isExpeditionLocked
+                          ? 'In Expedition'
+                          : isOverEncumbered
                           ? 'Over-Encumbered'
                           : hpState.isRecovering
                             ? 'Recover First'

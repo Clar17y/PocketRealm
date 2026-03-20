@@ -78,6 +78,7 @@ import {
   getIncomingFriendRequests,
   getFriendMailUnreadCount,
   getPlayerBuffs,
+  getExpeditionCooldowns,
 } from '@/lib/api';
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
@@ -268,6 +269,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, expeditionThemes, worldBosses, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
   const [activeEncounterSiteId, setActiveEncounterSiteId] = useState<string | null>(null);
+  const [hasActiveExpedition, setHasActiveExpedition] = useState(false);
   const [staminaState, setStaminaState] = useState<ResourceState>({
     current: STAMINA_CONSTANTS.BASE_POOL, max: STAMINA_CONSTANTS.BASE_POOL,
     regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 5
@@ -550,6 +552,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     if (skillPointRes.data) setSkillPointState(skillPointRes.data);
     if (buffsRes.data) setActiveBuffs(buffsRes.data.buffs);
+
+    // Load expedition state for activity lock (non-blocking)
+    getExpeditionCooldowns().then((cdRes) => {
+      if (cdRes.data) setHasActiveExpedition(cdRes.data.hasActiveExpedition);
+    });
+
     if (zonesRes.data) {
       setZones(zonesRes.data.zones);
       setZoneConnections(zonesRes.data.connections);
@@ -1923,5 +1931,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setActionError,
     activeEncounterSiteId,
     setActiveEncounterSiteId,
+
+    // Activity lock (encounter site / expedition in progress)
+    isActivityLocked: !!activeEncounterSiteId || hasActiveExpedition,
+    activityLockReason: activeEncounterSiteId ? 'encounter' as const : hasActiveExpedition ? 'expedition' as const : null,
   };
 }

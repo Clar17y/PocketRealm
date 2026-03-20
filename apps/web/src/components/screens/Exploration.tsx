@@ -39,6 +39,8 @@ interface ExplorationProps {
   activityLog: ActivityLogEntry[];
   isRecovering?: boolean;
   isOverEncumbered?: boolean;
+  isActivityLocked?: boolean;
+  activityLockReason?: 'encounter' | 'expedition' | null;
   recoveryCost?: number | null;
   currentHp?: number;
   maxHp?: number;
@@ -77,7 +79,7 @@ interface ExplorationProps {
   combatXpRate?: { skillName: string; rate: number };
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, isActivityLocked = false, activityLockReason, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
   const strangerLineRef = useRef<string | null>(null);
   const prevPlaybackDataRef = useRef(playbackData);
 
@@ -140,6 +142,14 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
       {/* Knockout Banner */}
       {isRecovering && !playbackData && (
         <KnockoutBanner action="exploring" recoveryCost={recoveryCost} onClick={onNavigateToRest} />
+      )}
+
+      {/* Activity Lock Banner */}
+      {isActivityLocked && !isRecovering && !playbackData && (
+        <KnockoutBanner
+          title={activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
+          action="exploring"
+        />
       )}
 
       {/* Resource Status */}
@@ -383,7 +393,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                 onStartExploration(turnInvestment[0], effectiveSelectedTier ?? undefined);
               }
             }}
-            disabled={isRecovering || isOverEncumbered || turnInvestment[0] > availableTurns || !!busyAction}
+            disabled={isRecovering || isOverEncumbered || isActivityLocked || turnInvestment[0] > availableTurns || !!busyAction}
           >
             <div className="flex items-center justify-center gap-2">
               {busyAction === 'exploration' ? (
@@ -394,7 +404,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               ) : (
                 <>
                   <Play size={20} />
-                  {isOverEncumbered ? 'Over-Encumbered' : isRecovering ? 'Recover First' : 'Start Exploration'}
+                  {isActivityLocked ? (activityLockReason === 'encounter' ? 'In Encounter Site' : 'In Expedition') : isOverEncumbered ? 'Over-Encumbered' : isRecovering ? 'Recover First' : 'Start Exploration'}
                 </>
               )}
             </div>
