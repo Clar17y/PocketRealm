@@ -1409,7 +1409,7 @@ export default function GamePage() {
         )}
 
         {busyAction && slowAction && (
-          <div className="text-center text-xs text-[var(--rpg-gold)] animate-pulse py-1">
+          <div className="text-center text-xs text-[var(--rpg-gold)] animate-pulse py-1" role="status" aria-live="polite">
             Still working...
           </div>
         )}
