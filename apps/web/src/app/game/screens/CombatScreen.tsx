@@ -84,6 +84,7 @@ interface CombatScreenProps {
   combatXpRate?: { skillName: string; rate: number };
   staminaState?: { current: number; max: number; regenPerSecond: number };
   manaState?: { current: number; max: number; regenPerSecond: number };
+  isOffline?: boolean;
 }
 
 export function CombatScreen({
@@ -123,6 +124,7 @@ export function CombatScreen({
   combatXpRate,
   staminaState,
   manaState,
+  isOffline,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
   const [strategyModalSite, setStrategyModalSite] = useState<PendingEncounter | null>(null);
@@ -209,7 +211,8 @@ export function CombatScreen({
             <div className="flex flex-col gap-3">
               <button
                 className="bg-[var(--rpg-gold)] hover:bg-[#e4b85b] text-[var(--rpg-background)] rounded-lg font-semibold transition-all w-full text-left p-3"
-                disabled={!!busyAction}
+                disabled={!!busyAction || isOffline}
+                title={isOffline ? "You're offline" : undefined}
                 onClick={async () => {
                   const siteId = strategyModalSite.encounterSiteId;
                   if (onSelectStrategy) {
@@ -224,7 +227,8 @@ export function CombatScreen({
               </button>
               <button
                 className="bg-[var(--rpg-surface)] hover:bg-[var(--rpg-border)] text-[var(--rpg-text-primary)] border border-[var(--rpg-border)] rounded-lg font-semibold transition-all w-full text-left p-3"
-                disabled={!!busyAction}
+                disabled={!!busyAction || isOffline}
+                title={isOffline ? "You're offline" : undefined}
                 onClick={async () => {
                   const siteId = strategyModalSite.encounterSiteId;
                   if (onSelectStrategy) {
@@ -278,6 +282,7 @@ export function CombatScreen({
           onQuickRest={onQuickRest}
           quickRestPercent={quickRestPercent}
           busyAction={busyAction}
+          isOffline={isOffline}
         />
       )}
 
@@ -488,7 +493,7 @@ export function CombatScreen({
                     ? (prefix ? `${prefix.displayName} ${e.nextMobName}` : e.nextMobName)
                     : null;
                   const isWrongZone = Boolean(currentZoneId) && e.zoneId !== currentZoneId;
-                  const isDisabled = isOverEncumbered || hpState.isRecovering || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData;
+                  const isDisabled = isOverEncumbered || hpState.isRecovering || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData || isOffline;
                   return (
                     <div
                       key={e.encounterSiteId}
@@ -534,6 +539,7 @@ export function CombatScreen({
                         type="button"
                         onClick={() => handleFightClick(e)}
                         disabled={isDisabled}
+                        title={isOffline ? "You're offline" : undefined}
                         className={`px-3 py-2 rounded font-semibold ${
                           isDisabled
                             ? 'bg-[var(--rpg-border)] text-[var(--rpg-text-secondary)] cursor-not-allowed'

@@ -163,6 +163,7 @@ export default function GamePage() {
     pendingClockMs,
     lastCombat,
     busyAction,
+    isOffline,
     actionError,
     bestiaryMobs,
     bestiaryLoading,
@@ -571,6 +572,7 @@ export default function GamePage() {
             onQuickRest={handleQuickRest}
             quickRestPercent={quickRestHealPercent}
             busyAction={busyAction}
+            isOffline={isOffline}
             onNavigateToRest={() => handleNavigate('rest')}
             guildTaxRate={guildTaxRate}
             combatLogPrefetch={combatLogPrefetch}
@@ -1000,6 +1002,7 @@ export default function GamePage() {
             pendingEncounterSort={pendingEncounterSort}
             pendingClockMs={pendingClockMs}
             busyAction={busyAction}
+            isOffline={isOffline}
             lastCombat={lastCombat}
             bestiaryMobs={bestiaryMobs.map((mob) => ({ id: mob.id, isDiscovered: mob.isDiscovered }))}
             onStartCombat={handleStartCombat}
@@ -1036,6 +1039,7 @@ export default function GamePage() {
           <ArenaScreen
             characterLevel={characterProgression.characterLevel}
             busyAction={busyAction}
+            isOffline={isOffline}
             currentTurns={turns}
             playerId={player?.id ?? null}
             isInTown={currentZone?.zoneType === 'town'}

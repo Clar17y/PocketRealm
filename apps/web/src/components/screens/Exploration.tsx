@@ -71,13 +71,14 @@ interface ExplorationProps {
   onQuickRest?: () => Promise<void>;
   quickRestPercent?: number;
   busyAction?: string | null;
+  isOffline?: boolean;
   onNavigateToRest?: () => void;
   guildTaxRate?: number;
   combatLogPrefetch?: CombatLogPrefetch;
   combatXpRate?: { skillName: string; rate: number };
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, isOffline, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
   const strangerLineRef = useRef<string | null>(null);
   const prevPlaybackDataRef = useRef(playbackData);
 
@@ -157,6 +158,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           onQuickRest={onQuickRest}
           quickRestPercent={quickRestPercent}
           busyAction={busyAction}
+          isOffline={isOffline}
         />
       )}
 
@@ -383,7 +385,8 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                 onStartExploration(turnInvestment[0], effectiveSelectedTier ?? undefined);
               }
             }}
-            disabled={isRecovering || isOverEncumbered || turnInvestment[0] > availableTurns || !!busyAction}
+            disabled={isRecovering || isOverEncumbered || turnInvestment[0] > availableTurns || !!busyAction || isOffline}
+            title={isOffline ? "You're offline" : undefined}
           >
             <div className="flex items-center justify-center gap-2">
               {busyAction === 'exploration' ? (
