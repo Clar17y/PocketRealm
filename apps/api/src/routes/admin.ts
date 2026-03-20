@@ -4,6 +4,7 @@ import { Prisma, prisma } from '@pocketrealm/database';
 import { authenticate } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
 import { asyncHandler } from '../utils/asyncHandler';
+import { getBalanceReport } from '../services/analyticsService';
 import { refundPlayerTurns } from '../services/turnBankService';
 import { addStackableItem, addStackableItemTx } from '../services/inventoryService';
 import { buildStateUpdates, fetchItemDTOs, fetchInventoryMeta, fetchMaterialTotals, buildInventoryStateUpdates } from '../services/stateUpdateHelpers';
@@ -816,6 +817,18 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
     totalParticipants: currentCount + botsNeeded,
     minRequired: minParticipants,
   });
+}));
+
+// ---------- Analytics ----------
+
+const balancePeriodSchema = z.object({
+  period: z.enum(['1h', '24h', '7d', '30d']).default('7d'),
+});
+
+router.get('/analytics/balance', asyncHandler(async (req, res) => {
+  const { period } = balancePeriodSchema.parse(req.query);
+  const report = await getBalanceReport(period);
+  res.json(report);
 }));
 
 export const adminRouter = router;
