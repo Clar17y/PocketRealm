@@ -149,6 +149,9 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
         <KnockoutBanner
           title={activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
           action="exploring"
+          message={activityLockReason === 'encounter'
+            ? 'You have an active encounter site. Complete or abandon it before exploring.'
+            : 'You are on an active expedition. Complete it before exploring.'}
         />
       )}
 

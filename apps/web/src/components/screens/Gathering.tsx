@@ -242,6 +242,9 @@ export function Gathering({
         <KnockoutBanner
           title={activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
           action="gathering"
+          message={activityLockReason === 'encounter'
+            ? 'You have an active encounter site. Complete or abandon it before gathering.'
+            : 'You are on an active expedition. Complete it before gathering.'}
         />
       )}
 

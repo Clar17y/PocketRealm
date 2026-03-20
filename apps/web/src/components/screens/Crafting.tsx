@@ -184,6 +184,9 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
         <KnockoutBanner
           title={activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
           action="crafting"
+          message={activityLockReason === 'encounter'
+            ? 'You have an active encounter site. Complete or abandon it before crafting.'
+            : 'You are on an active expedition. Complete it before crafting.'}
         />
       )}
 

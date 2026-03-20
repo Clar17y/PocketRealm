@@ -280,6 +280,7 @@ export function CombatScreen({
         <KnockoutBanner
           title="Active Expedition"
           action="fighting encounter sites"
+          message="You are on an active expedition. Complete it before starting combat."
         />
       )}
 
@@ -358,6 +359,16 @@ export function CombatScreen({
               // Refetch site data by calling start-room for next room
               const result = await startEncounterRoom(activeSiteCombat.siteId);
               if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
+              // All remaining rooms decayed — site auto-cleared
+              if (result.siteAutoCleared) {
+                return {
+                  currentRoom: 0,
+                  mobs: [],
+                  playerState: { hp: 0, maxHp: 0, stamina: 0, maxStamina: 0, mana: 0, maxMana: 0, activeEffects: [] },
+                  hasDecayedMobs: false,
+                  siteAutoCleared: true,
+                };
+              }
               return {
                 currentRoom: result.currentRoom,
                 mobs: result.mobs.map(m => ({

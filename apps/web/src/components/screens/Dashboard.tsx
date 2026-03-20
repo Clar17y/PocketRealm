@@ -89,6 +89,9 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
         <KnockoutBanner
           title={playerData.activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
           action="taking any actions"
+          message={playerData.activityLockReason === 'encounter'
+            ? 'You have an active encounter site. Complete or abandon it before doing other activities.'
+            : 'You are on an active expedition. Complete it before doing other activities.'}
         />
       )}
 
