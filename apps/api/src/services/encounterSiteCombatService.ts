@@ -27,6 +27,7 @@ import {
 } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
+import type { AttackSkill } from './combatStatsService';
 import { handleCombatDefeat, assertCanAct, assertInZone } from '../utils/routeHelpers';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { getHpState } from './hpService';
@@ -315,17 +316,20 @@ async function loadRoomMobsAsRaidState(
   roomMobs: EncounterMobSlot[],
   zoneId: string,
   mobFamilyId: string,
-): Promise<ExpeditionMobState[]> {
+): Promise<{ mobs: ExpeditionMobState[]; mobXpByTemplateId: Record<string, number> }> {
   const mobTemplateIds = [...new Set(roomMobs.map(m => m.mobTemplateId))];
   const mobTemplateRows = await prisma.mobTemplate.findMany({
     where: { id: { in: mobTemplateIds } },
     select: {
       id: true, name: true, hp: true, accuracy: true, defence: true,
       magicDefence: true, evasion: true, damageMin: true, damageMax: true,
-      damageType: true,
+      damageType: true, xpReward: true,
     },
   });
   const mobTemplateById = new Map(mobTemplateRows.map(t => [t.id, t]));
+
+  const mobXpByTemplateId: Record<string, number> = {};
+  for (const t of mobTemplateRows) mobXpByTemplateId[t.id] = t.xpReward;
 
   const [cachedZoneEvents, cachedWorldEvents] = await Promise.all([
     getActiveEventsForZone(zoneId),
@@ -349,7 +353,7 @@ async function loadRoomMobsAsRaidState(
     };
     expeditionMobs.push(buildEncounterRaidMob(slot, modifiedTemplate));
   }
-  return expeditionMobs;
+  return { mobs: expeditionMobs, mobXpByTemplateId };
 }
 
 /**
@@ -391,7 +395,7 @@ async function buildParticipantForEncounterSite(
   username: string,
   currentHp: number,
   maxHp: number,
-): Promise<RaidParticipant> {
+): Promise<{ participant: RaidParticipant; attackSkill: AttackSkill; guildXpBoost: number }> {
   const [equipStats, progression] = await Promise.all([
     getEquipmentStats(playerId),
     getPlayerProgressionState(playerId),
@@ -430,7 +434,7 @@ async function buildParticipantForEncounterSite(
     ? await buildPotionPool(playerId, maxHp)
     : [];
 
-  return {
+  const participant: RaidParticipant = {
     playerId,
     username,
     targetMobId: null,
@@ -455,6 +459,7 @@ async function buildParticipantForEncounterSite(
     activeEffects: [],
     availablePotions,
   };
+  return { participant, attackSkill: prep.attackSkill, guildXpBoost: prep.guildMods.xpBoost };
 }
 
 // ---------------------------------------------------------------------------
@@ -531,7 +536,7 @@ export async function autoResolveEncounterRoom(
   const { currentRoom, roomMobs } = advanceResult;
 
   // Load mob templates, apply zone modifiers, build ExpeditionMobState[]
-  const expeditionMobs = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
+  const { mobs: expeditionMobs, mobXpByTemplateId } = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
   if (expeditionMobs.length === 0) {
     throw new AppError(410, 'No valid mobs in encounter room', 'SITE_DECAYED');
   }
@@ -540,7 +545,7 @@ export async function autoResolveEncounterRoom(
   const totalTurnCost = roomMobs.length * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST;
 
   // Build player as RaidParticipant
-  const participant = await buildParticipantForEncounterSite(
+  const { participant, attackSkill, guildXpBoost } = await buildParticipantForEncounterSite(
     playerId,
     username,
     hpState.currentHp,
@@ -745,6 +750,10 @@ interface ManualCombatState {
   zoneName: string;
   mobFamilyName: string;
   initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
+  mobXpByTemplateId: Record<string, number>;
+  roomMobSlots: EncounterMobSlot[];
+  attackSkill: string;
+  guildXpBoost: number;
 }
 
 // Redis key prefix for manual combat sessions
@@ -907,12 +916,12 @@ export async function startManualEncounterRoom(
   const { currentRoom, roomMobs } = advanceResult;
 
   // Load mob templates, apply zone modifiers, build ExpeditionMobState[]
-  const expeditionMobs = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
+  const { mobs: expeditionMobs, mobXpByTemplateId } = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
   if (expeditionMobs.length === 0) {
     throw new AppError(410, 'No valid mobs in encounter room', 'SITE_DECAYED');
   }
 
-  const participant = await buildParticipantForEncounterSite(
+  const { participant, attackSkill, guildXpBoost } = await buildParticipantForEncounterSite(
     playerId,
     username,
     hpState.currentHp,
@@ -941,6 +950,10 @@ export async function startManualEncounterRoom(
     zoneName: site.zone.name,
     mobFamilyName: site.mobFamily.name,
     initialMobs: toInitialMobSnapshot(expeditionMobs),
+    mobXpByTemplateId,
+    roomMobSlots: roomMobs,
+    attackSkill,
+    guildXpBoost,
   });
 
   return {
