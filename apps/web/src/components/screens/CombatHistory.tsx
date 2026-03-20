@@ -17,6 +17,7 @@ import { relativeTime } from '@/lib/format';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatRewardsSummary } from '@/components/combat/CombatRewardsSummary';
 import { RoundLogContent } from '@/components/common/combat';
+import type { ExpeditionRoundLog } from '@pocketrealm/shared';
 import { EventBadges } from '@/components/common/EventBadge';
 import { CopyButton } from '@/components/common/CopyButton';
 import { FightNavigationBar } from '@/components/common/FightNavigationBar';
@@ -487,12 +488,19 @@ export function CombatHistory() {
 
               {selectedEntry.source === 'encounter_site_room' ? (
                 <div className="max-h-96 overflow-y-auto space-y-3 border-t border-[var(--rpg-border)] pt-2">
-                  {(selectedDetail.rounds ?? []).map((roundLog, i) => (
-                    <div key={i}>
-                      <p className="text-xs font-bold text-[var(--rpg-text-secondary)] mb-1">Round {roundLog.round}</p>
-                      <RoundLogContent log={roundLog} playerId={null} />
-                    </div>
-                  ))}
+                  {(selectedDetail.rounds ?? []).map((entry: Record<string, unknown>, i: number) => {
+                    // Auto-resolve stores RoundSnapshot[] ({roundNumber, log, ...}),
+                    // manual stores ExpeditionRoundLog[] ({round, phases, ...}).
+                    const roundLog = entry.phases ? entry : entry.log;
+                    const roundNum = entry.round ?? entry.roundNumber ?? i + 1;
+                    if (!roundLog || typeof roundLog !== 'object' || !('phases' in roundLog)) return null;
+                    return (
+                      <div key={i}>
+                        <p className="text-xs font-bold text-[var(--rpg-text-secondary)] mb-1">Round {roundNum as number}</p>
+                        <RoundLogContent log={roundLog as ExpeditionRoundLog} playerId={null} />
+                      </div>
+                    );
+                  })}
                   {!!selectedDetail.chestReward && (
                     <div className="border-t border-[var(--rpg-border)] pt-2 text-xs text-[var(--rpg-gold)]">
                       Chest reward received on site completion
