@@ -103,6 +103,8 @@ import { useAchievements } from './hooks/useAchievements';
 import { useQuests } from './hooks/useQuests';
 import { useCombatPlayback } from './hooks/useCombatPlayback';
 import { runSimpleAction } from './simpleAction';
+import { useApiReachable } from '@/hooks/useApiReachable';
+import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
@@ -264,6 +266,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const encounterSites = useEncounterSites(isAuthenticated, activeScreen);
   const { refreshPendingEncounters, pendingEncounters } = encounterSites;
   const [lastCombat, setLastCombat] = useState<LastCombat | null>(null);
+  const connectionStatus = useConnectionStatus();
+  const apiReachable = useApiReachable();
+  const isOffline = !apiReachable
+    || connectionStatus === 'disconnected'
+    || connectionStatus === 'reconnecting'
+    || connectionStatus === 'failed';
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, expeditionThemes, worldBosses, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
@@ -1777,6 +1785,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     pushLog,
     lastCombat,
     busyAction,
+    isOffline,
     actionError,
     bestiaryMobs,
     bestiaryLoading,
