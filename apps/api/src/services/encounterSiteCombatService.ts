@@ -1030,6 +1030,7 @@ export interface ManualRoundResult {
   completionRewards: Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>> | null;
   fleeResult: AutoResolveEncounterResult['fleeResult'];
   respawnedTo: { townId: string; townName: string } | null;
+  xpGrants: GrantXpResult[];
 }
 
 /**
@@ -1118,6 +1119,7 @@ export async function resolveManualEncounterRound(
       completionRewards: null,
       fleeResult: null,
       respawnedTo: null,
+      xpGrants: [],
     };
   }
 
@@ -1245,6 +1247,27 @@ export async function resolveManualEncounterRound(
     state.participant.mana,
   );
 
+  // Grant XP for defeated mobs (only on room clear, not on defeat)
+  let xpGrants: GrantXpResult[] = [];
+  if (roomCleared) {
+    // All room mobs are killed — sum XP for every mob slot in the room
+    let totalXp = 0;
+    for (const slot of state.roomMobSlots) {
+      const baseXp = state.mobXpByTemplateId[slot.mobTemplateId];
+      if (baseXp === undefined) continue;
+      let xp = baseXp;
+      const prefix = getMobPrefixDefinition(slot.prefix);
+      if (prefix) xp = Math.max(1, Math.floor(xp * (prefix.xpMultiplier ?? 1)));
+      totalXp += xp;
+    }
+    if (totalXp > 0) {
+      xpGrants = await splitAndGrantXp(
+        playerId, totalXp, state.attackSkill as AttackSkill,
+        undefined, undefined, state.guildXpBoost,
+      );
+    }
+  }
+
   // Handle defeat
   let fleeResult: AutoResolveEncounterResult['fleeResult'] = null;
   let respawnedTo: { townId: string; townName: string } | null = null;
@@ -1275,5 +1298,6 @@ export async function resolveManualEncounterRound(
     completionRewards: txResult.completionRewards,
     fleeResult,
     respawnedTo,
+    xpGrants,
   };
 }

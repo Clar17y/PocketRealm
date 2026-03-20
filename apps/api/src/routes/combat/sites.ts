@@ -397,7 +397,7 @@ export function registerSiteRoutes(router: Router): void {
 
       // Include stateUpdates when combat ends so global HP/resource bars refresh
       const stateUpdates = combatEnded
-        ? await buildStateUpdates(playerId, ['hp', 'resources', 'buffs'])
+        ? await buildStateUpdates(playerId, ['hp', 'resources', 'buffs', 'skills', 'characterProgression'])
         : undefined;
       if (stateUpdates) stateUpdates.activeEncounterSiteId = null;
 
@@ -425,6 +425,7 @@ export function registerSiteRoutes(router: Router): void {
         roomCleared: result.outcome === 'cleared' || result.outcome === 'site_cleared',
         siteCleared: result.siteCleared,
         chestReward: await mapChestRewardDTO(result.completionRewards),
+        ...(combatEnded && result.xpGrants?.length ? { skillXpGrants: result.xpGrants.map(serializeXpGrant) } : {}),
         fleeResult: result.fleeResult,
         respawnedTo: result.respawnedTo,
         ...(stateUpdates ? { stateUpdates } : {}),
