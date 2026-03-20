@@ -321,7 +321,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
         sections={[
           {
             heading: 'Multi-Room Combat',
-            text: 'Encounter sites are multi-room dungeons. Clear each room to advance. Your HP, stamina, and mana carry between rooms — manage your resources carefully.',
+            text: 'Encounter sites are multi-room dungeons. Clear each room to advance. Your HP, stamina, and mana carry between rooms but regenerate naturally while you\'re between fights.',
           },
           {
             heading: 'Auto-Resolve vs Manual',
