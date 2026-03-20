@@ -394,13 +394,20 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
       )}
 
       {state === 'manual_combat' && (
-        <CombatActionButtons
-          loading={loading}
-          actions={[
-            { key: 'next-round', label: 'Next Round', onClick: handleNextRound },
-            { key: 'abandon', label: 'Abandon', onClick: handleAbandon, variant: 'danger' },
-          ]}
-        />
+        <>
+          <CombatActionButtons
+            loading={loading}
+            actions={[
+              { key: 'next-round', label: 'Next Round', onClick: handleNextRound },
+              { key: 'abandon', label: 'Abandon', onClick: handleAbandon, variant: 'danger' },
+            ]}
+          />
+          <TemplateQuickSwitch
+            templates={props.templates}
+            activeTemplateId={props.templates.find(t => t.isActive)?.id ?? props.templates[0]?.id ?? null}
+            onActivate={props.onActivateTemplate}
+          />
+        </>
       )}
 
       {/* Room result */}
@@ -424,6 +431,11 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
                   ))}
                 </div>
               )}
+              <TemplateQuickSwitch
+                templates={props.templates}
+                activeTemplateId={props.templates.find(t => t.isActive)?.id ?? props.templates[0]?.id ?? null}
+                onActivate={props.onActivateTemplate}
+              />
               <div className="mt-2">
                 <PixelButton onClick={handleContinue} disabled={loading}>
                   Continue to Room {currentRoom + 1}
