@@ -165,6 +165,7 @@ export default function GamePage() {
     pendingClockMs,
     lastCombat,
     busyAction,
+    slowAction,
     isOffline,
     actionError,
     bestiaryMobs,
@@ -1404,6 +1405,12 @@ export default function GamePage() {
                 Go to Guild Expeditions
               </button>
             )}
+          </div>
+        )}
+
+        {busyAction && slowAction && (
+          <div className="text-center text-xs text-[var(--rpg-gold)] animate-pulse py-1">
+            Still working...
           </div>
         )}
 

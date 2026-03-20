@@ -273,6 +273,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     || connectionStatus === 'reconnecting'
     || connectionStatus === 'failed';
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [slowAction, setSlowAction] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, expeditionThemes, worldBosses, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
@@ -787,10 +788,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (busyAction) return;
     setBusyAction(actionName);
     setActionError(null);
+    setSlowAction(false);
+    const timer = setTimeout(() => setSlowAction(true), 10_000);
     try {
       await fn();
     } finally {
+      clearTimeout(timer);
       setBusyAction(null);
+      setSlowAction(false);
     }
   };
 
@@ -1798,6 +1803,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     pushLog,
     lastCombat,
     busyAction,
+    slowAction,
     isOffline,
     actionError,
     bestiaryMobs,
