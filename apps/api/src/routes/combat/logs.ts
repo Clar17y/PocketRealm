@@ -370,6 +370,28 @@ export function registerLogRoutes(router: Router): void {
           } as unknown as Prisma.JsonValue;
         }
 
+        // Enrich chestReward.loot with item names (encounter site room logs)
+        const chestRewardUnknown = combatRecord.chestReward;
+        if (chestRewardUnknown && typeof chestRewardUnknown === 'object' && !Array.isArray(chestRewardUnknown)) {
+          const chestRecord = parseJsonRecord<unknown>(chestRewardUnknown, 'combat.chestReward');
+          const chestLootUnknown = chestRecord.loot;
+          if (Array.isArray(chestLootUnknown)) {
+            const parsedChestLoot = chestLootUnknown
+              .map((entry) => lootDropWithNameSchema.safeParse(entry))
+              .filter((entry): entry is { success: true; data: z.infer<typeof lootDropWithNameSchema> } => entry.success)
+              .map((entry) => entry.data);
+
+            const chestLootWithNames = await enrichLootWithNames(parsedChestLoot);
+            combat = {
+              ...(combat as Record<string, unknown>),
+              chestReward: {
+                ...chestRecord,
+                loot: chestLootWithNames,
+              },
+            } as unknown as Prisma.JsonValue;
+          }
+        }
+
         // Map template combat log fields to frontend response shape
         if (Array.isArray(combatRecord.log)) {
           combat = {

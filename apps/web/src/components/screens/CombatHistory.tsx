@@ -538,7 +538,7 @@ export function CombatHistory() {
                         </span>
                         {Array.isArray(chest.loot) && chest.loot.map((item: Record<string, unknown>, idx: number) => (
                           <div key={idx} className="text-xs text-[var(--rpg-text-primary)]">
-                            {(item.name ?? item.itemTemplateId) as string} x{item.quantity as number}
+                            {(item.itemName ?? item.name ?? item.itemTemplateId) as string} x{item.quantity as number}
                           </div>
                         ))}
                         {!!chest.recipeUnlocked && (
