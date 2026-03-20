@@ -3,6 +3,7 @@ import type {
   CombatantStats,
   RaidParticipant,
   ExpeditionMobState,
+  EncounterMobSlot,
 } from '@pocketrealm/shared';
 import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 import { initThreatTable } from '@pocketrealm/game-engine';
@@ -31,7 +32,7 @@ vi.mock('./equipmentService', () => ({}));
 vi.mock('./attributesService', () => ({}));
 vi.mock('../routes/combat/helpers', () => ({}));
 
-import { resolveEncounterRoomCombat } from './encounterSiteCombatService';
+import { resolveEncounterRoomCombat, computeDefeatedMobXp } from './encounterSiteCombatService';
 
 // ---------------------------------------------------------------------------
 // Test helpers (mirrors raidRoundResolver.test.ts pattern)
@@ -260,5 +261,52 @@ describe('resolveEncounterRoomCombat', () => {
     // At least one mob should be dead (mob1 has 1 hp)
     const deadMobs = result.mobResults.filter(m => !m.alive);
     expect(deadMobs.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeDefeatedMobXp
+// ---------------------------------------------------------------------------
+
+describe('computeDefeatedMobXp', () => {
+  const makeSlot = (slot: number, mobTemplateId: string, prefix: string | null = null): EncounterMobSlot => ({
+    slot, mobTemplateId, role: 'trash', prefix, status: 'alive', room: 1,
+  });
+
+  it('returns 0 when no mobs defeated', () => {
+    const defeated = new Set<string>();
+    const slots = [makeSlot(0, 'mob-a')];
+    const xpMap = { 'mob-a': 10 };
+    expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(0);
+  });
+
+  it('sums xpReward for defeated mobs only', () => {
+    const defeated = new Set(['encounter-mob-0', 'encounter-mob-1']);
+    const slots = [makeSlot(0, 'mob-a'), makeSlot(1, 'mob-b'), makeSlot(2, 'mob-a')];
+    const xpMap = { 'mob-a': 10, 'mob-b': 20 };
+    expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(30);
+  });
+
+  it('applies prefix xpMultiplier', () => {
+    const defeated = new Set(['encounter-mob-0']);
+    const slots = [makeSlot(0, 'mob-a', 'tough')];
+    const xpMap = { 'mob-a': 10 };
+    // tough prefix has xpMultiplier 1.3 — result should be > 10
+    const result = computeDefeatedMobXp(defeated, slots, xpMap);
+    expect(result).toBeGreaterThan(10);
+  });
+
+  it('returns 0 for missing template', () => {
+    const defeated = new Set(['encounter-mob-0']);
+    const slots = [makeSlot(0, 'unknown-mob')];
+    const xpMap = {};
+    expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(0);
+  });
+
+  it('grants XP independently for same template used multiple times', () => {
+    const defeated = new Set(['encounter-mob-0', 'encounter-mob-1']);
+    const slots = [makeSlot(0, 'mob-a'), makeSlot(1, 'mob-a')];
+    const xpMap = { 'mob-a': 15 };
+    expect(computeDefeatedMobXp(defeated, slots, xpMap)).toBe(30);
   });
 });
