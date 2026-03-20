@@ -427,7 +427,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const needs = SCREEN_POLL_NEEDS[activeScreenRef.current] ?? ['turns'];
     const fetches: Promise<void>[] = [];
 
-    fetches.push(getTurns().then(res => { if (res.data) setTurns(res.data.currentTurns); }));
+    fetches.push(getTurns().then(res => {
+      if (res.data) {
+        setTurns(res.data.currentTurns);
+        window.dispatchEvent(new CustomEvent('api:reachable', { detail: { ok: true } }));
+      } else {
+        window.dispatchEvent(new CustomEvent('api:reachable', { detail: { ok: false } }));
+      }
+    }));
 
     if (needs.includes('hp') && hpStateRef.current.currentHp < hpStateRef.current.maxHp) {
       fetches.push(getHpState().then(res => {
