@@ -441,6 +441,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         window.dispatchEvent(new CustomEvent('api:reachable', { detail: { ok: true } }));
       } else {
         window.dispatchEvent(new CustomEvent('api:reachable', { detail: { ok: false } }));
+        window.dispatchEvent(new CustomEvent('api:error', {
+          detail: { message: res.error?.message ?? 'Network error', code: res.error?.code ?? 'UNKNOWN' }
+        }));
       }
     }));
 
@@ -476,6 +479,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const result = await getPvpNotificationCount();
     if (result.data) {
       setPvpNotificationCount(result.data.count);
+    } else {
+      window.dispatchEvent(new CustomEvent('api:error', {
+        detail: { message: result.error?.message ?? 'Network error', code: result.error?.code ?? 'UNKNOWN' }
+      }));
     }
   }, []);
 
@@ -486,6 +493,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     ]);
     if (reqRes.data) setIncomingFriendRequestCount(reqRes.data.requests.length);
     if (mailRes.data) setMailUnreadCount(mailRes.data.count);
+    // Dispatch error if both failed (if only one failed, partial success is OK)
+    if (!reqRes.data && !mailRes.data) {
+      window.dispatchEvent(new CustomEvent('api:error', {
+        detail: { message: 'Network error', code: 'NETWORK_ERROR' }
+      }));
+    }
   }, []);
 
   const handleLoadSkillPoints = useCallback(async () => {

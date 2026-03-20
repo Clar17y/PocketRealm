@@ -32,6 +32,8 @@ import { QuestToast } from '@/components/QuestToast';
 import { ForgeResultToast } from '@/components/ForgeResultToast';
 import { RateLimitToast } from '@/components/RateLimitToast';
 import { useRateLimitToast } from './hooks/useRateLimitToast';
+import { ErrorToast } from '@/components/ErrorToast';
+import { useErrorToast } from './hooks/useErrorToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
 import { Settings } from '@/components/screens/Settings';
@@ -310,6 +312,7 @@ export default function GamePage() {
   } = useGameController({ isAuthenticated });
 
   useRateLimitToast();
+  useErrorToast(isOffline);
   const { state: pushState, toggle: pushToggle } = usePushNotifications();
 
   // Navigate to screen from query param (e.g. push notification deep link)
@@ -1452,6 +1455,7 @@ export default function GamePage() {
       <QuestToast />
       <ForgeResultToast />
       <RateLimitToast />
+      <ErrorToast />
     </ErrorBoundary>
     </>
   );
