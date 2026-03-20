@@ -7,6 +7,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.48',
+    date: '2026-03-20',
+    title: 'Encounter Site XP & Polish',
+    summary:
+      'Encounter sites now grant combat skill XP for every mob you defeat, matching the zone combat XP pipeline. XP is awarded when a room is cleared (not on defeat) and split by your weapon\'s attack skill. The combat history tab shows XP earned and full chest contents (rarity, materials, recipes) instead of a generic message. Chest rewards now properly merge with existing inventory stacks. The template quick-switch dropdown is available during manual combat rounds and between rooms. Fixed an issue where the Continue button was unclickable after skipping auto-resolve playback.',
+  },
+  {
+    version: '0.47',
+    date: '2026-03-20',
+    title: 'Encounter Site Rework',
+    summary:
+      'Encounter sites have been completely rebuilt as multi-room dungeons. Each site is divided into rooms that you clear one at a time, choosing between auto-resolve (template-locked, earns a chest loot bonus) or manual round-by-round combat. HP, stamina, and mana carry between rooms but regenerate naturally while you\'re between fights. Splash Cascade makes missed attacks bounce to other enemies in the room, each re-rolling hit chance against a new target. Mobs decay over time — if all remaining rooms decay, the site auto-clears and you receive your chest reward. Chest rarity scales with room count: more rooms means better loot. Combat logs now show detailed hit breakdowns including accuracy rolls, dodge checks, and splash chains. Combat history tracks encounter room fights with source filtering. An activity lockout prevents starting other actions while you\'re mid-site.',
+  },
+  {
     version: '0.46',
     date: '2026-03-19',
     title: 'NPC Expansion & Zone-Aware Dialogue',
