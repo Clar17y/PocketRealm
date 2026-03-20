@@ -270,7 +270,7 @@ async function advanceToFirstAliveRoom(
   site: { id: string; currentRoom: number },
   decayedMobs: EncounterMobSlot[],
   totalRooms: number,
-): Promise<{ currentRoom: number; roomMobs: EncounterMobSlot[] }> {
+): Promise<{ currentRoom: number; roomMobs: EncounterMobSlot[] } | null> {
   let currentRoom = site.currentRoom;
   let roomMobs = getAllAliveMobsInRoom(decayedMobs, currentRoom);
   if (roomMobs.length > 0) return { currentRoom, roomMobs };
@@ -284,7 +284,8 @@ async function advanceToFirstAliveRoom(
       return { currentRoom, roomMobs };
     }
   }
-  throw new AppError(410, 'No alive mobs in encounter site', 'SITE_DECAYED');
+  // All remaining rooms have decayed — callers should auto-clear
+  return null;
 }
 
 /**
@@ -481,11 +482,49 @@ export async function autoResolveEncounterRoom(
 
   // Advance to first room with alive mobs (decay may have wiped the current room)
   const totalRoomsForAdvance = site.totalRooms || new Set(decayed.mobs.map(m => m.room)).size || 1;
-  const { currentRoom, roomMobs } = await advanceToFirstAliveRoom(
+  const advanceResult = await advanceToFirstAliveRoom(
     { id: site.id, currentRoom: site.currentRoom ?? 1 },
     decayed.mobs,
     totalRoomsForAdvance,
   );
+
+  // All remaining rooms decayed — auto-clear site with chest reward
+  if (!advanceResult) {
+    const { availableSlots } = await getInventoryState(playerId);
+    const totalRoomsCount = site.totalRooms ?? 1;
+    const existingStrategy = (Array.isArray(site.roomStrategy) ? site.roomStrategy : []) as unknown as RoomStrategyEntry[];
+    const autoResolvedCount = existingStrategy.filter((e: RoomStrategyEntry) => e.mode === 'auto').length;
+    const completionRewards = await prisma.$transaction(async (tx) => {
+      const rewards = await grantEncounterSiteChestRewardsTx(tx, {
+        playerId,
+        mobFamilyId: site.mobFamilyId,
+        totalRooms: totalRoomsCount,
+        autoResolvedBonusRooms: autoResolvedCount,
+        availableSlots,
+      });
+      await tx.encounterSite.deleteMany({ where: { id: siteId, playerId } });
+      await tx.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
+      return rewards;
+    });
+    return {
+      outcome: 'site_cleared' as const,
+      roundsResolved: 0,
+      rounds: [],
+      initialMobs: [],
+      playerHpAfter: 0,
+      playerStaminaAfter: 0,
+      playerManaAfter: 0,
+      potionsConsumed: [],
+      currentRoom: site.currentRoom ?? 1,
+      totalRooms: totalRoomsCount,
+      siteCleared: true,
+      completionRewards,
+      fleeResult: null,
+      respawnedTo: null,
+    };
+  }
+
+  const { currentRoom, roomMobs } = advanceResult;
 
   // Load mob templates, apply zone modifiers, build ExpeditionMobState[]
   const expeditionMobs = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);
@@ -771,6 +810,10 @@ export interface StartManualRoomResult {
   /** Number of rounds already resolved (0 = fresh start, >0 = resuming) */
   roundNumber: number;
   roundLogs: ExpeditionRoundLog[];
+  /** True when all remaining rooms had decayed mobs — site was auto-cleared. */
+  siteAutoCleared?: boolean;
+  /** Chest rewards granted on auto-clear. */
+  completionRewards?: Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>> | null;
 }
 
 /**
@@ -831,11 +874,48 @@ export async function startManualEncounterRoom(
 
   // Advance to first room with alive mobs (decay may have wiped the current room)
   const totalRoomsForAdvance = site.totalRooms || new Set(decayed.mobs.map(m => m.room)).size || 1;
-  const { currentRoom, roomMobs } = await advanceToFirstAliveRoom(
+  const advanceResult = await advanceToFirstAliveRoom(
     { id: site.id, currentRoom: site.currentRoom ?? 1 },
     decayed.mobs,
     totalRoomsForAdvance,
   );
+
+  // All remaining rooms decayed — auto-clear site with chest reward
+  if (!advanceResult) {
+    const { availableSlots } = await getInventoryState(playerId);
+    const totalRoomsCount = site.totalRooms ?? 1;
+    const existingStrategy = (Array.isArray(site.roomStrategy) ? site.roomStrategy : []) as unknown as RoomStrategyEntry[];
+    const autoResolvedCount = existingStrategy.filter((e: RoomStrategyEntry) => e.mode === 'auto').length;
+    const completionRewards = await prisma.$transaction(async (tx) => {
+      const rewards = await grantEncounterSiteChestRewardsTx(tx, {
+        playerId,
+        mobFamilyId: site.mobFamilyId,
+        totalRooms: totalRoomsCount,
+        autoResolvedBonusRooms: autoResolvedCount,
+        availableSlots,
+      });
+      await tx.encounterSite.deleteMany({ where: { id: siteId, playerId } });
+      await tx.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
+      return rewards;
+    });
+    return {
+      currentRoom: site.currentRoom ?? 1,
+      totalRooms: totalRoomsCount,
+      mobs: [],
+      playerHp: hpState.currentHp,
+      playerMaxHp: hpState.maxHp,
+      playerStamina: 0,
+      playerMaxStamina: 0,
+      playerMana: 0,
+      playerMaxMana: 0,
+      roundNumber: 0,
+      roundLogs: [],
+      siteAutoCleared: true,
+      completionRewards,
+    };
+  }
+
+  const { currentRoom, roomMobs } = advanceResult;
 
   // Load mob templates, apply zone modifiers, build ExpeditionMobState[]
   const expeditionMobs = await loadRoomMobsAsRaidState(roomMobs, site.zoneId, site.mobFamilyId);

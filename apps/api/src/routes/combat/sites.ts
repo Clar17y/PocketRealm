@@ -326,6 +326,17 @@ export function registerSiteRoutes(router: Router): void {
 
       const result = await startManualEncounterRoom(playerId, siteId, username);
 
+      // Site was auto-cleared (all remaining rooms decayed) — clear lockout and return
+      if (result.siteAutoCleared) {
+        await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
+        res.json({
+          siteAutoCleared: true,
+          chestReward: await mapChestRewardDTO(result.completionRewards ?? null),
+          stateUpdates: { activeEncounterSiteId: null },
+        });
+        return;
+      }
+
       // Transform to frontend DTO
       res.json({
         currentRoom: result.currentRoom,

@@ -42,6 +42,7 @@ export interface EncounterSiteCombatViewProps {
     mobs: ExpeditionMobInfo[];
     playerState: EncounterPlayerState;
     hasDecayedMobs: boolean;
+    siteAutoCleared?: boolean;
   }>;
   onComplete: (outcome: 'cleared' | 'defeated' | 'abandoned') => void;
   onActivateTemplate: (templateId: string) => void;
@@ -242,6 +243,12 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
     setLoading(true);
     try {
       const nextRoom = await props.onAdvanceRoom();
+      if (nextRoom.siteAutoCleared) {
+        // All remaining rooms decayed — site auto-cleared
+        setOutcome('site_cleared');
+        setState('room_result');
+        return;
+      }
       setCurrentRoom(nextRoom.currentRoom);
       setMobs(nextRoom.mobs);
       setPlayerState(nextRoom.playerState);

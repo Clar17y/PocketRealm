@@ -570,6 +570,9 @@ export interface EncounterStartRoomResponse {
   /** 0 = fresh start, >0 = resuming an existing session */
   roundNumber: number;
   roundLogs?: ExpeditionRoundLog[];
+  /** True when all remaining rooms decayed — site auto-cleared with chest reward. */
+  siteAutoCleared?: boolean;
+  chestReward?: unknown;
   stateUpdates?: StateUpdates;
 }
 
