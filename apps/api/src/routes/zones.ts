@@ -38,7 +38,7 @@ import { buildStateUpdates, mergeLootIntoStateUpdates } from '../services/stateU
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 import { trackProgress } from '../services/progressService';
-import { checkExpeditionLockout } from '../services/expeditionLockoutService';
+import { checkExpeditionLockout, checkEncounterSiteLockout } from '../services/expeditionLockoutService';
 
 
 
@@ -199,6 +199,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     throw new AppError(400, 'Cannot travel while recovering', 'IS_RECOVERING');
   }
   await checkExpeditionLockout(playerId);
+  await checkEncounterSiteLockout(playerId);
   await assertNotOverEncumbered(playerId);
 
   // 4. Validate destination is discovered

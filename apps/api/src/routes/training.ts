@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../utils/asyncHandler';
 import { simulateFight, getCooldownRemaining } from '../services/trainingService';
 import { assertInTown } from '../utils/routeHelpers.js';
+import { checkExpeditionLockout, checkEncounterSiteLockout } from '../services/expeditionLockoutService';
 
 export const trainingRouter = Router();
 trainingRouter.use(authenticate);
@@ -15,6 +16,8 @@ const fightSchema = z.object({
 
 trainingRouter.post('/fight', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
+  await checkEncounterSiteLockout(playerId);
+  await checkExpeditionLockout(playerId);
   const { mobTemplateId, prefix } = fightSchema.parse(req.body);
   await assertInTown(playerId);
 

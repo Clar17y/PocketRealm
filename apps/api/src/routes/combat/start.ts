@@ -52,7 +52,7 @@ import { mapTemplateCombatLog } from '../../services/combatLogMapper';
 import { serializeXpGrant, toMobTemplate, assertCanAct, assertInZone, trackAchievements, handleCombatDefeat, buildPveCombatOptions } from '../../utils/routeHelpers.js';
 import { getCombatBuffs, applyCombatBuffs, consumeCombatBuffs, buildCombatBuffBadges } from '../../services/buffService';
 import { preparePlayerForCombat, buildPlayerTemplateCombatant, applyGuildCombatModifiers, processCombatVictoryRewards } from '../../services/combatOrchestrationService';
-import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
+import { checkExpeditionLockout, checkEncounterSiteLockout } from '../../services/expeditionLockoutService';
 import { buildStateUpdates, fetchItemDTOs, fetchMaterialTotals } from '../../services/stateUpdateHelpers.js';
 import {
   startSchema,
@@ -77,6 +77,7 @@ export function registerStartRoutes(router: Router): void {
   router.post('/start', asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
       await checkExpeditionLockout(playerId);
+      await checkEncounterSiteLockout(playerId);
       const body = startSchema.parse(req.body);
 
       // Encounter site combat has moved to dedicated endpoints
