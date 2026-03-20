@@ -24,6 +24,7 @@ export function trackEvent<E extends AnalyticsEvent>(
   event: E,
   ...args: EventMap[E] extends undefined ? [] : [EventMap[E]]
 ): void {
+  if (typeof window === 'undefined') return;
   const props = args[0] as Record<string, string | number> | undefined;
   window.plausible?.(event, props ? { props } : undefined);
 }

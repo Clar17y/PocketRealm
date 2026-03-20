@@ -1042,7 +1042,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       pushLog(...newLogs);
       applyStateUpdates(data.stateUpdates, stateSetters);
       const gatherType = data.xp?.skillType ?? 'mining';
-      trackEvent('action', { type: gatherType, turns: turnSpend, zone: activeZoneId ?? '' });
+      trackEvent('action', { type: gatherType, turns: turnSpend, zone: activeZoneId });
       if (data.xp?.leveledUp) {
         trackEvent('level_up', { skill: data.xp.skillType, level: data.xp.newLevel });
       }
