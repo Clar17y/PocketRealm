@@ -141,7 +141,7 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
       if (result.data) {
         setLastResult(result.data);
         setPvpPlaybackActive(true);
-        trackEvent('action', { type: 'pvp_challenge', turns: 500 });
+        trackEvent('action', { type: 'pvp_challenge', turns: PVP_CONSTANTS.CHALLENGE_TURN_COST });
         if (result.data.stateUpdates) onStateUpdates?.(result.data.stateUpdates);
       } else if (result.error) {
         setError(result.error.message);

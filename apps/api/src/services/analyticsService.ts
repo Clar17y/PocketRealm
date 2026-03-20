@@ -52,11 +52,14 @@ const PERIOD_MAP: Record<string, string> = {
   '30d': '30 days',
 };
 
-export async function getBalanceReport(period: string): Promise<BalanceReport> {
+export type BalancePeriod = '1h' | '24h' | '7d' | '30d';
+
+export async function getBalanceReport(period: BalancePeriod): Promise<BalanceReport> {
   const intervalSql = PERIOD_MAP[period] ?? '7 days';
   const cacheKey = `analytics:balance:v1:${period}`;
 
   return cachedQuery(cacheKey, async () => {
+    // SAFETY: intervalSql is always from PERIOD_MAP (hardcoded values), never user input
     const cutoff = Prisma.sql`NOW() - INTERVAL ${Prisma.raw(`'${intervalSql}'`)}`;
 
     // Active players in period
