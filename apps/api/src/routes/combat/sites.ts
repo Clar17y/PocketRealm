@@ -17,7 +17,7 @@ import {
   clearManualCombatSession,
   parseEncounterMobSlot,
 } from '../../services/encounterSiteCombatService';
-import { buildStateUpdates } from '../../services/stateUpdateHelpers.js';
+import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers.js';
 
 const abandonSchema = z.object({
   zoneId: z.string().uuid().optional(),
@@ -303,6 +303,11 @@ export function registerSiteRoutes(router: Router): void {
         const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources', 'buffs', 'skills', 'characterProgression']);
         stateUpdates.activeEncounterSiteId = null;
 
+        // Merge chest reward items into stateUpdates so frontend inventory stays in sync
+        if (result.completionRewards) {
+          await mergeLootIntoStateUpdates(playerId, result.completionRewards.newItemIds, result.completionRewards.updatedItemIds, stateUpdates);
+        }
+
         // On defeat the player is respawned to a town — sync the zone in the UI
         if (result.respawnedTo) {
           const player = await prisma.player.findUnique({ where: { id: playerId }, select: { currentZoneId: true } });
@@ -342,10 +347,14 @@ export function registerSiteRoutes(router: Router): void {
       // Site was auto-cleared (all remaining rooms decayed) — clear lockout and return
       if (result.siteAutoCleared) {
         await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
+        const stateUpdates: Record<string, unknown> = { activeEncounterSiteId: null };
+        if (result.completionRewards) {
+          await mergeLootIntoStateUpdates(playerId, result.completionRewards.newItemIds, result.completionRewards.updatedItemIds, stateUpdates);
+        }
         res.json({
           siteAutoCleared: true,
           chestReward: await mapChestRewardDTO(result.completionRewards ?? null),
-          stateUpdates: { activeEncounterSiteId: null },
+          stateUpdates,
         });
         return;
       }
@@ -400,6 +409,11 @@ export function registerSiteRoutes(router: Router): void {
         ? await buildStateUpdates(playerId, ['hp', 'resources', 'buffs', 'skills', 'characterProgression'])
         : undefined;
       if (stateUpdates) stateUpdates.activeEncounterSiteId = null;
+
+      // Merge chest reward items into stateUpdates so frontend inventory stays in sync
+      if (stateUpdates && result.completionRewards) {
+        await mergeLootIntoStateUpdates(playerId, result.completionRewards.newItemIds, result.completionRewards.updatedItemIds, stateUpdates);
+      }
 
       // On defeat the player is respawned to a town — sync the zone in the UI
       if (stateUpdates && result.respawnedTo) {
