@@ -52,7 +52,7 @@ import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
 import { getMainHandAttackSkill } from '../../services/combatStatsService';
-import { checkExpeditionLockout, checkEncounterSiteLockout } from '../../services/expeditionLockoutService';
+import { checkActivityLockout } from '../../services/expeditionLockoutService';
 import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers';
 import {
   startSchema,
@@ -81,8 +81,7 @@ export const startRouter = Router();
  */
 startRouter.post('/start', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
-    await checkExpeditionLockout(playerId);
-    await checkEncounterSiteLockout(playerId);
+    await checkActivityLockout(playerId);
     const body = startSchema.parse(req.body);
 
     const hpState = await assertCanAct(playerId);

@@ -5,6 +5,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
+import { ActivityLockBanner } from '@/components/common/ActivityLockBanner';
 import { ResourceStatusBar } from '../common/ResourceStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Loader2, Mountain, Play } from 'lucide-react';
@@ -146,13 +147,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
 
       {/* Activity Lock Banner */}
       {isActivityLocked && !isRecovering && !playbackData && (
-        <KnockoutBanner
-          title={activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
-          action="exploring"
-          message={activityLockReason === 'encounter'
-            ? 'You have an active encounter site. Complete or abandon it before exploring.'
-            : 'You are on an active expedition. Complete it before exploring.'}
-        />
+        <ActivityLockBanner activityLockReason={activityLockReason ?? null} action="exploring" />
       )}
 
       {/* Resource Status */}

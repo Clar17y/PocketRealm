@@ -17,7 +17,7 @@ import {
   salvageSchema,
   salvageBatchSchema,
 } from './helpers';
-import { checkExpeditionLockout, checkEncounterSiteLockout } from '../../services/expeditionLockoutService';
+import { checkActivityLockout } from '../../services/expeditionLockoutService';
 
 export const salvageRouter = Router();
 
@@ -29,8 +29,7 @@ salvageRouter.post('/', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = salvageSchema.parse(req.body);
 
-    await checkEncounterSiteLockout(playerId);
-    await checkExpeditionLockout(playerId);
+    await checkActivityLockout(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);
@@ -202,8 +201,7 @@ salvageRouter.post('/batch', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = salvageBatchSchema.parse(req.body);
 
-    await checkEncounterSiteLockout(playerId);
-    await checkExpeditionLockout(playerId);
+    await checkActivityLockout(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);
     assertZoneAllowsCrafting(zone);

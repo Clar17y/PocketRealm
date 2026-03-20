@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
+import { ActivityLockBanner } from '@/components/common/ActivityLockBanner';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import { Hourglass, Sparkles, CheckCircle, XCircle, Lock, Minus, Plus } from 'lucide-react';
@@ -181,13 +182,7 @@ export function Crafting({ skillType, skillName, skillLevel, xpRate, recipes, on
 
       {/* Activity Lock Banner */}
       {isActivityLocked && !isRecovering && (
-        <KnockoutBanner
-          title={activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
-          action="crafting"
-          message={activityLockReason === 'encounter'
-            ? 'You have an active encounter site. Complete or abandon it before crafting.'
-            : 'You are on an active expedition. Complete it before crafting.'}
-        />
+        <ActivityLockBanner activityLockReason={activityLockReason ?? null} action="crafting" />
       )}
 
       {/* Header */}

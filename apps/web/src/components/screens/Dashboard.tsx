@@ -6,6 +6,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
+import { ActivityLockBanner } from '@/components/common/ActivityLockBanner';
 import { Coins, TrendingUp, MapPin, Sword, Pickaxe, Hammer, Heart, Crosshair, Sparkles, Dice5, Wind } from 'lucide-react';
 import Image from 'next/image';
 import { getStaggerDelay } from '@/lib/animations';
@@ -86,13 +87,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
 
       {/* Activity Lock Banner */}
       {playerData.isActivityLocked && !playerData.isRecovering && (
-        <KnockoutBanner
-          title={playerData.activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
-          action="taking any actions"
-          message={playerData.activityLockReason === 'encounter'
-            ? 'You have an active encounter site. Complete or abandon it before doing other activities.'
-            : 'You are on an active expedition. Complete it before doing other activities.'}
-        />
+        <ActivityLockBanner activityLockReason={playerData.activityLockReason ?? null} action="taking any actions" />
       )}
 
       {/* Over-Encumbered Banner */}

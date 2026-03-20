@@ -289,6 +289,33 @@ async function advanceToFirstAliveRoom(
 }
 
 /**
+ * Handle the case where all remaining rooms have decayed: grant chest
+ * rewards, delete the encounter site, and clear the player lockout.
+ */
+async function handleDecayedSiteClearance(
+  playerId: string,
+  siteId: string,
+  site: { mobFamilyId: string; totalRooms: number | null; roomStrategy: unknown },
+): Promise<Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>>> {
+  const { availableSlots } = await getInventoryState(playerId);
+  const totalRoomsCount = site.totalRooms ?? 1;
+  const existingStrategy = (Array.isArray(site.roomStrategy) ? site.roomStrategy : []) as unknown as RoomStrategyEntry[];
+  const autoResolvedCount = existingStrategy.filter((e: RoomStrategyEntry) => e.mode === 'auto').length;
+  return prisma.$transaction(async (tx) => {
+    const rewards = await grantEncounterSiteChestRewardsTx(tx, {
+      playerId,
+      mobFamilyId: site.mobFamilyId,
+      totalRooms: totalRoomsCount,
+      autoResolvedBonusRooms: autoResolvedCount,
+      availableSlots,
+    });
+    await tx.encounterSite.deleteMany({ where: { id: siteId, playerId } });
+    await tx.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
+    return rewards;
+  });
+}
+
+/**
  * Load mob templates for a set of encounter mob slots, apply zone event
  * modifiers, and convert them to ExpeditionMobState[] via buildEncounterRaidMob.
  */
@@ -490,22 +517,7 @@ export async function autoResolveEncounterRoom(
 
   // All remaining rooms decayed — auto-clear site with chest reward
   if (!advanceResult) {
-    const { availableSlots } = await getInventoryState(playerId);
-    const totalRoomsCount = site.totalRooms ?? 1;
-    const existingStrategy = (Array.isArray(site.roomStrategy) ? site.roomStrategy : []) as unknown as RoomStrategyEntry[];
-    const autoResolvedCount = existingStrategy.filter((e: RoomStrategyEntry) => e.mode === 'auto').length;
-    const completionRewards = await prisma.$transaction(async (tx) => {
-      const rewards = await grantEncounterSiteChestRewardsTx(tx, {
-        playerId,
-        mobFamilyId: site.mobFamilyId,
-        totalRooms: totalRoomsCount,
-        autoResolvedBonusRooms: autoResolvedCount,
-        availableSlots,
-      });
-      await tx.encounterSite.deleteMany({ where: { id: siteId, playerId } });
-      await tx.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
-      return rewards;
-    });
+    const completionRewards = await handleDecayedSiteClearance(playerId, siteId, site);
     return {
       outcome: 'site_cleared' as const,
       roundsResolved: 0,
@@ -516,7 +528,7 @@ export async function autoResolveEncounterRoom(
       playerManaAfter: 0,
       potionsConsumed: [],
       currentRoom: site.currentRoom ?? 1,
-      totalRooms: totalRoomsCount,
+      totalRooms: site.totalRooms ?? 1,
       siteCleared: true,
       completionRewards,
       fleeResult: null,
@@ -882,25 +894,10 @@ export async function startManualEncounterRoom(
 
   // All remaining rooms decayed — auto-clear site with chest reward
   if (!advanceResult) {
-    const { availableSlots } = await getInventoryState(playerId);
-    const totalRoomsCount = site.totalRooms ?? 1;
-    const existingStrategy = (Array.isArray(site.roomStrategy) ? site.roomStrategy : []) as unknown as RoomStrategyEntry[];
-    const autoResolvedCount = existingStrategy.filter((e: RoomStrategyEntry) => e.mode === 'auto').length;
-    const completionRewards = await prisma.$transaction(async (tx) => {
-      const rewards = await grantEncounterSiteChestRewardsTx(tx, {
-        playerId,
-        mobFamilyId: site.mobFamilyId,
-        totalRooms: totalRoomsCount,
-        autoResolvedBonusRooms: autoResolvedCount,
-        availableSlots,
-      });
-      await tx.encounterSite.deleteMany({ where: { id: siteId, playerId } });
-      await tx.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
-      return rewards;
-    });
+    const completionRewards = await handleDecayedSiteClearance(playerId, siteId, site);
     return {
       currentRoom: site.currentRoom ?? 1,
-      totalRooms: totalRoomsCount,
+      totalRooms: site.totalRooms ?? 1,
       mobs: [],
       playerHp: hpState.currentHp,
       playerMaxHp: hpState.maxHp,

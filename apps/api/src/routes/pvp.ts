@@ -21,7 +21,7 @@ import { paginationSchema } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
 import { trackProgress } from '../services/progressService';
-import { checkExpeditionLockout, checkEncounterSiteLockout } from '../services/expeditionLockoutService';
+import { checkActivityLockout } from '../services/expeditionLockoutService';
 
 export const pvpRouter = Router();
 pvpRouter.use(authenticate);
@@ -79,8 +79,7 @@ pvpRouter.get('/rating', asyncHandler(async (req, res) => {
  */
 pvpRouter.post('/scout', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
-  await checkEncounterSiteLockout(playerId);
-  await checkExpeditionLockout(playerId);
+  await checkActivityLockout(playerId);
   const body = scoutSchema.parse(req.body);
   const result = await scoutOpponent(playerId, body.targetId);
 
@@ -102,8 +101,7 @@ pvpRouter.post('/scout', asyncHandler(async (req, res) => {
  */
 pvpRouter.post('/challenge', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
-  await checkEncounterSiteLockout(playerId);
-  await checkExpeditionLockout(playerId);
+  await checkActivityLockout(playerId);
   const body = challengeSchema.parse(req.body);
   const result = await challenge(playerId, req.player!.username, body.targetId);
 

@@ -29,7 +29,7 @@ import {
   forgeUpgradeSchema,
   forgeRerollSchema,
 } from './helpers';
-import { checkExpeditionLockout, checkEncounterSiteLockout } from '../../services/expeditionLockoutService';
+import { checkActivityLockout } from '../../services/expeditionLockoutService';
 
 export const forgeRouter = Router();
 
@@ -41,8 +41,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = forgeUpgradeSchema.parse(req.body);
 
-    await checkEncounterSiteLockout(playerId);
-    await checkExpeditionLockout(playerId);
+    await checkActivityLockout(playerId);
     await assertNotRecovering(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);
@@ -303,8 +302,7 @@ forgeRouter.post('/reroll', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = forgeRerollSchema.parse(req.body);
 
-    await checkEncounterSiteLockout(playerId);
-    await checkExpeditionLockout(playerId);
+    await checkActivityLockout(playerId);
     await assertNotRecovering(playerId);
 
     const zone = await getZoneCraftingLevel(playerId);

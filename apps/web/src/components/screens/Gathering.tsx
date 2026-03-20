@@ -6,6 +6,7 @@ import { PixelButton } from '@/components/PixelButton';
 import { Pagination } from '@/components/common/Pagination';
 import { Slider } from '@/components/ui/Slider';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
+import { ActivityLockBanner } from '@/components/common/ActivityLockBanner';
 import { titleCaseFromSnake } from '@/lib/format';
 import { SkillHeader } from '@/components/common/SkillHeader';
 import { Pickaxe, MapPin } from 'lucide-react';
@@ -239,13 +240,7 @@ export function Gathering({
 
       {/* Activity Lock Banner */}
       {isActivityLocked && !isRecovering && (
-        <KnockoutBanner
-          title={activityLockReason === 'encounter' ? 'Active Encounter Site' : 'Active Expedition'}
-          action="gathering"
-          message={activityLockReason === 'encounter'
-            ? 'You have an active encounter site. Complete or abandon it before gathering.'
-            : 'You are on an active expedition. Complete it before gathering.'}
-        />
+        <ActivityLockBanner activityLockReason={activityLockReason ?? null} action="gathering" />
       )}
 
       {/* Header */}
