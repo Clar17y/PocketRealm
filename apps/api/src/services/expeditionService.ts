@@ -753,23 +753,43 @@ function buildParticipantFromSnapshot(
 }
 
 /**
+ * Fetch combat data for all members and store snapshots in Redis.
+ * Returns the in-memory snapshots for direct use (avoids a Redis read round-trip).
+ */
+async function fetchAndStoreSnapshots(
+  aliveMembers: BuildParticipantInput[],
+  expeditionId: string,
+  roomIndex: number,
+): Promise<{ playerId: string; snapshot: ExpeditionCombatSnapshot }[]> {
+  const snapshots = await Promise.all(
+    aliveMembers.map(async m => ({
+      playerId: m.playerId,
+      snapshot: await fetchCombatDataForSnapshot(m),
+    })),
+  );
+  // Fire-and-forget Redis writes (best-effort, errors swallowed by snapshotCombatData)
+  void Promise.all(
+    snapshots.map(s => snapshotCombatData(expeditionId, roomIndex, s.playerId, s.snapshot)),
+  );
+  return snapshots;
+}
+
+/**
  * Build a raid participant. Checks Redis snapshot first (set at room start),
  * falls back to full DB fetch on cache miss.
  */
 async function buildRaidParticipant(
   member: BuildParticipantInput,
-  expeditionId?: string,
-  roomIndex?: number,
+  expeditionId: string,
+  roomIndex: number,
 ): Promise<RaidParticipant> {
   // Try cached snapshot first (set at room start)
-  if (expeditionId !== undefined && roomIndex !== undefined) {
-    const snapshot = await getCombatSnapshot(expeditionId, roomIndex, member.playerId);
-    if (snapshot) return buildParticipantFromSnapshot(member, snapshot);
-  }
+  const snapshot = await getCombatSnapshot(expeditionId, roomIndex, member.playerId);
+  if (snapshot) return buildParticipantFromSnapshot(member, snapshot);
 
-  // Fallback: fetch from DB (first round of room, or cache miss)
-  const snapshot = await fetchCombatDataForSnapshot(member);
-  return buildParticipantFromSnapshot(member, snapshot);
+  // Fallback: fetch from DB (cache miss)
+  const freshSnapshot = await fetchCombatDataForSnapshot(member);
+  return buildParticipantFromSnapshot(member, freshSnapshot);
 }
 
 // ---------------------------------------------------------------------------
@@ -885,23 +905,16 @@ export async function resolveExpeditionRound(expeditionId: string, io: Server | 
     return;
   }
 
-  // First round of room — fetch and snapshot combat data for all members
+  // Build participants — snapshot on first round, read from cache on subsequent rounds
+  let participants: RaidParticipant[];
   if (expedition.roundNumber === 0) {
-    const snapshots = await Promise.all(
-      aliveMembers.map(async m => ({
-        playerId: m.playerId,
-        snapshot: await fetchCombatDataForSnapshot(m),
-      })),
-    );
-    await Promise.all(
-      snapshots.map(s => snapshotCombatData(expeditionId, expedition.currentRoom, s.playerId, s.snapshot)),
+    const snapshots = await fetchAndStoreSnapshots(aliveMembers, expeditionId, expedition.currentRoom);
+    participants = aliveMembers.map((m, i) => buildParticipantFromSnapshot(m, snapshots[i].snapshot));
+  } else {
+    participants = await Promise.all(
+      aliveMembers.map(m => buildRaidParticipant(m, expeditionId, expedition.currentRoom)),
     );
   }
-
-  // Build participants (reads from snapshot for all rounds including round 0)
-  const participants: RaidParticipant[] = await Promise.all(
-    aliveMembers.map(m => buildRaidParticipant(m, expeditionId, expedition.currentRoom)),
-  );
 
   // Build threat table from member records (init fresh if round 1 of room)
   const nextRound = expedition.roundNumber + 1;
@@ -1049,17 +1062,7 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
   }
 
   // Snapshot combat data for all alive members (locked for the room)
-  const snapshots = await Promise.all(
-    aliveMembers.map(async m => ({
-      playerId: m.playerId,
-      snapshot: await fetchCombatDataForSnapshot(m),
-    })),
-  );
-  await Promise.all(
-    snapshots.map(s => snapshotCombatData(expeditionId, expedition.currentRoom, s.playerId, s.snapshot)),
-  );
-
-  // Build participants directly from snapshots (no Redis round-trip needed)
+  const snapshots = await fetchAndStoreSnapshots(aliveMembers, expeditionId, expedition.currentRoom);
   const participants: RaidParticipant[] = aliveMembers.map((m, i) =>
     buildParticipantFromSnapshot(m, snapshots[i].snapshot),
   );
@@ -1475,6 +1478,11 @@ export async function abandonExpedition(expeditionId: string, playerId: string):
     throw new AppError(400, 'Expedition is not active', 'NOT_ACTIVE');
   }
 
+  // Clear combat snapshots if in-progress
+  if (expedition.status === 'in_progress') {
+    await clearRoomSnapshots(expeditionId, expedition.currentRoom);
+  }
+
   // Archive current round logs if any
   const newAttemptLogs = buildUpdatedAttemptLogs(expedition, { abandoned: true });
 
@@ -1569,8 +1577,7 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
   });
   if (!expedition) return;
 
-  // Clear combat snapshots for the final room
-  await clearRoomSnapshots(expeditionId, expedition.currentRoom);
+  // Note: combat snapshots already cleared by handleRoomCleared (which calls this)
 
   // Archive final successful attempt's logs alongside previous wipe attempts
   const finalAttemptLogs = buildUpdatedAttemptLogs(expedition, { outcome: 'completed' });
