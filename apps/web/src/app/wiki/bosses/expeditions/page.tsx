@@ -171,6 +171,30 @@ export default function ExpeditionsPage() {
         Ward.
       </p>
 
+      <h2>Equipment Lock</h2>
+      <p>
+        When a room begins, each party member&rsquo;s equipment stats are{' '}
+        <strong>locked for the duration of the room</strong>. Changing your
+        equipped gear between rounds has no effect until the next room starts.
+      </p>
+      <ul>
+        <li>
+          <strong>Swapping gear between rooms</strong> — during the rest phase
+          between rooms, you can freely change equipment. Your new stats will
+          take effect when the next room begins.
+        </li>
+        <li>
+          <strong>Durability</strong> — equipment durability continues to degrade
+          during the room, but stat contributions are based on the snapshot taken
+          at room start. Even if a weapon reaches 0 durability mid-room, it
+          retains its full stats until the room ends.
+        </li>
+        <li>
+          <strong>Why?</strong> — this ensures consistent combat calculations
+          throughout each room and prevents mid-fight gear swapping.
+        </li>
+      </ul>
+
       <h2>Mob Threat-Based Targeting</h2>
       <p>
         Each mob maintains its own threat table. When a mob uses a single-target
