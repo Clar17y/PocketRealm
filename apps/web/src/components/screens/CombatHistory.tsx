@@ -333,7 +333,6 @@ export function CombatHistory() {
             className="px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-sm"
           >
             <option value="all">Source: All</option>
-            <option value="zone_combat">Zone Combat</option>
             <option value="encounter_site_room">Encounter Room</option>
             <option value="exploration_ambush">Ambush (Exploring)</option>
             <option value="travel_ambush">Ambush (Travel)</option>
