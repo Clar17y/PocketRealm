@@ -16,6 +16,7 @@ const logParamsSchema = z.object({
 const listLogsQuerySchema = z.object({
   ...paginationSchema,
   outcome: z.enum(['victory', 'defeat', 'fled']).optional(),
+  source: z.enum(['zone_combat', 'encounter_site', 'encounter_site_room', 'exploration_ambush', 'travel_ambush']).optional(),
   zoneId: z.string().uuid().optional(),
   mobTemplateId: z.string().uuid().optional(),
   sort: z.enum(['recent', 'xp']).default('recent'),
@@ -63,6 +64,7 @@ export function registerLogRoutes(router: Router): void {
         page: req.query.page,
         pageSize: req.query.pageSize,
         outcome: req.query.outcome,
+        source: req.query.source,
         zoneId: req.query.zoneId,
         mobTemplateId: req.query.mobTemplateId,
         sort: req.query.sort,
@@ -76,7 +78,17 @@ export function registerLogRoutes(router: Router): void {
       ];
 
       if (query.outcome) {
-        whereParts.push(Prisma.sql`("result"->>'outcome') = ${query.outcome}`);
+        // Map frontend outcome values to include encounter site equivalents
+        if (query.outcome === 'victory') {
+          whereParts.push(Prisma.sql`("result"->>'outcome') IN ('victory', 'cleared', 'site_cleared')`);
+        } else if (query.outcome === 'defeat') {
+          whereParts.push(Prisma.sql`("result"->>'outcome') IN ('defeat', 'defeated')`);
+        } else {
+          whereParts.push(Prisma.sql`("result"->>'outcome') = ${query.outcome}`);
+        }
+      }
+      if (query.source) {
+        whereParts.push(Prisma.sql`("result"->>'source') = ${query.source}`);
       }
       if (query.zoneId) {
         whereParts.push(Prisma.sql`("result"->>'zoneId') = ${query.zoneId}`);

@@ -8,6 +8,7 @@ import {
   type CombatHistoryListItemResponse,
   type CombatHistoryResponse,
   type CombatOutcomeResponse,
+  type CombatSourceResponse,
   type CombatResultResponse,
   type EncounterSiteFightSummary,
 } from '@/lib/api';
@@ -25,6 +26,7 @@ import { Pagination } from '@/components/common/Pagination';
 import { ScreenContainer } from '../common/ScreenContainer';
 
 type OutcomeFilter = 'all' | CombatOutcomeResponse;
+type SourceFilter = 'all' | CombatSourceResponse;
 
 const PAGE_SIZE = 8;
 
@@ -72,6 +74,7 @@ export function CombatHistory() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [outcome, setOutcome] = useState<OutcomeFilter>('all');
+  const [source, setSource] = useState<SourceFilter>('all');
   const [zoneId, setZoneId] = useState('all');
   const [mobTemplateId, setMobTemplateId] = useState('all');
   const [sort, setSort] = useState<'recent' | 'xp'>('recent');
@@ -99,7 +102,7 @@ export function CombatHistory() {
 
   useEffect(() => {
     setPage(1);
-  }, [outcome, zoneId, mobTemplateId, sort]);
+  }, [outcome, source, zoneId, mobTemplateId, sort]);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +115,7 @@ export function CombatHistory() {
         page,
         pageSize: PAGE_SIZE,
         outcome: outcome === 'all' ? undefined : outcome,
+        source: source === 'all' ? undefined : source,
         zoneId: zoneId === 'all' ? undefined : zoneId,
         mobTemplateId: mobTemplateId === 'all' ? undefined : mobTemplateId,
         sort,
@@ -164,7 +168,7 @@ export function CombatHistory() {
     return () => {
       cancelled = true;
     };
-  }, [page, outcome, zoneId, mobTemplateId, sort, search]);
+  }, [page, outcome, source, zoneId, mobTemplateId, sort, search]);
 
   useEffect(() => {
     selectedLogIdRef.current = selectedLogId;
@@ -321,6 +325,19 @@ export function CombatHistory() {
             <option value="victory">Outcome: Victory</option>
             <option value="defeat">Outcome: Defeat</option>
             <option value="fled">Outcome: Fled</option>
+          </select>
+
+          <select
+            value={source}
+            onChange={(event) => setSource(event.target.value as SourceFilter)}
+            className="px-3 py-2 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] text-[var(--rpg-text-primary)] text-sm"
+          >
+            <option value="all">Source: All</option>
+            <option value="encounter_site_room">Encounter Room</option>
+            <option value="encounter_site">Encounter Site</option>
+            <option value="zone_combat">Direct Encounter</option>
+            <option value="exploration_ambush">Ambush (Exploring)</option>
+            <option value="travel_ambush">Ambush (Travel)</option>
           </select>
 
           <select

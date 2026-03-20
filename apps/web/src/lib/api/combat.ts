@@ -415,6 +415,7 @@ export interface CombatHistoryQuery {
   page?: number;
   pageSize?: number;
   outcome?: CombatOutcomeResponse;
+  source?: CombatSourceResponse;
   zoneId?: string;
   mobTemplateId?: string;
   sort?: 'recent' | 'xp';
@@ -636,6 +637,7 @@ export async function getCombatLogs(query: CombatHistoryQuery = {}) {
   if (query.page !== undefined) params.set('page', String(query.page));
   if (query.pageSize !== undefined) params.set('pageSize', String(query.pageSize));
   if (query.outcome) params.set('outcome', query.outcome);
+  if (query.source) params.set('source', query.source);
   if (query.zoneId) params.set('zoneId', query.zoneId);
   if (query.mobTemplateId) params.set('mobTemplateId', query.mobTemplateId);
   if (query.sort) params.set('sort', query.sort);
