@@ -84,7 +84,7 @@ import {
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
-import { STAMINA_CONSTANTS, MANA_CONSTANTS } from '@pocketrealm/shared';
+import { STAMINA_CONSTANTS, MANA_CONSTANTS, ITEM_RARITY_CONSTANTS } from '@pocketrealm/shared';
 import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
@@ -1186,7 +1186,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
         showForgeToast({ type: 'upgrade_fail', message: `Upgrade failed — target and sacrifice consumed` });
       }
-      trackEvent('action', { type: 'forge_upgrade', turns: 100 });
+      const upgradeTurns = ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY[data.forge.fromRarity as keyof typeof ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY] ?? 100;
+      trackEvent('action', { type: 'forge_upgrade', turns: upgradeTurns });
     });
 
   const handleForgeReroll = (itemId: string, sacrificialItemId: string) =>
@@ -1195,7 +1196,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       const rarityLabel = data.forge.rarity.charAt(0).toUpperCase() + data.forge.rarity.slice(1);
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Re-rolled ${rarityLabel} item bonus stats. Sacrificial duplicate consumed.` });
       showForgeToast({ type: 'reroll', message: `Stats rerolled!` });
-      trackEvent('action', { type: 'forge_reroll', turns: 75 });
+      const rerollTurns = ITEM_RARITY_CONSTANTS.REROLL_TURN_COST_BY_RARITY[data.forge.rarity as keyof typeof ITEM_RARITY_CONSTANTS.REROLL_TURN_COST_BY_RARITY] ?? 75;
+      trackEvent('action', { type: 'forge_reroll', turns: rerollTurns });
     });
 
   const handleDestroyItem = (itemId: string) =>
