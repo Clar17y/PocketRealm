@@ -52,7 +52,6 @@ import {
   salvage,
   salvageBatch,
   useItem,
-  startCombatFromEncounterSite,
   startExploration,
   travelToZone,
   unequip,
@@ -423,6 +422,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setCharacterProgression: (cp) => setCharacterProgression((prev) => ({ ...prev, ...cp })),
     setMaterialTotals,
     setActiveEncounterSiteId,
+    setActiveZoneId,
   }), []);
   // All useState setters are stable references, so empty deps is correct
 
@@ -893,152 +893,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
     }
     await finalizeExplorationPlayback();
-  };
-
-  const handleStartCombat = async (encounterSiteId: string) => {
-    const selectedSite = pendingEncounters.find((site) => site.encounterSiteId === encounterSiteId);
-    if (selectedSite && activeZoneId && selectedSite.zoneId !== activeZoneId) {
-      setActionError(`Travel to ${selectedSite.zoneName} before fighting this encounter.`);
-      return;
-    }
-
-    const hpBefore = hpState.currentHp;
-
-    await runAction('combat', async () => {
-      const res = await startCombatFromEncounterSite(encounterSiteId, 'melee');
-      const data = res.data;
-      if (!data) {
-        if (res.error?.code === 'SITE_DECAYED' || res.error?.code === 'NOT_FOUND') {
-          await refreshPendingEncounters();
-        }
-        setActionError(res.error?.message ?? 'Combat failed');
-        return;
-      }
-
-      setTurns(data.turns.currentTurns);
-      showQuestToasts(data.questProgress);
-
-      const rewards: LastCombat['rewards'] = {
-        xp: data.rewards.xp,
-        loot: data.rewards.loot,
-        siteCompletion: data.rewards.siteCompletion ?? null,
-        skillXpGrants: data.rewards.skillXpGrants ?? [],
-      };
-
-      // Build playback queue from fights[] or single-element queue for zone combat
-      if (data.combat.fights && data.combat.fights.length > 0) {
-        const queue = data.combat.fights.map((fight, idx) => {
-          const fightLogId = fight.combatLogId;
-          return {
-            room: fight.room,
-            mobName: fight.mobName ?? data.combat.mobName,
-            mobDisplayName: fight.mobDisplayName,
-            mobTemplateId: fight.mobTemplateId,
-            mobPrefix: fight.mobPrefix,
-            outcome: fight.outcome,
-            combatantAMaxHp: fight.playerMaxHp,
-            playerStartHp: fight.playerStartHp,
-            playerStartStamina: fight.playerStartStamina,
-            playerStartMana: fight.playerStartMana,
-            combatantBMaxHp: fight.mobMaxHp,
-            log: fight.log?.length ? (fight.log as LastCombatLogEntry[]) : null,
-            combatLogId: fightLogId,
-            activeEvents: data.activeEvents,
-            rewards: {
-              xp: fight.xp,
-              loot: fight.loot,
-              siteCompletion: null as LastCombat['rewards']['siteCompletion'],
-              skillXpGrants: fight.skillXpGrants ?? [],
-            } satisfies LastCombat['rewards'],
-          };
-        });
-
-        // Pre-fetch first two fights' logs
-        for (let i = 0; i < Math.min(2, queue.length); i++) {
-          if (queue[i].combatLogId) {
-            combatLogPrefetch.prefetch(queue[i].combatLogId!);
-          }
-        }
-
-
-        pendingCombatRewardsRef.current = rewards;
-        setCombatPlaybackQueue(queue);
-        setCombatPlaybackIndex(0);
-      } else {
-        const combatLogId = data.combat.combatLogId;
-        setCombatPlaybackQueue([{
-          mobName: data.combat.mobName,
-          mobDisplayName: data.combat.mobDisplayName,
-          mobTemplateId: data.combat.mobTemplateId,
-          mobPrefix: data.combat.mobPrefix,
-          outcome: data.combat.outcome,
-          combatantAMaxHp: data.combat.playerMaxHp,
-          playerStartHp: hpBefore,
-          playerStartStamina: data.combat.playerStartStamina,
-          playerStartMana: data.combat.playerStartMana,
-          combatantBMaxHp: data.combat.mobMaxHp,
-          log: data.combat.log?.length ? (data.combat.log as LastCombatLogEntry[]) : null,
-          combatLogId,
-          activeEvents: data.activeEvents,
-          rewards,
-        }]);
-        setCombatPlaybackIndex(0);
-        pendingCombatRewardsRef.current = rewards;
-
-        if (combatLogId) combatLogPrefetch.prefetch(combatLogId);
-      }
-      setPlaybackActive(true);
-      if (activeZoneId) recordTurnsSpent(activeZoneId, 1);
-
-      if (data.rewards.siteCompletion) {
-        siteJustClearedRef.current = true;
-      }
-
-      logActiveEvents(data.activeEvents);
-
-      if (data.rewards.siteCompletion) {
-        const chest = data.rewards.siteCompletion;
-        const chestLabel = `${chest.chestRarity.charAt(0).toUpperCase()}${chest.chestRarity.slice(1)} Chest`;
-        const lootCount = chest.loot.reduce((sum, entry) => sum + entry.quantity, 0);
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `Encounter site cleared. ${chestLabel} opened with ${lootCount} item${lootCount === 1 ? '' : 's'}.`,
-        });
-
-        if (chest.recipeUnlocked) {
-          const unlockedRecipe = chest.recipeUnlocked;
-          pushLog({
-            timestamp: nowStamp(),
-            type: 'success',
-            message: `Learned advanced recipe: ${unlockedRecipe.recipeName}.`,
-          });
-        }
-      }
-
-      for (const grant of data.rewards?.skillXpGrants ?? []) {
-        if (grant.leveledUp) {
-          const skillName = grant.skillType.charAt(0).toUpperCase() + grant.skillType.slice(1);
-          pushLog({ timestamp: nowStamp(), type: 'success', message: `🎉 ${skillName} leveled up to ${grant.newLevel}!` });
-        }
-      }
-
-      logDurabilityWarnings(data.rewards.durabilityLost);
-
-      if (data.combat.room?.roomCleared && data.combat.room.siteStrategy === 'room_by_room') {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `Room ${data.combat.room.currentRoom} cleared! You can rest before the next room.`,
-        });
-      }
-
-      // Store pending loot session ID for activation after playback
-      combatPendingLootRef.current = data.pendingLootSessionId ?? null;
-
-      applyStateUpdates(data.stateUpdates, stateSetters);
-      await loadBestiary(false);
-    });
   };
 
   const handleNavigate = (screen: string) => {
@@ -1872,7 +1726,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleStartExploration,
     handleExplorationPlaybackComplete,
     handlePlaybackSkip,
-    handleStartCombat,
     handleCombatPlaybackComplete,
     handleTravelPlaybackComplete,
     handleTravelPlaybackSkip,

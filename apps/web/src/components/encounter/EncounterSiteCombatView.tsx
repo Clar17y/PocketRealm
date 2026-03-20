@@ -18,6 +18,7 @@ import type {
   EncounterManualRoundResponse,
   EncounterRoundSnapshot,
   EncounterPlayerState,
+  EncounterFleeResult,
 } from '@/lib/api/combat';
 import { parseEncounterMobSlot } from '@pocketrealm/shared';
 import type { ExpeditionMobInfo, ExpeditionRoundLog, CombatTemplateData } from '@pocketrealm/shared';
@@ -93,6 +94,8 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
   const [loading, setLoading] = useState(false);
   const [outcome, setOutcome] = useState<'cleared' | 'defeated' | 'site_cleared' | null>(null);
   const [chestReward, setChestReward] = useState<EncounterAutoResolveResponse['chestReward'] | null>(null);
+  const [fleeResult, setFleeResult] = useState<EncounterFleeResult | null>(null);
+  const [respawnedTo, setRespawnedTo] = useState<string | null>(null);
   const [hasDecayedMobs, setHasDecayedMobs] = useState(props.hasDecayedMobs);
 
   // Auto-playback state
@@ -161,6 +164,8 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
       setState('auto_playback');
       setOutcome(result.outcome);
       if (result.chestReward) setChestReward(result.chestReward);
+      if (result.fleeResult) setFleeResult(result.fleeResult);
+      if (result.respawnedTo) setRespawnedTo(result.respawnedTo.townName);
 
       // Start animated playback
       for (let i = 0; i < result.rounds.length; i++) {
@@ -231,6 +236,8 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
         setState('room_result');
       } else if (result.outcome === 'defeated') {
         setOutcome('defeated');
+        if (result.fleeResult) setFleeResult(result.fleeResult);
+        if (result.respawnedTo) setRespawnedTo(result.respawnedTo.townName);
         setState('room_result');
       }
     } catch (err) {
@@ -257,6 +264,8 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
       setRoundLogs([]);
       setOutcome(null);
       setChestReward(null);
+      setFleeResult(null);
+      setRespawnedTo(null);
       setTargetMobId(null);
       setState('room_preview');
     } catch (err) {
@@ -274,6 +283,8 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
       setPlayerState(result.playerState);
       setRoundLogs([]);
       setOutcome(null);
+      setFleeResult(null);
+      setRespawnedTo(null);
       setTargetMobId(null);
       setState('room_preview');
     } catch (err) {
@@ -433,11 +444,20 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
           {outcome === 'defeated' && (
             <>
               <h3 className="text-sm font-pixel text-[var(--rpg-red)]">
-                Defeated in Room {currentRoom}
+                {fleeResult?.isRecovering ? 'Knocked Out' : 'Defeated'} in Room {currentRoom}
               </h3>
-              <p className="text-xs text-[var(--rpg-text-secondary)] mt-1">
-                Retrying charges the turn cost again.
-              </p>
+              <div className="text-xs text-[var(--rpg-text-secondary)] mt-1 space-y-0.5">
+                {fleeResult?.isRecovering && respawnedTo && (
+                  <p>You were knocked out and woke up in {respawnedTo}.</p>
+                )}
+                {fleeResult && !fleeResult.isRecovering && (
+                  <p>You escaped with {fleeResult.remainingHp} HP.</p>
+                )}
+                {fleeResult?.goldLost ? (
+                  <p>Lost {fleeResult.goldLost.toLocaleString()} gold.</p>
+                ) : null}
+                <p>Retrying charges the turn cost again.</p>
+              </div>
               <div className="flex gap-2 mt-2">
                 <PixelButton onClick={handleRetry} disabled={loading}>Retry Room</PixelButton>
                 <PixelButton onClick={handleAbandon} variant="danger" disabled={loading}>Abandon Site</PixelButton>

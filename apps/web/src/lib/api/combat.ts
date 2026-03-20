@@ -431,12 +431,6 @@ export async function startCombat(zoneId: string, attackSkill: 'melee' | 'ranged
   });
 }
 
-export async function startCombatFromEncounterSite(encounterSiteId: string, attackSkill: 'melee' | 'ranged' | 'magic' = 'melee') {
-  return fetchApi<CombatResponse>('/api/v1/combat/start', {
-    method: 'POST',
-    body: JSON.stringify({ encounterSiteId, attackSkill }),
-  });
-}
 
 export interface EncounterSitesQuery {
   page?: number;
@@ -544,6 +538,14 @@ export interface EncounterRoundSnapshot {
   playerState: EncounterPlayerState;
 }
 
+export interface EncounterFleeResult {
+  outcome: string;
+  remainingHp: number;
+  goldLost: number;
+  isRecovering: boolean;
+  recoveryCost: number | null;
+}
+
 export interface EncounterAutoResolveResponse {
   outcome: 'cleared' | 'defeated' | 'site_cleared';
   rounds: EncounterRoundSnapshot[];
@@ -553,6 +555,8 @@ export interface EncounterAutoResolveResponse {
     materials: Array<{ itemTemplateId: string; name: string; quantity: number }>;
     recipe?: { recipeId: string; name: string } | null;
   };
+  fleeResult?: EncounterFleeResult | null;
+  respawnedTo?: { townId: string; townName: string } | null;
   stateUpdates?: StateUpdates;
 }
 
@@ -586,6 +590,8 @@ export interface EncounterManualRoundResponse {
   siteCleared: boolean;
   chestReward?: EncounterAutoResolveResponse['chestReward'];
   completionRewards?: Record<string, unknown>;
+  fleeResult?: EncounterFleeResult | null;
+  respawnedTo?: { townId: string; townName: string } | null;
   stateUpdates?: StateUpdates;
 }
 

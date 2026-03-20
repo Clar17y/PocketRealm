@@ -17,12 +17,9 @@ export const lootDropWithNameSchema = z.object({
 });
 
 export const startSchema = z.object({
-  encounterSiteId: z.string().uuid().optional(),
-  zoneId: z.string().uuid().optional(),
+  zoneId: z.string().uuid(),
   mobTemplateId: z.string().uuid().optional(),
   attackSkill: attackSkillSchema.optional(),
-}).refine((v) => Boolean(v.encounterSiteId || v.zoneId), {
-  message: 'encounterSiteId or zoneId is required',
 });
 
 export const listEncounterSitesQuerySchema = z.object({

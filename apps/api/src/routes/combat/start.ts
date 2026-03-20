@@ -61,34 +61,17 @@ import {
 
 
 
-// handleEncounterSiteRoomCombat was removed — encounter site combat is now handled by
-// the dedicated service at apps/api/src/services/encounterSiteCombatService.ts
-// Routes: POST /api/v1/combat/sites/:id/auto-resolve
-//         POST /api/v1/combat/sites/:id/start-room
-//         POST /api/v1/combat/sites/:id/round
-
-
-
 export function registerStartRoutes(router: Router): void {
   /**
    * POST /api/v1/combat/start
-   * Spend turns and run combat. Encounter sites fight all mobs in the current room.
+   * Spend turns and run zone combat (single mob).
+   * Encounter site combat uses dedicated routes in sites.ts.
    */
   router.post('/start', asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
       await checkActivityLockout(playerId);
       const body = startSchema.parse(req.body);
 
-      // Encounter site combat has moved to dedicated endpoints
-      if (body.encounterSiteId) {
-        res.status(410).json({
-          error: 'ENDPOINT_MOVED',
-          message: 'Use /api/v1/combat/sites/:id/auto-resolve or /api/v1/combat/sites/:id/start-room',
-        });
-        return;
-      }
-
-      // --- Zone combat (single mob, unchanged) ---
       const hpState = await assertCanAct(playerId);
       if (hpState.currentHp <= 0) {
         throw new AppError(400, 'Cannot fight with 0 HP. Rest to recover health.', 'NO_HP');

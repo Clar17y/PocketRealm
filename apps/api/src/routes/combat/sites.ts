@@ -17,6 +17,7 @@ import {
   clearManualCombatSession,
   parseEncounterMobSlot,
 } from '../../services/encounterSiteCombatService';
+import { buildStateUpdates } from '../../services/stateUpdateHelpers.js';
 
 const abandonSchema = z.object({
   zoneId: z.string().uuid().optional(),
@@ -299,12 +300,23 @@ export function registerSiteRoutes(router: Router): void {
 
       try {
         const result = await autoResolveEncounterRoom(playerId, siteId, username);
+        const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources', 'buffs']);
+        stateUpdates.activeEncounterSiteId = null;
+
+        // On defeat the player is respawned to a town — sync the zone in the UI
+        if (result.respawnedTo) {
+          const player = await prisma.player.findUnique({ where: { id: playerId }, select: { currentZoneId: true } });
+          if (player?.currentZoneId) stateUpdates.currentZoneId = player.currentZoneId;
+        }
 
         res.json({
           outcome: result.outcome,
           rounds: result.rounds,
           initialMobs: result.initialMobs,
           chestReward: await mapChestRewardDTO(result.completionRewards),
+          fleeResult: result.fleeResult,
+          respawnedTo: result.respawnedTo,
+          stateUpdates,
         });
       } finally {
         // Clear lockout when combat resolves (or throws)
@@ -366,8 +378,10 @@ export function registerSiteRoutes(router: Router): void {
       const playerId = req.player!.playerId;
       const result = await resolveManualEncounterRound(playerId, siteId, body);
 
+      const combatEnded = result.outcome !== 'ongoing';
+
       // Clear lockout when combat ends
-      if (result.outcome !== 'ongoing') {
+      if (combatEnded) {
         await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
       }
 
@@ -379,6 +393,18 @@ export function registerSiteRoutes(router: Router): void {
         alive: m.alive,
         activeEffects: m.activeEffects ?? [],
       }));
+
+      // Include stateUpdates when combat ends so global HP/resource bars refresh
+      const stateUpdates = combatEnded
+        ? await buildStateUpdates(playerId, ['hp', 'resources', 'buffs'])
+        : undefined;
+      if (stateUpdates) stateUpdates.activeEncounterSiteId = null;
+
+      // On defeat the player is respawned to a town — sync the zone in the UI
+      if (stateUpdates && result.respawnedTo) {
+        const player = await prisma.player.findUnique({ where: { id: playerId }, select: { currentZoneId: true } });
+        if (player?.currentZoneId) stateUpdates.currentZoneId = player.currentZoneId;
+      }
 
       res.json({
         roundNumber: result.roundNumber,
@@ -398,6 +424,9 @@ export function registerSiteRoutes(router: Router): void {
         roomCleared: result.outcome === 'cleared' || result.outcome === 'site_cleared',
         siteCleared: result.siteCleared,
         chestReward: await mapChestRewardDTO(result.completionRewards),
+        fleeResult: result.fleeResult,
+        respawnedTo: result.respawnedTo,
+        ...(stateUpdates ? { stateUpdates } : {}),
       });
   }));
 }

@@ -22,7 +22,6 @@ import {
 import {
   resolveRaidRound,
   buildEncounterRaidMob,
-  applyCrowdedDebuff,
   buildPlayerCombatStats,
   initThreatTable,
 } from '@pocketrealm/game-engine';
@@ -159,15 +158,8 @@ export function resolveEncounterRoomCombat(
 
     roundsResolved = round;
 
-    // Apply crowded debuff to mob stats (copies, don't mutate originals)
-    const aliveMobCount = aliveMobList.length;
-    const debuffedMobs = aliveMobList.map(m => ({
-      ...m,
-      stats: applyCrowdedDebuff(m.stats, aliveMobCount),
-    }));
-
     const input: RaidRoundInput = {
-      mobs: debuffedMobs,
+      mobs: aliveMobList,
       participants: [currentParticipant],
       threatTable,
       roundNumber: round,
@@ -1013,15 +1005,8 @@ export async function resolveManualEncounterRound(
   state.roundNumber++;
   const aliveMobs = state.mobs.filter(m => m.hp > 0);
 
-  // Apply crowded debuff
-  const aliveMobCount = aliveMobs.length;
-  const debuffedMobs = aliveMobs.map(m => ({
-    ...m,
-    stats: applyCrowdedDebuff(m.stats, aliveMobCount),
-  }));
-
   const input: RaidRoundInput = {
-    mobs: debuffedMobs,
+    mobs: aliveMobs,
     participants: [state.participant],
     threatTable: state.threatTable,
     roundNumber: state.roundNumber,

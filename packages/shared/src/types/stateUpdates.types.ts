@@ -71,4 +71,5 @@ export interface StateUpdates {
     attributePoints: number;
   };
   activeEncounterSiteId?: string | null;
+  currentZoneId?: string;
 }

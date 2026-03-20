@@ -29,7 +29,6 @@ export {
   estimateExploration,
   startExploration,
   startCombat,
-  startCombatFromEncounterSite,
   getEncounterSites,
   selectSiteStrategy,
   abandonEncounterSites,
