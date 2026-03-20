@@ -1105,6 +1105,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       pushLog(...newLogs);
       applyStateUpdates(data.stateUpdates, stateSetters);
+      const craftTurns = recipe ? recipe.turnCost * quantity : 50;
+      trackEvent('action', { type: data.xp.skillType, turns: craftTurns });
+      trackOnce('first_craft', { skill: data.xp.skillType });
+      if (data.xp?.leveledUp) {
+        trackEvent('level_up', { skill: data.xp.skillType, level: data.xp.newLevel });
+      }
       advanceTutorial(TUTORIAL_STEP_REFINE);
       advanceTutorial(TUTORIAL_STEP_CRAFT);
     });
