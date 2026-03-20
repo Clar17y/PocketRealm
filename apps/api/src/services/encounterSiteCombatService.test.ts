@@ -176,61 +176,6 @@ describe('resolveEncounterRoomCombat', () => {
     expect(result.rounds.length).toBe(result.roundsResolved);
   });
 
-  it('crowded debuff reduces mob damage and accuracy proportionally', () => {
-    // Test the crowded debuff itself by inspecting applyCrowdedDebuff behavior:
-    // With 1 mob: multiplier = 1.0 (no debuff)
-    // With 3 mobs: multiplier = 1 / (1 + 2 * 0.15) = 1/1.3 ≈ 0.769
-
-    // We verify that the service applies the debuff by comparing a 3-mob scenario
-    // to a mathematically equivalent 1-mob scenario.
-    //
-    // Use very high accuracy mobs (always hit) with no player evasion/defence,
-    // and a player that does no damage (so mobs always survive all 5 rounds).
-    // With fixed min=max damage, we can compare total damage taken deterministically.
-
-    const highAccuracy = 99999;
-    const noDodge = 0;
-    const noDefence = 0;
-
-    // Single mob doing 130 damage — equivalent to 3 mobs each doing ~100 damage
-    // but with crowded debuff reducing to 77% each (100 * 0.769 * 3 = 230.7)
-    // The single mob equivalence is that 3 mobs do LESS than 3x a single mob of 100
-
-    // 3 mobs each with damageMin=damageMax=100, accuracy=highAccuracy
-    const mobs3 = [
-      makeMob({ id: 'encounter-mob-1', hp: 99999, maxHp: 99999, stats: makeStats({ damageMin: 100, damageMax: 100, accuracy: highAccuracy, dodge: noDodge, defence: noDefence, magicDefence: noDefence }) }),
-      makeMob({ id: 'encounter-mob-2', hp: 99999, maxHp: 99999, stats: makeStats({ damageMin: 100, damageMax: 100, accuracy: highAccuracy, dodge: noDodge, defence: noDefence, magicDefence: noDefence }) }),
-      makeMob({ id: 'encounter-mob-3', hp: 99999, maxHp: 99999, stats: makeStats({ damageMin: 100, damageMax: 100, accuracy: highAccuracy, dodge: noDodge, defence: noDefence, magicDefence: noDefence }) }),
-    ];
-
-    // 1 mob doing 300 damage (3x single mob, uncrowded equivalent)
-    const mobs1x3 = [
-      makeMob({ id: 'encounter-mob-1', hp: 99999, maxHp: 99999, stats: makeStats({ damageMin: 300, damageMax: 300, accuracy: highAccuracy, dodge: noDodge, defence: noDefence, magicDefence: noDefence }) }),
-    ];
-
-    // Player does no damage, high HP, no evasion/defence
-    const playerBase = makeParticipant({
-      hp: 99999, maxHp: 99999,
-      stats: makeStats({ damageMin: 0, damageMax: 0, evasion: 0, dodge: 0 }),
-    });
-    const player3 = { ...playerBase, availablePotions: [] };
-    const player1x3 = { ...playerBase, availablePotions: [] };
-
-    // Run exactly 3 rounds each (player doesn't die, mobs don't die)
-    const result3 = resolveEncounterRoomCombat(player3, mobs3, 3);
-    const result1x3 = resolveEncounterRoomCombat(player1x3, mobs1x3, 3);
-
-    const damageTaken3mobs = 99999 - result3.playerHpAfter;
-    const damageTaken1mob = 99999 - result1x3.playerHpAfter;
-
-    // 3 crowded mobs with 100 damage each should deal LESS than 1 mob with 300 damage
-    // (because crowded debuff reduces each mob's effective damage)
-    expect(damageTaken3mobs).toBeLessThan(damageTaken1mob);
-    // Sanity: 3 crowded mobs should still deal positive damage
-    expect(damageTaken3mobs).toBeGreaterThan(0);
-    expect(damageTaken1mob).toBeGreaterThan(0);
-  });
-
   it('returns empty potionsConsumed when no potions are used', () => {
     const participant = makeParticipant({
       stats: makeStats({ damageMin: 1000, damageMax: 1000, accuracy: 1000 }),

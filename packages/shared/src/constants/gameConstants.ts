@@ -857,7 +857,6 @@ export const FULL_CLEAR_CONSTANTS = {
 // =============================================================================
 
 export const ENCOUNTER_SITE_CONSTANTS = {
-  CROWDED_FACTOR: 0.15,
   AUTO_RESOLVE_DROP_MULTIPLIER: 1.5,
   AUTO_RESOLVE_RECIPE_MULTIPLIER: 1.5,
   AUTO_RESOLVE_MAX_ROUNDS: 100,
