@@ -1,3 +1,25 @@
+// ---------------------------------------------------------------------------
+// Encounter mob ID helpers
+// ---------------------------------------------------------------------------
+
+const ENCOUNTER_MOB_ID_PREFIX = 'encounter-mob-';
+const ENCOUNTER_MOB_ID_RE = /^encounter-mob-(\d+)$/;
+
+/** Build the canonical mob ID for a given slot number. */
+export function makeEncounterMobId(slot: number): string {
+  return `${ENCOUNTER_MOB_ID_PREFIX}${slot}`;
+}
+
+/** Extract the numeric slot from an encounter mob ID like "encounter-mob-3". Returns null if the ID is invalid. */
+export function parseEncounterMobSlot(mobId: string): number | null {
+  const match = mobId.match(ENCOUNTER_MOB_ID_RE);
+  return match ? parseInt(match[1]!, 10) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Encounter types
+// ---------------------------------------------------------------------------
+
 export type EncounterSiteSize = 'small' | 'medium' | 'large';
 export type EncounterMobRole = 'trash' | 'elite' | 'boss';
 export type EncounterMobStatus = 'alive' | 'defeated' | 'decayed';

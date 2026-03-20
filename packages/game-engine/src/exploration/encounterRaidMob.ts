@@ -1,3 +1,4 @@
+import { makeEncounterMobId } from '@pocketrealm/shared';
 import type { EncounterMobSlot, ExpeditionMobState, BossTemplateAction, DamageType } from '@pocketrealm/shared';
 
 /**
@@ -29,7 +30,7 @@ export function buildEncounterRaidMob(
   template: MobTemplateForConversion,
 ): ExpeditionMobState {
   return {
-    id: `encounter-mob-${slot.slot}`,
+    id: makeEncounterMobId(slot.slot),
     mobTemplateId: template.id,
     name: template.name,
     prefix: slot.prefix,
