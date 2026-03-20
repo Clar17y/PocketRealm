@@ -4,7 +4,7 @@ import { prisma } from '@pocketrealm/database';
 import { getMobPrefixDefinition, COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
-import { buildPagination } from '../../utils/routeHelpers.js';
+import { buildPagination, serializeXpGrant } from '../../utils/routeHelpers.js';
 import { getEventModifiersForEntity, type EventModifierBadge } from '../../services/worldEventService';
 import {
   listEncounterSitesQuerySchema,
@@ -300,7 +300,7 @@ export function registerSiteRoutes(router: Router): void {
 
       try {
         const result = await autoResolveEncounterRoom(playerId, siteId, username);
-        const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources', 'buffs']);
+        const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources', 'buffs', 'skills', 'characterProgression']);
         stateUpdates.activeEncounterSiteId = null;
 
         // On defeat the player is respawned to a town — sync the zone in the UI
@@ -314,6 +314,7 @@ export function registerSiteRoutes(router: Router): void {
           rounds: result.rounds,
           initialMobs: result.initialMobs,
           chestReward: await mapChestRewardDTO(result.completionRewards),
+          skillXpGrants: result.xpGrants.map(serializeXpGrant),
           fleeResult: result.fleeResult,
           respawnedTo: result.respawnedTo,
           stateUpdates,

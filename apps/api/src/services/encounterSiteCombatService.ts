@@ -7,6 +7,7 @@ import {
   ALWAYS_AVAILABLE_ACTION_IDS,
   makeEncounterMobId,
   parseEncounterMobSlot,
+  getMobPrefixDefinition,
   type RaidRoundInput,
   type RaidParticipant,
   type RaidThreatEntry,
@@ -26,7 +27,8 @@ import {
   initThreatTable,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
-import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
+import { preparePlayerForCombat, applyGuildCombatModifiers, splitAndGrantXp } from './combatOrchestrationService';
+import type { GrantXpResult } from './xpService';
 import type { AttackSkill } from './combatStatsService';
 import { handleCombatDefeat, assertCanAct, assertInZone } from '../utils/routeHelpers';
 import { spendPlayerTurnsTx } from './turnBankService';
@@ -117,6 +119,7 @@ export interface AutoResolveEncounterResult {
   totalRooms: number;
   siteCleared: boolean;
   completionRewards: Awaited<ReturnType<typeof grantEncounterSiteChestRewardsTx>> | null;
+  xpGrants: GrantXpResult[];
   fleeResult: {
     outcome: string;
     remainingHp: number;
@@ -386,6 +389,27 @@ async function handleEncounterDefeat(
   return { fleeResult, respawnedTo: defeatResult.respawnedTo };
 }
 
+export function computeDefeatedMobXp(
+  defeatedMobIds: Set<string>,
+  roomMobs: EncounterMobSlot[],
+  mobXpByTemplateId: Record<string, number>,
+): number {
+  let totalXp = 0;
+  for (const slot of roomMobs) {
+    const mobId = makeEncounterMobId(slot.slot);
+    if (!defeatedMobIds.has(mobId)) continue;
+    const baseXp = mobXpByTemplateId[slot.mobTemplateId];
+    if (baseXp === undefined) continue;
+    let xp = baseXp;
+    const prefix = getMobPrefixDefinition(slot.prefix);
+    if (prefix) {
+      xp = Math.max(1, Math.floor(xp * (prefix.xpMultiplier ?? 1)));
+    }
+    totalXp += xp;
+  }
+  return totalXp;
+}
+
 // ---------------------------------------------------------------------------
 // Build RaidParticipant from player data (mirrors buildRaidParticipant in expeditionService)
 // ---------------------------------------------------------------------------
@@ -528,6 +552,7 @@ export async function autoResolveEncounterRoom(
       totalRooms: site.totalRooms ?? 1,
       siteCleared: true,
       completionRewards,
+      xpGrants: [],
       fleeResult: null,
       respawnedTo: null,
     };
@@ -696,6 +721,18 @@ export async function autoResolveEncounterRoom(
     combatResult.playerManaAfter,
   );
 
+  // Grant XP for defeated mobs (only on room clear, not on defeat)
+  let xpGrants: GrantXpResult[] = [];
+  if (combatResult.outcome === 'cleared') {
+    const totalXp = computeDefeatedMobXp(defeatedMobIds, roomMobs, mobXpByTemplateId);
+    if (totalXp > 0) {
+      xpGrants = await splitAndGrantXp(
+        playerId, totalXp, attackSkill,
+        undefined, undefined, guildXpBoost,
+      );
+    }
+  }
+
   // Handle defeat
   let fleeResult: AutoResolveEncounterResult['fleeResult'] = null;
   let respawnedTo: { townId: string; townName: string } | null = null;
@@ -721,6 +758,7 @@ export async function autoResolveEncounterRoom(
     totalRooms: site.totalRooms ?? 1,
     siteCleared: txResult.siteCleared,
     completionRewards: txResult.completionRewards,
+    xpGrants,
     fleeResult,
     respawnedTo,
   };
