@@ -104,6 +104,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const isPlayingBackRef = useRef(false);
   const playbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playbackResolveRef = useRef<(() => void) | null>(null);
 
   // Cancel playback on unmount to prevent setState on unmounted component
   useEffect(() => {
@@ -180,7 +181,8 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
         setPlayerState(snapshot.playerState);
 
         await new Promise<void>(resolve => {
-          playbackTimerRef.current = setTimeout(() => { playbackTimerRef.current = null; resolve(); }, 1200);
+          playbackResolveRef.current = resolve;
+          playbackTimerRef.current = setTimeout(() => { playbackTimerRef.current = null; playbackResolveRef.current = null; resolve(); }, 1200);
         });
       }
 
@@ -196,6 +198,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
   const handleSkipPlayback = useCallback(() => {
     isPlayingBackRef.current = false;
     if (playbackTimerRef.current) { clearTimeout(playbackTimerRef.current); playbackTimerRef.current = null; }
+    if (playbackResolveRef.current) { playbackResolveRef.current(); playbackResolveRef.current = null; }
     const lastRound = playbackRounds[playbackRounds.length - 1];
     if (lastRound) {
       setRoundLogs(playbackRounds.map(r => r.log));
@@ -203,6 +206,7 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
       setPlayerState(lastRound.playerState);
     }
     setState('room_result');
+    setLoading(false);
   }, [playbackRounds]);
 
   const handleStartManual = useCallback(async () => {
