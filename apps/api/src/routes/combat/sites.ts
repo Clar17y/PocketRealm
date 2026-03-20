@@ -314,7 +314,7 @@ export function registerSiteRoutes(router: Router): void {
           rounds: result.rounds,
           initialMobs: result.initialMobs,
           chestReward: await mapChestRewardDTO(result.completionRewards),
-          skillXpGrants: result.xpGrants.map(serializeXpGrant),
+          ...(result.xpGrants.length ? { skillXpGrants: result.xpGrants.map(serializeXpGrant) } : {}),
           fleeResult: result.fleeResult,
           respawnedTo: result.respawnedTo,
           stateUpdates,

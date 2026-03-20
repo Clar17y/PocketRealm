@@ -1251,15 +1251,8 @@ export async function resolveManualEncounterRound(
   let xpGrants: GrantXpResult[] = [];
   if (roomCleared) {
     // All room mobs are killed — sum XP for every mob slot in the room
-    let totalXp = 0;
-    for (const slot of state.roomMobSlots) {
-      const baseXp = state.mobXpByTemplateId[slot.mobTemplateId];
-      if (baseXp === undefined) continue;
-      let xp = baseXp;
-      const prefix = getMobPrefixDefinition(slot.prefix);
-      if (prefix) xp = Math.max(1, Math.floor(xp * (prefix.xpMultiplier ?? 1)));
-      totalXp += xp;
-    }
+    const allMobIds = new Set(state.roomMobSlots.map(s => makeEncounterMobId(s.slot)));
+    const totalXp = computeDefeatedMobXp(allMobIds, state.roomMobSlots, state.mobXpByTemplateId);
     if (totalXp > 0) {
       xpGrants = await splitAndGrantXp(
         playerId, totalXp, state.attackSkill as AttackSkill,
