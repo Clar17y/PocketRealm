@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { trackEvent, trackOnce } from '@/lib/analytics';
 import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { RARITY_RANK } from '@/lib/rarity';
@@ -324,6 +325,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const lastEventLogTimeRef = useRef(0);
   const prevInventoryIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedOnceRef = useRef(false);
+  const sessionTrackedRef = useRef(false);
   const lootRevealRarityRef = useRef(lootRevealRarity);
   lootRevealRarityRef.current = lootRevealRarity;
   const [lootRevealItems, setLootRevealItems] = useState<Array<{
@@ -706,6 +708,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const friendInterval = setInterval(() => { if (!cancelled) void loadFriendCounts(); }, 60000);
     return () => { cancelled = true; clearInterval(interval); clearInterval(pvpInterval); clearInterval(friendInterval); };
   }, [isAuthenticated, loadAll, pollScreenData, loadPvpNotificationCount, loadFriendCounts]);
+
+  useEffect(() => {
+    if (!isAuthenticated || sessionTrackedRef.current || characterProgression.characterLevel === 0) return;
+    sessionTrackedRef.current = true;
+    trackEvent('session_start', { characterLevel: characterProgression.characterLevel, daysSinceSignup: 0 });
+  }, [isAuthenticated, characterProgression.characterLevel]);
 
   const getActiveTab = () => {
     if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'quests', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
