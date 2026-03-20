@@ -939,6 +939,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Map bottom nav tab ids to default sub-screens
     const resolved = screen === 'social' ? 'guild' : screen;
     setActiveScreen(resolved as Screen);
+    trackEvent('screen_view', { screen: resolved });
   };
 
   const handleMine = async (playerNodeId: string, turnSpend: number) => {
