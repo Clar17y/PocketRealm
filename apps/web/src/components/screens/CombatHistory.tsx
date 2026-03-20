@@ -29,22 +29,22 @@ type OutcomeFilter = 'all' | CombatOutcomeResponse;
 const PAGE_SIZE = 8;
 
 function formatOutcome(outcome: string | null): string {
-  if (outcome === 'victory') return 'Victory';
-  if (outcome === 'defeat') return 'Defeat';
+  if (outcome === 'victory' || outcome === 'cleared' || outcome === 'site_cleared') return 'Victory';
+  if (outcome === 'defeat' || outcome === 'defeated') return 'Defeat';
   if (outcome === 'fled') return 'Fled';
   return 'Unknown';
 }
 
 function outcomeIcon(outcome: string | null): string {
-  if (outcome === 'victory') return 'V';
-  if (outcome === 'defeat') return 'X';
+  if (outcome === 'victory' || outcome === 'cleared' || outcome === 'site_cleared') return 'V';
+  if (outcome === 'defeat' || outcome === 'defeated') return 'X';
   if (outcome === 'fled') return 'F';
   return '?';
 }
 
 function outcomeColor(outcome: string | null): string {
-  if (outcome === 'victory') return 'text-[var(--rpg-green-light)]';
-  if (outcome === 'defeat') return 'text-[var(--rpg-red)]';
+  if (outcome === 'victory' || outcome === 'cleared' || outcome === 'site_cleared') return 'text-[var(--rpg-green-light)]';
+  if (outcome === 'defeat' || outcome === 'defeated') return 'text-[var(--rpg-red)]';
   if (outcome === 'fled') return 'text-[var(--rpg-gold)]';
   return 'text-[var(--rpg-text-secondary)]';
 }
@@ -141,6 +141,8 @@ export function CombatHistory() {
           }
         }
 
+        // New page — clear stale detail before selecting first entry
+        setSelectedDetail(null);
         if (data.logs.length > 0) {
           setSelectedEntry(data.logs[0]);
           return data.logs[0].logId;
