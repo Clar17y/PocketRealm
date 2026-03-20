@@ -368,6 +368,7 @@ export function CombatHistory() {
                 type="button"
                 onClick={() => {
                   setSelectedEntry(entry);
+                  setSelectedDetail(null);
                   setSelectedLogId(entry.logId);
                 }}
                 className={`w-full text-left border rounded-lg p-2 transition-colors ${
