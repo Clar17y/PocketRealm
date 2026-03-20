@@ -273,6 +273,7 @@ export function CombatHistory() {
 
   const shareText = useMemo(() => {
     if (!selectedEntry || !selectedDetail) return '';
+    if (selectedEntry.source === 'encounter_site_room') return '';
     return formatCombatShareText({
       outcome: formatOutcome(selectedDetail.outcome),
       mobName: selectedDetail.mobDisplayName ?? selectedEntry.mobDisplayName ?? selectedEntry.mobName ?? 'Unknown Mob',

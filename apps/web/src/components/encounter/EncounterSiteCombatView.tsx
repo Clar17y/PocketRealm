@@ -11,6 +11,7 @@ import {
   PlayerResourceBars,
   CombatRoundLog,
 } from '@/components/common/combat';
+import { FirstVisitHowTo } from '@/components/common/FirstVisitHowTo';
 import type {
   EncounterAutoResolveResponse,
   EncounterStartRoomResponse,
@@ -298,6 +299,33 @@ export function EncounterSiteCombatView(props: EncounterSiteCombatViewProps) {
 
   return (
     <div className="flex flex-col gap-3">
+      <FirstVisitHowTo
+        storageKey="howto_encounter_sites"
+        title="Encounter Sites"
+        sections={[
+          {
+            heading: 'Multi-Room Combat',
+            text: 'Encounter sites are multi-room dungeons. Clear each room to advance. Your HP, stamina, and mana carry between rooms — manage your resources carefully.',
+          },
+          {
+            heading: 'Auto-Resolve vs Manual',
+            text: 'Auto-resolve uses your active combat template to clear a room instantly. Fighting manually lets you control each round. Auto-resolved rooms earn a bonus loot chance on site completion.',
+          },
+          {
+            heading: 'Splash Cascade',
+            text: 'Encounter site combat features Splash Cascade: when your attack misses, it bounces to other enemies in the room. Each bounce re-rolls hit chance against a new target. Expand the combat log to see the full cascade chain.',
+          },
+          {
+            heading: 'Mob Decay',
+            text: 'Encounter site mobs decay over time. If all mobs in remaining rooms decay, the site auto-clears and you receive your chest reward. Decayed rooms disable the auto-resolve bonus.',
+          },
+          {
+            heading: 'Chest Reward',
+            text: 'Clearing all rooms unlocks a chest with materials and a chance at a recipe. More rooms auto-resolved = better bonus rolls.',
+          },
+        ]}
+      />
+
       {/* Sticky playback bar during auto_playback */}
       {state === 'auto_playback' && (
         <div className="sticky top-0 z-20 bg-[var(--rpg-surface)] border-b border-[var(--rpg-border)] p-3 flex justify-between items-center rounded">
