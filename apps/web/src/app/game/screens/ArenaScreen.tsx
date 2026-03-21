@@ -40,11 +40,12 @@ interface ArenaScreenProps {
   onNotificationsChanged?: () => void;
   onNavigate?: (screen: string) => void;
   combatSpeedMs?: number;
+  isOffline?: boolean;
 }
 
 type ArenaView = 'ladder' | 'history' | 'notifications' | 'rankings';
 
-export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId, isInTown = true, onStateUpdates, onNotificationsChanged, onNavigate, combatSpeedMs }: ArenaScreenProps) {
+export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId, isInTown = true, onStateUpdates, onNotificationsChanged, onNavigate, combatSpeedMs, isOffline }: ArenaScreenProps) {
   const [rating, setRating] = useState<PvpRatingResponse | null>(null);
   const [ladder, setLadder] = useState<PvpLadderEntry[]>([]);
   const [notifications, setNotifications] = useState<PvpNotification[]>([]);
@@ -430,9 +431,9 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                   <PixelButton
                     variant="secondary"
                     size="sm"
-                    disabled={!isInTown || !meetsLevel || !!actionBusy || !!busyAction || currentTurns < PVP_CONSTANTS.SCOUT_TURN_COST}
+                    disabled={!isInTown || !meetsLevel || !!actionBusy || !!busyAction || currentTurns < PVP_CONSTANTS.SCOUT_TURN_COST || isOffline}
                     onClick={() => void handleScout(opponent.playerId)}
-                    title={isInTown ? `Scout (${PVP_CONSTANTS.SCOUT_TURN_COST} turns)` : 'Must be in a town'}
+                    title={isOffline ? "You're offline" : isInTown ? `Scout (${PVP_CONSTANTS.SCOUT_TURN_COST} turns)` : 'Must be in a town'}
                   >
                     <Eye size={14} className="inline mr-1" />
                     {isInTown ? 'Scout' : 'Town Only'}
@@ -441,9 +442,9 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                 <PixelButton
                   variant="gold"
                   size="sm"
-                  disabled={!isInTown || !meetsLevel || !!actionBusy || !!busyAction || currentTurns < PVP_CONSTANTS.CHALLENGE_TURN_COST}
+                  disabled={!isInTown || !meetsLevel || !!actionBusy || !!busyAction || currentTurns < PVP_CONSTANTS.CHALLENGE_TURN_COST || isOffline}
                   onClick={() => void handleChallenge(opponent.playerId)}
-                  title={isInTown ? `Challenge (${PVP_CONSTANTS.CHALLENGE_TURN_COST} turns)` : 'Must be in a town'}
+                  title={isOffline ? "You're offline" : isInTown ? `Challenge (${PVP_CONSTANTS.CHALLENGE_TURN_COST} turns)` : 'Must be in a town'}
                 >
                   <Swords size={14} className="inline mr-1" />
                   {isInTown ? 'Fight' : 'Town Only'}

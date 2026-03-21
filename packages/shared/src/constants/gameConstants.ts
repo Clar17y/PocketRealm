@@ -1505,3 +1505,12 @@ export const EXPEDITION_TOKEN_CONSTANTS = {
   TOKEN_COST_BOOTS: 60,
   SET_BONUS_GROUP_CONTENT_ONLY: true,
 } as const;
+
+export const UI_TIMING_CONSTANTS = {
+  /** ms before an in-flight action shows "Still working..." */
+  SLOW_ACTION_THRESHOLD_MS: 10_000,
+  /** ms debounce between background error toasts */
+  ERROR_TOAST_DEBOUNCE_MS: 10_000,
+  /** ms before error toast auto-dismisses */
+  ERROR_TOAST_DISMISS_MS: 5_000,
+} as const;

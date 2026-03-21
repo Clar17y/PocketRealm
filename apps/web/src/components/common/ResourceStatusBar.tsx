@@ -18,6 +18,7 @@ interface ResourceStatusBarProps {
   onRecover?: () => Promise<void>;
   quickRestPercent?: number;
   busyAction?: string | null;
+  isOffline?: boolean;
   compact?: boolean;
 }
 
@@ -55,7 +56,7 @@ export function ResourceStatusBar({
   hpRegenPerSecond, staminaRegenPerSecond, manaRegenPerSecond,
   isRecovering, recoveryCost,
   onQuickRest, onRecover,
-  quickRestPercent, busyAction,
+  quickRestPercent, busyAction, isOffline,
   compact,
 }: ResourceStatusBarProps) {
   const hpRatio = maxHp > 0 ? currentHp / maxHp : 0;
@@ -78,7 +79,8 @@ export function ResourceStatusBar({
             <button
               className="text-xs font-semibold px-2 py-0.5 rounded bg-[var(--rpg-green-light)] text-black hover:brightness-110 transition-all disabled:opacity-50"
               onClick={onQuickRest}
-              disabled={busyAction != null}
+              disabled={busyAction != null || isOffline}
+              title={isOffline ? "You're offline" : undefined}
             >
               {busyAction === 'quick_rest' ? 'Resting...' : `Rest ${quickRestPercent ?? 100}%`}
             </button>
@@ -87,7 +89,8 @@ export function ResourceStatusBar({
             <button
               className="text-xs font-semibold px-2 py-0.5 rounded bg-[var(--rpg-red)] text-white hover:brightness-110 transition-all disabled:opacity-50"
               onClick={onRecover}
-              disabled={busyAction != null}
+              disabled={busyAction != null || isOffline}
+              title={isOffline ? "You're offline" : undefined}
             >
               {busyAction === 'recovering' ? 'Recovering...' : `Recover (${recoveryCost ?? '?'} turns)`}
             </button>
