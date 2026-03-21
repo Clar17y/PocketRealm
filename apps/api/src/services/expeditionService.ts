@@ -4,9 +4,6 @@ import {
   EXPEDITION_CONSTANTS,
   EXPEDITION_THEMES,
   EXPEDITION_THEMES_BY_ID,
-  ALWAYS_AVAILABLE_ACTION_IDS,
-  BASE_ACTION_DEFINITIONS,
-  type ActionDefinition,
   type ExpeditionAttemptLog,
   type ExpeditionData,
   type ExpeditionMemberData,
@@ -40,9 +37,8 @@ import { getHpState } from './hpService';
 import { getEquipmentStats } from './equipmentService';
 import { getSkillLevel, getMainHandAttackSkill } from './combatStatsService';
 import { getPlayerProgressionState } from './attributesService';
-import { getActiveTemplate } from './combatTemplateService';
-import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
-import { buildPotionPool, templateHasPotionActions, deductConsumedPotions } from './potionService';
+import { preparePlayerForCombat, applyGuildCombatModifiers, fetchFreshTemplateData } from './combatOrchestrationService';
+import { deductConsumedPotions } from './potionService';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
 import { validateEnum } from '../utils/validateEnum';
 import { sendPush } from './pushNotificationService';
@@ -683,9 +679,6 @@ async function fetchCombatDataForSnapshot(
     progression: { attributes: prep.progression.attributes },
     guildMods: { combatDamage: prep.guildMods.combatDamage, defenseBoost: prep.guildMods.defenseBoost },
     perActionScaling: prep.perActionScaling,
-    playerTemplate: prep.playerTemplate,
-    unlockedActions: prep.unlockedActions,
-    potionPool: prep.potionPool,
     maxHp,
     maxStamina: prep.resources.maxStamina,
     staminaRegenPerRound: prep.resources.staminaRegenPerRound,
@@ -695,12 +688,14 @@ async function fetchCombatDataForSnapshot(
 }
 
 /**
- * Build a RaidParticipant from a pre-fetched snapshot (no DB queries).
+ * Build a RaidParticipant from a pre-fetched snapshot.
+ * Equipment stats come from the snapshot (locked at room start).
+ * Template + potions are fetched fresh so mid-room switches take effect.
  */
-function buildParticipantFromSnapshot(
+async function buildParticipantFromSnapshot(
   member: BuildParticipantInput,
   snapshot: ExpeditionCombatSnapshot,
-): RaidParticipant {
+): Promise<RaidParticipant> {
   const stats = buildPlayerCombatStats(
     snapshot.maxHp, snapshot.maxHp,
     { attackStyle: snapshot.attackSkill, skillLevel: snapshot.attackLevel, attributes: snapshot.progression.attributes },
@@ -708,20 +703,8 @@ function buildParticipantFromSnapshot(
   );
   applyGuildCombatModifiers(stats, snapshot.guildMods);
 
-  const unlockedSet = new Set(snapshot.unlockedActions);
-  const filteredActions: Record<string, ActionDefinition> = {};
-  for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
-    if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-      filteredActions[id] = def;
-    }
-  }
-  for (const slot of snapshot.playerTemplate) {
-    for (const actionId of [slot.actionId, slot.thenActionId]) {
-      if (actionId && !filteredActions[actionId] && BASE_ACTION_DEFINITIONS[actionId]) {
-        filteredActions[actionId] = BASE_ACTION_DEFINITIONS[actionId];
-      }
-    }
-  }
+  // Fetch template + actions + potions fresh each round (not cached)
+  const fresh = await fetchFreshTemplateData(member.playerId, snapshot.maxHp);
 
   const effects = Array.isArray(member.activeEffects) ? member.activeEffects : [];
 
@@ -731,13 +714,13 @@ function buildParticipantFromSnapshot(
     targetMobId: member.targetMobId ?? null,
     healTargetPlayerId: member.healTargetPlayerId ?? null,
     stats,
-    template: snapshot.playerTemplate.map(s => ({
+    template: fresh.playerTemplate.map(s => ({
       actionId: s.actionId,
       condition: s.condition,
       thenActionId: s.thenActionId ?? undefined,
       sortOrder: s.sortOrder,
     })),
-    actionDefinitions: filteredActions,
+    actionDefinitions: fresh.actionDefinitions,
     hp: member.currentHp,
     maxHp: snapshot.maxHp,
     stamina: member.currentStamina,
@@ -748,7 +731,7 @@ function buildParticipantFromSnapshot(
     manaRegenPerRound: snapshot.manaRegenPerRound,
     templateRound: member.templateRound,
     activeEffects: effects as RaidParticipant['activeEffects'],
-    availablePotions: snapshot.potionPool,
+    availablePotions: fresh.potionPool,
   };
 }
 
@@ -909,7 +892,9 @@ export async function resolveExpeditionRound(expeditionId: string, io: Server | 
   let participants: RaidParticipant[];
   if (expedition.roundNumber === 0) {
     const snapshots = await fetchAndStoreSnapshots(aliveMembers, expeditionId, expedition.currentRoom);
-    participants = aliveMembers.map((m, i) => buildParticipantFromSnapshot(m, snapshots[i].snapshot));
+    participants = await Promise.all(
+      aliveMembers.map((m, i) => buildParticipantFromSnapshot(m, snapshots[i].snapshot)),
+    );
   } else {
     participants = await Promise.all(
       aliveMembers.map(m => buildRaidParticipant(m, expeditionId, expedition.currentRoom)),
@@ -1063,8 +1048,8 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
 
   // Snapshot combat data for all alive members (locked for the room)
   const snapshots = await fetchAndStoreSnapshots(aliveMembers, expeditionId, expedition.currentRoom);
-  const participants: RaidParticipant[] = aliveMembers.map((m, i) =>
-    buildParticipantFromSnapshot(m, snapshots[i].snapshot),
+  const participants: RaidParticipant[] = await Promise.all(
+    aliveMembers.map((m, i) => buildParticipantFromSnapshot(m, snapshots[i].snapshot)),
   );
 
   const summonPool = await buildSummonPool(expedition.themeId);

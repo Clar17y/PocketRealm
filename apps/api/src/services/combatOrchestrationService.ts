@@ -121,6 +121,49 @@ export async function preparePlayerForCombat(
   };
 }
 
+// ── Fresh template + action definitions (re-fetched each round) ─────
+
+export interface FreshTemplateData {
+  playerTemplate: CombatTemplateSlotData[];
+  actionDefinitions: Record<string, ActionDefinition>;
+  potionPool: CombatPotion[];
+}
+
+/**
+ * Fetch a player's current template, unlocked actions, and potion pool.
+ * Called each round so mid-combat template switches take effect.
+ */
+export async function fetchFreshTemplateData(
+  playerId: string,
+  maxHp: number,
+): Promise<FreshTemplateData> {
+  const [template, skillPoints] = await Promise.all([
+    getActiveTemplate(playerId),
+    getSkillPoints(playerId),
+  ]);
+
+  const unlockedSet = new Set(skillPoints.unlockedActions);
+  const actionDefinitions: Record<string, ActionDefinition> = {};
+  for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
+    if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
+      actionDefinitions[id] = def;
+    }
+  }
+  for (const slot of template) {
+    for (const actionId of [slot.actionId, slot.thenActionId]) {
+      if (actionId && !actionDefinitions[actionId] && BASE_ACTION_DEFINITIONS[actionId]) {
+        actionDefinitions[actionId] = BASE_ACTION_DEFINITIONS[actionId]!;
+      }
+    }
+  }
+
+  const potionPool = templateHasPotionActions(template)
+    ? await buildPotionPool(playerId, maxHp)
+    : [];
+
+  return { playerTemplate: template, actionDefinitions, potionPool };
+}
+
 // ── Build player template combatant ──────────────────────────────────
 
 export function buildPlayerTemplateCombatant(params: {

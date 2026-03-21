@@ -1,9 +1,14 @@
 import { redis } from '../redis';
 import type { EquipmentStats } from './equipmentService';
 import type { AttackSkill } from './combatStatsService';
-import type { PerActionScaling, CombatTemplateSlotData, CombatPotion, PlayerAttributes } from '@pocketrealm/shared';
+import type { PerActionScaling, PlayerAttributes } from '@pocketrealm/shared';
 import type { PlayerGuildModifiers } from './guildUpgradeService';
 
+/**
+ * Snapshot of equipment/stat data locked at room start.
+ * Excludes playerTemplate, unlockedActions, and potionPool — those are
+ * re-fetched each round so players can switch templates mid-room.
+ */
 export interface ExpeditionCombatSnapshot {
   equipmentStats: EquipmentStats;
   attackSkill: AttackSkill;
@@ -11,9 +16,6 @@ export interface ExpeditionCombatSnapshot {
   progression: { attributes: PlayerAttributes };
   guildMods: Pick<PlayerGuildModifiers, 'combatDamage' | 'defenseBoost'>;
   perActionScaling: PerActionScaling;
-  playerTemplate: CombatTemplateSlotData[];
-  unlockedActions: string[];
-  potionPool: CombatPotion[];
   maxHp: number;
   maxStamina: number;
   staminaRegenPerRound: number;
