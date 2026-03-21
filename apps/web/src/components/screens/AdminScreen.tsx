@@ -817,7 +817,7 @@ function AnalyticsTab() {
                       <td className="text-[var(--rpg-text-primary)] py-0.5 capitalize">{category}</td>
                       <td className="text-[var(--rpg-text-primary)] text-right">{data.totalXpGained.toLocaleString()}</td>
                       <td className="text-[var(--rpg-text-primary)] text-right">{data.totalTurnsSpent.toLocaleString()}</td>
-                      <td className="text-[var(--rpg-text-primary)] text-right">{data.xpPerTurn.toFixed(1)}</td>
+                      <td className="text-[var(--rpg-text-primary)] text-right">{data.xpPerTurn.toFixed(2)}</td>
                     </tr>
                   ))}
               </tbody>

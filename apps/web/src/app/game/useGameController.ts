@@ -84,7 +84,7 @@ import {
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
-import { STAMINA_CONSTANTS, MANA_CONSTANTS, ITEM_RARITY_CONSTANTS, COMBAT_CONSTANTS } from '@pocketrealm/shared';
+import { STAMINA_CONSTANTS, MANA_CONSTANTS, ITEM_RARITY_CONSTANTS, COMBAT_CONSTANTS, CRAFTING_CONSTANTS } from '@pocketrealm/shared';
 import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
@@ -1042,7 +1042,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       pushLog(...newLogs);
       applyStateUpdates(data.stateUpdates, stateSetters);
       const gatherType = data.xp?.skillType ?? 'mining';
-      trackEvent('action', { type: gatherType, turns: turnSpend, zone: activeZoneId });
+      trackEvent('action', { type: gatherType, turns: turnSpend, zone: activeZoneId ?? undefined });
       if (data.xp?.leveledUp) {
         trackEvent('level_up', { skill: data.xp.skillType, level: data.xp.newLevel });
       }
@@ -1142,7 +1142,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setTurns(data.turns.currentTurns);
       const materialSummary = data.salvage.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged item for: ${materialSummary}.` });
-      trackEvent('action', { type: 'salvage', turns: 50 });
+      trackEvent('action', { type: 'salvage', turns: CRAFTING_CONSTANTS.SALVAGE_TURN_COST });
     });
 
   const handleSalvageBatch = (itemIds: string[]) =>
