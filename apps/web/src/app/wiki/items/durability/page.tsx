@@ -85,6 +85,14 @@ export default function DurabilityPage() {
         <strong>{(DURABILITY_CONSTANTS.WARNING_THRESHOLD * 100).toFixed(0)}%</strong>.
       </p>
 
+      <h2>Expeditions</h2>
+      <p>
+        During expeditions, equipment stats are locked at the start of each room.
+        Durability still degrades normally, but even if an item reaches 0
+        durability mid-room, its stat contributions are preserved until the room
+        ends. The durability penalty applies from the next room onward.
+      </p>
+
       <h2>Sell Price</h2>
       <FormulaBlock>
         <Out>sellPrice</Out> <Op>=</Op> <Var>baseSellPrice</Var> <Op>*</Op>{' '}

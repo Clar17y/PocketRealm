@@ -4,9 +4,6 @@ import {
   EXPEDITION_CONSTANTS,
   EXPEDITION_THEMES,
   EXPEDITION_THEMES_BY_ID,
-  ALWAYS_AVAILABLE_ACTION_IDS,
-  BASE_ACTION_DEFINITIONS,
-  type ActionDefinition,
   type ExpeditionAttemptLog,
   type ExpeditionData,
   type ExpeditionMemberData,
@@ -40,12 +37,12 @@ import { getHpState } from './hpService';
 import { getEquipmentStats } from './equipmentService';
 import { getSkillLevel, getMainHandAttackSkill } from './combatStatsService';
 import { getPlayerProgressionState } from './attributesService';
-import { getActiveTemplate } from './combatTemplateService';
-import { preparePlayerForCombat, applyGuildCombatModifiers } from './combatOrchestrationService';
-import { buildPotionPool, templateHasPotionActions, deductConsumedPotions } from './potionService';
+import { preparePlayerForCombat, applyGuildCombatModifiers, fetchFreshTemplateData } from './combatOrchestrationService';
+import { deductConsumedPotions } from './potionService';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
 import { validateEnum } from '../utils/validateEnum';
 import { sendPush } from './pushNotificationService';
+import { snapshotCombatData, getCombatSnapshot, clearRoomSnapshots, type ExpeditionCombatSnapshot } from './expeditionCombatCache';
 
 // ---------------------------------------------------------------------------
 // Bot Cleanup — delete bot players created by admin /expedition/fill
@@ -647,10 +644,20 @@ function buildUpdatedRoomMobs(
 // Build Raid Participant (follows bossEncounterService pattern)
 // ---------------------------------------------------------------------------
 
-async function buildRaidParticipant(
-  member: { playerId: string; currentHp: number; currentStamina: number; currentMana: number; templateRound: number; activeEffects: unknown; targetMobId?: string | null; healTargetPlayerId?: string | null; player?: { username: string } },
-): Promise<RaidParticipant> {
-  // Fetch equipment + progression first to compute maxHp (needed by preparePlayerForCombat)
+type BuildParticipantInput = {
+  playerId: string; currentHp: number; currentStamina: number; currentMana: number;
+  templateRound: number; activeEffects: unknown;
+  targetMobId?: string | null; healTargetPlayerId?: string | null;
+  player?: { username: string };
+};
+
+/**
+ * Fetch all combat-relevant data for a player and return it as a snapshot.
+ * This is called once at room start; the snapshot is then stored in Redis.
+ */
+async function fetchCombatDataForSnapshot(
+  member: BuildParticipantInput,
+): Promise<ExpeditionCombatSnapshot> {
   const [equipStats, progression] = await Promise.all([
     getEquipmentStats(member.playerId),
     getPlayerProgressionState(member.playerId),
@@ -665,35 +672,41 @@ async function buildRaidParticipant(
     preloaded: { equipmentStats: equipStats, progression },
   });
 
-  const stats = buildPlayerCombatStats(
-    maxHp, maxHp,
-    { attackStyle: prep.attackSkill, skillLevel: prep.attackLevel, attributes: prep.progression.attributes },
-    prep.equipmentStats,
-  );
-  applyGuildCombatModifiers(stats, prep.guildMods);
+  return {
+    equipmentStats: prep.equipmentStats,
+    attackSkill: prep.attackSkill,
+    attackLevel: prep.attackLevel,
+    progression: { attributes: prep.progression.attributes },
+    guildMods: { combatDamage: prep.guildMods.combatDamage, defenseBoost: prep.guildMods.defenseBoost },
+    perActionScaling: prep.perActionScaling,
+    maxHp,
+    maxStamina: prep.resources.maxStamina,
+    staminaRegenPerRound: prep.resources.staminaRegenPerRound,
+    maxMana: prep.resources.maxMana,
+    manaRegenPerRound: prep.resources.manaRegenPerRound,
+  };
+}
 
-  // Include unlocked actions + any actions referenced by the player's template
-  const unlockedSet = new Set(prep.unlockedActions);
-  const filteredActions: Record<string, ActionDefinition> = {};
-  for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
-    if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || unlockedSet.has(id)) {
-      filteredActions[id] = def;
-    }
-  }
-  for (const slot of prep.playerTemplate) {
-    for (const actionId of [slot.actionId, slot.thenActionId]) {
-      if (actionId && !filteredActions[actionId] && BASE_ACTION_DEFINITIONS[actionId]) {
-        filteredActions[actionId] = BASE_ACTION_DEFINITIONS[actionId];
-      }
-    }
-  }
+/**
+ * Build a RaidParticipant from a pre-fetched snapshot.
+ * Equipment stats come from the snapshot (locked at room start).
+ * Template + potions are fetched fresh so mid-room switches take effect.
+ */
+async function buildParticipantFromSnapshot(
+  member: BuildParticipantInput,
+  snapshot: ExpeditionCombatSnapshot,
+): Promise<RaidParticipant> {
+  const stats = buildPlayerCombatStats(
+    snapshot.maxHp, snapshot.maxHp,
+    { attackStyle: snapshot.attackSkill, skillLevel: snapshot.attackLevel, attributes: snapshot.progression.attributes },
+    snapshot.equipmentStats,
+  );
+  applyGuildCombatModifiers(stats, snapshot.guildMods);
+
+  // Fetch template + actions + potions fresh each round (not cached)
+  const fresh = await fetchFreshTemplateData(member.playerId, snapshot.maxHp);
 
   const effects = Array.isArray(member.activeEffects) ? member.activeEffects : [];
-
-  // Build potion pool if template uses potion actions
-  const potionPool = templateHasPotionActions(prep.playerTemplate)
-    ? await buildPotionPool(member.playerId, maxHp)
-    : [];
 
   return {
     playerId: member.playerId,
@@ -701,25 +714,65 @@ async function buildRaidParticipant(
     targetMobId: member.targetMobId ?? null,
     healTargetPlayerId: member.healTargetPlayerId ?? null,
     stats,
-    template: prep.playerTemplate.map(s => ({
+    template: fresh.playerTemplate.map(s => ({
       actionId: s.actionId,
       condition: s.condition,
       thenActionId: s.thenActionId ?? undefined,
       sortOrder: s.sortOrder,
     })),
-    actionDefinitions: filteredActions,
+    actionDefinitions: fresh.actionDefinitions,
     hp: member.currentHp,
-    maxHp,
+    maxHp: snapshot.maxHp,
     stamina: member.currentStamina,
-    maxStamina: prep.resources.maxStamina,
-    staminaRegenPerRound: prep.resources.staminaRegenPerRound,
+    maxStamina: snapshot.maxStamina,
+    staminaRegenPerRound: snapshot.staminaRegenPerRound,
     mana: member.currentMana,
-    maxMana: prep.resources.maxMana,
-    manaRegenPerRound: prep.resources.manaRegenPerRound,
+    maxMana: snapshot.maxMana,
+    manaRegenPerRound: snapshot.manaRegenPerRound,
     templateRound: member.templateRound,
     activeEffects: effects as RaidParticipant['activeEffects'],
-    availablePotions: potionPool,
+    availablePotions: fresh.potionPool,
   };
+}
+
+/**
+ * Fetch combat data for all members and store snapshots in Redis.
+ * Returns the in-memory snapshots for direct use (avoids a Redis read round-trip).
+ */
+async function fetchAndStoreSnapshots(
+  aliveMembers: BuildParticipantInput[],
+  expeditionId: string,
+  roomIndex: number,
+): Promise<{ playerId: string; snapshot: ExpeditionCombatSnapshot }[]> {
+  const snapshots = await Promise.all(
+    aliveMembers.map(async m => ({
+      playerId: m.playerId,
+      snapshot: await fetchCombatDataForSnapshot(m),
+    })),
+  );
+  // Fire-and-forget Redis writes (best-effort, errors swallowed by snapshotCombatData)
+  void Promise.all(
+    snapshots.map(s => snapshotCombatData(expeditionId, roomIndex, s.playerId, s.snapshot)),
+  );
+  return snapshots;
+}
+
+/**
+ * Build a raid participant. Checks Redis snapshot first (set at room start),
+ * falls back to full DB fetch on cache miss.
+ */
+async function buildRaidParticipant(
+  member: BuildParticipantInput,
+  expeditionId: string,
+  roomIndex: number,
+): Promise<RaidParticipant> {
+  // Try cached snapshot first (set at room start)
+  const snapshot = await getCombatSnapshot(expeditionId, roomIndex, member.playerId);
+  if (snapshot) return buildParticipantFromSnapshot(member, snapshot);
+
+  // Fallback: fetch from DB (cache miss)
+  const freshSnapshot = await fetchCombatDataForSnapshot(member);
+  return buildParticipantFromSnapshot(member, freshSnapshot);
 }
 
 // ---------------------------------------------------------------------------
@@ -835,10 +888,18 @@ export async function resolveExpeditionRound(expeditionId: string, io: Server | 
     return;
   }
 
-  // Build participants
-  const participants: RaidParticipant[] = await Promise.all(
-    aliveMembers.map(m => buildRaidParticipant(m)),
-  );
+  // Build participants — snapshot on first round, read from cache on subsequent rounds
+  let participants: RaidParticipant[];
+  if (expedition.roundNumber === 0) {
+    const snapshots = await fetchAndStoreSnapshots(aliveMembers, expeditionId, expedition.currentRoom);
+    participants = await Promise.all(
+      aliveMembers.map((m, i) => buildParticipantFromSnapshot(m, snapshots[i].snapshot)),
+    );
+  } else {
+    participants = await Promise.all(
+      aliveMembers.map(m => buildRaidParticipant(m, expeditionId, expedition.currentRoom)),
+    );
+  }
 
   // Build threat table from member records (init fresh if round 1 of room)
   const nextRound = expedition.roundNumber + 1;
@@ -985,8 +1046,10 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
     return { outcome: 'wiped', roundsResolved: 0, roundLogs: [], tokensAwarded: 0 };
   }
 
+  // Snapshot combat data for all alive members (locked for the room)
+  const snapshots = await fetchAndStoreSnapshots(aliveMembers, expeditionId, expedition.currentRoom);
   const participants: RaidParticipant[] = await Promise.all(
-    aliveMembers.map(m => buildRaidParticipant(m)),
+    aliveMembers.map((m, i) => buildParticipantFromSnapshot(m, snapshots[i].snapshot)),
   );
 
   const summonPool = await buildSummonPool(expedition.themeId);
@@ -1163,6 +1226,9 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
   });
   if (!expedition) return;
 
+  // Clear combat snapshots for the completed room
+  await clearRoomSnapshots(expeditionId, expedition.currentRoom);
+
   const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const currentRoomDef = rooms[expedition.currentRoom];
   const roomType = currentRoomDef?.roomType ?? 'trash';
@@ -1282,6 +1348,9 @@ export async function handleWipe(expeditionId: string): Promise<void> {
   });
   if (!expedition) return;
 
+  // Clear combat snapshots for the current room
+  await clearRoomSnapshots(expeditionId, expedition.currentRoom);
+
   const newWipeCount = (expedition.wipeCount ?? 0) + 1;
   const newAttemptLogs = buildUpdatedAttemptLogs(expedition);
 
@@ -1394,6 +1463,11 @@ export async function abandonExpedition(expeditionId: string, playerId: string):
     throw new AppError(400, 'Expedition is not active', 'NOT_ACTIVE');
   }
 
+  // Clear combat snapshots if in-progress
+  if (expedition.status === 'in_progress') {
+    await clearRoomSnapshots(expeditionId, expedition.currentRoom);
+  }
+
   // Archive current round logs if any
   const newAttemptLogs = buildUpdatedAttemptLogs(expedition, { abandoned: true });
 
@@ -1487,6 +1561,8 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
     include: { members: { include: { player: { select: { username: true } } } } },
   });
   if (!expedition) return;
+
+  // Note: combat snapshots already cleared by handleRoomCleared (which calls this)
 
   // Archive final successful attempt's logs alongside previous wipe attempts
   const finalAttemptLogs = buildUpdatedAttemptLogs(expedition, { outcome: 'completed' });

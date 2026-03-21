@@ -27,7 +27,7 @@ import {
   initThreatTable,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
-import { preparePlayerForCombat, applyGuildCombatModifiers, splitAndGrantXp } from './combatOrchestrationService';
+import { preparePlayerForCombat, applyGuildCombatModifiers, splitAndGrantXp, fetchFreshTemplateData } from './combatOrchestrationService';
 import type { GrantXpResult } from './xpService';
 import type { AttackSkill } from './combatStatsService';
 import { handleCombatDefeat, assertCanAct, assertInZone } from '../utils/routeHelpers';
@@ -39,8 +39,6 @@ import { getInventoryState } from './inventoryService';
 import { deductConsumedPotions } from './potionService';
 import { templateHasPotionActions, buildPotionPool } from './potionService';
 import { getEquipmentStats } from './equipmentService';
-import { getActiveTemplate } from './combatTemplateService';
-import { getSkillPoints } from './skillPointService';
 import { getPlayerProgressionState } from './attributesService';
 import {
   computeZoneModifiers,
@@ -1058,31 +1056,14 @@ export async function resolveManualEncounterRound(
   }
 
   // Refresh template from DB so mid-combat template switches take effect
-  const [freshTemplate, freshSkillPoints] = await Promise.all([
-    getActiveTemplate(playerId),
-    getSkillPoints(playerId),
-  ]);
-  const freshUnlockedSet = new Set(freshSkillPoints.unlockedActions);
-  const freshActions: Record<string, ActionDefinition> = {};
-  for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
-    if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || freshUnlockedSet.has(id)) {
-      freshActions[id] = def;
-    }
-  }
-  for (const slot of freshTemplate) {
-    for (const actionId of [slot.actionId, slot.thenActionId]) {
-      if (actionId && !freshActions[actionId] && BASE_ACTION_DEFINITIONS[actionId]) {
-        freshActions[actionId] = BASE_ACTION_DEFINITIONS[actionId]!;
-      }
-    }
-  }
-  state.participant.template = freshTemplate.map(s => ({
+  const fresh = await fetchFreshTemplateData(playerId, state.participant.maxHp);
+  state.participant.template = fresh.playerTemplate.map(s => ({
     actionId: s.actionId,
     condition: s.condition,
     thenActionId: s.thenActionId ?? undefined,
     sortOrder: s.sortOrder,
   }));
-  state.participant.actionDefinitions = freshActions;
+  state.participant.actionDefinitions = fresh.actionDefinitions;
 
   // Apply player's target selection
   state.participant.targetMobId = body.targetMobSlot !== undefined
