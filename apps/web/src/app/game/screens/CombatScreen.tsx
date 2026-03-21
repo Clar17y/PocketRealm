@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { trackEvent, trackOnce } from '@/lib/analytics';
+import { COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { LowHpWarningDialog } from '@/components/common/LowHpWarningDialog';
@@ -384,6 +386,14 @@ export function CombatScreen({
               };
             }}
             onComplete={(combatOutcome) => {
+              // Analytics: track combat action
+              const zone = currentZoneId ?? '';
+              trackEvent('action', { type: 'combat', turns: COMBAT_CONSTANTS.ENCOUNTER_TURN_COST, zone });
+              trackOnce('first_combat', { zone });
+              if (combatOutcome === 'death') {
+                trackEvent('death', { zone, mob: activeSiteCombat.mobFamilyName });
+              }
+
               setActiveSiteCombat(null);
               onActiveEncounterSiteIdChange?.(null);
               refreshPendingEncounters?.();
