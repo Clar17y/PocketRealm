@@ -84,7 +84,8 @@ import {
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
-import { STAMINA_CONSTANTS, MANA_CONSTANTS, ITEM_RARITY_CONSTANTS, COMBAT_CONSTANTS, CRAFTING_CONSTANTS } from '@pocketrealm/shared';
+import { STAMINA_CONSTANTS, MANA_CONSTANTS, ITEM_RARITY_CONSTANTS, COMBAT_CONSTANTS, CRAFTING_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
+
 import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
@@ -104,6 +105,8 @@ import { useAchievements } from './hooks/useAchievements';
 import { useQuests } from './hooks/useQuests';
 import { useCombatPlayback } from './hooks/useCombatPlayback';
 import { runSimpleAction } from './simpleAction';
+import { useApiReachable } from '@/hooks/useApiReachable';
+import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 
 type AttributeType = keyof CharacterProgression['attributes'];
 
@@ -265,7 +268,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const encounterSites = useEncounterSites(isAuthenticated, activeScreen);
   const { refreshPendingEncounters, pendingEncounters } = encounterSites;
   const [lastCombat, setLastCombat] = useState<LastCombat | null>(null);
+  const connectionStatus = useConnectionStatus();
+  const apiReachable = useApiReachable();
+  const isOffline = !apiReachable
+    || connectionStatus === 'disconnected'
+    || connectionStatus === 'reconnecting'
+    || connectionStatus === 'failed';
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [slowAction, setSlowAction] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, expeditionThemes, worldBosses, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
@@ -433,7 +443,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const needs = SCREEN_POLL_NEEDS[activeScreenRef.current] ?? ['turns'];
     const fetches: Promise<void>[] = [];
 
-    fetches.push(getTurns().then(res => { if (res.data) setTurns(res.data.currentTurns); }));
+    fetches.push(getTurns().then(res => {
+      if (res.data) {
+        setTurns(res.data.currentTurns);
+        window.dispatchEvent(new CustomEvent('api:reachable', { detail: { ok: true } }));
+      } else {
+        window.dispatchEvent(new CustomEvent('api:reachable', { detail: { ok: false } }));
+        window.dispatchEvent(new CustomEvent('api:error', {
+          detail: { message: res.error?.message ?? 'Network error', code: res.error?.code ?? 'UNKNOWN' }
+        }));
+      }
+    }));
 
     if (needs.includes('hp') && hpStateRef.current.currentHp < hpStateRef.current.maxHp) {
       fetches.push(getHpState().then(res => {
@@ -467,6 +487,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const result = await getPvpNotificationCount();
     if (result.data) {
       setPvpNotificationCount(result.data.count);
+    } else {
+      window.dispatchEvent(new CustomEvent('api:error', {
+        detail: { message: result.error?.message ?? 'Network error', code: result.error?.code ?? 'UNKNOWN' }
+      }));
     }
   }, []);
 
@@ -477,6 +501,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     ]);
     if (reqRes.data) setIncomingFriendRequestCount(reqRes.data.requests.length);
     if (mailRes.data) setMailUnreadCount(mailRes.data.count);
+    // Dispatch error if both failed (if only one failed, partial success is OK)
+    if (!reqRes.data && !mailRes.data) {
+      window.dispatchEvent(new CustomEvent('api:error', {
+        detail: { message: 'Network error', code: 'NETWORK_ERROR' }
+      }));
+    }
   }, []);
 
   const handleLoadSkillPoints = useCallback(async () => {
@@ -793,10 +823,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (busyAction) return;
     setBusyAction(actionName);
     setActionError(null);
+    setSlowAction(false);
+    const timer = setTimeout(() => setSlowAction(true), UI_TIMING_CONSTANTS.SLOW_ACTION_THRESHOLD_MS);
     try {
       await fn();
     } finally {
+      clearTimeout(timer);
       setBusyAction(null);
+      setSlowAction(false);
     }
   };
 
@@ -1672,6 +1706,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     pushLog,
     lastCombat,
     busyAction,
+    slowAction,
+    isOffline,
     actionError,
     bestiaryMobs,
     bestiaryLoading,

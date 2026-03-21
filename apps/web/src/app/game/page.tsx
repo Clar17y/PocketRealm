@@ -32,6 +32,8 @@ import { QuestToast } from '@/components/QuestToast';
 import { ForgeResultToast } from '@/components/ForgeResultToast';
 import { RateLimitToast } from '@/components/RateLimitToast';
 import { useRateLimitToast } from './hooks/useRateLimitToast';
+import { ErrorToast } from '@/components/ErrorToast';
+import { useErrorToast } from './hooks/useErrorToast';
 import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Casino } from '@/components/screens/Casino';
 import { Settings } from '@/components/screens/Settings';
@@ -163,6 +165,8 @@ export default function GamePage() {
     pendingClockMs,
     lastCombat,
     busyAction,
+    slowAction,
+    isOffline,
     actionError,
     bestiaryMobs,
     bestiaryLoading,
@@ -313,6 +317,7 @@ export default function GamePage() {
   } = useGameController({ isAuthenticated });
 
   useRateLimitToast();
+  useErrorToast(isOffline);
   const { state: pushState, toggle: pushToggle } = usePushNotifications();
 
   // Navigate to screen from query param (e.g. push notification deep link)
@@ -579,6 +584,7 @@ export default function GamePage() {
             onQuickRest={handleQuickRest}
             quickRestPercent={quickRestHealPercent}
             busyAction={busyAction}
+            isOffline={isOffline}
             onNavigateToRest={() => handleNavigate('rest')}
             guildTaxRate={guildTaxRate}
             combatLogPrefetch={combatLogPrefetch}
@@ -1016,6 +1022,7 @@ export default function GamePage() {
             pendingEncounterSort={pendingEncounterSort}
             pendingClockMs={pendingClockMs}
             busyAction={busyAction}
+            isOffline={isOffline}
             lastCombat={lastCombat}
             bestiaryMobs={bestiaryMobs.map((mob) => ({ id: mob.id, isDiscovered: mob.isDiscovered }))}
             templates={templates}
@@ -1058,6 +1065,7 @@ export default function GamePage() {
           <ArenaScreen
             characterLevel={characterProgression.characterLevel}
             busyAction={busyAction}
+            isOffline={isOffline}
             currentTurns={turns}
             playerId={player?.id ?? null}
             isInTown={currentZone?.zoneType === 'town'}
@@ -1422,6 +1430,12 @@ export default function GamePage() {
           </div>
         )}
 
+        {busyAction && slowAction && (
+          <div className="text-center text-xs text-[var(--rpg-gold)] animate-pulse py-1" role="status" aria-live="polite">
+            Still working...
+          </div>
+        )}
+
         {renderScreen()}
         <XpRateTutorial skillName={lowestXpRate.skillName} rate={lowestXpRate.rate} />
       </AppShell>
@@ -1470,6 +1484,7 @@ export default function GamePage() {
       <QuestToast />
       <ForgeResultToast />
       <RateLimitToast />
+      <ErrorToast />
     </ErrorBoundary>
     </>
   );

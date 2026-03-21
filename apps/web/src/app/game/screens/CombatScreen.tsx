@@ -95,6 +95,7 @@ interface CombatScreenProps {
   combatXpRate?: { skillName: string; rate: number };
   staminaState?: { current: number; max: number; regenPerSecond: number };
   manaState?: { current: number; max: number; regenPerSecond: number };
+  isOffline?: boolean;
   // Encounter site combat
   templates?: CombatTemplateData[];
   onActivateTemplate?: (templateId: string) => void;
@@ -143,6 +144,7 @@ export function CombatScreen({
   combatXpRate,
   staminaState,
   manaState,
+  isOffline,
   templates,
   onActivateTemplate,
   onStateUpdates,
@@ -301,6 +303,7 @@ export function CombatScreen({
           onQuickRest={onQuickRest}
           quickRestPercent={quickRestPercent}
           busyAction={busyAction}
+          isOffline={isOffline}
         />
       )}
 
@@ -600,7 +603,7 @@ export function CombatScreen({
                     : null;
                   const isWrongZone = Boolean(currentZoneId) && e.zoneId !== currentZoneId;
                   const isExpeditionLocked = isActivityLocked && activityLockReason === 'expedition';
-                  const isDisabled = isOverEncumbered || hpState.isRecovering || isExpeditionLocked || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData;
+                  const isDisabled = isOverEncumbered || hpState.isRecovering || isExpeditionLocked || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData || isOffline;
                   return (
                     <div
                       key={e.encounterSiteId}
@@ -641,6 +644,7 @@ export function CombatScreen({
                         type="button"
                         onClick={() => handleFightClick(e)}
                         disabled={isDisabled}
+                        title={isOffline ? "You're offline" : undefined}
                         className={`px-3 py-2 rounded font-semibold ${
                           isDisabled
                             ? 'bg-[var(--rpg-border)] text-[var(--rpg-text-secondary)] cursor-not-allowed'
