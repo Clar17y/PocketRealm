@@ -27,6 +27,9 @@ vi.mock('@pocketrealm/game-engine', () => ({
   characterLevelFromXp: vi.fn((xp: number) => Math.floor(xp / 100)),
   rollMobPrefix: vi.fn(() => null),
   rollBonusStatsForRarity: vi.fn(() => null),
+  generateRoomAssignments: vi.fn(() => ({
+    rooms: [{ roomNumber: 1, mobCount: 2 }],
+  })),
 }));
 vi.mock('../middleware/auth', () => ({
   authenticate: vi.fn((_req: any, _res: any, next: any) => next()),

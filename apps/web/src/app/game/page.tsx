@@ -200,8 +200,6 @@ export default function GamePage() {
     handleStartExploration,
     handleExplorationPlaybackComplete,
     handlePlaybackSkip,
-    handleStartCombat,
-    handleSelectStrategy,
     handleCombatPlaybackComplete,
     handleTravelPlaybackComplete,
     handleTravelPlaybackSkip,
@@ -310,6 +308,12 @@ export default function GamePage() {
     lootRevealItems,
     handleDismissLootReveal,
     stateSetters,
+    refreshPendingEncounters,
+    setActionError,
+    activeEncounterSiteId,
+    setActiveEncounterSiteId,
+    isActivityLocked,
+    activityLockReason,
   } = useGameController({ isAuthenticated });
 
   useRateLimitToast();
@@ -497,6 +501,8 @@ export default function GamePage() {
                 isRecovering: hpState.isRecovering,
                 isOverEncumbered,
                 recoveryCost: hpState.recoveryCost,
+                isActivityLocked,
+                activityLockReason,
               }}
               characterProgression={characterProgression}
               skills={skills
@@ -552,6 +558,8 @@ export default function GamePage() {
             activityLog={activityLog}
             isRecovering={hpState.isRecovering}
             isOverEncumbered={isOverEncumbered}
+            isActivityLocked={isActivityLocked}
+            activityLockReason={activityLockReason}
             recoveryCost={hpState.recoveryCost}
             currentHp={hpState.currentHp}
             maxHp={hpState.maxHp}
@@ -745,6 +753,8 @@ export default function GamePage() {
             availableTurns={turns}
             isRecovering={hpState.isRecovering}
             isOverEncumbered={isOverEncumbered}
+            isActivityLocked={isActivityLocked}
+            activityLockReason={activityLockReason}
             playbackActive={playbackActive}
             travelPlaybackData={travelPlaybackData}
             onTravelPlaybackComplete={handleTravelPlaybackComplete}
@@ -867,6 +877,8 @@ export default function GamePage() {
               activityLog={activityLog}
               isRecovering={hpState.isRecovering}
               isOverEncumbered={isOverEncumbered}
+              isActivityLocked={isActivityLocked}
+              activityLockReason={activityLockReason}
               recoveryCost={hpState.recoveryCost}
               zoneCraftingLevel={zoneCraftingLevel}
               zoneName={zoneCraftingName}
@@ -978,6 +990,8 @@ export default function GamePage() {
               onStartGathering={handleMine}
               isRecovering={hpState.isRecovering}
               isOverEncumbered={isOverEncumbered}
+              isActivityLocked={isActivityLocked}
+              activityLockReason={activityLockReason}
               backpackFull={backpackFull}
               ownedResourceNames={ownedResourceNames}
               recoveryCost={hpState.recoveryCost}
@@ -993,6 +1007,8 @@ export default function GamePage() {
           <CombatScreen
             hpState={hpState}
             isOverEncumbered={isOverEncumbered}
+            isActivityLocked={isActivityLocked}
+            activityLockReason={activityLockReason}
             currentTurns={turns}
             currentZoneId={activeZoneId}
             pendingEncounters={pendingEncounters}
@@ -1009,8 +1025,11 @@ export default function GamePage() {
             isOffline={isOffline}
             lastCombat={lastCombat}
             bestiaryMobs={bestiaryMobs.map((mob) => ({ id: mob.id, isDiscovered: mob.isDiscovered }))}
-            onStartCombat={handleStartCombat}
-            onSelectStrategy={handleSelectStrategy}
+            templates={templates}
+            onActivateTemplate={handleTemplateSaved}
+            onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)}
+            refreshPendingEncounters={refreshPendingEncounters}
+            setError={setActionError}
             onPendingEncounterPageChange={handlePendingEncounterPageChange}
             onPendingEncounterZoneFilterChange={handlePendingEncounterZoneFilterChange}
             onPendingEncounterMobFilterChange={handlePendingEncounterMobFilterChange}
@@ -1035,6 +1054,9 @@ export default function GamePage() {
             combatXpRate={primaryCombatXpRate}
             staminaState={staminaState}
             manaState={manaState}
+            advanceTutorial={advanceTutorial}
+            activeEncounterSiteId={activeEncounterSiteId}
+            onActiveEncounterSiteIdChange={setActiveEncounterSiteId}
           />
         );
       }

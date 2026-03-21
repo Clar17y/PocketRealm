@@ -81,6 +81,7 @@ function makeInput(overrides: Partial<RaidRoundInput> = {}): RaidRoundInput {
     roundNumber: overrides.roundNumber ?? 1,
     environmentalDotPercent: overrides.environmentalDotPercent,
     summonPool: overrides.summonPool,
+    splashCascade: overrides.splashCascade,
   };
 }
 
@@ -2495,6 +2496,123 @@ describe('resolveRaidRound', () => {
       const p2Buff = result.participantResults[1].activeEffectsAfter.find(e => e.name === 'Battle Cry');
       expect(p1Buff).toBeDefined();
       expect(p2Buff).toBeUndefined();
+    });
+  });
+
+  describe('splash hit cascade', () => {
+    it('redirects missed attack to next alive mob when splashCascade is true', () => {
+      // Use a RNG that misses on first call (primary target), hits on second call (cascade target)
+      let hitCallCount = 0;
+      const missFirstThenHitRng: RaidRoundRng = {
+        rollHitChance: () => {
+          hitCallCount++;
+          // First call: miss (return 1.0, above any hitChance)
+          // Subsequent calls: hit (return 0, below any hitChance)
+          return hitCallCount <= 1 ? 1.0 : 0;
+        },
+        rollDamage: (min: number) => min,
+        rollCrit: () => false,
+      };
+
+      const mob1 = makeMob({
+        id: 'mob1',
+        hp: 100, maxHp: 100,
+        stats: makeStats({ dodge: 0, evasion: 0 }),
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+      const mob2 = makeMob({
+        id: 'mob2',
+        hp: 100, maxHp: 100,
+        stats: makeStats({ dodge: 0, evasion: 0 }),
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+      const p = makeParticipant({
+        playerId: 'p1',
+        targetMobId: 'mob1',
+        stats: makeStats({ accuracy: 10, damageMin: 20, damageMax: 20 }),
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [mob1, mob2], splashCascade: true }),
+        missFirstThenHitRng,
+      );
+
+      const pr = result.participantResults[0];
+      // Attack cascaded to mob2 — damage should have been dealt
+      expect(pr.damageDealt).toBeGreaterThan(0);
+      expect(pr.hit).toBe(true);
+    });
+
+    it('records a miss when all cascade targets also miss', () => {
+      // RNG always returns 1 — every hit check fails for all mobs
+      const mob1 = makeMob({
+        id: 'mob1',
+        hp: 100, maxHp: 100,
+        stats: makeStats({ dodge: 0, evasion: 0 }),
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+      const mob2 = makeMob({
+        id: 'mob2',
+        hp: 100, maxHp: 100,
+        stats: makeStats({ dodge: 0, evasion: 0 }),
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+      const p = makeParticipant({
+        playerId: 'p1',
+        targetMobId: 'mob1',
+        stats: makeStats({ accuracy: 10, damageMin: 20, damageMax: 20 }),
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [mob1, mob2], splashCascade: true }),
+        alwaysMissRng, // 1.0 roll — misses everything including cascade
+      );
+
+      const pr = result.participantResults[0];
+      // All mobs missed — no damage
+      expect(pr.damageDealt).toBe(0);
+      expect(pr.hit).toBe(false);
+    });
+
+    it('does not cascade when splashCascade is false or undefined', () => {
+      // Same missFirst RNG but without splashCascade — miss stays a miss
+      let hitCallCount2 = 0;
+      const missFirstThenHitRng2: RaidRoundRng = {
+        rollHitChance: () => {
+          hitCallCount2++;
+          return hitCallCount2 <= 1 ? 1.0 : 0;
+        },
+        rollDamage: (min: number) => min,
+        rollCrit: () => false,
+      };
+
+      const mob1 = makeMob({
+        id: 'mob1',
+        hp: 100, maxHp: 100,
+        stats: makeStats({ dodge: 0, evasion: 0 }),
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+      const mob2 = makeMob({
+        id: 'mob2',
+        hp: 100, maxHp: 100,
+        stats: makeStats({ dodge: 0, evasion: 0 }),
+        actionTemplate: [{ actionId: 'boss_rest', targetMode: 'single_target' }],
+      });
+      const p = makeParticipant({
+        playerId: 'p1',
+        targetMobId: 'mob1',
+        stats: makeStats({ accuracy: 10, damageMin: 20, damageMax: 20 }),
+      });
+
+      const result = resolveRaidRound(
+        makeInput({ participants: [p], mobs: [mob1, mob2] }), // no splashCascade
+        missFirstThenHitRng2,
+      );
+
+      const pr = result.participantResults[0];
+      // No cascade — initial miss stays a miss
+      expect(pr.damageDealt).toBe(0);
+      expect(pr.hit).toBe(false);
     });
   });
 });

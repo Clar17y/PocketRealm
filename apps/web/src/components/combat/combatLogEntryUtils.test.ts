@@ -1,34 +1,39 @@
 import { describe, expect, it } from 'vitest';
-
 import { formatHitBreakdown } from './combatLogEntryUtils';
 
 describe('formatHitBreakdown', () => {
-  it('formats score-based hit breakdowns from mode-aware combat logs', () => {
+  it('formats hit breakdown with 2DP percentage and sample', () => {
     const text = formatHitBreakdown({
-      roll: 4,
-      accuracyModifier: 0,
       hitChance: 0.25,
       hitRollValue: 0.95,
       attackerHitScore: 12,
       defenderAvoidScore: 2,
     });
 
-    expect(text).toContain('Roll: 4');
-    expect(text).toContain('25.0% chance');
-    expect(text).toContain('12 hit vs 2 avoid');
-    expect(text).toContain('0.95');
-    expect(text).toContain('Miss');
-    expect(text).not.toContain('10 +');
+    expect(text).toBe('25.00% chance (12 hit vs 2 avoid), sample 0.95 => Miss');
   });
 
-  it('does not fabricate threshold math for old combat logs', () => {
+  it('formats a hit result', () => {
+    const text = formatHitBreakdown({
+      hitChance: 0.5,
+      hitRollValue: 0.44,
+      attackerHitScore: 12,
+      defenderAvoidScore: 2,
+    });
+
+    expect(text).toBe('50.00% chance (12 hit vs 2 avoid), sample 0.44 => Hit');
+  });
+
+  it('returns null when required fields are missing', () => {
+    const text = formatHitBreakdown({});
+    expect(text).toBeNull();
+  });
+
+  it('still accepts legacy fields without breaking (returns null if no new fields)', () => {
     const text = formatHitBreakdown({
       roll: 4,
       accuracyModifier: 0,
-      targetDodge: 2,
-      targetEvasion: 0,
     });
-
     expect(text).toBeNull();
   });
 });

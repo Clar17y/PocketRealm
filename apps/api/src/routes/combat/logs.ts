@@ -16,6 +16,7 @@ const logParamsSchema = z.object({
 const listLogsQuerySchema = z.object({
   ...paginationSchema,
   outcome: z.enum(['victory', 'defeat', 'fled']).optional(),
+  source: z.enum(['zone_combat', 'encounter_site', 'encounter_site_room', 'exploration_ambush', 'travel_ambush']).optional(),
   zoneId: z.string().uuid().optional(),
   mobTemplateId: z.string().uuid().optional(),
   sort: z.enum(['recent', 'xp']).default('recent'),
@@ -41,6 +42,10 @@ interface CombatHistoryListRow {
   fightCount: number;
   encounterSiteId: string | null;
   mobFamilyName: string | null;
+  siteName: string | null;
+  siteRoom: number | null;
+  siteTotalRooms: number | null;
+  siteMode: string | null;
 }
 
 interface CombatHistoryFilterRow {
@@ -59,6 +64,7 @@ export function registerLogRoutes(router: Router): void {
         page: req.query.page,
         pageSize: req.query.pageSize,
         outcome: req.query.outcome,
+        source: req.query.source,
         zoneId: req.query.zoneId,
         mobTemplateId: req.query.mobTemplateId,
         sort: req.query.sort,
@@ -72,7 +78,17 @@ export function registerLogRoutes(router: Router): void {
       ];
 
       if (query.outcome) {
-        whereParts.push(Prisma.sql`("result"->>'outcome') = ${query.outcome}`);
+        // Map frontend outcome values to include encounter site equivalents
+        if (query.outcome === 'victory') {
+          whereParts.push(Prisma.sql`("result"->>'outcome') IN ('victory', 'cleared', 'site_cleared')`);
+        } else if (query.outcome === 'defeat') {
+          whereParts.push(Prisma.sql`("result"->>'outcome') IN ('defeat', 'defeated')`);
+        } else {
+          whereParts.push(Prisma.sql`("result"->>'outcome') = ${query.outcome}`);
+        }
+      }
+      if (query.source) {
+        whereParts.push(Prisma.sql`("result"->>'source') = ${query.source}`);
       }
       if (query.zoneId) {
         whereParts.push(Prisma.sql`("result"->>'zoneId') = ${query.zoneId}`);
@@ -110,19 +126,27 @@ export function registerLogRoutes(router: Router): void {
                 END
               ) AS "source",
               COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) AS "xpGained",
-              COALESCE((
-                SELECT MAX(
-                  CASE
-                    WHEN jsonb_typeof(log_entry->'round') = 'number'
-                      THEN (log_entry->>'round')::int
-                    ELSE 0
-                  END
-                )
-                FROM jsonb_array_elements(COALESCE("result"->'log', '[]'::jsonb)) AS log_entry
-              ), 0) AS "roundCount",
+              COALESCE(
+                NULLIF(("result"->>'roundsResolved'), '')::int,
+                (
+                  SELECT MAX(
+                    CASE
+                      WHEN jsonb_typeof(log_entry->'round') = 'number'
+                        THEN (log_entry->>'round')::int
+                      ELSE 0
+                    END
+                  )
+                  FROM jsonb_array_elements(COALESCE("result"->'log', '[]'::jsonb)) AS log_entry
+                ),
+                0
+              ) AS "roundCount",
               COALESCE(("result"->>'fightCount')::int, 1) AS "fightCount",
               ("result"->>'encounterSiteId') AS "encounterSiteId",
-              ("result"->>'mobFamilyName') AS "mobFamilyName"`;
+              ("result"->>'mobFamilyName') AS "mobFamilyName",
+              ("result"->>'siteName') AS "siteName",
+              ("result"->>'room')::int AS "siteRoom",
+              ("result"->>'totalRooms')::int AS "siteTotalRooms",
+              ("result"->>'mode') AS "siteMode"`;
       const orderBy = query.sort === 'xp'
         ? Prisma.sql`ORDER BY COALESCE(NULLIF("result"->'rewards'->>'xp', '')::int, 0) DESC, "created_at" DESC`
         : Prisma.sql`ORDER BY "created_at" DESC`;
@@ -192,6 +216,10 @@ export function registerLogRoutes(router: Router): void {
           fightCount: row.fightCount,
           encounterSiteId: row.encounterSiteId ?? null,
           mobFamilyName: row.mobFamilyName ?? null,
+          siteName: row.siteName ?? null,
+          siteRoom: row.siteRoom ?? null,
+          siteTotalRooms: row.siteTotalRooms ?? null,
+          siteMode: row.siteMode ?? null,
         })),
         pagination: buildPagination(query.page, query.pageSize, total),
         filters: {
@@ -340,6 +368,28 @@ export function registerLogRoutes(router: Router): void {
             ...combatRecord,
             rewards: nextRewards,
           } as unknown as Prisma.JsonValue;
+        }
+
+        // Enrich chestReward.loot with item names (encounter site room logs)
+        const chestRewardUnknown = combatRecord.chestReward;
+        if (chestRewardUnknown && typeof chestRewardUnknown === 'object' && !Array.isArray(chestRewardUnknown)) {
+          const chestRecord = parseJsonRecord<unknown>(chestRewardUnknown, 'combat.chestReward');
+          const chestLootUnknown = chestRecord.loot;
+          if (Array.isArray(chestLootUnknown)) {
+            const parsedChestLoot = chestLootUnknown
+              .map((entry) => lootDropWithNameSchema.safeParse(entry))
+              .filter((entry): entry is { success: true; data: z.infer<typeof lootDropWithNameSchema> } => entry.success)
+              .map((entry) => entry.data);
+
+            const chestLootWithNames = await enrichLootWithNames(parsedChestLoot);
+            combat = {
+              ...(combat as Record<string, unknown>),
+              chestReward: {
+                ...chestRecord,
+                loot: chestLootWithNames,
+              },
+            } as unknown as Prisma.JsonValue;
+          }
         }
 
         // Map template combat log fields to frontend response shape

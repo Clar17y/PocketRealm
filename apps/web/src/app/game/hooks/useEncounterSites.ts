@@ -89,10 +89,10 @@ export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen
           nextMobPrefix: site.nextMobPrefix,
           nextMobDisplayName: site.nextMobDisplayName,
           discoveredAt: site.discoveredAt,
-          clearStrategy: site.clearStrategy,
           currentRoom: site.currentRoom,
           totalRooms: site.totalRooms,
           roomMobCounts: site.roomMobCounts,
+          currentRoomMobs: site.currentRoomMobs ?? [],
           eventModifiers: site.eventModifiers,
           totalTurnCost: site.totalTurnCost,
         }))

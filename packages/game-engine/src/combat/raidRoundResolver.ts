@@ -44,6 +44,7 @@ import {
   calculateAvoidScore,
   calculateFinalDamage,
 } from './damageCalculator';
+import type { HitResolution } from './damageCalculator';
 import type { CombatMode } from '@pocketrealm/shared';
 
 // --- RNG Interface ---
@@ -84,6 +85,7 @@ interface OffensiveAttackContext {
   mobState: { id: string; hp: number; maxHp: number; stats: CombatantStats; activeEffects: BossActiveEffect[]; name: string; prefix: string | null }[];
   playerActionDefs: Record<string, ActionDefinition>;
   getUsername: (id: string) => string;
+  splashCascade?: boolean;
 }
 
 /**
@@ -156,6 +158,86 @@ function resolvePlayerOffensive(
           roundsRemaining: def.effect.duration,
         });
       }
+
+      // Splash hit cascade: on miss, try other alive mobs in order
+      if (ctx.splashCascade && !isAoe) {
+        const otherMobs = aliveMobs.filter(m => m.id !== target.id && m.hp > 0);
+        const cascadeAttempts: import('@pocketrealm/shared').SplashCascadeAttempt[] = [];
+        let cascadeTarget: typeof target | null = null;
+        for (const candidateMob of otherMobs) {
+          const cascadeAvoid = calculateAvoidScore(candidateMob.stats);
+          const cascadeResult = def.alwaysHits
+            ? guaranteedHitResult(hitScore, cascadeAvoid)
+            : resolveHitCheck({
+                combatMode: ctx.combatMode,
+                hitScore,
+                avoidScore: cascadeAvoid,
+                hitRollValue: ctx.roll.rollHitChance(),
+              });
+          if (cascadeResult.didHit) {
+            cascadeTarget = candidateMob;
+            // Cascade hit: compute damage against cascade target
+            s.hit = true;
+            const rawDmg = ctx.roll.rollDamage(p.stats.damageMin, p.stats.damageMax);
+            const scaledDmg = Math.floor(rawDmg * (def.damageMultiplier ?? 1.0));
+            const crit = ctx.roll.rollCrit(p.stats.critChance ?? 0);
+            if (crit) s.isCritical = true;
+            const isMagicAttack = def.damageType === 'magic' || p.stats.damageType === 'magic';
+            const effectiveDefence = isMagicAttack
+              ? getEffectiveStatValue(candidateMob.stats.magicDefence, candidateMob.activeEffects, 'magicDefence')
+              : getEffectiveStatValue(candidateMob.stats.defence, candidateMob.activeEffects, 'defence');
+            const { damage } = calculateFinalDamage(scaledDmg, effectiveDefence, crit, p.stats.critDamage ?? 0);
+            candidateMob.hp = Math.max(0, candidateMob.hp - damage);
+            totalDamageDealt += damage;
+            if (def.effect?.isDebuff && candidateMob.hp > 0) {
+              const dotFlat = def.effect.damagePerRound ?? 0;
+              const dotPct = def.effect.damagePerRoundPercent ?? 0;
+              const resolvedDot = dotFlat + Math.floor((dotPct / 100) * damage);
+              candidateMob.activeEffects.push({
+                name: def.effect.name,
+                stat: def.effect.stat,
+                modifier: def.effect.modifier,
+                roundsRemaining: def.effect.duration,
+                ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
+              });
+            }
+            cascadeAttempts.push({
+              targetMobName: mobDisplayName(candidateMob),
+              hitChance: cascadeResult.hitChance,
+              hitRollValue: cascadeResult.hitRollValue,
+              attackerHitScore: cascadeResult.hitScore,
+              defenderAvoidScore: cascadeAvoid,
+              hit: true,
+              crit,
+              damageRoll: rawDmg,
+              totalDamage: damage,
+            });
+            break;
+          } else {
+            cascadeAttempts.push({
+              targetMobName: mobDisplayName(candidateMob),
+              hitChance: cascadeResult.hitChance,
+              hitRollValue: cascadeResult.hitRollValue,
+              attackerHitScore: cascadeResult.hitScore,
+              defenderAvoidScore: cascadeAvoid,
+              hit: false,
+            });
+          }
+        }
+        // Log entry shows original miss + cascade chain
+        entries.push({
+          ...baseEntry,
+          hit: !!cascadeTarget,
+          crit: cascadeTarget ? cascadeAttempts[cascadeAttempts.length - 1]?.crit ?? false : false,
+          ...(cascadeTarget ? {
+            damageRoll: cascadeAttempts[cascadeAttempts.length - 1]?.damageRoll,
+            totalDamage: cascadeAttempts[cascadeAttempts.length - 1]?.totalDamage,
+          } : {}),
+          splashCascade: cascadeAttempts,
+        });
+        continue;
+      }
+
       entries.push({ ...baseEntry, hit: false, crit: false });
       continue;
     }
@@ -342,7 +424,7 @@ export function resolveRaidRound(
   }
 
   // --- Step 4: Player offensive phase ---
-  const offensiveCtx: OffensiveAttackContext = { combatMode, roll, mobState, playerActionDefs, getUsername };
+  const offensiveCtx: OffensiveAttackContext = { combatMode, roll, mobState, playerActionDefs, getUsername, splashCascade: input.splashCascade };
 
   for (let i = 0; i < input.participants.length; i++) {
     const p = input.participants[i];
@@ -802,6 +884,10 @@ export function resolveRaidRound(
         const targetIdx = pState.findIndex(ps => ps.playerId === targetId);
         const stance = defStances.get(targetId);
 
+        // Compute hit scores for all attacks (needed for log entries)
+        const mobHitScore = mob.stats.accuracy + (mActionDef.accuracyModifier ?? 0);
+        const playerAvoidScore = calculateAvoidScore(targetParticipant.stats);
+
         // Counter avoids physical, Ward avoids magic
         const blocked = (stance?.avoidsPhysical && isPhysical) || (stance?.resistsMagic && isMagic);
         if (blocked) {
@@ -812,15 +898,16 @@ export function resolveRaidRound(
             blocked: true,
             dodged: false,
             knockedOut: false,
+            mobHitScore,
+            playerAvoidScore,
           });
           continue;
         }
 
         // Hit resolution: normal attacks can be dodged, boss specials (alwaysHits) cannot
+        let hitResult: HitResolution | undefined;
         if (!mActionDef.alwaysHits) {
-          const mobHitScore = mob.stats.accuracy + (mActionDef.accuracyModifier ?? 0);
-          const playerAvoidScore = calculateAvoidScore(targetParticipant.stats);
-          const hitResult = resolveHitCheck({
+          hitResult = resolveHitCheck({
             combatMode,
             hitScore: mobHitScore,
             avoidScore: playerAvoidScore,
@@ -846,6 +933,10 @@ export function resolveRaidRound(
               blocked: false,
               dodged: true,
               knockedOut: false,
+              hitChance: hitResult.hitChance,
+              hitRollValue: hitResult.hitRollValue,
+              mobHitScore,
+              playerAvoidScore,
             });
             continue;
           }
@@ -906,6 +997,11 @@ export function resolveRaidRound(
           blocked: false,
           dodged: false,
           knockedOut: targetState.hp <= 0,
+          hitChance: hitResult?.hitChance,
+          hitRollValue: hitResult?.hitRollValue,
+          mobHitScore,
+          playerAvoidScore,
+          damageRoll: dmgRaw,
         });
 
         // Apply mob debuff/DoT effects to player on hit

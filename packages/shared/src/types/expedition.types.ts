@@ -47,6 +47,7 @@ export interface RaidRoundInput {
   roundNumber: number;
   environmentalDotPercent?: number;
   summonPool?: ExpeditionMobState[];
+  splashCascade?: boolean;
 }
 
 export interface RaidParticipant {
@@ -187,6 +188,18 @@ export interface ExpeditionMemberData {
 
 // --- Round Log (detailed action-level breakdown) ---
 
+export interface SplashCascadeAttempt {
+  targetMobName: string;
+  hitChance: number;
+  hitRollValue: number;
+  attackerHitScore: number;
+  defenderAvoidScore: number;
+  hit: boolean;
+  crit?: boolean;
+  damageRoll?: number;
+  totalDamage?: number;
+}
+
 export interface PlayerAttackEntry {
   entryType?: 'attack';
   playerId: string;
@@ -205,6 +218,8 @@ export interface PlayerAttackEntry {
   totalDamage?: number;
   staminaCost: number;
   manaCost: number;
+  /** Splash cascade chain — present when the attack missed its primary target and cascaded to others. */
+  splashCascade?: SplashCascadeAttempt[];
 }
 
 export type ExhaustedActionReason =
@@ -248,6 +263,11 @@ export interface MobActionLogEntry {
     blocked: boolean;
     dodged: boolean;
     knockedOut: boolean;
+    hitChance?: number;
+    hitRollValue?: number;
+    mobHitScore?: number;
+    playerAvoidScore?: number;
+    damageRoll?: number;
   }[];
 }
 

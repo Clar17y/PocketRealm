@@ -51,9 +51,7 @@ import {
   restEstimate,
   salvage,
   salvageBatch,
-  selectSiteStrategy,
   useItem,
-  startCombatFromEncounterSite,
   startExploration,
   travelToZone,
   unequip,
@@ -70,6 +68,7 @@ import {
   allocateSkillPoint,
   respecSkillPoints,
   getTemplates,
+  activateTemplate,
   type ApiResponse,
   type PendingLootItem,
   type WorldEventResponse,
@@ -79,6 +78,7 @@ import {
   getIncomingFriendRequests,
   getFriendMailUnreadCount,
   getPlayerBuffs,
+  getExpeditionCooldowns,
 } from '@/lib/api';
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
@@ -277,6 +277,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [actionError, setActionError] = useState<string | null>(null);
   const { bestiaryMobs, bestiaryLoading, bestiaryError, bestiaryPrefixSummary, expeditionThemes, worldBosses, loadBestiary } = useBestiary(isAuthenticated, activeScreen);
   const [hpState, setHpState] = useState<HpState>({ currentHp: 100, maxHp: 100, regenPerSecond: 0.4, isRecovering: false, recoveryCost: null });
+  const [activeEncounterSiteId, setActiveEncounterSiteId] = useState<string | null>(null);
+  const [hasActiveExpedition, setHasActiveExpedition] = useState(false);
   const [staminaState, setStaminaState] = useState<ResourceState>({
     current: STAMINA_CONSTANTS.BASE_POOL, max: STAMINA_CONSTANTS.BASE_POOL,
     regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 5
@@ -429,6 +431,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setActiveBuffs: setActiveBuffs,
     setCharacterProgression: (cp) => setCharacterProgression((prev) => ({ ...prev, ...cp })),
     setMaterialTotals,
+    setActiveEncounterSiteId,
+    setActiveZoneId,
   }), []);
   // All useState setters are stable references, so empty deps is correct
 
@@ -553,6 +557,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         attributes: playerRes.data.player.attributes,
       });
       setGold(playerRes.data.player.gold ?? 0);
+      setActiveEncounterSiteId(playerRes.data.player.activeEncounterSiteId ?? null);
       initSettingsFromServer(playerRes.data.player);
       const serverTutorialStep = playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED;
       setTutorialStep(serverTutorialStep);
@@ -577,6 +582,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     if (skillPointRes.data) setSkillPointState(skillPointRes.data);
     if (buffsRes.data) setActiveBuffs(buffsRes.data.buffs);
+
+    // Load expedition state for activity lock (non-blocking)
+    getExpeditionCooldowns().then((cdRes) => {
+      if (cdRes.data) setHasActiveExpedition(cdRes.data.hasActiveExpedition);
+    });
+
     if (zonesRes.data) {
       setZones(zonesRes.data.zones);
       setZoneConnections(zonesRes.data.connections);
@@ -662,11 +673,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (res.data) setTutorialStep(res.data.tutorialStep);
   }, []);
 
-  const handleTemplateSaved = useCallback(() => {
+  const handleTemplateSaved = useCallback(async (templateId?: string) => {
+    if (templateId) {
+      await activateTemplate(templateId);
+      await handleLoadTemplates();
+    }
     if (tutorialStep === TUTORIAL_STEP_SAVE_TEMPLATE) {
       void advanceTutorial(TUTORIAL_STEP_SAVE_TEMPLATE);
     }
-  }, [tutorialStep, advanceTutorial]);
+  }, [tutorialStep, advanceTutorial, handleLoadTemplates]);
 
   const handleClaimStarterWeapon = useCallback(async (weaponType: 'melee' | 'ranged' | 'magic') => {
     const res = await claimStarterWeapon(weaponType);
@@ -917,167 +932,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
     await finalizeExplorationPlayback();
   };
-
-  const handleStartCombat = async (encounterSiteId: string) => {
-    const selectedSite = pendingEncounters.find((site) => site.encounterSiteId === encounterSiteId);
-    if (selectedSite && activeZoneId && selectedSite.zoneId !== activeZoneId) {
-      setActionError(`Travel to ${selectedSite.zoneName} before fighting this encounter.`);
-      return;
-    }
-
-    const hpBefore = hpState.currentHp;
-
-    await runAction('combat', async () => {
-      const res = await startCombatFromEncounterSite(encounterSiteId, 'melee');
-      const data = res.data;
-      if (!data) {
-        if (res.error?.code === 'SITE_DECAYED' || res.error?.code === 'NOT_FOUND') {
-          await refreshPendingEncounters();
-        }
-        setActionError(res.error?.message ?? 'Combat failed');
-        return;
-      }
-
-      setTurns(data.turns.currentTurns);
-      showQuestToasts(data.questProgress);
-
-      const rewards: LastCombat['rewards'] = {
-        xp: data.rewards.xp,
-        loot: data.rewards.loot,
-        siteCompletion: data.rewards.siteCompletion ?? null,
-        skillXpGrants: data.rewards.skillXpGrants ?? [],
-      };
-
-      // Build playback queue from fights[] or single-element queue for zone combat
-      if (data.combat.fights && data.combat.fights.length > 0) {
-        const queue = data.combat.fights.map((fight, idx) => {
-          const fightLogId = fight.combatLogId;
-          return {
-            room: fight.room,
-            mobName: fight.mobName ?? data.combat.mobName,
-            mobDisplayName: fight.mobDisplayName,
-            mobTemplateId: fight.mobTemplateId,
-            mobPrefix: fight.mobPrefix,
-            outcome: fight.outcome,
-            combatantAMaxHp: fight.playerMaxHp,
-            playerStartHp: fight.playerStartHp,
-            playerStartStamina: fight.playerStartStamina,
-            playerStartMana: fight.playerStartMana,
-            combatantBMaxHp: fight.mobMaxHp,
-            log: fight.log?.length ? (fight.log as LastCombatLogEntry[]) : null,
-            combatLogId: fightLogId,
-            activeEvents: data.activeEvents,
-            rewards: {
-              xp: fight.xp,
-              loot: fight.loot,
-              siteCompletion: null as LastCombat['rewards']['siteCompletion'],
-              skillXpGrants: fight.skillXpGrants ?? [],
-            } satisfies LastCombat['rewards'],
-          };
-        });
-
-        // Pre-fetch first two fights' logs
-        for (let i = 0; i < Math.min(2, queue.length); i++) {
-          if (queue[i].combatLogId) {
-            combatLogPrefetch.prefetch(queue[i].combatLogId!);
-          }
-        }
-
-
-        pendingCombatRewardsRef.current = rewards;
-        setCombatPlaybackQueue(queue);
-        setCombatPlaybackIndex(0);
-      } else {
-        const combatLogId = data.combat.combatLogId;
-        setCombatPlaybackQueue([{
-          mobName: data.combat.mobName,
-          mobDisplayName: data.combat.mobDisplayName,
-          mobTemplateId: data.combat.mobTemplateId,
-          mobPrefix: data.combat.mobPrefix,
-          outcome: data.combat.outcome,
-          combatantAMaxHp: data.combat.playerMaxHp,
-          playerStartHp: hpBefore,
-          playerStartStamina: data.combat.playerStartStamina,
-          playerStartMana: data.combat.playerStartMana,
-          combatantBMaxHp: data.combat.mobMaxHp,
-          log: data.combat.log?.length ? (data.combat.log as LastCombatLogEntry[]) : null,
-          combatLogId,
-          activeEvents: data.activeEvents,
-          rewards,
-        }]);
-        setCombatPlaybackIndex(0);
-        pendingCombatRewardsRef.current = rewards;
-
-        if (combatLogId) combatLogPrefetch.prefetch(combatLogId);
-      }
-      setPlaybackActive(true);
-      if (activeZoneId) recordTurnsSpent(activeZoneId, 1);
-
-      if (data.rewards.siteCompletion) {
-        siteJustClearedRef.current = true;
-      }
-
-      logActiveEvents(data.activeEvents);
-
-      if (data.rewards.siteCompletion) {
-        const chest = data.rewards.siteCompletion;
-        const chestLabel = `${chest.chestRarity.charAt(0).toUpperCase()}${chest.chestRarity.slice(1)} Chest`;
-        const lootCount = chest.loot.reduce((sum, entry) => sum + entry.quantity, 0);
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `Encounter site cleared. ${chestLabel} opened with ${lootCount} item${lootCount === 1 ? '' : 's'}.`,
-        });
-
-        if (chest.recipeUnlocked) {
-          const unlockedRecipe = chest.recipeUnlocked;
-          pushLog({
-            timestamp: nowStamp(),
-            type: 'success',
-            message: `Learned advanced recipe: ${unlockedRecipe.recipeName}.`,
-          });
-        }
-      }
-
-      for (const grant of data.rewards?.skillXpGrants ?? []) {
-        if (grant.leveledUp) {
-          const skillName = grant.skillType.charAt(0).toUpperCase() + grant.skillType.slice(1);
-          pushLog({ timestamp: nowStamp(), type: 'success', message: `🎉 ${skillName} leveled up to ${grant.newLevel}!` });
-        }
-      }
-
-      logDurabilityWarnings(data.rewards.durabilityLost);
-
-      if (data.combat.room?.roomCleared && data.combat.room.siteStrategy === 'room_by_room') {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `Room ${data.combat.room.currentRoom} cleared! You can rest before the next room.`,
-        });
-      }
-
-      // Store pending loot session ID for activation after playback
-      combatPendingLootRef.current = data.pendingLootSessionId ?? null;
-
-      applyStateUpdates(data.stateUpdates, stateSetters);
-      await loadBestiary(false);
-    });
-  };
-
-  const handleSelectStrategy = useCallback(async (
-    encounterSiteId: string,
-    strategy: 'full_clear' | 'room_by_room'
-  ) => {
-    setBusyAction('strategy');
-    try {
-      await selectSiteStrategy(encounterSiteId, strategy);
-      await refreshPendingEncounters();
-    } catch (err) {
-      pushLog({ timestamp: nowStamp(), type: 'danger', message: `Failed to select strategy: ${(err as Error).message}` });
-    } finally {
-      setBusyAction(null);
-    }
-  }, [refreshPendingEncounters]);
 
   const handleNavigate = (screen: string) => {
     // Auto-skip any active playback when navigating away
@@ -1912,8 +1766,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     handleStartExploration,
     handleExplorationPlaybackComplete,
     handlePlaybackSkip,
-    handleStartCombat,
-    handleSelectStrategy,
     handleCombatPlaybackComplete,
     handleTravelPlaybackComplete,
     handleTravelPlaybackSkip,
@@ -1966,5 +1818,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Loot reveal
     lootRevealItems,
     handleDismissLootReveal,
+
+    // Encounter site combat
+    refreshPendingEncounters,
+    setActionError,
+    activeEncounterSiteId,
+    setActiveEncounterSiteId,
+
+    // Activity lock (encounter site / expedition in progress)
+    isActivityLocked: !!activeEncounterSiteId || hasActiveExpedition,
+    activityLockReason: activeEncounterSiteId ? 'encounter' as const : hasActiveExpedition ? 'expedition' as const : null,
   };
 }

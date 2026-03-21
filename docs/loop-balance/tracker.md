@@ -31,7 +31,7 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 
 | # | System | Issue | Source Report | Status | Plan |
 |---|--------|-------|--------------|--------|------|
-| 6 | Exploration | Extreme ambush dominance (6.25x more common than encounter sites) | exploration-constants | `confirmed` | Encounter Site Rework |
+| 6 | Exploration | Extreme ambush dominance (6.25x more common than encounter sites) | exploration-constants | `done` | Encounter Site Rework |
 | 7 | Exploration | Travel ambush rate creates punishing zone transitions (~4 forced combats per travel) | exploration-constants | `wontfix` | |
 | 8 | Skills | Marginal XP per level too flat at high levels (level 100 reachable in 43 days combat) | skill-constants | `done` | XP Curve Rebalance — PR #128 |
 | 9 | Skills | 2.14x non-combat vs combat XP gap (non-combat maxes 2x faster) | skill-constants | `done` | XP Curve Rebalance — PR #128 |
@@ -55,7 +55,7 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 | 27 | Guild | Contract rewards negligible (<1% of treasury income) | guild-constants | `confirmed` | Guild Economy Redesign |
 | 28 | Guild | Boost scaling cliffs at 5 and 10 members (50%->75%->100% jumps) | guild-constants | `confirmed` | Guild Economy Redesign |
 | 29 | Potion | Mana potion tier gap (T1 -> T4, no mid-game mana potion) | potion-constants | `done` | PR #141 — added T2/T3 mana potions |
-| 30 | Room/Clear | Decay exploit for full-clear (wait for mobs to decay, keep full-clear bonuses) | room-and-full-clear-constants | `confirmed` | Encounter Site Rework |
+| 30 | Room/Clear | Decay exploit for full-clear (wait for mobs to decay, keep full-clear bonuses) | room-and-full-clear-constants | `done` | Encounter Site Rework |
 | 31 | Room/Clear | Large site mob count variance too high (6-20 mobs, 3.3x ratio) | room-and-full-clear-constants | `wontfix` | |
 | 32 | Chest | Small chests have zero recipe chance | chest-constants | `done` | PR #144 — CHEST_RECIPE_CHANCE_SMALL: 0.005 |
 | 33 | World Event | Global spawn cooldown prevents zone+world events from co-spawning | world-event-constants | `done` | PR #143 — dedicated boss timer |
@@ -67,7 +67,7 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 | # | System | Issue | Source Report | Status | Plan |
 |---|--------|-------|--------------|--------|------|
 | 36 | Exploration | Hidden cache near-impossibility at low turn counts (9.5% at 1000 turns) | exploration-constants | `done` | PR #144 — HIDDEN_CACHE_CHANCE 0.0002 |
-| 37 | Exploration | Encounter site decay rate misaligned with discovery rate (sites accumulate) | exploration-constants | `confirmed` | Encounter Site Rework |
+| 37 | Exploration | Encounter site decay rate misaligned with discovery rate (sites accumulate) | exploration-constants | `done` | Encounter Site Rework |
 | 38 | Exploration | Min exploration (10 turns) is nearly valueless | exploration-constants | `done` | PR #144 — MIN 100, MAX 2500 |
 | 39 | Exploration | Potential exploit with spawnRateMultiplier stacking | exploration-constants | `wontfix` | |
 | 40 | Skills | Window-based cap creates degenerate multi-skill rotation | skill-constants | `wontfix` | |
@@ -105,11 +105,11 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 | 72 | Potion | Mana potion values asymmetrically low vs stamina (~30% less) | potion-constants | `done` | PR #141 — rebalanced to ~75-83% stamina parity |
 | 73 | Turn | Respec under max guild tax nearly impossible (96.5% of bank cap) | turn-constants | `wontfix` | |
 | 74 | Turn | No turn sink for high-activity endgame | turn-constants | `deferred` | Addressed by planned Tradeskill Turn-Sink System (see talent-tree-aoe-balance-design.md) |
-| 75 | Room/Clear | Large full-clear weak reward premium (no chest tier upgrade, already capped at rare) | room-and-full-clear-constants | `confirmed` | Encounter Site Rework |
-| 76 | Room/Clear | Admin/player site generation divergence | room-and-full-clear-constants | `confirmed` | Encounter Site Rework |
-| 77 | Room/Clear | Medium per-room mob range identical to small | room-and-full-clear-constants | `confirmed` | Encounter Site Rework |
+| 75 | Room/Clear | Large full-clear weak reward premium (no chest tier upgrade, already capped at rare) | room-and-full-clear-constants | `done` | Encounter Site Rework |
+| 76 | Room/Clear | Admin/player site generation divergence | room-and-full-clear-constants | `done` | Encounter Site Rework |
+| 77 | Room/Clear | Medium per-room mob range identical to small | room-and-full-clear-constants | `done` | Encounter Site Rework |
 | 78 | Chest | Large sites less material-roll-efficient than medium | chest-constants | `wontfix` | |
-| 79 | Chest | No chest tier above rare (caps reward ceiling) | chest-constants | `confirmed` | Encounter Site Rework |
+| 79 | Chest | No chest tier above rare (caps reward ceiling) | chest-constants | `done` | Encounter Site Rework |
 | 80 | World Event | Dead code: HEALER_MAGIC_SCALING and ATTACKER_TURN_SCALING | world-event-constants | `done` | PR #144 — deleted |
 | 81 | World Event | Persisted mob regen floor issue (low-HP mobs never heal) | world-event-constants | `done` | PR #144 — conditional Math.ceil with 1-min gate |
 | 82 | World Event | Uniform event durations (all 6 hours, no variation) | world-event-constants | `done` | PR #143 — world-wide 6h → 4h |
@@ -139,11 +139,11 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 6. [World Boss & Events](plans/06-world-boss-events.md) — #22, #33, #82 — [PR #143](https://github.com/Clar17y/Adventure/pull/143)
 7. [Quick Fixes Batch](plans/07-quick-fixes-batch.md) — #10, #15, #26, #32, #36, #38, #59, #60, #68, #70, #71, #80, #81, #89, #90 — [PR #144](https://github.com/Clar17y/Adventure/pull/144)
 8. [Durability System Overhaul](plans/08-durability-system-overhaul.md) — #11, #12, #13, #44, #45, #46
+9. [Encounter Site Rework](plans/08-encounter-site-rework.md) — #6, #30, #37, #75, #76, #77, #79
 
 ### Needs Brainstorm First
 
 - **Guild Economy Redesign** — #1, #2, #27, #28, #94, #95
-- **Encounter Site Rework** — #6, #30, #37, #75, #76, #77, #79
 - **Boss/Threat System** — #20, #21
 
 ---

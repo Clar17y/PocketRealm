@@ -1,8 +1,9 @@
 import { CHEST_CONSTANTS } from '@pocketrealm/shared';
 import type { EncounterSiteSize } from '@pocketrealm/shared';
 export type { EncounterSiteSize };
-export type ChestRarity = 'common' | 'uncommon' | 'rare';
+export type ChestRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
+/** @deprecated Use getChestRarityForRoomCount instead */
 export function getChestRarityForEncounterSize(size: EncounterSiteSize): ChestRarity {
   if (size === 'small') return 'common';
   if (size === 'medium') return 'uncommon';
@@ -39,8 +40,45 @@ export function rollEncounterChestRecipeDrop(
   return rng() < chance;
 }
 
+/** @deprecated No longer used — tier upgrade removed */
 export function getUpgradedChestSize(size: EncounterSiteSize): EncounterSiteSize {
   if (size === 'small') return 'medium';
   if (size === 'medium') return 'large';
   return 'large';
+}
+
+export function getChestRarityForRoomCount(rooms: number): ChestRarity {
+  if (rooms <= 1) return 'common';
+  if (rooms === 2) return 'uncommon';
+  if (rooms === 3) return 'rare';
+  return 'epic';
+}
+
+export function getChestMaterialRollRangeForRoomCount(rooms: number): { min: number; max: number } {
+  const rarity = getChestRarityForRoomCount(rooms);
+  switch (rarity) {
+    case 'common': return CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_SMALL;
+    case 'uncommon': return CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_MEDIUM;
+    case 'rare': return CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_LARGE;
+    case 'epic': return CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_EPIC;
+    case 'legendary': return CHEST_CONSTANTS.CHEST_MATERIAL_ROLLS_LEGENDARY;
+  }
+}
+
+export function getChestRecipeChanceForRoomCount(rooms: number): number {
+  const rarity = getChestRarityForRoomCount(rooms);
+  switch (rarity) {
+    case 'common': return CHEST_CONSTANTS.CHEST_RECIPE_CHANCE_SMALL;
+    case 'uncommon': return CHEST_CONSTANTS.CHEST_RECIPE_CHANCE_MEDIUM;
+    case 'rare': return CHEST_CONSTANTS.CHEST_RECIPE_CHANCE_LARGE;
+    case 'epic': return CHEST_CONSTANTS.CHEST_RECIPE_CHANCE_EPIC;
+    case 'legendary': return CHEST_CONSTANTS.CHEST_RECIPE_CHANCE_LEGENDARY;
+  }
+}
+
+export function rollChestMaterialRollsByRoomCount(rooms: number, rng: () => number = Math.random): number {
+  const range = getChestMaterialRollRangeForRoomCount(rooms);
+  if (range.min >= range.max) return range.min;
+  const roll = Math.max(0, Math.min(1, rng()));
+  return Math.floor(roll * (range.max - range.min + 1)) + range.min;
 }

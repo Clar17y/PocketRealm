@@ -52,7 +52,7 @@ import { grantCacheLootTx } from '../../services/cacheLootService';
 import { getInventoryState } from '../../services/inventoryService';
 import { storePendingLoot, type PendingLootItem } from '../../services/pendingLootService';
 import { getMainHandAttackSkill } from '../../services/combatStatsService';
-import { checkExpeditionLockout } from '../../services/expeditionLockoutService';
+import { checkActivityLockout } from '../../services/expeditionLockoutService';
 import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers';
 import {
   startSchema,
@@ -81,7 +81,7 @@ export const startRouter = Router();
  */
 startRouter.post('/start', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
-    await checkExpeditionLockout(playerId);
+    await checkActivityLockout(playerId);
     const body = startSchema.parse(req.body);
 
     const hpState = await assertCanAct(playerId);
@@ -853,7 +853,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
             name: discovery.siteName,
             size: discovery.size,
             mobs: { mobs: discovery.mobs } as unknown as Prisma.InputJsonValue,
-            ...(distinctRooms <= 1 ? { clearStrategy: 'full_clear', fullClearActive: true } : {}),
+            totalRooms: distinctRooms,
           },
           select: {
             id: true,
