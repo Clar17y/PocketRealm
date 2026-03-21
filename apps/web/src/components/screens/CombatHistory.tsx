@@ -388,11 +388,10 @@ export function CombatHistory() {
                   setSelectedDetail(null);
                   setSelectedLogId(entry.logId);
                 }}
-                className={`w-full text-left border rounded-lg p-2 transition-colors ${
-                  selectedLogId === entry.logId
-                    ? 'border-[var(--rpg-gold)] bg-[var(--rpg-background)]'
-                    : 'border-[var(--rpg-border)] bg-[var(--rpg-surface)]'
-                }`}
+                className={`w-full text-left border rounded-lg p-2 transition-colors ${selectedLogId === entry.logId
+                  ? 'border-[var(--rpg-gold)] bg-[var(--rpg-background)]'
+                  : 'border-[var(--rpg-border)] bg-[var(--rpg-surface)]'
+                  }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-sm text-[var(--rpg-text-primary)] font-semibold truncate">
