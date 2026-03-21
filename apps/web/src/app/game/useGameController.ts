@@ -68,6 +68,7 @@ import {
   allocateSkillPoint,
   respecSkillPoints,
   getTemplates,
+  activateTemplate,
   type ApiResponse,
   type PendingLootItem,
   type WorldEventResponse,
@@ -643,11 +644,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (res.data) setTutorialStep(res.data.tutorialStep);
   }, []);
 
-  const handleTemplateSaved = useCallback(() => {
+  const handleTemplateSaved = useCallback(async (templateId?: string) => {
+    if (templateId) {
+      await activateTemplate(templateId);
+      await handleLoadTemplates();
+    }
     if (tutorialStep === TUTORIAL_STEP_SAVE_TEMPLATE) {
       void advanceTutorial(TUTORIAL_STEP_SAVE_TEMPLATE);
     }
-  }, [tutorialStep, advanceTutorial]);
+  }, [tutorialStep, advanceTutorial, handleLoadTemplates]);
 
   const handleClaimStarterWeapon = useCallback(async (weaponType: 'melee' | 'ranged' | 'magic') => {
     const res = await claimStarterWeapon(weaponType);
