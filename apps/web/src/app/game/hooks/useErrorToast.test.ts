@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useErrorToast } from './useErrorToast';
+import { UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
 
 function fireApiError(message = 'Network error', code = 'NETWORK_ERROR') {
   window.dispatchEvent(new CustomEvent('api:error', { detail: { message, code } }));
@@ -36,7 +37,7 @@ describe('useErrorToast', () => {
   it('allows toast after 10s debounce expires', () => {
     renderHook(() => useErrorToast(false));
     fireApiError('Error 1');
-    vi.advanceTimersByTime(10_000);
+    vi.advanceTimersByTime(UI_TIMING_CONSTANTS.ERROR_TOAST_DEBOUNCE_MS);
     fireApiError('Error 2');
     expect(showToast).toHaveBeenCalledTimes(2);
   });

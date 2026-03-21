@@ -83,7 +83,7 @@ import {
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
-import { STAMINA_CONSTANTS, MANA_CONSTANTS } from '@pocketrealm/shared';
+import { STAMINA_CONSTANTS, MANA_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
 import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
@@ -789,7 +789,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setBusyAction(actionName);
     setActionError(null);
     setSlowAction(false);
-    const timer = setTimeout(() => setSlowAction(true), 10_000);
+    const timer = setTimeout(() => setSlowAction(true), UI_TIMING_CONSTANTS.SLOW_ACTION_THRESHOLD_MS);
     try {
       await fn();
     } finally {

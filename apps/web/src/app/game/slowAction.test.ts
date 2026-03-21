@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
 
 describe('runAction slow-action timer', () => {
   beforeEach(() => {
@@ -24,7 +25,7 @@ describe('runAction slow-action timer', () => {
       setBusyAction(actionName);
       setActionError(null);
       setSlowAction(false);
-      const timer = setTimeout(() => setSlowAction(true), 10_000);
+      const timer = setTimeout(() => setSlowAction(true), UI_TIMING_CONSTANTS.SLOW_ACTION_THRESHOLD_MS);
       try {
         await fn();
       } finally {
@@ -37,7 +38,7 @@ describe('runAction slow-action timer', () => {
     const promise = runAction('test', () => actionPromise);
 
     // Before 10s
-    vi.advanceTimersByTime(9_999);
+    vi.advanceTimersByTime(UI_TIMING_CONSTANTS.SLOW_ACTION_THRESHOLD_MS - 1);
     expect(slowAction).toBe(false);
     expect(busyAction).toBe('test');
 
@@ -65,7 +66,7 @@ describe('runAction slow-action timer', () => {
       setBusyAction(actionName);
       setActionError(null);
       setSlowAction(false);
-      const timer = setTimeout(() => setSlowAction(true), 10_000);
+      const timer = setTimeout(() => setSlowAction(true), UI_TIMING_CONSTANTS.SLOW_ACTION_THRESHOLD_MS);
       try {
         await fn();
       } finally {

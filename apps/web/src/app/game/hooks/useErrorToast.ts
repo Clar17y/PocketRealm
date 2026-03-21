@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
 
 export function useErrorToast(isOffline: boolean) {
   const isOfflineRef = useRef(isOffline);
@@ -19,7 +20,7 @@ export function useErrorToast(isOffline: boolean) {
 
       timeout = setTimeout(() => {
         timeout = null;
-      }, 10_000);
+      }, UI_TIMING_CONSTANTS.ERROR_TOAST_DEBOUNCE_MS);
     };
 
     window.addEventListener('api:error', handler);
