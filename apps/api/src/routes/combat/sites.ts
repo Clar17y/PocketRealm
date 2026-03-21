@@ -4,20 +4,55 @@ import { prisma } from '@pocketrealm/database';
 import { getMobPrefixDefinition, COMBAT_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
 import { asyncHandler } from '../../utils/asyncHandler';
-import { buildPagination } from '../../utils/routeHelpers.js';
+import { buildPagination, serializeXpGrant } from '../../utils/routeHelpers.js';
 import { getEventModifiersForEntity, type EventModifierBadge } from '../../services/worldEventService';
 import {
   listEncounterSitesQuerySchema,
   applyEncounterSiteDecayAndPersist,
 } from './helpers';
+import {
+  autoResolveEncounterRoom,
+  startManualEncounterRoom,
+  resolveManualEncounterRound,
+  clearManualCombatSession,
+  parseEncounterMobSlot,
+} from '../../services/encounterSiteCombatService';
+import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers.js';
 
 const abandonSchema = z.object({
   zoneId: z.string().uuid().optional(),
 });
 
-const strategySchema = z.object({
-  strategy: z.enum(['full_clear', 'room_by_room']),
+const roundSchema = z.object({
+  action: z.enum(['template']).optional(),
+  targetMobSlot: z.number().int().optional(),
 });
+
+async function mapChestRewardDTO(completionRewards: Awaited<ReturnType<typeof autoResolveEncounterRoom>>['completionRewards']) {
+  if (!completionRewards) return undefined;
+
+  // Look up item template names for the loot
+  const templateIds = [...new Set(completionRewards.loot.map(l => l.itemTemplateId))];
+  const templates = templateIds.length > 0
+    ? await prisma.itemTemplate.findMany({
+        where: { id: { in: templateIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const nameMap = new Map(templates.map(t => [t.id, t.name]));
+
+  return {
+    rarity: completionRewards.chestRarity,
+    materials: completionRewards.loot.map(l => ({
+      itemTemplateId: l.itemTemplateId,
+      name: nameMap.get(l.itemTemplateId) ?? l.itemTemplateId,
+      quantity: l.quantity,
+    })),
+    recipe: completionRewards.recipeUnlocked
+      ? { recipeId: completionRewards.recipeUnlocked.recipeId, name: completionRewards.recipeUnlocked.recipeName }
+      : null,
+  };
+}
 
 export function registerSiteRoutes(router: Router): void {
   /**
@@ -67,10 +102,10 @@ export function registerSiteRoutes(router: Router): void {
         nextMobTemplateId: string | null;
         nextMobPrefix: string | null;
         discoveredAt: string;
-        clearStrategy: string | null;
         currentRoom: number;
         totalRooms: number;
         roomMobCounts: Array<{ room: number; alive: number; total: number }>;
+        currentRoomMobs: Array<{ slot: number; mobTemplateId: string; prefix: string | null; status: string }>;
       }> = [];
 
       for (const site of sites) {
@@ -92,6 +127,11 @@ export function registerSiteRoutes(router: Router): void {
           };
         });
 
+        const currentRoomNumber = site.currentRoom ?? 1;
+        const currentRoomMobs = decayed.mobs
+          .filter(m => (m.room ?? 1) === currentRoomNumber && m.status === 'alive')
+          .map(m => ({ slot: m.slot, mobTemplateId: m.mobTemplateId, prefix: m.prefix ?? null, status: m.status }));
+
         activeSites.push({
           encounterSiteId: site.id,
           zoneId: site.zoneId,
@@ -107,23 +147,27 @@ export function registerSiteRoutes(router: Router): void {
           nextMobTemplateId: decayed.nextMob?.mobTemplateId ?? null,
           nextMobPrefix: decayed.nextMob?.prefix ?? null,
           discoveredAt: site.discoveredAt.toISOString(),
-          clearStrategy: site.clearStrategy ?? null,
-          currentRoom: site.currentRoom ?? 1,
-          totalRooms: roomNumbers.length,
+          currentRoom: currentRoomNumber,
+          totalRooms: site.totalRooms ?? roomNumbers.length,
           roomMobCounts,
+          currentRoomMobs,
         });
       }
 
-      const nextMobTemplateIds = Array.from(
-        new Set(activeSites.map((site) => site.nextMobTemplateId).filter((id): id is string => Boolean(id)))
-      );
-      const nextMobRows = nextMobTemplateIds.length > 0
+      // Collect all mob template IDs (next mob + current room mobs) for name/HP lookup
+      const allMobTemplateIds = new Set<string>();
+      for (const site of activeSites) {
+        if (site.nextMobTemplateId) allMobTemplateIds.add(site.nextMobTemplateId);
+        for (const mob of site.currentRoomMobs) allMobTemplateIds.add(mob.mobTemplateId);
+      }
+      const mobTemplateRows = allMobTemplateIds.size > 0
         ? await prisma.mobTemplate.findMany({
-            where: { id: { in: nextMobTemplateIds } },
-            select: { id: true, name: true },
+            where: { id: { in: [...allMobTemplateIds] } },
+            select: { id: true, name: true, hp: true },
           })
         : [];
-      const nextMobNameById = new Map(nextMobRows.map((row) => [row.id, row.name]));
+      const mobTemplateById = new Map(mobTemplateRows.map((row) => [row.id, row]));
+      const nextMobNameById = new Map(mobTemplateRows.map((row) => [row.id, row.name]));
 
       activeSites.sort((a, b) => {
         if (query.sort === 'danger') {
@@ -175,10 +219,19 @@ export function registerSiteRoutes(router: Router): void {
             nextMobPrefix: site.nextMobPrefix,
             nextMobDisplayName,
             discoveredAt: site.discoveredAt,
-            clearStrategy: site.clearStrategy,
-            currentRoom: site.currentRoom,
             totalRooms: site.totalRooms,
+            currentRoom: site.currentRoom,
             roomMobCounts: site.roomMobCounts,
+            currentRoomMobs: site.currentRoomMobs.map(m => {
+              const template = mobTemplateById.get(m.mobTemplateId);
+              return {
+                slot: m.slot,
+                name: template?.name ?? 'Unknown',
+                prefix: m.prefix,
+                hp: template?.hp ?? 0,
+                maxHp: template?.hp ?? 0,
+              };
+            }),
             eventModifiers: badgeCache.get(`${site.zoneId}:${site.mobFamilyId}`) ?? [],
             totalTurnCost: site.aliveMobs * COMBAT_CONSTANTS.ENCOUNTER_TURN_COST,
           };
@@ -210,38 +263,186 @@ export function registerSiteRoutes(router: Router): void {
   }));
 
   /**
-   * POST /api/v1/combat/sites/:id/strategy
-   * Select clearing strategy for an encounter site.
+   * POST /api/v1/combat/sites/:id/abandon
+   * Abandon a single encounter site.
    */
-  router.post('/sites/:id/strategy', asyncHandler(async (req, res) => {
-      const playerId = req.player!.playerId;
+  router.post('/sites/:id/abandon', asyncHandler(async (req, res) => {
       const siteId = z.string().uuid().parse(req.params.id);
-      const body = strategySchema.parse(req.body);
+      const playerId = req.player!.playerId;
 
-      const site = await prisma.encounterSite.findFirst({
+      // Clear any in-memory manual combat session
+      await clearManualCombatSession(playerId, siteId);
+
+      const result = await prisma.encounterSite.deleteMany({
         where: { id: siteId, playerId },
       });
 
-      if (!site) {
-        throw new AppError(404, 'Encounter site not found', 'NOT_FOUND');
-      }
-
-      if (site.clearStrategy) {
-        throw new AppError(400, 'Strategy already selected for this site', 'STRATEGY_ALREADY_SET');
-      }
-
-      await prisma.encounterSite.update({
-        where: { id: siteId },
-        data: {
-          clearStrategy: body.strategy,
-          fullClearActive: body.strategy === 'full_clear',
-        },
+      // Clear lockout if this was the active site
+      await prisma.player.update({
+        where: { id: playerId },
+        data: { activeEncounterSiteId: null },
       });
 
+      res.json({ success: true, abandoned: result.count ?? 0 });
+  }));
+
+  /**
+   * POST /api/v1/combat/sites/:id/auto-resolve
+   * Auto-resolve the current room of an encounter site using the raid resolver.
+   */
+  router.post('/sites/:id/auto-resolve', asyncHandler(async (req, res) => {
+      const siteId = z.string().uuid().parse(req.params.id);
+      const playerId = req.player!.playerId;
+      const username = req.player!.username;
+
+      // Set lockout
+      await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: siteId } });
+
+      try {
+        const result = await autoResolveEncounterRoom(playerId, siteId, username);
+        const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources', 'buffs', 'skills', 'characterProgression']);
+        stateUpdates.activeEncounterSiteId = null;
+
+        // Merge chest reward items into stateUpdates so frontend inventory stays in sync
+        if (result.completionRewards) {
+          await mergeLootIntoStateUpdates(playerId, result.completionRewards.newItemIds, result.completionRewards.updatedItemIds, stateUpdates);
+        }
+
+        // On defeat the player is respawned to a town — sync the zone in the UI
+        if (result.respawnedTo) {
+          const player = await prisma.player.findUnique({ where: { id: playerId }, select: { currentZoneId: true } });
+          if (player?.currentZoneId) stateUpdates.currentZoneId = player.currentZoneId;
+        }
+
+        res.json({
+          outcome: result.outcome,
+          rounds: result.rounds,
+          initialMobs: result.initialMobs,
+          chestReward: await mapChestRewardDTO(result.completionRewards),
+          ...(result.xpGrants.length ? { skillXpGrants: result.xpGrants.map(serializeXpGrant) } : {}),
+          fleeResult: result.fleeResult,
+          respawnedTo: result.respawnedTo,
+          stateUpdates,
+        });
+      } finally {
+        // Clear lockout when combat resolves (or throws)
+        await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
+      }
+  }));
+
+  /**
+   * POST /api/v1/combat/sites/:id/start-room
+   * Initialize manual combat for the current room of an encounter site.
+   */
+  router.post('/sites/:id/start-room', asyncHandler(async (req, res) => {
+      const siteId = z.string().uuid().parse(req.params.id);
+      const playerId = req.player!.playerId;
+      const username = req.player!.username;
+
+      // Set lockout
+      await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: siteId } });
+
+      const result = await startManualEncounterRoom(playerId, siteId, username);
+
+      // Site was auto-cleared (all remaining rooms decayed) — clear lockout and return
+      if (result.siteAutoCleared) {
+        await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
+        const stateUpdates: Record<string, unknown> = { activeEncounterSiteId: null };
+        if (result.completionRewards) {
+          await mergeLootIntoStateUpdates(playerId, result.completionRewards.newItemIds, result.completionRewards.updatedItemIds, stateUpdates);
+        }
+        res.json({
+          siteAutoCleared: true,
+          chestReward: await mapChestRewardDTO(result.completionRewards ?? null),
+          stateUpdates,
+        });
+        return;
+      }
+
+      // Transform to frontend DTO
       res.json({
-        success: true,
-        encounterSiteId: siteId,
-        strategy: body.strategy,
+        currentRoom: result.currentRoom,
+        totalRooms: result.totalRooms,
+        mobs: result.mobs,
+        playerState: {
+          hp: result.playerHp,
+          maxHp: result.playerMaxHp,
+          stamina: result.playerStamina,
+          maxStamina: result.playerMaxStamina,
+          mana: result.playerMana,
+          maxMana: result.playerMaxMana,
+          activeEffects: [],
+        },
+        roundNumber: result.roundNumber,
+        roundLogs: result.roundLogs,
+      });
+  }));
+
+  /**
+   * POST /api/v1/combat/sites/:id/round
+   * Resolve one round of manual encounter site combat.
+   */
+  router.post('/sites/:id/round', asyncHandler(async (req, res) => {
+      const siteId = z.string().uuid().parse(req.params.id);
+      const body = roundSchema.parse(req.body ?? {});
+      const playerId = req.player!.playerId;
+      const result = await resolveManualEncounterRound(playerId, siteId, body);
+
+      const combatEnded = result.outcome !== 'ongoing';
+
+      // Clear lockout when combat ends
+      if (combatEnded) {
+        await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } });
+      }
+
+      // Transform mobs to mobStates with slot info
+      const mobStates = result.mobs.map(m => ({
+        slot: parseEncounterMobSlot(m.mobId) ?? 0,
+        hp: m.hpRemaining,
+        maxHp: m.maxHp,
+        alive: m.alive,
+        activeEffects: m.activeEffects ?? [],
+      }));
+
+      // Include stateUpdates when combat ends so global HP/resource bars refresh
+      const stateUpdates = combatEnded
+        ? await buildStateUpdates(playerId, ['hp', 'resources', 'buffs', 'skills', 'characterProgression'])
+        : undefined;
+      if (stateUpdates) stateUpdates.activeEncounterSiteId = null;
+
+      // Merge chest reward items into stateUpdates so frontend inventory stays in sync
+      if (stateUpdates && result.completionRewards) {
+        await mergeLootIntoStateUpdates(playerId, result.completionRewards.newItemIds, result.completionRewards.updatedItemIds, stateUpdates);
+      }
+
+      // On defeat the player is respawned to a town — sync the zone in the UI
+      if (stateUpdates && result.respawnedTo) {
+        const player = await prisma.player.findUnique({ where: { id: playerId }, select: { currentZoneId: true } });
+        if (player?.currentZoneId) stateUpdates.currentZoneId = player.currentZoneId;
+      }
+
+      res.json({
+        roundNumber: result.roundNumber,
+        roundLog: result.roundLog,
+        mobStates,
+        playerState: {
+          hp: result.playerHpAfter,
+          maxHp: result.playerMaxHp,
+          stamina: result.playerStaminaAfter,
+          maxStamina: result.playerMaxStamina,
+          mana: result.playerManaAfter,
+          maxMana: result.playerMaxMana,
+          activeEffects: [],
+        },
+        outcome: result.outcome === 'site_cleared' ? 'cleared' : result.outcome,
+        defeated: result.outcome === 'defeated',
+        roomCleared: result.outcome === 'cleared' || result.outcome === 'site_cleared',
+        siteCleared: result.siteCleared,
+        chestReward: await mapChestRewardDTO(result.completionRewards),
+        ...(combatEnded && result.xpGrants?.length ? { skillXpGrants: result.xpGrants.map(serializeXpGrant) } : {}),
+        fleeResult: result.fleeResult,
+        respawnedTo: result.respawnedTo,
+        ...(stateUpdates ? { stateUpdates } : {}),
       });
   }));
 }

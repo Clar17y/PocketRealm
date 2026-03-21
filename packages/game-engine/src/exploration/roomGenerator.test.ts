@@ -13,8 +13,8 @@ describe('generateRoomAssignments', () => {
     const result = generateRoomAssignments('medium', () => 0.5);
     expect(result.rooms).toHaveLength(2);
     for (const room of result.rooms) {
-      expect(room.mobCount).toBeGreaterThanOrEqual(2);
-      expect(room.mobCount).toBeLessThanOrEqual(4);
+      expect(room.mobCount).toBeGreaterThanOrEqual(3);
+      expect(room.mobCount).toBeLessThanOrEqual(5);
     }
   });
 
@@ -43,5 +43,14 @@ describe('generateRoomAssignments', () => {
     const a = generateRoomAssignments('medium', () => 0.5);
     const b = generateRoomAssignments('medium', () => 0.5);
     expect(a).toEqual(b);
+  });
+});
+
+describe('medium mob differentiation', () => {
+  it('medium rooms have min 3 mobs (higher than small min 2)', () => {
+    // With rng always returning 0 (minimum), medium room should have 3 mobs
+    const result = generateRoomAssignments('medium', () => 0);
+    const room = result.rooms[0];
+    expect(room!.mobCount).toBeGreaterThanOrEqual(3);
   });
 });

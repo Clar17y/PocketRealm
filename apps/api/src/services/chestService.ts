@@ -1,13 +1,11 @@
 import { Prisma } from '@pocketrealm/database';
 import {
-  getChestRarityForEncounterSize,
-  getChestRecipeChanceForEncounterSize,
-  getUpgradedChestSize,
-  rollChestMaterialRolls,
+  getChestRarityForRoomCount,
+  getChestRecipeChanceForRoomCount,
+  rollChestMaterialRollsByRoomCount,
   type ChestRarity,
-  type EncounterSiteSize,
 } from '@pocketrealm/game-engine';
-import { FULL_CLEAR_CONSTANTS, type LootDrop } from '@pocketrealm/shared';
+import { ENCOUNTER_SITE_CONSTANTS, type LootDrop } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantDropsTx, type DropTableEntry, type DropGrantResult } from './dropRollingService';
 import type { GrantedItemIds } from './stateUpdateHelpers';
@@ -33,20 +31,21 @@ export async function grantEncounterSiteChestRewardsTx(
   params: {
     playerId: string;
     mobFamilyId: string;
-    size: EncounterSiteSize;
-    fullClearBonus?: boolean;
+    totalRooms: number;
+    autoResolvedBonusRooms: number;
     availableSlots?: number;
   }
 ): Promise<EncounterSiteChestRewards> {
-  const effectiveSize = params.fullClearBonus && FULL_CLEAR_CONSTANTS.CHEST_TIER_UPGRADE
-    ? getUpgradedChestSize(params.size)
-    : params.size;
+  const chestRarity = getChestRarityForRoomCount(params.totalRooms);
+  const baseRolls = rollChestMaterialRollsByRoomCount(params.totalRooms);
 
-  const chestRarity = getChestRarityForEncounterSize(effectiveSize);
-  const baseRolls = rollChestMaterialRolls(effectiveSize);
-  const materialRolls = params.fullClearBonus
-    ? Math.ceil(baseRolls * FULL_CLEAR_CONSTANTS.DROP_MULTIPLIER)
-    : baseRolls;
+  // Auto-resolve proportional multiplier
+  const bonusFraction = params.totalRooms > 0
+    ? params.autoResolvedBonusRooms / params.totalRooms
+    : 0;
+  const materialRolls = Math.ceil(
+    baseRolls * (1 + bonusFraction * (ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_DROP_MULTIPLIER - 1))
+  );
 
   const dropEntries = await tx.chestDropTable.findMany({
     where: {
@@ -67,10 +66,8 @@ export async function grantEncounterSiteChestRewardsTx(
   const dropResult = await rollAndGrantDropsTx(tx, params.playerId, dropEntries, materialRolls, 'common', params.availableSlots);
 
   let recipeUnlocked: RecipeUnlockReward | null = null;
-  const baseRecipeChance = getChestRecipeChanceForEncounterSize(effectiveSize);
-  const recipeChance = params.fullClearBonus
-    ? baseRecipeChance * FULL_CLEAR_CONSTANTS.RECIPE_MULTIPLIER
-    : baseRecipeChance;
+  const baseRecipeChance = getChestRecipeChanceForRoomCount(params.totalRooms);
+  const recipeChance = baseRecipeChance * (1 + bonusFraction * (ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_RECIPE_MULTIPLIER - 1));
   const rolledRecipe = Math.random() < recipeChance;
   if (rolledRecipe) {
     const advancedRecipes = await tx.craftingRecipe.findMany({

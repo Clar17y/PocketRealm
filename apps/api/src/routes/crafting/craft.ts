@@ -36,6 +36,7 @@ import {
   parseMaterials,
   craftSchema,
 } from './helpers';
+import { checkActivityLockout } from '../../services/expeditionLockoutService';
 
 export const craftRouter = Router();
 
@@ -46,6 +47,8 @@ export const craftRouter = Router();
 craftRouter.post('/', asyncHandler(async (req, res) => {
     const playerId = req.player!.playerId;
     const body = craftSchema.parse(req.body);
+
+    await checkActivityLockout(playerId);
 
     // Pre-flight: not recovering, not over-encumbered
     await assertCanAct(playerId);

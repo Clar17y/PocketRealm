@@ -8,6 +8,14 @@ vi.mock('./equipmentService', () => ({
   }),
   isSkillType: vi.fn(),
 }));
+vi.mock('./resourceService', () => ({
+  getResourceState: vi.fn().mockResolvedValue({
+    stamina: { current: 50, max: 100, regenPerRound: 10, regenPerSecond: 1.0, restHealPerTurn: 5 },
+    mana: { current: 25, max: 50, regenPerRound: 5, regenPerSecond: 0.5, restHealPerTurn: 3 },
+    lastStaminaRegenAt: new Date(),
+    lastManaRegenAt: new Date(),
+  }),
+}));
 vi.mock('./turnBankService', () => ({
   spendPlayerTurnsTx: vi.fn().mockResolvedValue({
     previousTurns: 1000, spent: 10, currentTurns: 990,
@@ -56,6 +64,10 @@ function defaultPlayer(overrides: Record<string, unknown> = {}) {
     isRecovering: false,
     recoveryCost: null,
     attributes: defaultPlayerAttrs(),
+    currentStamina: 50,
+    lastStaminaRegenAt: now,
+    currentMana: 25,
+    lastManaRegenAt: now,
     ...overrides,
   };
 }
@@ -204,11 +216,28 @@ describe('rest', () => {
     await expect(rest('p1', 10, now)).rejects.toThrow('Cannot rest while recovering');
   });
 
-  it('throws FULL_HP when already at max', async () => {
+  it('throws FULLY_RESTED when HP, stamina, and mana are all full', async () => {
+    const { getResourceState } = await import('./resourceService.js');
+    vi.mocked(getResourceState).mockResolvedValueOnce({
+      stamina: { current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1.0, restHealPerTurn: 5 },
+      mana: { current: 50, max: 50, regenPerRound: 5, regenPerSecond: 0.5, restHealPerTurn: 3 },
+      lastStaminaRegenAt: now,
+      lastManaRegenAt: now,
+    });
     mockPrisma.player.findUnique.mockResolvedValue(
       defaultPlayer({ currentHp: 100 })
     );
-    await expect(rest('p1', 10, now)).rejects.toThrow('Already at full HP');
+    await expect(rest('p1', 10, now)).rejects.toThrow('Already fully rested');
+  });
+
+  it('allows rest when HP is full but stamina is not', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue(
+      defaultPlayer({ currentHp: 100 })
+    );
+    // Default mock has stamina at 50/100 and mana at 25/50
+    const result = await rest('p1', 10, now);
+    expect(result.healedAmount).toBe(0); // No HP healing needed
+    expect(result.currentHp).toBe(100);
   });
 
   it('heals player and returns correct result', async () => {
@@ -282,7 +311,9 @@ describe('rest', () => {
     expect(spendPlayerTurnsTx).toHaveBeenCalledWith(expect.anything(), 'p1', 12, now);
   });
 
-  it('uses updateMany with optimistic lock conditions', async () => {
+  it('uses updateMany with optimistic lock conditions and updates all resources', async () => {
+    // Default mock: stamina 50/100 at 5/turn, mana 25/50 at 3/turn, HP 80/100 at 2/turn
+    // With 100 effective turns: stamina→100, mana→50, HP→100
     await rest('p1', 100, now);
 
     expect(mockPrisma.player.updateMany).toHaveBeenCalledWith({
@@ -291,10 +322,18 @@ describe('rest', () => {
         currentHp: 80,
         lastHpRegenAt: now,
         isRecovering: false,
+        currentStamina: 50,
+        lastStaminaRegenAt: now,
+        currentMana: 25,
+        lastManaRegenAt: now,
       },
       data: {
         currentHp: 100,
         lastHpRegenAt: now,
+        currentStamina: 100,
+        lastStaminaRegenAt: now,
+        currentMana: 50,
+        lastManaRegenAt: now,
       },
     });
   });

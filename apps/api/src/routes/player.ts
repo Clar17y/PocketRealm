@@ -56,6 +56,7 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       activeTitle: true,
       gold: true,
       homeTownId: true,
+      activeEncounterSiteId: true,
       notifyPvpAttack: true,
       notifyPvpScout: true,
       notifyBossAppeared: true,

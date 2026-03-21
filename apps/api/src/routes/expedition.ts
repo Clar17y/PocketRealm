@@ -236,12 +236,8 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
   if (expedition.status !== 'in_progress') {
     throw new AppError(400, 'Expedition is not active', 'NOT_ACTIVE');
   }
-  // Enforce round timing to prevent rapid-fire resolution
-  if (expedition.nextRoundAt && expedition.nextRoundAt > new Date()) {
-    throw new AppError(400, 'Round is not ready yet', 'ROUND_NOT_READY');
-  }
 
-  // Resolve this expedition's round directly (not the global scheduler)
+  // Resolve this expedition's round directly (skip timer — that's the point of force-round)
   await resolveExpeditionRound(id, null);
 
   // Fetch updated state
@@ -279,11 +275,6 @@ expeditionRouter.post('/:id/auto-resolve', asyncHandler(async (req, res) => {
   }
   if (membership.role === 'member') {
     throw new AppError(403, 'Officer or leader role required', 'INSUFFICIENT_ROLE');
-  }
-
-  // Enforce round timing to prevent instant room clears
-  if (expedition.nextRoundAt && expedition.nextRoundAt > new Date()) {
-    throw new AppError(400, 'Round is not ready yet', 'ROUND_NOT_READY');
   }
 
   // Service validates status + roundNumber and does full fetch

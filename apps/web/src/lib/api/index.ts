@@ -29,7 +29,6 @@ export {
   estimateExploration,
   startExploration,
   startCombat,
-  startCombatFromEncounterSite,
   getEncounterSites,
   selectSiteStrategy,
   abandonEncounterSites,
@@ -263,6 +262,7 @@ export {
   forceStartExpedition,
   forceNextRound,
   recoverFromExpeditionKO,
+  getExpeditionCooldowns,
   getExpeditionShop,
   purchaseExpeditionItem,
 } from './expedition';

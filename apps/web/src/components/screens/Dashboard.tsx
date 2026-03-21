@@ -6,6 +6,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
+import { ActivityLockBanner } from '@/components/common/ActivityLockBanner';
 import { Coins, TrendingUp, MapPin, Sword, Pickaxe, Hammer, Heart, Crosshair, Sparkles, Dice5, Wind } from 'lucide-react';
 import Image from 'next/image';
 import { getStaggerDelay } from '@/lib/animations';
@@ -29,6 +30,8 @@ interface DashboardProps {
     isRecovering: boolean;
     recoveryCost: number | null;
     isOverEncumbered: boolean;
+    isActivityLocked?: boolean;
+    activityLockReason?: 'encounter' | 'expedition' | null;
   };
   skills: Array<{ name: string; level: number; icon?: LucideIcon; imageSrc?: string }>;
   onNavigate: (screen: string) => void;
@@ -82,8 +85,13 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
         <KnockoutBanner action="taking any actions" recoveryCost={playerData.recoveryCost} />
       )}
 
+      {/* Activity Lock Banner */}
+      {playerData.isActivityLocked && !playerData.isRecovering && (
+        <ActivityLockBanner activityLockReason={playerData.activityLockReason ?? null} action="taking any actions" />
+      )}
+
       {/* Over-Encumbered Banner */}
-      {playerData.isOverEncumbered && !playerData.isRecovering && (
+      {playerData.isOverEncumbered && !playerData.isRecovering && !playerData.isActivityLocked && (
         <PixelCard className="border-[var(--rpg-gold)]">
           <div className="text-center text-sm text-[var(--rpg-gold)]">
             You are <span className="font-bold">over-encumbered</span> and cannot explore, mine, or craft until you free up inventory space.
@@ -138,7 +146,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
               variant="primary"
               className="w-full"
               onClick={() => onNavigate('explore')}
-              disabled={playerData.isOverEncumbered || playerData.isRecovering}
+              disabled={playerData.isOverEncumbered || playerData.isRecovering || playerData.isActivityLocked}
             >
               <div className="flex items-center justify-center gap-2">
                 <span className="inline-flex h-5 w-5 items-center justify-center">
@@ -147,9 +155,9 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
                 Explore
               </div>
             </PixelButton>
-            {(playerData.isOverEncumbered || playerData.isRecovering) && (
+            {(playerData.isOverEncumbered || playerData.isRecovering || playerData.isActivityLocked) && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-xs text-[var(--rpg-text-secondary)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                {playerData.isOverEncumbered ? 'Over-encumbered' : 'Recover first'}
+                {playerData.isActivityLocked ? (playerData.activityLockReason === 'encounter' ? 'In Encounter Site' : 'In Expedition') : playerData.isOverEncumbered ? 'Over-encumbered' : 'Recover first'}
               </div>
             )}
           </div>
@@ -158,7 +166,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
               variant="primary"
               className="w-full"
               onClick={() => onNavigate('gathering')}
-              disabled={playerData.isOverEncumbered || playerData.isRecovering}
+              disabled={playerData.isOverEncumbered || playerData.isRecovering || playerData.isActivityLocked}
             >
               <div className="flex items-center justify-center gap-2">
                 <span className="inline-flex h-5 w-5 items-center justify-center">
@@ -167,9 +175,9 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
                 Mine
               </div>
             </PixelButton>
-            {(playerData.isOverEncumbered || playerData.isRecovering) && (
+            {(playerData.isOverEncumbered || playerData.isRecovering || playerData.isActivityLocked) && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-xs text-[var(--rpg-text-secondary)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                {playerData.isOverEncumbered ? 'Over-encumbered' : 'Recover first'}
+                {playerData.isActivityLocked ? (playerData.activityLockReason === 'encounter' ? 'In Encounter Site' : 'In Expedition') : playerData.isOverEncumbered ? 'Over-encumbered' : 'Recover first'}
               </div>
             )}
           </div>
@@ -178,7 +186,7 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
               variant="secondary"
               className="w-full"
               onClick={() => onNavigate('crafting')}
-              disabled={playerData.isOverEncumbered || playerData.isRecovering}
+              disabled={playerData.isOverEncumbered || playerData.isRecovering || playerData.isActivityLocked}
             >
               <div className="flex items-center justify-center gap-2">
                 <span className="inline-flex h-5 w-5 items-center justify-center">
@@ -187,9 +195,9 @@ export function Dashboard({ playerData, skills, onNavigate, characterProgression
                 Craft
               </div>
             </PixelButton>
-            {(playerData.isOverEncumbered || playerData.isRecovering) && (
+            {(playerData.isOverEncumbered || playerData.isRecovering || playerData.isActivityLocked) && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded text-xs text-[var(--rpg-text-secondary)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                {playerData.isOverEncumbered ? 'Over-encumbered' : 'Recover first'}
+                {playerData.isActivityLocked ? (playerData.activityLockReason === 'encounter' ? 'In Encounter Site' : 'In Expedition') : playerData.isOverEncumbered ? 'Over-encumbered' : 'Recover first'}
               </div>
             )}
           </div>

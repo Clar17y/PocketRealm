@@ -7,7 +7,7 @@ vi.mock('./inventoryService', () => ({
 import { mockPrisma } from '../__test__/setup';
 import { grantEncounterSiteChestRewardsTx } from './chestService';
 import { addStackableItemTx } from './inventoryService';
-import { FULL_CLEAR_CONSTANTS } from '@pocketrealm/shared';
+import { ENCOUNTER_SITE_CONSTANTS } from '@pocketrealm/shared';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -22,7 +22,8 @@ afterEach(() => {
 const baseParams = {
   playerId: 'p1',
   mobFamilyId: 'family-1',
-  size: 'small' as const,
+  totalRooms: 1,
+  autoResolvedBonusRooms: 0,
 };
 
 // Helper to set up a single stackable drop entry
@@ -59,7 +60,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, baseParams);
-      expect(result.chestRarity).toBe('common'); // small → common
+      expect(result.chestRarity).toBe('common'); // 1 room → common
       expect(result.materialRolls).toBeGreaterThanOrEqual(1);
       expect(result.loot).toEqual([]);
       expect(result.recipeUnlocked).toBeNull();
@@ -90,7 +91,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
 
     it('returns loot from drop table entries', async () => {
-      // random=0.999: rollChestMaterialRolls('small') → Math.floor(0.999 * 2) + 1 = 2 rolls
+      // random=0.999: rollChestMaterialRollsByRoomCount(1) → Math.floor(0.999 * 2) + 1 = 2 rolls
       // Both rolls pick the single drop entry (ore-1) → aggregated into 1 loot entry
       vi.spyOn(Math, 'random').mockReturnValue(0.999);
       setupStackableDrop();
@@ -103,145 +104,111 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
   });
 
-  // ── Chest rarity per size ─────────────────────────────────────────────────
+  // ── Chest rarity per room count ───────────────────────────────────────────
 
-  describe('chest rarity based on size', () => {
-    it('returns common rarity for small encounters', async () => {
+  describe('chest rarity based on room count', () => {
+    it('returns common rarity for 1-room encounters', async () => {
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'small',
+        totalRooms: 1,
       });
       expect(result.chestRarity).toBe('common');
     });
 
-    it('returns uncommon rarity for medium encounters', async () => {
+    it('returns uncommon rarity for 2-room encounters', async () => {
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'medium',
+        totalRooms: 2,
       });
       expect(result.chestRarity).toBe('uncommon');
     });
 
-    it('returns rare rarity for large encounters', async () => {
+    it('returns rare rarity for 3-room encounters', async () => {
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
+        totalRooms: 3,
       });
       expect(result.chestRarity).toBe('rare');
     });
   });
 
-  // ── Full clear bonus ──────────────────────────────────────────────────────
+  // ── Auto-resolve bonus ────────────────────────────────────────────────────
 
-  describe('full clear bonus', () => {
-    it('upgrades chest size from small to medium when fullClearBonus is true', async () => {
-      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
-
-      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
-        ...baseParams,
-        size: 'small',
-        fullClearBonus: true,
-      });
-
-      // small upgrades to medium, medium → uncommon rarity
-      expect(result.chestRarity).toBe('uncommon');
-    });
-
-    it('upgrades chest size from medium to large when fullClearBonus is true', async () => {
-      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
-
-      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
-        ...baseParams,
-        size: 'medium',
-        fullClearBonus: true,
-      });
-
-      // medium upgrades to large, large → rare rarity
-      expect(result.chestRarity).toBe('rare');
-    });
-
-    it('caps upgrade at large for large encounters', async () => {
-      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
-
-      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
-        ...baseParams,
-        size: 'large',
-        fullClearBonus: true,
-      });
-
-      // large → large (already max)
-      expect(result.chestRarity).toBe('rare');
-    });
-
-    it('does not upgrade chest when fullClearBonus is false', async () => {
-      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
-
-      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
-        ...baseParams,
-        size: 'small',
-        fullClearBonus: false,
-      });
-
-      expect(result.chestRarity).toBe('common');
-    });
-
-    it('does not upgrade chest when fullClearBonus is undefined', async () => {
-      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
-
-      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
-        ...baseParams,
-        size: 'small',
-      });
-
-      expect(result.chestRarity).toBe('common');
-    });
-
-    it('applies DROP_MULTIPLIER to material rolls when fullClearBonus is true', async () => {
+  describe('auto-resolve bonus', () => {
+    it('applies DROP_MULTIPLIER proportionally when all rooms auto-resolved', async () => {
       // Use a deterministic random that gives a known material roll
       vi.spyOn(Math, 'random').mockReturnValue(0.999);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
-      // With fullClearBonus on medium: size upgrades to large first,
-      // then rollChestMaterialRolls('large') produces base rolls,
-      // which are multiplied by DROP_MULTIPLIER.
-      // With random=0.999 and large range (3-6), base rolls = 6
-      // Result: Math.ceil(6 * 1.5) = 9
-      const withBonus = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+      // With totalRooms=3 and autoResolvedBonusRooms=3 (full bonus, bonusFraction=1):
+      // baseRolls = rollChestMaterialRollsByRoomCount(3) with random=0.999 → max(3-6 range) = 6
+      // materialRolls = Math.ceil(6 * (1 + 1 * (1.5-1))) = Math.ceil(6 * 1.5) = 9
+      const withFullBonus = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'medium',
-        fullClearBonus: true,
+        totalRooms: 3,
+        autoResolvedBonusRooms: 3,
       });
 
-      // Also get the base rolls for the upgraded size (large) without multiplier
       vi.spyOn(Math, 'random').mockReturnValue(0.999);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
-      const upgradedNoBonus = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+      const withNoBonus = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large', // same as the upgraded size
-        fullClearBonus: false,
+        totalRooms: 3,
+        autoResolvedBonusRooms: 0,
       });
 
-      expect(withBonus.materialRolls).toBe(
-        Math.ceil(upgradedNoBonus.materialRolls * FULL_CLEAR_CONSTANTS.DROP_MULTIPLIER)
+      expect(withFullBonus.materialRolls).toBe(
+        Math.ceil(withNoBonus.materialRolls * ENCOUNTER_SITE_CONSTANTS.AUTO_RESOLVE_DROP_MULTIPLIER)
       );
     });
 
-    it('queries drop table with upgraded rarity when fullClearBonus is true', async () => {
+    it('applies partial multiplier when some rooms auto-resolved', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.999);
+      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
+
+      // totalRooms=2, autoResolvedBonusRooms=1 → bonusFraction=0.5
+      // baseRolls with random=0.999 for 2 rooms: Math.floor(0.999 * 3) + 2 = 4
+      // materialRolls = Math.ceil(4 * (1 + 0.5 * 0.5)) = Math.ceil(4 * 1.25) = 5
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 2,
+        autoResolvedBonusRooms: 1,
+      });
+
+      expect(result.materialRolls).toBeGreaterThan(4); // More than base
+    });
+
+    it('does not apply bonus when autoResolvedBonusRooms is 0', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.999);
+      mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
+
+      const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
+        ...baseParams,
+        totalRooms: 1,
+        autoResolvedBonusRooms: 0,
+      });
+
+      // No bonus: materialRolls = baseRolls
+      expect(result.materialRolls).toBeGreaterThanOrEqual(1);
+      expect(result.materialRolls).toBeLessThanOrEqual(2);
+    });
+
+    it('queries drop table with rarity matching totalRooms', async () => {
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'small',
-        fullClearBonus: true,
+        totalRooms: 2,
+        autoResolvedBonusRooms: 2,
       });
 
-      // small + fullClear → medium → uncommon
+      // 2 rooms → uncommon rarity
       expect(mockPrisma.chestDropTable.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -256,7 +223,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
   describe('recipe unlock', () => {
     it('does not unlock recipe when random roll fails', async () => {
-      // Recipe chance for small is 0, so even a low random won't trigger it
+      // Recipe chance for 1 room is 0.005, so 0.999 won't trigger it
       vi.spyOn(Math, 'random').mockReturnValue(0.999);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
@@ -270,15 +237,15 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large', // has non-zero recipe chance
+        totalRooms: 3, // has non-zero recipe chance (0.05)
       });
 
-      // random 0.999 > 0.05 (large recipe chance), so recipe roll fails
+      // random 0.999 > 0.05 (3-room recipe chance), so recipe roll fails
       expect(mockPrisma.craftingRecipe.findMany).not.toHaveBeenCalled();
     });
 
     it('unlocks a recipe when random roll succeeds and unknown recipes exist', async () => {
-      // For large: recipe chance = 0.05, so random < 0.05 triggers recipe
+      // For 3 rooms: recipe chance = 0.05, so random < 0.05 triggers recipe
       vi.spyOn(Math, 'random').mockReturnValue(0.01);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
       mockPrisma.craftingRecipe.findMany.mockResolvedValue([
@@ -294,7 +261,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
+        totalRooms: 3,
       });
 
       expect(result.recipeUnlocked).toEqual({
@@ -321,7 +288,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
+        totalRooms: 3,
       });
 
       expect(mockPrisma.playerRecipe.create).toHaveBeenCalledWith({
@@ -348,7 +315,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
+        totalRooms: 3,
       });
 
       expect(result.recipeUnlocked).toBeNull();
@@ -362,7 +329,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
+        totalRooms: 3,
       });
 
       expect(result.recipeUnlocked).toBeNull();
@@ -391,7 +358,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
+        totalRooms: 3,
       });
 
       // Should unlock recipe-2 (the only unknown)
@@ -411,7 +378,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
         mobFamilyId: 'wolves-family',
-        size: 'large',
+        totalRooms: 3,
       });
 
       expect(mockPrisma.craftingRecipe.findMany).toHaveBeenCalledWith(
@@ -425,22 +392,22 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       );
     });
 
-    it('applies RECIPE_MULTIPLIER when fullClearBonus is true', async () => {
-      // Large base recipe chance is 0.05
-      // With full clear: 0.05 * 1.5 = 0.075
-      // So a random value of 0.06 should succeed with bonus but fail without
+    it('applies AUTO_RESOLVE_RECIPE_MULTIPLIER proportionally', async () => {
+      // 3-room base recipe chance is 0.05
+      // With full auto-resolve (bonusFraction=1): 0.05 * 1.5 = 0.075
+      // So a random value of 0.06 should succeed with full bonus but fail without
       vi.spyOn(Math, 'random').mockReturnValue(0.06);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
-      // Without full clear bonus, 0.06 > 0.05, so no recipe
+      // Without auto-resolve bonus, 0.06 > 0.05, so no recipe
       const resultWithout = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
-        fullClearBonus: false,
+        totalRooms: 3,
+        autoResolvedBonusRooms: 0,
       });
       expect(resultWithout.recipeUnlocked).toBeNull();
 
-      // With full clear bonus, 0.06 < 0.075, so recipe roll passes
+      // With full auto-resolve bonus, 0.06 < 0.075, so recipe roll passes
       vi.spyOn(Math, 'random').mockReturnValue(0.06);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
       mockPrisma.craftingRecipe.findMany.mockResolvedValue([
@@ -456,8 +423,8 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const resultWith = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
-        fullClearBonus: true,
+        totalRooms: 3,
+        autoResolvedBonusRooms: 3,
       });
       expect(resultWith.recipeUnlocked).not.toBeNull();
     });
@@ -478,7 +445,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
+        totalRooms: 3,
       });
 
       // Boolean(0) === false
@@ -501,20 +468,20 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
+        totalRooms: 3,
       });
 
       expect(result.recipeUnlocked!.soulbound).toBe(true);
     });
 
-    it('skips recipe unlock for small encounters when roll exceeds chance', async () => {
-      // Small recipe chance is 0.005, so random = 0.01 won't trigger
+    it('skips recipe unlock for 1-room encounters when roll exceeds chance', async () => {
+      // 1-room recipe chance is 0.005, so random = 0.01 won't trigger
       vi.spyOn(Math, 'random').mockReturnValue(0.01);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'small',
+        totalRooms: 1,
       });
 
       expect(result.recipeUnlocked).toBeNull();
@@ -525,12 +492,12 @@ describe('grantEncounterSiteChestRewardsTx', () => {
   // ── Material rolls (count) ────────────────────────────────────────────────
 
   describe('material rolls', () => {
-    it('produces material rolls within range for small chest', async () => {
+    it('produces material rolls within range for 1-room chest', async () => {
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'small',
+        totalRooms: 1,
       });
 
       // CHEST_MATERIAL_ROLLS_SMALL: { min: 1, max: 2 }
@@ -538,12 +505,12 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       expect(result.materialRolls).toBeLessThanOrEqual(2);
     });
 
-    it('produces material rolls within range for medium chest', async () => {
+    it('produces material rolls within range for 2-room chest', async () => {
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'medium',
+        totalRooms: 2,
       });
 
       // CHEST_MATERIAL_ROLLS_MEDIUM: { min: 2, max: 4 }
@@ -551,12 +518,12 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       expect(result.materialRolls).toBeLessThanOrEqual(4);
     });
 
-    it('produces material rolls within range for large chest', async () => {
+    it('produces material rolls within range for 3-room chest', async () => {
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
+        totalRooms: 3,
       });
 
       // CHEST_MATERIAL_ROLLS_LARGE: { min: 3, max: 6 }
@@ -564,18 +531,18 @@ describe('grantEncounterSiteChestRewardsTx', () => {
       expect(result.materialRolls).toBeLessThanOrEqual(6);
     });
 
-    it('applies full clear DROP_MULTIPLIER with ceiling', async () => {
+    it('applies auto-resolve DROP multiplier with ceiling', async () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.999);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'small',
-        fullClearBonus: true,
+        totalRooms: 1,
+        autoResolvedBonusRooms: 1,
       });
 
-      // With random 0.999, rollChestMaterialRolls for small gives max (2 for upgraded=medium: 2-4 range)
-      // Then multiplied by 1.5 and ceiled
+      // With random 0.999, rollChestMaterialRollsByRoomCount for 1 room gives max (2)
+      // Then multiplied by 1.5 and ceiled: Math.ceil(2 * 1.5) = 3
       expect(result.materialRolls).toBeGreaterThanOrEqual(1);
     });
   });
@@ -584,7 +551,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
   describe('loot accumulation', () => {
     it('grants stackable materials via addStackableItemTx', async () => {
-      // random=0.5: rollChestMaterialRolls('small') → Math.floor(0.5 * 2) + 1 = 2 rolls
+      // random=0.5: rollChestMaterialRollsByRoomCount(1) → Math.floor(0.5 * 2) + 1 = 2 rolls
       // Each roll picks the single drop entry and calls addStackableItemTx with qty=1
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
       setupStackableDrop('ore-1');
@@ -612,7 +579,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large', // more rolls → more chances for aggregation
+        totalRooms: 3, // more rolls → more chances for aggregation
       });
 
       const oreEntries = result.loot.filter(l => l.itemTemplateId === 'ore-1');
@@ -621,7 +588,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
 
     it('produces loot with common rarity from dropRollingService', async () => {
-      // random=0.5: 2 rolls on small chest, single entry always picked → 1 loot entry guaranteed
+      // random=0.5: 2 rolls on 1-room chest, single entry always picked → 1 loot entry guaranteed
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
       setupStackableDrop();
       mockPrisma.craftingRecipe.findMany.mockResolvedValue([]);
@@ -637,7 +604,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
   describe('available slots and overflow', () => {
     it('passes availableSlots through to rollAndGrantDropsTx', async () => {
-      // random=0.5: 2 rolls on small chest, single stackable entry
+      // random=0.5: 2 rolls on 1-room chest, single stackable entry
       // Roll 1: new slot needed → slotsConsumed++ (total 1)
       // Roll 2: template already granted → merges, no new slot
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -692,7 +659,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
 
     it('returns overflow items with correct shape', async () => {
-      // random=0.5: 2 rolls on small chest, non-stackable equipment, 0 slots available
+      // random=0.5: 2 rolls on 1-room chest, non-stackable equipment, 0 slots available
       // Both rolls overflow → 2 overflow entries with correct shape
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
       setupEquipmentDrop('sword-1', 'weapon');
@@ -716,11 +683,11 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
   });
 
-  // ── Recipe chance for medium ──────────────────────────────────────────────
+  // ── Recipe chance for 2-room encounters ───────────────────────────────────
 
-  describe('recipe unlock for medium encounters', () => {
-    it('triggers recipe unlock for medium encounters when roll succeeds', async () => {
-      // Medium recipe chance is 0.02
+  describe('recipe unlock for 2-room encounters', () => {
+    it('triggers recipe unlock for 2-room encounters when roll succeeds', async () => {
+      // 2-room recipe chance is 0.02
       vi.spyOn(Math, 'random').mockReturnValue(0.01);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
       mockPrisma.craftingRecipe.findMany.mockResolvedValue([
@@ -736,7 +703,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'medium',
+        totalRooms: 2,
       });
 
       expect(result.recipeUnlocked).not.toBeNull();
@@ -744,20 +711,20 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
   });
 
-  // ── Full clear + recipe combined ──────────────────────────────────────────
+  // ── Auto-resolve + recipe combined ───────────────────────────────────────
 
-  describe('full clear bonus with recipe upgrade', () => {
-    it('uses upgraded size for both rarity and recipe chance', async () => {
-      // small + fullClear → medium → uncommon rarity
-      // Recipe chance for medium = 0.02
-      vi.spyOn(Math, 'random').mockReturnValue(0.01);
+  describe('auto-resolve bonus with recipe', () => {
+    it('uses totalRooms for rarity and auto-resolve bonus for recipe chance', async () => {
+      // 1 room → common rarity
+      // With full auto-resolve bonus (bonusFraction=1): recipe chance = 0.005 * 1.5 = 0.0075
+      vi.spyOn(Math, 'random').mockReturnValue(0.005);
       mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
       mockPrisma.craftingRecipe.findMany.mockResolvedValue([
         {
           id: 'recipe-fc1',
           resultTemplateId: 'template-fc1',
           soulbound: false,
-          resultTemplate: { name: 'Full Clear Reward' },
+          resultTemplate: { name: 'Auto Resolve Reward' },
         },
       ]);
       mockPrisma.playerRecipe.findMany.mockResolvedValue([]);
@@ -765,14 +732,13 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'small',
-        fullClearBonus: true,
+        totalRooms: 1,
+        autoResolvedBonusRooms: 1,
       });
 
-      // Upgraded to medium → uncommon
-      expect(result.chestRarity).toBe('uncommon');
-      // Medium has non-zero recipe chance (0.02), so recipe should unlock
-      // But with fullClear multiplier: 0.02 * 1.5 = 0.03, random 0.01 < 0.03 → success
+      // 1 room → common
+      expect(result.chestRarity).toBe('common');
+      // 0.005 < 0.0075 → recipe unlocks
       expect(result.recipeUnlocked).not.toBeNull();
     });
   });
@@ -785,8 +751,8 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
-        fullClearBonus: true,
+        totalRooms: 3,
+        autoResolvedBonusRooms: 3,
       });
 
       // No drops possible from empty table, but function should not error
@@ -795,7 +761,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
     });
 
     it('handles multiple drop table entries (weighted selection)', async () => {
-      // random=0.5: rollChestMaterialRolls('medium') → Math.floor(0.5 * 3) + 2 = 3 rolls
+      // random=0.5: rollChestMaterialRollsByRoomCount(2) → Math.floor(0.5 * 3) + 2 = 3 rolls
       // pickWeighted: totalWeight=10, roll=0.5*10=5; after ore-1's weight (5): 5-5=0 ≤ 0 → ore-1 always picked
       // All 3 rolls pick ore-1, aggregated into 1 loot entry
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -819,7 +785,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       const result = await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'medium',
+        totalRooms: 2,
       });
 
       expect(result.loot.length).toBe(1);
@@ -848,7 +814,7 @@ describe('grantEncounterSiteChestRewardsTx', () => {
 
       await grantEncounterSiteChestRewardsTx(mockPrisma as any, {
         ...baseParams,
-        size: 'large',
+        totalRooms: 3,
       });
 
       expect(mockPrisma.playerRecipe.findMany).toHaveBeenCalledWith({

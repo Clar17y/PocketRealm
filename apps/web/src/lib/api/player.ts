@@ -24,6 +24,7 @@ export async function getPlayer() {
       lootRevealRarity: 'none' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
       gold: number;
       homeTownId: string | null;
+      activeEncounterSiteId: string | null;
       notifyPvpAttack: boolean;
       notifyPvpScout: boolean;
       notifyBossAppeared: boolean;

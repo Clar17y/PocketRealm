@@ -7,10 +7,13 @@ import {
   calculateRestHealing,
   calculateRecoveryCost,
   calculateRecoveryExitHp,
+  calculateStaminaRestHealing,
+  calculateManaRestHealing,
 } from '@pocketrealm/game-engine';
 import type { HpState, RestResult, RecoveryResult } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getEquipmentStats } from './equipmentService';
+import { getResourceState } from './resourceService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, type TaxResult } from './guildTaxService';
 import { normalizePlayerAttributes } from './attributesService';
@@ -82,6 +85,7 @@ export async function rest(
     throw new AppError(400, 'Turns must be a positive integer', 'INVALID_TURNS');
   }
 
+  // Single query for all needed player fields (HP + attributes + stamina/mana)
   const player = await prisma.player.findUnique({
     where: { id: playerId },
     select: {
@@ -89,6 +93,11 @@ export async function rest(
       lastHpRegenAt: true,
       isRecovering: true,
       recoveryCost: true,
+      attributes: true,
+      currentStamina: true,
+      lastStaminaRegenAt: true,
+      currentMana: true,
+      lastManaRegenAt: true,
     },
   });
 
@@ -100,8 +109,13 @@ export async function rest(
     throw new AppError(400, 'Cannot rest while recovering. Spend recovery turns first.', 'IS_RECOVERING');
   }
 
-  const vitalityLevel = await getVitalityLevel(playerId);
-  const equipmentStats = await getEquipmentStats(playerId);
+  const vitalityLevel = normalizePlayerAttributes(player.attributes).vitality;
+
+  // Parallelize independent lookups
+  const [equipmentStats, resourceState] = await Promise.all([
+    getEquipmentStats(playerId),
+    getResourceState(playerId, now),
+  ]);
 
   const maxHp = calculateMaxHp({
     vitalityLevel,
@@ -118,21 +132,51 @@ export async function rest(
     now
   );
 
-  if (currentHp >= maxHp) {
-    throw new AppError(400, 'Already at full HP', 'FULL_HP');
+  const hpFull = currentHp >= maxHp;
+  const staminaFull = resourceState.stamina.current >= resourceState.stamina.max;
+  const manaFull = resourceState.mana.current >= resourceState.mana.max;
+
+  if (hpFull && staminaFull && manaFull) {
+    throw new AppError(400, 'Already fully rested', 'FULLY_RESTED');
   }
 
   const healPerTurn = calculateHealPerTurn(vitalityLevel);
 
-  // Spend turns, apply tax, and update HP atomically.
+  // Spend turns, apply tax, and update all resources atomically.
   const { healing, taxResult } = await prisma.$transaction(async (tx) => {
     const { taxRate } = await getPlayerTaxRateTx(tx, playerId);
     const effectiveTurns = calculateEffectiveTurns(turnsToSpend, taxRate);
 
-    const innerHealing = calculateRestHealing(currentHp, maxHp, healPerTurn, effectiveTurns);
+    // Calculate healing for all three resources using the same effective turns
+    const innerHealing = hpFull
+      ? { turnsUsed: 0, healedAmount: 0, newHp: currentHp }
+      : calculateRestHealing(currentHp, maxHp, healPerTurn, effectiveTurns);
 
-    // Inflate the effective turns used back to the actual bank cost
-    const actualTurnsToDeduct = calculateInflatedCost(innerHealing.turnsUsed, taxRate);
+    const innerStamina = staminaFull
+      ? { turnsUsed: 0, healedAmount: 0, newStamina: resourceState.stamina.current }
+      : calculateStaminaRestHealing(
+          resourceState.stamina.current,
+          resourceState.stamina.max,
+          effectiveTurns,
+          resourceState.stamina.restHealPerTurn,
+        );
+
+    const innerMana = manaFull
+      ? { turnsUsed: 0, healedAmount: 0, newMana: resourceState.mana.current }
+      : calculateManaRestHealing(
+          resourceState.mana.current,
+          resourceState.mana.max,
+          effectiveTurns,
+          resourceState.mana.restHealPerTurn,
+        );
+
+    // Turn cost is the resource that needed the most rest time
+    const maxTurnsUsed = Math.max(
+      innerHealing.turnsUsed,
+      innerStamina.turnsUsed,
+      innerMana.turnsUsed,
+    );
+    const actualTurnsToDeduct = calculateInflatedCost(maxTurnsUsed, taxRate);
 
     await spendPlayerTurnsTx(tx, playerId, actualTurnsToDeduct, now);
     const tax = await applyGuildTaxTx(tx, playerId, actualTurnsToDeduct);
@@ -143,10 +187,18 @@ export async function rest(
         currentHp: player.currentHp,
         lastHpRegenAt: player.lastHpRegenAt,
         isRecovering: false,
+        currentStamina: player.currentStamina,
+        lastStaminaRegenAt: player.lastStaminaRegenAt,
+        currentMana: player.currentMana,
+        lastManaRegenAt: player.lastManaRegenAt,
       },
       data: {
         currentHp: innerHealing.newHp,
         lastHpRegenAt: now,
+        currentStamina: innerStamina.newStamina,
+        lastStaminaRegenAt: now,
+        currentMana: innerMana.newMana,
+        lastManaRegenAt: now,
       },
     });
 

@@ -19,6 +19,7 @@ import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEf
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getBuffValue, consumeBuffStandalone } from '../services/buffService';
 import { trackProgress } from '../services/progressService';
+import { checkActivityLockout } from '../services/expeditionLockoutService';
 
 export const gatheringRouter = Router();
 
@@ -241,6 +242,8 @@ async function getResourceTemplateId(resourceType: string): Promise<string> {
 gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = mineSchema.parse(req.body);
+
+  await checkActivityLockout(playerId);
 
   // Pre-flight: not recovering (encumbrance checked after stack check)
   const hpState = await assertNotRecovering(playerId);
