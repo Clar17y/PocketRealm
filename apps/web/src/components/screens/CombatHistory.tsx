@@ -51,7 +51,6 @@ function formatCombatSource(source: string | null | undefined): string {
   if (source === 'encounter_site') return 'Encounter Site';
   if (source === 'exploration_ambush') return 'Ambush (Exploring)';
   if (source === 'travel_ambush') return 'Ambush (Travel)';
-  if (source === 'zone_combat') return 'Direct Encounter';
   return 'Unknown Source';
 }
 
@@ -365,11 +364,10 @@ export function CombatHistory() {
                   setSelectedEntry(entry);
                   setSelectedLogId(entry.logId);
                 }}
-                className={`w-full text-left border rounded-lg p-2 transition-colors ${
-                  selectedLogId === entry.logId
-                    ? 'border-[var(--rpg-gold)] bg-[var(--rpg-background)]'
-                    : 'border-[var(--rpg-border)] bg-[var(--rpg-surface)]'
-                }`}
+                className={`w-full text-left border rounded-lg p-2 transition-colors ${selectedLogId === entry.logId
+                  ? 'border-[var(--rpg-gold)] bg-[var(--rpg-background)]'
+                  : 'border-[var(--rpg-border)] bg-[var(--rpg-surface)]'
+                  }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-sm text-[var(--rpg-text-primary)] font-semibold truncate">

@@ -59,8 +59,9 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
   }, []);
 
   // Fetch estimate when turns or currentHp changes (debounced)
+  // Skip when HP is full — estimate endpoint only returns HP data
   useEffect(() => {
-    if (!hpState || hpState.isRecovering) return;
+    if (!hpState || hpState.isRecovering || hpState.currentHp >= hpState.maxHp) return;
 
     const timer = setTimeout(async () => {
       const result = await api.restEstimate(turns);
@@ -77,11 +78,17 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [turns, hpState?.currentHp, hpState?.isRecovering]);
+  }, [turns, hpState?.currentHp, hpState?.maxHp, hpState?.isRecovering]);
 
-  // Default to "Full" when healPerTurn first loads
+  // Default to "Full" when healPerTurn first loads, or 10 if HP is already full
   useEffect(() => {
-    if (!healPerTurn || !hpState || hpState.currentHp >= hpState.maxHp || turnsInitialized.current) return;
+    if (!hpState || turnsInitialized.current) return;
+    if (hpState.currentHp >= hpState.maxHp) {
+      turnsInitialized.current = true;
+      setTurns(10);
+      return;
+    }
+    if (!healPerTurn) return;
     turnsInitialized.current = true;
     const full = Math.ceil((hpState.maxHp - hpState.currentHp) / healPerTurn);
     const rounded = Math.ceil(full / 10) * 10;
@@ -232,7 +239,7 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
           <div>
             <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Rest</h2>
             <p className="text-sm text-[var(--rpg-text-secondary)]">
-              Spend turns to restore health
+              Spend turns to restore health, stamina &amp; mana
             </p>
           </div>
         </div>
@@ -257,83 +264,79 @@ export function Rest({ onComplete, onTurnsUpdate, onHpUpdate, availableTurns }: 
           </div>
         </div>
 
-        {/* Turn Slider */}
-        {!isFullHp && (
-          <>
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-[var(--rpg-text-secondary)]">Turns to spend</span>
-                <div className="text-right">
-                  <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{turns}</div>
-                  {estimate?.taxRate != null && estimate.taxRate > 0 && estimate.effectiveTurns != null && (
-                    <div className="text-xs text-[var(--rpg-text-secondary)]">
-                      {estimate.effectiveTurns} effective ({estimate.taxRate}% tax)
-                    </div>
-                  )}
-                  <div className="text-xs text-[var(--rpg-text-secondary)]">of {availableTurns.toLocaleString()} available</div>
-                </div>
-              </div>
-              <Slider
-                min={10}
-                max={sliderMax}
-                step={10}
-                value={[Math.min(turns, sliderMax)]}
-                onValueChange={(val) => setTurns(val[0])}
-              />
-              {presets && (
-                <TurnPresets
-                  presets={presets}
-                  currentValue={turns}
-                  onChange={setTurns}
-                  className="mt-3"
-                />
-              )}
-            </div>
-
-            {/* Estimate */}
-            {estimate && (
-              <div className="bg-[var(--rpg-background)] rounded-lg p-4 mb-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-[var(--rpg-text-secondary)]">HP Restored</span>
-                  <span className="text-[12px] text-[var(--rpg-green-light)] font-pixel">
-                    +{Math.floor(estimate.healAmount)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-[var(--rpg-text-secondary)]">Result</span>
-                  <span className="font-pixel text-[12px]">
-                    {hpState.currentHp} → {Math.floor(estimate.resultingHp)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-[var(--rpg-text-secondary)]">Turns Used</span>
-                  <span className="font-pixel text-[12px] text-[var(--rpg-gold)]">
-                    {estimate.turnsNeeded}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="text-[var(--rpg-red)] text-sm mb-4">{error}</div>
-            )}
-
-            <PixelButton
-              variant="primary"
-              onClick={handleRest}
-              disabled={isLoading || isFullHp}
-              className="w-full"
-            >
-              {isLoading ? 'Resting...' : 'Rest'}
-            </PixelButton>
-          </>
-        )}
-
         {isFullHp && (
-          <div className="text-center py-4 text-[var(--rpg-green-light)]">
-            You are at full health!
+          <div className="text-sm text-[var(--rpg-text-secondary)] mb-4 text-center">
+            HP is full — resting will still restore stamina &amp; mana
           </div>
         )}
+
+        {/* Turn Slider */}
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-[var(--rpg-text-secondary)]">Turns to spend</span>
+            <div className="text-right">
+              <div className="text-[24px] text-[var(--rpg-gold)] font-pixel">{turns}</div>
+              {estimate?.taxRate != null && estimate.taxRate > 0 && estimate.effectiveTurns != null && (
+                <div className="text-xs text-[var(--rpg-text-secondary)]">
+                  {estimate.effectiveTurns} effective ({estimate.taxRate}% tax)
+                </div>
+              )}
+              <div className="text-xs text-[var(--rpg-text-secondary)]">of {availableTurns.toLocaleString()} available</div>
+            </div>
+          </div>
+          <Slider
+            min={10}
+            max={sliderMax}
+            step={10}
+            value={[Math.min(turns, sliderMax)]}
+            onValueChange={(val) => setTurns(val[0])}
+          />
+          {presets && (
+            <TurnPresets
+              presets={presets}
+              currentValue={turns}
+              onChange={setTurns}
+              className="mt-3"
+            />
+          )}
+        </div>
+
+        {/* Estimate */}
+        {estimate && !isFullHp && (
+          <div className="bg-[var(--rpg-background)] rounded-lg p-4 mb-4">
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--rpg-text-secondary)]">HP Restored</span>
+              <span className="text-[12px] text-[var(--rpg-green-light)] font-pixel">
+                +{Math.floor(estimate.healAmount)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <span className="text-[var(--rpg-text-secondary)]">Result</span>
+              <span className="font-pixel text-[12px]">
+                {hpState.currentHp} → {Math.floor(estimate.resultingHp)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center mt-2">
+              <span className="text-[var(--rpg-text-secondary)]">Turns Used</span>
+              <span className="font-pixel text-[12px] text-[var(--rpg-gold)]">
+                {estimate.turnsNeeded}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="text-[var(--rpg-red)] text-sm mb-4">{error}</div>
+        )}
+
+        <PixelButton
+          variant="primary"
+          onClick={handleRest}
+          disabled={isLoading}
+          className="w-full"
+        >
+          {isLoading ? 'Resting...' : 'Rest'}
+        </PixelButton>
       </PixelCard>
     </ScreenContainer>
   );
