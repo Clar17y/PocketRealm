@@ -92,6 +92,7 @@ export const wikiNavigation: WikiNavSection[] = [
     slug: 'exploration',
     icon: '/assets/ui/ui_explore-pixelated-128.webp',
     items: [
+      { label: 'Encounter Sites', href: '/wiki/exploration/encounter-sites' },
       { label: 'Probability Model', href: '/wiki/exploration/probability' },
       { label: 'Room Generation', href: '/wiki/exploration/rooms' },
       { label: 'Mob Tier Filtering', href: '/wiki/exploration/mob-tiers' },

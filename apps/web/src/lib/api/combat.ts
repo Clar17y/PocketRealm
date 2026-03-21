@@ -1,4 +1,4 @@
-import type { QuestProgressUpdate, StateUpdates } from '@pocketrealm/shared';
+import type { QuestProgressUpdate, StateUpdates, BossActiveEffect, ExpeditionRoundLog } from '@pocketrealm/shared';
 import { fetchApi, type TurnStateResponse, type TaxInfo } from './core';
 import type { CombatAction } from '@pocketrealm/shared';
 
@@ -216,7 +216,7 @@ export interface SkillXpGrantResponse {
 }
 
 export type CombatOutcomeResponse = 'victory' | 'defeat' | 'fled' | 'draw';
-export type CombatSourceResponse = 'zone_combat' | 'encounter_site' | 'exploration_ambush' | 'travel_ambush';
+export type CombatSourceResponse = 'zone_combat' | 'encounter_site' | 'encounter_site_room' | 'exploration_ambush' | 'travel_ambush';
 
 export interface CombatResultResponse {
   zoneId: string;
@@ -235,6 +235,10 @@ export interface CombatResultResponse {
   playerStartMana?: number;
   mobMaxHp: number;
   log: CombatLogEntryResponse[];
+  /** Encounter site room combat: round-by-round logs. Auto-resolve stores RoundSnapshot[], manual stores ExpeditionRoundLog[]. */
+  rounds?: Record<string, unknown>[];
+  /** Encounter site room combat: chest reward data if site was cleared. */
+  chestReward?: unknown;
   eventModifiers?: EventModifierBadge[];
   rewards: {
     xp: number;
@@ -368,6 +372,10 @@ export interface CombatHistoryListItemResponse {
   fightCount: number;
   encounterSiteId: string | null;
   mobFamilyName: string | null;
+  siteName: string | null;
+  siteRoom: number | null;
+  siteTotalRooms: number | null;
+  siteMode: string | null;
 }
 
 export interface EncounterSiteFightSummary {
@@ -407,6 +415,7 @@ export interface CombatHistoryQuery {
   page?: number;
   pageSize?: number;
   outcome?: CombatOutcomeResponse;
+  source?: CombatSourceResponse;
   zoneId?: string;
   mobTemplateId?: string;
   sort?: 'recent' | 'xp';
@@ -422,12 +431,6 @@ export async function startCombat(zoneId: string, attackSkill: 'melee' | 'ranged
   });
 }
 
-export async function startCombatFromEncounterSite(encounterSiteId: string, attackSkill: 'melee' | 'ranged' | 'magic' = 'melee') {
-  return fetchApi<CombatResponse>('/api/v1/combat/start', {
-    method: 'POST',
-    body: JSON.stringify({ encounterSiteId, attackSkill }),
-  });
-}
 
 export interface EncounterSitesQuery {
   page?: number;
@@ -455,10 +458,10 @@ export interface EncounterSitesResponse {
     nextMobPrefix: string | null;
     nextMobDisplayName: string | null;
     discoveredAt: string;
-    clearStrategy: string | null;
     currentRoom: number;
     totalRooms: number;
     roomMobCounts: Array<{ room: number; alive: number; total: number }>;
+    currentRoomMobs: Array<{ slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
     eventModifiers?: EventModifierBadge[];
     totalTurnCost: number;
   }>;
@@ -508,6 +511,144 @@ export async function abandonEncounterSites(zoneId?: string) {
   });
 }
 
+// --- Encounter Site Room Combat Types ---
+
+export interface EncounterRoomMobState {
+  slot: number;
+  hp: number;
+  maxHp: number;
+  alive: boolean;
+  activeEffects: BossActiveEffect[];
+}
+
+export interface EncounterPlayerState {
+  hp: number;
+  maxHp: number;
+  stamina: number;
+  maxStamina: number;
+  mana: number;
+  maxMana: number;
+  activeEffects: BossActiveEffect[];
+}
+
+export interface EncounterRoundSnapshot {
+  roundNumber: number;
+  log: ExpeditionRoundLog;
+  mobStates: EncounterRoomMobState[];
+  playerState: EncounterPlayerState;
+}
+
+export interface EncounterFleeResult {
+  outcome: string;
+  remainingHp: number;
+  goldLost: number;
+  isRecovering: boolean;
+  recoveryCost: number | null;
+}
+
+export interface EncounterAutoResolveResponse {
+  outcome: 'cleared' | 'defeated' | 'site_cleared';
+  rounds: EncounterRoundSnapshot[];
+  initialMobs: Array<{ mobId: string; slot: number; name: string; prefix: string | null; hp: number; maxHp: number }>;
+  chestReward?: {
+    rarity: string;
+    materials: Array<{ itemTemplateId: string; name: string; quantity: number }>;
+    recipe?: { recipeId: string; name: string } | null;
+  };
+  fleeResult?: EncounterFleeResult | null;
+  respawnedTo?: { townId: string; townName: string } | null;
+  stateUpdates?: StateUpdates;
+  skillXpGrants?: Array<{
+    skillType: string;
+    xpGained: number;
+    xpAfterEfficiency: number;
+    newLevel: number;
+    leveledUp: boolean;
+    characterLeveledUp?: boolean;
+  }>;
+}
+
+export interface EncounterStartRoomResponse {
+  currentRoom: number;
+  totalRooms: number;
+  mobs: Array<{
+    mobId: string;
+    name: string;
+    prefix: string | null;
+    hp: number;
+    maxHp: number;
+    mobTemplateId: string;
+  }>;
+  playerState: EncounterPlayerState;
+  /** 0 = fresh start, >0 = resuming an existing session */
+  roundNumber: number;
+  roundLogs?: ExpeditionRoundLog[];
+  /** True when all remaining rooms decayed — site auto-cleared with chest reward. */
+  siteAutoCleared?: boolean;
+  chestReward?: unknown;
+  stateUpdates?: StateUpdates;
+}
+
+export interface EncounterManualRoundResponse {
+  roundNumber: number;
+  roundLog: ExpeditionRoundLog;
+  mobStates: EncounterRoomMobState[];
+  playerState: EncounterPlayerState;
+  outcome: 'ongoing' | 'cleared' | 'defeated' | 'site_cleared';
+  siteCleared: boolean;
+  chestReward?: EncounterAutoResolveResponse['chestReward'];
+  completionRewards?: Record<string, unknown>;
+  fleeResult?: EncounterFleeResult | null;
+  respawnedTo?: { townId: string; townName: string } | null;
+  stateUpdates?: StateUpdates;
+  skillXpGrants?: Array<{
+    skillType: string;
+    xpGained: number;
+    xpAfterEfficiency: number;
+    newLevel: number;
+    leveledUp: boolean;
+    characterLeveledUp?: boolean;
+  }>;
+}
+
+// --- Encounter Site Room Combat API Functions ---
+
+export async function autoResolveEncounterRoom(siteId: string): Promise<EncounterAutoResolveResponse> {
+  const res = await fetchApi<EncounterAutoResolveResponse>(`/api/v1/combat/sites/${siteId}/auto-resolve`, {
+    method: 'POST',
+  });
+  if (!res.data) throw new Error(res.error?.message ?? 'Auto-resolve failed');
+  return res.data;
+}
+
+export async function startEncounterRoom(siteId: string): Promise<EncounterStartRoomResponse> {
+  const res = await fetchApi<EncounterStartRoomResponse>(`/api/v1/combat/sites/${siteId}/start-room`, {
+    method: 'POST',
+  });
+  if (!res.data) throw new Error(res.error?.message ?? 'Failed to start room');
+  return res.data;
+}
+
+export async function resolveEncounterRound(
+  siteId: string,
+  action: { action: string; targetMobSlot?: number },
+): Promise<EncounterManualRoundResponse> {
+  const res = await fetchApi<EncounterManualRoundResponse>(`/api/v1/combat/sites/${siteId}/round`, {
+    method: 'POST',
+    body: JSON.stringify(action),
+  });
+  if (!res.data) throw new Error(res.error?.message ?? 'Failed to resolve round');
+  return res.data;
+}
+
+export async function abandonEncounterSite(siteId: string): Promise<{ success: boolean; stateUpdates?: StateUpdates }> {
+  const res = await fetchApi<{ success: boolean; stateUpdates?: StateUpdates }>(`/api/v1/combat/sites/${siteId}/abandon`, {
+    method: 'POST',
+  });
+  if (!res.data) throw new Error(res.error?.message ?? 'Failed to abandon');
+  return res.data;
+}
+
 export async function getCombatLog(id: string) {
   return fetchApi<{ logId: string; createdAt: string; combat: CombatResultResponse }>(`/api/v1/combat/logs/${id}`);
 }
@@ -518,6 +659,7 @@ export async function getCombatLogs(query: CombatHistoryQuery = {}) {
   if (query.page !== undefined) params.set('page', String(query.page));
   if (query.pageSize !== undefined) params.set('pageSize', String(query.pageSize));
   if (query.outcome) params.set('outcome', query.outcome);
+  if (query.source) params.set('source', query.source);
   if (query.zoneId) params.set('zoneId', query.zoneId);
   if (query.mobTemplateId) params.set('mobTemplateId', query.mobTemplateId);
   if (query.sort) params.set('sort', query.sort);

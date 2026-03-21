@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
-import { ModalOverlay } from '@/components/common/ModalOverlay';
 import { LowHpWarningDialog } from '@/components/common/LowHpWarningDialog';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
@@ -20,14 +19,26 @@ import { CopyButton } from '@/components/common/CopyButton';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { monsterImageSrc } from '@/lib/assets';
 import { relativeTime } from '@/lib/format';
-import { getMobPrefixDefinition, HP_CONSTANTS } from '@pocketrealm/shared';
+import { getMobPrefixDefinition, HP_CONSTANTS, TUTORIAL_STEP_COMBAT } from '@pocketrealm/shared';
 import type { HpState, LastCombat, LastCombatLogEntry, PendingEncounter } from '../gameController.types';
 import { ScreenContainer } from '@/components/common/ScreenContainer';
 import { SubNav } from '@/components/common/SubNav';
+import { EncounterSiteCombatView } from '@/components/encounter/EncounterSiteCombatView';
+import type { EncounterPlayerState } from '@/lib/api/combat';
+import {
+  autoResolveEncounterRoom,
+  startEncounterRoom,
+  resolveEncounterRound,
+  abandonEncounterSite,
+} from '@/lib/api/combat';
+import { makeEncounterMobId } from '@pocketrealm/shared';
+import type { CombatTemplateData, ExpeditionMobInfo, StateUpdates } from '@pocketrealm/shared';
 
 interface CombatScreenProps {
   hpState: HpState;
   isOverEncumbered?: boolean;
+  isActivityLocked?: boolean;
+  activityLockReason?: 'encounter' | 'expedition' | null;
   currentTurns: number;
   currentZoneId: string | null;
   pendingEncounters: PendingEncounter[];
@@ -53,8 +64,6 @@ interface CombatScreenProps {
   busyAction: string | null;
   lastCombat: LastCombat | null;
   bestiaryMobs: Array<{ id: string; isDiscovered: boolean }>;
-  onStartCombat: (encounterSiteId: string) => void | Promise<void>;
-  onSelectStrategy?: (encounterSiteId: string, strategy: 'full_clear' | 'room_by_room') => void | Promise<void>;
   onPendingEncounterPageChange: (page: number) => void;
   onPendingEncounterZoneFilterChange: (zoneId: string) => void;
   onPendingEncounterMobFilterChange: (mobTemplateId: string) => void;
@@ -84,11 +93,22 @@ interface CombatScreenProps {
   combatXpRate?: { skillName: string; rate: number };
   staminaState?: { current: number; max: number; regenPerSecond: number };
   manaState?: { current: number; max: number; regenPerSecond: number };
+  // Encounter site combat
+  templates?: CombatTemplateData[];
+  onActivateTemplate?: (templateId: string) => void;
+  onStateUpdates?: (updates: StateUpdates) => void;
+  refreshPendingEncounters?: () => void;
+  setError?: (msg: string | null) => void;
+  activeEncounterSiteId?: string | null;
+  onActiveEncounterSiteIdChange?: (id: string | null) => void;
+  advanceTutorial?: (step: number) => void;
 }
 
 export function CombatScreen({
   hpState,
   isOverEncumbered,
+  isActivityLocked = false,
+  activityLockReason,
   currentTurns,
   currentZoneId,
   pendingEncounters,
@@ -104,8 +124,6 @@ export function CombatScreen({
   busyAction,
   lastCombat,
   bestiaryMobs,
-  onStartCombat,
-  onSelectStrategy,
   onPendingEncounterPageChange,
   onPendingEncounterZoneFilterChange,
   onPendingEncounterMobFilterChange,
@@ -123,12 +141,41 @@ export function CombatScreen({
   combatXpRate,
   staminaState,
   manaState,
+  templates,
+  onActivateTemplate,
+  onStateUpdates,
+  refreshPendingEncounters,
+  setError,
+  activeEncounterSiteId: externalActiveEncounterSiteId,
+  onActiveEncounterSiteIdChange,
+  advanceTutorial,
 }: CombatScreenProps) {
   const [activeView, setActiveView] = useState<'encounters' | 'history' | 'bossHistory'>('encounters');
-  const [strategyModalSite, setStrategyModalSite] = useState<PendingEncounter | null>(null);
   const [lowHpPendingSite, setLowHpPendingSite] = useState<PendingEncounter | null>(null);
   const [lastCombatFightIndex, setLastCombatFightIndex] = useState(0);
   const [lastCombatCollapsed, setLastCombatCollapsed] = useState(false);
+
+  // Encounter site room combat state
+  const [activeSiteCombat, setActiveSiteCombat] = useState<{
+    siteId: string;
+    siteName: string;
+    mobFamilyName: string;
+    currentRoom: number;
+    totalRooms: number;
+    hasDecayedMobs: boolean;
+    mobs: ExpeditionMobInfo[];
+    resumeSession?: boolean;
+  } | null>(null);
+
+  // Sync with external activeEncounterSiteId on mount (reconnect)
+  useEffect(() => {
+    if (externalActiveEncounterSiteId && !activeSiteCombat) {
+      const site = pendingEncounters.find(e => e.encounterSiteId === externalActiveEncounterSiteId);
+      if (site) {
+        enterEncounterCombat(site, { resumeSession: true });
+      }
+    }
+  }, [externalActiveEncounterSiteId, pendingEncounters]);
 
   useEffect(() => {
     setLastCombatFightIndex(lastCombat?.fights ? lastCombat.fights.length - 1 : 0);
@@ -136,6 +183,27 @@ export function CombatScreen({
   }, [lastCombat]);
 
   const displayedFight = lastCombat?.fights?.[lastCombatFightIndex] ?? lastCombat;
+
+  const enterEncounterCombat = (site: PendingEncounter, opts?: { resumeSession?: boolean }) => {
+    setActiveSiteCombat({
+      siteId: site.encounterSiteId,
+      siteName: site.siteName,
+      mobFamilyName: site.mobFamilyName,
+      currentRoom: site.currentRoom,
+      totalRooms: site.totalRooms,
+      hasDecayedMobs: site.decayedMobs > 0,
+      mobs: (site.currentRoomMobs ?? []).map(m => ({
+        id: makeEncounterMobId(m.slot),
+        name: m.name,
+        prefix: m.prefix,
+        hp: m.hp,
+        maxHp: m.maxHp,
+        activeEffects: [],
+      })),
+      resumeSession: opts?.resumeSession,
+    });
+    onActiveEncounterSiteIdChange?.(site.encounterSiteId);
+  };
 
   const handleFightClick = (site: PendingEncounter) => {
     if (
@@ -146,20 +214,12 @@ export function CombatScreen({
       setLowHpPendingSite(site);
       return;
     }
-    if (!site.clearStrategy) {
-      setStrategyModalSite(site);
-    } else {
-      void onStartCombat(site.encounterSiteId);
-    }
+    enterEncounterCombat(site);
   };
 
   const proceedWithFight = (site: PendingEncounter) => {
     setLowHpPendingSite(null);
-    if (!site.clearStrategy) {
-      setStrategyModalSite(site);
-    } else {
-      void onStartCombat(site.encounterSiteId);
-    }
+    enterEncounterCombat(site);
   };
 
   // Player max HP should be the player's real max HP.
@@ -198,55 +258,7 @@ export function CombatScreen({
 
   return (
     <ScreenContainer>
-      {/* Strategy Selection Modal */}
-      {strategyModalSite && (
-        <ModalOverlay>
-          <div className="bg-[var(--rpg-bg-dark,#1a1a2e)] border border-[var(--rpg-gold,#c8a84e)] rounded-lg p-6 max-w-sm w-full mx-4">
-            <h3 className="text-[var(--rpg-gold,#c8a84e)] font-bold text-lg mb-1">Choose Strategy</h3>
-            <p className="text-[var(--rpg-light-dim,#a0a0b0)] text-sm mb-4">
-              {strategyModalSite.siteName} — {strategyModalSite.totalRooms} room{strategyModalSite.totalRooms !== 1 ? 's' : ''}
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                className="bg-[var(--rpg-gold)] hover:bg-[#e4b85b] text-[var(--rpg-background)] rounded-lg font-semibold transition-all w-full text-left p-3"
-                disabled={!!busyAction}
-                onClick={async () => {
-                  const siteId = strategyModalSite.encounterSiteId;
-                  if (onSelectStrategy) {
-                    await onSelectStrategy(siteId, 'full_clear');
-                  }
-                  setStrategyModalSite(null);
-                  void onStartCombat(siteId);
-                }}
-              >
-                <span className="font-bold block">Full Clear</span>
-                <span className="text-xs opacity-80 block mt-1">Fight all rooms back-to-back. Better drops on success.</span>
-              </button>
-              <button
-                className="bg-[var(--rpg-surface)] hover:bg-[var(--rpg-border)] text-[var(--rpg-text-primary)] border border-[var(--rpg-border)] rounded-lg font-semibold transition-all w-full text-left p-3"
-                disabled={!!busyAction}
-                onClick={async () => {
-                  const siteId = strategyModalSite.encounterSiteId;
-                  if (onSelectStrategy) {
-                    await onSelectStrategy(siteId, 'room_by_room');
-                  }
-                  setStrategyModalSite(null);
-                  void onStartCombat(siteId);
-                }}
-              >
-                <span className="font-bold block">Room by Room</span>
-                <span className="text-xs opacity-80 block mt-1">Clear one room at a time. Heal between rooms.</span>
-              </button>
-              <button
-                className="text-[var(--rpg-light-dim,#a0a0b0)] text-sm mt-1 hover:text-white"
-                onClick={() => setStrategyModalSite(null)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
+      {/* Strategy Selection Modal — removed, strategy is chosen per-room in combat view */}
 
       {/* Low HP Warning Dialog */}
       {lowHpPendingSite && (
@@ -261,6 +273,15 @@ export function CombatScreen({
       {/* Knockout Banner */}
       {hpState.isRecovering && (
         <KnockoutBanner action="fighting" recoveryCost={hpState.recoveryCost} onClick={onNavigateToRest} />
+      )}
+
+      {/* Activity Lock Banner — only shown for expedition locks; encounter site locks don't block this screen */}
+      {isActivityLocked && activityLockReason === 'expedition' && !hpState.isRecovering && !combatPlaybackData && (
+        <KnockoutBanner
+          title="Active Expedition"
+          action="fighting encounter sites"
+          message="You are on an active expedition. Complete it before starting combat."
+        />
       )}
 
       {/* Resource Status */}
@@ -295,6 +316,86 @@ export function CombatScreen({
       {activeView === 'bossHistory' ? (
         <BossHistory />
       ) : activeView === 'encounters' ? (
+        activeSiteCombat ? (
+          <EncounterSiteCombatView
+            siteId={activeSiteCombat.siteId}
+            siteName={activeSiteCombat.siteName}
+            mobFamilyName={activeSiteCombat.mobFamilyName}
+            currentRoom={activeSiteCombat.currentRoom}
+            totalRooms={activeSiteCombat.totalRooms}
+            initialMobs={activeSiteCombat.mobs}
+            playerState={{
+              hp: hpState.currentHp,
+              maxHp: hpState.maxHp,
+              stamina: staminaState?.current ?? 0,
+              maxStamina: staminaState?.max ?? 0,
+              mana: manaState?.current ?? 0,
+              maxMana: manaState?.max ?? 0,
+              activeEffects: [],
+            }}
+            templates={templates ?? []}
+            hasDecayedMobs={activeSiteCombat.hasDecayedMobs}
+            onAutoResolve={async () => {
+              const result = await autoResolveEncounterRoom(activeSiteCombat.siteId);
+              if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
+              return result;
+            }}
+            onStartRoom={async () => {
+              const result = await startEncounterRoom(activeSiteCombat.siteId);
+              if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
+              return result;
+            }}
+            onResolveRound={async (action) => {
+              const result = await resolveEncounterRound(activeSiteCombat.siteId, action);
+              if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
+              return result;
+            }}
+            onAbandon={async () => {
+              const result = await abandonEncounterSite(activeSiteCombat.siteId);
+              if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
+              setActiveSiteCombat(null);
+            }}
+            onAdvanceRoom={async () => {
+              // Refetch site data by calling start-room for next room
+              const result = await startEncounterRoom(activeSiteCombat.siteId);
+              if (result.stateUpdates) onStateUpdates?.(result.stateUpdates);
+              // All remaining rooms decayed — site auto-cleared
+              if (result.siteAutoCleared) {
+                return {
+                  currentRoom: 0,
+                  mobs: [],
+                  playerState: { hp: 0, maxHp: 0, stamina: 0, maxStamina: 0, mana: 0, maxMana: 0, activeEffects: [] },
+                  hasDecayedMobs: false,
+                  siteAutoCleared: true,
+                };
+              }
+              return {
+                currentRoom: result.currentRoom,
+                mobs: result.mobs.map(m => ({
+                  id: m.mobId,
+                  name: m.name,
+                  prefix: m.prefix,
+                  hp: m.hp,
+                  maxHp: m.maxHp,
+                  activeEffects: [],
+                })),
+                playerState: result.playerState,
+                hasDecayedMobs: false,
+              };
+            }}
+            onComplete={(combatOutcome) => {
+              setActiveSiteCombat(null);
+              onActiveEncounterSiteIdChange?.(null);
+              refreshPendingEncounters?.();
+              if (combatOutcome === 'cleared') {
+                advanceTutorial?.(TUTORIAL_STEP_COMBAT);
+              }
+            }}
+            onActivateTemplate={onActivateTemplate ?? (() => {})}
+            setError={setError ?? (() => {})}
+            resumeSession={activeSiteCombat.resumeSession}
+          />
+        ) : (
         <>
           {/* Room transition interstitial */}
           {roomTransition && (
@@ -488,7 +589,8 @@ export function CombatScreen({
                     ? (prefix ? `${prefix.displayName} ${e.nextMobName}` : e.nextMobName)
                     : null;
                   const isWrongZone = Boolean(currentZoneId) && e.zoneId !== currentZoneId;
-                  const isDisabled = isOverEncumbered || hpState.isRecovering || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData;
+                  const isExpeditionLocked = isActivityLocked && activityLockReason === 'expedition';
+                  const isDisabled = isOverEncumbered || hpState.isRecovering || isExpeditionLocked || busyAction === 'combat' || !e.nextMobTemplateId || isWrongZone || !!combatPlaybackData;
                   return (
                     <div
                       key={e.encounterSiteId}
@@ -516,11 +618,6 @@ export function CombatScreen({
                           <span className={`text-xs ${e.totalTurnCost > currentTurns ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-secondary)]'}`}>
                             {' · '}Cost: <span className="font-pixel text-[8px]">{e.totalTurnCost.toLocaleString()}</span> turns
                           </span>
-                          {e.clearStrategy && (
-                            <span className="text-xs text-[var(--rpg-gold)] ml-2">
-                              {e.clearStrategy === 'full_clear' ? 'Full Clear' : 'Room by Room'}
-                            </span>
-                          )}
                           <div className="text-xs text-[var(--rpg-text-secondary)]">
                             Next monster: <span className="font-almendra">{nextMobLabel ?? 'None (site decayed)'}</span>
                           </div>
@@ -540,7 +637,9 @@ export function CombatScreen({
                             : 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
                         }`}
                       >
-                        {isOverEncumbered
+                        {isExpeditionLocked
+                          ? 'In Expedition'
+                          : isOverEncumbered
                           ? 'Over-Encumbered'
                           : hpState.isRecovering
                             ? 'Recover First'
@@ -566,6 +665,7 @@ export function CombatScreen({
             )}
           </div>
         </>
+        )
       ) : (
         <CombatHistory />
       )}

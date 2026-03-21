@@ -1,1 +1,1 @@
-export { RoundLogAttackRow } from './guildExpeditionRoundLogView';
+export { RoundLogAttackRow } from '@/components/common/combat/RoundLogAttackRow';

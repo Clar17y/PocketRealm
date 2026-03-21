@@ -183,5 +183,127 @@ export function getAllChestDropTables() {
     cd(f.abominations, 'uncommon', r.ancientOre, 60, 2, 4), cd(f.abominations, 'uncommon', r.petrifiedWood, 45, 2, 3), cd(f.abominations, 'uncommon', r.abyssalKelp, 55, 2, 3), cd(f.abominations, 'uncommon', d.eldritchFragment, 65, 2, 4), cd(f.abominations, 'uncommon', d.oozeResidue, 55, 2, 4), cd(f.abominations, 'uncommon', d.ancientRelic, 15, 1, 1), cd(f.abominations, 'uncommon', p.elixirOfPower, 30, 1, 1),
     // Abominations — Large
     cd(f.abominations, 'rare', r.ancientOre, 70, 3, 5), cd(f.abominations, 'rare', r.petrifiedWood, 55, 2, 4), cd(f.abominations, 'rare', r.abyssalKelp, 65, 3, 4), cd(f.abominations, 'rare', d.eldritchFragment, 75, 4, 7), cd(f.abominations, 'rare', d.oozeResidue, 65, 4, 6), cd(f.abominations, 'rare', d.ancientRelic, 30, 1, 2), cd(f.abominations, 'rare', p.elixirOfPower, 45, 1, 2),
+
+    // ══════════════════════════════════════════════════════════════════════
+    // EPIC DROP TABLES (4+ rooms)
+    // ══════════════════════════════════════════════════════════════════════
+
+    // Vermin — Epic
+    cd(f.vermin, 'epic', r.copperOre, 95, 6, 10), cd(f.vermin, 'epic', r.oakLog, 80, 4, 8), cd(f.vermin, 'epic', r.forestSage, 70, 4, 6), cd(f.vermin, 'epic', d.ratTail, 90, 6, 10), cd(f.vermin, 'epic', d.ratPelt, 80, 5, 8), cd(f.vermin, 'epic', p.minorHealthPotion, 70, 3, 5),
+
+    // Spiders — Epic
+    cd(f.spiders, 'epic', r.copperOre, 90, 4, 8), cd(f.spiders, 'epic', r.oakLog, 70, 4, 6), cd(f.spiders, 'epic', r.forestSage, 80, 4, 7), cd(f.spiders, 'epic', d.spiderSilk, 95, 7, 14), cd(f.spiders, 'epic', p.minorHealthPotion, 70, 3, 5),
+
+    // Boars — Epic
+    cd(f.boars, 'epic', r.copperOre, 95, 5, 10), cd(f.boars, 'epic', r.oakLog, 80, 4, 7), cd(f.boars, 'epic', r.forestSage, 60, 3, 6), cd(f.boars, 'epic', d.boarTusk, 90, 6, 10), cd(f.boars, 'epic', d.boarHide, 80, 5, 8), cd(f.boars, 'epic', p.minorHealthPotion, 70, 3, 5),
+
+    // Wolves — Epic
+    cd(f.wolves, 'epic', r.tinOre, 90, 5, 9), cd(f.wolves, 'epic', r.mapleLog, 80, 4, 7), cd(f.wolves, 'epic', r.moonpetal, 70, 4, 6), cd(f.wolves, 'epic', d.wolfFang, 90, 6, 10), cd(f.wolves, 'epic', d.wolfPelt, 80, 5, 8), cd(f.wolves, 'epic', p.healthPotion, 60, 2, 4),
+
+    // Bandits — Epic
+    cd(f.bandits, 'epic', r.tinOre, 80, 4, 7), cd(f.bandits, 'epic', r.mapleLog, 70, 3, 6), cd(f.bandits, 'epic', r.moonpetal, 60, 3, 5), cd(f.bandits, 'epic', d.stolenCoin, 95, 7, 14), cd(f.bandits, 'epic', d.crudeGemstone, 75, 3, 6), cd(f.bandits, 'epic', d.banditCloth, 75, 4, 7), cd(f.bandits, 'epic', p.healthPotion, 60, 2, 4),
+
+    // Treants — Epic
+    cd(f.treants, 'epic', r.tinOre, 80, 4, 7), cd(f.treants, 'epic', r.mapleLog, 95, 5, 10), cd(f.treants, 'epic', r.moonpetal, 70, 4, 6), cd(f.treants, 'epic', d.ancientBark, 90, 6, 12), cd(f.treants, 'epic', p.healthPotion, 60, 2, 4), cd(f.treants, 'epic', p.manaPotion2, 40, 2, 3),
+
+    // Bats — Epic
+    cd(f.bats, 'epic', r.tinOre, 80, 4, 7), cd(f.bats, 'epic', r.fungalWood, 70, 4, 6), cd(f.bats, 'epic', r.caveMoss, 70, 4, 6), cd(f.bats, 'epic', d.batWing, 90, 6, 10), cd(f.bats, 'epic', d.batFang, 80, 5, 8), cd(f.bats, 'epic', p.healthPotion, 60, 2, 4),
+
+    // Goblins — Epic
+    cd(f.goblins, 'epic', r.tinOre, 90, 4, 8), cd(f.goblins, 'epic', r.fungalWood, 60, 3, 6), cd(f.goblins, 'epic', r.caveMoss, 60, 3, 5), cd(f.goblins, 'epic', d.stolenCoin, 95, 7, 14), cd(f.goblins, 'epic', d.crudeGemstone, 75, 3, 6), cd(f.goblins, 'epic', d.goblinRag, 70, 4, 7), cd(f.goblins, 'epic', p.healthPotion, 60, 2, 4), cd(f.goblins, 'epic', p.manaPotion2, 40, 2, 3),
+
+    // Spirits — Epic
+    cd(f.spirits, 'epic', r.elderwoodLog, 80, 4, 7), cd(f.spirits, 'epic', r.starbloom, 80, 4, 7), cd(f.spirits, 'epic', d.spriteDust, 90, 6, 12), cd(f.spirits, 'epic', d.dryadThread, 70, 4, 7), cd(f.spirits, 'epic', p.greaterHealthPotion, 60, 2, 4), cd(f.spirits, 'epic', p.manaPotion3, 45, 2, 3),
+
+    // Fae — Epic
+    cd(f.fae, 'epic', r.elderwoodLog, 70, 4, 6), cd(f.fae, 'epic', r.starbloom, 80, 4, 7), cd(f.fae, 'epic', d.pixieWing, 90, 6, 10), cd(f.fae, 'epic', d.faeSilk, 80, 5, 8), cd(f.fae, 'epic', p.greaterHealthPotion, 60, 2, 4), cd(f.fae, 'epic', p.manaPotion3, 45, 2, 3),
+
+    // Golems — Epic
+    cd(f.golems, 'epic', r.ironOre, 95, 6, 10), cd(f.golems, 'epic', r.glowcapMushroom, 60, 3, 5), cd(f.golems, 'epic', d.crystalShard, 90, 6, 10), cd(f.golems, 'epic', p.greaterHealthPotion, 60, 2, 4),
+
+    // Crawlers — Epic
+    cd(f.crawlers, 'epic', r.ironOre, 90, 4, 8), cd(f.crawlers, 'epic', r.glowcapMushroom, 60, 3, 5), cd(f.crawlers, 'epic', d.crawlerChitin, 90, 6, 12), cd(f.crawlers, 'epic', p.greaterHealthPotion, 60, 2, 4),
+
+    // Harpies — Epic
+    cd(f.harpies, 'epic', r.sandstone, 70, 3, 6), cd(f.harpies, 'epic', r.willowLog, 70, 3, 6), cd(f.harpies, 'epic', r.windbloom, 70, 4, 6), cd(f.harpies, 'epic', d.harpyFeather, 90, 6, 10), cd(f.harpies, 'epic', d.harpyTalon, 75, 4, 7), cd(f.harpies, 'epic', p.greaterHealthPotion, 60, 2, 4),
+
+    // Undead — Epic
+    cd(f.undead, 'epic', r.darkIronOre, 95, 6, 10), cd(f.undead, 'epic', r.bogwoodLog, 75, 4, 7), cd(f.undead, 'epic', r.gravemoss, 70, 4, 6), cd(f.undead, 'epic', d.boneFragment, 90, 6, 12), cd(f.undead, 'epic', d.wraithEssence, 75, 4, 7), cd(f.undead, 'epic', p.resistPotion, 60, 2, 4),
+
+    // Swamp Beasts — Epic
+    cd(f.swampBeasts, 'epic', r.darkIronOre, 85, 4, 8), cd(f.swampBeasts, 'epic', r.bogwoodLog, 75, 4, 7), cd(f.swampBeasts, 'epic', r.gravemoss, 70, 4, 6), cd(f.swampBeasts, 'epic', d.hydraScale, 85, 5, 8), cd(f.swampBeasts, 'epic', d.bogHeart, 75, 4, 7), cd(f.swampBeasts, 'epic', p.resistPotion, 60, 2, 4),
+
+    // Witches — Epic
+    cd(f.witches, 'epic', r.darkIronOre, 75, 4, 7), cd(f.witches, 'epic', r.bogwoodLog, 75, 4, 6), cd(f.witches, 'epic', r.gravemoss, 80, 4, 7), cd(f.witches, 'epic', d.witchCloth, 85, 5, 9), cd(f.witches, 'epic', d.bogHeart, 75, 4, 7), cd(f.witches, 'epic', p.resistPotion, 60, 2, 4),
+
+    // Elementals — Epic
+    cd(f.elementals, 'epic', r.mithrilOre, 85, 4, 8), cd(f.elementals, 'epic', r.crystalWood, 75, 4, 7), cd(f.elementals, 'epic', r.shimmerFern, 75, 4, 6), cd(f.elementals, 'epic', d.darkCrystal, 90, 6, 12), cd(f.elementals, 'epic', p.manaPotion, 60, 2, 4),
+
+    // Serpents — Epic
+    cd(f.serpents, 'epic', r.ancientOre, 85, 4, 8), cd(f.serpents, 'epic', r.petrifiedWood, 70, 4, 6), cd(f.serpents, 'epic', r.abyssalKelp, 75, 4, 7), cd(f.serpents, 'epic', d.nagaScale, 85, 5, 9), cd(f.serpents, 'epic', d.nagaPearl, 70, 3, 6), cd(f.serpents, 'epic', d.ancientRelic, 40, 2, 4), cd(f.serpents, 'epic', p.elixirOfPower, 55, 2, 4),
+
+    // Abominations — Epic
+    cd(f.abominations, 'epic', r.ancientOre, 80, 4, 7), cd(f.abominations, 'epic', r.petrifiedWood, 65, 3, 6), cd(f.abominations, 'epic', r.abyssalKelp, 75, 4, 6), cd(f.abominations, 'epic', d.eldritchFragment, 85, 5, 9), cd(f.abominations, 'epic', d.oozeResidue, 75, 5, 8), cd(f.abominations, 'epic', d.ancientRelic, 40, 2, 4), cd(f.abominations, 'epic', p.elixirOfPower, 55, 2, 4),
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LEGENDARY DROP TABLES (5+ rooms)
+    // ══════════════════════════════════════════════════════════════════════
+
+    // Vermin — Legendary
+    cd(f.vermin, 'legendary', r.copperOre, 95, 7, 12), cd(f.vermin, 'legendary', r.oakLog, 85, 5, 10), cd(f.vermin, 'legendary', r.forestSage, 75, 5, 8), cd(f.vermin, 'legendary', d.ratTail, 95, 7, 12), cd(f.vermin, 'legendary', d.ratPelt, 85, 6, 10), cd(f.vermin, 'legendary', p.minorHealthPotion, 75, 4, 7),
+
+    // Spiders — Legendary
+    cd(f.spiders, 'legendary', r.copperOre, 95, 5, 10), cd(f.spiders, 'legendary', r.oakLog, 75, 5, 8), cd(f.spiders, 'legendary', r.forestSage, 85, 5, 9), cd(f.spiders, 'legendary', d.spiderSilk, 95, 8, 16), cd(f.spiders, 'legendary', p.minorHealthPotion, 75, 4, 7),
+
+    // Boars — Legendary
+    cd(f.boars, 'legendary', r.copperOre, 95, 6, 12), cd(f.boars, 'legendary', r.oakLog, 85, 5, 9), cd(f.boars, 'legendary', r.forestSage, 65, 4, 8), cd(f.boars, 'legendary', d.boarTusk, 95, 7, 12), cd(f.boars, 'legendary', d.boarHide, 85, 6, 10), cd(f.boars, 'legendary', p.minorHealthPotion, 75, 4, 7),
+
+    // Wolves — Legendary
+    cd(f.wolves, 'legendary', r.tinOre, 95, 6, 11), cd(f.wolves, 'legendary', r.mapleLog, 85, 5, 9), cd(f.wolves, 'legendary', r.moonpetal, 75, 5, 8), cd(f.wolves, 'legendary', d.wolfFang, 95, 7, 12), cd(f.wolves, 'legendary', d.wolfPelt, 85, 6, 10), cd(f.wolves, 'legendary', p.healthPotion, 65, 3, 6),
+
+    // Bandits — Legendary
+    cd(f.bandits, 'legendary', r.tinOre, 85, 5, 9), cd(f.bandits, 'legendary', r.mapleLog, 75, 4, 8), cd(f.bandits, 'legendary', r.moonpetal, 65, 4, 7), cd(f.bandits, 'legendary', d.stolenCoin, 95, 8, 16), cd(f.bandits, 'legendary', d.crudeGemstone, 80, 4, 8), cd(f.bandits, 'legendary', d.banditCloth, 80, 5, 9), cd(f.bandits, 'legendary', p.healthPotion, 65, 3, 6),
+
+    // Treants — Legendary
+    cd(f.treants, 'legendary', r.tinOre, 85, 5, 9), cd(f.treants, 'legendary', r.mapleLog, 95, 6, 12), cd(f.treants, 'legendary', r.moonpetal, 75, 5, 8), cd(f.treants, 'legendary', d.ancientBark, 95, 7, 14), cd(f.treants, 'legendary', p.healthPotion, 65, 3, 6), cd(f.treants, 'legendary', p.manaPotion2, 45, 3, 5),
+
+    // Bats — Legendary
+    cd(f.bats, 'legendary', r.tinOre, 85, 5, 9), cd(f.bats, 'legendary', r.fungalWood, 75, 5, 8), cd(f.bats, 'legendary', r.caveMoss, 75, 5, 8), cd(f.bats, 'legendary', d.batWing, 95, 7, 12), cd(f.bats, 'legendary', d.batFang, 85, 6, 10), cd(f.bats, 'legendary', p.healthPotion, 65, 3, 6),
+
+    // Goblins — Legendary
+    cd(f.goblins, 'legendary', r.tinOre, 95, 5, 10), cd(f.goblins, 'legendary', r.fungalWood, 65, 4, 8), cd(f.goblins, 'legendary', r.caveMoss, 65, 4, 7), cd(f.goblins, 'legendary', d.stolenCoin, 95, 8, 16), cd(f.goblins, 'legendary', d.crudeGemstone, 80, 4, 8), cd(f.goblins, 'legendary', d.goblinRag, 75, 5, 9), cd(f.goblins, 'legendary', p.healthPotion, 65, 3, 6), cd(f.goblins, 'legendary', p.manaPotion2, 45, 3, 5),
+
+    // Spirits — Legendary
+    cd(f.spirits, 'legendary', r.elderwoodLog, 85, 5, 9), cd(f.spirits, 'legendary', r.starbloom, 85, 5, 9), cd(f.spirits, 'legendary', d.spriteDust, 95, 7, 14), cd(f.spirits, 'legendary', d.dryadThread, 75, 5, 9), cd(f.spirits, 'legendary', p.greaterHealthPotion, 65, 3, 6), cd(f.spirits, 'legendary', p.manaPotion3, 50, 3, 5),
+
+    // Fae — Legendary
+    cd(f.fae, 'legendary', r.elderwoodLog, 75, 5, 8), cd(f.fae, 'legendary', r.starbloom, 85, 5, 9), cd(f.fae, 'legendary', d.pixieWing, 95, 7, 12), cd(f.fae, 'legendary', d.faeSilk, 85, 6, 10), cd(f.fae, 'legendary', p.greaterHealthPotion, 65, 3, 6), cd(f.fae, 'legendary', p.manaPotion3, 50, 3, 5),
+
+    // Golems — Legendary
+    cd(f.golems, 'legendary', r.ironOre, 95, 7, 12), cd(f.golems, 'legendary', r.glowcapMushroom, 65, 4, 7), cd(f.golems, 'legendary', d.crystalShard, 95, 7, 12), cd(f.golems, 'legendary', p.greaterHealthPotion, 65, 3, 6),
+
+    // Crawlers — Legendary
+    cd(f.crawlers, 'legendary', r.ironOre, 95, 5, 10), cd(f.crawlers, 'legendary', r.glowcapMushroom, 65, 4, 7), cd(f.crawlers, 'legendary', d.crawlerChitin, 95, 7, 14), cd(f.crawlers, 'legendary', p.greaterHealthPotion, 65, 3, 6),
+
+    // Harpies — Legendary
+    cd(f.harpies, 'legendary', r.sandstone, 75, 4, 8), cd(f.harpies, 'legendary', r.willowLog, 75, 4, 8), cd(f.harpies, 'legendary', r.windbloom, 75, 5, 8), cd(f.harpies, 'legendary', d.harpyFeather, 95, 7, 12), cd(f.harpies, 'legendary', d.harpyTalon, 80, 5, 9), cd(f.harpies, 'legendary', p.greaterHealthPotion, 65, 3, 6),
+
+    // Undead — Legendary
+    cd(f.undead, 'legendary', r.darkIronOre, 95, 7, 12), cd(f.undead, 'legendary', r.bogwoodLog, 80, 5, 9), cd(f.undead, 'legendary', r.gravemoss, 75, 5, 8), cd(f.undead, 'legendary', d.boneFragment, 95, 7, 14), cd(f.undead, 'legendary', d.wraithEssence, 80, 5, 9), cd(f.undead, 'legendary', p.resistPotion, 65, 3, 6),
+
+    // Swamp Beasts — Legendary
+    cd(f.swampBeasts, 'legendary', r.darkIronOre, 90, 5, 10), cd(f.swampBeasts, 'legendary', r.bogwoodLog, 80, 5, 9), cd(f.swampBeasts, 'legendary', r.gravemoss, 75, 5, 8), cd(f.swampBeasts, 'legendary', d.hydraScale, 90, 6, 10), cd(f.swampBeasts, 'legendary', d.bogHeart, 80, 5, 9), cd(f.swampBeasts, 'legendary', p.resistPotion, 65, 3, 6),
+
+    // Witches — Legendary
+    cd(f.witches, 'legendary', r.darkIronOre, 80, 5, 9), cd(f.witches, 'legendary', r.bogwoodLog, 80, 5, 8), cd(f.witches, 'legendary', r.gravemoss, 85, 5, 9), cd(f.witches, 'legendary', d.witchCloth, 90, 6, 11), cd(f.witches, 'legendary', d.bogHeart, 80, 5, 9), cd(f.witches, 'legendary', p.resistPotion, 65, 3, 6),
+
+    // Elementals — Legendary
+    cd(f.elementals, 'legendary', r.mithrilOre, 90, 5, 10), cd(f.elementals, 'legendary', r.crystalWood, 80, 5, 9), cd(f.elementals, 'legendary', r.shimmerFern, 80, 5, 8), cd(f.elementals, 'legendary', d.darkCrystal, 95, 7, 14), cd(f.elementals, 'legendary', p.manaPotion, 65, 3, 6),
+
+    // Serpents — Legendary
+    cd(f.serpents, 'legendary', r.ancientOre, 90, 5, 10), cd(f.serpents, 'legendary', r.petrifiedWood, 75, 5, 8), cd(f.serpents, 'legendary', r.abyssalKelp, 80, 5, 9), cd(f.serpents, 'legendary', d.nagaScale, 90, 6, 11), cd(f.serpents, 'legendary', d.nagaPearl, 75, 4, 8), cd(f.serpents, 'legendary', d.ancientRelic, 45, 3, 6), cd(f.serpents, 'legendary', p.elixirOfPower, 60, 3, 6),
+
+    // Abominations — Legendary
+    cd(f.abominations, 'legendary', r.ancientOre, 85, 5, 9), cd(f.abominations, 'legendary', r.petrifiedWood, 70, 4, 8), cd(f.abominations, 'legendary', r.abyssalKelp, 80, 5, 8), cd(f.abominations, 'legendary', d.eldritchFragment, 90, 6, 11), cd(f.abominations, 'legendary', d.oozeResidue, 80, 6, 10), cd(f.abominations, 'legendary', d.ancientRelic, 45, 3, 6), cd(f.abominations, 'legendary', p.elixirOfPower, 60, 3, 6),
   ];
 }

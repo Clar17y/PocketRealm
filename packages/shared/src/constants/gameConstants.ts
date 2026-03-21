@@ -156,11 +156,11 @@ export const CHARACTER_CONSTANTS = {
 
 export const EXPLORATION_CONSTANTS = {
   AMBUSH_CHANCE_PER_TURN: 0.005,
-  ENCOUNTER_SITE_CHANCE_PER_TURN: 0.0008,
+  ENCOUNTER_SITE_CHANCE_PER_TURN: 0.0015,
   RESOURCE_NODE_CHANCE: 0.0005,
   HIDDEN_CACHE_CHANCE: 0.0002,
   TRAVEL_AMBUSH_CHANCE_PER_TURN: 0.04,
-  ENCOUNTER_SITE_DECAY_RATE_PER_HOUR: 0.06,
+  ENCOUNTER_SITE_DECAY_RATE_PER_HOUR: 0.25,
   RESOURCE_NODE_DECAY_RATE_PER_HOUR: 0.65,
   ENCOUNTER_SIZE_SMALL: { min: 2, max: 3 },
   ENCOUNTER_SIZE_MEDIUM: { min: 4, max: 6 },
@@ -178,6 +178,10 @@ export const CHEST_CONSTANTS = {
   CHEST_MATERIAL_ROLLS_SMALL: { min: 1, max: 2 },
   CHEST_MATERIAL_ROLLS_MEDIUM: { min: 2, max: 4 },
   CHEST_MATERIAL_ROLLS_LARGE: { min: 3, max: 6 },
+  CHEST_RECIPE_CHANCE_EPIC: 0.08,
+  CHEST_RECIPE_CHANCE_LEGENDARY: 0.15,
+  CHEST_MATERIAL_ROLLS_EPIC: { min: 5, max: 9 },
+  CHEST_MATERIAL_ROLLS_LEGENDARY: { min: 7, max: 12 },
 } as const;
 
 // =============================================================================
@@ -834,7 +838,7 @@ export const ROOM_CONSTANTS = {
   ROOMS_MEDIUM: { min: 2, max: 2 },
   ROOMS_LARGE: { min: 3, max: 4 },
   MOBS_PER_ROOM_SMALL: { min: 2, max: 4 },
-  MOBS_PER_ROOM_MEDIUM: { min: 2, max: 4 },
+  MOBS_PER_ROOM_MEDIUM: { min: 3, max: 5 },
   MOBS_PER_ROOM_LARGE: { min: 2, max: 5 },
 } as const;
 
@@ -846,6 +850,16 @@ export const FULL_CLEAR_CONSTANTS = {
   DROP_MULTIPLIER: 1.5,
   RECIPE_MULTIPLIER: 1.5,
   CHEST_TIER_UPGRADE: true,
+} as const;
+
+// =============================================================================
+// ENCOUNTER SITE
+// =============================================================================
+
+export const ENCOUNTER_SITE_CONSTANTS = {
+  AUTO_RESOLVE_DROP_MULTIPLIER: 1.5,
+  AUTO_RESOLVE_RECIPE_MULTIPLIER: 1.5,
+  AUTO_RESOLVE_MAX_ROUNDS: 100,
 } as const;
 
 // =============================================================================

@@ -1,9 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Shield } from 'lucide-react';
-import Image from 'next/image';
-import { monsterImageSrc, type ExpeditionContext } from '@/lib/assets';
+import type { ExpeditionContext } from '@/lib/assets';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { SkeletonCard } from '@/components/common/LoadingSkeleton';
@@ -31,19 +29,20 @@ import type {
   ExpeditionAttemptLog,
   ExpeditionData,
   ExpeditionMemberData,
-  ExpeditionRoomType,
-  ExpeditionMobInfo,
   ExpeditionRoundLog,
   ExpeditionCooldownInfo,
-  BossActiveEffect,
   CombatTemplateData,
   StateUpdates,
 } from '@pocketrealm/shared';
-import { EXPEDITION_CONSTANTS, EXPEDITION_THEMES, mobDisplayName } from '@pocketrealm/shared';
+import { EXPEDITION_CONSTANTS, EXPEDITION_THEMES } from '@pocketrealm/shared';
 import { formatNumber, formatTimeRemaining } from '@/lib/format';
 import { ResourceStatusBar } from '@/components/common/ResourceStatusBar';
 import { ContributionList } from '@/components/common/ContributionList';
-import { RoundLogAttackRow } from './guildExpeditionRoundLog';
+import {
+  EffectPill, roomTypeBadge,
+  RoomProgressBar, MobCardGrid, CombatRoundLog, TemplateQuickSwitch,
+  RoundLogContent, ThreatMeter,
+} from '@/components/common/combat';
 
 // ---------------------------------------------------------------------------
 // Tier definitions — derived from shared constants
@@ -96,17 +95,6 @@ interface GuildExpeditionsTabProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function roomTypeBadge(roomType: ExpeditionRoomType | null): { label: string; color: string } {
-  switch (roomType) {
-    case 'trash':      return { label: 'Trash',      color: 'var(--rpg-text-secondary)' };
-    case 'elite':      return { label: 'Elite',      color: 'var(--rpg-blue-light)' };
-    case 'mini_boss':  return { label: 'Mini-Boss',  color: 'var(--rpg-gold)' };
-    case 'event':      return { label: 'Event',      color: 'var(--rpg-green-light)' };
-    case 'final_boss': return { label: 'Final Boss', color: 'var(--rpg-red)' };
-    default:           return { label: 'Unknown',    color: 'var(--rpg-text-secondary)' };
-  }
-}
-
 function Countdown({ expiresAt, onExpired }: { expiresAt: string | null; onExpired?: () => void }) {
   const [remaining, setRemaining] = useState('');
   const firedRef = useRef(false);
@@ -139,75 +127,6 @@ function Countdown({ expiresAt, onExpired }: { expiresAt: string | null; onExpir
   }, [expiresAt]);
   if (!expiresAt) return null;
   return <span className="text-xs text-[var(--rpg-text-secondary)]">{remaining}</span>;
-}
-
-function HpBar({ current, max, label, color }: { current: number; max: number; label: string; color: string }) {
-  const pct = max > 0 ? Math.min((current / max) * 100, 100) : 0;
-  return (
-    <div className="relative w-full h-4 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded overflow-hidden">
-      <div
-        className="absolute inset-y-0 left-0 transition-all duration-300"
-        style={{ width: `${pct}%`, backgroundColor: color }}
-        role="progressbar"
-        aria-valuenow={current}
-        aria-valuemin={0}
-        aria-valuemax={max}
-      />
-      <div className="absolute inset-0 flex items-center px-1.5">
-        <span className="text-[8px] font-pixel text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
-          {label} {Math.floor(current)}/{max}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function isEffectDebuff(effect: BossActiveEffect): boolean {
-  if (effect.stat === 'potionSickness') return true;
-  if (effect.damagePerRound && effect.damagePerRound > 0) return true;
-  if (effect.stat === 'rooted' || effect.stat === 'marked_for_death' || effect.stat === 'nature_cursed') return true;
-  return (effect.modifier ?? 0) < 0;
-}
-
-function effectDetail(effect: BossActiveEffect): string {
-  const parts: string[] = [];
-  if (effect.modifier && effect.modifier !== 0) {
-    parts.push(`${effect.stat} ${effect.modifier > 0 ? '+' : ''}${effect.modifier}`);
-  }
-  if (effect.damagePerRound && effect.damagePerRound > 0) {
-    parts.push(`${effect.damagePerRound} ${effect.dotDamageType ?? 'magic'} dmg/round`);
-  }
-  parts.push(`${effect.roundsRemaining}r remaining`);
-  return parts.join(' · ');
-}
-
-function EffectPill({ effect, isDebuff }: { effect: BossActiveEffect; isDebuff?: boolean }) {
-  const [showDetail, setShowDetail] = useState(false);
-  const debuff = isDebuff ?? isEffectDebuff(effect);
-
-  return (
-    <span className="relative">
-      <span
-        role="button"
-        tabIndex={0}
-        onClick={(e) => { e.stopPropagation(); setShowDetail(!showDetail); }}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setShowDetail(!showDetail); } }}
-        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer select-none ${
-          debuff
-            ? 'bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]'
-            : 'bg-[var(--rpg-blue-light)]/20 text-[var(--rpg-blue-light)]'
-        }`}
-      >
-        {effect.name}
-        <span className="opacity-70">{effect.roundsRemaining}r</span>
-      </span>
-      {showDetail && (
-        <span className="absolute bottom-full left-0 mb-1 px-2 py-1 rounded bg-[var(--rpg-surface)] border border-[var(--rpg-border)] text-[10px] text-[var(--rpg-text-primary)] whitespace-nowrap z-10 shadow-lg">
-          {effectDetail(effect)}
-        </span>
-      )}
-    </span>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -873,9 +792,6 @@ function InProgressView({
   onActivateTemplate: (templateId: string) => void;
 }) {
   const roomBadge = roomTypeBadge(expedition.currentRoomType);
-  const roomPct = expedition.totalRooms > 0
-    ? Math.min(((expedition.currentRoom + 0.5) / expedition.totalRooms) * 100, 100)
-    : 0;
 
   const isResting = expedition.currentRoomType === null && expedition.status === 'in_progress';
   const isBetweenRooms = expedition.roundNumber === 0;
@@ -915,22 +831,7 @@ function InProgressView({
 
         {/* Room progress bar */}
         <div className="mb-3">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-[var(--rpg-text-secondary)]">Room Progress</span>
-            <span className="text-[var(--rpg-text-primary)]">
-              Room {expedition.currentRoom + 1} / {expedition.totalRooms}
-            </span>
-          </div>
-          <div className="h-2 rounded-full" style={{ backgroundColor: 'var(--rpg-bg-dark, #1a1a2e)' }}>
-            <div
-              className="h-full rounded-full transition-all"
-              style={{ width: `${roomPct}%`, backgroundColor: 'var(--rpg-gold)' }}
-              role="progressbar"
-              aria-valuenow={expedition.currentRoom}
-              aria-valuemin={0}
-              aria-valuemax={expedition.totalRooms}
-            />
-          </div>
+          <RoomProgressBar currentRoom={expedition.currentRoom} totalRooms={expedition.totalRooms} zeroIndexed />
         </div>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
@@ -998,105 +899,29 @@ function InProgressView({
       </PixelCard>
 
       {/* Template quick-switch */}
-      {myMember && templates.length > 1 && (
-        <div className="flex items-center gap-2">
-          <label htmlFor="expedition-template-select" className="text-xs text-[var(--rpg-text-secondary)] whitespace-nowrap">Template</label>
-          <select
-            id="expedition-template-select"
-            className="flex-1 text-xs px-2 py-1.5 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] text-[var(--rpg-text-primary)] outline-none"
-            value={templates.find(t => t.isActive)?.id ?? ''}
-            onChange={(e) => onActivateTemplate(e.target.value)}
-          >
-            {templates.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
+      {myMember && (
+        <TemplateQuickSwitch
+          templates={templates}
+          activeTemplateId={templates.find(t => t.isActive)?.id ?? null}
+          onActivate={onActivateTemplate}
+        />
       )}
 
       {/* Current Room Mobs */}
-      {expedition.currentRoomMobs.length > 0 && (
-        <PixelCard>
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="text-xs font-bold text-[var(--rpg-text-primary)]">Current Room</h4>
-            {myTargetMobId && !amKnockedOut && (
-              <button
-                onClick={() => onSetTarget(null)}
-                className="text-[10px] text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] underline"
-              >
-                Clear Target
-              </button>
-            )}
-          </div>
-          <div className="space-y-2">
-            {expedition.currentRoomMobs.map((mob) => {
-              const isMyTarget = myTargetMobId === mob.id;
-              const count = targetCounts.get(mob.id) ?? 0;
-              return (
-                <button
-                  key={mob.id}
-                  onClick={() => !amKnockedOut && onSetTarget(isMyTarget ? null : mob.id)}
-                  disabled={amKnockedOut}
-                  className={`w-full text-left p-2 rounded border transition-colors ${
-                    amKnockedOut
-                      ? 'border-[var(--rpg-border)] opacity-50 cursor-not-allowed'
-                      : isMyTarget
-                        ? 'border-[var(--rpg-gold)] bg-[var(--rpg-gold)]/10'
-                        : 'border-[var(--rpg-border)] hover:border-[var(--rpg-text-secondary)]'
-                  }`}
-                >
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-[var(--rpg-text-primary)] font-bold flex items-center gap-1.5">
-                      <Image
-                        src={monsterImageSrc(mob.name)}
-                        alt={mob.name}
-                        width={24}
-                        height={24}
-                        className="image-rendering-pixelated"
-                      />
-                      {mobDisplayName(mob)}
-                    </span>
-                    <div className="flex gap-1 items-center">
-                      {count > 0 && (
-                        <span className="text-[10px] px-1.5 py-0 rounded bg-[var(--rpg-blue-light)]/20 text-[var(--rpg-blue-light)]">
-                          {count} targeting
-                        </span>
-                      )}
-                      {isMyTarget && (
-                        <span className="text-[10px] px-1.5 py-0 rounded bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
-                          YOUR TARGET
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <HpBar
-                    current={mob.hp}
-                    max={mob.maxHp}
-                    label="HP"
-                    color={mob.hp <= mob.maxHp * 0.25 ? 'var(--rpg-red)' : 'var(--rpg-green-light)'}
-                  />
-                  {mob.activeEffects?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-0.5">
-                      {mob.activeEffects.map((eff, idx) => (
-                        <EffectPill key={idx} effect={eff} isDebuff={true} />
-                      ))}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </PixelCard>
-      )}
+      <MobCardGrid
+        mobs={expedition.currentRoomMobs}
+        myTargetMobId={myTargetMobId}
+        targetCounts={targetCounts}
+        onSetTarget={onSetTarget}
+        disabled={amKnockedOut}
+      />
 
-      {/* Latest Round Log (between mobs and party) */}
-      {expedition.roundLogs.length > 0 && (
-        <LatestRoundLog
-          log={expedition.roundLogs[expedition.roundLogs.length - 1]}
-          playerId={playerId}
-          multiRoom={expedition.roundLogs.some(l => l.roomIndex !== expedition.roundLogs[0]?.roomIndex)}
-        />
-      )}
+      {/* Round Logs */}
+      <CombatRoundLog
+        roundLogs={expedition.roundLogs}
+        playerId={playerId}
+        multiRoom={expedition.roundLogs.some(l => l.roomIndex !== expedition.roundLogs[0]?.roomIndex)}
+      />
 
       {/* Member status */}
       <MemberList
@@ -1110,14 +935,6 @@ function InProgressView({
         amKnockedOut={amKnockedOut}
       />
 
-      {/* Previous Round History (collapsed by default, below party) */}
-      {expedition.roundLogs.length > 1 && (
-        <PreviousRoundsLog
-          logs={expedition.roundLogs.slice(0, -1)}
-          playerId={playerId}
-        />
-      )}
-
       {/* Previous Attempt Logs (from wipes) */}
       {expedition.attemptLogs.length > 0 && (
         <PreviousAttemptsSection attemptLogs={expedition.attemptLogs} playerId={playerId} />
@@ -1126,253 +943,7 @@ function InProgressView({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Round Log Content (shared renderer for a single round's phases)
-// ---------------------------------------------------------------------------
-
-function RoundLogContent({ log, playerId }: { log: ExpeditionRoundLog; playerId: string | null }) {
-  const outcome = log.phases.outcome;
-  return (
-    <div className="space-y-2">
-      {/* Player Attacks */}
-      {log.phases.playerAttacks.length > 0 && (
-        <div>
-          <p className="text-xs text-[var(--rpg-text-secondary)] font-bold mb-0.5">Attacks</p>
-          {log.phases.playerAttacks.map((atk, j) => (
-            <RoundLogAttackRow key={j} attack={atk} currentPlayerId={playerId} />
-          ))}
-        </div>
-      )}
-
-      {/* Defences */}
-      {log.phases.defences?.length > 0 && (
-        <div>
-          <p className="text-xs text-[var(--rpg-text-secondary)] font-bold mb-0.5">Defences</p>
-          {log.phases.defences.map((d, j) => (
-            <div key={j} className="text-xs ml-2 text-[var(--rpg-blue-light)]">
-              {d.username}: {d.actionLabel}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Healing */}
-      {log.phases.healing.length > 0 && (
-        <div>
-          <p className="text-xs text-[var(--rpg-text-secondary)] font-bold mb-0.5">Healing</p>
-          {log.phases.healing.map((h, j) => (
-            <div key={j} className="text-xs ml-2 text-[var(--rpg-green-light)]">
-              {h.username}: {h.actionLabel} → {h.targetUsername} +{h.amountHealed} HP
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Mob Actions */}
-      {log.phases.mobActions.length > 0 && (
-        <div>
-          <p className="text-xs text-[var(--rpg-text-secondary)] font-bold mb-0.5">Enemy Actions</p>
-          {log.phases.mobActions.map((ma, j) => (
-            <div
-              key={j}
-              className={`text-xs ml-2 mb-0.5 p-1 rounded ${
-                ma.wasTelegraphed
-                  ? 'border border-[var(--rpg-gold)] bg-[var(--rpg-gold)]/5'
-                  : ''
-              }`}
-            >
-              <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-[var(--rpg-red)] font-bold">{ma.mobName}</span>
-                <span className="text-[var(--rpg-text-secondary)]">uses</span>
-                <span className="text-[var(--rpg-text-primary)]">{ma.actionLabel}</span>
-                {ma.wasTelegraphed && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--rpg-gold)]/20 text-[var(--rpg-gold)]">
-                    TELEGRAPHED
-                  </span>
-                )}
-                {ma.targetMode === 'aoe' && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--rpg-red)]/20 text-[var(--rpg-red)]">
-                    AOE
-                  </span>
-                )}
-              </div>
-              {ma.targets.length > 0 && (
-                <div className="ml-2 mt-0.5">
-                  {ma.targets.map((t, k) => (
-                    <div key={k} className="text-[var(--rpg-text-secondary)]">
-                      {t.username}: {t.blocked ? (
-                        <span className="text-[var(--rpg-blue-light)]">BLOCKED</span>
-                      ) : t.dodged ? (
-                        <span className="text-[var(--rpg-green-light)]">DODGED</span>
-                      ) : (
-                        <>
-                          <span className="text-[var(--rpg-red)]">-{t.damageTaken} HP</span>
-                          {t.knockedOut && <span className="text-[var(--rpg-red)] font-bold"> KO!</span>}
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Effect Ticks (DoT damage) */}
-      {log.phases.effectTicks?.length > 0 && (
-        <div>
-          <p className="text-xs text-[var(--rpg-text-secondary)] font-bold mb-0.5">Effect Ticks</p>
-          {log.phases.effectTicks.map((tick, j) => (
-            <div key={j} className="text-xs ml-2">
-              <span className={tick.targetType === 'mob' ? 'text-[var(--rpg-red)]' : 'text-[var(--rpg-text-primary)]'}>
-                {tick.targetName}
-              </span>
-              <span className="text-[var(--rpg-text-secondary)]"> takes </span>
-              <span className="text-[var(--rpg-red)]">-{tick.damage} HP</span>
-              <span className="text-[var(--rpg-text-secondary)]"> from {tick.effectName}</span>
-              <span className="text-[var(--rpg-text-secondary)] opacity-60"> ({tick.hpAfter} HP)</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Telegraphs */}
-      {log.telegraphs.length > 0 && (
-        <div className="border border-[var(--rpg-gold)] bg-[var(--rpg-gold)]/5 rounded p-1.5">
-          <p className="text-xs text-[var(--rpg-gold)] font-bold mb-0.5">Next Round Warning</p>
-          {log.telegraphs.map((t, j) => (
-            <div key={j} className="text-xs text-[var(--rpg-gold)]">
-              {t.warningText}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Outcome */}
-      <div className="text-xs text-[var(--rpg-text-secondary)] border-t border-[var(--rpg-border)] pt-1">
-        Mobs: {outcome.mobsAlive} alive, {outcome.mobsKilled} killed
-        {' | '}
-        Players: {outcome.playersAlive} alive{outcome.playersKnockedOut > 0 && `, ${outcome.playersKnockedOut} KO`}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Latest Round Log (shown between mobs and party, collapsible)
-// ---------------------------------------------------------------------------
-
-function LatestRoundLog({ log, playerId, multiRoom }: {
-  log: ExpeditionRoundLog;
-  playerId: string | null;
-  multiRoom: boolean;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const outcome = log.phases.outcome;
-
-  return (
-    <PixelCard>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex justify-between items-center text-xs"
-      >
-        <span className="font-bold text-[var(--rpg-text-primary)]">
-          {multiRoom ? `R${log.roomIndex + 1} · ` : ''}Round {log.round}
-        </span>
-        <div className="flex gap-2">
-          {outcome.mobsKilled > 0 && (
-            <span className="text-[var(--rpg-green-light)]">{outcome.mobsKilled} killed</span>
-          )}
-          {outcome.playersKnockedOut > 0 && (
-            <span className="text-[var(--rpg-red)]">{outcome.playersKnockedOut} KO</span>
-          )}
-          {outcome.roomCleared && (
-            <span className="text-[var(--rpg-gold)]">CLEARED</span>
-          )}
-          {outcome.wipe && (
-            <span className="text-[var(--rpg-red)]">WIPE</span>
-          )}
-          <span className="text-[var(--rpg-text-secondary)]">{expanded ? '▲' : '▼'}</span>
-        </div>
-      </button>
-      {expanded && (
-        <div className="mt-2">
-          <RoundLogContent log={log} playerId={playerId} />
-        </div>
-      )}
-    </PixelCard>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Previous Rounds (collapsed by default, shown below party)
-// ---------------------------------------------------------------------------
-
-function PreviousRoundsLog({ logs, playerId }: {
-  logs: ExpeditionRoundLog[];
-  playerId: string | null;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [expandedRound, setExpandedRound] = useState<string | null>(null);
-
-  const reversedLogs = logs.map((log, i) => ({ log, idx: i })).reverse();
-
-  return (
-    <PixelCard>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex justify-between items-center text-xs"
-      >
-        <span className="font-bold text-[var(--rpg-text-secondary)]">
-          Previous Rounds ({logs.length})
-        </span>
-        <span className="text-[var(--rpg-text-secondary)]">{expanded ? '▲' : '▼'}</span>
-      </button>
-      {expanded && (
-        <div className="mt-2 space-y-1">
-          {reversedLogs.map(({ log, idx }) => {
-            const key = String(idx);
-            const isOpen = expandedRound === key;
-            const outcome = log.phases.outcome;
-            return (
-              <div key={key}>
-                <button
-                  onClick={() => setExpandedRound(isOpen ? null : key)}
-                  className="w-full flex justify-between items-center px-2 py-1 rounded text-xs hover:bg-[var(--rpg-surface)]"
-                >
-                  <span className="text-[var(--rpg-text-primary)] font-bold">
-                    {logs.some(l => l.roomIndex !== logs[0]?.roomIndex) ? `R${log.roomIndex + 1} · ` : ''}Round {log.round}
-                  </span>
-                  <div className="flex gap-2 text-xs">
-                    {outcome.mobsKilled > 0 && (
-                      <span className="text-[var(--rpg-green-light)]">{outcome.mobsKilled} killed</span>
-                    )}
-                    {outcome.playersKnockedOut > 0 && (
-                      <span className="text-[var(--rpg-red)]">{outcome.playersKnockedOut} KO</span>
-                    )}
-                    {outcome.roomCleared && (
-                      <span className="text-[var(--rpg-gold)]">CLEARED</span>
-                    )}
-                    {outcome.wipe && (
-                      <span className="text-[var(--rpg-red)]">WIPE</span>
-                    )}
-                    <span className="text-[var(--rpg-text-secondary)]">{isOpen ? '▲' : '▼'}</span>
-                  </div>
-                </button>
-                {isOpen && (
-                  <div className="px-2 pb-2">
-                    <RoundLogContent log={log} playerId={playerId} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </PixelCard>
-  );
-}
+// (RoundLogContent, LatestRoundLog, PreviousRoundsLog extracted to @/components/common/combat)
 
 // ---------------------------------------------------------------------------
 // Round Log Display (used by history view)
@@ -1681,69 +1252,7 @@ function HistoryDetailPanel({
 // Member List
 // ---------------------------------------------------------------------------
 
-function ThreatMeter({ members }: { members: ExpeditionMemberData[] }) {
-  const standings = useMemo(() => {
-    const alive = members.filter((m) => !m.isKnockedOut);
-    if (alive.length === 0) return [];
-    const maxThreat = Math.max(...alive.map((m) => m.threatValue), 1);
-    return alive
-      .map((m) => ({
-        playerId: m.playerId,
-        name: m.username ?? m.playerId.slice(0, 8),
-        threat: m.threatValue,
-        percent: (m.threatValue / maxThreat) * 100,
-      }))
-      .sort((a, b) => b.threat - a.threat);
-  }, [members]);
-
-  if (standings.length === 0) return null;
-
-  const aggroPlayerId = standings[0].threat > 0 ? standings[0].playerId : null;
-
-  return (
-    <div className="mb-2 pb-2 border-b border-[var(--rpg-border)]">
-      <p className="text-[10px] font-bold text-[var(--rpg-text-secondary)] mb-1 flex items-center gap-1">
-        <Shield size={10} className="text-[var(--rpg-red)]" />
-        THREAT
-        {aggroPlayerId && (
-          <span className="font-normal ml-1">
-            — <span className="text-[var(--rpg-red)]">{standings[0].name}</span> has aggro
-          </span>
-        )}
-      </p>
-      <div className="space-y-0.5">
-        {standings.map((t) => {
-          const isAggro = t.playerId === aggroPlayerId;
-          return (
-            <div key={t.playerId} className="flex items-center gap-1.5 text-[10px]">
-              <span
-                className="w-16 truncate"
-                style={{ color: isAggro ? 'var(--rpg-red)' : 'var(--rpg-text-secondary)' }}
-              >
-                {t.name}
-              </span>
-              <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.max(t.percent, t.threat > 0 ? 2 : 0)}%`,
-                    background: isAggro ? 'var(--rpg-red)' : 'rgba(255,255,255,0.25)',
-                  }}
-                />
-              </div>
-              <span
-                className="w-6 text-right tabular-nums"
-                style={{ color: isAggro ? 'var(--rpg-red)' : 'var(--rpg-text-secondary)' }}
-              >
-                {t.threat}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+// (ThreatMeter extracted to @/components/common/combat)
 
 function MemberList({
   members,
@@ -1788,7 +1297,15 @@ function MemberList({
       </div>
       {/* Threat Meter — only show during active combat (showResources) when anyone has threat */}
       {showResources && members.some((m) => m.threatValue > 0) && (
-        <ThreatMeter members={members} />
+        <ThreatMeter
+          entries={members
+            .filter(m => !m.isKnockedOut && m.threatValue > 0)
+            .map(m => ({
+              id: m.playerId,
+              label: m.username ?? m.playerId.slice(0, 8),
+              threatValue: m.threatValue,
+            }))}
+        />
       )}
 
       <div className="space-y-2">

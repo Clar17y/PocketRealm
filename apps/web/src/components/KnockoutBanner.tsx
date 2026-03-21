@@ -4,10 +4,12 @@ interface KnockoutBannerProps {
   action: string;
   recoveryCost?: number | null;
   title?: string;
+  /** Override the default "You must recover before {action}" message. */
+  message?: string;
   onClick?: () => void;
 }
 
-export function KnockoutBanner({ action, recoveryCost, title = 'Knocked Out', onClick }: KnockoutBannerProps) {
+export function KnockoutBanner({ action, recoveryCost, title = 'Knocked Out', message, onClick }: KnockoutBannerProps) {
   return (
     <div
       className={`bg-[var(--rpg-red)]/20 border border-[var(--rpg-red)] rounded-lg p-4${onClick ? ' cursor-pointer hover:bg-[var(--rpg-red)]/30 transition-colors' : ''}`}
@@ -21,7 +23,7 @@ export function KnockoutBanner({ action, recoveryCost, title = 'Knocked Out', on
         <div className="flex-1">
           <div className="font-bold text-[var(--rpg-red)]">{title}</div>
           <div className="text-sm text-[var(--rpg-text-secondary)]">
-            You must recover before {action}.
+            {message ?? `You must recover before ${action}.`}
             {typeof recoveryCost === 'number' && (
               <>
                 {' '}
