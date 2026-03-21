@@ -39,6 +39,8 @@ import { getInventoryState } from './inventoryService';
 import { deductConsumedPotions } from './potionService';
 import { templateHasPotionActions, buildPotionPool } from './potionService';
 import { getEquipmentStats } from './equipmentService';
+import { getActiveTemplate } from './combatTemplateService';
+import { getSkillPoints } from './skillPointService';
 import { getPlayerProgressionState } from './attributesService';
 import {
   computeZoneModifiers,
@@ -1054,6 +1056,33 @@ export async function resolveManualEncounterRound(
     await prisma.player.update({ where: { id: playerId }, data: { activeEncounterSiteId: null } }).catch(() => {});
     throw new AppError(400, 'No active manual combat session. Call start-room first.', 'NO_COMBAT_SESSION');
   }
+
+  // Refresh template from DB so mid-combat template switches take effect
+  const [freshTemplate, freshSkillPoints] = await Promise.all([
+    getActiveTemplate(playerId),
+    getSkillPoints(playerId),
+  ]);
+  const freshUnlockedSet = new Set(freshSkillPoints.unlockedActions);
+  const freshActions: Record<string, ActionDefinition> = {};
+  for (const [id, def] of Object.entries(BASE_ACTION_DEFINITIONS)) {
+    if (ALWAYS_AVAILABLE_ACTION_IDS.has(id) || freshUnlockedSet.has(id)) {
+      freshActions[id] = def;
+    }
+  }
+  for (const slot of freshTemplate) {
+    for (const actionId of [slot.actionId, slot.thenActionId]) {
+      if (actionId && !freshActions[actionId] && BASE_ACTION_DEFINITIONS[actionId]) {
+        freshActions[actionId] = BASE_ACTION_DEFINITIONS[actionId]!;
+      }
+    }
+  }
+  state.participant.template = freshTemplate.map(s => ({
+    actionId: s.actionId,
+    condition: s.condition,
+    thenActionId: s.thenActionId ?? undefined,
+    sortOrder: s.sortOrder,
+  }));
+  state.participant.actionDefinitions = freshActions;
 
   // Apply player's target selection
   state.participant.targetMobId = body.targetMobSlot !== undefined
