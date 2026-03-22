@@ -1,3 +1,5 @@
+import { init, trackEvent as plausibleTrack } from '@plausible-analytics/tracker';
+
 type EventMap = {
   signup: undefined;
   tutorial_complete: undefined;
@@ -14,10 +16,14 @@ type EventMap = {
 
 type AnalyticsEvent = keyof EventMap;
 
-declare global {
-  interface Window {
-    plausible?: (event: string, options?: { props?: Record<string, string | number> }) => void;
-  }
+let initialized = false;
+
+function ensureInit() {
+  if (initialized || typeof window === 'undefined') return;
+  const domain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN;
+  if (!domain) return;
+  init({ domain });
+  initialized = true;
 }
 
 export function trackEvent<E extends AnalyticsEvent>(
@@ -25,8 +31,10 @@ export function trackEvent<E extends AnalyticsEvent>(
   ...args: EventMap[E] extends undefined ? [] : [EventMap[E]]
 ): void {
   if (typeof window === 'undefined') return;
+  ensureInit();
+  if (!initialized) return;
   const props = args[0] as Record<string, string | number> | undefined;
-  window.plausible?.(event, props ? { props } : undefined);
+  plausibleTrack(event, { props: props ?? {} });
 }
 
 /**

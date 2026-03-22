@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@plausible-analytics/tracker": "^0.4.4",
     "@pocketrealm/game-engine": "*",
     "@pocketrealm/shared": "*",
     "@serwist/next": "^9.5.7",
