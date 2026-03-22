@@ -1,4 +1,4 @@
-import { init, trackEvent as plausibleTrack } from '@plausible-analytics/tracker';
+import { init, track as plausibleTrack } from '@plausible-analytics/tracker';
 
 type EventMap = {
   signup: undefined;
@@ -33,8 +33,10 @@ export function trackEvent<E extends AnalyticsEvent>(
   if (typeof window === 'undefined') return;
   ensureInit();
   if (!initialized) return;
-  const props = args[0] as Record<string, string | number> | undefined;
-  plausibleTrack(event, { props: props ?? {} });
+  const raw = args[0] as Record<string, string | number> | undefined;
+  const props: Record<string, string> = {};
+  if (raw) { for (const [k, v] of Object.entries(raw)) props[k] = String(v); }
+  plausibleTrack(event, { props });
 }
 
 /**
