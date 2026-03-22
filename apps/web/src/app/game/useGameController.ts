@@ -336,6 +336,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const prevInventoryIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedOnceRef = useRef(false);
   const sessionTrackedRef = useRef(false);
+  const playerCreatedAtRef = useRef<string | null>(null);
   const lootRevealRarityRef = useRef(lootRevealRarity);
   lootRevealRarityRef.current = lootRevealRarity;
   const [lootRevealItems, setLootRevealItems] = useState<Array<{
@@ -561,6 +562,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       });
       setGold(playerRes.data.player.gold ?? 0);
       setActiveEncounterSiteId(playerRes.data.player.activeEncounterSiteId ?? null);
+      playerCreatedAtRef.current = playerRes.data.player.createdAt;
       initSettingsFromServer(playerRes.data.player);
       const serverTutorialStep = playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED;
       setTutorialStep(serverTutorialStep);
@@ -747,7 +749,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   useEffect(() => {
     if (!isAuthenticated || sessionTrackedRef.current || characterProgression.characterLevel === 0) return;
     sessionTrackedRef.current = true;
-    trackEvent('session_start', { characterLevel: characterProgression.characterLevel, daysSinceSignup: 0 });
+    const daysSinceSignup = playerCreatedAtRef.current
+      ? Math.floor((Date.now() - new Date(playerCreatedAtRef.current).getTime()) / 86_400_000)
+      : 0;
+    trackEvent('session_start', { characterLevel: characterProgression.characterLevel, daysSinceSignup });
   }, [isAuthenticated, characterProgression.characterLevel]);
 
   useEffect(() => {

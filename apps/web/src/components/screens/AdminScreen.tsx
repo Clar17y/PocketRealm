@@ -698,9 +698,11 @@ function AnalyticsTab() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let stale = false;
     setLoading(true);
     setError(null);
     adminGetBalanceReport(period).then((res) => {
+      if (stale) return;
       if (res.error) {
         setError(res.error.message);
       } else if (res.data) {
@@ -708,6 +710,7 @@ function AnalyticsTab() {
       }
       setLoading(false);
     });
+    return () => { stale = true; };
   }, [period]);
 
   const periods: BalancePeriod[] = ['1h', '24h', '7d', '30d'];

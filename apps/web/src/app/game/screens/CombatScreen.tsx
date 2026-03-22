@@ -393,7 +393,7 @@ export function CombatScreen({
               const zone = currentZoneId ?? '';
               trackEvent('action', { type: 'combat', turns: COMBAT_CONSTANTS.ENCOUNTER_TURN_COST, zone });
               trackOnce('first_combat', { zone });
-              if (combatOutcome === 'death') {
+              if (combatOutcome === 'defeated') {
                 trackEvent('death', { zone, mob: activeSiteCombat.mobFamilyName });
               }
 
