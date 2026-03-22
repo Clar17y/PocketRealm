@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import withSerwistInit from "@serwist/next";
+import { withPlausibleProxy } from "next-plausible";
 
 const revision =
   spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" }).stdout?.trim() ||
@@ -16,10 +17,10 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV === "development",
 });
 
-export default withSerwist({
+export default withPlausibleProxy()(withSerwist({
   reactStrictMode: true,
   transpilePackages: ["@pocketrealm/shared", "@pocketrealm/game-engine"],
   images: {
     minimumCacheTTL: 2592000,
   },
-});
+}));

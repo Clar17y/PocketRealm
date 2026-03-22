@@ -14,31 +14,19 @@ type EventMap = {
 
 type AnalyticsEvent = keyof EventMap;
 
-let plausibleReady: Promise<typeof import('@plausible-analytics/tracker')> | null = null;
-
-function getPlausible() {
-  if (typeof window === 'undefined') return null;
-  const domain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN;
-  if (!domain) return null;
-  if (!plausibleReady) {
-    plausibleReady = import('@plausible-analytics/tracker').then((mod) => {
-      mod.init({ domain });
-      return mod;
-    });
+declare global {
+  interface Window {
+    plausible?: (event: string, options?: { props?: Record<string, string | number> }) => void;
   }
-  return plausibleReady;
 }
 
 export function trackEvent<E extends AnalyticsEvent>(
   event: E,
   ...args: EventMap[E] extends undefined ? [] : [EventMap[E]]
 ): void {
-  const p = getPlausible();
-  if (!p) return;
-  const raw = args[0] as Record<string, string | number> | undefined;
-  const props: Record<string, string> = {};
-  if (raw) { for (const [k, v] of Object.entries(raw)) props[k] = String(v); }
-  void p.then((mod) => mod.track(event, { props }));
+  if (typeof window === 'undefined') return;
+  const props = args[0] as Record<string, string | number> | undefined;
+  window.plausible?.(event, props ? { props } : undefined);
 }
 
 /**
