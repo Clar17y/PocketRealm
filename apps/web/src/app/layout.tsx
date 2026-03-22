@@ -36,13 +36,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
-          <PlausibleProvider domain={process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN} />
-        )}
-      </head>
       <body className={`${almendra.variable} ${crimsonText.variable} ${silkscreen.variable}`}>
-        {children}
+        {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN ? (
+          <PlausibleProvider domain={process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}>
+            {children}
+          </PlausibleProvider>
+        ) : children}
       </body>
     </html>
   );
