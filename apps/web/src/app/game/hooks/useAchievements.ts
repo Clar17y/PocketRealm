@@ -7,6 +7,7 @@ import {
   setActiveTitle,
   type AchievementsResponse,
 } from '@/lib/api';
+import { useVisibleInterval } from '@/hooks/usePageVisible';
 import { getSocket } from '@/lib/socket';
 
 export function useAchievements(
@@ -30,18 +31,17 @@ export function useAchievements(
     if (res.data) setAchievementUnclaimedCount(res.data.unclaimedCount);
   }, []);
 
-  // Initial load + polling
+  // Initial load
   useEffect(() => {
     if (!isAuthenticated) return;
-
     void loadAchievementUnclaimedCount();
     void getActiveTitle().then((res) => {
       if (res.data) setActiveTitleState(res.data.activeTitle);
     });
-
-    const interval = setInterval(() => void loadAchievementUnclaimedCount(), 60_000);
-    return () => clearInterval(interval);
   }, [isAuthenticated, loadAchievementUnclaimedCount]);
+
+  // Poll unclaimed count (paused when tab hidden)
+  useVisibleInterval(() => void loadAchievementUnclaimedCount(), 60_000, isAuthenticated);
 
   // Socket listener for real-time achievement unlocks
   useEffect(() => {

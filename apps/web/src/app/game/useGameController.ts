@@ -4,6 +4,7 @@ import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { RARITY_RANK } from '@/lib/rarity';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
+import { useVisibleInterval } from '@/hooks/usePageVisible';
 import type { ForgeResultData } from '@/components/ForgeResultToast';
 import { updateTutorialStep, claimStarterWeapon } from '@/lib/api';
 import {
@@ -730,21 +731,18 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   }, [tutorialStep]);
 
+  // Initial one-shot loads
   useEffect(() => {
     if (!isAuthenticated) return;
-    let cancelled = false;
-    // Initial loads are one-shot and safe to complete after cleanup —
-    // only guard recurring intervals to prevent stale polling.
     void loadAll();
     void loadPvpNotificationCount();
     void loadFriendCounts();
-    const interval = setInterval(() => { if (!cancelled) void pollScreenData(); }, 10000);
-    // Poll PvP notifications less frequently (60s)
-    const pvpInterval = setInterval(() => { if (!cancelled) void loadPvpNotificationCount(); }, 60000);
-    // Poll friend counts at same cadence as PvP
-    const friendInterval = setInterval(() => { if (!cancelled) void loadFriendCounts(); }, 60000);
-    return () => { cancelled = true; clearInterval(interval); clearInterval(pvpInterval); clearInterval(friendInterval); };
-  }, [isAuthenticated, loadAll, pollScreenData, loadPvpNotificationCount, loadFriendCounts]);
+  }, [isAuthenticated, loadAll, loadPvpNotificationCount, loadFriendCounts]);
+
+  // Recurring polls — paused when the tab is hidden to save compute
+  useVisibleInterval(() => void pollScreenData(), 10000, isAuthenticated);
+  useVisibleInterval(() => void loadPvpNotificationCount(), 60000, isAuthenticated);
+  useVisibleInterval(() => void loadFriendCounts(), 60000, isAuthenticated);
 
   useEffect(() => {
     if (!isAuthenticated || sessionTrackedRef.current || characterProgression.characterLevel === 0) return;
