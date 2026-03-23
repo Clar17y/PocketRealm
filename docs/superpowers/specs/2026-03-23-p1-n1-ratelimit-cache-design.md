@@ -69,10 +69,10 @@ export function createEndpointLimiter(name: string, windowMs: number, max: numbe
 ```
 
 Returns an `express-rate-limit` middleware configured with:
-- `RedisStore` from `rate-limit-redis` using the existing `redis` client from `utils/redis.ts`. The project uses `ioredis`, which requires a specific `sendCommand` adapter:
+- `RedisStore` from `rate-limit-redis` using the existing `redis` client from `redis.ts`. The project uses `ioredis`, which requires a specific `sendCommand` adapter:
   ```typescript
   import { RedisStore } from 'rate-limit-redis';
-  import { redis } from '../utils/redis';
+  import { redis } from '../redis';
 
   store: new RedisStore({
     sendCommand: (...args: string[]) => redis.call(...args),
@@ -126,7 +126,7 @@ The chat limiter is a custom `Map<string, number>` implementation used inside So
 - Replace `Map.get`/`Map.set` with `redis.set(key, '1', 'PX', limitMs, 'NX')`.
 - `NX` flag: returns `'OK'` (string) if key didn't exist (allowed), `null` if it did (rate limited). Single atomic operation, no get+set race condition. In ioredis the return type is `string | null`.
 - Delete the `lastSendTimes` map entirely.
-- Uses the existing `redis` client from `utils/redis.ts`.
+- Uses the existing `redis` client from `redis.ts`.
 
 ---
 
