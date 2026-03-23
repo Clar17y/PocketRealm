@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../redis', () => ({
+  redis: { set: vi.fn() },
+}));
+
+import { redis } from '../redis';
 import { mockPrisma } from '../__test__/setup';
 import { checkRateLimit, saveMessage, getChannelHistory } from './chatService';
+
+const mockRedis = redis as unknown as { set: ReturnType<typeof vi.fn> };
 
 describe('chatService', () => {
   beforeEach(() => {
@@ -9,23 +16,26 @@ describe('chatService', () => {
   });
 
   describe('checkRateLimit', () => {
-    it('allows first message', () => {
-      expect(checkRateLimit('player-1', 'world')).toBe(true);
+    it('allows first message', async () => {
+      mockRedis.set.mockResolvedValue('OK');
+      expect(await checkRateLimit('player-1', 'world')).toBe(true);
     });
 
-    it('blocks rapid second message on same channel', () => {
-      checkRateLimit('player-2', 'world');
-      expect(checkRateLimit('player-2', 'world')).toBe(false);
+    it('blocks rapid second message on same channel', async () => {
+      mockRedis.set.mockResolvedValue(null);
+      expect(await checkRateLimit('player-2', 'world')).toBe(false);
     });
 
-    it('allows messages on different channels', () => {
-      checkRateLimit('player-3', 'world');
-      expect(checkRateLimit('player-3', 'zone')).toBe(true);
+    it('allows messages on different channels', async () => {
+      mockRedis.set.mockResolvedValue('OK');
+      await checkRateLimit('player-3', 'world');
+      expect(await checkRateLimit('player-3', 'zone')).toBe(true);
     });
 
-    it('allows messages from different players', () => {
-      checkRateLimit('player-4', 'world');
-      expect(checkRateLimit('player-5', 'world')).toBe(true);
+    it('allows messages from different players', async () => {
+      mockRedis.set.mockResolvedValue('OK');
+      await checkRateLimit('player-4', 'world');
+      expect(await checkRateLimit('player-5', 'world')).toBe(true);
     });
   });
 

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { CACHE_HEADER_CONSTANTS } from '@pocketrealm/shared';
 import { optionalAuthenticate } from '../middleware/auth';
 import { getCategories, getLeaderboard } from '../services/leaderboardService';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -8,6 +9,7 @@ export const leaderboardRouter = Router();
 leaderboardRouter.use(optionalAuthenticate);
 
 leaderboardRouter.get('/categories', (_req, res) => {
+  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PUBLIC_LONG);
   res.json(getCategories());
 });
 
@@ -19,6 +21,7 @@ leaderboardRouter.get('/:category', asyncHandler(async (req, res) => {
   const result = await getLeaderboard(category, playerId, aroundMe);
 
   // Strip playerId and isAdmin from public entries to prevent UUID enumeration
+  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PRIVATE_SHORT);
   res.json({
     ...result,
     entries: result.entries.map(({ playerId: _pid, isAdmin: _adm, ...rest }) => rest),
