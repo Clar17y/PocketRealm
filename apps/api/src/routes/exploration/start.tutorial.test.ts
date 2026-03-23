@@ -133,6 +133,12 @@ vi.mock('../../services/resourceService', () => ({
 vi.mock('../../services/combatLogMapper', () => ({
   mapTemplateCombatLog: vi.fn((log: any) => log),
 }));
+vi.mock('../../services/staticDataCacheService', () => ({
+  getCachedMobTemplatesByZone: vi.fn().mockResolvedValue([]),
+  getCachedResourceNodesByZone: vi.fn().mockResolvedValue([]),
+  getCachedZoneMobFamilies: vi.fn().mockResolvedValue([]),
+  getCachedBossMobTemplates: vi.fn().mockResolvedValue([]),
+}));
 vi.mock('../../services/statsService', () => ({
   incrementStats: vi.fn(),
 }));
@@ -234,6 +240,11 @@ import { mockPrisma } from '../../__test__/setup';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { applyMobPrefix, simulateExploration, runTemplateCombat } from '@pocketrealm/game-engine';
 import { startRouter } from './start';
+import { getCachedMobTemplatesByZone, getCachedResourceNodesByZone, getCachedZoneMobFamilies } from '../../services/staticDataCacheService';
+
+const mockGetCachedMobTemplatesByZone = getCachedMobTemplatesByZone as ReturnType<typeof vi.fn>;
+const mockGetCachedResourceNodesByZone = getCachedResourceNodesByZone as ReturnType<typeof vi.fn>;
+const mockGetCachedZoneMobFamilies = getCachedZoneMobFamilies as ReturnType<typeof vi.fn>;
 
 const mockSpendPlayerTurnsTx = spendPlayerTurnsTx as ReturnType<typeof vi.fn>;
 const mockApplyMobPrefix = applyMobPrefix as ReturnType<typeof vi.fn>;
@@ -271,12 +282,12 @@ function setupZoneAndMobs(tutorialStep: number) {
     id: ZONE_ID, name: 'Test Zone', difficulty: 1, zoneType: 'wild',
     zoneExitChance: 0.01, explorationTiers: null,
   });
-  mockPrisma.mobTemplate.findMany.mockResolvedValue([
+  mockGetCachedMobTemplatesByZone.mockResolvedValue([
     { id: 'mob-fm', name: 'Field Mouse', level: 1, hp: 20, attack: 3, accuracy: 5, defence: 2, magicDefence: 0, speed: 5, xpReward: 10, encounterWeight: 100, explorationTier: 1, zoneId: ZONE_ID, dropChanceMultiplier: 1, spellPattern: [] },
     { id: 'mob-rat', name: 'Giant Rat', level: 2, hp: 30, attack: 5, accuracy: 5, defence: 3, magicDefence: 0, speed: 4, xpReward: 15, encounterWeight: 100, explorationTier: 1, zoneId: ZONE_ID, dropChanceMultiplier: 1, spellPattern: [] },
   ]);
-  mockPrisma.resourceNode.findMany.mockResolvedValue([]);
-  mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
+  mockGetCachedResourceNodesByZone.mockResolvedValue([]);
+  mockGetCachedZoneMobFamilies.mockResolvedValue([]);
   mockPrisma.zoneConnection.findMany.mockResolvedValue([]);
   mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep });
   mockPrisma.playerBestiary.upsert.mockResolvedValue({});
@@ -332,7 +343,7 @@ describe('exploration tutorial path', () => {
   it('falls back to first mob if Field Mouse not found', async () => {
     setupZoneAndMobs(TUTORIAL_STEP_EXPLORE);
     // Override mobs to not include Field Mouse
-    mockPrisma.mobTemplate.findMany.mockResolvedValue([
+    mockGetCachedMobTemplatesByZone.mockResolvedValue([
       { id: 'mob-rat', name: 'Giant Rat', level: 2, hp: 30, attack: 5, accuracy: 5, defence: 3, magicDefence: 0, speed: 4, xpReward: 15, encounterWeight: 100, explorationTier: 1, zoneId: ZONE_ID, dropChanceMultiplier: 1, spellPattern: [] },
     ]);
 

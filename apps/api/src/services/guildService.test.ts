@@ -4,6 +4,11 @@ vi.mock('../redis', () => ({
   redis: { get: vi.fn().mockResolvedValue(null), set: vi.fn(), del: vi.fn() },
 }));
 
+vi.mock('./guildUpgradeService', () => ({
+  invalidateGuildModifiersForGuild: vi.fn(),
+  invalidateGuildModifiersForPlayer: vi.fn(),
+}));
+
 import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 import { mockPrisma } from '../__test__/setup';
 import {

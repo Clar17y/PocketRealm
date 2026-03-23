@@ -55,6 +55,12 @@ import { getMainHandAttackSkill } from '../../services/combatStatsService';
 import { checkActivityLockout } from '../../services/expeditionLockoutService';
 import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers';
 import {
+  getCachedMobTemplatesByZone,
+  getCachedResourceNodesByZone,
+  getCachedZoneMobFamilies,
+  getCachedBossMobTemplates,
+} from '../../services/staticDataCacheService';
+import {
   startSchema,
   pickWeighted,
   randomIntInclusive,
@@ -105,24 +111,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     }
 
     const [mobTemplates, resourceNodes, zoneFamilies, progression, equipmentStats, mainHandAttackSkill] = await Promise.all([
-      prisma.mobTemplate.findMany({ where: { zoneId: body.zoneId } }),
-      prisma.resourceNode.findMany({ where: { zoneId: body.zoneId } }),
-      prisma.zoneMobFamily.findMany({
-        where: { zoneId: body.zoneId },
-        include: {
-          mobFamily: {
-            include: {
-              members: {
-                include: {
-                  mobTemplate: {
-                    select: { id: true, name: true, zoneId: true, explorationTier: true },
-                  },
-                },
-              },
-            },
-          },
-        },
-      }) as Promise<ZoneFamilyRow[]>,
+      getCachedMobTemplatesByZone(body.zoneId),
+      getCachedResourceNodesByZone(body.zoneId),
+      getCachedZoneMobFamilies(body.zoneId) as Promise<ZoneFamilyRow[]>,
       getPlayerProgressionState(playerId),
       getEquipmentStats(playerId),
       getMainHandAttackSkill(playerId),
@@ -658,13 +649,11 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           });
 
           if (activeBosses < WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS) {
-            const familyIds = zoneFamilies.map((f: ZoneFamilyRow) => f.mobFamilyId);
-            const bossMobs = await prisma.mobTemplate.findMany({
-              where: {
-                isBoss: true,
-                familyMembers: { some: { mobFamilyId: { in: familyIds } } },
-              },
-            });
+            const allBossMobs = await getCachedBossMobTemplates();
+            const familyMobIds = new Set(
+              zoneFamilies.flatMap((zf: ZoneFamilyRow) => zf.mobFamily.members.map((m: ZoneFamilyMember) => m.mobTemplate.id)),
+            );
+            const bossMobs = allBossMobs.filter(m => familyMobIds.has(m.id));
 
             if (bossMobs.length > 0) {
               const bossMob = bossMobs[Math.floor(Math.random() * bossMobs.length)]!;

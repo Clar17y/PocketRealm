@@ -10,6 +10,7 @@ import { requireRole } from './guildService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { consumeItemsByTemplateTx } from './inventoryService';
 import { addGuildXp } from './guildService';
+import { invalidateGuildModifiersForGuild } from './guildUpgradeService';
 import { materialsProgressSchema } from '../utils/jsonColumnSchemas';
 
 // ---------------------------------------------------------------------------
@@ -197,6 +198,10 @@ export async function contributeTurns(
     return tx.guildProject.findUnique({ where: { id: projectId } });
   });
 
+  if (updated!.status === 'completed') {
+    await invalidateGuildModifiersForGuild(guildId);
+  }
+
   return toProjectData(updated!, def);
 }
 
@@ -303,6 +308,10 @@ export async function contributeMaterials(
     // Re-fetch to get final state
     return tx.guildProject.findUnique({ where: { id: projectId } });
   });
+
+  if (updated!.status === 'completed') {
+    await invalidateGuildModifiersForGuild(guildId);
+  }
 
   return toProjectData(updated!, def);
 }

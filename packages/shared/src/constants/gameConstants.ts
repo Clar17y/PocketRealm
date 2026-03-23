@@ -1509,6 +1509,13 @@ export const EXPEDITION_TOKEN_CONSTANTS = {
   SET_BONUS_GROUP_CONTENT_ONLY: true,
 } as const;
 
+export const CACHE_TTL_CONSTANTS = {
+  /** Seconds — static seed data (zones, mobs, recipes, resources) */
+  STATIC_DATA_TTL: 86400,
+  /** Seconds — per-player guild modifier cache */
+  GUILD_MODIFIERS_TTL: 90,
+} as const;
+
 export const UI_TIMING_CONSTANTS = {
   /** ms before an in-flight action shows "Still working..." */
   SLOW_ACTION_THRESHOLD_MS: 10_000,

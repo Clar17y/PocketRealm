@@ -3,6 +3,7 @@ import { prisma } from '@pocketrealm/database';
 import type { CraftingMaterial } from '@pocketrealm/shared';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { parseMaterials, buildRecipeDiscoveryHint } from './helpers';
+import { getCachedCraftingRecipes } from '../../services/staticDataCacheService';
 
 export const recipesRouter = Router();
 
@@ -38,18 +39,7 @@ recipesRouter.get('/', asyncHandler(async (req, res) => {
     const skillLevels = new Map<string, number>(skills.map((s: typeof skills[number]) => [s.skillType, s.level]));
     const learnedRecipeIds = new Set(learnedAdvancedRecipes.map((entry) => entry.recipeId));
 
-    const recipes = await prisma.craftingRecipe.findMany({
-      include: {
-        resultTemplate: true,
-        mobFamily: {
-          select: {
-            name: true,
-            siteNounLarge: true,
-          },
-        },
-      },
-      orderBy: [{ requiredLevel: 'asc' }],
-    });
+    const recipes = await getCachedCraftingRecipes();
 
     const visible = recipes
       .map((r: typeof recipes[number]) => {

@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('./staticDataCacheService', () => ({
+  getCachedBossMobTemplates: vi.fn().mockResolvedValue([]),
+}));
+
 import { mockPrisma } from '../__test__/setup';
 import { getWorldBossBestiary } from './bossBestiaryService';
+import { getCachedBossMobTemplates } from './staticDataCacheService';
+
+const mockGetCachedBossMobTemplates = getCachedBossMobTemplates as ReturnType<typeof vi.fn>;
 
 const GORRATH_TEMPLATE = {
   id: 'gorrath', name: 'Gorrath the Undying',
@@ -9,7 +17,7 @@ const GORRATH_TEMPLATE = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPrisma.mobTemplate.findMany.mockResolvedValue([GORRATH_TEMPLATE]);
+  mockGetCachedBossMobTemplates.mockResolvedValue([GORRATH_TEMPLATE]);
 });
 
 describe('getWorldBossBestiary', () => {
@@ -92,7 +100,7 @@ describe('getWorldBossBestiary', () => {
       id: 'stone-colossus', name: 'Stone Colossus',
       hp: 3000, accuracy: 200, defence: 120, bossBaseHp: 500,
     };
-    mockPrisma.mobTemplate.findMany.mockResolvedValue([stoneColossus]);
+    mockGetCachedBossMobTemplates.mockResolvedValue([stoneColossus]);
     mockPrisma.bossParticipant.findMany.mockResolvedValue(
       Array.from({ length: 5 }, (_, i) => ({
         encounterId: `enc${i}`, playerId: 'player1',

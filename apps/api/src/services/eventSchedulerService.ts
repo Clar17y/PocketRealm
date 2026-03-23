@@ -6,6 +6,7 @@ import {
   type WorldEventTemplate,
 } from '@pocketrealm/shared';
 import { expireStaleEvents, spawnWorldEvent } from './worldEventService';
+import { getCachedZones, getCachedBossMobTemplates, getCachedZoneMobFamilies } from './staticDataCacheService';
 import { createBossEncounter, checkAndResolveDueBossRounds } from './bossEncounterService';
 import { emitSystemMessage } from './systemMessageService';
 import { sendPush } from './pushNotificationService';
@@ -38,11 +39,12 @@ async function resolveTarget(
   }
 
   if (template.targeting === 'family') {
-    const where = zoneId ? { zoneId } : {};
-    const zoneFamilies = await prisma.zoneMobFamily.findMany({
-      where,
-      include: { mobFamily: { select: { id: true, name: true } } },
-    });
+    const zoneFamilies = zoneId
+      ? await getCachedZoneMobFamilies(zoneId)
+      : await prisma.zoneMobFamily.findMany({
+          where: {},
+          include: { mobFamily: { select: { id: true, name: true } } },
+        });
     if (zoneFamilies.length === 0) return null;
 
     // Fixed target: match by name; random target: pick any
@@ -208,18 +210,13 @@ async function trySpawnBoss(io: SocketServer | null, zoneId: string, zoneName: s
   });
   if (activeBosses >= WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS) return false;
 
-  const zoneFamilies = await prisma.zoneMobFamily.findMany({
-    where: { zoneId },
-    select: { mobFamilyId: true },
-  });
-  const familyIds = zoneFamilies.map(f => f.mobFamilyId);
+  const zoneFamilies = await getCachedZoneMobFamilies(zoneId);
 
-  const bossMobs = await prisma.mobTemplate.findMany({
-    where: {
-      isBoss: true,
-      familyMembers: { some: { mobFamilyId: { in: familyIds } } },
-    },
-  });
+  const allBossMobs = await getCachedBossMobTemplates();
+  const familyMobIds = new Set(
+    zoneFamilies.flatMap(zf => zf.mobFamily.members.map(m => m.mobTemplateId)),
+  );
+  const bossMobs = allBossMobs.filter(m => familyMobIds.has(m.id));
   if (bossMobs.length === 0) return false;
 
   const bossMob = bossMobs[Math.floor(Math.random() * bossMobs.length)]!;
@@ -286,10 +283,8 @@ export async function checkAndSpawnBoss(io: SocketServer | null): Promise<void> 
   if (recentBoss) return;
 
   // Pick a random wild zone
-  const wildZones = await prisma.zone.findMany({
-    where: { zoneType: 'wild' },
-    select: { id: true, name: true },
-  });
+  const allZones = await getCachedZones();
+  const wildZones = allZones.filter(z => z.zoneType === 'wild');
   if (wildZones.length === 0) return;
 
   const zone = pickRandom(wildZones);
@@ -301,10 +296,8 @@ export async function checkAndSpawnBoss(io: SocketServer | null): Promise<void> 
 
 /** Try to spawn a zone-scoped event. */
 async function trySpawnZoneEvent(io: SocketServer | null): Promise<void> {
-  const wildZones = await prisma.zone.findMany({
-    where: { zoneType: 'wild' },
-    select: { id: true, name: true },
-  });
+  const allZones = await getCachedZones();
+  const wildZones = allZones.filter(z => z.zoneType === 'wild');
   if (wildZones.length === 0) return;
 
   // Get effectTypes already active per zone to prevent duplicates

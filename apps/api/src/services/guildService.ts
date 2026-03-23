@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';
 import { cachedQuery, invalidateCache } from './cacheService';
+import { invalidateGuildModifiersForGuild } from './guildUpgradeService';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -424,6 +425,11 @@ export async function addGuildXp(
     await addGuildLog(guildId, 'guild_level_up', `Guild reached level ${currentLevel}`, undefined, tx);
     // Fire-and-forget: check guild achievements for all members
     void checkGuildAchievementsForAllMembers(guildId, ['guildLevel', 'guildTurnsContributed']);
+    // Invalidate guild modifier caches — level-up can unlock new specialization tiers.
+    // Only invalidate for standalone calls (no tx); tx callers handle post-commit invalidation.
+    if (!tx) {
+      await invalidateGuildModifiersForGuild(guildId);
+    }
   }
 
   return { level: currentLevel, xp: currentXp, leveledUp };

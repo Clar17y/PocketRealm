@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('./guildUpgradeService', () => ({
+  invalidateGuildModifiersForGuild: vi.fn(),
+}));
+
 import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 import { mockPrisma as db } from '../__test__/setup';
 

@@ -1,5 +1,6 @@
 import { prisma } from '@pocketrealm/database';
 import { BOSS_TEMPLATES, BESTIARY_UNLOCK_CONSTANTS } from '@pocketrealm/shared';
+import { getCachedBossMobTemplates } from './staticDataCacheService';
 
 const { DISCOVERED_THRESHOLD: HP_THRESHOLD, STATS_THRESHOLD, ROTATION_THRESHOLD } = BESTIARY_UNLOCK_CONSTANTS;
 
@@ -17,10 +18,7 @@ interface WorldBossBestiaryResponse {
 }
 
 export async function getWorldBossBestiary(playerId: string): Promise<WorldBossBestiaryResponse> {
-  const bossMobTemplates = await prisma.mobTemplate.findMany({
-    where: { isBoss: true },
-    select: { id: true, name: true, hp: true, accuracy: true, defence: true, bossBaseHp: true },
-  });
+  const bossMobTemplates = await getCachedBossMobTemplates();
 
   const participations = await prisma.bossParticipant.findMany({
     where: { playerId },
