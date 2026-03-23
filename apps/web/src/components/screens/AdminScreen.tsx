@@ -483,7 +483,7 @@ function WorldTab() {
 
 // ── Zones Tab ───────────────────────────────────────────────────────────────
 
-function ZonesTab() {
+function ZonesTab({ onStateUpdates, reloadZones }: { onStateUpdates: (u: StateUpdates) => void; reloadZones: () => Promise<void> }) {
   const [zones, setZones] = useState<AdminZone[]>([]);
   const [families, setFamilies] = useState<AdminMobFamily[]>([]);
   const [encZoneId, setEncZoneId] = useState('');
@@ -512,7 +512,7 @@ function ZonesTab() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-[var(--rpg-gold)]">Zones</h3>
           <PixelButton size="sm" variant="gold" disabled={busy}
-            onClick={() => act('Discover all', () => adminDiscoverAllZones(), 'Discover all zones on your account?')}>
+            onClick={async () => { const ok = await act('Discover all', () => adminDiscoverAllZones(), 'Discover all zones on your account?'); if (ok) void reloadZones(); }}>
             Discover All
           </PixelButton>
         </div>
@@ -526,7 +526,10 @@ function ZonesTab() {
                 </span>
               </div>
               <PixelButton size="sm" disabled={busy}
-                onClick={() => act('Teleport', () => adminTeleport(z.id), `Teleport to ${z.name}?`)}>
+                onClick={async () => {
+                  const data = await act('Teleport', () => adminTeleport(z.id), `Teleport to ${z.name}?`);
+                  if (data?.stateUpdates) onStateUpdates(data.stateUpdates);
+                }}>
                 Teleport
               </PixelButton>
             </div>
@@ -905,9 +908,10 @@ const TABS: { id: AdminTab; label: string }[] = [
 interface AdminScreenProps {
   onStateUpdates: (updates: StateUpdates) => void;
   setTurns: (n: number) => void;
+  reloadZones: () => Promise<void>;
 }
 
-export default function AdminScreen({ onStateUpdates, setTurns: setGameTurns }: AdminScreenProps) {
+export default function AdminScreen({ onStateUpdates, setTurns: setGameTurns, reloadZones }: AdminScreenProps) {
   const [tab, setTab] = useState<AdminTab>('player');
 
   return (
@@ -933,7 +937,7 @@ export default function AdminScreen({ onStateUpdates, setTurns: setGameTurns }: 
       {tab === 'player' && <PlayerTab onStateUpdates={onStateUpdates} setTurns={setGameTurns} />}
       {tab === 'items' && <ItemsTab onStateUpdates={onStateUpdates} />}
       {tab === 'world' && <WorldTab />}
-      {tab === 'zones' && <ZonesTab />}
+      {tab === 'zones' && <ZonesTab onStateUpdates={onStateUpdates} reloadZones={reloadZones} />}
       {tab === 'resources' && <ResourcesTab />}
       {tab === 'guild' && <GuildTab />}
       {tab === 'analytics' && <AnalyticsTab />}

@@ -537,6 +537,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (res.data) setTemplates(res.data.templates);
   }, []);
 
+  const reloadZones = useCallback(async () => {
+    const zonesRes = await getZones();
+    if (zonesRes.data) {
+      setZones(zonesRes.data.zones);
+      setZoneConnections(zonesRes.data.connections);
+      setUndiscoveredZones(zonesRes.data.undiscoveredZones ?? []);
+      setActiveZoneId(zonesRes.data.currentZoneId);
+    }
+  }, []);
+
   const loadAll = useCallback(async () => {
     setActionError(null);
 
@@ -1694,6 +1704,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     activeZoneId,
     zoneConnections,
     undiscoveredZones,
+    reloadZones,
     skills,
     characterProgression,
     inventory,

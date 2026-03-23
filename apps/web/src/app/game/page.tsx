@@ -134,6 +134,7 @@ export default function GamePage() {
     activeZoneId,
     zoneConnections,
     undiscoveredZones,
+    reloadZones,
     skills,
     characterProgression,
     inventory,
@@ -1256,7 +1257,7 @@ export default function GamePage() {
           />
         );
       case 'admin':
-        return <AdminScreen onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)} setTurns={setTurns} />;
+        return <AdminScreen onStateUpdates={(updates) => applyStateUpdates(updates, stateSetters)} setTurns={setTurns} reloadZones={reloadZones} />;
       default:
         return null;
     }

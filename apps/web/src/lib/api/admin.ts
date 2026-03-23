@@ -168,7 +168,7 @@ export async function adminDiscoverAllZones() {
 }
 
 export async function adminTeleport(zoneId: string) {
-  return fetchApi<{ success: boolean }>('/api/v1/admin/zones/teleport', {
+  return fetchApi<{ success: boolean; zoneId: string; stateUpdates: StateUpdates }>('/api/v1/admin/zones/teleport', {
     method: 'POST',
     body: JSON.stringify({ zoneId }),
   });

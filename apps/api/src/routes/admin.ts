@@ -473,7 +473,7 @@ router.post('/zones/teleport', asyncHandler(async (req, res) => {
     data: { currentZoneId: zoneId },
   });
   await adminAudit(req.player!.playerId, 'teleport', { zoneId });
-  res.json({ success: true, zoneId });
+  res.json({ success: true, zoneId, stateUpdates: { currentZoneId: zoneId } });
 }));
 
 router.get('/mob-families', asyncHandler(async (req, res) => {
