@@ -17,17 +17,11 @@ vi.mock('../services/emailService', () => ({
   sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../redis', () => ({
-  redis: {
-    incr: vi.fn().mockResolvedValue(1),
-    expire: vi.fn().mockResolvedValue(1),
-  },
-}));
-
 vi.mock('../services/lockoutService', () => ({
   recordFailedLogin: vi.fn().mockResolvedValue(undefined),
   isLockedOut: vi.fn().mockResolvedValue(false),
   clearLockout: vi.fn().mockResolvedValue(undefined),
+  checkEmailRateLimit: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('bcrypt', () => ({

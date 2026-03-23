@@ -27,3 +27,11 @@ export async function isLockedOut(playerId: string): Promise<boolean> {
 export async function clearLockout(playerId: string): Promise<void> {
   await redis.del(lockoutKey(playerId));
 }
+
+/** Per-email rate limiting for password reset (prevents email bombing). */
+export async function checkEmailRateLimit(email: string): Promise<boolean> {
+  const key = `password-reset:email:${email.toLowerCase()}`;
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, 3600); // 1 hour TTL
+  return count <= 3; // max 3 per hour per email
+}

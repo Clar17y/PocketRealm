@@ -17,7 +17,6 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [registered, setRegistered] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -40,7 +39,6 @@ export default function RegisterPage() {
 
     if (data) {
       setTokens(data.accessToken, data.refreshToken, data.player);
-      setRegistered(true);
       trackEvent('signup');
       router.push('/game');
     }
@@ -121,12 +119,6 @@ export default function RegisterPage() {
             {loading ? 'Creating account...' : 'Begin Journey'}
           </PixelButton>
         </form>
-
-        {registered && (
-          <p className="text-sm text-[var(--rpg-gold)] text-center mt-4">
-            Check your email to verify and claim 3 days of Champion!
-          </p>
-        )}
 
         <p className="mt-6 text-center text-sm text-[var(--rpg-text-secondary)]">
           Already playing?{' '}

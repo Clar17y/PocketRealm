@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { escapeHtml } from '../utils/sanitize';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_ADDRESS = process.env.EMAIL_FROM ?? 'noreply@pocketrealm.gg';
@@ -50,8 +51,4 @@ export async function sendPasswordResetEmail(
       </div>
     `,
   });
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

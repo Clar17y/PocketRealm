@@ -18,8 +18,9 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { validatePassword } from '../utils/passwordValidation';
 import { createEmailVerificationToken, verifyEmailToken, createPasswordResetToken, verifyPasswordResetToken } from '../services/authTokenService';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
-import { redis } from '../redis';
-import { recordFailedLogin, isLockedOut, clearLockout } from '../services/lockoutService';
+import { recordFailedLogin, isLockedOut, clearLockout, checkEmailRateLimit } from '../services/lockoutService';
+
+const BCRYPT_ROUNDS = 10;
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
 const loginLimiter = createEndpointLimiter('login', RATE_LIMIT_CONSTANTS.LOGIN_WINDOW_MS, RATE_LIMIT_CONSTANTS.LOGIN_MAX, { message: 'Too many login attempts, please try again later' });
@@ -63,14 +64,6 @@ const forgotPasswordLimiter = rateLimit({
   message: { error: 'Too many password reset requests, please try again later', code: 'RATE_LIMITED' },
 });
 
-// Per-email rate limiting (Redis-backed, prevents email bombing)
-async function checkEmailRateLimit(email: string): Promise<boolean> {
-  const key = `password-reset:email:${email.toLowerCase()}`;
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, 3600);
-  return count <= 3;
-}
-
 const changeEmailSchema = z.object({
   email: z.string().email(),
   password: z.string(),
@@ -107,7 +100,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   }
 
   // Hash password
-  const passwordHash = await bcrypt.hash(body.password, 10);
+  const passwordHash = await bcrypt.hash(body.password, BCRYPT_ROUNDS);
 
   // Find starter town (for homeTownId) and first connected wild zone (for currentZoneId)
   const starterTown = await prisma.zone.findFirst({ where: { isStarter: true } });
@@ -456,7 +449,7 @@ authRouter.post('/reset-password', asyncHandler(async (req, res) => {
     throw new AppError(400, 'Invalid or expired reset token', 'INVALID_TOKEN');
   }
 
-  const passwordHash = await bcrypt.hash(body.password, 10);
+  const passwordHash = await bcrypt.hash(body.password, BCRYPT_ROUNDS);
 
   await prisma.$transaction([
     prisma.player.update({
@@ -543,7 +536,7 @@ authRouter.post('/change-password', authenticate, asyncHandler(async (req, res) 
     throw new AppError(401, 'Current password is incorrect', 'INVALID_CREDENTIALS');
   }
 
-  const newPasswordHash = await bcrypt.hash(body.newPassword, 10);
+  const newPasswordHash = await bcrypt.hash(body.newPassword, BCRYPT_ROUNDS);
 
   await prisma.player.update({
     where: { id: playerId },
