@@ -68,7 +68,7 @@ Expected: `"rate-limit-redis": "^X.X.X"` in dependencies.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add apps/api/package.json apps/api/package-lock.json
+git add apps/api/package.json package-lock.json
 git commit -m "chore: add rate-limit-redis dependency for Redis-backed rate limiting"
 ```
 
@@ -94,16 +94,19 @@ import { redis } from '../redis';
  * Creates a Redis-backed rate limiter for a specific endpoint group.
  * Falls through if Redis is unavailable (passOnStoreError).
  */
-export function createEndpointLimiter(name: string, windowMs: number, max: number) {
+export function createEndpointLimiter(
+  name: string, windowMs: number, max: number, message?: string,
+) {
   return rateLimit({
     windowMs,
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: 'Too many requests, please try again later', code: 'RATE_LIMITED' },
+    message: { error: message ?? 'Too many requests, please try again later', code: 'RATE_LIMITED' },
     passOnStoreError: true,
     store: new RedisStore({
-      sendCommand: (...args: string[]) => redis.call(...args),
+      sendCommand: (command: string, ...args: string[]) =>
+        redis.call(command, ...args) as Promise<number | string>,
       prefix: `rl:${name}:`,
     }),
   });
@@ -113,14 +116,10 @@ export function createEndpointLimiter(name: string, windowMs: number, max: numbe
 - [ ] **Step 2: Verify it compiles**
 
 ```bash
-cd apps/api && npx tsc --noEmit src/middleware/rateLimiter.ts 2>&1 | head -20
+npm run typecheck 2>&1 | grep -i error | head -20
 ```
 
-If there are type issues with `redis.call(...)`, adjust the return type cast. The `sendCommand` signature for `rate-limit-redis` expects `(...args: string[]) => Promise<number | string>`. ioredis `call` returns `Promise<unknown>`, so you may need:
-
-```typescript
-sendCommand: (...args: string[]) => redis.call(...args) as Promise<number | string>,
-```
+Expected: No new errors.
 
 - [ ] **Step 3: Commit**
 
@@ -148,15 +147,11 @@ app.use('/api/v1/', rateLimit({
 }));
 ```
 
-- [ ] **Step 1: Import the factory and replace the global limiter**
+- [ ] **Step 1: Add Redis store to the global limiter inline**
 
-In `apps/api/src/index.ts`:
-- Add import: `import { createEndpointLimiter } from './middleware/rateLimiter';`
-- Remove the `import rateLimit from 'express-rate-limit';` if no other usage remains in this file.
-- Replace the `rateLimit({...})` call with `createEndpointLimiter('global', 60_000, 120)`.
-- The `skip: (req) => req.method === 'OPTIONS'` option is NOT in the factory. Since only the global limiter needs it, add a custom wrapper or keep the global limiter inline but use `RedisStore`. The simplest approach: keep the global limiter inline but add the Redis store directly (don't use the factory for the global limiter since it has the unique `skip` option).
+The global limiter has a unique `skip` option for OPTIONS requests that the factory doesn't support. Keep it inline but swap in `RedisStore` directly.
 
-Updated global limiter:
+In `apps/api/src/index.ts`, add imports and update the limiter:
 ```typescript
 import { RedisStore } from 'rate-limit-redis';
 import { redis } from './redis';
@@ -170,7 +165,8 @@ app.use('/api/v1/', rateLimit({
   skip: (req) => req.method === 'OPTIONS',
   passOnStoreError: true,
   store: new RedisStore({
-    sendCommand: (...args: string[]) => redis.call(...args) as Promise<number | string>,
+    sendCommand: (command: string, ...args: string[]) =>
+      redis.call(command, ...args) as Promise<number | string>,
     prefix: 'rl:global:',
   }),
 }));
@@ -217,9 +213,9 @@ In `apps/api/src/routes/auth.ts`:
 - Remove `import rateLimit from 'express-rate-limit';` if no other usage remains.
 - Replace the `loginLimiter` definition with:
 ```typescript
-const loginLimiter = createEndpointLimiter('login', 15 * 60_000, 10);
+const loginLimiter = createEndpointLimiter('login', 15 * 60_000, 10, 'Too many login attempts, please try again later');
 ```
-- The login limiter had a custom error message (`'Too many login attempts...'`). The factory uses a generic message. This is acceptable — the `code: 'RATE_LIMITED'` field is what the frontend checks. If the custom message is important, keep it inline with Redis store instead.
+The factory's optional `message` parameter preserves the login-specific error message.
 
 - [ ] **Step 2: Run typecheck**
 
@@ -285,7 +281,9 @@ router.post('/start', combatLimiter, asyncHandler(async (req, res) => {
 
 For each of `apps/api/src/routes/crafting/craft.ts`, `forge.ts`, `salvage.ts`:
 - Add import: `import { createEndpointLimiter } from '../../middleware/rateLimiter';`
-- Add after router creation: `<router>.use(createEndpointLimiter('crafting', 60_000, 20));`
+- In `craft.ts`, add after router creation: `craftRouter.use(createEndpointLimiter('crafting', 60_000, 20));`
+- In `forge.ts`, add after router creation: `forgeRouter.use(createEndpointLimiter('crafting', 60_000, 20));`
+- In `salvage.ts`, add after router creation: `salvageRouter.use(createEndpointLimiter('crafting', 60_000, 20));`
 
 All three share the `rl:crafting:` prefix so they count against the same 20/min budget.
 
@@ -380,13 +378,20 @@ grep -rn "checkRateLimit(" apps/api/src/ --include="*.ts"
 
 Update each call site from `checkRateLimit(...)` to `await checkRateLimit(...)`.
 
-- [ ] **Step 3: Run existing chat service tests**
+- [ ] **Step 3: Update chat service tests**
+
+The tests call `checkRateLimit` synchronously and assert `boolean` returns. After the refactor, it returns `Promise<boolean>`, so tests will silently pass with truthy Promise objects. Fix:
+
+1. Add `vi.mock('../redis')` (or appropriate mock path) to mock the redis module
+2. Change all test callbacks to `async`
+3. Add `await` to all `checkRateLimit(...)` calls
+4. Mock `redis.set` to return `'OK'` for "allowed" cases and `null` for "rate limited" cases
 
 ```bash
 npm run test -- --reporter=verbose apps/api/src/services/chatService.test.ts 2>&1 | tail -20
 ```
 
-The tests may need updating if they mock `checkRateLimit` or rely on synchronous behavior. If tests import the Map directly, they'll need to mock `redis.set` instead.
+Expected: All tests pass with the updated async patterns.
 
 - [ ] **Step 4: Run typecheck**
 
