@@ -49,6 +49,7 @@ import { CRAFTING_CONSTANTS, TURN_CONSTANTS, type SkillType } from '@pocketrealm
 import { calculateEfficiency, xpForLevel } from '@pocketrealm/game-engine';
 import { Sword, Shield, Crosshair, Sparkles, Pickaxe, Hammer, Leaf, FlaskConical, Axe, Scissors, Anvil, Gem } from 'lucide-react';
 import { TutorialBanner } from '@/components/TutorialBanner';
+import { VerificationBanner } from '@/components/VerificationBanner';
 import { TutorialDialog } from '@/components/TutorialDialog';
 import { StarterWeaponPopup } from '@/components/StarterWeaponPopup';
 import {
@@ -1328,6 +1329,8 @@ export default function GamePage() {
             You have unclaimed loot! Tap to pick up items.
           </button>
         )}
+
+        {player && <VerificationBanner emailVerified={player.emailVerified} />}
 
         <TutorialBanner
           tutorialStep={tutorialStep}
