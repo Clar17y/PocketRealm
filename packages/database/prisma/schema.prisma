@@ -21,6 +21,12 @@ model Player {
   createdAt    DateTime  @default(now()) @map("created_at")
   lastActiveAt DateTime? @map("last_active_at")
 
+  // Auth hardening
+  emailVerified       Boolean   @default(false) @map("email_verified")
+  premiumTrialClaimed Boolean   @default(false) @map("premium_trial_claimed")
+  isPremium           Boolean   @default(false) @map("is_premium")
+  premiumExpiresAt    DateTime? @map("premium_expires_at")
+
   // Character Progression
   characterXp     BigInt @default(0) @map("character_xp")
   characterLevel  Int    @default(1) @map("character_level")
@@ -92,6 +98,8 @@ model Player {
   encounterSites     EncounterSite[]
   knownRecipes       PlayerRecipe[]
   refreshTokens      RefreshToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
   resourceNodes      PlayerResourceNode[]
   zoneDiscoveries    PlayerZoneDiscovery[]
   zoneExplorations   PlayerZoneExploration[]
@@ -149,6 +157,33 @@ model RefreshToken {
 
   @@index([playerId])
   @@map("refresh_tokens")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  playerId  String   @map("player_id")
+  tokenHash String   @unique @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  playerId  String    @map("player_id")
+  tokenHash String    @unique @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
+  @@map("password_reset_tokens")
 }
 
 // =============================================================================
