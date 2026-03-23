@@ -30,8 +30,10 @@ import {
   forgeRerollSchema,
 } from './helpers';
 import { checkActivityLockout } from '../../services/expeditionLockoutService';
+import { createEndpointLimiter } from '../../middleware/rateLimiter';
 
 export const forgeRouter = Router();
+forgeRouter.use(createEndpointLimiter('crafting', 60_000, 20));
 
 /**
  * POST /api/v1/crafting/forge/upgrade

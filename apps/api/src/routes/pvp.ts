@@ -22,9 +22,11 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
 import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
+import { createEndpointLimiter } from '../middleware/rateLimiter';
 
 export const pvpRouter = Router();
 pvpRouter.use(authenticate);
+pvpRouter.use(createEndpointLimiter('pvp', 60_000, 10));
 
 const scoutSchema = z.object({
   targetId: z.string().uuid(),

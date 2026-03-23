@@ -59,6 +59,9 @@ import {
   pickWeighted,
 } from './helpers';
 import { getCachedMobTemplatesByZone } from '../../services/staticDataCacheService';
+import { createEndpointLimiter } from '../../middleware/rateLimiter';
+
+const combatLimiter = createEndpointLimiter('combat', 60_000, 30);
 
 
 
@@ -68,7 +71,7 @@ export function registerStartRoutes(router: Router): void {
    * Spend turns and run zone combat (single mob).
    * Encounter site combat uses dedicated routes in sites.ts.
    */
-  router.post('/start', asyncHandler(async (req, res) => {
+  router.post('/start', combatLimiter, asyncHandler(async (req, res) => {
       const playerId = req.player!.playerId;
       await checkActivityLockout(playerId);
       const body = startSchema.parse(req.body);

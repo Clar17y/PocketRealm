@@ -18,8 +18,10 @@ import {
   salvageBatchSchema,
 } from './helpers';
 import { checkActivityLockout } from '../../services/expeditionLockoutService';
+import { createEndpointLimiter } from '../../middleware/rateLimiter';
 
 export const salvageRouter = Router();
+salvageRouter.use(createEndpointLimiter('crafting', 60_000, 20));
 
 /**
  * POST /api/v1/crafting/salvage
