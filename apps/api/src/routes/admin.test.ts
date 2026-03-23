@@ -266,7 +266,7 @@ describe('admin routes', () => {
         where: { id: 'p1' },
         data: { currentZoneId: '00000000-0000-0000-0000-000000000001' },
       });
-      expect(res.json).toHaveBeenCalledWith({ success: true, zoneId: '00000000-0000-0000-0000-000000000001' });
+      expect(res.json).toHaveBeenCalledWith({ success: true, zoneId: '00000000-0000-0000-0000-000000000001', stateUpdates: { currentZoneId: '00000000-0000-0000-0000-000000000001' } });
     });
   });
 
