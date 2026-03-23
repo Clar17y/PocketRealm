@@ -1,24 +1,18 @@
 import { prisma } from '@pocketrealm/database';
 import { ACHIEVEMENTS_BY_ID, CHAT_CONSTANTS } from '@pocketrealm/shared';
 import type { ChatChannelType, ChatMessageEvent, ChatMessageType } from '@pocketrealm/shared';
+import { redis } from '../redis';
 
-// In-memory rate limiter: key = "playerId:channelType" → last send timestamp
-const lastSendTimes = new Map<string, number>();
-
-export function checkRateLimit(playerId: string, channelType: ChatChannelType): boolean {
-  const key = `${playerId}:${channelType}`;
-  const now = Date.now();
-  const lastSend = lastSendTimes.get(key);
+export async function checkRateLimit(playerId: string, channelType: ChatChannelType): Promise<boolean> {
+  const key = `chat:rl:${playerId}:${channelType}`;
   const limitMs = channelType === 'world'
     ? CHAT_CONSTANTS.WORLD_RATE_LIMIT_MS
     : CHAT_CONSTANTS.ZONE_RATE_LIMIT_MS;
 
-  if (lastSend && now - lastSend < limitMs) {
-    return false;
-  }
-
-  lastSendTimes.set(key, now);
-  return true;
+  // SET NX PX: sets key only if it doesn't exist, with TTL in ms.
+  // Returns 'OK' if set (allowed), null if already exists (rate limited).
+  const result = await redis.set(key, '1', 'PX', limitMs, 'NX');
+  return result === 'OK';
 }
 
 export async function saveMessage(params: {
