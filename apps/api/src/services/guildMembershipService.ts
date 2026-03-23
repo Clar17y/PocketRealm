@@ -5,7 +5,7 @@ import {
   requireRole, addGuildLog, calculateMaxMembers,
   addGuildXp, checkGuildAchievementsForAllMembers, getGuild, invalidateGuildIdCache,
 } from './guildService';
-import { invalidateGuildModifiersForGuild, invalidateGuildModifiersForPlayer } from './guildUpgradeService';
+import { invalidateGuildModifiersForGuild } from './guildUpgradeService';
 
 // ---------------------------------------------------------------------------
 // Join / Leave
@@ -46,7 +46,7 @@ export async function joinGuild(playerId: string, guildId: string): Promise<Guil
     await addGuildLog(guildId, 'member_joined', `${player.username} joined the guild`, undefined, tx);
   });
 
-  await Promise.all([invalidateGuildIdCache(playerId), invalidateGuildModifiersForPlayer(playerId)]);
+  await Promise.all([invalidateGuildIdCache(playerId), invalidateGuildModifiersForGuild(guildId)]);
 
   // Add guild XP for new member
   await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
@@ -72,7 +72,7 @@ export async function leaveGuild(playerId: string): Promise<void> {
     await addGuildLog(membership.guildId, 'member_left', `${membership.player.username} left the guild`, undefined, tx);
   });
 
-  await Promise.all([invalidateGuildIdCache(playerId), invalidateGuildModifiersForPlayer(playerId)]);
+  await Promise.all([invalidateGuildIdCache(playerId), invalidateGuildModifiersForGuild(membership.guildId)]);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ export async function respondToJoinRequest(
       await addGuildLog(membership.guildId, 'join_request_accepted', `${request.player.username} was accepted into the guild`, undefined, tx);
     });
 
-    await Promise.all([invalidateGuildIdCache(request.playerId), invalidateGuildModifiersForPlayer(request.playerId)]);
+    await Promise.all([invalidateGuildIdCache(request.playerId), invalidateGuildModifiersForGuild(membership.guildId)]);
 
     await addGuildXp(membership.guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
     void checkGuildAchievementsForAllMembers(membership.guildId, ['guildMemberCount']);
@@ -226,7 +226,7 @@ export async function kickMember(requesterId: string, targetId: string): Promise
     await addGuildLog(requester.guildId, 'member_kicked', `${target.player.username} was kicked`, undefined, tx);
   });
 
-  await Promise.all([invalidateGuildIdCache(targetId), invalidateGuildModifiersForPlayer(targetId)]);
+  await Promise.all([invalidateGuildIdCache(targetId), invalidateGuildModifiersForGuild(requester.guildId)]);
 }
 
 export async function promoteMember(leaderId: string, targetId: string): Promise<void> {
