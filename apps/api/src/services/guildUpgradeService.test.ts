@@ -413,7 +413,7 @@ describe('getPlayerGuildModifiers', () => {
   });
 
   it('uses cachedQuery with guild:modifiers key', async () => {
-    const { cachedQuery } = await import('./cacheService');
+    const { cachedQuery } = await import('./cacheService.js');
     db.guildMember.findUnique.mockResolvedValue(null);
 
     await getPlayerGuildModifiers(PLAYER_ID);
