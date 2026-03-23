@@ -42,13 +42,7 @@ const refreshSchema = z.object({ refreshToken: z.string().min(1) });
 
 const verifyEmailSchema = z.object({ token: z.string().min(1) });
 
-const resendVerificationLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 3,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many verification requests, please try again later', code: 'RATE_LIMITED' },
-});
+const resendVerificationLimiter = createEndpointLimiter('resend-verification', 60 * 60 * 1000, 3, { message: 'Too many verification requests, please try again later' });
 
 const forgotPasswordSchema = z.object({ email: z.string().email() });
 const resetPasswordSchema = z.object({
@@ -56,13 +50,7 @@ const resetPasswordSchema = z.object({
   password: z.string().min(10).max(100),
 });
 
-const forgotPasswordLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many password reset requests, please try again later', code: 'RATE_LIMITED' },
-});
+const forgotPasswordLimiter = createEndpointLimiter('forgot-password', 60 * 60 * 1000, 5, { message: 'Too many password reset requests, please try again later' });
 
 const changeEmailSchema = z.object({
   email: z.string().email(),

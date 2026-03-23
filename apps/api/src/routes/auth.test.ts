@@ -17,6 +17,10 @@ vi.mock('../services/emailService', () => ({
   sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../middleware/rateLimiter', () => ({
+  createEndpointLimiter: vi.fn(() => (_req: any, _res: any, next: any) => next()),
+}));
+
 vi.mock('../services/lockoutService', () => ({
   recordFailedLogin: vi.fn().mockResolvedValue(undefined),
   isLockedOut: vi.fn().mockResolvedValue(false),
