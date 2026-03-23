@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Almendra, Crimson_Text, Silkscreen } from 'next/font/google';
+import PlausibleProvider from 'next-plausible';
 import './globals.css';
 
 const almendra = Almendra({ weight: ['400', '700'], style: ['normal', 'italic'], subsets: ['latin'], variable: '--font-almendra', display: 'swap' });
@@ -35,7 +36,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${almendra.variable} ${crimsonText.variable} ${silkscreen.variable}`}>{children}</body>
+      <body className={`${almendra.variable} ${crimsonText.variable} ${silkscreen.variable}`}>
+        {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN ? (
+          <PlausibleProvider domain={process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}>
+            {children}
+          </PlausibleProvider>
+        ) : children}
+      </body>
     </html>
   );
 }

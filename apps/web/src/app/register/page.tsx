@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { register } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { PixelButton } from '@/components/PixelButton';
+import { trackEvent } from '@/lib/analytics';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -37,6 +38,7 @@ export default function RegisterPage() {
 
     if (data) {
       setTokens(data.accessToken, data.refreshToken, data.player);
+      trackEvent('signup');
       router.push('/game');
     }
 

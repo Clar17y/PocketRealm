@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { trackEvent, trackOnce } from '@/lib/analytics';
 import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { RARITY_RANK } from '@/lib/rarity';
@@ -83,7 +84,8 @@ import {
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
-import { STAMINA_CONSTANTS, MANA_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
+import { STAMINA_CONSTANTS, MANA_CONSTANTS, ITEM_RARITY_CONSTANTS, COMBAT_CONSTANTS, CRAFTING_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
+
 import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
 import { fmtDur } from '@/lib/format';
@@ -333,6 +335,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const lastEventLogTimeRef = useRef(0);
   const prevInventoryIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedOnceRef = useRef(false);
+  const sessionTrackedRef = useRef(false);
+  const playerCreatedAtRef = useRef<string | null>(null);
   const lootRevealRarityRef = useRef(lootRevealRarity);
   lootRevealRarityRef.current = lootRevealRarity;
   const [lootRevealItems, setLootRevealItems] = useState<Array<{
@@ -558,6 +562,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       });
       setGold(playerRes.data.player.gold ?? 0);
       setActiveEncounterSiteId(playerRes.data.player.activeEncounterSiteId ?? null);
+      playerCreatedAtRef.current = playerRes.data.player.createdAt;
       initSettingsFromServer(playerRes.data.player);
       const serverTutorialStep = playerRes.data.player.tutorialStep ?? TUTORIAL_COMPLETED;
       setTutorialStep(serverTutorialStep);
@@ -665,7 +670,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (tutorialStep !== fromStep) return;
     const nextStep = fromStep + 1;
     const res = await updateTutorialStep(nextStep);
-    if (res.data) setTutorialStep(res.data.tutorialStep);
+    if (res.data) {
+      setTutorialStep(res.data.tutorialStep);
+      if (res.data.tutorialStep === TUTORIAL_COMPLETED) {
+        trackEvent('tutorial_complete');
+      }
+    }
   }, [tutorialStep]);
 
   const skipTutorial = useCallback(async () => {
@@ -735,6 +745,21 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     const friendInterval = setInterval(() => { if (!cancelled) void loadFriendCounts(); }, 60000);
     return () => { cancelled = true; clearInterval(interval); clearInterval(pvpInterval); clearInterval(friendInterval); };
   }, [isAuthenticated, loadAll, pollScreenData, loadPvpNotificationCount, loadFriendCounts]);
+
+  useEffect(() => {
+    if (!isAuthenticated || sessionTrackedRef.current || characterProgression.characterLevel === 0) return;
+    sessionTrackedRef.current = true;
+    const daysSinceSignup = playerCreatedAtRef.current
+      ? Math.floor((Date.now() - new Date(playerCreatedAtRef.current).getTime()) / 86_400_000)
+      : 0;
+    trackEvent('session_start', { characterLevel: characterProgression.characterLevel, daysSinceSignup });
+  }, [isAuthenticated, characterProgression.characterLevel]);
+
+  useEffect(() => {
+    const handler = () => trackEvent('pwa_install');
+    window.addEventListener('appinstalled', handler);
+    return () => window.removeEventListener('appinstalled', handler);
+  }, []);
 
   const getActiveTab = () => {
     if (['home', 'skills', 'zones', 'bestiary', 'rest', 'worldEvents', 'achievements', 'quests', 'leaderboard', 'casino', 'training', 'admin'].includes(activeScreen)) return 'home';
@@ -901,6 +926,16 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const finalizeExplorationPlayback = async () => {
     const pendingIds = explorationPlaybackData?.pendingLootSessionIds;
     const savedStateUpdates = explorationPlaybackData?.stateUpdates;
+
+    // Analytics: track exploration (before clearing playback data)
+    if (explorationPlaybackData) {
+      trackEvent('action', {
+        type: 'exploration',
+        turns: explorationPlaybackData.totalTurns,
+        zone: explorationPlaybackData.zoneName,
+      });
+    }
+
     setExplorationPlaybackData(null);
     combatLogPrefetch.clear();
     setPlaybackActive(false);
@@ -964,6 +999,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     // Map bottom nav tab ids to default sub-screens
     const resolved = screen === 'social' ? 'guild' : screen;
     setActiveScreen(resolved as Screen);
+    trackEvent('screen_view', { screen: resolved });
   };
 
   const handleMine = async (playerNodeId: string, turnSpend: number) => {
@@ -1044,6 +1080,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       pushLog(...newLogs);
       applyStateUpdates(data.stateUpdates, stateSetters);
+      const gatherType = data.xp?.skillType ?? 'mining';
+      trackEvent('action', { type: gatherType, turns: turnSpend, zone: activeZoneId ?? undefined });
+      if (data.xp?.leveledUp) {
+        trackEvent('level_up', { skill: data.xp.skillType, level: data.xp.newLevel });
+      }
       await loadGatheringNodes();
       advanceTutorial(TUTORIAL_STEP_GATHER);
     });
@@ -1124,6 +1165,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
       pushLog(...newLogs);
       applyStateUpdates(data.stateUpdates, stateSetters);
+      const craftTurns = recipe ? recipe.turnCost * quantity : 50;
+      trackEvent('action', { type: data.xp.skillType, turns: craftTurns });
+      trackOnce('first_craft', { skill: data.xp.skillType });
+      if (data.xp?.leveledUp) {
+        trackEvent('level_up', { skill: data.xp.skillType, level: data.xp.newLevel });
+      }
       advanceTutorial(TUTORIAL_STEP_REFINE);
       advanceTutorial(TUTORIAL_STEP_CRAFT);
     });
@@ -1134,6 +1181,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setTurns(data.turns.currentTurns);
       const materialSummary = data.salvage.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged item for: ${materialSummary}.` });
+      trackEvent('action', { type: 'salvage', turns: CRAFTING_CONSTANTS.SALVAGE_TURN_COST });
     });
 
   const handleSalvageBatch = (itemIds: string[]) =>
@@ -1141,6 +1189,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setTurns(data.turns.currentTurns);
       const materialSummary = data.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged ${data.salvaged.length} items (${data.totalTurnCost} turns). Recovered: ${materialSummary}` });
+      trackEvent('action', { type: 'salvage', turns: data.totalTurnCost });
     });
 
   const handleForgeUpgrade = (itemId: string, sacrificialItemId: string) =>
@@ -1176,6 +1225,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         });
         showForgeToast({ type: 'upgrade_fail', message: `Upgrade failed — target and sacrifice consumed` });
       }
+      const upgradeTurns = ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY[data.forge.fromRarity as keyof typeof ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY] ?? 100;
+      trackEvent('action', { type: 'forge_upgrade', turns: upgradeTurns });
     });
 
   const handleForgeReroll = (itemId: string, sacrificialItemId: string) =>
@@ -1184,6 +1235,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       const rarityLabel = data.forge.rarity.charAt(0).toUpperCase() + data.forge.rarity.slice(1);
       pushLog({ timestamp: nowStamp(), type: 'success', message: `Re-rolled ${rarityLabel} item bonus stats. Sacrificial duplicate consumed.` });
       showForgeToast({ type: 'reroll', message: `Stats rerolled!` });
+      const rerollTurns = ITEM_RARITY_CONSTANTS.REROLL_TURN_COST_BY_RARITY[data.forge.rarity as keyof typeof ITEM_RARITY_CONSTANTS.REROLL_TURN_COST_BY_RARITY] ?? 75;
+      trackEvent('action', { type: 'forge_reroll', turns: rerollTurns });
     });
 
   const handleDestroyItem = (itemId: string) =>
@@ -1589,6 +1642,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         setHpState(prev => ({ ...prev, currentHp: result.data!.currentHp, maxHp: result.data!.maxHp }));
         applyStateUpdates(result.data.stateUpdates, stateSetters);
         pushLog({ timestamp: nowStamp(), type: 'success', message: `Rested ${actualTurns.toLocaleString()} turns, healed ${Math.round(healed)} HP` });
+        trackEvent('action', { type: 'rest', turns: actualTurns });
       }
     });
   };

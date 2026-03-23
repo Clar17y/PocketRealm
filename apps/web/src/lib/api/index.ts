@@ -169,6 +169,7 @@ export {
   adminGrantGuildTreasury,
   adminResetExpeditionCooldowns,
   adminFillExpedition,
+  adminGetBalanceReport,
 } from './admin';
 export type {
   AdminItemTemplate,
@@ -178,6 +179,8 @@ export type {
   AdminEventTemplate,
   AdminActiveEvent,
   AdminResourceNode,
+  BalanceReport,
+  BalancePeriod,
 } from './admin';
 
 export {

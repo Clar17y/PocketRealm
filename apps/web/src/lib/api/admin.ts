@@ -220,3 +220,20 @@ export async function adminFillExpedition() {
     { method: 'POST' },
   );
 }
+
+export interface BalanceReport {
+  period: string;
+  generatedAt: string;
+  activePlayers: number;
+  skillDistribution: Record<string, { avg: number; median: number; p90: number; playerCount: number }>;
+  turnDistribution: Record<string, { totalTurns: number; actionCount: number; avgTurnsPerAction: number }>;
+  xpEfficiency: Record<string, { totalXpGained: number; totalTurnsSpent: number; xpPerTurn: number }>;
+  progressionVelocity: Record<string, { atLevel5: number; atLevel10: number; atLevel15: number; atLevel20: number; atLevel30: number }>;
+  zoneActivity: Record<string, { totalTurns: number; actionCount: number; uniquePlayers: number }>;
+}
+
+export type BalancePeriod = '1h' | '24h' | '7d' | '30d';
+
+export async function adminGetBalanceReport(period: BalancePeriod = '7d') {
+  return fetchApi<BalanceReport>(`/api/v1/admin/analytics/balance?period=${period}`);
+}
