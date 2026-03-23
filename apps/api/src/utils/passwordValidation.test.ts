@@ -33,7 +33,7 @@ describe('validatePassword', () => {
   });
 
   it('accepts passwords at exactly 10 characters', () => {
-    const result = validatePassword('abcdefghij');
+    const result = validatePassword('r3almH0und');
     expect(result.valid).toBe(true);
   });
 
