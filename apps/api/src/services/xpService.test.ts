@@ -310,9 +310,9 @@ describe('grantSkillXp', () => {
     });
 
     it('returns POINTS_PER_LEVEL when skill levels up once', async () => {
-      // Level 2 requires ~348 XP, so 400 raw XP triggers level-up from 1->2
+      // Level 2 requires 80 XP (flattened early curve), so 100 raw XP triggers level-up from 1->2
       setupBasicMocks(makeSkill({ xp: BigInt(0), level: 1 }));
-      const result = await grantSkillXp('p1', 'melee', 400, now);
+      const result = await grantSkillXp('p1', 'melee', 100, now);
 
       expect(result.newLevel).toBe(2);
       expect(result.skillPointsGained).toBe(SKILL_POINT_CONSTANTS.POINTS_PER_LEVEL);
@@ -366,14 +366,14 @@ describe('grantSkillXp', () => {
 
     it('sets characterLeveledUp to true when level increases', async () => {
       // characterLevelFromXp uses same formula as skill levels but with CHARACTER_CONSTANTS.MAX_LEVEL
-      // Need enough character XP to level up. Lets compute: level 2 requires xpForLevel(2) = floor(100 * 2^2.0) = 400
-      // CharacterXP = floor(skillXpAfterEfficiency * 0.3). We need total char XP >= 400.
-      // With 1400 skill XP, char gain = floor(1400 * 0.3) = 420. If char starts at 0, total = 420 >= 400.
+      // Level 2 requires xpForLevel(2) = 80 (flattened early curve).
+      // CharacterXP = floor(skillXpAfterEfficiency * 0.3). We need total char XP >= 80.
+      // With 300 skill XP, char gain = floor(300 * 0.3) = 90. If char starts at 0, total = 90 >= 80.
       setupBasicMocks(makeSkill(), makePlayer({ characterXp: BigInt(0), characterLevel: 1 }));
-      const result = await grantSkillXp('p1', 'melee', 1400, now);
+      const result = await grantSkillXp('p1', 'melee', 300, now);
 
       // Verify character actually leveled up
-      expect(result.characterXpAfter).toBeGreaterThanOrEqual(400);
+      expect(result.characterXpAfter).toBeGreaterThanOrEqual(80);
       expect(result.characterLevelAfter).toBeGreaterThan(1);
       expect(result.characterLeveledUp).toBe(true);
     });
@@ -400,7 +400,7 @@ describe('grantSkillXp', () => {
     it('does not reduce attribute points when no character level-up', async () => {
       setupBasicMocks(
         makeSkill(),
-        makePlayer({ characterXp: BigInt(500), characterLevel: 2, attributePoints: 5 }),
+        makePlayer({ characterXp: BigInt(200), characterLevel: 2, attributePoints: 5 }),
       );
       const result = await grantSkillXp('p1', 'melee', 10, now);
 

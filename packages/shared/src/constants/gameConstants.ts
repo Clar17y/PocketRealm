@@ -96,10 +96,13 @@ export const SLOT_STAT_POOLS: Record<string, { primary: string[]; utility: strin
 // =============================================================================
 
 export const SKILL_CONSTANTS = {
-  /** Base XP needed for level 2 */
+  /** Base XP multiplier at level 10+ */
   XP_BASE: 100,
 
-  /** Exponent for XP curve: xp_for_level = base * (level ^ exponent) */
+  /** Per-level multiplier for early levels (1-9): effective base = min(XP_BASE, level * XP_EARLY_LEVEL_SCALE) */
+  XP_EARLY_LEVEL_SCALE: 10,
+
+  /** Exponent for XP curve: xp_for_level = effectiveBase * (level ^ exponent) */
   XP_EXPONENT: 2.0,
 
   /** Maximum level */

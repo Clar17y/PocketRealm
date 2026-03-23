@@ -19,7 +19,7 @@ const progressionRelated = [
   { label: 'Damage Calculation', href: '/wiki/combat/damage' },
 ];
 
-const sampleLevels = [1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+const sampleLevels = [1, 2, 3, 5, 7, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
 const xpTable = sampleLevels.map((level) => ({
   level,
@@ -35,15 +35,27 @@ export default function XpLevelingPage() {
     >
       <h2>Skill XP Formula</h2>
       <p>
-        The total XP required to reach a given skill level uses a power curve:
+        The total XP required to reach a given skill level uses a power curve
+        with a reduced base for early levels (1&ndash;9) so new players progress
+        faster:
       </p>
       <FormulaBlock>
+        <Var>base</Var> <Op>=</Op> <Op>min(</Op>
+        <Const>{SKILL_CONSTANTS.XP_BASE}</Const><Op>,</Op>{' '}
+        <Var>level</Var> <Op>&times;</Op>{' '}
+        <Const>{SKILL_CONSTANTS.XP_EARLY_LEVEL_SCALE}</Const><Op>)</Op>
+      </FormulaBlock>
+      <FormulaBlock>
         <Out>xpForLevel</Out><Op>(</Op><Var>level</Var><Op>)</Op> <Op>=</Op>{' '}
-        <Op>floor(</Op><Const>{SKILL_CONSTANTS.XP_BASE}</Const> <Op>&times;</Op>{' '}
+        <Op>floor(</Op><Var>base</Var> <Op>&times;</Op>{' '}
         <Var>level</Var><Op>^</Op>
         <Const>{SKILL_CONSTANTS.XP_EXPONENT}</Const><Op>)</Op>
         <Comment> {'//'} level 1 = 0 XP</Comment>
       </FormulaBlock>
+      <p>
+        At level 10 and above the base reaches{' '}
+        <Const>{SKILL_CONSTANTS.XP_BASE}</Const> and the curve is unchanged.
+      </p>
       <p>
         Level 1 requires 0 XP (starting level). The maximum skill level is{' '}
         <Const>{SKILL_CONSTANTS.MAX_LEVEL}</Const>.
@@ -113,7 +125,13 @@ export default function XpLevelingPage() {
           {
             name: 'XP_BASE',
             value: SKILL_CONSTANTS.XP_BASE,
-            description: 'Base multiplier for the XP curve',
+            description: 'Base multiplier for the XP curve (at level 10+)',
+          },
+          {
+            name: 'XP_EARLY_LEVEL_SCALE',
+            value: SKILL_CONSTANTS.XP_EARLY_LEVEL_SCALE,
+            description:
+              'Per-level base scale for levels 1-9 (effective base = min(XP_BASE, level × scale))',
           },
           {
             name: 'XP_EXPONENT',

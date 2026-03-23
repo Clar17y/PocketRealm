@@ -27,11 +27,41 @@ describe('xpForLevel', () => {
     expect(xpForLevel(-5)).toBe(0);
   });
 
-  it('calculates XP for level 2 using base * 2^exponent', () => {
-    const expected = Math.floor(
-      SKILL_CONSTANTS.XP_BASE * Math.pow(2, SKILL_CONSTANTS.XP_EXPONENT),
+  it('calculates XP for level 2 using early-level scaling', () => {
+    // level 2: base = min(100, 2*10) = 20, xp = floor(20 * 2^2) = 80
+    const base = Math.min(
+      SKILL_CONSTANTS.XP_BASE,
+      2 * SKILL_CONSTANTS.XP_EARLY_LEVEL_SCALE,
     );
+    const expected = Math.floor(base * Math.pow(2, SKILL_CONSTANTS.XP_EXPONENT));
     expect(xpForLevel(2)).toBe(expected);
+  });
+
+  it('flattens early levels (1-9) compared to level 10+', () => {
+    // At level 10, early scale = 10*10 = 100 = XP_BASE, so no discount
+    expect(xpForLevel(10)).toBe(
+      Math.floor(SKILL_CONSTANTS.XP_BASE * Math.pow(10, SKILL_CONSTANTS.XP_EXPONENT)),
+    );
+    // At level 5, early scale = 5*10 = 50 < 100, so 50% discount
+    const base5 = 5 * SKILL_CONSTANTS.XP_EARLY_LEVEL_SCALE;
+    expect(xpForLevel(5)).toBe(
+      Math.floor(base5 * Math.pow(5, SKILL_CONSTANTS.XP_EXPONENT)),
+    );
+  });
+
+  it('matches issue #213 expected values', () => {
+    expect(xpForLevel(2)).toBe(80);    // was 400
+    expect(xpForLevel(3)).toBe(270);   // was 900
+    expect(xpForLevel(5)).toBe(1250);  // was 2500
+    expect(xpForLevel(7)).toBe(3430);  // was 4900
+  });
+
+  it('is unchanged at level 10+', () => {
+    for (const lvl of [10, 15, 20, 50]) {
+      expect(xpForLevel(lvl)).toBe(
+        Math.floor(SKILL_CONSTANTS.XP_BASE * Math.pow(lvl, SKILL_CONSTANTS.XP_EXPONENT)),
+      );
+    }
   });
 
   it('XP requirements increase monotonically', () => {

@@ -16,9 +16,11 @@ const MS_PER_HOUR = 60 * 60 * 1000;
  */
 export function xpForLevel(level: number): number {
   if (level <= 1) return 0;
-  return Math.floor(
-    SKILL_CONSTANTS.XP_BASE * Math.pow(level, SKILL_CONSTANTS.XP_EXPONENT)
+  const base = Math.min(
+    SKILL_CONSTANTS.XP_BASE,
+    level * SKILL_CONSTANTS.XP_EARLY_LEVEL_SCALE,
   );
+  return Math.floor(base * Math.pow(level, SKILL_CONSTANTS.XP_EXPONENT));
 }
 
 /**
