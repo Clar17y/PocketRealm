@@ -14,6 +14,10 @@ import {
 import { ensureEquipmentSlots } from '../services/equipmentService';
 import { ensureStarterDiscoveries, ensureStarterEncounterAndNodes } from '../services/zoneDiscoveryService';
 import { asyncHandler } from '../utils/asyncHandler';
+import { validatePassword } from '../utils/passwordValidation';
+import { createEmailVerificationToken } from '../services/authTokenService';
+import { sendVerificationEmail } from '../services/emailService';
+import { recordFailedLogin, isLockedOut, clearLockout } from '../services/lockoutService';
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
 const loginLimiter = createEndpointLimiter('login', RATE_LIMIT_CONSTANTS.LOGIN_WINDOW_MS, RATE_LIMIT_CONSTANTS.LOGIN_MAX, { message: 'Too many login attempts, please try again later' });
@@ -23,7 +27,7 @@ export const authRouter = Router();
 const registerSchema = z.object({
   username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_]+$/),
   email: z.string().email(),
-  password: z.string().min(8).max(100),
+  password: z.string().min(10).max(100),
 });
 
 const loginSchema = z.object({
@@ -36,6 +40,12 @@ const refreshSchema = z.object({ refreshToken: z.string().min(1) });
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
+
+  const passwordCheck = validatePassword(body.password);
+  if (!passwordCheck.valid) {
+    throw new AppError(400, passwordCheck.reason!, 'WEAK_PASSWORD');
+  }
+
   const now = new Date();
 
   // Check if user exists
@@ -155,10 +165,16 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
       username: player.username,
       email: player.email,
       role: player.role,
+      emailVerified: false,
     },
     accessToken,
     refreshToken,
   });
+
+  // Fire-and-forget: don't block registration on email send
+  createEmailVerificationToken(player.id)
+    .then(({ rawToken }) => sendVerificationEmail(player.email, rawToken, player.username))
+    .catch((err) => console.error('Failed to send verification email:', err));
 }));
 
 authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
@@ -167,6 +183,7 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
 
   const player = await prisma.player.findUnique({
     where: { email: body.email },
+    select: { id: true, username: true, email: true, role: true, passwordHash: true, isBot: true, emailVerified: true },
   });
 
   if (!player) {
@@ -208,6 +225,7 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
       username: player.username,
       email: player.email,
       role: player.role,
+      emailVerified: player.emailVerified,
     },
     accessToken,
     refreshToken,

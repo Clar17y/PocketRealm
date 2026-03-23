@@ -1,6 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { STARTER_LOADOUT } from '@pocketrealm/shared';
 
+vi.mock('../utils/passwordValidation', () => ({
+  validatePassword: vi.fn().mockReturnValue({ valid: true }),
+}));
+
+vi.mock('../services/authTokenService', () => ({
+  createEmailVerificationToken: vi.fn().mockResolvedValue({ rawToken: 'test-token' }),
+}));
+
+vi.mock('../services/emailService', () => ({
+  sendVerificationEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../services/lockoutService', () => ({
+  recordFailedLogin: vi.fn().mockResolvedValue(undefined),
+  isLockedOut: vi.fn().mockResolvedValue(false),
+  clearLockout: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('bcrypt', () => ({
   default: {
     hash: vi.fn().mockResolvedValue('hashed-password'),
