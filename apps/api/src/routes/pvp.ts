@@ -23,10 +23,11 @@ import { buildStateUpdates } from '../services/stateUpdateHelpers';
 import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
 import { createEndpointLimiter } from '../middleware/rateLimiter';
+import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
 
 export const pvpRouter = Router();
 pvpRouter.use(authenticate);
-pvpRouter.use(createEndpointLimiter('pvp', 60_000, 10));
+pvpRouter.use(createEndpointLimiter('pvp', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.PVP_MAX));
 
 const scoutSchema = z.object({
   targetId: z.string().uuid(),

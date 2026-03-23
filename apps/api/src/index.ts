@@ -5,8 +5,8 @@ import cors from 'cors';
 import 'dotenv/config';
 import compression from 'compression';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import { makeRedisStore } from './middleware/rateLimiter';
+import { createEndpointLimiter } from './middleware/rateLimiter';
+import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
 import { authRouter } from './routes/auth';
 import { turnsRouter } from './routes/turns';
 import { playerRouter } from './routes/player';
@@ -111,15 +111,8 @@ app.set('trust proxy', 1);
 
 // Global rate limiter: 120 requests per minute per IP
 // Skip CORS preflight (OPTIONS) — they carry no payload and shouldn't count against the limit.
-app.use('/api/v1/', rateLimit({
-  windowMs: 60_000,
-  max: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later', code: 'RATE_LIMITED' },
+app.use('/api/v1/', createEndpointLimiter('global', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.GLOBAL_MAX, {
   skip: (req) => req.method === 'OPTIONS',
-  passOnStoreError: true,
-  store: makeRedisStore('global'),
 }));
 
 // Health check

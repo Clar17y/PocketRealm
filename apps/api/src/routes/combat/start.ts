@@ -60,8 +60,9 @@ import {
 } from './helpers';
 import { getCachedMobTemplatesByZone } from '../../services/staticDataCacheService';
 import { createEndpointLimiter } from '../../middleware/rateLimiter';
+import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
 
-const combatLimiter = createEndpointLimiter('combat', 60_000, 30);
+const combatLimiter = createEndpointLimiter('combat', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.COMBAT_MAX);
 
 
 

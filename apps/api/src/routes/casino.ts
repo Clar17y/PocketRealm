@@ -9,8 +9,9 @@ import { checkAchievements, emitAchievementNotifications } from '../services/ach
 import type { RouletteBetType } from '@pocketrealm/shared';
 import { trackProgress } from '../services/progressService';
 import { createEndpointLimiter } from '../middleware/rateLimiter';
+import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
 
-const casinoLimiter = createEndpointLimiter('casino', 60_000, 30);
+const casinoLimiter = createEndpointLimiter('casino', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.CASINO_MAX);
 
 export const casinoRouter = Router();
 casinoRouter.use(authenticate);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '@pocketrealm/database';
-import { getAllMobPrefixes, BOSS_TEMPLATES } from '@pocketrealm/shared';
+import { getAllMobPrefixes, BOSS_TEMPLATES, CACHE_HEADER_CONSTANTS } from '@pocketrealm/shared';
 import type { BossRotationReveal } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { calculateExplorationPercent } from '../services/zoneExplorationService';
@@ -78,7 +78,7 @@ bestiaryRouter.get('/', asyncHandler(async (req, res) => {
   }
 
   const allPrefixes = getAllMobPrefixes();
-  res.set('Cache-Control', 'private, max-age=300');
+  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PRIVATE_MEDIUM);
   res.json({
     mobs: mobTemplates.map((mob: typeof mobTemplates[number]) => {
       const kills = killsByMobId.get(mob.id) ?? 0;

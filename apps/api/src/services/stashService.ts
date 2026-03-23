@@ -175,7 +175,11 @@ export async function withdrawBatch(
 
       await moveStackableItem(tx, item, item.quantity, false);
       withdrawnCount++;
-      if (!willMerge) availableSlots--;
+      if (!willMerge) {
+        availableSlots--;
+        // Track newly created backpack stack so subsequent same-template items merge correctly
+        if (item.template.stackable) backpackStackSet.add(item.templateId);
+      }
     }
     return { withdrawnCount };
   });
