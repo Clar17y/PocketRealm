@@ -402,7 +402,7 @@ npm run typecheck 2>&1 | grep -i error | head -20
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/src/services/chatService.ts
+git add apps/api/src/services/chatService.ts apps/api/src/socket/chatHandlers.ts apps/api/src/services/chatService.test.ts
 git commit -m "feat: migrate chat rate limiter from in-memory Map to Redis"
 ```
 
@@ -470,18 +470,22 @@ export async function emitAchievementNotifications(
 
 Add `import { prisma } from '@pocketrealm/database';` if not already imported. Remove the `createActivityLog` import if it's no longer used in this file.
 
-- [ ] **Step 2: Run existing achievement tests**
+- [ ] **Step 2: Update achievement tests**
+
+The existing tests mock `createActivityLog` and assert call counts. After the refactor, update the tests:
+- Replace `mockCreateActivityLog` assertions with `prisma.activityLog.createMany` mock assertions
+- Instead of asserting N individual calls, assert one `createMany` call with a `data` array of N entries
 
 ```bash
 npm run test -- --reporter=verbose apps/api/src/services/achievementService.test.ts 2>&1 | tail -30
 ```
 
-Expected: All tests pass. If tests mock `createActivityLog`, they'll need to mock `prisma.activityLog.createMany` instead.
+Expected: All tests pass after mock updates.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add apps/api/src/services/achievementService.ts
+git add apps/api/src/services/achievementService.ts apps/api/src/services/achievementService.test.ts
 git commit -m "fix: batch activity log inserts in emitAchievementNotifications"
 ```
 
