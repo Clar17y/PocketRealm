@@ -194,10 +194,19 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
     throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
   }
 
+  const locked = await isLockedOut(player.id);
+
   const validPassword = await bcrypt.compare(body.password, player.passwordHash);
   if (!validPassword) {
+    await recordFailedLogin(player.id);
     throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
   }
+
+  if (locked) {
+    throw new AppError(423, 'Account temporarily locked, try again later', 'ACCOUNT_LOCKED');
+  }
+
+  await clearLockout(player.id);
 
   // Update last active
   await prisma.player.update({
