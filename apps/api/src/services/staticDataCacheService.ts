@@ -19,8 +19,10 @@ async function staticCachedQuery<T>(key: string, fetcher: () => Promise<T>): Pro
   const result = await fetcher();
 
   try {
-    await redis.set(key, JSON.stringify(result), 'EX', TTL);
-    await redis.sadd(INDEX_KEY, key);
+    await Promise.all([
+      redis.set(key, JSON.stringify(result), 'EX', TTL),
+      redis.sadd(INDEX_KEY, key),
+    ]);
   } catch {
     // Best-effort
   }

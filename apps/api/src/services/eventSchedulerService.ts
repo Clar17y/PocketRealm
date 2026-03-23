@@ -296,8 +296,8 @@ export async function checkAndSpawnBoss(io: SocketServer | null): Promise<void> 
 
 /** Try to spawn a zone-scoped event. */
 async function trySpawnZoneEvent(io: SocketServer | null): Promise<void> {
-  const allZonesForEvent = await getCachedZones();
-  const wildZones = allZonesForEvent.filter(z => z.zoneType === 'wild');
+  const allZones = await getCachedZones();
+  const wildZones = allZones.filter(z => z.zoneType === 'wild');
   if (wildZones.length === 0) return;
 
   // Get effectTypes already active per zone to prevent duplicates
