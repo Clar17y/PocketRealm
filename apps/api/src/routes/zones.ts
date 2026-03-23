@@ -116,6 +116,7 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
       discovered: false as const,
     }));
 
+  res.set('Cache-Control', 'private, max-age=60');
   res.json({
     zones: zones.map((z) => {
       const discovered = discoveredZoneIds.has(z.id);

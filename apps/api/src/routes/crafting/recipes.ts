@@ -81,6 +81,7 @@ recipesRouter.get('/', asyncHandler(async (req, res) => {
         .filter(Boolean) as Array<{ id: string; name: string; itemType: string; stackable: boolean }>;
     }
 
+    res.set('Cache-Control', 'private, max-age=300');
     res.json({
       recipes: visible,
       zoneCraftingLevel: currentZone ? currentZone.maxCraftingLevel : 0,
