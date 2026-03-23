@@ -537,15 +537,22 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (res.data) setTemplates(res.data.templates);
   }, []);
 
-  const reloadZones = useCallback(async () => {
-    const zonesRes = await getZones();
-    if (zonesRes.data) {
-      setZones(zonesRes.data.zones);
-      setZoneConnections(zonesRes.data.connections);
-      setUndiscoveredZones(zonesRes.data.undiscoveredZones ?? []);
-      setActiveZoneId(zonesRes.data.currentZoneId);
+  const applyZonesData = useCallback((data: { zones: typeof zones; connections: typeof zoneConnections; undiscoveredZones?: typeof undiscoveredZones; currentZoneId: string }) => {
+    setZones(data.zones);
+    setZoneConnections(data.connections);
+    setUndiscoveredZones(data.undiscoveredZones ?? []);
+    setActiveZoneId(data.currentZoneId);
+    if (data.currentZoneId) {
+      getZoneEvents(data.currentZoneId).then((res) => {
+        if (res.data) setActiveEvents(res.data.events);
+      });
     }
   }, []);
+
+  const reloadZones = useCallback(async () => {
+    const zonesRes = await getZones();
+    if (zonesRes.data) applyZonesData(zonesRes.data);
+  }, [applyZonesData]);
 
   const loadAll = useCallback(async () => {
     setActionError(null);
@@ -604,17 +611,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       if (cdRes.data) setHasActiveExpedition(cdRes.data.hasActiveExpedition);
     });
 
-    if (zonesRes.data) {
-      setZones(zonesRes.data.zones);
-      setZoneConnections(zonesRes.data.connections);
-      setUndiscoveredZones(zonesRes.data.undiscoveredZones ?? []);
-      setActiveZoneId(zonesRes.data.currentZoneId);
-      if (zonesRes.data.currentZoneId) {
-        getZoneEvents(zonesRes.data.currentZoneId).then((res) => {
-          if (res.data) setActiveEvents(res.data.events);
-        });
-      }
-    }
+    if (zonesRes.data) applyZonesData(zonesRes.data);
     if (invRes.data) {
       setInventory(invRes.data.items);
       setInventoryCapacity(invRes.data.capacity ?? 24);
