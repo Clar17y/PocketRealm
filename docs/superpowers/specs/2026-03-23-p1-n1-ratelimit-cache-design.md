@@ -14,10 +14,13 @@
 **Problem:** Loops through all guild members sequentially, calling `checkAchievements(playerId)` per member (2+ queries each). A 50-member guild fires 100+ sequential queries.
 
 **Fix:**
-- Batch-fetch all member stats in one `findMany` query upfront.
-- Create an internal `checkAchievementsWithStats(playerId, stats, statKeys)` variant that accepts pre-loaded stats instead of querying them.
+- `checkAchievements` calls `resolveStats(playerId, statKeys)` which internally calls `resolveAllStats(playerId)` — a complex per-player aggregation across multiple tables (PlayerStat, PlayerSkill, Item counts, etc.).
+- Batch-fetch the raw data for all members in bulk queries: one `findMany` for PlayerStat, one for PlayerSkill, one for Item counts, grouped by playerId. This replaces N calls to `resolveAllStats` with ~3 bulk queries.
+- Create an internal `checkAchievementsWithStats(playerId, resolvedStats, statKeys)` variant that accepts pre-resolved stats instead of querying them. The achievement-checking logic itself (comparing stats against thresholds) is already pure and doesn't need changes.
 - Batch-insert any newly unlocked achievements via `createMany`.
 - Batch activity log emissions (see Section 1.4).
+
+**Note:** If `resolveAllStats` proves too complex to batch (e.g., uses per-player subqueries that can't be rewritten), fall back to `Promise.all` for concurrent execution as a pragmatic alternative. The implementer should assess feasibility when reading the `resolveAllStats` internals.
 
 ### 1.2 lootService.rollAndGrantLootWithCapacity
 
@@ -26,10 +29,10 @@
 **Problem:** Calls `prisma.item.create()` per non-stackable item in a loop.
 
 **Fix:**
-- Collect all non-stackable item data objects into an array during the loop.
-- Call `prisma.item.createManyAndReturn({ data: items })` after the loop (Prisma 6.19+ supports this).
+- The capacity-check loop still runs to determine which items to create vs. overflow (tracking `slotsUsed` as a running counter). Instead of calling `prisma.item.create()` per item, collect the create-data objects into an array for items that pass the capacity check.
+- After the loop, call `prisma.item.createManyAndReturn({ data: pendingItems })` once (Prisma 6.19+ supports this) to batch-insert all non-stackable items.
+- Build the `newItemIds` and `drops` response arrays from the `createManyAndReturn` result (it returns the created records including their IDs).
 - Stackable items still use individual `update` calls (they increment existing rows), but these are typically 0-2 items per loot roll.
-- Build the `newItems` response array from the `createManyAndReturn` result.
 
 ### 1.3 stashService.depositBatch / withdrawBatch
 
@@ -38,7 +41,7 @@
 **Problem:** Calls `findUnique` per item ID in a loop inside a transaction (2-4 queries per item).
 
 **Fix:**
-- Replace per-item `findUnique` with a single `findMany({ where: { id: { in: itemIds } }, include: { template: true, equipment: true } })` at the top of the transaction.
+- Replace per-item `findUnique` with a single `findMany({ where: { id: { in: itemIds } } })` at the top of the transaction. Include `{ template: true, equipment: true }` for `depositBatch` (needs equipment check), `{ template: true }` for `withdrawBatch` (no equipment check needed).
 - Build a `Map<id, item>` for O(1) lookup during validation.
 - `moveStackableItem` calls remain sequential within the transaction (they modify shared stash state), but the read amplification is eliminated.
 
@@ -66,10 +69,20 @@ export function createEndpointLimiter(name: string, windowMs: number, max: numbe
 ```
 
 Returns an `express-rate-limit` middleware configured with:
-- `RedisStore` from `rate-limit-redis` using the existing `redis` client from `utils/redis.ts`.
+- `RedisStore` from `rate-limit-redis` using the existing `redis` client from `utils/redis.ts`. The project uses `ioredis`, which requires a specific `sendCommand` adapter:
+  ```typescript
+  import { RedisStore } from 'rate-limit-redis';
+  import { redis } from '../utils/redis';
+
+  store: new RedisStore({
+    sendCommand: (...args: string[]) => redis.call(...args),
+    prefix: `rl:${name}:`,
+  }),
+  ```
 - Key prefix: `rl:${name}:` (namespaced to avoid collisions).
 - Consistent error response: `{ error: 'Too many requests, please try again later', code: 'RATE_LIMITED' }`.
 - `standardHeaders: true`, `legacyHeaders: false` (matches existing convention).
+- `passOnStoreError: true` — if Redis is unavailable, allow requests through rather than blocking all traffic. Matches the existing "Redis unavailable = fall through" pattern in `cacheService.ts`.
 
 ### 2.2 Endpoint Limits
 
@@ -79,9 +92,9 @@ Applied at the router level (not individual routes):
 |--------|-----------|-------|-------|
 | pvp | `rl:pvp:` | 10/min | All PvP routes (challenge, accept, scout) |
 | combat/start | `rl:combat:` | 30/min | Combat start sub-router only |
-| crafting | `rl:crafting:` | 20/min | Craft/forge/salvage (not recipe reads) |
+| crafting | `rl:crafting:` | 20/min | Applied to `/craft`, `/forge`, `/salvage` sub-routers individually (not the parent crafting router, which also mounts `/recipes` reads) |
 | exploration | `rl:exploration:` | 30/min | All exploration routes |
-| casino | `rl:casino:` | 30/min | POST routes only (bets, exchange — not GET history/stats) |
+| casino | `rl:casino:` | 30/min | Applied to individual `POST` route handlers (`/exchange`, `/roulette/bet`) rather than the whole router, to exclude GET endpoints |
 
 The global 120/min limiter remains as an outer bound on top of these.
 
@@ -111,7 +124,7 @@ The chat limiter is a custom `Map<string, number>` implementation used inside So
 
 **Fix:**
 - Replace `Map.get`/`Map.set` with `redis.set(key, '1', 'PX', limitMs, 'NX')`.
-- `NX` flag: returns `'OK'` if key didn't exist (allowed), `null` if it did (rate limited). Single atomic operation, no get+set race condition.
+- `NX` flag: returns `'OK'` (string) if key didn't exist (allowed), `null` if it did (rate limited). Single atomic operation, no get+set race condition. In ioredis the return type is `string | null`.
 - Delete the `lastSendTimes` map entirely.
 - Uses the existing `redis` client from `utils/redis.ts`.
 
