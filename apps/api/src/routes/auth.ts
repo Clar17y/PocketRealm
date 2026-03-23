@@ -71,6 +71,16 @@ async function checkEmailRateLimit(email: string): Promise<boolean> {
   return count <= 3;
 }
 
+const changeEmailSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string(),
+  newPassword: z.string().min(10).max(100),
+});
+
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
@@ -463,4 +473,86 @@ authRouter.post('/reset-password', asyncHandler(async (req, res) => {
   ]);
 
   res.json({ message: 'Password reset successfully. Please log in with your new password.' });
+}));
+
+authRouter.post('/change-email', authenticate, asyncHandler(async (req, res) => {
+  const body = changeEmailSchema.parse(req.body);
+  const playerId = req.player!.playerId;
+
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { passwordHash: true, username: true },
+  });
+
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
+  const validPassword = await bcrypt.compare(body.password, player.passwordHash);
+  if (!validPassword) {
+    throw new AppError(401, 'Invalid password', 'INVALID_CREDENTIALS');
+  }
+
+  const existing = await prisma.player.findUnique({ where: { email: body.email } });
+  if (existing) {
+    throw new AppError(409, 'Email already in use', 'EMAIL_TAKEN');
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.player.update({
+        where: { id: playerId },
+        data: { email: body.email, emailVerified: false },
+      }),
+      prisma.emailVerificationToken.deleteMany({ where: { playerId } }),
+    ]);
+  } catch (err: any) {
+    if (err?.code === 'P2002') {
+      throw new AppError(409, 'Email already in use', 'EMAIL_TAKEN');
+    }
+    throw err;
+  }
+
+  createEmailVerificationToken(playerId)
+    .then(({ rawToken }) => sendVerificationEmail(body.email, rawToken, player.username))
+    .catch((err) => console.error('Failed to send verification email:', err));
+
+  res.json({ message: 'Email updated. Check your inbox to verify your new address.' });
+}));
+
+authRouter.post('/change-password', authenticate, asyncHandler(async (req, res) => {
+  const body = changePasswordSchema.parse(req.body);
+  const playerId = req.player!.playerId;
+
+  const passwordCheck = validatePassword(body.newPassword);
+  if (!passwordCheck.valid) {
+    throw new AppError(400, passwordCheck.reason!, 'WEAK_PASSWORD');
+  }
+
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { passwordHash: true },
+  });
+
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
+  const validPassword = await bcrypt.compare(body.currentPassword, player.passwordHash);
+  if (!validPassword) {
+    throw new AppError(401, 'Current password is incorrect', 'INVALID_CREDENTIALS');
+  }
+
+  const newPasswordHash = await bcrypt.hash(body.newPassword, 10);
+
+  await prisma.player.update({
+    where: { id: playerId },
+    data: { passwordHash: newPasswordHash },
+  });
+
+  await prisma.refreshToken.deleteMany({
+    where: { playerId },
+  });
+
+  res.json({ message: 'Password updated. Please log in again.' });
 }));
