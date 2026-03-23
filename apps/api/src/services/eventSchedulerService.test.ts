@@ -14,6 +14,17 @@ vi.mock('./systemMessageService', () => ({
 vi.mock('./pushNotificationService', () => ({
   sendPush: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('./staticDataCacheService', () => ({
+  getCachedZones: vi.fn().mockResolvedValue([]),
+  getCachedZoneConnections: vi.fn().mockResolvedValue([]),
+  getCachedMobTemplatesByZone: vi.fn().mockResolvedValue([]),
+  getCachedBossMobTemplates: vi.fn().mockResolvedValue([]),
+  getCachedExpeditionMobTemplates: vi.fn().mockResolvedValue([]),
+  getCachedResourceNodesByZone: vi.fn().mockResolvedValue([]),
+  getCachedZoneMobFamilies: vi.fn().mockResolvedValue([]),
+  getCachedCraftingRecipes: vi.fn().mockResolvedValue([]),
+  invalidateStaticCache: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { mockPrisma } from '../__test__/setup';
 import { checkAndSpawnEvents, _resetBossSpawnTimer } from './eventSchedulerService';
@@ -21,6 +32,11 @@ import { expireStaleEvents, spawnWorldEvent } from './worldEventService';
 import { createBossEncounter, checkAndResolveDueBossRounds } from './bossEncounterService';
 import { emitSystemMessage } from './systemMessageService';
 import { WORLD_EVENT_CONSTANTS } from '@pocketrealm/shared';
+import { getCachedZones, getCachedBossMobTemplates, getCachedZoneMobFamilies } from './staticDataCacheService';
+
+const mockGetCachedZones = getCachedZones as ReturnType<typeof vi.fn>;
+const mockGetCachedBossMobTemplates = getCachedBossMobTemplates as ReturnType<typeof vi.fn>;
+const mockGetCachedZoneMobFamilies = getCachedZoneMobFamilies as ReturnType<typeof vi.fn>;
 
 const BASE = new Date('2099-01-01T00:00:00Z').getTime();
 let epoch = 0;
@@ -382,7 +398,7 @@ describe('eventSchedulerService', () => {
     it('skips when no wild zones exist', async () => {
       setupZonePath();
       vi.spyOn(Math, 'random').mockReturnValue(0.9);
-      mockPrisma.zone.findMany.mockResolvedValue([]);
+      mockGetCachedZones.mockResolvedValue([]);
 
       await checkAndSpawnEvents(null);
 
@@ -395,9 +411,9 @@ describe('eventSchedulerService', () => {
       // pickWeighted picks last zone template "{target} Weakening" (family targeting, hp_down)
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
-      mockPrisma.zone.findMany.mockResolvedValue([
-        { id: 'z1', name: 'Forest' },
-        { id: 'z2', name: 'Swamp' },
+      mockGetCachedZones.mockResolvedValue([
+        { id: 'z1', name: 'Forest', zoneType: 'wild' },
+        { id: 'z2', name: 'Swamp', zoneType: 'wild' },
       ]);
       // z1 has an active event, z2 is free → freeZones = [z2] → z2 selected
       mockPrisma.worldEvent.findMany.mockResolvedValue([
@@ -407,8 +423,8 @@ describe('eventSchedulerService', () => {
       mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
 
       // Provide family data so "{target} Weakening" (family template) resolves
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([
-        { mobFamilyId: 'f1', mobFamily: { id: 'f1', name: 'Wolves' } },
+      mockGetCachedZoneMobFamilies.mockResolvedValue([
+        { mobFamilyId: 'f1', mobFamily: { id: 'f1', name: 'Wolves', members: [] } },
       ]);
 
       vi.mocked(spawnWorldEvent).mockResolvedValue({
@@ -429,16 +445,16 @@ describe('eventSchedulerService', () => {
       // pickWeighted with damage_up filtered out picks "{target} Weakening" (hp_down, family)
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
-      mockPrisma.zone.findMany.mockResolvedValue([
-        { id: 'z1', name: 'Forest' },
+      mockGetCachedZones.mockResolvedValue([
+        { id: 'z1', name: 'Forest', zoneType: 'wild' },
       ]);
       mockPrisma.worldEvent.findMany.mockResolvedValue([
         { zoneId: 'z1', effectType: 'damage_up' },
       ]);
       mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
 
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([
-        { mobFamilyId: 'f1', mobFamily: { id: 'f1', name: 'Wolves' } },
+      mockGetCachedZoneMobFamilies.mockResolvedValue([
+        { mobFamilyId: 'f1', mobFamily: { id: 'f1', name: 'Wolves', members: [] } },
       ]);
 
       vi.mocked(spawnWorldEvent).mockResolvedValue({
@@ -457,15 +473,15 @@ describe('eventSchedulerService', () => {
       setupZonePath();
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
-      mockPrisma.zone.findMany.mockResolvedValue([
-        { id: 'z1', name: 'Dark Forest' },
+      mockGetCachedZones.mockResolvedValue([
+        { id: 'z1', name: 'Dark Forest', zoneType: 'wild' },
       ]);
       mockPrisma.worldEvent.findMany.mockResolvedValue([]);
       mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
 
       // Provide both families and resources so any template (family/resource/zone targeting) resolves
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([
-        { mobFamilyId: 'f1', mobFamily: { id: 'f1', name: 'Wolves' } },
+      mockGetCachedZoneMobFamilies.mockResolvedValue([
+        { mobFamilyId: 'f1', mobFamily: { id: 'f1', name: 'Wolves', members: [] } },
       ]);
       mockPrisma.resourceNode.findMany.mockResolvedValue([
         { resourceType: 'Iron Ore' },
@@ -493,13 +509,13 @@ describe('eventSchedulerService', () => {
       setupZonePath();
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
-      mockPrisma.zone.findMany.mockResolvedValue([
-        { id: 'z1', name: 'Forest' },
+      mockGetCachedZones.mockResolvedValue([
+        { id: 'z1', name: 'Forest', zoneType: 'wild' },
       ]);
       mockPrisma.worldEvent.findMany.mockResolvedValue([]);
       mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
 
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
+      mockGetCachedZoneMobFamilies.mockResolvedValue([]);
       mockPrisma.resourceNode.findMany.mockResolvedValue([
         { resourceType: 'Copper Ore' },
       ]);
@@ -524,13 +540,13 @@ describe('eventSchedulerService', () => {
         return 0.30; // picks "Rich {target} Veins"
       });
 
-      mockPrisma.zone.findMany.mockResolvedValue([
-        { id: 'z1', name: 'Forest' },
+      mockGetCachedZones.mockResolvedValue([
+        { id: 'z1', name: 'Forest', zoneType: 'wild' },
       ]);
       mockPrisma.worldEvent.findMany.mockResolvedValue([]);
       mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
 
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
+      mockGetCachedZoneMobFamilies.mockResolvedValue([]);
       mockPrisma.resourceNode.findMany.mockResolvedValue([
         { resourceType: 'Copper Ore' },
       ]);
@@ -551,9 +567,9 @@ describe('eventSchedulerService', () => {
       // "{target} Weakening" (family, hp_down) picked by pickWeighted
       vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
-      mockPrisma.zone.findMany.mockResolvedValue([
-        { id: 'z1', name: 'Forest' },
-        { id: 'z2', name: 'Swamp' },
+      mockGetCachedZones.mockResolvedValue([
+        { id: 'z1', name: 'Forest', zoneType: 'wild' },
+        { id: 'z2', name: 'Swamp', zoneType: 'wild' },
       ]);
       // Both zones have active events → freeZones is empty → candidatePool = wildZones
       mockPrisma.worldEvent.findMany.mockResolvedValue([
@@ -563,8 +579,8 @@ describe('eventSchedulerService', () => {
       mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
 
       // Provide family data so "{target} Weakening" (family template) can resolve
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([
-        { mobFamilyId: 'f1', mobFamily: { id: 'f1', name: 'Wolves' } },
+      mockGetCachedZoneMobFamilies.mockResolvedValue([
+        { mobFamilyId: 'f1', mobFamily: { id: 'f1', name: 'Wolves', members: [] } },
       ]);
 
       vi.mocked(spawnWorldEvent).mockResolvedValue({ id: 'ze1', title: 'T', description: 'D' } as any);
@@ -593,13 +609,13 @@ describe('eventSchedulerService', () => {
       setupBossSpawnPath();
       vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
-      mockPrisma.zone.findMany.mockResolvedValue([
-        { id: 'z1', name: 'Cursed Swamp' },
+      mockGetCachedZones.mockResolvedValue([
+        { id: 'z1', name: 'Cursed Swamp', zoneType: 'wild' },
       ]);
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([
-        { mobFamilyId: 'fam1' },
+      mockGetCachedZoneMobFamilies.mockResolvedValue([
+        { mobFamilyId: 'fam1', mobFamily: { id: 'fam1', name: 'Swamp', members: [{ mobTemplateId: 'boss1' }] } },
       ]);
-      mockPrisma.mobTemplate.findMany.mockResolvedValue([
+      mockGetCachedBossMobTemplates.mockResolvedValue([
         { id: 'boss1', name: 'Swamp Horror', hp: 500, bossBaseHp: 1000, isBoss: true },
       ]);
 
@@ -642,9 +658,9 @@ describe('eventSchedulerService', () => {
       setupBossSpawnPath();
       vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
-      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([{ mobFamilyId: 'fam1' }]);
-      mockPrisma.mobTemplate.findMany.mockResolvedValue([
+      mockGetCachedZones.mockResolvedValue([{ id: 'z1', name: 'Forest', zoneType: 'wild' }]);
+      mockGetCachedZoneMobFamilies.mockResolvedValue([{ mobFamilyId: 'fam1', mobFamily: { id: 'fam1', name: 'Forest', members: [{ mobTemplateId: 'boss1' }] } }]);
+      mockGetCachedBossMobTemplates.mockResolvedValue([
         { id: 'boss1', name: 'Forest Guardian', hp: 300, bossBaseHp: null, isBoss: true },
       ]);
 
@@ -688,24 +704,21 @@ describe('eventSchedulerService', () => {
       setupBossSpawnPath();
       vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
-      mockPrisma.zone.findMany.mockResolvedValue([
-        { id: 'z1', name: 'Forest' },
-        { id: 'z2', name: 'Swamp' },
+      mockGetCachedZones.mockResolvedValue([
+        { id: 'z1', name: 'Forest', zoneType: 'wild' },
+        { id: 'z2', name: 'Swamp', zoneType: 'wild' },
       ]);
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
-      mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
+      mockGetCachedZoneMobFamilies.mockResolvedValue([]);
+      mockGetCachedBossMobTemplates.mockResolvedValue([]);
 
       await checkAndSpawnEvents(null);
 
-      expect(mockPrisma.zone.findMany).toHaveBeenCalledWith({
-        where: { zoneType: 'wild' },
-        select: { id: true, name: true },
-      });
+      expect(mockGetCachedZones).toHaveBeenCalled();
     });
 
     it('skips boss spawn when no wild zones exist', async () => {
       setupBossSpawnPath();
-      mockPrisma.zone.findMany.mockResolvedValue([]);
+      mockGetCachedZones.mockResolvedValue([]);
 
       await checkAndSpawnEvents(null);
 
@@ -716,9 +729,9 @@ describe('eventSchedulerService', () => {
       setupBossSpawnPath();
       vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
-      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([{ mobFamilyId: 'fam1' }]);
-      mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
+      mockGetCachedZones.mockResolvedValue([{ id: 'z1', name: 'Forest', zoneType: 'wild' }]);
+      mockGetCachedZoneMobFamilies.mockResolvedValue([{ mobFamilyId: 'fam1', mobFamily: { id: 'fam1', name: 'Forest', members: [] } }]);
+      mockGetCachedBossMobTemplates.mockResolvedValue([]);
 
       await checkAndSpawnEvents(null);
 
@@ -729,9 +742,9 @@ describe('eventSchedulerService', () => {
       setupBossSpawnPath();
       vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
-      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([{ mobFamilyId: 'fam1' }]);
-      mockPrisma.mobTemplate.findMany.mockResolvedValue([
+      mockGetCachedZones.mockResolvedValue([{ id: 'z1', name: 'Forest', zoneType: 'wild' }]);
+      mockGetCachedZoneMobFamilies.mockResolvedValue([{ mobFamilyId: 'fam1', mobFamily: { id: 'fam1', name: 'Forest', members: [{ mobTemplateId: 'boss1' }] } }]);
+      mockGetCachedBossMobTemplates.mockResolvedValue([
         { id: 'boss1', name: 'Boss', hp: 100, bossBaseHp: null, isBoss: true },
       ]);
 
@@ -742,34 +755,30 @@ describe('eventSchedulerService', () => {
       expect(mockPrisma.worldEvent.update).not.toHaveBeenCalled();
     });
 
-    it('queries mob templates for isBoss=true with matching family IDs', async () => {
+    it('fetches boss mobs from cache and filters by zone family members', async () => {
       setupBossSpawnPath();
       vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
-      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([
-        { mobFamilyId: 'fam1' },
-        { mobFamilyId: 'fam2' },
+      mockGetCachedZones.mockResolvedValue([{ id: 'z1', name: 'Forest', zoneType: 'wild' }]);
+      mockGetCachedZoneMobFamilies.mockResolvedValue([
+        { mobFamilyId: 'fam1', mobFamily: { id: 'fam1', name: 'Forest', members: [{ mobTemplateId: 'mob1' }] } },
+        { mobFamilyId: 'fam2', mobFamily: { id: 'fam2', name: 'Swamp', members: [{ mobTemplateId: 'mob2' }] } },
       ]);
-      mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
+      mockGetCachedBossMobTemplates.mockResolvedValue([]);
 
       await checkAndSpawnEvents(null);
 
-      expect(mockPrisma.mobTemplate.findMany).toHaveBeenCalledWith({
-        where: {
-          isBoss: true,
-          familyMembers: { some: { mobFamilyId: { in: ['fam1', 'fam2'] } } },
-        },
-      });
+      expect(mockGetCachedBossMobTemplates).toHaveBeenCalled();
+      expect(mockGetCachedZoneMobFamilies).toHaveBeenCalledWith('z1');
     });
 
     it('passes io parameter to emitSystemMessage for boss spawn', async () => {
       setupBossSpawnPath();
       vi.spyOn(Math, 'random').mockReturnValue(0.0);
 
-      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([{ mobFamilyId: 'f1' }]);
-      mockPrisma.mobTemplate.findMany.mockResolvedValue([
+      mockGetCachedZones.mockResolvedValue([{ id: 'z1', name: 'Forest', zoneType: 'wild' }]);
+      mockGetCachedZoneMobFamilies.mockResolvedValue([{ mobFamilyId: 'f1', mobFamily: { id: 'f1', name: 'Forest', members: [{ mobTemplateId: 'b1' }] } }]);
+      mockGetCachedBossMobTemplates.mockResolvedValue([
         { id: 'b1', name: 'Boss', hp: 100, bossBaseHp: null, isBoss: true },
       ]);
       vi.mocked(spawnWorldEvent).mockResolvedValue({ id: 'be1', title: 'Boss' } as any);
@@ -801,11 +810,11 @@ describe('eventSchedulerService', () => {
         return 0.30;
       });
 
-      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Mine' }]);
+      mockGetCachedZones.mockResolvedValue([{ id: 'z1', name: 'Mine', zoneType: 'wild' }]);
       mockPrisma.worldEvent.findMany.mockResolvedValue([]);
       mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
 
-      mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
+      mockGetCachedZoneMobFamilies.mockResolvedValue([]);
       mockPrisma.resourceNode.findMany.mockResolvedValue([
         { resourceType: 'Iron Ore' },
       ]);
@@ -833,16 +842,16 @@ describe('eventSchedulerService', () => {
         return 0.0;
       });
 
-      mockPrisma.zone.findMany.mockResolvedValue([{ id: 'z1', name: 'Forest' }]);
+      mockGetCachedZones.mockResolvedValue([{ id: 'z1', name: 'Forest', zoneType: 'wild' }]);
       mockPrisma.worldEvent.findMany.mockResolvedValue([]);
       mockPrisma.bossEncounter.count.mockResolvedValue(WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS);
 
       vi.mocked(spawnWorldEvent).mockResolvedValue({ id: 'ev1', title: 'T', description: 'D' } as any);
       await checkAndSpawnEvents(null);
 
-      // Zone-targeting resolveTarget returns immediately — no family/resource DB queries
+      // Zone-targeting resolveTarget returns immediately — no family/resource lookups
       expect(spawnWorldEvent).toHaveBeenCalledOnce();
-      expect(mockPrisma.zoneMobFamily.findMany).not.toHaveBeenCalled();
+      expect(mockGetCachedZoneMobFamilies).not.toHaveBeenCalled();
       expect(mockPrisma.resourceNode.findMany).not.toHaveBeenCalled();
     });
   });
@@ -893,12 +902,12 @@ describe('eventSchedulerService', () => {
       mockPrisma.worldEvent.findFirst.mockResolvedValue(null);
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
-      mockPrisma.zone.findMany.mockResolvedValue([]); // no zones → early exit
+      mockGetCachedZones.mockResolvedValue([]); // no zones → early exit
 
       await checkAndSpawnEvents(null);
 
-      // zone.findMany is only called in the zone path
-      expect(mockPrisma.zone.findMany).toHaveBeenCalled();
+      // getCachedZones is only called in the zone path
+      expect(mockGetCachedZones).toHaveBeenCalled();
       // worldEvent.count is only called in the world-wide path
       expect(mockPrisma.worldEvent.count).not.toHaveBeenCalled();
     });
@@ -913,7 +922,7 @@ describe('eventSchedulerService', () => {
       await checkAndSpawnEvents(null);
 
       expect(mockPrisma.worldEvent.count).toHaveBeenCalled();
-      expect(mockPrisma.zone.findMany).not.toHaveBeenCalled();
+      expect(mockGetCachedZones).not.toHaveBeenCalled();
     });
   });
 });

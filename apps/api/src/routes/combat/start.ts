@@ -58,6 +58,7 @@ import {
   startSchema,
   pickWeighted,
 } from './helpers';
+import { getCachedMobTemplatesByZone } from '../../services/staticDataCacheService';
 
 
 
@@ -100,7 +101,7 @@ export function registerStartRoutes(router: Router): void {
         }
         mob = found;
       } else {
-        const mobs = await prisma.mobTemplate.findMany({ where: { zoneId } });
+        const mobs = await getCachedMobTemplatesByZone(zoneId);
         const zoneTiers = zone.explorationTiers as Record<string, number> | null;
         const tiers = zoneTiers ?? ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
 

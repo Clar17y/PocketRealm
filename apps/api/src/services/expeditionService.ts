@@ -43,6 +43,7 @@ import { parseJsonArray } from '../utils/jsonColumnSchemas';
 import { validateEnum } from '../utils/validateEnum';
 import { sendPush } from './pushNotificationService';
 import { snapshotCombatData, getCombatSnapshot, clearRoomSnapshots, type ExpeditionCombatSnapshot } from './expeditionCombatCache';
+import { getCachedExpeditionMobTemplates } from './staticDataCacheService';
 
 // ---------------------------------------------------------------------------
 // Bot Cleanup — delete bot players created by admin /expedition/fill
@@ -218,10 +219,7 @@ export async function getExpeditionCooldowns(guildId: string): Promise<Expeditio
 // ---------------------------------------------------------------------------
 
 async function buildTemplateIdMap(theme: import('@pocketrealm/shared').ExpeditionTheme): Promise<Map<string, string>> {
-  const expeditionMobTemplates = await prisma.mobTemplate.findMany({
-    where: { isExpeditionMob: true },
-    select: { id: true, name: true },
-  });
+  const expeditionMobTemplates = await getCachedExpeditionMobTemplates();
   const templateIdMap = new Map<string, string>();
   const allThemeMobs = [
     ...theme.trash, ...theme.elites, theme.miniBoss,
@@ -572,10 +570,8 @@ async function buildSummonPool(themeId: string | null): Promise<ExpeditionMobSta
   if (!theme) return [];
 
   const summonNames = [theme.regularAdd.name, theme.casterAdd.name];
-  const summonTemplates = await prisma.mobTemplate.findMany({
-    where: { isExpeditionMob: true, name: { in: summonNames } },
-    select: { id: true, name: true },
-  });
+  const allExpeditionMobs = await getCachedExpeditionMobTemplates();
+  const summonTemplates = allExpeditionMobs.filter(m => summonNames.includes(m.name));
   const summonIdByName = new Map(summonTemplates.map(t => [t.name, t.id]));
 
   return [theme.regularAdd, theme.casterAdd].map((add, i) => ({

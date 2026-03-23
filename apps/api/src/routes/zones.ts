@@ -39,6 +39,7 @@ import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers } from '../services/worldEventService';
 import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
+import { getCachedZones, getCachedZoneConnections, getCachedMobTemplatesByZone } from '../services/staticDataCacheService';
 
 
 
@@ -58,10 +59,8 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
 
   // Fetch all data in parallel
   const [zones, connections, discoveredZoneIds, player, explorations] = await Promise.all([
-    prisma.zone.findMany({
-      orderBy: [{ isStarter: 'desc' }, { difficulty: 'asc' }, { name: 'asc' }],
-    }),
-    prisma.zoneConnection.findMany({ select: { fromId: true, toId: true, explorationThreshold: true } }),
+    getCachedZones(),
+    getCachedZoneConnections(),
     getDiscoveredZoneIds(playerId),
     prisma.player.findUnique({ where: { id: playerId }, select: { currentZoneId: true } }),
     prisma.playerZoneExploration.findMany({
@@ -314,7 +313,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
       // Prepare player combat data (parallelized) + zone-specific data
       const [combatPrep, mobTemplates, explorationProgress, travelZoneEvents, travelWorldEvents, mobFamilyMembers] = await Promise.all([
         preparePlayerForCombat(playerId, { maxHp: hpState.maxHp, preloaded: { guildMods } }),
-        prisma.mobTemplate.findMany({ where: { zoneId: currentZoneId } }),
+        getCachedMobTemplatesByZone(currentZoneId),
         getExplorationPercent(playerId, currentZoneId),
         getActiveEventsForZone(currentZoneId),
         getActiveWorldWideEvents(),
