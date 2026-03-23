@@ -1,7 +1,7 @@
 export { fetchApi, clearStoredTokens, getJwtExpMs } from './core';
 export type { ApiResponse, TaxInfo } from './core';
 
-export { register, login, refreshToken } from './auth';
+export { register, login, refreshToken, verifyEmail, resendVerification, forgotPassword, resetPassword, changeEmail, changePassword } from './auth';
 
 export {
   getPlayer,
