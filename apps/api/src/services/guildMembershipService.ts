@@ -5,6 +5,8 @@ import {
   requireRole, addGuildLog, calculateMaxMembers,
   addGuildXp, checkGuildAchievementsForAllMembers, getGuild, invalidateGuildIdCache,
 } from './guildService';
+import { invalidateCache } from './cacheService';
+import { invalidateGuildModifiersForGuild, invalidateGuildModifiersForPlayer } from './guildUpgradeService';
 
 // ---------------------------------------------------------------------------
 // Join / Leave
@@ -46,6 +48,7 @@ export async function joinGuild(playerId: string, guildId: string): Promise<Guil
   });
 
   await invalidateGuildIdCache(playerId);
+  await invalidateGuildModifiersForPlayer(playerId);
 
   // Add guild XP for new member
   await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
@@ -72,6 +75,7 @@ export async function leaveGuild(playerId: string): Promise<void> {
   });
 
   await invalidateGuildIdCache(playerId);
+  await invalidateGuildModifiersForPlayer(playerId);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +192,7 @@ export async function respondToJoinRequest(
     });
 
     await invalidateGuildIdCache(request.playerId);
+    await invalidateGuildModifiersForPlayer(request.playerId);
 
     await addGuildXp(membership.guildId, GUILD_CONSTANTS.XP_PER_MEMBER_JOIN);
     void checkGuildAchievementsForAllMembers(membership.guildId, ['guildMemberCount']);
@@ -226,6 +231,7 @@ export async function kickMember(requesterId: string, targetId: string): Promise
   });
 
   await invalidateGuildIdCache(targetId);
+  await invalidateGuildModifiersForPlayer(targetId);
 }
 
 export async function promoteMember(leaderId: string, targetId: string): Promise<void> {
@@ -312,6 +318,7 @@ export async function disbandGuild(leaderId: string, guildId: string): Promise<v
     select: { playerId: true },
   });
   await invalidateGuildIdCache(...members.map((m) => m.playerId));
+  await invalidateCache(...members.map(m => `guild:modifiers:${m.playerId}`));
 
   await prisma.guild.delete({ where: { id: guildId } });
 }

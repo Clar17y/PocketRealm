@@ -85,6 +85,7 @@ beforeEach(() => {
 describe('activateUpgrade', () => {
   it('activates an upgrade successfully', async () => {
     db.guildMember.findUnique.mockResolvedValue(makeMembership());
+    db.guildMember.findMany.mockResolvedValue([{ playerId: PLAYER_ID }]);
     db.guild.findUnique.mockResolvedValue({ treasuryTurns: 50_000 });
     db.guildUpgrade.findFirst.mockResolvedValue(null);
     db.guild.update.mockResolvedValue(makeGuild({ treasuryTurns: 40_000 }));

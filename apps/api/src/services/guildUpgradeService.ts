@@ -10,7 +10,7 @@ import {
 import { AppError } from '../middleware/errorHandler';
 import { requireRole } from './guildService';
 import { isActiveWithinWindow } from './guildService';
-import { cachedQuery } from './cacheService';
+import { cachedQuery, invalidateCache } from './cacheService';
 
 function toUpgradeData(row: {
   id: string;
@@ -114,6 +114,9 @@ export async function activateUpgrade(
 
     return created;
   });
+
+  // Transaction committed — safe to invalidate caches
+  await invalidateGuildModifiersForGuild(guildId);
 
   return toUpgradeData(upgrade);
 }
@@ -226,6 +229,27 @@ export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerG
     () => computePlayerGuildModifiers(playerId),
     90,
   );
+}
+
+/**
+ * Invalidate guild modifier caches for all members of a guild.
+ * Call AFTER transactions have committed, never inside them.
+ */
+export async function invalidateGuildModifiersForGuild(guildId: string): Promise<void> {
+  const members = await prisma.guildMember.findMany({
+    where: { guildId },
+    select: { playerId: true },
+  });
+  if (members.length > 0) {
+    await invalidateCache(...members.map(m => `guild:modifiers:${m.playerId}`));
+  }
+}
+
+/**
+ * Invalidate guild modifier cache for a single player.
+ */
+export async function invalidateGuildModifiersForPlayer(playerId: string): Promise<void> {
+  await invalidateCache(`guild:modifiers:${playerId}`);
 }
 
 async function computePlayerGuildModifiers(playerId: string): Promise<PlayerGuildModifiers> {

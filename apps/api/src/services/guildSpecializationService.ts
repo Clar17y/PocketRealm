@@ -6,6 +6,7 @@ import {
 } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { requireRole } from './guildService';
+import { invalidateGuildModifiersForGuild } from './guildUpgradeService';
 
 const VALID_PATHS = new Set<string>(GUILD_SPECIALIZATION_DEFINITIONS.map((s) => s.path));
 
@@ -59,6 +60,8 @@ export async function selectSpecialization(
 
     return result;
   });
+
+  await invalidateGuildModifiersForGuild(guildId);
 
   return updated;
 }
@@ -122,6 +125,8 @@ export async function respecSpecialization(
 
     return result;
   });
+
+  await invalidateGuildModifiersForGuild(guildId);
 
   return updated;
 }
