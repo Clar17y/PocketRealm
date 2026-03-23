@@ -211,7 +211,6 @@ async function trySpawnBoss(io: SocketServer | null, zoneId: string, zoneName: s
   if (activeBosses >= WORLD_EVENT_CONSTANTS.MAX_BOSS_ENCOUNTERS) return false;
 
   const zoneFamilies = await getCachedZoneMobFamilies(zoneId);
-  const familyIds = zoneFamilies.map(f => f.mobFamilyId);
 
   const allBossMobs = await getCachedBossMobTemplates();
   const familyMobIds = new Set(
