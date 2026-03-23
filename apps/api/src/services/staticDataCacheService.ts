@@ -1,7 +1,8 @@
 import { prisma } from '@pocketrealm/database';
+import { CACHE_TTL_CONSTANTS } from '@pocketrealm/shared';
 import { redis } from '../redis';
 
-const TTL = 86400; // 24 hours
+const TTL = CACHE_TTL_CONSTANTS.STATIC_DATA_TTL;
 const INDEX_KEY = 'static:__index';
 
 /**

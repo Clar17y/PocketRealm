@@ -4,6 +4,7 @@ import {
   GUILD_UPGRADE_DEFINITIONS,
   GUILD_PROJECT_DEFINITIONS,
   GUILD_SPECIALIZATION_DEFINITIONS,
+  CACHE_TTL_CONSTANTS,
   type GuildUpgradeData,
   type GuildUpgradeEffectType,
 } from '@pocketrealm/shared';
@@ -227,7 +228,7 @@ export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerG
   return cachedQuery(
     `guild:modifiers:${playerId}`,
     () => computePlayerGuildModifiers(playerId),
-    90,
+    CACHE_TTL_CONSTANTS.GUILD_MODIFIERS_TTL,
   );
 }
 
