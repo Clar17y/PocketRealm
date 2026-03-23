@@ -117,16 +117,17 @@ export async function depositBatch(
   playerId: string,
   itemIds: string[]
 ): Promise<{ depositedCount: number }> {
+  const uniqueIds = [...new Set(itemIds)];
   return prisma.$transaction(async (tx) => {
     // Batch-fetch all items in one query
     const items = await tx.item.findMany({
-      where: { id: { in: itemIds } },
+      where: { id: { in: uniqueIds } },
       include: { template: true, equipment: true },
     });
     const itemMap = new Map(items.map((item) => [item.id, item]));
 
     let depositedCount = 0;
-    for (const itemId of itemIds) {
+    for (const itemId of uniqueIds) {
       const item = itemMap.get(itemId);
       if (!item || item.ownerId !== playerId) continue;
       if (item.equipment.length > 0) continue;
@@ -142,12 +143,13 @@ export async function withdrawBatch(
   playerId: string,
   itemIds: string[]
 ): Promise<{ withdrawnCount: number }> {
+  const uniqueIds = [...new Set(itemIds)];
   let { availableSlots } = await getInventoryState(playerId);
 
   return prisma.$transaction(async (tx) => {
     // Batch-fetch all items in one query
     const items = await tx.item.findMany({
-      where: { id: { in: itemIds } },
+      where: { id: { in: uniqueIds } },
       include: { template: true },
     });
     const itemMap = new Map(items.map((item) => [item.id, item]));
@@ -165,7 +167,7 @@ export async function withdrawBatch(
     const backpackStackSet = new Set(existingBackpackStacks.map((s) => s.templateId));
 
     let withdrawnCount = 0;
-    for (const itemId of itemIds) {
+    for (const itemId of uniqueIds) {
       const item = itemMap.get(itemId);
       if (!item || item.ownerId !== playerId) continue;
       if (!item.inStash) continue;
