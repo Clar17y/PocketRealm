@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { register } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { PixelButton } from '@/components/PixelButton';
+import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 import { trackEvent } from '@/lib/analytics';
 
 export default function RegisterPage() {
@@ -16,6 +17,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -38,6 +40,7 @@ export default function RegisterPage() {
 
     if (data) {
       setTokens(data.accessToken, data.refreshToken, data.player);
+      setRegistered(true);
       trackEvent('signup');
       router.push('/game');
     }
@@ -104,9 +107,10 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={10}
               className="px-3 py-2.5 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-blue-light)] transition-colors"
             />
+            <PasswordStrengthIndicator password={password} />
           </div>
 
           {error && (
@@ -117,6 +121,12 @@ export default function RegisterPage() {
             {loading ? 'Creating account...' : 'Begin Journey'}
           </PixelButton>
         </form>
+
+        {registered && (
+          <p className="text-sm text-[var(--rpg-gold)] text-center mt-4">
+            Check your email to verify and claim 3 days of Champion!
+          </p>
+        )}
 
         <p className="mt-6 text-center text-sm text-[var(--rpg-text-secondary)]">
           Already playing?{' '}
