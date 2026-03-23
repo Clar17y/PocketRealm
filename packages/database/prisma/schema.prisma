@@ -134,6 +134,7 @@ model Player {
   expeditionMemberships     GuildExpeditionMember[]
   expeditionBestiaryEntries PlayerExpeditionBestiary[]
 
+  @@index([currentZoneId])
   @@map("players")
 }
 
@@ -146,6 +147,7 @@ model RefreshToken {
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
+  @@index([playerId])
   @@map("refresh_tokens")
 }
 
@@ -244,6 +246,7 @@ model Item {
   owner     Player            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   equipment PlayerEquipment[]
 
+  @@index([ownerId, inStash])
   @@index([ownerId, templateId, inStash])
   @@map("items")
 }
@@ -363,6 +366,8 @@ model MobTemplate {
   persistedMobs     PersistedMob[]
   bossRotations     PlayerBossRotation[]
 
+  @@index([zoneId])
+  @@index([isBoss])
   @@index([isExpeditionMob])
   @@map("mob_templates")
 }
@@ -446,6 +451,7 @@ model ResourceNode {
   zone            Zone                 @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   playerNodes     PlayerResourceNode[]
 
+  @@index([zoneId])
   @@map("resource_nodes")
 }
 
@@ -1040,6 +1046,7 @@ model GuildExpeditionMember {
   player     Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([expeditionId, playerId])
+  @@index([playerId])
   @@map("guild_expedition_members")
 }
 
@@ -1217,6 +1224,7 @@ model RouletteRound {
   resolvedAt DateTime? @map("resolved_at")
   bets       RouletteBet[]
 
+  @@index([resolvedAt])
   @@map("roulette_rounds")
 }
 
