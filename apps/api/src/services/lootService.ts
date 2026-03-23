@@ -72,6 +72,17 @@ export async function rollAndGrantLootWithCapacity(
   /** IDs of existing items with updated quantity (for frontend inventoryUpdated). */
   const updatedItemIds: string[] = [];
 
+  const pendingCreates: Array<{
+    ownerId: string;
+    templateId: string;
+    rarity: string;
+    quantity: number;
+    maxDurability: number | null;
+    currentDurability: number | null;
+    bonusStats?: Prisma.InputJsonObject;
+  }> = [];
+  const pendingDrops: LootDrop[] = [];
+
   for (const entry of entries) {
     const chance = Math.min(1, Math.max(0, Number(entry.dropChance)));
     if (chance <= 0 || Math.random() >= chance) continue;
@@ -138,21 +149,27 @@ export async function rollAndGrantLootWithCapacity(
         continue;
       }
 
-      const newItem = await prisma.item.create({
-        data: {
-          ownerId: playerId,
-          templateId: entry.itemTemplateId,
-          rarity,
-          quantity: 1,
-          maxDurability,
-          currentDurability: maxDurability,
-          bonusStats: bonusStats ? (bonusStats as Prisma.InputJsonObject) : undefined,
-        },
+      pendingCreates.push({
+        ownerId: playerId,
+        templateId: entry.itemTemplateId,
+        rarity,
+        quantity: 1,
+        maxDurability,
+        currentDurability: maxDurability,
+        bonusStats: bonusStats ? (bonusStats as Prisma.InputJsonObject) : undefined,
       });
+      pendingDrops.push({ itemTemplateId: entry.itemTemplateId, quantity: 1, rarity });
       slotsUsed++;
-      newItemIds.push(newItem.id);
-      drops.push({ itemTemplateId: entry.itemTemplateId, quantity: 1, rarity });
     }
+  }
+
+  if (pendingCreates.length > 0) {
+    const created = await prisma.item.createManyAndReturn({
+      data: pendingCreates,
+      select: { id: true },
+    });
+    newItemIds.push(...created.map((c) => c.id));
+    drops.push(...pendingDrops);
   }
 
   let pendingLootSessionId: string | null = null;
