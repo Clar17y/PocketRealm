@@ -6,6 +6,8 @@ import 'dotenv/config';
 import compression from 'compression';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
+import { redis } from './redis';
 import { authRouter } from './routes/auth';
 import { turnsRouter } from './routes/turns';
 import { playerRouter } from './routes/player';
@@ -117,6 +119,12 @@ app.use('/api/v1/', rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later', code: 'RATE_LIMITED' },
   skip: (req) => req.method === 'OPTIONS',
+  passOnStoreError: true,
+  store: new RedisStore({
+    sendCommand: (command: string, ...args: string[]) =>
+      redis.call(command, ...args) as Promise<number | string>,
+    prefix: 'rl:global:',
+  }),
 }));
 
 // Health check
