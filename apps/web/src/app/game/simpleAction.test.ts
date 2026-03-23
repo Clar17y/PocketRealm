@@ -8,7 +8,7 @@ describe('runSimpleAction', () => {
 
     await runSimpleAction({
       actionName: 'equip',
-      apiFn: async (): Promise<ApiResponse<{ ok: true }>> => ({ data: { ok: true }, error: null }),
+      apiFn: async (): Promise<ApiResponse<{ ok: true }>> => ({ data: { ok: true } }),
       onSuccess: async () => {
         events.push('success:start');
         await Promise.resolve();
@@ -26,10 +26,7 @@ describe('runSimpleAction', () => {
 
     await runSimpleAction({
       actionName: 'equip_item',
-      apiFn: async (): Promise<ApiResponse<{ ok: true }>> => ({
-        data: null,
-        error: { message: null, code: 'BAD_REQUEST' },
-      }),
+      apiFn: async (): Promise<ApiResponse<{ ok: true }>> => ({}),
       onSuccess,
       setActionError,
     });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getEncounterSites } from '@/lib/api';
+import { useVisibleInterval } from '@/hooks/usePageVisible';
 import type { Screen, PendingEncounter } from '../gameController.types';
 
 const PENDING_ENCOUNTER_PAGE_SIZE = 8;
@@ -109,21 +110,17 @@ export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen
     }
   }, [isAuthenticated, pendingEncounterPage, pendingEncounterZoneFilter, pendingEncounterMobFilter, pendingEncounterSort]);
 
-  // Poll encounter sites when on the combat screen
+  // Poll encounter sites when on the combat screen (paused when tab hidden)
+  const encounterPollEnabled = isAuthenticated && activeScreen === 'combat';
   useEffect(() => {
-    if (!isAuthenticated) return;
-    if (activeScreen !== 'combat') return;
-
-    const tick = () => {
-      setPendingClockMs(Date.now());
-      void refreshPendingEncounters({ background: true });
-    };
-
+    if (!encounterPollEnabled) return;
     setPendingClockMs(Date.now());
     void refreshPendingEncounters();
-    const interval = setInterval(tick, 15000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, activeScreen, refreshPendingEncounters]);
+  }, [encounterPollEnabled, refreshPendingEncounters]);
+  useVisibleInterval(() => {
+    setPendingClockMs(Date.now());
+    void refreshPendingEncounters({ background: true });
+  }, 15000, encounterPollEnabled);
 
   const handlePendingEncounterPageChange = useCallback((page: number) => {
     setPendingEncounterPage(page);

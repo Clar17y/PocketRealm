@@ -4,6 +4,7 @@ import { itemImageSrc } from '@/lib/assets';
 import { getLatestVersion, CHANGELOG_STORAGE_KEY } from '@/lib/changelog';
 import { RARITY_RANK } from '@/lib/rarity';
 import { useCombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
+import { useVisibleInterval } from '@/hooks/usePageVisible';
 import type { ForgeResultData } from '@/components/ForgeResultToast';
 import { updateTutorialStep, claimStarterWeapon } from '@/lib/api';
 import {
@@ -536,6 +537,23 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     if (res.data) setTemplates(res.data.templates);
   }, []);
 
+  const applyZonesData = useCallback((data: { zones: typeof zones; connections: typeof zoneConnections; undiscoveredZones?: typeof undiscoveredZones; currentZoneId: string }) => {
+    setZones(data.zones);
+    setZoneConnections(data.connections);
+    setUndiscoveredZones(data.undiscoveredZones ?? []);
+    setActiveZoneId(data.currentZoneId);
+    if (data.currentZoneId) {
+      getZoneEvents(data.currentZoneId).then((res) => {
+        if (res.data) setActiveEvents(res.data.events);
+      });
+    }
+  }, []);
+
+  const reloadZones = useCallback(async () => {
+    const zonesRes = await getZones();
+    if (zonesRes.data) applyZonesData(zonesRes.data);
+  }, [applyZonesData]);
+
   const loadAll = useCallback(async () => {
     setActionError(null);
 
@@ -593,17 +611,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       if (cdRes.data) setHasActiveExpedition(cdRes.data.hasActiveExpedition);
     });
 
-    if (zonesRes.data) {
-      setZones(zonesRes.data.zones);
-      setZoneConnections(zonesRes.data.connections);
-      setUndiscoveredZones(zonesRes.data.undiscoveredZones ?? []);
-      setActiveZoneId(zonesRes.data.currentZoneId);
-      if (zonesRes.data.currentZoneId) {
-        getZoneEvents(zonesRes.data.currentZoneId).then((res) => {
-          if (res.data) setActiveEvents(res.data.events);
-        });
-      }
-    }
+    if (zonesRes.data) applyZonesData(zonesRes.data);
     if (invRes.data) {
       setInventory(invRes.data.items);
       setInventoryCapacity(invRes.data.capacity ?? 24);
@@ -730,21 +738,18 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   }, [tutorialStep]);
 
+  // Initial one-shot loads
   useEffect(() => {
     if (!isAuthenticated) return;
-    let cancelled = false;
-    // Initial loads are one-shot and safe to complete after cleanup —
-    // only guard recurring intervals to prevent stale polling.
     void loadAll();
     void loadPvpNotificationCount();
     void loadFriendCounts();
-    const interval = setInterval(() => { if (!cancelled) void pollScreenData(); }, 10000);
-    // Poll PvP notifications less frequently (60s)
-    const pvpInterval = setInterval(() => { if (!cancelled) void loadPvpNotificationCount(); }, 60000);
-    // Poll friend counts at same cadence as PvP
-    const friendInterval = setInterval(() => { if (!cancelled) void loadFriendCounts(); }, 60000);
-    return () => { cancelled = true; clearInterval(interval); clearInterval(pvpInterval); clearInterval(friendInterval); };
-  }, [isAuthenticated, loadAll, pollScreenData, loadPvpNotificationCount, loadFriendCounts]);
+  }, [isAuthenticated, loadAll, loadPvpNotificationCount, loadFriendCounts]);
+
+  // Recurring polls — paused when the tab is hidden to save compute
+  useVisibleInterval(() => void pollScreenData(), 10000, isAuthenticated);
+  useVisibleInterval(() => void loadPvpNotificationCount(), 60000, isAuthenticated);
+  useVisibleInterval(() => void loadFriendCounts(), 60000, isAuthenticated);
 
   useEffect(() => {
     if (!isAuthenticated || sessionTrackedRef.current || characterProgression.characterLevel === 0) return;
@@ -1696,6 +1701,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     activeZoneId,
     zoneConnections,
     undiscoveredZones,
+    reloadZones,
     skills,
     characterProgression,
     inventory,

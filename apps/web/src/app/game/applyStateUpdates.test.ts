@@ -20,6 +20,8 @@ function makeSetters(): StateSetters {
     setActiveBuffs: vi.fn(),
     setCharacterProgression: vi.fn(),
     setMaterialTotals: vi.fn(),
+    setActiveEncounterSiteId: vi.fn(),
+    setActiveZoneId: vi.fn(),
   };
 }
 
@@ -37,7 +39,7 @@ const mockItem = {
     id: 'tpl-1', name: 'Iron Ore', itemType: 'resource',
     weightClass: null, slot: null, tier: 1,
     baseStats: {}, requiredSkill: 'mining', requiredLevel: 1,
-    maxDurability: 0, stackable: true, sellPrice: 5,
+    maxDurability: 0, stackable: true, sellPrice: 5, flavorText: null,
   },
   equippedSlot: null,
 };
