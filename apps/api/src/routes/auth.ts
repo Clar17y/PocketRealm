@@ -16,8 +16,8 @@ import { ensureEquipmentSlots } from '../services/equipmentService';
 import { ensureStarterDiscoveries, ensureStarterEncounterAndNodes } from '../services/zoneDiscoveryService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { validatePassword } from '../utils/passwordValidation';
-import { createEmailVerificationToken, verifyEmailToken } from '../services/authTokenService';
-import { sendVerificationEmail } from '../services/emailService';
+import { createEmailVerificationToken, verifyEmailToken, createPasswordResetToken, verifyPasswordResetToken } from '../services/authTokenService';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
 import { redis } from '../redis';
 import { recordFailedLogin, isLockedOut, clearLockout } from '../services/lockoutService';
 
@@ -48,6 +48,28 @@ const resendVerificationLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many verification requests, please try again later', code: 'RATE_LIMITED' },
 });
+
+const forgotPasswordSchema = z.object({ email: z.string().email() });
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(10).max(100),
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many password reset requests, please try again later', code: 'RATE_LIMITED' },
+});
+
+// Per-email rate limiting (Redis-backed, prevents email bombing)
+async function checkEmailRateLimit(email: string): Promise<boolean> {
+  const key = `password-reset:email:${email.toLowerCase()}`;
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, 3600);
+  return count <= 3;
+}
 
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
@@ -388,4 +410,57 @@ authRouter.post('/resend-verification', authenticate, resendVerificationLimiter,
   await sendVerificationEmail(player.email, rawToken, player.username);
 
   res.json({ message: 'Verification email sent' });
+}));
+
+authRouter.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (req, res) => {
+  const { email } = forgotPasswordSchema.parse(req.body);
+
+  const player = await prisma.player.findUnique({
+    where: { email },
+    select: { id: true, username: true, emailVerified: true },
+  });
+
+  if (player?.emailVerified) {
+    const allowed = await checkEmailRateLimit(email);
+    if (allowed) {
+      const { rawToken } = await createPasswordResetToken(player.id);
+      sendPasswordResetEmail(email, rawToken, player.username).catch((err) =>
+        console.error('Failed to send password reset email:', err),
+      );
+    }
+  }
+
+  res.json({ message: 'If that email is verified with us, we\'ve sent a reset link.' });
+}));
+
+authRouter.post('/reset-password', asyncHandler(async (req, res) => {
+  const body = resetPasswordSchema.parse(req.body);
+
+  const passwordCheck = validatePassword(body.password);
+  if (!passwordCheck.valid) {
+    throw new AppError(400, passwordCheck.reason!, 'WEAK_PASSWORD');
+  }
+
+  const tokenRecord = await verifyPasswordResetToken(body.token);
+  if (!tokenRecord) {
+    throw new AppError(400, 'Invalid or expired reset token', 'INVALID_TOKEN');
+  }
+
+  const passwordHash = await bcrypt.hash(body.password, 10);
+
+  await prisma.$transaction([
+    prisma.player.update({
+      where: { id: tokenRecord.playerId },
+      data: { passwordHash },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: tokenRecord.id },
+      data: { usedAt: new Date() },
+    }),
+    prisma.refreshToken.deleteMany({
+      where: { playerId: tokenRecord.playerId },
+    }),
+  ]);
+
+  res.json({ message: 'Password reset successfully. Please log in with your new password.' });
 }));
