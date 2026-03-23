@@ -10,13 +10,15 @@ import {
   generateRefreshToken,
   refreshTokenExpiresAt,
   verifyRefreshToken,
+  authenticate,
 } from '../middleware/auth';
 import { ensureEquipmentSlots } from '../services/equipmentService';
 import { ensureStarterDiscoveries, ensureStarterEncounterAndNodes } from '../services/zoneDiscoveryService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { validatePassword } from '../utils/passwordValidation';
-import { createEmailVerificationToken } from '../services/authTokenService';
+import { createEmailVerificationToken, verifyEmailToken } from '../services/authTokenService';
 import { sendVerificationEmail } from '../services/emailService';
+import { redis } from '../redis';
 import { recordFailedLogin, isLockedOut, clearLockout } from '../services/lockoutService';
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
@@ -36,6 +38,16 @@ const loginSchema = z.object({
 });
 
 const refreshSchema = z.object({ refreshToken: z.string().min(1) });
+
+const verifyEmailSchema = z.object({ token: z.string().min(1) });
+
+const resendVerificationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many verification requests, please try again later', code: 'RATE_LIMITED' },
+});
 
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
@@ -308,4 +320,72 @@ authRouter.post('/logout', asyncHandler(async (req, res) => {
   }
 
   res.json({ success: true });
+}));
+
+const CHAMPION_TRIAL_DAYS = 3;
+
+authRouter.post('/verify-email', asyncHandler(async (req, res) => {
+  const { token } = verifyEmailSchema.parse(req.body);
+
+  const tokenRecord = await verifyEmailToken(token);
+  if (!tokenRecord) {
+    throw new AppError(400, 'Invalid or expired verification token', 'INVALID_TOKEN');
+  }
+
+  const trialGranted = await prisma.$transaction(async (tx) => {
+    const player = await tx.player.findUnique({
+      where: { id: tokenRecord.playerId },
+      select: { premiumTrialClaimed: true },
+    });
+
+    const shouldGrantTrial = player && !player.premiumTrialClaimed;
+    const expiresAt = new Date(Date.now() + CHAMPION_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+
+    await tx.player.update({
+      where: { id: tokenRecord.playerId },
+      data: {
+        emailVerified: true,
+        ...(shouldGrantTrial ? {
+          premiumTrialClaimed: true,
+          isPremium: true,
+          premiumExpiresAt: expiresAt,
+        } : {}),
+      },
+    });
+
+    await tx.emailVerificationToken.delete({
+      where: { id: tokenRecord.id },
+    });
+
+    return !!shouldGrantTrial;
+  });
+
+  res.json({
+    message: trialGranted
+      ? 'Email verified! You\'ve been awarded 3 days of Champion.'
+      : 'Email verified!',
+    championTrialGranted: trialGranted,
+  });
+}));
+
+authRouter.post('/resend-verification', authenticate, resendVerificationLimiter, asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { email: true, username: true, emailVerified: true },
+  });
+
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
+  if (player.emailVerified) {
+    throw new AppError(400, 'Email is already verified', 'ALREADY_VERIFIED');
+  }
+
+  const { rawToken } = await createEmailVerificationToken(playerId);
+  await sendVerificationEmail(player.email, rawToken, player.username);
+
+  res.json({ message: 'Verification email sent' });
 }));
