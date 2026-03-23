@@ -72,15 +72,7 @@ export async function rollAndGrantLootWithCapacity(
   /** IDs of existing items with updated quantity (for frontend inventoryUpdated). */
   const updatedItemIds: string[] = [];
 
-  const pendingCreates: Array<{
-    ownerId: string;
-    templateId: string;
-    rarity: string;
-    quantity: number;
-    maxDurability: number | null;
-    currentDurability: number | null;
-    bonusStats?: Prisma.InputJsonObject;
-  }> = [];
+  const pendingCreates: Prisma.ItemCreateManyInput[] = [];
   const pendingDrops: LootDrop[] = [];
 
   for (const entry of entries) {

@@ -97,7 +97,7 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
       }
     }
 
-    if (!await checkRateLimit(playerId, channelType as ChatChannelType)) {
+    if (!(await checkRateLimit(playerId, channelType as ChatChannelType))) {
       socket.emit('chat:error', { code: 'RATE_LIMITED', message: 'Sending too fast, slow down.' });
       return;
     }

@@ -9,8 +9,6 @@ export async function checkRateLimit(playerId: string, channelType: ChatChannelT
     ? CHAT_CONSTANTS.WORLD_RATE_LIMIT_MS
     : CHAT_CONSTANTS.ZONE_RATE_LIMIT_MS;
 
-  // SET NX PX: sets key only if it doesn't exist, with TTL in ms.
-  // Returns 'OK' if set (allowed), null if already exists (rate limited).
   const result = await redis.set(key, '1', 'PX', limitMs, 'NX');
   return result === 'OK';
 }
