@@ -43,6 +43,7 @@ import { cleanupFullyHealedMobs } from './services/persistedMobService';
 import { refreshAllLeaderboards } from './services/leaderboardService';
 import { startRoundResolutionScheduler } from './services/roundResolutionScheduler';
 import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
+import { cleanupExpiredTokens } from './services/authTokenService';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -181,4 +182,11 @@ server.listen(PORT, () => {
       console.error('Leaderboard refresh error:', err);
     });
   }, LEADERBOARD_CONSTANTS.REFRESH_INTERVAL_MS);
+
+  // Auth token cleanup (every 6 hours)
+  setInterval(() => {
+    cleanupExpiredTokens().catch((err) => {
+      console.error('Auth token cleanup error:', err);
+    });
+  }, 6 * 60 * 60 * 1000);
 });

@@ -69,3 +69,19 @@ export async function verifyPasswordResetToken(rawToken: string) {
 
   return record;
 }
+
+/** Delete expired tokens from both token tables. Called periodically. */
+export async function cleanupExpiredTokens(): Promise<void> {
+  const now = new Date();
+  await Promise.all([
+    prisma.emailVerificationToken.deleteMany({ where: { expiresAt: { lt: now } } }),
+    prisma.passwordResetToken.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lt: now } },
+          { usedAt: { not: null } },
+        ],
+      },
+    }),
+  ]);
+}
