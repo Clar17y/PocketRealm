@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.49',
+    date: '2026-03-23',
+    title: 'Early Leveling Rebalance',
+    summary:
+      'The XP curve for levels 1–9 has been flattened so new players progress faster through the opening zones. Level 2 now requires 80 XP (down from 400) and level 5 needs 1,250 XP (down from 2,500); level 10 and above are unchanged. Forest Edge mobs have received a small accuracy and damage buff to keep early fights engaging during quicker leveling.',
+  },
+  {
     version: '0.48',
     date: '2026-03-20',
     title: 'Encounter Site XP & Polish',
