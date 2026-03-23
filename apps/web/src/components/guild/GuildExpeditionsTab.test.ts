@@ -72,20 +72,25 @@ describe('RoundLogAttackRow', () => {
     });
     const exhaustedAction = buildExhaustedAction({});
 
+    // Current player: "You: Action → Target | outcome ▼" (hit details collapsed)
     expect(renderAttackRowText(currentPlayerAttack, 'player-1')).toBe(
-      'Power Strike → Crystal Golem | 75% hit (22 vs 13) | HIT 12 dmg',
+      'You: Power Strike \u2192 Crystal Golem | HIT 12 dmg\u25BC',
     );
+    // Other player: "Username: Action → Target | outcome ▼"
     expect(renderAttackRowText(otherPlayerAttack, 'player-1')).toBe(
-      'SinStalker: aimed shot → Crystal Golem | HIT 8 dmg',
+      'SinStalker: aimed shot \u2192 Crystal Golem | HIT 8 dmg\u25BC',
     );
+    // Null target, miss
     expect(renderAttackRowText(nullTargetAttack, 'player-1')).toBe(
-      'AutoTurret: suppressing fire → MISS',
+      'AutoTurret: suppressing fire | MISS\u25BC',
     );
+    // Current player, null target
     expect(renderAttackRowText(currentPlayerNullTargetAttack, 'player-1')).toBe(
-      'Power Strike | 75% hit (22 vs 13) | HIT 12 dmg',
+      'You: Power Strike | HIT 12 dmg\u25BC',
     );
+    // Exhausted action (no expand toggle)
     expect(renderAttackRowText(exhaustedAction, 'player-1')).toBe(
-      'GuardBot: Counter → Defend (Exhausted: mana)',
+      'GuardBot: Counter \u2192 Defend (Exhausted: mana)',
     );
   });
 });
