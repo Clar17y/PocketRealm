@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('./cacheService', () => ({
+  cachedQuery: vi.fn((_key: string, fetcher: () => Promise<unknown>) => fetcher()),
+  invalidateCache: vi.fn(),
+}));
+
 // Must call vi.mock before any imports that depend on the mocked module
 vi.mock('@pocketrealm/shared', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -404,5 +409,18 @@ describe('getPlayerGuildModifiers', () => {
     // Should warn about the unmapped effectType
     expect(warnSpy).toHaveBeenCalledWith('Unmapped guild specialization effect type: travel_cost_reduction');
     warnSpy.mockRestore();
+  });
+
+  it('uses cachedQuery with guild:modifiers key', async () => {
+    const { cachedQuery } = await import('./cacheService');
+    db.guildMember.findUnique.mockResolvedValue(null);
+
+    await getPlayerGuildModifiers(PLAYER_ID);
+
+    expect(cachedQuery).toHaveBeenCalledWith(
+      `guild:modifiers:${PLAYER_ID}`,
+      expect.any(Function),
+      90,
+    );
   });
 });

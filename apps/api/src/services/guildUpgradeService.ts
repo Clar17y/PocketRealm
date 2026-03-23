@@ -10,6 +10,7 @@ import {
 import { AppError } from '../middleware/errorHandler';
 import { requireRole } from './guildService';
 import { isActiveWithinWindow } from './guildService';
+import { cachedQuery } from './cacheService';
 
 function toUpgradeData(row: {
   id: string;
@@ -220,6 +221,14 @@ const EFFECT_TO_MODIFIER: Record<string, keyof PlayerGuildModifiers> = {
 };
 
 export async function getPlayerGuildModifiers(playerId: string): Promise<PlayerGuildModifiers> {
+  return cachedQuery(
+    `guild:modifiers:${playerId}`,
+    () => computePlayerGuildModifiers(playerId),
+    90,
+  );
+}
+
+async function computePlayerGuildModifiers(playerId: string): Promise<PlayerGuildModifiers> {
   const membership = await prisma.guildMember.findUnique({
     where: { playerId },
     select: { guildId: true, lastActiveAt: true },
