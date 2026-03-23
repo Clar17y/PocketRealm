@@ -7,10 +7,21 @@ vi.mock('../utils/passwordValidation', () => ({
 
 vi.mock('../services/authTokenService', () => ({
   createEmailVerificationToken: vi.fn().mockResolvedValue({ rawToken: 'test-token' }),
+  verifyEmailToken: vi.fn().mockResolvedValue(null),
+  createPasswordResetToken: vi.fn().mockResolvedValue({ rawToken: 'reset-token' }),
+  verifyPasswordResetToken: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../services/emailService', () => ({
   sendVerificationEmail: vi.fn().mockResolvedValue(undefined),
+  sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../redis', () => ({
+  redis: {
+    incr: vi.fn().mockResolvedValue(1),
+    expire: vi.fn().mockResolvedValue(1),
+  },
 }));
 
 vi.mock('../services/lockoutService', () => ({
@@ -31,6 +42,7 @@ vi.mock('../middleware/auth', () => ({
   generateRefreshToken: vi.fn(() => 'refresh-token'),
   refreshTokenExpiresAt: vi.fn(() => new Date('2026-03-10T12:00:00.000Z')),
   verifyRefreshToken: vi.fn(),
+  authenticate: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
 
 import { mockPrisma } from '../__test__/setup';
