@@ -442,10 +442,10 @@ export async function checkGuildAchievementsForAllMembers(guildId: string, statK
       where: { guildId },
       select: { playerId: true },
     });
-    for (const { playerId } of members) {
+    await Promise.all(members.map(async ({ playerId }) => {
       const newAchievements = await checkAchievements(playerId, { statKeys });
       await emitAchievementNotifications(playerId, newAchievements);
-    }
+    }));
   } catch (err) {
     console.error('Guild achievement check failed:', err);
   }
