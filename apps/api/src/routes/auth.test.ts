@@ -1,6 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { STARTER_LOADOUT } from '@pocketrealm/shared';
 
+vi.mock('../utils/passwordValidation', () => ({
+  validatePassword: vi.fn().mockReturnValue({ valid: true }),
+}));
+
+vi.mock('../services/authTokenService', () => ({
+  createEmailVerificationToken: vi.fn().mockResolvedValue({ rawToken: 'test-token' }),
+  verifyEmailToken: vi.fn().mockResolvedValue(null),
+  createPasswordResetToken: vi.fn().mockResolvedValue({ rawToken: 'reset-token' }),
+  verifyPasswordResetToken: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('../services/emailService', () => ({
+  sendVerificationEmail: vi.fn().mockResolvedValue(undefined),
+  sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../middleware/rateLimiter', () => ({
+  createEndpointLimiter: vi.fn(() => (_req: any, _res: any, next: any) => next()),
+}));
+
+vi.mock('../services/lockoutService', () => ({
+  recordFailedLogin: vi.fn().mockResolvedValue(undefined),
+  isLockedOut: vi.fn().mockResolvedValue(false),
+  clearLockout: vi.fn().mockResolvedValue(undefined),
+  checkEmailRateLimit: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('bcrypt', () => ({
   default: {
     hash: vi.fn().mockResolvedValue('hashed-password'),
@@ -13,6 +40,7 @@ vi.mock('../middleware/auth', () => ({
   generateRefreshToken: vi.fn(() => 'refresh-token'),
   refreshTokenExpiresAt: vi.fn(() => new Date('2026-03-10T12:00:00.000Z')),
   verifyRefreshToken: vi.fn(),
+  authenticate: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
 
 import { mockPrisma } from '../__test__/setup';
