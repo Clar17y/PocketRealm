@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { register } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { PixelButton } from '@/components/PixelButton';
+import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 import { trackEvent } from '@/lib/analytics';
 
 export default function RegisterPage() {
@@ -104,9 +105,10 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={8}
+              minLength={10}
               className="px-3 py-2.5 bg-[var(--rpg-background)] border border-[var(--rpg-border)] rounded-lg text-[var(--rpg-text-primary)] focus:outline-none focus:border-[var(--rpg-blue-light)] transition-colors"
             />
+            <PasswordStrengthIndicator password={password} />
           </div>
 
           {error && (

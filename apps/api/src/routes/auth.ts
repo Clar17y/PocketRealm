@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { prisma } from '@pocketrealm/database';
-import { TURN_CONSTANTS, CHARACTER_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT, RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
+import { TURN_CONSTANTS, CHARACTER_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT, RATE_LIMIT_CONSTANTS, AUTH_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { createEndpointLimiter } from '../middleware/rateLimiter';
 import {
@@ -10,10 +10,17 @@ import {
   generateRefreshToken,
   refreshTokenExpiresAt,
   verifyRefreshToken,
+  authenticate,
 } from '../middleware/auth';
 import { ensureEquipmentSlots } from '../services/equipmentService';
 import { ensureStarterDiscoveries, ensureStarterEncounterAndNodes } from '../services/zoneDiscoveryService';
 import { asyncHandler } from '../utils/asyncHandler';
+import { validatePassword } from '../utils/passwordValidation';
+import { createEmailVerificationToken, verifyEmailToken, createPasswordResetToken, verifyPasswordResetToken } from '../services/authTokenService';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
+import { recordFailedLogin, isLockedOut, clearLockout, checkEmailRateLimit } from '../services/lockoutService';
+import { verifyPlayerEmail, changePlayerEmail, changePlayerPassword } from '../services/authService';
+
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
 const loginLimiter = createEndpointLimiter('login', RATE_LIMIT_CONSTANTS.LOGIN_WINDOW_MS, RATE_LIMIT_CONSTANTS.LOGIN_MAX, { message: 'Too many login attempts, please try again later' });
@@ -23,7 +30,7 @@ export const authRouter = Router();
 const registerSchema = z.object({
   username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_]+$/),
   email: z.string().email(),
-  password: z.string().min(8).max(100),
+  password: z.string().min(10).max(100),
 });
 
 const loginSchema = z.object({
@@ -33,9 +40,37 @@ const loginSchema = z.object({
 
 const refreshSchema = z.object({ refreshToken: z.string().min(1) });
 
+const verifyEmailSchema = z.object({ token: z.string().min(1) });
+
+const resendVerificationLimiter = createEndpointLimiter('resend-verification', RATE_LIMIT_CONSTANTS.RESEND_VERIFICATION_WINDOW_MS, RATE_LIMIT_CONSTANTS.RESEND_VERIFICATION_MAX, { message: 'Too many verification requests, please try again later' });
+
+const forgotPasswordSchema = z.object({ email: z.string().email() });
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(10).max(100),
+});
+
+const forgotPasswordLimiter = createEndpointLimiter('forgot-password', RATE_LIMIT_CONSTANTS.FORGOT_PASSWORD_WINDOW_MS, RATE_LIMIT_CONSTANTS.FORGOT_PASSWORD_MAX, { message: 'Too many password reset requests, please try again later' });
+
+const changeEmailSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string(),
+  newPassword: z.string().min(10).max(100),
+});
+
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
+
+  const passwordCheck = validatePassword(body.password);
+  if (!passwordCheck.valid) {
+    throw new AppError(400, passwordCheck.reason!, 'WEAK_PASSWORD');
+  }
+
   const now = new Date();
 
   // Check if user exists
@@ -53,7 +88,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   }
 
   // Hash password
-  const passwordHash = await bcrypt.hash(body.password, 10);
+  const passwordHash = await bcrypt.hash(body.password, AUTH_CONSTANTS.BCRYPT_ROUNDS);
 
   // Find starter town (for homeTownId) and first connected wild zone (for currentZoneId)
   const starterTown = await prisma.zone.findFirst({ where: { isStarter: true } });
@@ -155,10 +190,16 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
       username: player.username,
       email: player.email,
       role: player.role,
+      emailVerified: false,
     },
     accessToken,
     refreshToken,
   });
+
+  // Fire-and-forget: don't block registration on email send
+  createEmailVerificationToken(player.id)
+    .then(({ rawToken }) => sendVerificationEmail(player.email, rawToken, player.username))
+    .catch((err) => console.error('Failed to send verification email:', err));
 }));
 
 authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
@@ -167,6 +208,7 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
 
   const player = await prisma.player.findUnique({
     where: { email: body.email },
+    select: { id: true, username: true, email: true, role: true, passwordHash: true, isBot: true, emailVerified: true },
   });
 
   if (!player) {
@@ -177,10 +219,19 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
     throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
   }
 
+  const locked = await isLockedOut(player.id);
+
   const validPassword = await bcrypt.compare(body.password, player.passwordHash);
   if (!validPassword) {
+    await recordFailedLogin(player.id);
     throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
   }
+
+  if (locked) {
+    throw new AppError(423, 'Account temporarily locked, try again later', 'ACCOUNT_LOCKED');
+  }
+
+  await clearLockout(player.id);
 
   // Update last active
   await prisma.player.update({
@@ -208,6 +259,7 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
       username: player.username,
       email: player.email,
       role: player.role,
+      emailVerified: player.emailVerified,
     },
     accessToken,
     refreshToken,
@@ -281,4 +333,124 @@ authRouter.post('/logout', asyncHandler(async (req, res) => {
   }
 
   res.json({ success: true });
+}));
+
+
+authRouter.post('/verify-email', asyncHandler(async (req, res) => {
+  const { token } = verifyEmailSchema.parse(req.body);
+
+  const tokenRecord = await verifyEmailToken(token);
+  if (!tokenRecord) {
+    throw new AppError(400, 'Invalid or expired verification token', 'INVALID_TOKEN');
+  }
+
+  const trialGranted = await verifyPlayerEmail(tokenRecord);
+
+  res.json({
+    message: trialGranted
+      ? 'Email verified! You\'ve been awarded 3 days of Champion.'
+      : 'Email verified!',
+    championTrialGranted: trialGranted,
+  });
+}));
+
+authRouter.post('/resend-verification', authenticate, resendVerificationLimiter, asyncHandler(async (req, res) => {
+  const playerId = req.player!.playerId;
+
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { email: true, username: true, emailVerified: true },
+  });
+
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
+  if (player.emailVerified) {
+    throw new AppError(400, 'Email is already verified', 'ALREADY_VERIFIED');
+  }
+
+  const { rawToken } = await createEmailVerificationToken(playerId);
+  await sendVerificationEmail(player.email, rawToken, player.username);
+
+  res.json({ message: 'Verification email sent' });
+}));
+
+authRouter.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (req, res) => {
+  const { email } = forgotPasswordSchema.parse(req.body);
+
+  // Always return the same response immediately to prevent timing leaks
+  res.json({ message: 'If that email is verified with us, we\'ve sent a reset link.' });
+
+  // Process asynchronously after response is sent
+  const player = await prisma.player.findUnique({
+    where: { email },
+    select: { id: true, username: true, emailVerified: true },
+  });
+
+  if (player?.emailVerified) {
+    const allowed = await checkEmailRateLimit(email);
+    if (allowed) {
+      const { rawToken } = await createPasswordResetToken(player.id);
+      sendPasswordResetEmail(email, rawToken, player.username).catch((err) =>
+        console.error('Failed to send password reset email:', err),
+      );
+    }
+  }
+}));
+
+authRouter.post('/reset-password', asyncHandler(async (req, res) => {
+  const body = resetPasswordSchema.parse(req.body);
+
+  const passwordCheck = validatePassword(body.password);
+  if (!passwordCheck.valid) {
+    throw new AppError(400, passwordCheck.reason!, 'WEAK_PASSWORD');
+  }
+
+  const tokenRecord = await verifyPasswordResetToken(body.token);
+  if (!tokenRecord) {
+    throw new AppError(400, 'Invalid or expired reset token', 'INVALID_TOKEN');
+  }
+
+  const passwordHash = await bcrypt.hash(body.password, AUTH_CONSTANTS.BCRYPT_ROUNDS);
+
+  // Atomically consume token + update password to prevent concurrent reuse.
+  // The conditional update on usedAt:null ensures only one request succeeds.
+  await prisma.$transaction(async (tx) => {
+    const consumed = await tx.passwordResetToken.updateMany({
+      where: { id: tokenRecord.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    if (consumed.count === 0) {
+      throw new AppError(400, 'Invalid or expired reset token', 'INVALID_TOKEN');
+    }
+
+    await tx.player.update({
+      where: { id: tokenRecord.playerId },
+      data: { passwordHash },
+    });
+
+    await tx.refreshToken.deleteMany({
+      where: { playerId: tokenRecord.playerId },
+    });
+  });
+
+  res.json({ message: 'Password reset successfully. Please log in with your new password.' });
+}));
+
+authRouter.post('/change-email', authenticate, asyncHandler(async (req, res) => {
+  const body = changeEmailSchema.parse(req.body);
+  await changePlayerEmail(req.player!.playerId, body.email, body.password);
+  res.json({ message: 'Email updated. Check your inbox to verify your new address.' });
+}));
+
+authRouter.post('/change-password', authenticate, asyncHandler(async (req, res) => {
+  const body = changePasswordSchema.parse(req.body);
+  const passwordCheck = validatePassword(body.newPassword);
+  if (!passwordCheck.valid) {
+    throw new AppError(400, passwordCheck.reason!, 'WEAK_PASSWORD');
+  }
+  await changePlayerPassword(req.player!.playerId, body.currentPassword, body.newPassword);
+  res.json({ message: 'Password updated. Please log in again.' });
 }));

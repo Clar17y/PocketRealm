@@ -1540,6 +1540,43 @@ export const RATE_LIMIT_CONSTANTS = {
   CASINO_MAX: 30,
   /** Max requests per window — login */
   LOGIN_MAX: 10,
+  /** ms — resend-verification rate-limit window (1 hour) */
+  RESEND_VERIFICATION_WINDOW_MS: 60 * 60_000,
+  /** Max resend-verification requests per window */
+  RESEND_VERIFICATION_MAX: 3,
+  /** ms — forgot-password rate-limit window (1 hour) */
+  FORGOT_PASSWORD_WINDOW_MS: 60 * 60_000,
+  /** Max forgot-password requests per window */
+  FORGOT_PASSWORD_MAX: 5,
+  /** Max emails per window for per-email rate limiting */
+  EMAIL_RATE_LIMIT_MAX: 3,
+  /** Seconds — per-email rate-limit window (1 hour) */
+  EMAIL_RATE_LIMIT_WINDOW_SECONDS: 3600,
+} as const;
+
+// =============================================================================
+// AUTH
+// =============================================================================
+
+export const AUTH_CONSTANTS = {
+  /** bcrypt cost factor */
+  BCRYPT_ROUNDS: 10,
+  /** Minimum password length */
+  PASSWORD_MIN_LENGTH: 10,
+  /** Maximum password length */
+  PASSWORD_MAX_LENGTH: 100,
+  /** Days of Champion trial granted on email verification */
+  CHAMPION_TRIAL_DAYS: 3,
+  /** Hours before email verification tokens expire */
+  VERIFICATION_TOKEN_TTL_HOURS: 24,
+  /** Hours before password reset tokens expire */
+  RESET_TOKEN_TTL_HOURS: 1,
+  /** Failed login attempts before account lockout */
+  LOCKOUT_THRESHOLD: 5,
+  /** Seconds — lockout duration (15 minutes) */
+  LOCKOUT_TTL_SECONDS: 900,
+  /** ms — interval for cleaning up expired auth tokens (6 hours) */
+  TOKEN_CLEANUP_INTERVAL_MS: 6 * 60 * 60 * 1000,
 } as const;
 
 // =============================================================================

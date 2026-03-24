@@ -6,7 +6,7 @@ import 'dotenv/config';
 import compression from 'compression';
 import helmet from 'helmet';
 import { createEndpointLimiter } from './middleware/rateLimiter';
-import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
+import { RATE_LIMIT_CONSTANTS, AUTH_CONSTANTS } from '@pocketrealm/shared';
 import { authRouter } from './routes/auth';
 import { turnsRouter } from './routes/turns';
 import { playerRouter } from './routes/player';
@@ -43,6 +43,7 @@ import { cleanupFullyHealedMobs } from './services/persistedMobService';
 import { refreshAllLeaderboards } from './services/leaderboardService';
 import { startRoundResolutionScheduler } from './services/roundResolutionScheduler';
 import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
+import { cleanupExpiredTokens } from './services/authTokenService';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -181,4 +182,11 @@ server.listen(PORT, () => {
       console.error('Leaderboard refresh error:', err);
     });
   }, LEADERBOARD_CONSTANTS.REFRESH_INTERVAL_MS);
+
+  // Auth token cleanup (every 6 hours)
+  setInterval(() => {
+    cleanupExpiredTokens().catch((err) => {
+      console.error('Auth token cleanup error:', err);
+    });
+  }, AUTH_CONSTANTS.TOKEN_CLEANUP_INTERVAL_MS);
 });
