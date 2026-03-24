@@ -414,19 +414,27 @@ authRouter.post('/reset-password', asyncHandler(async (req, res) => {
 
   const passwordHash = await bcrypt.hash(body.password, AUTH_CONSTANTS.BCRYPT_ROUNDS);
 
-  await prisma.$transaction([
-    prisma.player.update({
+  // Atomically consume token + update password to prevent concurrent reuse.
+  // The conditional update on usedAt:null ensures only one request succeeds.
+  await prisma.$transaction(async (tx) => {
+    const consumed = await tx.passwordResetToken.updateMany({
+      where: { id: tokenRecord.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    if (consumed.count === 0) {
+      throw new AppError(400, 'Invalid or expired reset token', 'INVALID_TOKEN');
+    }
+
+    await tx.player.update({
       where: { id: tokenRecord.playerId },
       data: { passwordHash },
-    }),
-    prisma.passwordResetToken.update({
-      where: { id: tokenRecord.id },
-      data: { usedAt: new Date() },
-    }),
-    prisma.refreshToken.deleteMany({
+    });
+
+    await tx.refreshToken.deleteMany({
       where: { playerId: tokenRecord.playerId },
-    }),
-  ]);
+    });
+  });
 
   res.json({ message: 'Password reset successfully. Please log in with your new password.' });
 }));

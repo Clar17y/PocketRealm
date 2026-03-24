@@ -94,7 +94,10 @@ export async function fetchApi<T>(
   options: RequestInit = {},
   attempt = 0
 ): Promise<ApiResponse<T>> {
-  const isAuthEndpoint = endpoint.startsWith('/api/v1/auth/');
+  // Only skip token refresh for unauthenticated auth endpoints (login, register, refresh, etc.)
+  // Authenticated auth endpoints (resend-verification, change-email, change-password) need refresh.
+  const AUTH_NO_REFRESH = ['/api/v1/auth/login', '/api/v1/auth/register', '/api/v1/auth/refresh', '/api/v1/auth/logout', '/api/v1/auth/forgot-password', '/api/v1/auth/reset-password', '/api/v1/auth/verify-email'];
+  const isAuthEndpoint = AUTH_NO_REFRESH.some(p => endpoint === p);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
