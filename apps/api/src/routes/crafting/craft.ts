@@ -37,8 +37,10 @@ import {
   craftSchema,
 } from './helpers';
 import { checkActivityLockout } from '../../services/expeditionLockoutService';
+import { createEndpointLimiter } from '../../middleware/rateLimiter';
 
 export const craftRouter = Router();
+craftRouter.use(createEndpointLimiter('crafting', 60_000, 20));
 
 /**
  * POST /api/v1/crafting/craft

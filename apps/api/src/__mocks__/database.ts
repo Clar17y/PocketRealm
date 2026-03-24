@@ -17,6 +17,7 @@ function mockModel() {
     findMany: vi.fn(),
     create: vi.fn(),
     createMany: vi.fn(),
+    createManyAndReturn: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
     upsert: vi.fn(),

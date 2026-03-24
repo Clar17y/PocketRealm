@@ -117,13 +117,18 @@ export async function depositBatch(
   playerId: string,
   itemIds: string[]
 ): Promise<{ depositedCount: number }> {
+  const uniqueIds = [...new Set(itemIds)];
   return prisma.$transaction(async (tx) => {
+    // Batch-fetch all items in one query
+    const items = await tx.item.findMany({
+      where: { id: { in: uniqueIds } },
+      include: { template: true, equipment: true },
+    });
+    const itemMap = new Map(items.map((item) => [item.id, item]));
+
     let depositedCount = 0;
-    for (const itemId of itemIds) {
-      const item = await tx.item.findUnique({
-        where: { id: itemId },
-        include: { template: true, equipment: true },
-      });
+    for (const itemId of uniqueIds) {
+      const item = itemMap.get(itemId);
       if (!item || item.ownerId !== playerId) continue;
       if (item.equipment.length > 0) continue;
       if (item.inStash) continue;
@@ -138,28 +143,45 @@ export async function withdrawBatch(
   playerId: string,
   itemIds: string[]
 ): Promise<{ withdrawnCount: number }> {
+  const uniqueIds = [...new Set(itemIds)];
   let { availableSlots } = await getInventoryState(playerId);
 
   return prisma.$transaction(async (tx) => {
+    // Batch-fetch all items in one query
+    const items = await tx.item.findMany({
+      where: { id: { in: uniqueIds } },
+      include: { template: true },
+    });
+    const itemMap = new Map(items.map((item) => [item.id, item]));
+
+    // Pre-fetch all existing backpack stacks for stackable items to check merge targets
+    const stackableTemplateIds = items
+      .filter((item) => item.template.stackable && item.inStash)
+      .map((item) => item.templateId);
+    const existingBackpackStacks = stackableTemplateIds.length > 0
+      ? await tx.item.findMany({
+          where: { ownerId: playerId, templateId: { in: stackableTemplateIds }, inStash: false },
+          select: { id: true, templateId: true },
+        })
+      : [];
+    const backpackStackSet = new Set(existingBackpackStacks.map((s) => s.templateId));
+
     let withdrawnCount = 0;
-    for (const itemId of itemIds) {
-      const item = await tx.item.findUnique({
-        where: { id: itemId },
-        include: { template: true },
-      });
+    for (const itemId of uniqueIds) {
+      const item = itemMap.get(itemId);
       if (!item || item.ownerId !== playerId) continue;
       if (!item.inStash) continue;
 
-      // Stackable items that merge into an existing backpack stack don't consume a slot
-      const willMerge = item.template.stackable && await tx.item.findFirst({
-        where: { ownerId: playerId, templateId: item.templateId, inStash: false },
-        select: { id: true },
-      });
+      const willMerge = item.template.stackable && backpackStackSet.has(item.templateId);
       if (!willMerge && availableSlots <= 0) break;
 
       await moveStackableItem(tx, item, item.quantity, false);
       withdrawnCount++;
-      if (!willMerge) availableSlots--;
+      if (!willMerge) {
+        availableSlots--;
+        // Track newly created backpack stack so subsequent same-template items merge correctly
+        if (item.template.stackable) backpackStackSet.add(item.templateId);
+      }
     }
     return { withdrawnCount };
   });

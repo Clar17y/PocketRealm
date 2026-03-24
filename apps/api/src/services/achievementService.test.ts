@@ -8,10 +8,6 @@ vi.mock('./statsService', () => ({
   incrementStats: vi.fn(),
 }));
 
-vi.mock('./activityLogService', () => ({
-  createActivityLog: vi.fn().mockResolvedValue({}),
-}));
-
 const mockEmit = vi.fn();
 const mockTo = vi.fn().mockReturnValue({ emit: mockEmit });
 vi.mock('../socket', () => ({
@@ -28,7 +24,6 @@ import {
   emitAchievementNotifications,
 } from './achievementService';
 import { resolveStats, resolveAllStats, resolveFamilyKills, resolveAllFamilyKills } from './statsService';
-import { createActivityLog } from './activityLogService';
 import { getIo } from '../socket';
 import { ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
@@ -37,7 +32,6 @@ const mockResolveStats = resolveStats as ReturnType<typeof vi.fn>;
 const mockResolveAllStats = resolveAllStats as ReturnType<typeof vi.fn>;
 const mockResolveFamilyKills = resolveFamilyKills as ReturnType<typeof vi.fn>;
 const mockResolveAllFamilyKills = resolveAllFamilyKills as ReturnType<typeof vi.fn>;
-const mockCreateActivityLog = createActivityLog as ReturnType<typeof vi.fn>;
 const mockGetIo = getIo as ReturnType<typeof vi.fn>;
 
 describe('achievementService', () => {
@@ -789,10 +783,12 @@ describe('achievementService', () => {
     it('does nothing for empty achievements array', async () => {
       await emitAchievementNotifications('p1', []);
 
-      expect(mockCreateActivityLog).not.toHaveBeenCalled();
+      expect(mockPrisma.activityLog.createMany).not.toHaveBeenCalled();
     });
 
-    it('creates activity log per achievement', async () => {
+    it('batch-inserts activity logs in one createMany call', async () => {
+      mockPrisma.activityLog.createMany.mockResolvedValue({ count: 2 });
+
       const achievements = [
         ACHIEVEMENTS_BY_ID.get('combat_kills_100')!,
         ACHIEVEMENTS_BY_ID.get('combat_kills_500')!,
@@ -800,23 +796,28 @@ describe('achievementService', () => {
 
       await emitAchievementNotifications('p1', achievements);
 
-      expect(mockCreateActivityLog).toHaveBeenCalledTimes(2);
-      expect(mockCreateActivityLog).toHaveBeenCalledWith({
-        playerId: 'p1',
-        activityType: 'achievement',
-        turnsSpent: 0,
-        result: { achievementId: 'combat_kills_100', title: 'Monster Hunter' },
-      });
-      expect(mockCreateActivityLog).toHaveBeenCalledWith({
-        playerId: 'p1',
-        activityType: 'achievement',
-        turnsSpent: 0,
-        result: { achievementId: 'combat_kills_500', title: 'Warrior' },
+      expect(mockPrisma.activityLog.createMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.activityLog.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            playerId: 'p1',
+            activityType: 'achievement',
+            turnsSpent: 0,
+            result: { achievementId: 'combat_kills_100', title: 'Monster Hunter' },
+          },
+          {
+            playerId: 'p1',
+            activityType: 'achievement',
+            turnsSpent: 0,
+            result: { achievementId: 'combat_kills_500', title: 'Warrior' },
+          },
+        ],
       });
     });
 
     it('emits socket event per achievement when io is available', async () => {
       mockGetIo.mockReturnValue({ to: mockTo });
+      mockPrisma.activityLog.createMany.mockResolvedValue({ count: 1 });
 
       const achievements = [ACHIEVEMENTS_BY_ID.get('combat_kills_100')!];
 
@@ -832,19 +833,21 @@ describe('achievementService', () => {
 
     it('skips socket emit when io is null', async () => {
       mockGetIo.mockReturnValue(null);
+      mockPrisma.activityLog.createMany.mockResolvedValue({ count: 1 });
 
       const achievements = [ACHIEVEMENTS_BY_ID.get('combat_kills_100')!];
 
       await emitAchievementNotifications('p1', achievements);
 
-      // Activity log still created
-      expect(mockCreateActivityLog).toHaveBeenCalledTimes(1);
+      // Activity log still created (batch)
+      expect(mockPrisma.activityLog.createMany).toHaveBeenCalledTimes(1);
       // No socket calls
       expect(mockTo).not.toHaveBeenCalled();
     });
 
     it('emits for each achievement in sequence', async () => {
       mockGetIo.mockReturnValue({ to: mockTo });
+      mockPrisma.activityLog.createMany.mockResolvedValue({ count: 2 });
 
       const achievements = [
         ACHIEVEMENTS_BY_ID.get('combat_kills_100')!,
@@ -860,6 +863,7 @@ describe('achievementService', () => {
 
     it('includes category in socket event', async () => {
       mockGetIo.mockReturnValue({ to: mockTo });
+      mockPrisma.activityLog.createMany.mockResolvedValue({ count: 1 });
 
       const achievements = [ACHIEVEMENTS_BY_ID.get('explore_zones_3')!];
 

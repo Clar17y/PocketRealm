@@ -95,6 +95,7 @@ beforeEach(() => {
   // Default: no existing stacks in inventory (batch pre-fetch returns empty)
   mockPrisma.item.findMany.mockResolvedValue([]);
   mockPrisma.item.create.mockResolvedValue({ id: 'new-item-1', templateId: 'tpl-mat', quantity: 1 });
+  mockPrisma.item.createManyAndReturn.mockResolvedValue([{ id: 'new-item-1' }]);
   mockPrisma.item.update.mockResolvedValue({});
 });
 
@@ -133,7 +134,7 @@ describe('rollAndGrantLoot', () => {
     mockPrisma.dropTable.findMany.mockResolvedValue([makeWeaponDropEntry()]);
     const drops = await rollAndGrantLoot('p1', 'mob-1', 5);
     expect(drops).toHaveLength(1);
-    expect(mockPrisma.item.create).toHaveBeenCalled();
+    expect(mockPrisma.item.createManyAndReturn).toHaveBeenCalled();
   });
 
   it('skips entries with 0 drop chance', async () => {
@@ -238,11 +239,15 @@ describe('rollAndGrantLootWithCapacity', () => {
     it('tracks slot usage across multiple non-stackable items', async () => {
       vi.mocked(randomIntInclusive).mockReturnValue(3); // 3 items per entry
       mockPrisma.dropTable.findMany.mockResolvedValue([makeWeaponDropEntry()]);
+      mockPrisma.item.createManyAndReturn.mockResolvedValue([{ id: 'item-1' }, { id: 'item-2' }]);
       // Capacity = 2, so only 2 fit, 1 overflows
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 2);
       expect(result.drops).toHaveLength(2);
       expect(result.overflow).toHaveLength(1);
-      expect(mockPrisma.item.create).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.item.createManyAndReturn).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.arrayContaining([expect.objectContaining({ templateId: 'tpl-sword' })]) }),
+      );
+      expect(mockPrisma.item.createManyAndReturn.mock.calls[0][0].data).toHaveLength(2);
     });
 
     it('increments slotsUsed for new stackable items (no existing stack)', async () => {
@@ -327,17 +332,21 @@ describe('rollAndGrantLootWithCapacity', () => {
 
       await rollAndGrantLootWithCapacity('p1', 'mob-1', 10, 1, 10);
 
-      expect(mockPrisma.item.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          ownerId: 'p1',
-          templateId: 'tpl-sword',
-          rarity: 'rare',
-          quantity: 1,
-          maxDurability: 100,
-          currentDurability: 100,
-          bonusStats: { attack: 3, critChance: 0.05 },
+      expect(mockPrisma.item.createManyAndReturn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              ownerId: 'p1',
+              templateId: 'tpl-sword',
+              rarity: 'rare',
+              quantity: 1,
+              maxDurability: 100,
+              currentDurability: 100,
+              bonusStats: { attack: 3, critChance: 0.05 },
+            }),
+          ]),
         }),
-      });
+      );
     });
 
     it('creates item records with correct data for armor', async () => {
@@ -347,23 +356,30 @@ describe('rollAndGrantLootWithCapacity', () => {
 
       await rollAndGrantLootWithCapacity('p1', 'mob-1', 10, 1, 10);
 
-      expect(mockPrisma.item.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          templateId: 'tpl-helm',
-          rarity: 'epic',
-          maxDurability: 80,
-          currentDurability: 80,
-          bonusStats: { defence: 5 },
+      expect(mockPrisma.item.createManyAndReturn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              templateId: 'tpl-helm',
+              rarity: 'epic',
+              maxDurability: 80,
+              currentDurability: 80,
+              bonusStats: { defence: 5 },
+            }),
+          ]),
         }),
-      });
+      );
     });
 
-    it('creates each item individually when quantity > 1', async () => {
+    it('batches item creates when quantity > 1', async () => {
       vi.mocked(randomIntInclusive).mockReturnValue(3);
+      mockPrisma.item.createManyAndReturn.mockResolvedValue([{ id: 'item-1' }, { id: 'item-2' }, { id: 'item-3' }]);
       mockPrisma.dropTable.findMany.mockResolvedValue([makeWeaponDropEntry()]);
 
       const result = await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
-      expect(mockPrisma.item.create).toHaveBeenCalledTimes(3);
+      // All 3 items created in a single batch
+      expect(mockPrisma.item.createManyAndReturn).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.item.createManyAndReturn.mock.calls[0][0].data).toHaveLength(3);
       expect(result.drops).toHaveLength(3);
       // Each drop should have quantity 1
       result.drops.forEach(d => expect(d.quantity).toBe(1));
@@ -401,11 +417,15 @@ describe('rollAndGrantLootWithCapacity', () => {
 
       await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
 
-      expect(mockPrisma.item.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          bonusStats: undefined,
+      expect(mockPrisma.item.createManyAndReturn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              bonusStats: undefined,
+            }),
+          ]),
         }),
-      });
+      );
     });
 
     it('does not call rollDropRarity or rollBonusStatsForRarity for non-equipment types', async () => {
@@ -447,12 +467,16 @@ describe('rollAndGrantLootWithCapacity', () => {
 
       await rollAndGrantLootWithCapacity('p1', 'mob-1', 5, 1, 10);
 
-      expect(mockPrisma.item.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          maxDurability: null,
-          currentDurability: null,
+      expect(mockPrisma.item.createManyAndReturn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              maxDurability: null,
+              currentDurability: null,
+            }),
+          ]),
         }),
-      });
+      );
     });
   });
 
@@ -501,6 +525,7 @@ describe('rollAndGrantLootWithCapacity', () => {
       expect(result.drops).toHaveLength(0);
       expect(mockPrisma.item.update).not.toHaveBeenCalled();
       expect(mockPrisma.item.create).not.toHaveBeenCalled();
+      expect(mockPrisma.item.createManyAndReturn).not.toHaveBeenCalled();
     });
 
     it('skips when quantity rolls to negative', async () => {
@@ -542,6 +567,7 @@ describe('rollAndGrantLootWithCapacity', () => {
     });
 
     it('partial overflow: some items fit, some overflow', async () => {
+      mockPrisma.item.createManyAndReturn.mockResolvedValue([{ id: 'item-1' }, { id: 'item-2' }]);
       mockPrisma.dropTable.findMany.mockResolvedValue([
         makeWeaponDropEntry({ itemTemplateId: 'tpl-sword-1', itemTemplate: { name: 'Sword 1', stackable: false, itemType: 'weapon', maxDurability: 100, baseStats: null, slot: 'main_hand' } }),
         makeWeaponDropEntry({ itemTemplateId: 'tpl-sword-2', itemTemplate: { name: 'Sword 2', stackable: false, itemType: 'weapon', maxDurability: 100, baseStats: null, slot: 'main_hand' } }),
@@ -594,6 +620,7 @@ describe('rollAndGrantLootWithCapacity', () => {
   describe('getInventoryState integration', () => {
     it('starts slotsUsed from current inventory usedSlots', async () => {
       vi.mocked(getInventoryState).mockResolvedValue({ usedSlots: 19, capacity: 20, availableSlots: 1 });
+      mockPrisma.item.createManyAndReturn.mockResolvedValue([{ id: 'item-1' }]);
       // Two weapon drops, but only 1 slot available
       mockPrisma.dropTable.findMany.mockResolvedValue([
         makeWeaponDropEntry({ itemTemplateId: 'tpl-sword-1', itemTemplate: { name: 'Sword 1', stackable: false, itemType: 'weapon', maxDurability: 100, baseStats: null, slot: 'main_hand' } }),

@@ -11,7 +11,7 @@ import {
   filterAndWeightMobsByTier,
   runTemplateCombat,
 } from '@pocketrealm/game-engine';
-import { DURABILITY_CONSTANTS, type PotionConsumed } from '@pocketrealm/shared';
+import { DURABILITY_CONSTANTS, CACHE_HEADER_CONSTANTS, type PotionConsumed } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { refundPlayerTurns } from '../services/turnBankService';
@@ -116,6 +116,7 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
       discovered: false as const,
     }));
 
+  res.set('Cache-Control', CACHE_HEADER_CONSTANTS.PRIVATE_SHORT);
   res.json({
     zones: zones.map((z) => {
       const discovered = discoveredZoneIds.has(z.id);

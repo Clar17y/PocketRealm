@@ -1,5 +1,4 @@
 import { prisma } from '@pocketrealm/database';
-import { createActivityLog } from './activityLogService';
 import { refundPlayerTurnsTx } from './turnBankService';
 import {
   ALL_ACHIEVEMENTS,
@@ -270,14 +269,20 @@ export async function emitAchievementNotifications(
   achievements: AchievementDef[],
 ): Promise<void> {
   if (achievements.length === 0) return;
-  const io = getIo();
-  for (const ach of achievements) {
-    await createActivityLog({
+
+  // Batch-insert all activity logs in one query
+  await prisma.activityLog.createMany({
+    data: achievements.map((ach) => ({
       playerId,
-      activityType: 'achievement',
+      activityType: 'achievement' as const,
       turnsSpent: 0,
       result: { achievementId: ach.id, title: ach.title },
-    });
+    })),
+  });
+
+  // Socket emissions are in-memory, no DB cost — keep per-achievement
+  const io = getIo();
+  for (const ach of achievements) {
     io?.to(playerId).emit('achievement_unlocked', {
       id: ach.id,
       title: ach.title,

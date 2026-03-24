@@ -1516,6 +1516,45 @@ export const CACHE_TTL_CONSTANTS = {
   GUILD_MODIFIERS_TTL: 90,
 } as const;
 
+// =============================================================================
+// RATE LIMITING
+// =============================================================================
+
+export const RATE_LIMIT_CONSTANTS = {
+  /** ms — default rate-limit window (1 minute) */
+  DEFAULT_WINDOW_MS: 60_000,
+  /** ms — login rate-limit window (15 minutes) */
+  LOGIN_WINDOW_MS: 15 * 60_000,
+
+  /** Max requests per window — global */
+  GLOBAL_MAX: 120,
+  /** Max requests per window — PvP */
+  PVP_MAX: 10,
+  /** Max requests per window — combat */
+  COMBAT_MAX: 30,
+  /** Max requests per window — crafting */
+  CRAFTING_MAX: 20,
+  /** Max requests per window — exploration */
+  EXPLORATION_MAX: 30,
+  /** Max requests per window — casino */
+  CASINO_MAX: 30,
+  /** Max requests per window — login */
+  LOGIN_MAX: 10,
+} as const;
+
+// =============================================================================
+// CACHE HEADERS
+// =============================================================================
+
+export const CACHE_HEADER_CONSTANTS = {
+  /** Cache-Control for public, rarely changing data (e.g. leaderboard categories) */
+  PUBLIC_LONG: 'public, max-age=3600',
+  /** Cache-Control for private, semi-static data (e.g. bestiary, recipes) */
+  PRIVATE_MEDIUM: 'private, max-age=300',
+  /** Cache-Control for private, frequently changing data (e.g. leaderboard, zones) */
+  PRIVATE_SHORT: 'private, max-age=60',
+} as const;
+
 export const UI_TIMING_CONSTANTS = {
   /** ms before an in-flight action shows "Still working..." */
   SLOW_ACTION_THRESHOLD_MS: 10_000,
