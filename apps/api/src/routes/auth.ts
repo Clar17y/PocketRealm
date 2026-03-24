@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { prisma } from '@pocketrealm/database';
-import { TURN_CONSTANTS, CHARACTER_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT, RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
+import { TURN_CONSTANTS, CHARACTER_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT, RATE_LIMIT_CONSTANTS, AUTH_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { createEndpointLimiter } from '../middleware/rateLimiter';
 import {
@@ -19,8 +19,8 @@ import { validatePassword } from '../utils/passwordValidation';
 import { createEmailVerificationToken, verifyEmailToken, createPasswordResetToken, verifyPasswordResetToken } from '../services/authTokenService';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
 import { recordFailedLogin, isLockedOut, clearLockout, checkEmailRateLimit } from '../services/lockoutService';
+import { verifyPlayerEmail, changePlayerEmail, changePlayerPassword } from '../services/authService';
 
-const BCRYPT_ROUNDS = 10;
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
 const loginLimiter = createEndpointLimiter('login', RATE_LIMIT_CONSTANTS.LOGIN_WINDOW_MS, RATE_LIMIT_CONSTANTS.LOGIN_MAX, { message: 'Too many login attempts, please try again later' });
@@ -42,7 +42,7 @@ const refreshSchema = z.object({ refreshToken: z.string().min(1) });
 
 const verifyEmailSchema = z.object({ token: z.string().min(1) });
 
-const resendVerificationLimiter = createEndpointLimiter('resend-verification', 60 * 60 * 1000, 3, { message: 'Too many verification requests, please try again later' });
+const resendVerificationLimiter = createEndpointLimiter('resend-verification', RATE_LIMIT_CONSTANTS.RESEND_VERIFICATION_WINDOW_MS, RATE_LIMIT_CONSTANTS.RESEND_VERIFICATION_MAX, { message: 'Too many verification requests, please try again later' });
 
 const forgotPasswordSchema = z.object({ email: z.string().email() });
 const resetPasswordSchema = z.object({
@@ -50,7 +50,7 @@ const resetPasswordSchema = z.object({
   password: z.string().min(10).max(100),
 });
 
-const forgotPasswordLimiter = createEndpointLimiter('forgot-password', 60 * 60 * 1000, 5, { message: 'Too many password reset requests, please try again later' });
+const forgotPasswordLimiter = createEndpointLimiter('forgot-password', RATE_LIMIT_CONSTANTS.FORGOT_PASSWORD_WINDOW_MS, RATE_LIMIT_CONSTANTS.FORGOT_PASSWORD_MAX, { message: 'Too many password reset requests, please try again later' });
 
 const changeEmailSchema = z.object({
   email: z.string().email(),
@@ -88,7 +88,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   }
 
   // Hash password
-  const passwordHash = await bcrypt.hash(body.password, BCRYPT_ROUNDS);
+  const passwordHash = await bcrypt.hash(body.password, AUTH_CONSTANTS.BCRYPT_ROUNDS);
 
   // Find starter town (for homeTownId) and first connected wild zone (for currentZoneId)
   const starterTown = await prisma.zone.findFirst({ where: { isStarter: true } });
@@ -335,7 +335,6 @@ authRouter.post('/logout', asyncHandler(async (req, res) => {
   res.json({ success: true });
 }));
 
-const CHAMPION_TRIAL_DAYS = 3;
 
 authRouter.post('/verify-email', asyncHandler(async (req, res) => {
   const { token } = verifyEmailSchema.parse(req.body);
@@ -345,33 +344,7 @@ authRouter.post('/verify-email', asyncHandler(async (req, res) => {
     throw new AppError(400, 'Invalid or expired verification token', 'INVALID_TOKEN');
   }
 
-  const trialGranted = await prisma.$transaction(async (tx) => {
-    const player = await tx.player.findUnique({
-      where: { id: tokenRecord.playerId },
-      select: { premiumTrialClaimed: true },
-    });
-
-    const shouldGrantTrial = player && !player.premiumTrialClaimed;
-    const expiresAt = new Date(Date.now() + CHAMPION_TRIAL_DAYS * 24 * 60 * 60 * 1000);
-
-    await tx.player.update({
-      where: { id: tokenRecord.playerId },
-      data: {
-        emailVerified: true,
-        ...(shouldGrantTrial ? {
-          premiumTrialClaimed: true,
-          isPremium: true,
-          premiumExpiresAt: expiresAt,
-        } : {}),
-      },
-    });
-
-    await tx.emailVerificationToken.delete({
-      where: { id: tokenRecord.id },
-    });
-
-    return !!shouldGrantTrial;
-  });
+  const trialGranted = await verifyPlayerEmail(tokenRecord);
 
   res.json({
     message: trialGranted
@@ -406,6 +379,10 @@ authRouter.post('/resend-verification', authenticate, resendVerificationLimiter,
 authRouter.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (req, res) => {
   const { email } = forgotPasswordSchema.parse(req.body);
 
+  // Always return the same response immediately to prevent timing leaks
+  res.json({ message: 'If that email is verified with us, we\'ve sent a reset link.' });
+
+  // Process asynchronously after response is sent
   const player = await prisma.player.findUnique({
     where: { email },
     select: { id: true, username: true, emailVerified: true },
@@ -420,8 +397,6 @@ authRouter.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (r
       );
     }
   }
-
-  res.json({ message: 'If that email is verified with us, we\'ve sent a reset link.' });
 }));
 
 authRouter.post('/reset-password', asyncHandler(async (req, res) => {
@@ -437,7 +412,7 @@ authRouter.post('/reset-password', asyncHandler(async (req, res) => {
     throw new AppError(400, 'Invalid or expired reset token', 'INVALID_TOKEN');
   }
 
-  const passwordHash = await bcrypt.hash(body.password, BCRYPT_ROUNDS);
+  const passwordHash = await bcrypt.hash(body.password, AUTH_CONSTANTS.BCRYPT_ROUNDS);
 
   await prisma.$transaction([
     prisma.player.update({
@@ -458,82 +433,16 @@ authRouter.post('/reset-password', asyncHandler(async (req, res) => {
 
 authRouter.post('/change-email', authenticate, asyncHandler(async (req, res) => {
   const body = changeEmailSchema.parse(req.body);
-  const playerId = req.player!.playerId;
-
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { passwordHash: true, username: true },
-  });
-
-  if (!player) {
-    throw new AppError(404, 'Player not found', 'NOT_FOUND');
-  }
-
-  const validPassword = await bcrypt.compare(body.password, player.passwordHash);
-  if (!validPassword) {
-    throw new AppError(401, 'Invalid password', 'INVALID_CREDENTIALS');
-  }
-
-  const existing = await prisma.player.findUnique({ where: { email: body.email } });
-  if (existing) {
-    throw new AppError(409, 'Email already in use', 'EMAIL_TAKEN');
-  }
-
-  try {
-    await prisma.$transaction([
-      prisma.player.update({
-        where: { id: playerId },
-        data: { email: body.email, emailVerified: false },
-      }),
-      prisma.emailVerificationToken.deleteMany({ where: { playerId } }),
-    ]);
-  } catch (err: any) {
-    if (err?.code === 'P2002') {
-      throw new AppError(409, 'Email already in use', 'EMAIL_TAKEN');
-    }
-    throw err;
-  }
-
-  createEmailVerificationToken(playerId)
-    .then(({ rawToken }) => sendVerificationEmail(body.email, rawToken, player.username))
-    .catch((err) => console.error('Failed to send verification email:', err));
-
+  await changePlayerEmail(req.player!.playerId, body.email, body.password);
   res.json({ message: 'Email updated. Check your inbox to verify your new address.' });
 }));
 
 authRouter.post('/change-password', authenticate, asyncHandler(async (req, res) => {
   const body = changePasswordSchema.parse(req.body);
-  const playerId = req.player!.playerId;
-
   const passwordCheck = validatePassword(body.newPassword);
   if (!passwordCheck.valid) {
     throw new AppError(400, passwordCheck.reason!, 'WEAK_PASSWORD');
   }
-
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-    select: { passwordHash: true },
-  });
-
-  if (!player) {
-    throw new AppError(404, 'Player not found', 'NOT_FOUND');
-  }
-
-  const validPassword = await bcrypt.compare(body.currentPassword, player.passwordHash);
-  if (!validPassword) {
-    throw new AppError(401, 'Current password is incorrect', 'INVALID_CREDENTIALS');
-  }
-
-  const newPasswordHash = await bcrypt.hash(body.newPassword, BCRYPT_ROUNDS);
-
-  await prisma.player.update({
-    where: { id: playerId },
-    data: { passwordHash: newPasswordHash },
-  });
-
-  await prisma.refreshToken.deleteMany({
-    where: { playerId },
-  });
-
+  await changePlayerPassword(req.player!.playerId, body.currentPassword, body.newPassword);
   res.json({ message: 'Password updated. Please log in again.' });
 }));

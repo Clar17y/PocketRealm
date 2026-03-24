@@ -1,8 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { prisma } from '@pocketrealm/database';
-
-const VERIFICATION_TOKEN_TTL_HOURS = 24;
-const RESET_TOKEN_TTL_HOURS = 1;
+import { AUTH_CONSTANTS } from '@pocketrealm/shared';
 
 /** Generate a 32-byte crypto-random hex token (64 chars). */
 export function generateToken(): string {
@@ -18,12 +16,14 @@ export function hashToken(rawToken: string): string {
 export async function createEmailVerificationToken(playerId: string): Promise<{ rawToken: string }> {
   const rawToken = generateToken();
   const tokenHash = hashToken(rawToken);
-  const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_HOURS * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + AUTH_CONSTANTS.VERIFICATION_TOKEN_TTL_HOURS * 60 * 60 * 1000);
 
-  await prisma.emailVerificationToken.deleteMany({ where: { playerId } });
-  await prisma.emailVerificationToken.create({
-    data: { playerId, tokenHash, expiresAt },
-  });
+  await prisma.$transaction([
+    prisma.emailVerificationToken.deleteMany({ where: { playerId } }),
+    prisma.emailVerificationToken.create({
+      data: { playerId, tokenHash, expiresAt },
+    }),
+  ]);
 
   return { rawToken };
 }
@@ -46,12 +46,14 @@ export async function verifyEmailToken(rawToken: string) {
 export async function createPasswordResetToken(playerId: string): Promise<{ rawToken: string }> {
   const rawToken = generateToken();
   const tokenHash = hashToken(rawToken);
-  const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_HOURS * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + AUTH_CONSTANTS.RESET_TOKEN_TTL_HOURS * 60 * 60 * 1000);
 
-  await prisma.passwordResetToken.deleteMany({ where: { playerId } });
-  await prisma.passwordResetToken.create({
-    data: { playerId, tokenHash, expiresAt },
-  });
+  await prisma.$transaction([
+    prisma.passwordResetToken.deleteMany({ where: { playerId } }),
+    prisma.passwordResetToken.create({
+      data: { playerId, tokenHash, expiresAt },
+    }),
+  ]);
 
   return { rawToken };
 }

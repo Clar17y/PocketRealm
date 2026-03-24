@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('resend', () => {
   const send = vi.fn().mockResolvedValue({ data: { id: 'email-1' }, error: null });
   return {
-    Resend: vi.fn().mockImplementation(function () {
+    Resend: vi.fn().mockImplementation(function (this: { emails: { send: typeof send } }) {
       this.emails = { send };
     }),
   };

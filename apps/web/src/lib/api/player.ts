@@ -8,6 +8,9 @@ export async function getPlayer() {
       username: string;
       email: string;
       role: string;
+      emailVerified: boolean;
+      isPremium: boolean;
+      premiumExpiresAt: string | null;
       createdAt: string;
       characterXp: number;
       characterLevel: number;

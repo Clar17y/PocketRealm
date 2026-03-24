@@ -6,7 +6,7 @@ import 'dotenv/config';
 import compression from 'compression';
 import helmet from 'helmet';
 import { createEndpointLimiter } from './middleware/rateLimiter';
-import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
+import { RATE_LIMIT_CONSTANTS, AUTH_CONSTANTS } from '@pocketrealm/shared';
 import { authRouter } from './routes/auth';
 import { turnsRouter } from './routes/turns';
 import { playerRouter } from './routes/player';
@@ -188,5 +188,5 @@ server.listen(PORT, () => {
     cleanupExpiredTokens().catch((err) => {
       console.error('Auth token cleanup error:', err);
     });
-  }, 6 * 60 * 60 * 1000);
+  }, AUTH_CONSTANTS.TOKEN_CLEANUP_INTERVAL_MS);
 });
