@@ -141,6 +141,7 @@ model Player {
   expeditionsLaunched       GuildExpedition[]           @relation("ExpeditionLauncher")
   expeditionMemberships     GuildExpeditionMember[]
   expeditionBestiaryEntries PlayerExpeditionBestiary[]
+  expeditionCooldowns       ExpeditionCooldown[]
 
   @@index([currentZoneId])
   @@map("players")
@@ -983,6 +984,7 @@ model GuildContract {
   status              String   @default("active") @db.VarChar(16)
   rewardGuildXp       Int      @default(0) @map("reward_guild_xp")
   rewardTreasuryTurns Int      @default(0) @map("reward_treasury_turns")
+  rewardRenown        Int      @default(0) @map("reward_renown")
   weekStartedAt       DateTime @map("week_started_at")
   expiresAt           DateTime @map("expires_at")
 
@@ -1083,6 +1085,19 @@ model GuildExpeditionMember {
   @@unique([expeditionId, playerId])
   @@index([playerId])
   @@map("guild_expedition_members")
+}
+
+model ExpeditionCooldown {
+  id        String   @id @default(uuid())
+  playerId  String   @map("player_id")
+  tier      Int
+  expiresAt DateTime @map("expires_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, tier])
+  @@index([playerId, expiresAt])
+  @@map("expedition_cooldowns")
 }
 
 // =============================================================================
