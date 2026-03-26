@@ -41,7 +41,7 @@ expeditionRouter.get('/cooldowns', asyncHandler(async (req, res) => {
     res.json({ weeklyCooldowns: {}, betweenCooldown: null, hasActiveExpedition: false });
     return;
   }
-  const cooldowns = await getExpeditionCooldowns(membership.guildId);
+  const cooldowns = await getExpeditionCooldowns(membership.guildId, req.player!.playerId);
   res.json(cooldowns);
 }));
 

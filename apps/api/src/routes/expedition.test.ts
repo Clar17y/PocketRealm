@@ -66,7 +66,7 @@ describe('expedition routes', () => {
 
       await handler(req, res, vi.fn());
 
-      expect(mockGetExpeditionCooldowns).toHaveBeenCalledWith('guild-1');
+      expect(mockGetExpeditionCooldowns).toHaveBeenCalledWith('guild-1', 'player-1');
       expect(res.json).toHaveBeenCalledWith({
         weeklyCooldowns: { 1: null, 2: '2026-03-10T00:00:00.000Z', 3: null },
         betweenCooldown: '2026-03-09T18:00:00.000Z',
