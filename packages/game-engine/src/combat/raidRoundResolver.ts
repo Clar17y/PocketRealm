@@ -2,284 +2,49 @@ import type {
   ActionDefinition,
   BossActiveEffect,
   RaidRoundInput,
-  RaidParticipant,
   RaidParticipantResult,
-  RaidThreatEntry,
   MobActionResult,
   RaidRoundResult,
   ExpeditionMobState,
-  PlayerAttackEntry,
   ExhaustedActionEntry,
   DefensiveActionEntry,
   PlayerRoundActionEntry,
-  MobActionLogEntry,
   HealingEntry,
   MobTelegraphEntry,
   EffectTickEntry,
   ExpeditionRoundLog,
-  CombatantStats,
   CombatPotion,
   PotionConsumed,
 } from '@pocketrealm/shared';
-import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, EXPEDITION_CONSTANTS, BOSS_ACTION_DEFINITIONS, mobDisplayName } from '@pocketrealm/shared';
+import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, BOSS_ACTION_DEFINITIONS, mobDisplayName } from '@pocketrealm/shared';
 import type { CombatParticipantState } from './combatHelpers';
 import {
   resolveParticipantActions,
   resolveSupportiveActions,
   applyResourceCosts,
-  getEffectiveStatValue,
   resolvePlayerBuffActions,
 } from './combatHelpers';
 import {
-  addDamageThreat,
   applyTaunt,
-  getSingleTarget,
   tickTaunts,
 } from './threatSystem';
 import {
   rollDamage as defaultRollDamage,
   isCriticalHit as defaultIsCriticalHit,
-  resolveHitCheck,
-  guaranteedHitResult,
-  calculateAvoidScore,
-  calculateFinalDamage,
 } from './damageCalculator';
-import type { HitResolution } from './damageCalculator';
 import type { CombatMode } from '@pocketrealm/shared';
+import {
+  checkPhaseTransition,
+  actionLabel,
+  resolvePlayerOffensive,
+} from './raidPlayerPhase';
+import type { OffensiveAttackContext } from './raidPlayerPhase';
+import { resolveMobActions } from './raidMobPhase';
 
 // --- RNG Interface ---
-
-export interface RaidRoundRng {
-  /** Returns a 0-1 float used as the hit roll against the computed hit probability. */
-  rollHitChance: () => number;
-  rollDamage: (min: number, max: number) => number;
-  rollCrit: (chance: number) => boolean;
-}
-
-// AoE player actions — these target all surviving mobs instead of one
-const AOE_ACTION_IDS = new Set([
-  'cleave', 'scatter_shot', 'volley', 'frost_nova', 'blizzard', 'whirlwind', 'meteor_strike',
-]);
-
-// --- Phase Transition ---
-
-function checkPhaseTransition(mob: ExpeditionMobState): void {
-  if (!mob.phaseTemplates || mob.phaseTemplates.length === 0) return;
-  for (const phase of mob.phaseTemplates) {
-    if (mob.hp <= mob.maxHp * phase.hpThreshold && mob.actionTemplate !== phase.template) {
-      mob.actionTemplate = phase.template;
-      break;
-    }
-  }
-}
-
-function actionLabel(actionId: string, defs: Record<string, ActionDefinition>): string {
-  return defs[actionId]?.name ?? actionId.replace(/_/g, ' ');
-}
-
-// --- Shared offensive attack resolution ---
-
-interface OffensiveAttackContext {
-  combatMode: CombatMode;
-  roll: RaidRoundRng;
-  mobState: { id: string; hp: number; maxHp: number; stats: CombatantStats; activeEffects: BossActiveEffect[]; name: string; prefix: string | null }[];
-  playerActionDefs: Record<string, ActionDefinition>;
-  getUsername: (id: string) => string;
-  splashCascade?: boolean;
-}
-
-/**
- * Resolve a player's offensive attack against mobs. Handles target selection,
- * hit resolution, damage, debuff/DoT application, and log generation.
- * Used by both Step 4 (primary offensive) and Step 5c (potion fallback).
- */
-function resolvePlayerOffensive(
-  p: RaidParticipant,
-  s: CombatParticipantState & { hit: boolean; isCritical: boolean; targetMobId: string | null; damageDealt: number },
-  def: ActionDefinition,
-  threatTable: RaidThreatEntry[],
-  ctx: OffensiveAttackContext,
-): PlayerAttackEntry[] {
-  const entries: PlayerAttackEntry[] = [];
-  const aliveMobs = ctx.mobState.filter(m => m.hp > 0);
-  if (aliveMobs.length === 0) return entries;
-
-  const isAoe = AOE_ACTION_IDS.has(s.actionId);
-  let targets: typeof aliveMobs;
-  if (isAoe) {
-    targets = aliveMobs;
-  } else if (p.targetMobId) {
-    const preferred = aliveMobs.find(m => m.id === p.targetMobId);
-    targets = [preferred ?? aliveMobs.reduce((lowest, m) => m.hp < lowest.hp ? m : lowest)];
-  } else {
-    targets = [aliveMobs.reduce((lowest, m) => m.hp < lowest.hp ? m : lowest)];
-  }
-
-  s.targetMobId = isAoe ? null : targets[0].id;
-
-  let totalDamageDealt = 0;
-  const effectiveAccuracy = getEffectiveStatValue(p.stats.accuracy, p.activeEffects, 'accuracy');
-  const hitScore = effectiveAccuracy + (def.accuracyModifier ?? 0);
-
-  for (const target of targets) {
-    const avoidScore = calculateAvoidScore(target.stats);
-    const hitResolution = def.alwaysHits
-      ? guaranteedHitResult(hitScore, avoidScore)
-      : resolveHitCheck({
-          combatMode: ctx.combatMode,
-          hitScore,
-          avoidScore,
-          hitRollValue: ctx.roll.rollHitChance(),
-        });
-
-    const hits = hitResolution.didHit;
-    const baseEntry = {
-      entryType: 'attack' as const,
-      playerId: p.playerId,
-      username: ctx.getUsername(p.playerId),
-      actionId: s.actionId,
-      actionLabel: actionLabel(s.actionId, ctx.playerActionDefs),
-      targetMobId: target.id,
-      targetMobName: mobDisplayName(target),
-      hitChance: hitResolution.hitChance,
-      hitRollValue: hitResolution.hitRollValue,
-      attackerHitScore: hitResolution.hitScore,
-      defenderAvoidScore: hitResolution.avoidScore,
-      staminaCost: def.cost.stamina,
-      manaCost: def.cost.mana,
-    };
-
-    if (!hits) {
-      if (def.effect?.alwaysApplies && def.effect.isDebuff && target.hp > 0) {
-        target.activeEffects.push({
-          name: def.effect.name,
-          stat: def.effect.stat,
-          modifier: def.effect.modifier,
-          roundsRemaining: def.effect.duration,
-        });
-      }
-
-      // Splash hit cascade: on miss, try other alive mobs in order
-      if (ctx.splashCascade && !isAoe) {
-        const otherMobs = aliveMobs.filter(m => m.id !== target.id && m.hp > 0);
-        const cascadeAttempts: import('@pocketrealm/shared').SplashCascadeAttempt[] = [];
-        let cascadeTarget: typeof target | null = null;
-        for (const candidateMob of otherMobs) {
-          const cascadeAvoid = calculateAvoidScore(candidateMob.stats);
-          const cascadeResult = def.alwaysHits
-            ? guaranteedHitResult(hitScore, cascadeAvoid)
-            : resolveHitCheck({
-                combatMode: ctx.combatMode,
-                hitScore,
-                avoidScore: cascadeAvoid,
-                hitRollValue: ctx.roll.rollHitChance(),
-              });
-          if (cascadeResult.didHit) {
-            cascadeTarget = candidateMob;
-            // Cascade hit: compute damage against cascade target
-            s.hit = true;
-            const rawDmg = ctx.roll.rollDamage(p.stats.damageMin, p.stats.damageMax);
-            const scaledDmg = Math.floor(rawDmg * (def.damageMultiplier ?? 1.0));
-            const crit = ctx.roll.rollCrit(p.stats.critChance ?? 0);
-            if (crit) s.isCritical = true;
-            const isMagicAttack = def.damageType === 'magic' || p.stats.damageType === 'magic';
-            const effectiveDefence = isMagicAttack
-              ? getEffectiveStatValue(candidateMob.stats.magicDefence, candidateMob.activeEffects, 'magicDefence')
-              : getEffectiveStatValue(candidateMob.stats.defence, candidateMob.activeEffects, 'defence');
-            const { damage } = calculateFinalDamage(scaledDmg, effectiveDefence, crit, p.stats.critDamage ?? 0);
-            candidateMob.hp = Math.max(0, candidateMob.hp - damage);
-            totalDamageDealt += damage;
-            if (def.effect?.isDebuff && candidateMob.hp > 0) {
-              const dotFlat = def.effect.damagePerRound ?? 0;
-              const dotPct = def.effect.damagePerRoundPercent ?? 0;
-              const resolvedDot = dotFlat + Math.floor((dotPct / 100) * damage);
-              candidateMob.activeEffects.push({
-                name: def.effect.name,
-                stat: def.effect.stat,
-                modifier: def.effect.modifier,
-                roundsRemaining: def.effect.duration,
-                ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
-              });
-            }
-            cascadeAttempts.push({
-              targetMobName: mobDisplayName(candidateMob),
-              hitChance: cascadeResult.hitChance,
-              hitRollValue: cascadeResult.hitRollValue,
-              attackerHitScore: cascadeResult.hitScore,
-              defenderAvoidScore: cascadeAvoid,
-              hit: true,
-              crit,
-              damageRoll: rawDmg,
-              totalDamage: damage,
-            });
-            break;
-          } else {
-            cascadeAttempts.push({
-              targetMobName: mobDisplayName(candidateMob),
-              hitChance: cascadeResult.hitChance,
-              hitRollValue: cascadeResult.hitRollValue,
-              attackerHitScore: cascadeResult.hitScore,
-              defenderAvoidScore: cascadeAvoid,
-              hit: false,
-            });
-          }
-        }
-        // Log entry shows original miss + cascade chain
-        entries.push({
-          ...baseEntry,
-          hit: !!cascadeTarget,
-          crit: cascadeTarget ? cascadeAttempts[cascadeAttempts.length - 1]?.crit ?? false : false,
-          ...(cascadeTarget ? {
-            damageRoll: cascadeAttempts[cascadeAttempts.length - 1]?.damageRoll,
-            totalDamage: cascadeAttempts[cascadeAttempts.length - 1]?.totalDamage,
-          } : {}),
-          splashCascade: cascadeAttempts,
-        });
-        continue;
-      }
-
-      entries.push({ ...baseEntry, hit: false, crit: false });
-      continue;
-    }
-
-    s.hit = true;
-    const rawDmg = ctx.roll.rollDamage(p.stats.damageMin, p.stats.damageMax);
-    const scaledDmg = Math.floor(rawDmg * (def.damageMultiplier ?? 1.0));
-    const crit = ctx.roll.rollCrit(p.stats.critChance ?? 0);
-    if (crit) s.isCritical = true;
-
-    const isMagicAttack = def.damageType === 'magic' || p.stats.damageType === 'magic';
-    const effectiveDefence = isMagicAttack
-      ? getEffectiveStatValue(target.stats.magicDefence, target.activeEffects, 'magicDefence')
-      : getEffectiveStatValue(target.stats.defence, target.activeEffects, 'defence');
-    const { damage } = calculateFinalDamage(scaledDmg, effectiveDefence, crit, p.stats.critDamage ?? 0);
-
-    target.hp = Math.max(0, target.hp - damage);
-    totalDamageDealt += damage;
-
-    if (def.effect?.isDebuff && target.hp > 0) {
-      const dotFlat = def.effect.damagePerRound ?? 0;
-      const dotPct = def.effect.damagePerRoundPercent ?? 0;
-      const resolvedDot = dotFlat + Math.floor((dotPct / 100) * damage);
-      target.activeEffects.push({
-        name: def.effect.name,
-        stat: def.effect.stat,
-        modifier: def.effect.modifier,
-        roundsRemaining: def.effect.duration,
-        ...(resolvedDot > 0 ? { damagePerRound: resolvedDot, dotDamageType: def.effect.dotDamageType } : {}),
-      });
-    }
-
-    entries.push({ ...baseEntry, hit: true, crit, damageRoll: rawDmg, totalDamage: damage });
-  }
-
-  s.damageDealt = totalDamageDealt;
-  if (totalDamageDealt > 0) {
-    addDamageThreat(threatTable, s.playerId, totalDamageDealt);
-  }
-
-  return entries;
-}
+// Defined in raidPlayerPhase to avoid circular imports; re-exported here for API consumers.
+export type { RaidRoundRng } from './raidPlayerPhase';
+import type { RaidRoundRng } from './raidPlayerPhase';
 
 // --- Resolver ---
 
@@ -346,7 +111,6 @@ export function resolveRaidRound(
   // Round log collectors
   const logPlayerAttacks: PlayerRoundActionEntry[] = [];
   const logDefences: DefensiveActionEntry[] = [];
-  const logMobActions: MobActionLogEntry[] = [];
   const logHealing: HealingEntry[] = [];
 
   // --- Step 1: Pick actions for all alive participants ---
@@ -496,7 +260,6 @@ export function resolveRaidRound(
   const cleanseResults: Map<number, { debuffNames: Set<string>; dotNamesToRemove: Set<string> }> = new Map();
   // Buff potion results: buff effects to apply per participant (applied in effect assembly)
   const buffPotionResults: Map<number, BossActiveEffect[]> = new Map();
-
   // Participants whose potion action failed and should fall back to alternate action
   const potionFallbackIndices: number[] = [];
 
@@ -759,306 +522,20 @@ export function resolveRaidRound(
   // --- Step 6: Mob offensive phase ---
   // Accumulator for new effects applied to players this round by mob actions
   const newPlayerEffects: Map<number, BossActiveEffect[]> = new Map();
-  const mobActionResults: MobActionResult[] = [];
 
-  for (const mob of mobState) {
-    if (mob.hp <= 0) continue;
-
-    // Pinned mobs skip their attack (forced defend)
-    const isPinned = mob.activeEffects.some(
-      e => e.stat === 'pinned' && e.roundsRemaining > 0,
-    );
-    if (isPinned) {
-      logMobActions.push({
-        mobId: mob.id,
-        mobName: mobDisplayName(mob),
-        actionId: 'pinned',
-        actionLabel: 'Pinned',
-        targetMode: 'single_target',
-        wasTelegraphed: false,
-        targets: [],
-      });
-      mobActionResults.push({
-        mobId: mob.id,
-        actionId: 'pinned',
-        targetMode: 'single_target',
-        targetPlayerIds: [],
-        damageDealt: 0,
-        healingDone: 0,
-      });
-      continue;
-    }
-
-    const actionIndex = (input.roundNumber - 1) % mob.actionTemplate.length;
-    const templateAction = mob.actionTemplate[actionIndex];
-    const mActionDef = mobActionDefs[templateAction.actionId];
-    if (!mActionDef) continue;
-
-    const mobResult: MobActionResult = {
-      mobId: mob.id,
-      actionId: templateAction.actionId,
-      targetMode: templateAction.targetMode,
-      targetPlayerIds: [],
-      damageDealt: 0,
-      healingDone: 0,
-    };
-
-    const mobLogEntry: MobActionLogEntry = {
-      mobId: mob.id,
-      mobName: mobDisplayName(mob),
-      actionId: templateAction.actionId,
-      actionLabel: actionLabel(templateAction.actionId, mobActionDefs),
-      targetMode: templateAction.targetMode,
-      wasTelegraphed: templateAction.isTelegraphed ?? false,
-      targets: [],
-    };
-
-    // boss_summon_adds: spawn new mobs from the summon pool
-    if (templateAction.actionId === 'boss_summon_adds' && input.summonPool && input.summonPool.length > 0) {
-      const MAX_TOTAL_SUMMONS = EXPEDITION_CONSTANTS.MAX_TOTAL_SUMMONS;
-      const existingSummonCount = mobState.filter(m => m.id.startsWith('mob-summon-')).length + spawnedThisRound.length;
-      const remainingBudget = MAX_TOTAL_SUMMONS - existingSummonCount;
-
-      if (remainingBudget > 0) {
-        const spawnCount = Math.min(2 + (roll.rollDamage(0, 1) >= 1 ? 1 : 0), remainingBudget); // 2-3 adds, capped
-        const mutablePool = [...input.summonPool];
-        for (let s = 0; s < spawnCount && mutablePool.length > 0; s++) {
-          const poolIndex = roll.rollDamage(0, mutablePool.length - 1);
-          const template = mutablePool.splice(poolIndex, 1)[0];
-          const spawnedMob: ExpeditionMobState = {
-            ...template,
-            id: `mob-summon-${input.roundNumber}-${s}`,
-            hp: template.maxHp,
-            activeEffects: [],
-          };
-          spawnedThisRound.push(spawnedMob);
-        }
-      }
-      logMobActions.push({
-        mobId: mob.id,
-        mobName: mobDisplayName(mob),
-        actionId: 'boss_summon_adds',
-        actionLabel: 'Summon Adds',
-        targetMode: 'aoe',
-        wasTelegraphed: templateAction.isTelegraphed ?? false,
-        targets: [],
-      });
-      mobActionResults.push({
-        mobId: mob.id,
-        actionId: 'boss_summon_adds',
-        targetMode: 'aoe',
-        targetPlayerIds: [],
-        damageDealt: 0,
-        healingDone: 0,
-      });
-      continue;
-    }
-
-    // Refresh alive set
-    const aliveAfterOffensive = new Set(pState.filter(s => s.hp > 0).map(s => s.playerId));
-    if (aliveAfterOffensive.size === 0) {
-      mobActionResults.push(mobResult);
-      logMobActions.push(mobLogEntry);
-      continue;
-    }
-
-    if (mActionDef.category === 'offensive' || mActionDef.actionType === 'debuff_spell') {
-      let targets: string[] = [];
-      const currentAggroHolder = getSingleTarget(input.threatTable, aliveAfterOffensive);
-
-      if (templateAction.targetMode === 'single_target') {
-        if (currentAggroHolder) targets = [currentAggroHolder];
-      } else {
-        targets = Array.from(aliveAfterOffensive);
-      }
-
-      const isMagic = mActionDef.damageType === 'magic';
-      const isPhysical = !isMagic;
-
-      for (const targetId of targets) {
-        mobResult.targetPlayerIds.push(targetId);
-        const targetState = pState.find(ps => ps.playerId === targetId);
-        const targetParticipant = input.participants.find(pp => pp.playerId === targetId);
-        if (!targetState || !targetParticipant) continue;
-
-        const targetIdx = pState.findIndex(ps => ps.playerId === targetId);
-        const stance = defStances.get(targetId);
-
-        // Compute hit scores for all attacks (needed for log entries)
-        const mobHitScore = mob.stats.accuracy + (mActionDef.accuracyModifier ?? 0);
-        const playerAvoidScore = calculateAvoidScore(targetParticipant.stats);
-
-        // Counter avoids physical, Ward avoids magic
-        const blocked = (stance?.avoidsPhysical && isPhysical) || (stance?.resistsMagic && isMagic);
-        if (blocked) {
-          mobLogEntry.targets.push({
-            playerId: targetId,
-            username: getUsername(targetId),
-            damageTaken: 0,
-            blocked: true,
-            dodged: false,
-            knockedOut: false,
-            mobHitScore,
-            playerAvoidScore,
-          });
-          continue;
-        }
-
-        // Hit resolution: normal attacks can be dodged, boss specials (alwaysHits) cannot
-        let hitResult: HitResolution | undefined;
-        if (!mActionDef.alwaysHits) {
-          hitResult = resolveHitCheck({
-            combatMode,
-            hitScore: mobHitScore,
-            avoidScore: playerAvoidScore,
-            hitRollValue: roll.rollHitChance(),
-          });
-
-          if (!hitResult.didHit) {
-            // Apply alwaysApplies effects even on dodge (symmetrical with player miss path)
-            if (mActionDef.effect?.alwaysApplies && mActionDef.effect.isDebuff && targetState.hp > 0 && targetIdx >= 0) {
-              const newEffect: BossActiveEffect = {
-                name: mActionDef.effect.name,
-                stat: mActionDef.effect.stat,
-                modifier: mActionDef.effect.modifier,
-                roundsRemaining: mActionDef.effect.duration,
-              };
-              if (!newPlayerEffects.has(targetIdx)) newPlayerEffects.set(targetIdx, []);
-              newPlayerEffects.get(targetIdx)!.push(newEffect);
-            }
-            mobLogEntry.targets.push({
-              playerId: targetId,
-              username: getUsername(targetId),
-              damageTaken: 0,
-              blocked: false,
-              dodged: true,
-              knockedOut: false,
-              hitChance: hitResult.hitChance,
-              hitRollValue: hitResult.hitRollValue,
-              mobHitScore,
-              playerAvoidScore,
-            });
-            continue;
-          }
-        }
-
-        const dmgRaw = roll.rollDamage(mob.stats.damageMin, mob.stats.damageMax);
-        // Apply mob attack buffs (rally/frenzy) as flat bonus damage
-        const mobAttackBonus = getEffectiveStatValue(0, mob.activeEffects, 'attack');
-        let baseDmg = Math.floor(dmgRaw * (mActionDef.damageMultiplier ?? 1.0)) + mobAttackBonus;
-        const combinedTargetEffects = [
-          ...(targetParticipant.activeEffects ?? []),
-          ...(targetIdx >= 0 ? (newPlayerEffects.get(targetIdx) ?? []) : []),
-          ...(targetIdx >= 0 ? (buffActionResults.get(targetIdx) ?? []) : []),
-        ];
-
-        // Execution strike + marked_for_death combo: 3x damage (before defence)
-        if (templateAction.actionId === 'boss_execution_strike') {
-          const isMarked = combinedTargetEffects.some(e => e.stat === 'marked_for_death' && e.roundsRemaining > 0);
-          if (isMarked) {
-            baseDmg *= 3;
-          }
-        }
-
-        // Nature cursed: magic damage amplified 3x (before defence)
-        if (isMagic) {
-          const isCursed = combinedTargetEffects.some(
-            e => e.stat === 'nature_cursed' && e.roundsRemaining > 0,
-          );
-          if (isCursed) {
-            baseDmg *= 3;
-          }
-        }
-
-        // Use effect-modified player defence (accounts for wither etc.)
-        const effectivePlayerDefence = isMagic
-          ? getEffectiveStatValue(targetParticipant.stats.magicDefence, combinedTargetEffects, 'magicDefence')
-          : getEffectiveStatValue(targetParticipant.stats.defence, combinedTargetEffects, 'defence');
-
-        let damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, baseDmg - effectivePlayerDefence);
-
-        if (stance?.isChanneling) {
-          damage = Math.floor(damage * COMBAT_ACTION_CONSTANTS.CHANNELING_BONUS_DAMAGE);
-        }
-
-        if (stance?.damageReductionPercent && stance.damageReductionPercent > 0) {
-          damage = Math.floor(damage * (1 - stance.damageReductionPercent));
-          damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, damage);
-        }
-
-        targetState.damageTaken += damage;
-        targetState.hp = Math.max(0, targetState.hp - damage);
-        mobResult.damageDealt += damage;
-
-        mobLogEntry.targets.push({
-          playerId: targetId,
-          username: getUsername(targetId),
-          damageTaken: damage,
-          blocked: false,
-          dodged: false,
-          knockedOut: targetState.hp <= 0,
-          hitChance: hitResult?.hitChance,
-          hitRollValue: hitResult?.hitRollValue,
-          mobHitScore,
-          playerAvoidScore,
-          damageRoll: dmgRaw,
-        });
-
-        // Apply mob debuff/DoT effects to player on hit
-        if (mActionDef.effect?.isDebuff && targetState.hp > 0 && targetIdx >= 0) {
-          const newEffect: BossActiveEffect = {
-            name: mActionDef.effect.name,
-            stat: mActionDef.effect.stat,
-            modifier: mActionDef.effect.modifier,
-            roundsRemaining: mActionDef.effect.duration,
-            ...(mActionDef.effect.damagePerRound ? {
-              damagePerRound: mActionDef.effect.damagePerRound,
-              dotDamageType: mActionDef.effect.dotDamageType,
-            } : {}),
-          };
-          if (!newPlayerEffects.has(targetIdx)) newPlayerEffects.set(targetIdx, []);
-          newPlayerEffects.get(targetIdx)!.push(newEffect);
-        }
-      }
-    }
-
-    // Mob heal_self
-    if (mActionDef.actionType === 'heal_self') {
-      const healAmount = Math.floor((mActionDef.healPercent ?? 0) * mob.maxHp) + (mActionDef.healFlat ?? 0);
-      const actualHeal = Math.min(healAmount, mob.maxHp - mob.hp);
-      mob.hp += actualHeal;
-      mobResult.healingDone = actualHeal;
-    }
-
-    // boss_rally — buff ALL alive mobs, not just self
-    if (templateAction.actionId === 'boss_rally' && mActionDef.effect) {
-      for (const m of mobState) {
-        if (m.hp <= 0) continue;
-        m.activeEffects.push({
-          name: mActionDef.effect.name,
-          stat: mActionDef.effect.stat,
-          modifier: mActionDef.effect.modifier,
-          roundsRemaining: mActionDef.effect.duration,
-        });
-      }
-      mobActionResults.push(mobResult);
-      logMobActions.push(mobLogEntry);
-      continue;
-    }
-
-    // Mob enrage/buff — applied to the mob itself
-    if (mActionDef.actionType === 'buff' && mActionDef.effect) {
-      mob.activeEffects.push({
-        name: mActionDef.effect.name,
-        stat: mActionDef.effect.stat,
-        modifier: mActionDef.effect.modifier,
-        roundsRemaining: mActionDef.effect.duration,
-      });
-    }
-
-    mobActionResults.push(mobResult);
-    logMobActions.push(mobLogEntry);
-  }
+  const { mobActionResults, logMobActions } = resolveMobActions({
+    mobState,
+    pState,
+    input,
+    defStances,
+    newPlayerEffects,
+    buffActionResults,
+    roll,
+    combatMode,
+    getUsername,
+    spawnedThisRound,
+    mobActionDefs,
+  });
 
   // Push spawned mobs into mobState AFTER the mob loop so they don't act this round
   for (const spawned of spawnedThisRound) {
