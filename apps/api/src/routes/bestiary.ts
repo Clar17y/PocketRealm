@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '@pocketrealm/database';
-import { getAllMobPrefixes, BOSS_TEMPLATES, CACHE_HEADER_CONSTANTS } from '@pocketrealm/shared';
+import { getAllMobPrefixes, BOSS_TEMPLATES, CACHE_HEADER_CONSTANTS, QUERY_LIMITS } from '@pocketrealm/shared';
 import type { BossRotationReveal } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { calculateExplorationPercent } from '../services/zoneExplorationService';
@@ -39,6 +39,7 @@ bestiaryRouter.get('/', asyncHandler(async (req, res) => {
         },
       },
       orderBy: [{ zoneId: 'asc' }, { name: 'asc' }],
+      take: QUERY_LIMITS.MAX_BESTIARY_RESULTS,
     }),
     prisma.playerBestiary.findMany({
       where: { playerId },
