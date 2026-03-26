@@ -6,7 +6,7 @@ import {
 } from '@pocketrealm/game-engine';
 import {
   PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, BASE_ACTION_DEFINITIONS,
-  TALENT_TREE_DEFINITIONS, FLEE_CONSTANTS,
+  TALENT_TREE_DEFINITIONS, FLEE_CONSTANTS, QUERY_LIMITS,
   type ActionDefinition, type FleeOutcome,
 } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
@@ -696,6 +696,7 @@ export async function getNotifications(playerId: string) {
       attacker: { select: { username: true } },
     },
     orderBy: { createdAt: 'desc' },
+    take: QUERY_LIMITS.MAX_PVP_NOTIFICATIONS,
   });
 }
 
@@ -729,6 +730,7 @@ export async function getScoutNotifications(playerId: string) {
     where: { targetId: playerId, isRead: false },
     include: { scouter: { select: { username: true } } },
     orderBy: { createdAt: 'desc' },
+    take: QUERY_LIMITS.MAX_SCOUT_NOTIFICATIONS,
   });
   return logs.map(l => ({
     id: l.id,
