@@ -30,7 +30,6 @@ export async function startProject(
   if (membership.guildId !== guildId) {
     throw new AppError(403, 'Not in this guild', 'NOT_IN_GUILD');
   }
-  const guild = membership.guild;
 
   // Check no active project
   const activeProject = await prisma.guildProject.findFirst({
@@ -56,18 +55,8 @@ export async function startProject(
     throw new AppError(400, 'Prerequisites not met', 'PREREQUISITES_NOT_MET');
   }
 
-  // Check treasury
-  if (guild.treasuryTurns < def.treasuryCost) {
-    throw new AppError(400, 'Insufficient treasury for this project', 'INSUFFICIENT_TREASURY');
-  }
-
-  // Transaction: deduct treasury, create project, log
+  // Transaction: create project, log
   const project = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    await tx.guild.update({
-      where: { id: guildId },
-      data: { treasuryTurns: { decrement: def.treasuryCost } },
-    });
-
     const created = await tx.guildProject.create({
       data: {
         guildId,
@@ -82,8 +71,8 @@ export async function startProject(
       data: {
         guildId,
         eventType: 'project_started',
-        message: `${def.name} project started (cost: ${def.treasuryCost.toLocaleString()} treasury turns)`,
-        metadata: { projectKey, treasuryCost: def.treasuryCost },
+        message: `${def.name} project started`,
+        metadata: { projectKey },
       },
     });
 
@@ -353,7 +342,6 @@ export async function getAvailableProjects(guildId: string) {
         description: def.description,
         level: def.level,
         prerequisites: def.prerequisites,
-        treasuryCost: def.treasuryCost,
         materialCosts: [...def.materialCosts],
         memberTurnGoal: def.memberTurnGoal,
         perks: [...def.perks],
@@ -439,7 +427,6 @@ function toProjectData(
     description: def?.description ?? '',
     level: def?.level ?? 0,
     status: project.status,
-    treasuryCost: def?.treasuryCost ?? 0,
     materialCosts: def?.materialCosts ? [...def.materialCosts] : [],
     materialsProgress: materialsProgressSchema.catch({}).parse(project.materialsProgress ?? {}),
     memberTurnGoal: def?.memberTurnGoal ?? 0,
