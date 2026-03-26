@@ -142,6 +142,7 @@ export function GameScreenRenderer({
     stateSetters, refreshPendingEncounters, setActionError,
     activeEncounterSiteId, setActiveEncounterSiteId,
     isActivityLocked, activityLockReason,
+    loadFriendCounts,
   } = gc;
 
   // Screen-specific memos
