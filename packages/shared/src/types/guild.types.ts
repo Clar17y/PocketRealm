@@ -87,6 +87,7 @@ export interface GuildContractData {
   status: 'active' | 'completed' | 'expired';
   rewardGuildXp: number;
   rewardTreasuryTurns: number;
+  rewardRenown: number;
   weekStartedAt: string;
   expiresAt: string;
 }
@@ -111,7 +112,6 @@ export interface GuildProjectDefinition {
   description: string;
   level: number;
   prerequisites: string[];
-  treasuryCost: number;
   materialCosts: GuildProjectMaterialCost[];
   memberTurnGoal: number;
   perks: GuildProjectPerk[];
@@ -125,7 +125,6 @@ export interface GuildProjectData {
   description: string;
   level: number;
   status: GuildProjectStatus;
-  treasuryCost: number;
   materialCosts: GuildProjectMaterialCost[];
   materialsProgress: Record<string, number>;
   memberTurnGoal: number;
