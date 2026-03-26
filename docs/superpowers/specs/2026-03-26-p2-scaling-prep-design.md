@@ -42,8 +42,8 @@ Apply to **all** refresh functions consistently:
 | `refreshPvp` | `pvpRating` | Paginate, process per batch |
 | `refreshProgression` | `player` | Paginate, process per batch |
 | `refreshSkills` | `playerSkill` | Paginate, accumulate per-skill + total maps across batches |
-| `refreshCombat` | `playerBestiary` | Paginate, accumulate kill totals across batches |
-| `refreshCombat` (boss) | `bossParticipant` | Paginate, accumulate damage totals across batches |
+| `refreshCombat` | `playerBestiary` | Paginate within the function, accumulate kill totals across batches |
+| `refreshCombat` | `bossParticipant` | Paginate separately within the same function, accumulate damage totals across batches |
 | `refreshGuilds` | `guild` | Paginate for consistency |
 | `refreshCasino` | N/A (raw SQL) | Already bounded by aggregation, no change |
 
@@ -70,19 +70,20 @@ Add `take` limits to queries that currently return unbounded result sets. No cur
 | `pvpService.getNotifications` | All unread PvP notifications | Add `take: 50` (newest first via existing `orderBy`) |
 | `pvpService.getScoutNotifications` | All unread scout notifications | Add `take: 50` (newest first via existing `orderBy`) |
 | `GET /bestiary` route | All mob templates + includes | Add `take: 200` safety cap (~50 mobs now) |
-| `GET /inventory` route | All player items + template include | Add `take: 100` per-player guard |
+| `GET /inventory` route | All player items + template include | Add `take: 200` per-player guard (exceeds max capacity ~80) |
 
 ### Constants
 
 Add to `gameConstants.ts`:
 
 - `MAX_PVP_NOTIFICATIONS: 50`
+- `MAX_SCOUT_NOTIFICATIONS: 50`
 - `MAX_BESTIARY_RESULTS: 200`
-- `MAX_INVENTORY_RESULTS: 100`
+- `MAX_INVENTORY_RESULTS: 200`
 
 ### UX impact
 
-None. If a player has 200+ unread PvP notifications, they see the 50 most recent. Bestiary and inventory caps are well above current maximums.
+None. If a player has 200+ unread PvP notifications, they see the 50 most recent. Bestiary cap is well above current mob count (~50). Inventory cap of 200 exceeds the maximum possible inventory capacity (base 24 + backpack/belt/champion bonuses ≈ 80 slots), so it will never truncate legitimate inventory.
 
 ---
 
@@ -96,11 +97,25 @@ Every socket connection fires 2 DB queries to determine room joins (player zone 
 
 **Guild lookup:** Replace the raw `prisma.guildMember.findUnique()` with the existing `getPlayerGuildId(playerId)` from `guildService.ts`, which already uses `cachedQuery` with key `guild:member:{playerId}`.
 
-**Zone lookup:** Add a new `getPlayerZoneId(playerId)` function following the same `cachedQuery` pattern:
+**Zone lookup:** Add a new `getPlayerZoneId(playerId)` function in `apps/api/src/services/zoneService.ts` (new file), following the same `cachedQuery` pattern:
 - Cache key: `player:zone:{playerId}`
 - TTL: 60 seconds
 - Fetcher: `prisma.player.findUnique({ where: { id: playerId }, select: { currentZoneId: true } })`
-- Invalidation: call `invalidateCache('player:zone:{playerId}')` wherever the player's zone changes (travel endpoints).
+- Invalidation: call `invalidateZoneIdCache(playerId)` at all `currentZoneId` mutation sites:
+
+| File | Line(s) | Context |
+|---|---|---|
+| `routes/zones.ts` | ~89 | Lazy-init for players without a zone |
+| `routes/zones.ts` | ~242 | Normal travel |
+| `routes/zones.ts` | ~660 | Recall/fast travel |
+| `routes/admin.ts` | ~473 | Admin teleport |
+| `services/questShopService.ts` | ~301 | Quest teleport scroll |
+| `services/questShopService.ts` | ~334 | Quest home teleport scroll |
+| `services/zoneDiscoveryService.ts` | ~202 | Zone discovery init |
+
+Note: `routes/combat/sites.ts:313,421` only *read* `currentZoneId` after a respawn — the actual mutation happens in the combat/respawn service prior to those reads, which is covered by the travel paths above.
+
+Minor staleness (up to 60s TTL) is acceptable here — this cache is only used for best-effort chat room assignment on socket connect. If stale, the player joins the wrong zone chat briefly; it self-corrects when they explicitly switch zones via `chat:switch-zone`.
 
 ### What stays the same
 
@@ -143,5 +158,9 @@ Add a `// TODO: @socket.io/redis-adapter needed for multi-instance deployment` c
 - `apps/api/src/routes/inventory.ts` — take limit
 - `apps/api/src/socket/index.ts` — TODO comment
 - `apps/api/src/socket/chatHandlers.ts` — cached lookups
-- `apps/api/src/services/playerService.ts` (or similar) — new `getPlayerZoneId`
+- `apps/api/src/services/zoneService.ts` (new) — `getPlayerZoneId` + `invalidateZoneIdCache`
+- `apps/api/src/routes/zones.ts` — zone cache invalidation calls
+- `apps/api/src/routes/admin.ts` — zone cache invalidation on teleport
+- `apps/api/src/services/questShopService.ts` — zone cache invalidation on quest teleport
+- `apps/api/src/services/zoneDiscoveryService.ts` — zone cache invalidation on discovery init
 - `packages/shared/src/constants/gameConstants.ts` — new constants
