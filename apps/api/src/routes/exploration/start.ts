@@ -42,7 +42,6 @@ import { persistExplorationResults } from '../../services/explorationPersistence
 import {
   startSchema,
   type ZoneFamilyRow,
-  type ZoneFamilyMember,
 } from './helpers';
 
 
@@ -367,9 +366,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       });
     }
 
-    const [stateUpdates] = await Promise.all([
-      buildStateUpdates(playerId, ['hp', 'resources']),
-    ]);
+    const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
     await mergeLootIntoStateUpdates(playerId, allNewItemIds, allUpdatedItemIds, stateUpdates);
 
     res.json({

@@ -30,8 +30,6 @@ import {
 import {
   allocatePlayerAttribute,
   craft,
-  equip,
-  getBestiary,
   getCraftingRecipes,
   getEquipment,
   getHpState,
@@ -46,11 +44,6 @@ import {
   mine,
   rest,
   restEstimate,
-  startExploration,
-  travelToZone,
-  unequip,
-  claimLoot,
-  fetchPendingLoot,
   getResources,
   getSkillPointState,
   allocateSkillPoint,
@@ -58,7 +51,6 @@ import {
   getTemplates,
   activateTemplate,
   type ApiResponse,
-  type PendingLootItem,
   type WorldEventResponse,
   type SkillPointState,
   exchangeGold,
@@ -71,12 +63,10 @@ import {
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
-import { STAMINA_CONSTANTS, MANA_CONSTANTS, ITEM_RARITY_CONSTANTS, COMBAT_CONSTANTS, CRAFTING_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
+import { STAMINA_CONSTANTS, MANA_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
 
 import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
-import { fmtDur } from '@/lib/format';
-import { findShortestZonePath } from '@/lib/zoneRoutes';
 import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
 export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
@@ -761,7 +751,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   });
 
   const explorationActions = useExplorationActions({
-    hpState, currentZone, runAction, pushLog,
+    hpStateRef, currentZone, runAction, pushLog,
     setTurns, setActionError, setPlaybackActive, stateSetters,
     advanceTutorial,
     combatLogPrefetchClear: combatLogPrefetch.clear,

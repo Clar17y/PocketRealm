@@ -400,11 +400,11 @@ export async function resolveExpeditionRound(expeditionId: string, io: Server | 
     }),
   );
 
-  for (const pr of result.participantResults) {
-    if (pr.potionsConsumed.length > 0) {
-      await deductConsumedPotions(pr.playerId, pr.potionsConsumed);
-    }
-  }
+  await Promise.all(
+    result.participantResults
+      .filter(pr => pr.potionsConsumed.length > 0)
+      .map(pr => deductConsumedPotions(pr.playerId, pr.potionsConsumed)),
+  );
 
   if (expedition.themeId) {
     const participantIds = aliveMembers.map(m => m.playerId);

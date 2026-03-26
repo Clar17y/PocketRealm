@@ -23,7 +23,7 @@ interface ExplorationPlaybackData {
 }
 
 interface UseExplorationActionsParams {
-  hpState: HpState;
+  hpStateRef: React.MutableRefObject<HpState>;
   currentZone: { id: string; name: string } | null;
   runAction: (name: string, fn: () => Promise<void>) => Promise<void>;
   pushLog: (...entries: ActivityLogEntry[]) => void;
@@ -40,7 +40,7 @@ interface UseExplorationActionsParams {
 }
 
 export function useExplorationActions({
-  hpState,
+  hpStateRef,
   currentZone,
   runAction,
   pushLog,
@@ -113,8 +113,8 @@ export function useExplorationActions({
     if (!currentZone) return;
 
     await runAction('exploration', async () => {
-      const hpBefore = hpState.currentHp;
-      const maxHpBefore = hpState.maxHp;
+      const hpBefore = hpStateRef.current.currentHp;
+      const maxHpBefore = hpStateRef.current.maxHp;
       const res = await startExploration(currentZone.id, turnSpend, tier);
       const data = res.data;
       if (!data) {
