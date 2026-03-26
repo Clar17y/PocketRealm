@@ -11,6 +11,7 @@ import { emitAchievementNotifications } from './achievementService';
 import { assertNotOverEncumbered } from './inventoryService';
 import { getWeekStart, getLevelBracket } from '../utils/dateHelpers';
 import { randomIntInclusive } from '../utils/random';
+import { invalidateZoneIdCache } from './zoneService';
 
 import type { ShopItemData } from '@pocketrealm/shared';
 
@@ -138,6 +139,11 @@ export async function purchaseItem(playerId: string, shopItemId: string, params?
 
     return { newBalance: updatedState.questTokens, itemKey: item.key, effect };
   });
+
+  // Invalidate zone cache after teleport/hearthstone effects
+  if (result.effect?.type === 'teleport' || result.effect?.type === 'hearthstone') {
+    await invalidateZoneIdCache(playerId);
+  }
 
   // Emit achievement notification after transaction commits (for prestige titles)
   if (result.effect?.type === 'prestige' && result.effect?.achievementId) {

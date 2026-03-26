@@ -1,4 +1,5 @@
 import { Prisma, prisma } from '@pocketrealm/database';
+import { invalidateZoneIdCache } from './zoneService';
 
 /** Shape of a mob entry stored in the encounterSite JSON `mobs` column. */
 interface EncounterSiteMob {
@@ -203,6 +204,7 @@ export async function respawnToHomeTown(playerId: string): Promise<{ townId: str
       lastTravelledFromZoneId: null,
     },
   });
+  await invalidateZoneIdCache(playerId);
 
   return { townId: town.id, townName: town.name };
 }

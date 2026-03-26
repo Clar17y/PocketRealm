@@ -12,6 +12,7 @@ import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { sendPush } from '../services/pushNotificationService';
 import { normalizePlayerAttributes } from '../services/attributesService';
+import { invalidateZoneIdCache } from '../services/zoneService';
 import { createActivityLog } from '../services/activityLogService';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
@@ -472,6 +473,7 @@ router.post('/zones/teleport', asyncHandler(async (req, res) => {
     where: { id: req.player!.playerId },
     data: { currentZoneId: zoneId },
   });
+  await invalidateZoneIdCache(req.player!.playerId);
   await adminAudit(req.player!.playerId, 'teleport', { zoneId });
   res.json({ success: true, zoneId, stateUpdates: { currentZoneId: zoneId } });
 }));

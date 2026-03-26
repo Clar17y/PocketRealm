@@ -40,6 +40,7 @@ import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers 
 import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
 import { getCachedZones, getCachedZoneConnections, getCachedMobTemplatesByZone } from '../services/staticDataCacheService';
+import { invalidateZoneIdCache } from '../services/zoneService';
 
 
 
@@ -88,6 +89,7 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
         where: { id: playerId },
         data: { currentZoneId: starterZone.id, homeTownId: starterZone.id },
       });
+      await invalidateZoneIdCache(playerId);
     }
   }
 
@@ -243,6 +245,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         lastTravelledFromZoneId: currentZoneId,
       },
     });
+    await invalidateZoneIdCache(playerId);
 
     let newDiscoveries: Array<{ id: string; name: string }> = [];
     if (destinationZone.zoneType === 'town') {
@@ -680,6 +683,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     where: { id: playerId },
     data: updateData,
   });
+  await invalidateZoneIdCache(playerId);
 
   void trackProgress(playerId, 'zone_travel', 1);
 
