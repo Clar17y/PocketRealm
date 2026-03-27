@@ -5,6 +5,15 @@ import { AppError } from '../middleware/errorHandler';
 
 // ── Paginated fetch helper ───────────────────────────────────────────────────
 
+// Shared player sub-shape selected in leaderboard queries
+interface LeaderboardPlayerSummary {
+  username: string;
+  characterLevel: number;
+  isBot: boolean;
+  role: string;
+  activeTitle: string | null;
+}
+
 // Row shapes for each paginated query (must include `id` for cursor pagination)
 interface PvpRatingRow {
   id: string;
@@ -13,7 +22,7 @@ interface PvpRatingRow {
   wins: number;
   bestRating: number;
   winStreak: number;
-  player: { username: string; characterLevel: number; isBot: boolean; role: string; activeTitle: string | null };
+  player: LeaderboardPlayerSummary;
 }
 interface PlayerRow {
   id: string;
@@ -29,19 +38,13 @@ interface PlayerSkillRow {
   playerId: string;
   skillType: string;
   level: number;
-  player: { username: string; characterLevel: number; isBot: boolean; role: string; activeTitle: string | null };
-}
-interface PlayerBestiaryRow {
-  id: string;
-  playerId: string;
-  kills: number;
-  player: { username: string; characterLevel: number; isBot: boolean; role: string; activeTitle: string | null };
+  player: LeaderboardPlayerSummary;
 }
 interface BossParticipantRow {
   id: string;
   playerId: string;
   totalDamage: number;
-  player: { username: string; characterLevel: number; isBot: boolean; role: string; activeTitle: string | null };
+  player: LeaderboardPlayerSummary;
 }
 interface GuildRow {
   id: string;
@@ -53,11 +56,11 @@ interface GuildRow {
 }
 
 /**
- * Iterate a Prisma model in cursor-based batches.
- * Collects all rows across batches and returns them.
+ * Fetches all rows from a Prisma model in cursor-based batches to avoid
+ * unbounded single-query memory pressure at scale.
  */
 async function paginatedFindMany<T extends { id: string }>(
-  findMany: (args: { take: number; skip?: number; cursor?: { id: string }; select?: unknown }) => Promise<T[]>,
+  findMany: (args: { take: number; skip?: number; cursor?: { id: string }; select?: unknown; orderBy?: unknown }) => Promise<T[]>,
   baseArgs: { select?: unknown },
 ): Promise<T[]> {
   const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
@@ -68,6 +71,7 @@ async function paginatedFindMany<T extends { id: string }>(
   do {
     batch = await findMany({
       ...baseArgs,
+      orderBy: { id: 'asc' },
       take: batchSize,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
     });
@@ -434,13 +438,11 @@ async function refreshSkills() {
 }
 
 async function refreshCombat() {
-  // Total kills from bestiary
-  const bestiaryRaw = await paginatedFindMany<PlayerBestiaryRow>(
-    (args) => prisma.playerBestiary.findMany(args as Parameters<typeof prisma.playerBestiary.findMany>[0]) as unknown as Promise<PlayerBestiaryRow[]>,
-    {
-      select: { id: true, playerId: true, kills: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
-    },
-  );
+  // Total kills from bestiary — uses direct findMany because PlayerBestiary has
+  // a composite PK (playerId + mobTemplateId), incompatible with cursor pagination
+  const bestiaryRaw = await prisma.playerBestiary.findMany({
+    select: { playerId: true, kills: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
+  });
 
   const killTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }>();
   for (const b of bestiaryRaw) {

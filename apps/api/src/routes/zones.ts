@@ -89,7 +89,7 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
         where: { id: playerId },
         data: { currentZoneId: starterZone.id, homeTownId: starterZone.id },
       });
-      await invalidateZoneIdCache(playerId);
+      void invalidateZoneIdCache(playerId);
     }
   }
 

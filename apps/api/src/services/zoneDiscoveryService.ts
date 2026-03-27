@@ -204,7 +204,7 @@ export async function respawnToHomeTown(playerId: string): Promise<{ townId: str
       lastTravelledFromZoneId: null,
     },
   });
-  await invalidateZoneIdCache(playerId);
+  void invalidateZoneIdCache(playerId);
 
   return { townId: town.id, townName: town.name };
 }

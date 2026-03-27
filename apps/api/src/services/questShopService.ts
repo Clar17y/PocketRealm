@@ -142,7 +142,7 @@ export async function purchaseItem(playerId: string, shopItemId: string, params?
 
   // Invalidate zone cache after teleport/hearthstone effects
   if (result.effect?.type === 'teleport' || result.effect?.type === 'hearthstone') {
-    await invalidateZoneIdCache(playerId);
+    void invalidateZoneIdCache(playerId);
   }
 
   // Emit achievement notification after transaction commits (for prestige titles)

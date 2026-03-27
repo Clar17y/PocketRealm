@@ -473,7 +473,7 @@ router.post('/zones/teleport', asyncHandler(async (req, res) => {
     where: { id: req.player!.playerId },
     data: { currentZoneId: zoneId },
   });
-  await invalidateZoneIdCache(req.player!.playerId);
+  void invalidateZoneIdCache(req.player!.playerId);
   await adminAudit(req.player!.playerId, 'teleport', { zoneId });
   res.json({ success: true, zoneId, stateUpdates: { currentZoneId: zoneId } });
 }));

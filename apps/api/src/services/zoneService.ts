@@ -1,7 +1,7 @@
 import { prisma } from '@pocketrealm/database';
+import { CACHE_TTL_CONSTANTS } from '@pocketrealm/shared';
 import { cachedQuery, invalidateCache } from './cacheService';
 
-const ZONE_CACHE_TTL = 60; // seconds
 const zoneIdCacheKey = (playerId: string) => `player:zone:${playerId}`;
 
 export async function getPlayerZoneId(playerId: string): Promise<string | null> {
@@ -14,7 +14,7 @@ export async function getPlayerZoneId(playerId: string): Promise<string | null> 
       });
       return player?.currentZoneId ?? null;
     },
-    ZONE_CACHE_TTL,
+    CACHE_TTL_CONSTANTS.PLAYER_ZONE_TTL,
   );
 }
 

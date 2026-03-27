@@ -22,7 +22,3 @@ export const redis = new Redis(REDIS_URL, {
 redis.on('error', (err) => {
   console.error('[Redis] Connection error:', err.message);
 });
-
-redis.on('reconnecting', () => {
-  console.warn('[Redis] Reconnecting...');
-});

@@ -1526,6 +1526,8 @@ export const CACHE_TTL_CONSTANTS = {
   STATIC_DATA_TTL: 86400,
   /** Seconds — per-player guild modifier cache */
   GUILD_MODIFIERS_TTL: 90,
+  /** Seconds — per-player zone ID cache (socket room joins) */
+  PLAYER_ZONE_TTL: 60,
 } as const;
 
 // =============================================================================
