@@ -44,7 +44,7 @@ export { handleRoomCleared, handleWipe, completeExpedition } from './expeditionT
 
 export async function getExpeditionCooldowns(guildId: string, playerId: string): Promise<ExpeditionCooldownInfo> {
   const now = new Date();
-  const betweenAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
+  const betweenAgo = new Date(now.getTime() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
 
   const [activeExp, playerCooldowns, recentAny] = await Promise.all([
     prisma.guildExpedition.findFirst({
@@ -78,16 +78,20 @@ async function setExpeditionCooldowns(expeditionId: string, tier: number): Promi
     select: { playerId: true },
   });
 
+  if (participants.length === 0) return;
+
   const expiresAt = new Date(Date.now() + EXPEDITION_CONSTANTS.WEEKLY_COOLDOWN_MS);
-  await Promise.all(
-    participants.map((p) =>
-      prisma.expeditionCooldown.upsert({
-        where: { playerId_tier: { playerId: p.playerId, tier } },
-        create: { playerId: p.playerId, tier, expiresAt },
-        update: { expiresAt },
-      }),
-    ),
-  );
+  const playerIds = participants.map((p) => p.playerId);
+
+  // Batch: delete existing then create fresh — single transaction, 2 queries instead of N
+  await prisma.$transaction([
+    prisma.expeditionCooldown.deleteMany({
+      where: { playerId: { in: playerIds }, tier },
+    }),
+    prisma.expeditionCooldown.createMany({
+      data: playerIds.map((playerId) => ({ playerId, tier, expiresAt })),
+    }),
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +123,7 @@ export async function launchExpedition(
 
   // Check cooldowns in parallel (all independent queries)
   const now = new Date();
-  const betweenAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
+  const betweenAgo = new Date(now.getTime() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
 
   const [activeExpedition, playerCooldown, recentAnyExpedition] = await Promise.all([
     prisma.guildExpedition.findFirst({
@@ -1216,7 +1220,6 @@ export async function handleWipe(expeditionId: string): Promise<void> {
       { expeditionId, wipeCount: newWipeCount },
     );
 
-    // Set per-player-per-tier cooldowns on failure too
     await setExpeditionCooldowns(expeditionId, expedition.tier);
 
     // Notify expedition members of failure
@@ -1332,7 +1335,6 @@ export async function abandonExpedition(expeditionId: string, playerId: string):
     { expeditionId },
   );
 
-  // Set per-player-per-tier cooldowns on abandonment
   await setExpeditionCooldowns(expeditionId, expedition.tier);
 
   await cleanupExpeditionBots(expeditionId);
@@ -1441,7 +1443,6 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
     { expeditionId },
   );
 
-  // Set per-player-per-tier cooldowns
   await setExpeditionCooldowns(expeditionId, expedition.tier);
 
   // Notify expedition members
