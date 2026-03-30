@@ -12,6 +12,7 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     exclude: ['dist/**', 'node_modules/**'],
+    setupFiles: ['src/__test__/setup.ts'],
     env: {
       JWT_SECRET: 'test-secret-at-least-thirty-two-characters-long',
     },
