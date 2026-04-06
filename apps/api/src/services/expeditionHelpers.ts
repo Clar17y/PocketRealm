@@ -1,4 +1,4 @@
-import { Prisma, prisma } from '@pocketrealm/database';
+import { prisma } from '@pocketrealm/database';
 import {
   EXPEDITION_CONSTANTS,
   EXPEDITION_THEMES_BY_ID,
@@ -205,4 +205,30 @@ export function buildUpdatedAttemptLogs(
     ...extra,
   };
   return [...(existing as unknown[]), attemptLog];
+}
+
+// ---------------------------------------------------------------------------
+// Expedition Cooldowns
+// ---------------------------------------------------------------------------
+
+export async function setExpeditionCooldowns(expeditionId: string, tier: number): Promise<void> {
+  const participants = await prisma.guildExpeditionMember.findMany({
+    where: { expeditionId },
+    select: { playerId: true },
+  });
+
+  if (participants.length === 0) return;
+
+  const expiresAt = new Date(Date.now() + EXPEDITION_CONSTANTS.WEEKLY_COOLDOWN_MS);
+  const playerIds = participants.map((p) => p.playerId);
+
+  // Batch: delete existing then create fresh — single transaction, 2 queries instead of N
+  await prisma.$transaction([
+    prisma.expeditionCooldown.deleteMany({
+      where: { playerId: { in: playerIds }, tier },
+    }),
+    prisma.expeditionCooldown.createMany({
+      data: playerIds.map((playerId) => ({ playerId, tier, expiresAt })),
+    }),
+  ]);
 }

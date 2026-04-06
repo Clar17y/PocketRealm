@@ -1426,10 +1426,10 @@ export const MAIL_CONSTANTS = {
 // =============================================================================
 
 export const EXPEDITION_CONSTANTS = {
-  TREASURY_COST_BY_TIER: [50_000, 125_000, 250_000, 400_000] as const,
-  LEVEL_REQUIREMENT_BY_TIER: [10, 16, 23, 30] as const,
-  MIN_PARTICIPANTS_BY_TIER: [5, 5, 5, 5] as const,
-  ROOMS_BY_TIER: [5, 6, 8, 10] as const,
+  TREASURY_COST_BY_TIER: [50_000, 125_000, 250_000] as const,
+  LEVEL_REQUIREMENT_BY_TIER: [10, 16, 23] as const,
+  MIN_PARTICIPANTS_BY_TIER: [5, 5, 5] as const,
+  ROOMS_BY_TIER: [5, 6, 8] as const,
   MOB_COUNTS: {
     trash: [4, 5] as const,
     elite: [3, 4] as const,
@@ -1459,7 +1459,7 @@ export const EXPEDITION_CONSTANTS = {
     event: 8,
     final_boss: 20,
   } as const,
-  TOKEN_TIER_MULTIPLIER: [1, 2, 4, 6] as const,
+  TOKEN_TIER_MULTIPLIER: [1, 2, 4] as const,
   COMPLETION_BONUS_MULTIPLIER: 1.0,
   LOOT_MULTIPLIER: {
     trash: 1.0,

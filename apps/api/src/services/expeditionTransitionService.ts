@@ -18,6 +18,7 @@ import {
   cleanupExpeditionBots,
   buildTemplateIdMap,
   buildUpdatedAttemptLogs,
+  setExpeditionCooldowns,
 } from './expeditionHelpers';
 
 // ---------------------------------------------------------------------------
@@ -149,6 +150,9 @@ export async function handleWipe(expeditionId: string): Promise<void> {
       { expeditionId, wipeCount: newWipeCount },
     );
 
+    // Set per-player-per-tier cooldowns on max-attempt failure
+    await setExpeditionCooldowns(expeditionId, expedition.tier);
+
     // Notify expedition members of failure
     for (const member of expedition.members) {
       void sendPush(member.playerId, 'expeditionFinished', {
@@ -254,6 +258,9 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
     `Tier ${expedition.tier} expedition completed!`,
     { expeditionId },
   );
+
+  // Set per-player-per-tier cooldowns
+  await setExpeditionCooldowns(expeditionId, expedition.tier);
 
   // Notify expedition members
   for (const member of expedition.members) {

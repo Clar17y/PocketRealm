@@ -316,10 +316,10 @@ describe('expeditionService', () => {
 
     it('rejects invalid tier', async () => {
       await expect(launchExpedition(PLAYER_ID, 0)).rejects.toThrow(
-        'Tier must be 1, 2, 3, or 4',
+        'Tier must be 1, 2, or 3',
       );
-      await expect(launchExpedition(PLAYER_ID, 5)).rejects.toThrow(
-        'Tier must be 1, 2, 3, or 4',
+      await expect(launchExpedition(PLAYER_ID, 4)).rejects.toThrow(
+        'Tier must be 1, 2, or 3',
       );
     });
   });
