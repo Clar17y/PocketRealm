@@ -20,6 +20,7 @@ import { createEmailVerificationToken, verifyEmailToken, createPasswordResetToke
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
 import { recordFailedLogin, isLockedOut, clearLockout, checkEmailRateLimit } from '../services/lockoutService';
 import { verifyPlayerEmail, changePlayerEmail, changePlayerPassword } from '../services/authService';
+import { logger } from '../logger';
 
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
@@ -199,7 +200,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   // Fire-and-forget: don't block registration on email send
   createEmailVerificationToken(player.id)
     .then(({ rawToken }) => sendVerificationEmail(player.email, rawToken, player.username))
-    .catch((err) => console.error('Failed to send verification email:', err));
+    .catch((err) => logger.error({ err }, 'Failed to send verification email'));
 }));
 
 authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
@@ -393,7 +394,7 @@ authRouter.post('/forgot-password', forgotPasswordLimiter, asyncHandler(async (r
     if (allowed) {
       const { rawToken } = await createPasswordResetToken(player.id);
       sendPasswordResetEmail(email, rawToken, player.username).catch((err) =>
-        console.error('Failed to send password reset email:', err),
+        logger.error({ err }, 'Failed to send password reset email'),
       );
     }
   }
