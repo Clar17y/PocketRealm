@@ -38,6 +38,7 @@ import { shopRouter } from './routes/shop';
 import { friendsRouter } from './routes/friends';
 import { notificationsRouter } from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
+import { requestLogger } from './middleware/requestLogger';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
@@ -105,6 +106,8 @@ app.use((req, res, next) => {
   res.setHeader('x-request-id', id);
   next();
 });
+
+app.use(requestLogger);
 
 // Trust the first proxy hop (e.g. nginx/Caddy) so Express resolves req.ip
 // to the real client IP rather than the reverse proxy's address.  Without
