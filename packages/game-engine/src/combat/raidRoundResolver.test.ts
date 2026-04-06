@@ -1922,7 +1922,7 @@ describe('resolveRaidRound', () => {
       const curve = HIT_CURVE_CONSTANTS.pve_expedition;
       expect(curve.minHitChance).toBe(0.20);
       expect(curve.maxHitChance).toBe(0.95);
-      expect(curve.bias).toBe(8);
+      expect(curve.bias).toBe(3);
       expect(curve.exponent).toBe(1.8);
     });
 
