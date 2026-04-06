@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { trackEvent } from '@/lib/analytics';
 import { startExploration } from '@/lib/api';
-import type { StateUpdates } from '@pocketrealm/shared';
+import type { StateUpdates, QuestProgressUpdate } from '@pocketrealm/shared';
 import { TUTORIAL_STEP_EXPLORE } from '@/lib/tutorial';
 import { nowStamp } from './useActivityLog';
-import { mapPlaybackEventsToLogs, showQuestToasts } from '../gameControllerHelpers';
+import { mapPlaybackEventsToLogs } from '../gameControllerHelpers';
 import { applyStateUpdates, type StateSetters } from '../applyStateUpdates';
 import { recordTurnsSpent } from '../../../lib/activityTracker';
 import { fmtDur } from '@/lib/format';
@@ -38,6 +38,7 @@ interface UseExplorationActionsParams {
   pendingLootQueueRef: React.MutableRefObject<string[]>;
   activatePendingLoot: (sessionId: string) => Promise<void>;
   updateZoneExploration: (zoneId: string, exploration: { turnsExplored: number; percent: number; turnsToExplore: number | null }) => void;
+  updateQuestProgress: (updates?: QuestProgressUpdate[]) => void;
 }
 
 export function useExplorationActions({
@@ -56,6 +57,7 @@ export function useExplorationActions({
   pendingLootQueueRef,
   activatePendingLoot,
   updateZoneExploration,
+  updateQuestProgress,
 }: UseExplorationActionsParams) {
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<ExplorationPlaybackData | null>(null);
 
@@ -125,7 +127,7 @@ export function useExplorationActions({
       }
 
       setTurns(data.turns.currentTurns);
-      showQuestToasts(data.questProgress);
+      updateQuestProgress(data.questProgress);
       recordTurnsSpent(currentZone.id, turnSpend);
       updateZoneExploration(currentZone.id, data.explorationProgress);
 

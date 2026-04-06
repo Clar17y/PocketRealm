@@ -84,7 +84,6 @@ import { useCombatPlayback } from './hooks/useCombatPlayback';
 import { runSimpleAction } from './simpleAction';
 import { useApiReachable } from '@/hooks/useApiReachable';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
-import { showQuestToasts } from './gameControllerHelpers';
 import { useInventoryActions } from './hooks/useInventoryActions';
 import { useLootActions } from './hooks/useLootActions';
 import { useExplorationActions } from './hooks/useExplorationActions';
@@ -616,6 +615,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const {
     quests, questState, questsLoading, questsError,
     loadQuests, handleClaimQuestReward, handleClaimDailyBonus, handleRerollQuest,
+    updateQuestProgress,
   } = useQuests();
 
   const advanceTutorial = useCallback(async (fromStep: number) => {
@@ -760,6 +760,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     updateZoneExploration: (zoneId, exploration) => {
       setZones(prev => prev.map(z => z.id === zoneId ? { ...z, exploration: { ...z.exploration, ...exploration, tiers: z.exploration?.tiers ?? null } } : z));
     },
+    updateQuestProgress,
   });
 
   const travelActions = useTravelActions({
@@ -824,7 +825,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
-      showQuestToasts(data.questProgress);
+      updateQuestProgress(data.questProgress);
       recordTurnsSpent(activeZoneId, turnSpend);
 
       const newLogs: ActivityLogEntry[] = [];
@@ -911,7 +912,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
-      showQuestToasts(data.questProgress);
+      updateQuestProgress(data.questProgress);
 
       const newLogs: ActivityLogEntry[] = [];
       const timestamp = nowStamp();
