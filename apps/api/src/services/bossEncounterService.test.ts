@@ -1609,7 +1609,7 @@ describe('bossEncounterService', () => {
     });
 
     it('preserves array bossEffects', async () => {
-      const effects = [{ effectId: 'weaken', duration: 2 }];
+      const effects = [{ name: 'Weaken', stat: 'defence', modifier: -5, roundsRemaining: 2 }];
       mockPrisma.bossEncounter.create.mockResolvedValue(
         makeEncounterRow({ bossEffects: effects }),
       );
@@ -1638,7 +1638,7 @@ describe('bossEncounterService', () => {
     });
 
     it('parses rewardsByPlayer object correctly', async () => {
-      const rewards = { p1: { xp: 100, gold: 50 } };
+      const rewards = { p1: { loot: [{ itemTemplateId: 'item-1', quantity: 1 }] } };
       mockPrisma.bossEncounter.create.mockResolvedValue(
         makeEncounterRow({ rewardsByPlayer: rewards }),
       );
