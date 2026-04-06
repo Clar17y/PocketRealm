@@ -222,6 +222,30 @@ export function resolveEncounterRoomCombat(
   };
 }
 
+/** Count player and mob hits from encounter site round logs for durability degradation. */
+export function countEncounterSiteHits(roundLogs: ExpeditionRoundLog[]): { playerHitsLanded: number; mobHitsLanded: number } {
+  let playerHitsLanded = 0;
+  let mobHitsLanded = 0;
+  for (const log of roundLogs) {
+    for (const action of log.phases.playerAttacks) {
+      if ('hit' in action && action.hit) {
+        playerHitsLanded++;
+        if ('splashCascade' in action && action.splashCascade) {
+          for (const splash of action.splashCascade) {
+            if (splash.hit) playerHitsLanded++;
+          }
+        }
+      }
+    }
+    for (const mobAction of log.phases.mobActions) {
+      for (const target of mobAction.targets) {
+        if (!target.dodged && target.damageTaken > 0) mobHitsLanded++;
+      }
+    }
+  }
+  return { playerHitsLanded, mobHitsLanded };
+}
+
 // ---------------------------------------------------------------------------
 // Shared private helpers
 // ---------------------------------------------------------------------------

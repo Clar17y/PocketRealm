@@ -10,7 +10,7 @@ import { COMBAT_CONSTANTS, COMBAT_ACTION_CONSTANTS, EXPEDITION_CONSTANTS, mobDis
 import type { CombatParticipantState } from './combatHelpers';
 import { getEffectiveStatValue } from './combatHelpers';
 import { getSingleTarget } from './threatSystem';
-import { resolveHitCheck, calculateAvoidScore } from './damageCalculator';
+import { resolveHitCheck, calculateAvoidScore, applyDefenceReduction } from './damageCalculator';
 import type { HitResolution } from './damageCalculator';
 import type { CombatMode } from '@pocketrealm/shared';
 import type { RaidRoundRng } from './raidPlayerPhase';
@@ -258,7 +258,7 @@ export function resolveMobActions(params: {
           ? getEffectiveStatValue(targetParticipant.stats.magicDefence, combinedTargetEffects, 'magicDefence')
           : getEffectiveStatValue(targetParticipant.stats.defence, combinedTargetEffects, 'defence');
 
-        let damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, baseDmg - effectivePlayerDefence);
+        let damage = applyDefenceReduction(baseDmg, effectivePlayerDefence);
 
         if (stance?.isChanneling) {
           damage = Math.floor(damage * COMBAT_ACTION_CONSTANTS.CHANNELING_BONUS_DAMAGE);

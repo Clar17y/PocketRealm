@@ -44,8 +44,10 @@ import {
   handleEncounterDefeat,
   computeDefeatedMobXp,
   buildParticipantForEncounterSite,
+  countEncounterSiteHits,
   type FleeResult,
 } from './encounterSiteCombatCore';
+import { degradeEquippedDurabilityByHits } from './durabilityService';
 import type { GrantXpResult } from './xpService';
 
 // ---------------------------------------------------------------------------
@@ -550,6 +552,10 @@ export async function resolveManualEncounterRound(
     state.participant.stamina,
     state.participant.mana,
   );
+
+  // Degrade equipment durability from all rounds of manual encounter combat
+  const { playerHitsLanded, mobHitsLanded } = countEncounterSiteHits(state.roundLogs);
+  await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded);
 
   // Grant XP for defeated mobs (only on room clear, not on defeat)
   let xpGrants: GrantXpResult[] = [];

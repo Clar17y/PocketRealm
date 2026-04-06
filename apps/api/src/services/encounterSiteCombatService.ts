@@ -31,8 +31,10 @@ import {
   computeDefeatedMobXp,
   buildParticipantForEncounterSite,
   resolveEncounterRoomCombat,
+  countEncounterSiteHits,
   type FleeResult,
 } from './encounterSiteCombatCore';
+import { degradeEquippedDurabilityByHits } from './durabilityService';
 import { deleteCombatSession } from './encounterSiteManualCombat';
 
 // Re-export for route handler convenience
@@ -308,6 +310,10 @@ export async function autoResolveEncounterRoom(
     combatResult.playerStaminaAfter,
     combatResult.playerManaAfter,
   );
+
+  // Degrade equipment durability from encounter site combat
+  const { playerHitsLanded, mobHitsLanded } = countEncounterSiteHits(combatResult.rounds.map(r => r.log));
+  await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded);
 
   // Grant XP for defeated mobs (only on room clear, not on defeat)
   let xpGrants: GrantXpResult[] = [];

@@ -37,6 +37,7 @@ interface UseExplorationActionsParams {
   loadGatheringNodes: () => Promise<void>;
   pendingLootQueueRef: React.MutableRefObject<string[]>;
   activatePendingLoot: (sessionId: string) => Promise<void>;
+  updateZoneExploration: (zoneId: string, exploration: { turnsExplored: number; percent: number; turnsToExplore: number | null }) => void;
 }
 
 export function useExplorationActions({
@@ -54,6 +55,7 @@ export function useExplorationActions({
   loadGatheringNodes,
   pendingLootQueueRef,
   activatePendingLoot,
+  updateZoneExploration,
 }: UseExplorationActionsParams) {
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<ExplorationPlaybackData | null>(null);
 
@@ -125,6 +127,7 @@ export function useExplorationActions({
       setTurns(data.turns.currentTurns);
       showQuestToasts(data.questProgress);
       recordTurnsSpent(currentZone.id, turnSpend);
+      updateZoneExploration(currentZone.id, data.explorationProgress);
 
       setExplorationPlaybackData({
         totalTurns: turnSpend,

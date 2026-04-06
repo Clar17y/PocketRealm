@@ -757,6 +757,25 @@ describe('purchaseItem — recipe_scroll', () => {
     expect(result.effect).toEqual({ type: 'recipe_scroll', recipeName: 'Basic Recipe' });
   });
 
+  it('only queries soulbound recipes', async () => {
+    const item = makeItem({ key: 'recipe_scroll', cost: 15 });
+
+    const tx = setupTx(item);
+    tx.craftingRecipe.findMany.mockResolvedValue([
+      { id: 'r1', skillType: 'weaponsmithing', requiredLevel: 1, resultTemplate: { name: 'Soul Blade' } },
+    ]);
+    tx.playerRecipe.findMany.mockResolvedValue([]);
+    tx.playerSkill.findMany.mockResolvedValue([{ skillType: 'weaponsmithing', level: 10 }]);
+    tx.playerRecipe.create.mockResolvedValue({});
+    vi.mocked(randomIntInclusive).mockReturnValue(0);
+
+    await purchaseItem(PLAYER_ID, SHOP_ITEM_ID);
+
+    expect(tx.craftingRecipe.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { soulbound: true } }),
+    );
+  });
+
   it('picks from eligible recipes using randomIntInclusive', async () => {
     const item = makeItem({ key: 'recipe_scroll', cost: 15 });
 

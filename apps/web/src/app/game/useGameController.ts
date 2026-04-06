@@ -757,6 +757,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     combatLogPrefetchClear: combatLogPrefetch.clear,
     refreshPendingEncounters, loadGatheringNodes,
     pendingLootQueueRef, activatePendingLoot: loot.activatePendingLoot,
+    updateZoneExploration: (zoneId, exploration) => {
+      setZones(prev => prev.map(z => z.id === zoneId ? { ...z, exploration: { ...z.exploration, ...exploration, tiers: z.exploration?.tiers ?? null } } : z));
+    },
   });
 
   const travelActions = useTravelActions({

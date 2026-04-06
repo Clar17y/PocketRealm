@@ -32,4 +32,5 @@ export interface ShopPurchaseResult {
   newBalance: number;
   itemKey: string;
   effect?: Record<string, unknown>;
+  stateUpdates?: import('./stateUpdates.types').StateUpdates;
 }

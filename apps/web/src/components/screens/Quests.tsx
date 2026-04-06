@@ -14,7 +14,7 @@ import {
   Wrench, Zap, Package, Crown, Shield,
 } from 'lucide-react';
 import { getShopItems, purchaseShopItem, getPlayerBuffs, getBestiary, getPlayerGuild, getGuildContracts } from '@/lib/api';
-import type { PlayerQuestData, PlayerQuestStateData, QuestCategory, ShopItemData, PlayerBuffData } from '@pocketrealm/shared';
+import type { PlayerQuestData, PlayerQuestStateData, QuestCategory, ShopItemData, PlayerBuffData, StateUpdates } from '@pocketrealm/shared';
 import { QUEST_CONSTANTS } from '@pocketrealm/shared';
 
 interface QuestsProps {
@@ -25,7 +25,7 @@ interface QuestsProps {
   onClaimReward: (questId: string) => Promise<void>;
   onClaimBonus: () => Promise<void>;
   onReroll: (questId: string) => Promise<void>;
-  onShopPurchase?: () => void;
+  onShopPurchase?: (stateUpdates?: StateUpdates) => void;
   zones?: Array<{ id: string; name: string; zoneType: string }>;
   homeTownId?: string | null;
   showNpcDialogue?: boolean;
@@ -317,7 +317,7 @@ function ShopTab({
   homeTownId,
 }: {
   questTokens: number;
-  onPurchase?: () => void;
+  onPurchase?: (stateUpdates?: StateUpdates) => void;
   zones?: Array<{ id: string; name: string; zoneType: string }>;
   homeTownId?: string | null;
 }) {
@@ -399,7 +399,7 @@ function ShopTab({
         // Refresh shop state and buffs
         void loadShop();
         // Refresh player state (attributes, skills, etc. may have changed)
-        onPurchase?.();
+        onPurchase?.(res.data.stateUpdates);
       } else if (res.error) {
         setPurchaseMessage(res.error.message);
       }

@@ -7,7 +7,7 @@ import type {
   PotionConsumed,
 } from '@pocketrealm/shared';
 import { COMBAT_ACTION_CONSTANTS, COMBAT_CONSTANTS } from '@pocketrealm/shared';
-import { calculateDefenceReduction } from './damageCalculator';
+import { applyDefenceReduction } from './damageCalculator';
 import {
   opponent,
   buildLogEntry,
@@ -150,11 +150,7 @@ export function applyEffectTicks(
       const defence = effect.dotDamageType === 'physical'
         ? effectiveStats.defence
         : effectiveStats.magicDefence;
-      const reduction = calculateDefenceReduction(defence);
-      const tickDamage = Math.max(
-        COMBAT_CONSTANTS.MIN_DAMAGE,
-        Math.floor(effect.resolvedDamagePerRound * (1 - reduction)),
-      );
+      const tickDamage = applyDefenceReduction(effect.resolvedDamagePerRound, defence);
 
       state.combatants[targetKey].hp -= tickDamage;
 

@@ -152,6 +152,7 @@ export function GameScreenRenderer({
     inventory.filter((i) => i.template.stackable && i.template.itemType === 'resource' && !i.equippedSlot).map((i) => i.template.name),
   ), [inventory]);
   const discountLookup = useMemo(() => buildRecipeDiscountLookup(craftingRecipes, skills), [craftingRecipes, skills]);
+  const skillLevelMap = useMemo(() => new Map(skills.map((s) => [s.skillType, s.level])), [skills]);
   const equipmentStats = useMemo(() => {
     const stats = { attack: 0, defence: 0, magicDefence: 0, hp: 0, dodge: 0, accuracy: 0, magicPower: 0, rangedPower: 0, luck: 0, critChance: 0, critDamage: 0 };
     for (const e of equipment) {
@@ -352,6 +353,8 @@ export function GameScreenRenderer({
             return getDiscountedCost(discountLookup, templateId, CRAFTING_CONSTANTS.SALVAGE_TURN_COST);
           }}
           zoneCraftingLevel={zoneCraftingLevel} confirmRarity={confirmRarity} showNpcDialogue={showNpcDialogue}
+          characterLevel={characterProgression.characterLevel}
+          skillLevels={skillLevelMap}
         />
       );
     case 'equipment':
@@ -548,7 +551,7 @@ export function GameScreenRenderer({
             const baseLuck = typeof base?.luck === 'number' ? base.luck : 0;
             const bonusLuck = typeof bonus?.luck === 'number' ? bonus.luck : 0;
             return sum + baseLuck + bonusLuck;
-          }, 0)}
+          }, 0) + characterProgression.attributes.luck}
           activityLog={activityLog}
           onUpgrade={handleForgeUpgrade} onReroll={handleForgeReroll}
           isRecovering={hpState.isRecovering} recoveryCost={hpState.recoveryCost}
@@ -723,7 +726,7 @@ export function GameScreenRenderer({
         <Quests
           quests={quests} questState={questState} loading={questsLoading} error={questsError}
           onClaimReward={handleClaimQuestReward} onClaimBonus={handleClaimDailyBonus}
-          onReroll={handleRerollQuest} onShopPurchase={loadAll}
+          onReroll={handleRerollQuest} onShopPurchase={(updates) => { if (updates) applyStateUpdates(updates, stateSetters); loadAll(); }}
           zones={zones.filter(z => z.discovered).map(z => ({ id: z.id, name: z.name, zoneType: z.zoneType }))}
           homeTownId={homeTownId} showNpcDialogue={showNpcDialogue}
         />

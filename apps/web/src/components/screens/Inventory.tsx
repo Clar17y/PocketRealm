@@ -81,6 +81,8 @@ interface InventoryProps {
   zoneCraftingLevel?: number | null;
   confirmRarity?: ConfirmRarity;
   showNpcDialogue?: boolean;
+  characterLevel?: number;
+  skillLevels?: Map<string, number>;
 }
 
 function prettySlot(slot: string) {
@@ -92,6 +94,7 @@ export function Inventory({
   items, capacity, usedSlots, gold, isInTown,
   onDrop, onSalvage, onSalvageBatch, onRepair, onEquip, onUnequip, onUse, onSell, onSellBatch, onDeposit, onDepositBatch, onWithdraw, onWithdrawBatch,
   getSalvageCost, zoneCraftingLevel, confirmRarity = 'uncommon', showNpcDialogue = true,
+  characterLevel, skillLevels,
 }: InventoryProps) {
   const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue();
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -243,11 +246,24 @@ export function Inventory({
   const isEquippable = Boolean(selectedItem?.slot && isEquipment);
   const isEquipped = Boolean(selectedItem?.equippedSlot);
 
+  const meetsRequirements = (() => {
+    if (!selectedItem) return true;
+    const reqLevel = selectedItem.requiredLevel ?? 0;
+    if (reqLevel <= 0) return true;
+    if (selectedItem.type === 'armor') {
+      return (characterLevel ?? 1) >= reqLevel;
+    }
+    if (selectedItem.requiredSkill) {
+      return (skillLevels?.get(selectedItem.requiredSkill) ?? 1) >= reqLevel;
+    }
+    return true;
+  })();
+
   const canRepair = Boolean(
     onRepair && isEquipment && selectedItem?.durability &&
     selectedItem.durability.current < selectedItem.durability.max
   );
-  const canEquip = Boolean(onEquip && isEquippable && !isEquipped);
+  const canEquip = Boolean(onEquip && isEquippable && !isEquipped && meetsRequirements);
   const canUnequip = Boolean(onUnequip && isEquippable && isEquipped);
   const noFacility = zoneCraftingLevel === 0;
   const canSalvage = Boolean(onSalvage && isEquipment && !isEquipped && !noFacility);
@@ -752,7 +768,7 @@ export function Inventory({
   selectedItem.description !== selectedItem.type ? 'italic' : ''
 }`}>{selectedItem.description}</p>
 
-            {(selectedItem.durability || hasAnyStats || hasAnyBonusStats || selectedItem.requiredSkill) && (
+            {(selectedItem.durability || hasAnyStats || hasAnyBonusStats || selectedItem.requiredSkill || (selectedItem.type === 'armor' && (selectedItem.requiredLevel ?? 0) > 0)) && (
               <div className="space-y-3 mb-4">
                 {selectedItem.durability && selectedItem.durability.max > 0 && (
                   <div>
@@ -834,11 +850,15 @@ export function Inventory({
                   </div>
                 )}
 
-                {selectedItem.requiredSkill && (
-                  <div className="text-xs text-[var(--rpg-text-secondary)]">
+                {selectedItem.requiredSkill ? (
+                  <div className={`text-xs ${meetsRequirements ? 'text-[var(--rpg-text-secondary)]' : 'text-[var(--rpg-red)]'}`}>
                     Requires {selectedItem.requiredSkill} level {selectedItem.requiredLevel ?? 1}
                   </div>
-                )}
+                ) : selectedItem.type === 'armor' && (selectedItem.requiredLevel ?? 0) > 0 ? (
+                  <div className={`text-xs ${meetsRequirements ? 'text-[var(--rpg-text-secondary)]' : 'text-[var(--rpg-red)]'}`}>
+                    Requires character level {selectedItem.requiredLevel}
+                  </div>
+                ) : null}
               </div>
             )}
 

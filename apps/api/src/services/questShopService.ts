@@ -388,6 +388,7 @@ async function applyBestiaryTome(tx: Prisma.TransactionClient, playerId: string,
 async function applyRecipeScroll(tx: Prisma.TransactionClient, playerId: string) {
   const [allRecipes, knownRecipes, skills] = await Promise.all([
     tx.craftingRecipe.findMany({
+      where: { soulbound: true },
       include: { resultTemplate: { select: { name: true } } },
     }),
     tx.playerRecipe.findMany({ where: { playerId }, select: { recipeId: true } }),

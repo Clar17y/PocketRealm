@@ -31,6 +31,7 @@ import {
 import {
   rollDamage as defaultRollDamage,
   isCriticalHit as defaultIsCriticalHit,
+  applyDefenceReduction,
 } from './damageCalculator';
 import type { CombatMode } from '@pocketrealm/shared';
 import {
@@ -568,7 +569,7 @@ export function resolveRaidRound(
     for (const effect of mob.activeEffects) {
       if (effect.damagePerRound && effect.damagePerRound > 0 && mob.hp > 0) {
         const defence = effect.dotDamageType === 'physical' ? mob.stats.defence : mob.stats.magicDefence;
-        const dotDmg = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, effect.damagePerRound - defence);
+        const dotDmg = applyDefenceReduction(effect.damagePerRound, defence);
         mob.hp = Math.max(0, mob.hp - dotDmg);
         logEffectTicks.push({
           targetType: 'mob',
@@ -635,7 +636,7 @@ export function resolveRaidRound(
         const defence = effect.dotDamageType === 'physical'
           ? p.stats.defence
           : p.stats.magicDefence;
-        const dotDmg = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, effect.damagePerRound - defence);
+        const dotDmg = applyDefenceReduction(effect.damagePerRound, defence);
         pState[idx].hp = Math.max(0, pState[idx].hp - dotDmg);
         pState[idx].damageTaken += dotDmg;
         logEffectTicks.push({
