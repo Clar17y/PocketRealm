@@ -152,7 +152,6 @@ export function GameScreenRenderer({
     inventory.filter((i) => i.template.stackable && i.template.itemType === 'resource' && !i.equippedSlot).map((i) => i.template.name),
   ), [inventory]);
   const discountLookup = useMemo(() => buildRecipeDiscountLookup(craftingRecipes, skills), [craftingRecipes, skills]);
-  const skillLevelMap = useMemo(() => new Map(skills.map((s) => [s.skillType, s.level])), [skills]);
   const equipmentStats = useMemo(() => {
     const stats = { attack: 0, defence: 0, magicDefence: 0, hp: 0, dodge: 0, accuracy: 0, magicPower: 0, rangedPower: 0, luck: 0, critChance: 0, critDamage: 0 };
     for (const e of equipment) {
@@ -354,7 +353,7 @@ export function GameScreenRenderer({
           }}
           zoneCraftingLevel={zoneCraftingLevel} confirmRarity={confirmRarity} showNpcDialogue={showNpcDialogue}
           characterLevel={characterProgression.characterLevel}
-          skillLevels={skillLevelMap}
+          skillLevels={discountLookup.skillByType}
         />
       );
     case 'equipment':
