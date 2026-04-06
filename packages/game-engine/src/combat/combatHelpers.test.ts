@@ -248,6 +248,54 @@ describe('resolveParticipantActions', () => {
     // Falls back to action.id when intendedActionId is undefined
     expect(pState[0].intendedActionId).toBe('normal_attack');
   });
+
+  it('passes participant activeEffects to resolveAction for condition evaluation', () => {
+    const atkDef = makeActionDef({ id: 'normal_attack' });
+    mockedResolveAction.mockReturnValue({
+      action: atkDef,
+      wasExhausted: false,
+    });
+
+    const participantEffects = [
+      { name: 'Poison', stat: 'attack', modifier: -5, roundsRemaining: 3 },
+    ];
+    const participants = [makeParticipant({
+      activeEffects: participantEffects,
+    })];
+    const pState = [makeState({ hp: 50 })];
+
+    resolveParticipantActions(participants, pState);
+
+    expect(mockedResolveAction).toHaveBeenCalledOnce();
+    // activeEffects is the 9th argument (index 8) to resolveAction
+    // Effects are mapped to ActiveEffect shape with target='combatantA'
+    const activeEffectsArg = mockedResolveAction.mock.calls[0][8];
+    expect(activeEffectsArg).toHaveLength(1);
+    expect(activeEffectsArg[0]).toMatchObject({
+      name: 'Poison',
+      stat: 'attack',
+      modifier: -5,
+      target: 'combatantA',
+      remainingRounds: 3,
+    });
+  });
+
+  it('defaults to empty activeEffects when participant has none', () => {
+    const atkDef = makeActionDef({ id: 'normal_attack' });
+    mockedResolveAction.mockReturnValue({
+      action: atkDef,
+      wasExhausted: false,
+    });
+
+    const participants = [makeParticipant()];
+    const pState = [makeState({ hp: 50 })];
+
+    resolveParticipantActions(participants, pState);
+
+    expect(mockedResolveAction).toHaveBeenCalledOnce();
+    const activeEffectsArg = mockedResolveAction.mock.calls[0][8];
+    expect(activeEffectsArg).toEqual([]);
+  });
 });
 
 // ===========================================================================
