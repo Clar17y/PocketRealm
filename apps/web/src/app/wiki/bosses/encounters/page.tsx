@@ -46,20 +46,20 @@ export default function BossEncountersPage() {
       </p>
       <ol>
         <li>
-          <strong>Player offensive actions</strong> — attacks and offensive
+          <strong>Player offensive actions:</strong> attacks and offensive
           abilities resolve first, dealing damage to the boss.
         </li>
         <li>
-          <strong>Player supportive actions</strong> — heals, buffs, and
+          <strong>Player supportive actions:</strong> heals, buffs, and
           defensive abilities resolve next, targeting allies.
         </li>
         <li>
-          <strong>Boss action</strong> — the boss executes its next action from
+          <strong>Boss action:</strong> the boss executes its next action from
           its rotation. Single-target attacks hit the player with highest threat;
           AoE attacks hit all participants.
         </li>
         <li>
-          <strong>Tick effects</strong> — damage-over-time, heal-over-time, and
+          <strong>Tick effects:</strong> damage-over-time, heal-over-time, and
           buff/debuff durations are updated. Taunts decrement.
         </li>
       </ol>
@@ -106,11 +106,11 @@ export default function BossEncountersPage() {
       </p>
       <ul>
         <li>
-          <strong>Single-target</strong> — targets the highest-threat player
+          <strong>Single-target:</strong> targets the highest-threat player
           (or a taunting player if one exists).
         </li>
         <li>
-          <strong>AoE</strong> — hits all living participants. Some AoE actions
+          <strong>AoE:</strong> hits all living participants. Some AoE actions
           are <em>telegraphed</em>, meaning players see a warning the round
           before and can use Defend or Ward to mitigate.
         </li>

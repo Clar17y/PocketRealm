@@ -30,11 +30,6 @@ import {
 import {
   allocatePlayerAttribute,
   craft,
-  destroyInventoryItem,
-  equip,
-  forgeReroll,
-  forgeUpgrade,
-  getBestiary,
   getCraftingRecipes,
   getEquipment,
   getHpState,
@@ -47,24 +42,8 @@ import {
   getZones,
   getZoneEvents,
   mine,
-  repairItem,
-  repairAllEquipped,
   rest,
   restEstimate,
-  salvage,
-  salvageBatch,
-  useItem,
-  startExploration,
-  travelToZone,
-  unequip,
-  sellItem,
-  sellBulk,
-  depositToStash,
-  depositBatchToStash,
-  withdrawBatchFromStash,
-  withdrawFromStash,
-  claimLoot,
-  fetchPendingLoot,
   getResources,
   getSkillPointState,
   allocateSkillPoint,
@@ -72,7 +51,6 @@ import {
   getTemplates,
   activateTemplate,
   type ApiResponse,
-  type PendingLootItem,
   type WorldEventResponse,
   type SkillPointState,
   exchangeGold,
@@ -85,12 +63,10 @@ import {
 import type { PlayerBuffData, StateUpdates, SkillStateDTO, InventoryItemDTO } from '@pocketrealm/shared';
 import type { CombatTemplateData, QuestProgressUpdate, ResourceState } from '@pocketrealm/shared';
 import type { RouletteBetType } from '@pocketrealm/shared';
-import { STAMINA_CONSTANTS, MANA_CONSTANTS, ITEM_RARITY_CONSTANTS, COMBAT_CONSTANTS, CRAFTING_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
+import { STAMINA_CONSTANTS, MANA_CONSTANTS, UI_TIMING_CONSTANTS } from '@pocketrealm/shared';
 
 import { applyStateUpdates, type StateSetters } from './applyStateUpdates';
 import { prettyStatName, formatStatValue } from '@/lib/statFormat';
-import { fmtDur } from '@/lib/format';
-import { findShortestZonePath } from '@/lib/zoneRoutes';
 import type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
 import { DEFAULT_CHARACTER_PROGRESSION } from './gameController.types';
 export type { Screen, PendingEncounter, LastCombat, LastCombatLogEntry, CombatPlaybackItem, CombatPlaybackQueueItem, BestiarySkipEntry, ActivityLogEntry, CharacterProgression, HpState } from './gameController.types';
@@ -108,60 +84,13 @@ import { useCombatPlayback } from './hooks/useCombatPlayback';
 import { runSimpleAction } from './simpleAction';
 import { useApiReachable } from '@/hooks/useApiReachable';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
+import { showQuestToasts } from './gameControllerHelpers';
+import { useInventoryActions } from './hooks/useInventoryActions';
+import { useLootActions } from './hooks/useLootActions';
+import { useExplorationActions } from './hooks/useExplorationActions';
+import { useTravelActions } from './hooks/useTravelActions';
 
 type AttributeType = keyof CharacterProgression['attributes'];
-
-function mapPlaybackEventsToLogs(
-  events: Array<{ turn: number; type: string; description: string }>,
-): Array<{ timestamp: string; type: 'info' | 'success' | 'danger'; message: string }> {
-  return events.slice().reverse().map((event) => ({
-    timestamp: nowStamp(),
-    type: (event.type === 'ambush_defeat'
-      ? 'danger'
-      : event.type === 'ambush_victory' || event.type === 'encounter_site' || event.type === 'resource_node'
-        ? 'success'
-        : 'info') as 'info' | 'success' | 'danger',
-    message: `Turn ${event.turn}: ${event.description}`,
-  }));
-}
-
-function showQuestToasts(updates?: QuestProgressUpdate[]) {
-  if (!updates?.length) return;
-  const show = (window as unknown as Record<string, unknown>).__showQuestToast as
-    | ((update: QuestProgressUpdate) => void)
-    | undefined;
-  if (!show) return;
-  for (const update of updates) show(update);
-}
-
-function showForgeToast(data: ForgeResultData) {
-  const show = (window as unknown as Record<string, unknown>).__showForgeToast as
-    | ((data: ForgeResultData) => void)
-    | undefined;
-  if (!show) return;
-  show(data);
-}
-
-interface TravelRouteState {
-  remainingZoneIds: string[];
-  totalHops: number;
-  finalDestinationName: string;
-}
-
-interface TravelPlaybackState {
-  totalTurns: number;
-  destinationName: string;
-  events: Array<{ turn: number; type: string; description: string; details?: Record<string, unknown> }>;
-  aborted: boolean;
-  refundedTurns: number;
-  playerHpBefore: number;
-  playerMaxHp: number;
-  respawnedToName?: string;
-  currentHop: number;
-  totalHops: number;
-  finalDestinationName: string;
-  stateUpdates?: StateUpdates;
-}
 
 const SCREEN_POLL_NEEDS: Record<string, string[]> = {
   explore: ['turns', 'hp', 'resources'],
@@ -216,11 +145,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [inventoryCapacity, setInventoryCapacity] = useState(24);
   const [inventoryUsedSlots, setInventoryUsedSlots] = useState(0);
   const [materialTotals, setMaterialTotals] = useState<Record<string, number>>({});
-  const [pendingLootSession, setPendingLootSession] = useState<{
-    sessionId: string;
-    items: PendingLootItem[];
-    minimized?: boolean;
-  } | null>(null);
   const [equipment, setEquipment] = useState<Array<{
     slot: string;
     itemId: string | null;
@@ -331,8 +255,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const [showChangelog, setShowChangelog] = useState(false);
   const activatePendingLootRef = useRef<(sessionId: string) => Promise<void>>(async () => {});
   const pendingLootQueueRef = useRef<string[]>([]);
-  const arrivedInTownRef = useRef(false);
-  const travelRouteRef = useRef<TravelRouteState | null>(null);
   const lastEventLogTimeRef = useRef(0);
   const prevInventoryIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedOnceRef = useRef(false);
@@ -346,18 +268,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     quantity: number;
     imageSrc?: string;
   }> | null>(null);
-  const [explorationPlaybackData, setExplorationPlaybackData] = useState<{
-    totalTurns: number;
-    zoneName: string;
-    events: Array<{ turn: number; type: string; description: string; details?: Record<string, unknown> }>;
-    aborted: boolean;
-    refundedTurns: number;
-    playerHpBeforeExploration: number;
-    playerMaxHp: number;
-    pendingLootSessionIds?: string[];
-    stateUpdates?: StateUpdates;
-  } | null>(null);
-  const [travelPlaybackData, setTravelPlaybackData] = useState<TravelPlaybackState | null>(null);
   const hpStateRef = useRef(hpState);
   useEffect(() => {
     hpStateRef.current = hpState;
@@ -440,6 +350,40 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setActiveZoneId,
   }), []);
   // All useState setters are stable references, so empty deps is correct
+
+  const runAction = async (actionName: string, fn: () => Promise<void>) => {
+    if (busyAction) return;
+    setBusyAction(actionName);
+    setActionError(null);
+    setSlowAction(false);
+    const timer = setTimeout(() => setSlowAction(true), UI_TIMING_CONSTANTS.SLOW_ACTION_THRESHOLD_MS);
+    try {
+      await fn();
+    } finally {
+      clearTimeout(timer);
+      setBusyAction(null);
+      setSlowAction(false);
+    }
+  };
+
+  // Helper for simple API-call-then-stateUpdates actions
+  const simpleAction = async <T>(
+    actionName: string,
+    apiFn: () => Promise<ApiResponse<T>>,
+    onSuccess?: (data: T) => void | Promise<void>,
+  ) => {
+    await runAction(actionName, async () => {
+      await runSimpleAction({
+        actionName,
+        apiFn,
+        onSuccess: async (data) => {
+          applyStateUpdates((data as { stateUpdates?: StateUpdates }).stateUpdates, stateSetters);
+          await onSuccess?.(data);
+        },
+        setActionError,
+      });
+    });
+  };
 
   const pollScreenData = useCallback(async () => {
     const needs = SCREEN_POLL_NEEDS[activeScreenRef.current] ?? ['turns'];
@@ -786,35 +730,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   };
 
-  const logDurabilityWarnings = (
-    losses: Array<{
-      itemName?: string;
-      newDurability?: number;
-      maxDurability?: number;
-      isBroken?: boolean;
-      crossedWarningThreshold?: boolean;
-    }>,
-  ) => {
-    const entries: ActivityLogEntry[] = [];
-    for (const loss of losses) {
-      if (!loss.itemName) continue;
-      if (loss.isBroken) {
-        entries.push({
-          timestamp: nowStamp(),
-          type: 'danger',
-          message: `Your ${loss.itemName} has broken!`,
-        });
-      } else if (loss.crossedWarningThreshold) {
-        entries.push({
-          timestamp: nowStamp(),
-          type: 'warning',
-          message: `Your ${loss.itemName} is about to break! (${fmtDur(loss.newDurability!)}/${loss.maxDurability})`,
-        });
-      }
-    }
-    if (entries.length > 0) pushLog(...entries);
-  };
-
   const currentZone = useMemo(() =>
     zones.find((z) => z.id === activeZoneId) ??
     zones.find((z) => z.discovered) ??
@@ -829,155 +744,45 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     return map;
   }, [materialTotals]);
 
-  const runAction = async (actionName: string, fn: () => Promise<void>) => {
-    if (busyAction) return;
-    setBusyAction(actionName);
-    setActionError(null);
-    setSlowAction(false);
-    const timer = setTimeout(() => setSlowAction(true), UI_TIMING_CONSTANTS.SLOW_ACTION_THRESHOLD_MS);
-    try {
-      await fn();
-    } finally {
-      clearTimeout(timer);
-      setBusyAction(null);
-      setSlowAction(false);
-    }
-  };
+  // === Domain hooks ===
+  const loot = useLootActions({
+    runAction, pushLog, setActionError, stateSetters,
+    activatePendingLootRef, pendingLootQueueRef,
+  });
 
-  // Helper for simple API-call-then-stateUpdates actions
-  const simpleAction = async <T>(
-    actionName: string,
-    apiFn: () => Promise<ApiResponse<T>>,
-    onSuccess?: (data: T) => void | Promise<void>,
-  ) => {
-    await runAction(actionName, async () => {
-      await runSimpleAction({
-        actionName,
-        apiFn,
-        onSuccess: async (data) => {
-          applyStateUpdates((data as { stateUpdates?: StateUpdates }).stateUpdates, stateSetters);
-          await onSuccess?.(data);
-        },
-        setActionError,
-      });
-    });
-  };
+  const explorationActions = useExplorationActions({
+    hpStateRef, currentZone, runAction, pushLog,
+    setTurns, setActionError, setPlaybackActive, stateSetters,
+    advanceTutorial,
+    combatLogPrefetchClear: combatLogPrefetch.clear,
+    refreshPendingEncounters, loadGatheringNodes,
+    pendingLootQueueRef, activatePendingLoot: loot.activatePendingLoot,
+    updateZoneExploration: (zoneId, exploration) => {
+      setZones(prev => prev.map(z => z.id === zoneId ? { ...z, exploration: { ...z.exploration, ...exploration, tiers: z.exploration?.tiers ?? null } } : z));
+    },
+  });
 
-  const handleStartExploration = async (turnSpend: number, tier?: number) => {
-    if (!currentZone) return;
+  const travelActions = useTravelActions({
+    hpStateRef, activeZoneId, zones, zoneConnections,
+    runAction, pushLog, setTurns, setActiveZoneId, setActionError,
+    setPlaybackActive, stateSetters, advanceTutorial,
+    refreshCraftingRecipes, loadAll,
+    pendingLootSession: loot.pendingLootSession,
+    clearPendingLootSession: () => loot.setPendingLootSession(null),
+    pendingLootQueueRef,
+    activateNextQueuedLoot: loot.activateNextQueuedLoot,
+    logDurabilityWarnings: explorationActions.logDurabilityWarnings,
+  });
 
-    await runAction('exploration', async () => {
-      const hpBefore = hpState.currentHp;
-      const maxHpBefore = hpState.maxHp;
-      const res = await startExploration(currentZone.id, turnSpend, tier);
-      const data = res.data;
-      if (!data) {
-        setActionError(res.error?.message ?? 'Exploration failed');
-        return;
-      }
-
-      setTurns(data.turns.currentTurns);
-      showQuestToasts(data.questProgress);
-      recordTurnsSpent(currentZone.id, turnSpend);
-
-      // Always trigger animated playback — even empty results get a brief progress bar
-      setExplorationPlaybackData({
-        totalTurns: turnSpend,
-        zoneName: data.zone.name,
-        events: data.events,
-        aborted: data.aborted,
-        refundedTurns: data.refundedTurns,
-        playerHpBeforeExploration: hpBefore,
-        playerMaxHp: maxHpBefore,
-        pendingLootSessionIds: data.pendingLootSessionIds,
-        stateUpdates: data.stateUpdates,
-      });
-      setPlaybackActive(true);
-
-      // Refresh encounter sites and gathering nodes discovered during exploration.
-      // Don't call loadAll() here — defer until playback completes so the zone
-      // doesn't update to the respawn town mid-playback.
-      if (data.encounterSites.length > 0) {
-        await refreshPendingEncounters();
-      }
-      if (data.resourceDiscoveries.length > 0) {
-        await loadGatheringNodes();
-      }
-    });
-  };
-
-  const handleExplorationPlaybackComplete = async () => {
-    if (explorationPlaybackData) {
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'info',
-        message: `Explored ${explorationPlaybackData.totalTurns.toLocaleString()} turns in ${explorationPlaybackData.zoneName}.`,
-      });
-      if (explorationPlaybackData.aborted && explorationPlaybackData.refundedTurns > 0) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'info',
-          message: `Exploration aborted. ${explorationPlaybackData.refundedTurns.toLocaleString()} turns refunded.`,
-        });
-      }
-      for (const event of explorationPlaybackData.events) {
-        const losses = event.details?.durabilityLost;
-        if (Array.isArray(losses)) logDurabilityWarnings(losses);
-      }
-    }
-    await finalizeExplorationPlayback();
-  };
-
-  const finalizeExplorationPlayback = async () => {
-    const pendingIds = explorationPlaybackData?.pendingLootSessionIds;
-    const savedStateUpdates = explorationPlaybackData?.stateUpdates;
-
-    // Analytics: track exploration (before clearing playback data)
-    if (explorationPlaybackData) {
-      trackEvent('action', {
-        type: 'exploration',
-        turns: explorationPlaybackData.totalTurns,
-        zone: explorationPlaybackData.zoneName,
-      });
-    }
-
-    setExplorationPlaybackData(null);
-    combatLogPrefetch.clear();
-    setPlaybackActive(false);
-    await advanceTutorial(TUTORIAL_STEP_EXPLORE);
-    applyStateUpdates(savedStateUpdates, stateSetters);
-    if (pendingIds?.length) {
-      pendingLootQueueRef.current = pendingIds.slice(1);
-      await activatePendingLoot(pendingIds[0]);
-    }
-  };
-
-  const handlePlaybackSkip = async () => {
-    if (explorationPlaybackData) {
-      pushLog(
-        {
-          timestamp: nowStamp(),
-          type: 'info',
-          message: `Explored ${explorationPlaybackData.totalTurns.toLocaleString()} turns in ${explorationPlaybackData.zoneName}.`,
-        },
-        ...mapPlaybackEventsToLogs(explorationPlaybackData.events),
-      );
-      if (explorationPlaybackData.aborted && explorationPlaybackData.refundedTurns > 0) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'info',
-          message: `Exploration aborted. ${explorationPlaybackData.refundedTurns.toLocaleString()} turns refunded.`,
-        });
-      }
-    }
-    await finalizeExplorationPlayback();
-  };
+  const inventoryActions = useInventoryActions({
+    simpleAction, pushLog, setTurns, setGold, advanceTutorial,
+  });
 
   const handleNavigate = (screen: string) => {
     // Auto-skip any active playback when navigating away
     if (playbackActive) {
-      if (explorationPlaybackData) {
-        void handlePlaybackSkip();
+      if (explorationActions.explorationPlaybackData) {
+        void explorationActions.handlePlaybackSkip();
       }
       if (combatPlaybackQueue) {
         // Skip to the end of the queue
@@ -993,8 +798,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
         combatLogPrefetch.clear();
         void refreshPendingEncounters();
       }
-      if (travelPlaybackData) {
-        void handleTravelPlaybackSkip();
+      if (travelActions.travelPlaybackData) {
+        void travelActions.handleTravelPlaybackSkip();
       }
     }
     // Clear last combat log when leaving the combat screen — it's in history if needed
@@ -1181,435 +986,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     });
   };
 
-  const handleSalvageItem = (itemId: string) =>
-    simpleAction('salvage', () => salvage(itemId), (data) => {
-      setTurns(data.turns.currentTurns);
-      const materialSummary = data.salvage.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
-      pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged item for: ${materialSummary}.` });
-      trackEvent('action', { type: 'salvage', turns: CRAFTING_CONSTANTS.SALVAGE_TURN_COST });
-    });
-
-  const handleSalvageBatch = (itemIds: string[]) =>
-    simpleAction('salvage_batch', () => salvageBatch(itemIds), (data) => {
-      setTurns(data.turns.currentTurns);
-      const materialSummary = data.returnedMaterials.map((e) => `${e.name} x${e.quantity}`).join(', ');
-      pushLog({ timestamp: nowStamp(), type: 'success', message: `Salvaged ${data.salvaged.length} items (${data.totalTurnCost} turns). Recovered: ${materialSummary}` });
-      trackEvent('action', { type: 'salvage', turns: data.totalTurnCost });
-    });
-
-  const handleForgeUpgrade = (itemId: string, sacrificialItemId: string) =>
-    simpleAction('forge_upgrade', () => forgeUpgrade(itemId, sacrificialItemId), (data) => {
-      setTurns(data.turns.currentTurns);
-      const fromLabel = data.forge.fromRarity.charAt(0).toUpperCase() + data.forge.fromRarity.slice(1);
-      const toLabel = data.forge.toRarity.charAt(0).toUpperCase() + data.forge.toRarity.slice(1);
-      const effectiveChance = data.forge.adjustedChance ?? data.forge.successChance;
-      const chancePct = (effectiveChance * 100).toFixed(1);
-      const buffTag = data.forge.buffUsed === 'forge_luck' ? ' [Forge Luck active]'
-        : data.forge.buffUsed === 'forge_protection' ? ' [Forge Protection active]'
-        : '';
-
-      if (data.forge.success) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `Forge success: ${fromLabel} -> ${toLabel} (${chancePct}% chance).${buffTag} Sacrificial item consumed.`,
-        });
-        showForgeToast({ type: 'upgrade_success', message: `Upgraded to ${toLabel}!` });
-      } else if (data.forge.protected) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'info',
-          message: `Forge failed at ${fromLabel} (${chancePct}% chance) but item was protected!${buffTag} Sacrifice consumed.`,
-        });
-        showForgeToast({ type: 'upgrade_protected', message: `Failed but protected!` });
-      } else {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'info',
-          message: `Forge failed at ${fromLabel} (${chancePct}% chance).${buffTag} Target and sacrifice consumed.`,
-        });
-        showForgeToast({ type: 'upgrade_fail', message: `Upgrade failed — target and sacrifice consumed` });
-      }
-      const upgradeTurns = ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY[data.forge.fromRarity as keyof typeof ITEM_RARITY_CONSTANTS.UPGRADE_TURN_COST_BY_RARITY] ?? 100;
-      trackEvent('action', { type: 'forge_upgrade', turns: upgradeTurns });
-    });
-
-  const handleForgeReroll = (itemId: string, sacrificialItemId: string) =>
-    simpleAction('forge_reroll', () => forgeReroll(itemId, sacrificialItemId), (data) => {
-      setTurns(data.turns.currentTurns);
-      const rarityLabel = data.forge.rarity.charAt(0).toUpperCase() + data.forge.rarity.slice(1);
-      pushLog({ timestamp: nowStamp(), type: 'success', message: `Re-rolled ${rarityLabel} item bonus stats. Sacrificial duplicate consumed.` });
-      showForgeToast({ type: 'reroll', message: `Stats rerolled!` });
-      const rerollTurns = ITEM_RARITY_CONSTANTS.REROLL_TURN_COST_BY_RARITY[data.forge.rarity as keyof typeof ITEM_RARITY_CONSTANTS.REROLL_TURN_COST_BY_RARITY] ?? 75;
-      trackEvent('action', { type: 'forge_reroll', turns: rerollTurns });
-    });
-
-  const handleDestroyItem = (itemId: string) =>
-    simpleAction('destroy', () => destroyInventoryItem(itemId));
-
-  const handleRepairItem = (itemId: string) =>
-    simpleAction('repair', () => repairItem(itemId), (data) => {
-      if (data.turns) setTurns(data.turns.currentTurns);
-      if (data.destroyed) {
-        const label = data.name ?? 'Item';
-        pushLog({ timestamp: nowStamp(), type: 'warning', message: `${label} was too degraded to survive repair and has been permanently destroyed.` });
-      }
-    });
-
-  const handleRepairAllEquipped = () =>
-    simpleAction('repair_all', () => repairAllEquipped(), (data) => {
-      if (data.turns) setTurns(data.turns.currentTurns);
-      const destroyed = data.items.filter((i) => i.destroyed);
-      for (const item of destroyed) {
-        pushLog({ timestamp: nowStamp(), type: 'warning', message: `${item.name} was too degraded to survive repair and has been permanently destroyed.` });
-      }
-    });
-
-  const handleUseItem = (itemId: string) =>
-    simpleAction('use_item', () => useItem(itemId));
-
-  const handleEquipItem = (itemId: string, slot: string) =>
-    simpleAction('equip', () => equip(itemId, slot), async () => {
-      await advanceTutorial(TUTORIAL_STEP_EQUIP);
-    });
-
-  const handleUnequipSlot = (slot: string) =>
-    simpleAction('unequip', () => unequip(slot));
-
-  const handleSellItem = (itemId: string) =>
-    simpleAction('sell', () => sellItem(itemId), (data) => {
-      setGold(data.newGold);
-      pushLog({ timestamp: nowStamp(), type: 'success', message: `Sold item for ${data.goldEarned} gold` });
-    });
-
-  const handleSellBatch = (itemIds: string[]) =>
-    simpleAction('sell_batch', () => sellBulk(itemIds), (data) => {
-      setGold(data.newGold);
-      pushLog({ timestamp: nowStamp(), type: 'success', message: `Sold ${data.soldCount} item(s) for ${data.totalGoldEarned} gold` });
-    });
-
-  const handleDepositItem = (itemId: string) =>
-    simpleAction('deposit', () => depositToStash(itemId), () => {
-      pushLog({ timestamp: nowStamp(), type: 'success', message: 'Item deposited to stash' });
-    });
-
-  const handleDepositBatch = (itemIds: string[]) =>
-    simpleAction('deposit_batch', () => depositBatchToStash(itemIds), (data) => {
-      pushLog({ timestamp: nowStamp(), type: 'success', message: `${data.depositedCount} item(s) deposited to stash` });
-    });
-
-  const handleWithdrawItem = (itemId: string) =>
-    simpleAction('withdraw', () => withdrawFromStash(itemId), () => {
-      pushLog({ timestamp: nowStamp(), type: 'success', message: 'Item withdrawn from stash' });
-    });
-
-  const handleWithdrawBatch = (itemIds: string[]) =>
-    simpleAction('withdraw_batch', () => withdrawBatchFromStash(itemIds), (data) => {
-      pushLog({ timestamp: nowStamp(), type: 'success', message: `${data.withdrawnCount} item(s) withdrawn from stash` });
-    });
-
-  const activateNextQueuedLoot = async () => {
-    const next = pendingLootQueueRef.current.shift();
-    if (next) {
-      await activatePendingLoot(next);
-    }
-  };
-
-  const clearExpiredLoot = async () => {
-    setPendingLootSession(null);
-    pushLog({ timestamp: nowStamp(), type: 'warning', message: 'Overflow loot expired — unclaimed items were lost.' });
-    await activateNextQueuedLoot();
-  };
-
-  const activatePendingLoot = async (sessionId: string) => {
-    const res = await fetchPendingLoot(sessionId);
-    if (res.data?.items?.length) {
-      setPendingLootSession({ sessionId, items: res.data.items, minimized: false });
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'warning',
-        message: `Backpack full! ${res.data.items.length} item(s) waiting to be claimed.`,
-      });
-    } else {
-      clearExpiredLoot();
-    }
-  };
-  activatePendingLootRef.current = activatePendingLoot;
-
-  const handleClaimLoot = async (sessionId: string, selectedIndices: number[]) => {
-    await runAction('claim_loot', async () => {
-      const res = await claimLoot(sessionId, selectedIndices);
-      if (!res.data) {
-        if (res.error?.code === 'LOOT_EXPIRED') {
-          clearExpiredLoot();
-        } else {
-          setPendingLootSession(null);
-          setActionError(res.error?.message ?? 'Loot claim failed');
-        }
-        return;
-      }
-      setPendingLootSession(null);
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'success',
-        message: `Claimed ${selectedIndices.length} loot items`,
-      });
-      applyStateUpdates(res.data.stateUpdates, stateSetters);
-      await activateNextQueuedLoot();
-    });
-  };
-
-  const handleDismissLoot = () => {
-    setPendingLootSession((prev) => prev ? { ...prev, minimized: true } : null);
-  };
-
-  const handleReopenLoot = async () => {
-    const session = pendingLootSession;
-    if (!session) return;
-    const res = await fetchPendingLoot(session.sessionId);
-    if (res.data?.items?.length) {
-      setPendingLootSession({ sessionId: session.sessionId, items: res.data.items, minimized: false });
-    } else {
-      clearExpiredLoot();
-    }
-  };
-
-  const [confirmAbandonLoot, setConfirmAbandonLoot] = useState<{ travelZoneId: string } | null>(null);
-
-  const completeQueuedTravelRoute = async () => {
-    travelRouteRef.current = null;
-    setPlaybackActive(false);
-
-    // Reload zone-dependent crafting recipes after arriving at new zone
-    void refreshCraftingRecipes();
-
-    if (arrivedInTownRef.current) {
-      arrivedInTownRef.current = false;
-      advanceTutorial(TUTORIAL_STEP_TRAVEL);
-    }
-
-    if (!pendingLootSession && pendingLootQueueRef.current.length > 0) {
-      await activateNextQueuedLoot();
-    }
-  };
-
-  const executeNextTravelHop = async () => {
-    const route = travelRouteRef.current;
-    if (!route || route.remainingZoneIds.length === 0) {
-      await completeQueuedTravelRoute();
-      return;
-    }
-
-    const nextZoneId = route.remainingZoneIds[0]!;
-    const currentHop = route.totalHops - route.remainingZoneIds.length + 1;
-    const hpBefore = hpStateRef.current.currentHp;
-    const playerMaxHp = hpStateRef.current.maxHp;
-
-    const res = await travelToZone(nextZoneId);
-    const data = res.data;
-    if (!data) {
-      travelRouteRef.current = null;
-      setPlaybackActive(false);
-      setActionError(res.error?.message ?? 'Travel failed');
-      // Earlier hops may have committed — reload world state and drain queued loot
-      await loadAll();
-      if (pendingLootQueueRef.current.length > 0) {
-        await activateNextQueuedLoot();
-      }
-      return;
-    }
-
-    setTurns(data.turns.currentTurns);
-    route.remainingZoneIds.shift();
-
-    const arrivedInTown = data.zone.zoneType === 'town';
-    if (arrivedInTown) arrivedInTownRef.current = true;
-
-    if (data.pendingLootSessionId) {
-      pendingLootQueueRef.current.push(data.pendingLootSessionId);
-    }
-
-    if (data.breadcrumbReturn) {
-      setActiveZoneId(data.zone.id);
-      pushLog({ timestamp: nowStamp(), type: 'success', message: `Returned to ${data.zone.name}.` });
-
-      if (route.remainingZoneIds.length > 0) {
-        applyStateUpdates(data.stateUpdates, stateSetters);
-        await executeNextTravelHop();
-        return;
-      }
-
-      applyStateUpdates(data.stateUpdates, stateSetters);
-      await completeQueuedTravelRoute();
-      return;
-    }
-
-    const travelCost = data.travelCost ?? 0;
-    if (travelCost > 0) {
-      const hopSuffix = route.totalHops > 1
-        ? ` (${currentHop}/${route.totalHops} to ${route.finalDestinationName})`
-        : '';
-      pushLog({
-        timestamp: nowStamp(),
-        type: 'info',
-        message: `Travelling to ${data.zone.name}${hopSuffix}...`,
-      });
-
-      setTravelPlaybackData({
-        totalTurns: travelCost,
-        destinationName: data.zone.name,
-        events: data.events,
-        aborted: data.aborted,
-        refundedTurns: data.refundedTurns,
-        playerHpBefore: hpBefore,
-        playerMaxHp,
-        respawnedToName: data.respawnedTo?.townName,
-        currentHop,
-        totalHops: route.totalHops,
-        finalDestinationName: route.finalDestinationName,
-        stateUpdates: data.stateUpdates,
-      });
-      setPlaybackActive(true);
-      return;
-    }
-
-    setActiveZoneId(data.zone.id);
-    pushLog({ timestamp: nowStamp(), type: 'success', message: `Arrived at ${data.zone.name}.` });
-
-    if (route.remainingZoneIds.length > 0) {
-      applyStateUpdates(data.stateUpdates, stateSetters);
-      await executeNextTravelHop();
-      return;
-    }
-
-    applyStateUpdates(data.stateUpdates, stateSetters);
-    await completeQueuedTravelRoute();
-  };
-
-  const abandonLootAndTravel = async () => {
-    if (!confirmAbandonLoot) return;
-    const zoneId = confirmAbandonLoot.travelZoneId;
-    if (pendingLootSession) {
-      await claimLoot(pendingLootSession.sessionId, []).catch(() => {});
-      setPendingLootSession(null);
-    }
-    pendingLootQueueRef.current = [];
-    setConfirmAbandonLoot(null);
-    await handleTravelToZone(zoneId);
-  };
-
-  const handleTravelToZone = async (id: string) => {
-    if (pendingLootSession) {
-      setConfirmAbandonLoot({ travelZoneId: id });
-      return;
-    }
-
-    if (!activeZoneId) return;
-    if (id === activeZoneId) return;
-
-    const route = findShortestZonePath(activeZoneId, id, zoneConnections);
-    if (!route) {
-      setActionError('No route to that zone');
-      return;
-    }
-
-    const hops = route.slice(1);
-    if (hops.length === 0) return;
-
-    const finalDestinationName = zones.find((zone) => zone.id === id)?.name ?? 'that zone';
-    travelRouteRef.current = {
-      remainingZoneIds: hops,
-      totalHops: hops.length,
-      finalDestinationName,
-    };
-
-    await runAction('travel', async () => {
-      await executeNextTravelHop();
-    });
-  };
-
-  const handleTravelPlaybackComplete = async () => {
-    if (travelPlaybackData) {
-      if (travelPlaybackData.aborted && travelPlaybackData.respawnedToName) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'danger',
-          message: `You were knocked out and woke up in ${travelPlaybackData.respawnedToName}.`,
-        });
-      } else if (travelPlaybackData.aborted) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'danger',
-          message: `Travel to ${travelPlaybackData.destinationName} failed. You fled back to safety.`,
-        });
-      } else {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `Arrived at ${travelPlaybackData.destinationName}.`,
-        });
-      }
-      for (const event of travelPlaybackData.events) {
-        const losses = event.details?.durabilityLost;
-        if (Array.isArray(losses)) logDurabilityWarnings(losses);
-      }
-    }
-    await finalizeTravelPlayback();
-  };
-
-  const finalizeTravelPlayback = async () => {
-    const currentPlayback = travelPlaybackData;
-    if (!currentPlayback) return;
-
-    const shouldContinueRoute =
-      !currentPlayback.aborted &&
-      (travelRouteRef.current?.remainingZoneIds.length ?? 0) > 0;
-
-    const savedStateUpdates = currentPlayback.stateUpdates;
-    setTravelPlaybackData(null);
-    setPlaybackActive(false);
-
-    if (currentPlayback.aborted) {
-      travelRouteRef.current = null;
-    }
-
-    if (shouldContinueRoute) {
-      applyStateUpdates(savedStateUpdates, stateSetters);
-      await executeNextTravelHop();
-      return;
-    }
-
-    applyStateUpdates(savedStateUpdates, stateSetters);
-    await completeQueuedTravelRoute();
-  };
-
-  const handleTravelPlaybackSkip = async () => {
-    if (travelPlaybackData) {
-      pushLog(...mapPlaybackEventsToLogs(travelPlaybackData.events));
-
-      if (travelPlaybackData.aborted && travelPlaybackData.respawnedToName) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'danger',
-          message: `You were knocked out and woke up in ${travelPlaybackData.respawnedToName}.`,
-        });
-      } else if (travelPlaybackData.aborted) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'danger',
-          message: `Travel to ${travelPlaybackData.destinationName} failed. You fled back to safety.`,
-        });
-      } else {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `Arrived at ${travelPlaybackData.destinationName}.`,
-        });
-      }
-    }
-    await finalizeTravelPlayback();
-  };
-
   const handleAllocateAttribute = async (attribute: AttributeType, points = 1) => {
     await runAction('allocate_attribute', async () => {
       const res = await allocatePlayerAttribute(attribute, points);
@@ -1684,10 +1060,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setActiveScreen,
     handleNavigate,
     getActiveTab,
-    handleTravelToZone,
-    confirmAbandonLoot,
-    abandonLootAndTravel,
-    cancelAbandonLoot: () => setConfirmAbandonLoot(null),
+    handleTravelToZone: travelActions.handleTravelToZone,
+    confirmAbandonLoot: travelActions.confirmAbandonLoot,
+    abandonLootAndTravel: travelActions.abandonLootAndTravel,
+    cancelAbandonLoot: travelActions.cancelAbandonLoot,
 
     // Core state
     turns,
@@ -1764,8 +1140,8 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     combatPlaybackQueue,
     combatPlaybackIndex,
     roomTransition,
-    explorationPlaybackData,
-    travelPlaybackData,
+    explorationPlaybackData: explorationActions.explorationPlaybackData,
+    travelPlaybackData: travelActions.travelPlaybackData,
 
     // Achievements
     achievementData,
@@ -1823,24 +1199,15 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     ownedByTemplateId,
 
     // Actions
-    handleStartExploration,
-    handleExplorationPlaybackComplete,
-    handlePlaybackSkip,
+    handleStartExploration: explorationActions.handleStartExploration,
+    handleExplorationPlaybackComplete: explorationActions.handleExplorationPlaybackComplete,
+    handlePlaybackSkip: explorationActions.handlePlaybackSkip,
     handleCombatPlaybackComplete,
-    handleTravelPlaybackComplete,
-    handleTravelPlaybackSkip,
+    handleTravelPlaybackComplete: travelActions.handleTravelPlaybackComplete,
+    handleTravelPlaybackSkip: travelActions.handleTravelPlaybackSkip,
     handleMine,
     handleCraft,
-    handleSalvageItem,
-    handleSalvageBatch,
-    handleForgeUpgrade,
-    handleForgeReroll,
-    handleDestroyItem,
-    handleRepairItem,
-    handleRepairAllEquipped,
-    handleUseItem,
-    handleEquipItem,
-    handleUnequipSlot,
+    ...inventoryActions,
     handleAllocateAttribute,
     loadAll,
     loadPvpNotificationCount,
@@ -1857,16 +1224,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     inventoryUsedSlots,
     isOverEncumbered: inventoryUsedSlots > inventoryCapacity,
     backpackFull: inventoryUsedSlots >= inventoryCapacity,
-    pendingLootSession,
-    handleSellItem,
-    handleSellBatch,
-    handleDepositItem,
-    handleDepositBatch,
-    handleWithdrawItem,
-    handleWithdrawBatch,
-    handleClaimLoot,
-    handleDismissLoot,
-    handleReopenLoot,
+    pendingLootSession: loot.pendingLootSession,
+    handleClaimLoot: loot.handleClaimLoot,
+    handleDismissLoot: loot.handleDismissLoot,
+    handleReopenLoot: loot.handleReopenLoot,
 
     // State update helpers
     stateSetters,

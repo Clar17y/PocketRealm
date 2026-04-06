@@ -28,6 +28,7 @@ import {
   resolveHitCheck,
   calculateAvoidScore,
   calculateFinalDamage,
+  applyDefenceReduction,
 } from './damageCalculator';
 
 // --- Input Types ---
@@ -274,7 +275,7 @@ export function resolveBossRound(
           ? getEffectiveStatValue(targetParticipant.stats.magicDefence, targetParticipant.activeEffects ?? [], 'magicDefence')
           : getEffectiveStatValue(targetParticipant.stats.defence, targetParticipant.activeEffects ?? [], 'defence');
 
-        let damage = Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, scaledBossDmg - effectivePlayerDefence);
+        let damage = applyDefenceReduction(scaledBossDmg, effectivePlayerDefence);
 
         if (stance?.damageReductionPercent && stance.damageReductionPercent > 0) {
           damage = Math.floor(damage * (1 - stance.damageReductionPercent));

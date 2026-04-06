@@ -7,6 +7,8 @@ import {
   CHARACTER_CONSTANTS,
 } from '@pocketrealm/shared';
 
+const SCALING = COMBAT_CONSTANTS.DEFENCE_SCALING_FACTOR;
+
 const { Var, Out, Enemy, Const, Op, Comment } = FormulaBlock;
 
 export const metadata: Metadata = {
@@ -101,16 +103,18 @@ export default function DamagePage() {
 
       <h2>Defence Reduction</h2>
       <p>
-        Defence uses a diminishing-returns curve. Physical attacks check{' '}
-        <code>defence</code>; magic attacks check <code>magicDefence</code>.
+        Defence uses a diminishing-returns curve that applies identically in all
+        combat contexts: open-world, encounter sites, expeditions, raids, and
+        PvP. Physical attacks check <code>defence</code>; magic attacks check{' '}
+        <code>magicDefence</code>.
       </p>
       <FormulaBlock>
         <Out>reduction</Out> <Op>=</Op> <Enemy>defence</Enemy> <Op>/</Op>{' '}
-        <Op>(</Op><Enemy>defence</Enemy> <Op>+</Op> <Const>100</Const><Op>)</Op>
+        <Op>(</Op><Enemy>defence</Enemy> <Op>+</Op> <Const>{SCALING}</Const><Op>)</Op>
         <Comment> {'//'} diminishing returns</Comment>
       </FormulaBlock>
       <p>
-        At 100 defence, reduction is 50%. At 200, it is ~67%. The curve
+        At {SCALING} defence, reduction is 50%. At {SCALING * 2}, it is ~67%. The curve
         approaches but never reaches 100%.
       </p>
 

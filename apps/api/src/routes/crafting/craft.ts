@@ -179,7 +179,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
 
     // Single transaction: spend turns + consume materials + create items
     const baseTurnCost = recipe.turnCost * quantity;
-    const { turnSpend, taxResult, craftedItemIds, craftedItemDetails, fullyConsumedIds, partiallyConsumedIds } = await prisma.$transaction(async (tx) => {
+    const { turnSpend, taxResult, newItemIds, updatedItemIds, craftedItemDetails, fullyConsumedIds, partiallyConsumedIds } = await prisma.$transaction(async (tx) => {
       const { turnSpend: spent, taxResult: tax } = await spendWithTaxTx(tx, playerId, baseTurnCost);
 
       const allFullyConsumed: string[] = [];
@@ -190,7 +190,8 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         allPartiallyConsumed.push(...consumeResult.partiallyConsumedIds);
       }
 
-      const itemIds: string[] = [];
+      const newItemIds: string[] = [];
+      const updatedItemIds: string[] = [];
       const itemDetails: Array<{
         id: string;
         isCrit: boolean;
@@ -210,7 +211,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
             data: { quantity: existing.quantity + quantity },
             select: { id: true },
           });
-          itemIds.push(updated.id);
+          updatedItemIds.push(updated.id);
         } else {
           const created = await tx.item.create({
             data: {
@@ -223,7 +224,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
             },
             select: { id: true },
           });
-          itemIds.push(created.id);
+          newItemIds.push(created.id);
         }
       } else {
         for (const rolled of preRolledItems!) {
@@ -239,7 +240,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
             },
             select: { id: true },
           });
-          itemIds.push(created.id);
+          newItemIds.push(created.id);
           if (rolled.isCrit && rolled.bonusEntries.length > 0) {
             itemDetails.push({
               id: created.id,
@@ -253,8 +254,10 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         }
       }
 
-      return { turnSpend: spent, taxResult: tax, craftedItemIds: itemIds, craftedItemDetails: itemDetails, fullyConsumedIds: allFullyConsumed, partiallyConsumedIds: allPartiallyConsumed };
+      return { turnSpend: spent, taxResult: tax, newItemIds, updatedItemIds, craftedItemDetails: itemDetails, fullyConsumedIds: allFullyConsumed, partiallyConsumedIds: allPartiallyConsumed };
     });
+
+    const allCraftedItemIds = [...newItemIds, ...updatedItemIds];
 
     // Consume shop crafting crit buff (one use per craft action)
     if (shopCraftingCrit > 0) await consumeBuffStandalone(playerId, 'crafting_crit');
@@ -307,7 +310,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         turnCost: recipe.turnCost,
         materials,
         resultTemplateId: recipe.resultTemplateId,
-        craftedItemIds,
+        craftedItemIds: allCraftedItemIds,
         craftedItemDetails,
         durability: needsDurability
           ? { baseMax, durabilityBonusPct, craftedMax }
@@ -320,8 +323,8 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     if (shopCraftingCrit > 0) craftingBuffBadges.push({ title: 'Crafting Crit Scroll', effectType: 'crafting_crit_up', effectValue: shopCraftingCrit, isGlobal: false });
 
     const [inventoryAdded, inventoryUpdated, skills, characterProgression, inventoryMeta, materialTotals] = await Promise.all([
-      fetchItemDTOs(craftedItemIds),
-      fetchItemDTOs(partiallyConsumedIds),
+      fetchItemDTOs(newItemIds),
+      fetchItemDTOs([...partiallyConsumedIds, ...updatedItemIds]),
       fetchSkillDTOs(playerId),
       fetchCharacterProgression(playerId),
       fetchInventoryMeta(playerId),
@@ -335,7 +338,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         recipeId: recipe.id,
         resultTemplateId: recipe.resultTemplateId,
         quantity,
-        craftedItemIds,
+        craftedItemIds: allCraftedItemIds,
       },
       craftedItemDetails,
       xp: serializeXpGrant(xpGrant),

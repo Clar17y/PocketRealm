@@ -73,12 +73,16 @@ export function TurnPlayback({
   const [combatEvent, setCombatEvent] = useState<ExplorationPlaybackEvent | null>(null);
   const [resumeFromCombat, setResumeFromCombat] = useState(false);
   const [playerHpForNextCombat, setPlayerHpForNextCombat] = useState<number | null>(null);
+  const [playerStaminaForNextCombat, setPlayerStaminaForNextCombat] = useState<number | null>(null);
+  const [playerManaForNextCombat, setPlayerManaForNextCombat] = useState<number | null>(null);
 
   const [loadedCombatLog, setLoadedCombatLog] = useState<CombatLogEntryResponse[] | null>(null);
 
   // Reset tracked HP when playback data changes (new exploration/travel starts)
   useEffect(() => {
     setPlayerHpForNextCombat(null);
+    setPlayerStaminaForNextCombat(null);
+    setPlayerManaForNextCombat(null);
   }, [totalTurns, events]);
 
   // Pre-fetch the first ambush's combat log on mount
@@ -140,9 +144,13 @@ export function TurnPlayback({
       const mobId = event.details?.mobTemplateId as string | undefined;
       const prefix = event.details?.mobPrefix as string | undefined;
       if (mobId && isMobKnown(mobId, prefix, bestiaryMobs)) {
-        // Track HP from event summary (no log needed)
+        // Track HP/stamina/mana from event summary (no log needed)
         const hpRemaining = event.details?.playerHpRemaining as number | undefined;
         if (hpRemaining !== undefined) setPlayerHpForNextCombat(hpRemaining);
+        const staminaRemaining = event.details?.playerStaminaRemaining as number | undefined;
+        if (staminaRemaining !== undefined) setPlayerStaminaForNextCombat(staminaRemaining);
+        const manaRemaining = event.details?.playerManaRemaining as number | undefined;
+        if (manaRemaining !== undefined) setPlayerManaForNextCombat(manaRemaining);
 
         onPushLog?.({
           timestamp: nowStamp(),
@@ -175,6 +183,15 @@ export function TurnPlayback({
       const lastEntry = loadedCombatLog[loadedCombatLog.length - 1];
       if (lastEntry.combatantAHpAfter !== undefined) {
         setPlayerHpForNextCombat(lastEntry.combatantAHpAfter);
+      }
+      // Track stamina/mana from the last entry where combatantA acted
+      for (let i = loadedCombatLog.length - 1; i >= 0; i--) {
+        const entry = loadedCombatLog[i];
+        if (entry.actor === 'combatantA' || entry.action === 'regen') {
+          if (entry.combatantAStaminaAfter !== undefined) setPlayerStaminaForNextCombat(entry.combatantAStaminaAfter);
+          if (entry.combatantAManaAfter !== undefined) setPlayerManaForNextCombat(entry.combatantAManaAfter);
+          break;
+        }
       }
     }
 
@@ -242,8 +259,8 @@ export function TurnPlayback({
       activeEvents={(combatEvent?.details?.eventModifiers as EventModifierBadge[] | undefined)?.map(m => ({
         ...m, appliedToThisMob: true,
       }))}
-      playerStartStamina={playerStartStamina}
-      playerStartMana={playerStartMana}
+      playerStartStamina={playerStaminaForNextCombat ?? playerStartStamina}
+      playerStartMana={playerManaForNextCombat ?? playerStartMana}
       playerMaxStamina={playerMaxStamina}
       playerMaxMana={playerMaxMana}
       autoSkip={!!shouldAutoSkip}

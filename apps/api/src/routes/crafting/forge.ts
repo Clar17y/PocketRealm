@@ -12,6 +12,7 @@ import {
   rollBonusStatsForRarity,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
+import { getPlayerProgressionState } from '../../services/attributesService';
 import { getBuffValue, hasActiveBuff, consumeBuff, consumeBuffStandalone } from '../../services/buffService';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
@@ -88,8 +89,12 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       }
       return { turnSpend: spent, taxResult: tax };
     });
-    const equipmentStats = await getEquipmentStats(playerId);
-    const successChance = calculateForgeUpgradeSuccessChance(currentRarity, equipmentStats.luck);
+    const [equipmentStats, progression] = await Promise.all([
+      getEquipmentStats(playerId),
+      getPlayerProgressionState(playerId),
+    ]);
+    const totalLuck = equipmentStats.luck + progression.attributes.luck;
+    const successChance = calculateForgeUpgradeSuccessChance(currentRarity, totalLuck);
     if (successChance === null) {
       throw new AppError(400, 'Legendary items cannot be upgraded', 'MAX_RARITY');
     }
@@ -161,7 +166,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
             successChance,
             adjustedChance,
             roll,
-            luckStat: equipmentStats.luck,
+            luckStat: totalLuck,
             buffUsed: forgeLuckBonus > 0 ? 'forge_luck' : hasForgeProtection ? 'forge_protection' : null,
             sacrificialItem: {
               itemId: sacrificial.id,
@@ -248,7 +253,7 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
           successChance,
           adjustedChance,
           roll,
-          luckStat: equipmentStats.luck,
+          luckStat: totalLuck,
           buffUsed: hasForgeProtection ? 'forge_protection' : forgeLuckBonus > 0 ? 'forge_luck' : null,
           sacrificialItem: {
             itemId: sacrificial.id,

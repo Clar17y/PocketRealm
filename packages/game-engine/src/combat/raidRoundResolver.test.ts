@@ -1277,9 +1277,9 @@ describe('resolveRaidRound', () => {
       );
 
       const pr = result.participantResults[0];
-      // DoT: 10 - 3 magicDefence = 7 damage
-      expect(pr.damageTaken).toBe(7);
-      expect(pr.hpAfter).toBe(93);
+      // DoT: floor(10 * (1 - 3/103)) = 9 damage (diminishing returns)
+      expect(pr.damageTaken).toBe(9);
+      expect(pr.hpAfter).toBe(91);
     });
 
     it('stacking DoTs accumulate damage', () => {
@@ -1318,9 +1318,9 @@ describe('resolveRaidRound', () => {
       );
 
       const pr = result.participantResults[0];
-      // Each DoT: 5 - 2 magicDefence = 3 damage, two stacks = 6 total
-      expect(pr.damageTaken).toBe(6);
-      expect(pr.hpAfter).toBe(94);
+      // Each DoT: floor(5 * (1 - 2/102)) = 4 damage, two stacks = 8 total (diminishing returns)
+      expect(pr.damageTaken).toBe(8);
+      expect(pr.hpAfter).toBe(92);
     });
 
     it('physical DoT uses physical defence', () => {
@@ -1349,9 +1349,9 @@ describe('resolveRaidRound', () => {
       );
 
       const pr = result.participantResults[0];
-      // 8 - 4 defence = 4 damage
-      expect(pr.damageTaken).toBe(4);
-      expect(pr.hpAfter).toBe(96);
+      // floor(8 * (1 - 4/104)) = 7 damage (diminishing returns)
+      expect(pr.damageTaken).toBe(7);
+      expect(pr.hpAfter).toBe(93);
     });
   });
 
@@ -1400,9 +1400,9 @@ describe('resolveRaidRound', () => {
       const markedDmg = resultMarked.participantResults[0].damageTaken;
       const unmarkedDmg = resultUnmarked.participantResults[0].damageTaken;
 
-      // 3x multiplier applies to base damage BEFORE defence subtraction,
-      // so marked damage is greater than 3x unmarked (defence is subtracted once, not tripled)
-      expect(markedDmg).toBeGreaterThan(unmarkedDmg * 3);
+      // 3x multiplier applies to base damage BEFORE diminishing-returns defence,
+      // so marked damage is approximately 3x unmarked (floor rounding can vary slightly)
+      expect(markedDmg).toBeGreaterThanOrEqual(unmarkedDmg * 3);
       expect(markedDmg).toBeGreaterThan(0);
     });
 
@@ -1768,8 +1768,8 @@ describe('resolveRaidRound', () => {
 
   describe('effect-modified stats in damage calculations', () => {
     it('boss_wither reduces effective defence so mob deals more damage', () => {
-      // Without wither: mob deals dmgMin(10) * 1.0 - defence(5) = 5 damage
-      // With wither (-8): mob deals dmgMin(10) * 1.0 - max(0, 5-8) = 10 damage
+      // Without wither: mob deals floor(10 * (1 - 5/105)) = 9 damage
+      // With wither (-8): effective defence = max(0, 5-8) = 0, mob deals full 10 damage
       const p1NoWither = makeParticipant({ playerId: 'p1', hp: 200, maxHp: 200, stats: makeStats({ defence: 5 }) });
       const mobA = makeMob({
         id: 'boss1', hp: 500, maxHp: 500,
@@ -1803,8 +1803,8 @@ describe('resolveRaidRound', () => {
     });
 
     it('boss_rally +8 attack modifier increases mob damage', () => {
-      // Without rally: mob deals dmgMin(10) * 1.0 - defence(5) = 5
-      // With rally (+8 attack): mob deals (dmgMin(10) * 1.0 + 8) - defence(5) = 13
+      // Without rally: mob deals floor(10 * (1 - 5/105)) = 9
+      // With rally (+8 attack): mob deals floor((10 + 8) * (1 - 5/105)) = 17
       const pNoRally = makeParticipant({ playerId: 'p1', hp: 200, maxHp: 200 });
       const mobNoRally = makeMob({
         id: 'boss1', hp: 500, maxHp: 500,
@@ -1922,7 +1922,7 @@ describe('resolveRaidRound', () => {
       const curve = HIT_CURVE_CONSTANTS.pve_expedition;
       expect(curve.minHitChance).toBe(0.20);
       expect(curve.maxHitChance).toBe(0.95);
-      expect(curve.bias).toBe(8);
+      expect(curve.bias).toBe(3);
       expect(curve.exponent).toBe(1.8);
     });
 

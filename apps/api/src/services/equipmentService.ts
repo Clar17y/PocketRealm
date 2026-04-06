@@ -167,7 +167,7 @@ export async function equipItem(
       throw new AppError(404, 'Player not found', 'NOT_FOUND');
     }
     if (player.characterLevel < item.template.requiredLevel) {
-      throw new AppError(400, 'Insufficient character level to equip armor', 'INSUFFICIENT_LEVEL');
+      throw new AppError(400, `Insufficient character level to equip ${item.template.slot ?? 'armor'} (requires level ${item.template.requiredLevel})`, 'INSUFFICIENT_LEVEL');
     }
   } else if (item.template.requiredSkill) {
     // Weapons still use skill-based requirements.

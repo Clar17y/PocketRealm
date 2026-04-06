@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DURABILITY_CONSTANTS } from '@pocketrealm/shared';
 
 import { mockPrisma } from '../__test__/setup';
-import { degradeEquippedDurability, countCombatHits } from './durabilityService';
+import { degradeEquippedDurability, degradeEquippedDurabilityByHits, countCombatHits } from './durabilityService';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -338,5 +338,59 @@ describe('degradeEquippedDurability', () => {
     // weapon: 10 * 0.03 * 1 = 0.30
     const losses = await degradeEquippedDurability('p1', makeLog(10, 0));
     expect(losses[0].amount).toBe(0.3);
+  });
+});
+
+describe('degradeEquippedDurabilityByHits', () => {
+  it('degrades weapon and armor from pre-counted hit totals', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue(
+      makeEquipped([
+        {
+          id: 'weapon-1',
+          currentDurability: 50,
+          maxDurability: 100,
+          template: { name: 'Sword', itemType: 'weapon', maxDurability: 100 },
+        },
+        {
+          id: 'armor-1',
+          currentDurability: 50,
+          maxDurability: 100,
+          template: { name: 'Shield', itemType: 'armor', maxDurability: 100 },
+        },
+      ])
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+
+    // 10 player hits, 5 mob hits — same as the combat-log-based test
+    const losses = await degradeEquippedDurabilityByHits('p1', 10, 5);
+    expect(losses).toHaveLength(2);
+    const weapon = losses.find(l => l.itemName === 'Sword')!;
+    const armor = losses.find(l => l.itemName === 'Shield')!;
+    expect(weapon.newDurability).toBe(49.7);
+    expect(armor.newDurability).toBe(49.85);
+  });
+
+  it('returns empty array when no hits landed', async () => {
+    const result = await degradeEquippedDurabilityByHits('p1', 0, 0);
+    expect(result).toEqual([]);
+  });
+
+  it('applies degradation multiplier', async () => {
+    mockPrisma.playerEquipment.findMany.mockResolvedValue(
+      makeEquipped([
+        {
+          id: 'weapon-1',
+          currentDurability: 50,
+          maxDurability: 100,
+          template: { name: 'Sword', itemType: 'weapon', maxDurability: 100 },
+        },
+      ])
+    );
+    mockPrisma.item.update.mockResolvedValue({});
+
+    // 10 player hits * 0.03 * 2x multiplier = 0.60 weapon degradation
+    const losses = await degradeEquippedDurabilityByHits('p1', 10, 0, 2);
+    expect(losses[0].amount).toBe(0.6);
+    expect(losses[0].newDurability).toBe(49.4);
   });
 });

@@ -39,8 +39,21 @@ export async function degradeEquippedDurability(
   const hits = countCombatHits(combatLog);
   const myHits = perspective === 'combatantA' ? hits.playerHitsLanded : hits.mobHitsLanded;
   const theirHits = perspective === 'combatantA' ? hits.mobHitsLanded : hits.playerHitsLanded;
-  const weaponDegradation = round2(myHits * DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier);
-  const armorDegradation = round2(theirHits * DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier);
+  return degradeEquippedDurabilityByHits(playerId, myHits, theirHits, degradationMultiplier);
+}
+
+/**
+ * Degrade equipped durability from pre-counted hit totals.
+ * Used by encounter site / raid combat where the log format differs from 1v1.
+ */
+export async function degradeEquippedDurabilityByHits(
+  playerId: string,
+  playerHitsLanded: number,
+  mobHitsLanded: number,
+  degradationMultiplier: number = 1,
+): Promise<DurabilityLoss[]> {
+  const weaponDegradation = round2(playerHitsLanded * DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier);
+  const armorDegradation = round2(mobHitsLanded * DURABILITY_CONSTANTS.COMBAT_DEGRADATION * degradationMultiplier);
 
   if (weaponDegradation <= 0 && armorDegradation <= 0) return [];
 
