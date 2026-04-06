@@ -1,4 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { ZodError } from 'zod';
+
+vi.mock('../logger', () => ({
+  logger: {
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
+import { logger } from '../logger';
 import { AppError, errorHandler } from './errorHandler';
 
 function mockRes() {
@@ -8,8 +18,11 @@ function mockRes() {
   return res;
 }
 
-const mockReq = {} as any;
 const mockNext = vi.fn();
+
+function mockReq(overrides: Record<string, unknown> = {}) {
+  return { requestId: 'req-123', ...overrides } as any;
+}
 
 describe('AppError', () => {
   it('creates error with status code and message', () => {
@@ -27,32 +40,64 @@ describe('AppError', () => {
 });
 
 describe('errorHandler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('handles AppError with correct status and body', () => {
     const res = mockRes();
     const err = new AppError(400, 'Bad request', 'BAD_REQUEST');
 
-    errorHandler(err, mockReq, res, mockNext);
+    errorHandler(err, mockReq(), res, mockNext);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
       error: {
         message: 'Bad request',
         code: 'BAD_REQUEST',
+        requestId: 'req-123',
       },
     });
+  });
+
+  it('logs 4xx AppErrors at warn level', () => {
+    const res = mockRes();
+    const err = new AppError(400, 'Bad request', 'BAD_REQUEST');
+
+    errorHandler(err, mockReq(), res, mockNext);
+
+    expect(logger.warn).toHaveBeenCalledOnce();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'req-123', statusCode: 400 }),
+      expect.stringContaining('Bad request'),
+    );
+  });
+
+  it('logs 5xx errors at error level', () => {
+    const res = mockRes();
+    const err = new Error('unexpected');
+
+    errorHandler(err, mockReq(), res, mockNext);
+
+    expect(logger.error).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'req-123', err }),
+      expect.stringContaining('unexpected'),
+    );
   });
 
   it('handles unknown errors as 500', () => {
     const res = mockRes();
     const err = new Error('unexpected');
 
-    errorHandler(err, mockReq, res, mockNext);
+    errorHandler(err, mockReq(), res, mockNext);
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({
       error: {
         message: 'Internal server error',
         code: 'INTERNAL_ERROR',
+        requestId: 'req-123',
       },
     });
   });
@@ -61,14 +106,27 @@ describe('errorHandler', () => {
     const res = mockRes();
     const err = new AppError(422, 'Validation failed');
 
-    errorHandler(err, mockReq, res, mockNext);
+    errorHandler(err, mockReq(), res, mockNext);
 
     expect(res.status).toHaveBeenCalledWith(422);
     expect(res.json).toHaveBeenCalledWith({
       error: {
         message: 'Validation failed',
         code: undefined,
+        requestId: 'req-123',
       },
     });
+  });
+
+  it('handles ZodError as 400', () => {
+    const res = mockRes();
+    const err = new ZodError([
+      { code: 'invalid_type', expected: 'string', received: 'number', path: ['name'], message: 'Expected string' },
+    ]);
+
+    errorHandler(err, mockReq(), res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(logger.warn).toHaveBeenCalledOnce();
   });
 });
