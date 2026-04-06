@@ -27,7 +27,7 @@ export interface CombatParticipantInput {
   manaRegenPerRound: number;
   healTargetPlayerId?: string | null;
   /** Active effects on this participant — used for condition evaluation in template slots. */
-  activeEffects?: readonly { name: string; stat: string; modifier: number; remainingRounds?: number; roundsRemaining?: number; resolvedDamagePerRound?: number; damagePerRound?: number; dotDamageType?: 'physical' | 'magic' }[];
+  activeEffects?: readonly BossActiveEffect[];
 }
 
 /** Minimal per-round mutable state used by all three helpers. */
@@ -78,18 +78,17 @@ export function resolveParticipantActions(
       };
     });
 
-    // Convert participant effects to ActiveEffect shape for condition evaluation.
-    // Boss/raid effects lack the `target` field; we set it to 'combatantA' to
+    // Convert BossActiveEffect[] to ActiveEffect[] for condition evaluation.
+    // BossActiveEffect lacks the `target` field; we set it to 'combatantA' to
     // match the actorKey passed to resolveAction (each participant is evaluated
     // independently, so their own effects always target them).
-    const rawEffects = p.activeEffects ?? [];
-    const activeEffects: ActiveEffect[] = rawEffects.map(e => ({
+    const activeEffects: ActiveEffect[] = (p.activeEffects ?? []).map(e => ({
       name: e.name,
       target: 'combatantA' as const,
       stat: e.stat,
       modifier: e.modifier,
-      remainingRounds: e.remainingRounds ?? e.roundsRemaining ?? 0,
-      resolvedDamagePerRound: e.resolvedDamagePerRound ?? e.damagePerRound,
+      remainingRounds: e.roundsRemaining,
+      resolvedDamagePerRound: e.damagePerRound,
       dotDamageType: e.dotDamageType,
     }));
 
