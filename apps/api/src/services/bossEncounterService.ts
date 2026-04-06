@@ -3,6 +3,7 @@ import type { Server as SocketServer } from 'socket.io';
 import { prisma } from '@pocketrealm/database';
 import {
   WORLD_EVENT_CONSTANTS,
+  GUILD_CONSTANTS,
   BASE_ACTION_DEFINITIONS,
   BOSS_ACTION_DEFINITIONS,
   BOSS_TEMPLATES,
@@ -39,6 +40,7 @@ import { redis } from '../redis';
 import { parseBossEffects, parseBossRoundSummaries, parseBossRewardsByPlayer } from '../utils/bossJsonSchemas';
 import { sendPush } from './pushNotificationService';
 import { validateEnum } from '../utils/validateEnum';
+import { addGuildXp } from './guildService';
 
 const VALID_ENCOUNTER_STATUSES = new Set<BossEncounterStatus>(['waiting', 'in_progress', 'defeated', 'expired']);
 const VALID_PARTICIPANT_STATUSES = new Set<BossParticipantStatus>(['alive', 'knocked_out']);
@@ -485,6 +487,17 @@ async function resolveBossRoundInner(
       }),
     ),
   );
+
+  // Award guild XP for this boss round (each participating guild gets XP)
+  const uniquePlayerIds = [...new Set(result.participantResults.map(r => r.playerId))];
+  const memberships = await prisma.guildMember.findMany({
+    where: { playerId: { in: uniquePlayerIds } },
+    select: { guildId: true },
+  });
+  const guildIds = new Set(memberships.map(m => m.guildId));
+  for (const guildId of guildIds) {
+    await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_BOSS_ROUND);
+  }
 
   // Progressive bestiary reveal: alive players learn the boss's action for this round
   const alivePlayerIdsForReveal = result.participantResults

@@ -905,21 +905,18 @@ export const GUILD_CONSTANTS = {
   /** Maximum tax rate (percentage) */
   MAX_TAX_RATE: 20,
   /** Base treasury capacity */
-  TREASURY_BASE_CAP: 100_000,
+  TREASURY_BASE_CAP: 200_000,
   /** Additional treasury capacity per guild level */
-  TREASURY_CAP_PER_LEVEL: 10_000,
+  TREASURY_CAP_PER_LEVEL: 15_000,
   /** Guild level required to unlock specialization */
   SPECIALIZATION_UNLOCK_LEVEL: 10,
   /** Treasury cost to respec specialization */
-  SPECIALIZATION_RESPEC_COST: 2_000_000,
+  SPECIALIZATION_RESPEC_COST: 500_000,
   /** Hours of XP activity required to be considered "active" for boost eligibility */
   BOOST_ELIGIBILITY_WINDOW_HOURS: 48,
-  /** Active member thresholds for boost scaling: <5 = 50%, 5-9 = 75%, 10+ = 100% */
-  BOOST_SCALING_MIN_FULL: 10,
-  BOOST_SCALING_MIN_MEDIUM: 5,
-  BOOST_SCALING_FULL: 1.0,
-  BOOST_SCALING_MEDIUM: 0.75,
-  BOOST_SCALING_LOW: 0.5,
+  /** Linear boost scaling: 10% per active member, capped at 100% */
+  BOOST_SCALING_PER_MEMBER: 0.10,
+  BOOST_SCALING_MAX: 1.0,
   /** XP required per guild level: floor(BASE * level^EXPONENT) */
   XP_PER_LEVEL_BASE: 100,
   XP_PER_LEVEL_EXPONENT: 1.8,
@@ -1057,10 +1054,12 @@ export const GUILD_CONTRACT_DEFINITIONS: readonly GuildContractDefinition[] = [
 export const GUILD_CONTRACT_CONSTANTS = {
   CONTRACTS_PER_WEEK: 3,
   MIN_CATEGORIES: 2,
-  REWARD_GUILD_XP_MIN: 200,
-  REWARD_GUILD_XP_MAX: 800,
-  REWARD_TREASURY_MIN: 500,
-  REWARD_TREASURY_MAX: 2_000,
+  REWARD_GUILD_XP_MIN: 500,
+  REWARD_GUILD_XP_MAX: 2_000,
+  REWARD_TREASURY_MIN: 5_000,
+  REWARD_TREASURY_MAX: 15_000,
+  REWARD_RENOWN_MIN: 50,
+  REWARD_RENOWN_MAX: 200,
 } as const;
 
 // =============================================================================
@@ -1088,7 +1087,7 @@ export const GUILD_PROJECT_CONSTANTS = {
   /** Max materials a single player can contribute to one project (per category) */
   PER_PROJECT_MATERIAL_CAP: 200,
   /** Max turns a single player can contribute to one project */
-  PER_PROJECT_TURN_CAP: 10_000,
+  PER_PROJECT_TURN_CAP: 50_000,
   MAX_ACTIVE_PROJECTS: 1,
 } as const;
 
@@ -1100,12 +1099,11 @@ export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
     description: 'A communal forge that improves crafting outcomes for all members.',
     level: 1,
     prerequisites: [],
-    treasuryCost: 500_000,
     materialCosts: [
-      { category: 'ore', quantity: 2_000 },
-      { category: 'ingot', quantity: 1_000 },
+      { category: 'ore', quantity: 1_000 },
+      { category: 'ingot', quantity: 500 },
     ],
-    memberTurnGoal: 100_000,
+    memberTurnGoal: 150_000,
     perks: [{ effectType: 'craftingCrit', value: 0.05 }],
     guildXpReward: 500,
   },
@@ -1115,12 +1113,11 @@ export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
     description: 'A strategic planning center that sharpens combat skills.',
     level: 1,
     prerequisites: [],
-    treasuryCost: 500_000,
     materialCosts: [
-      { category: 'leather', quantity: 1_500 },
-      { category: 'plank', quantity: 1_000 },
+      { category: 'leather', quantity: 750 },
+      { category: 'plank', quantity: 500 },
     ],
-    memberTurnGoal: 100_000,
+    memberTurnGoal: 150_000,
     perks: [{ effectType: 'xpBoost', value: 0.05 }],
     guildXpReward: 500,
   },
@@ -1130,12 +1127,11 @@ export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
     description: 'A network of scouts that reduces travel time across zones.',
     level: 1,
     prerequisites: [],
-    treasuryCost: 500_000,
     materialCosts: [
-      { category: 'herb', quantity: 1_000 },
-      { category: 'plank', quantity: 1_500 },
+      { category: 'herb', quantity: 500 },
+      { category: 'plank', quantity: 750 },
     ],
-    memberTurnGoal: 100_000,
+    memberTurnGoal: 150_000,
     perks: [{ effectType: 'travelCostReduction', value: 0.10 }],
     guildXpReward: 500,
   },
@@ -1146,12 +1142,11 @@ export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
     description: 'An upgraded forge with superior tools and techniques.',
     level: 2,
     prerequisites: ['guild_forge'],
-    treasuryCost: 2_000_000,
     materialCosts: [
-      { category: 'ore', quantity: 5_000 },
-      { category: 'ingot', quantity: 2_000 },
+      { category: 'ore', quantity: 2_500 },
+      { category: 'ingot', quantity: 1_000 },
     ],
-    memberTurnGoal: 400_000,
+    memberTurnGoal: 500_000,
     perks: [{ effectType: 'craftingCrit', value: 0.10 }],
     guildXpReward: 1_000,
   },
@@ -1161,12 +1156,11 @@ export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
     description: 'Training grounds that hone combat expertise.',
     level: 2,
     prerequisites: ['war_room'],
-    treasuryCost: 2_000_000,
     materialCosts: [
-      { category: 'leather', quantity: 3_000 },
-      { category: 'ingot', quantity: 2_000 },
+      { category: 'leather', quantity: 1_500 },
+      { category: 'ingot', quantity: 1_000 },
     ],
-    memberTurnGoal: 400_000,
+    memberTurnGoal: 500_000,
     perks: [{ effectType: 'xpBoost', value: 0.10 }],
     guildXpReward: 1_000,
   },
@@ -1176,12 +1170,11 @@ export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
     description: 'Expert mapmakers chart safer and faster travel routes.',
     level: 2,
     prerequisites: ['scout_network'],
-    treasuryCost: 2_000_000,
     materialCosts: [
-      { category: 'plank', quantity: 2_500 },
-      { category: 'herb', quantity: 2_000 },
+      { category: 'plank', quantity: 1_250 },
+      { category: 'herb', quantity: 1_000 },
     ],
-    memberTurnGoal: 400_000,
+    memberTurnGoal: 500_000,
     perks: [{ effectType: 'travelCostReduction', value: 0.20 }],
     guildXpReward: 1_000,
   },
@@ -1191,12 +1184,11 @@ export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
     description: 'An alchemical lab that reduces repair costs guild-wide.',
     level: 2,
     prerequisites: [], // requires ANY one L1 project (checked in service)
-    treasuryCost: 1_500_000,
     materialCosts: [
-      { category: 'herb', quantity: 2_000 },
-      { category: 'cloth', quantity: 1_500 },
+      { category: 'herb', quantity: 1_000 },
+      { category: 'cloth', quantity: 750 },
     ],
-    memberTurnGoal: 300_000,
+    memberTurnGoal: 500_000,
     perks: [{ effectType: 'repairCostReduction', value: 0.10 }],
     guildXpReward: 800,
   },
@@ -1207,11 +1199,10 @@ export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
     description: 'The pinnacle of guild craftsmanship.',
     level: 3,
     prerequisites: ['advanced_forge', 'apothecary'],
-    treasuryCost: 5_000_000,
     materialCosts: [
-      { category: 'ore', quantity: 10_000 },
-      { category: 'ingot', quantity: 5_000 },
-      { category: 'herb', quantity: 3_000 },
+      { category: 'ore', quantity: 5_000 },
+      { category: 'ingot', quantity: 2_500 },
+      { category: 'herb', quantity: 1_500 },
     ],
     memberTurnGoal: 1_000_000,
     perks: [{ effectType: 'craftingCrit', value: 0.15 }],
@@ -1223,11 +1214,10 @@ export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
     description: 'A war council chamber for elite combat coordination.',
     level: 3,
     prerequisites: ['barracks', 'apothecary'],
-    treasuryCost: 5_000_000,
     materialCosts: [
-      { category: 'leather', quantity: 5_000 },
-      { category: 'ingot', quantity: 4_000 },
-      { category: 'plank', quantity: 3_000 },
+      { category: 'leather', quantity: 2_500 },
+      { category: 'ingot', quantity: 2_000 },
+      { category: 'plank', quantity: 1_500 },
     ],
     memberTurnGoal: 1_000_000,
     perks: [{ effectType: 'xpBoost', value: 0.15 }],
@@ -1239,11 +1229,10 @@ export const GUILD_PROJECT_DEFINITIONS: readonly GuildProjectDefinition[] = [
     description: 'Master explorers that command unmatched knowledge of the land.',
     level: 3,
     prerequisites: ['cartographers_lodge', 'apothecary'],
-    treasuryCost: 5_000_000,
     materialCosts: [
-      { category: 'plank', quantity: 5_000 },
-      { category: 'herb', quantity: 4_000 },
-      { category: 'cloth', quantity: 3_000 },
+      { category: 'plank', quantity: 2_500 },
+      { category: 'herb', quantity: 2_000 },
+      { category: 'cloth', quantity: 1_500 },
     ],
     memberTurnGoal: 1_000_000,
     perks: [
@@ -1437,9 +1426,9 @@ export const MAIL_CONSTANTS = {
 // =============================================================================
 
 export const EXPEDITION_CONSTANTS = {
-  TREASURY_COST_BY_TIER: [200_000, 500_000, 1_000_000] as const,
+  TREASURY_COST_BY_TIER: [50_000, 125_000, 250_000] as const,
   LEVEL_REQUIREMENT_BY_TIER: [10, 16, 23] as const,
-  MIN_PARTICIPANTS_BY_TIER: [5, 8, 12] as const,
+  MIN_PARTICIPANTS_BY_TIER: [5, 5, 5] as const,
   ROOMS_BY_TIER: [5, 6, 8] as const,
   MOB_COUNTS: {
     trash: [4, 5] as const,

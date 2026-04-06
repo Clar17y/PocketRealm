@@ -17,6 +17,7 @@ function toContractData(row: {
   status: string;
   rewardGuildXp: number;
   rewardTreasuryTurns: number;
+  rewardRenown: number;
   weekStartedAt: Date;
   expiresAt: Date;
 }): GuildContractData {
@@ -30,6 +31,7 @@ function toContractData(row: {
     status: row.status as 'active' | 'completed' | 'expired',
     rewardGuildXp: row.rewardGuildXp,
     rewardTreasuryTurns: row.rewardTreasuryTurns,
+    rewardRenown: row.rewardRenown,
     weekStartedAt: row.weekStartedAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),
   };
@@ -46,7 +48,7 @@ export async function generateWeeklyContracts(guildId: string, now: Date = new D
   const weekStart = getWeekStart(now);
   const weekEnd = getWeekEnd(weekStart);
   const bracket = getLevelBracket(guild.level);
-  const { CONTRACTS_PER_WEEK, MIN_CATEGORIES, REWARD_GUILD_XP_MIN, REWARD_GUILD_XP_MAX, REWARD_TREASURY_MIN, REWARD_TREASURY_MAX } = GUILD_CONTRACT_CONSTANTS;
+  const { CONTRACTS_PER_WEEK, MIN_CATEGORIES, REWARD_GUILD_XP_MIN, REWARD_GUILD_XP_MAX, REWARD_TREASURY_MIN, REWARD_TREASURY_MAX, REWARD_RENOWN_MIN, REWARD_RENOWN_MAX } = GUILD_CONTRACT_CONSTANTS;
 
   const selected = selectWithCategorySpread([...GUILD_CONTRACT_DEFINITIONS], CONTRACTS_PER_WEEK, MIN_CATEGORIES);
 
@@ -62,6 +64,7 @@ export async function generateWeeklyContracts(guildId: string, now: Date = new D
           status: 'active',
           rewardGuildXp: randomIntInclusive(REWARD_GUILD_XP_MIN, REWARD_GUILD_XP_MAX),
           rewardTreasuryTurns: randomIntInclusive(REWARD_TREASURY_MIN, REWARD_TREASURY_MAX),
+          rewardRenown: randomIntInclusive(REWARD_RENOWN_MIN, REWARD_RENOWN_MAX),
           weekStartedAt: weekStart,
           expiresAt: weekEnd,
         },
@@ -151,18 +154,21 @@ export async function incrementContractProgress(
       });
       if (count === 0) return false; // Another call already completed it
 
-      // Award treasury
+      // Award treasury + renown
       await tx.guild.update({
         where: { id: guildId },
-        data: { treasuryTurns: { increment: contract.rewardTreasuryTurns } },
+        data: {
+          treasuryTurns: { increment: contract.rewardTreasuryTurns },
+          renown: { increment: contract.rewardRenown },
+        },
       });
 
       await tx.guildLog.create({
         data: {
           guildId,
           eventType: 'contract_completed',
-          message: `Contract "${GUILD_CONTRACT_DEFINITIONS.find((d) => d.key === contractType)?.name ?? contractType}" completed! +${contract.rewardGuildXp} Guild XP, +${contract.rewardTreasuryTurns} treasury turns`,
-          metadata: { contractKey: contractType, rewardXp: contract.rewardGuildXp, rewardTreasury: contract.rewardTreasuryTurns },
+          message: `Contract "${GUILD_CONTRACT_DEFINITIONS.find((d) => d.key === contractType)?.name ?? contractType}" completed! +${contract.rewardGuildXp} Guild XP, +${contract.rewardTreasuryTurns} treasury turns, +${contract.rewardRenown} renown`,
+          metadata: { contractKey: contractType, rewardXp: contract.rewardGuildXp, rewardTreasury: contract.rewardTreasuryTurns, rewardRenown: contract.rewardRenown },
         },
       });
 

@@ -31,6 +31,7 @@ import {
   cleanupExpeditionBots,
   buildTemplateIdMap,
   buildUpdatedAttemptLogs,
+  setExpeditionCooldowns,
 } from './expeditionHelpers';
 
 // Re-export from sub-services so existing importers don't break
@@ -42,17 +43,16 @@ export { handleRoomCleared, handleWipe, completeExpedition } from './expeditionT
 // Cooldowns
 // ---------------------------------------------------------------------------
 
-export async function getExpeditionCooldowns(guildId: string): Promise<ExpeditionCooldownInfo> {
-  const weeklyAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.WEEKLY_COOLDOWN_MS);
-  const betweenAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
+export async function getExpeditionCooldowns(guildId: string, playerId: string): Promise<ExpeditionCooldownInfo> {
+  const now = new Date();
+  const betweenAgo = new Date(now.getTime() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
 
-  const [activeExp, recentCompleted, recentAny] = await Promise.all([
+  const [activeExp, playerCooldowns, recentAny] = await Promise.all([
     prisma.guildExpedition.findFirst({
       where: { guildId, status: { in: ['recruiting', 'in_progress'] } },
     }),
-    prisma.guildExpedition.findMany({
-      where: { guildId, status: 'completed', completedAt: { gt: weeklyAgo } },
-      select: { tier: true, completedAt: true },
+    prisma.expeditionCooldown.findMany({
+      where: { playerId, expiresAt: { gt: now } },
     }),
     prisma.guildExpedition.findFirst({
       where: { guildId, status: { in: ['completed', 'failed'] }, completedAt: { gt: betweenAgo } },
@@ -62,13 +62,8 @@ export async function getExpeditionCooldowns(guildId: string): Promise<Expeditio
   ]);
 
   const weeklyCooldowns: Record<number, string | null> = { 1: null, 2: null, 3: null };
-  for (const exp of recentCompleted) {
-    if (exp.completedAt) {
-      const expiry = new Date(exp.completedAt.getTime() + EXPEDITION_CONSTANTS.WEEKLY_COOLDOWN_MS);
-      if (!weeklyCooldowns[exp.tier] || expiry > new Date(weeklyCooldowns[exp.tier]!)) {
-        weeklyCooldowns[exp.tier] = expiry.toISOString();
-      }
-    }
+  for (const cd of playerCooldowns) {
+    weeklyCooldowns[cd.tier] = cd.expiresAt.toISOString();
   }
 
   const betweenCooldown = recentAny?.completedAt
@@ -78,6 +73,7 @@ export async function getExpeditionCooldowns(guildId: string): Promise<Expeditio
   return { weeklyCooldowns, betweenCooldown, hasActiveExpedition: !!activeExp };
 }
 
+
 // ---------------------------------------------------------------------------
 // Launch Expedition
 // ---------------------------------------------------------------------------
@@ -86,6 +82,7 @@ export async function launchExpedition(
   playerId: string,
   tier: number,
 ): Promise<ExpeditionData> {
+  // Validate tier
   if (tier < 1 || tier > 3) {
     throw new AppError(400, 'Tier must be 1, 2, or 3', 'INVALID_TIER');
   }
@@ -104,25 +101,26 @@ export async function launchExpedition(
   const guild = membership.guild;
   const guildId = guild.id;
 
-  const weeklyAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.WEEKLY_COOLDOWN_MS);
-  const dayAgo = new Date(Date.now() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
+  // Check cooldowns in parallel (all independent queries)
+  const now = new Date();
+  const betweenAgo = new Date(now.getTime() - EXPEDITION_CONSTANTS.BETWEEN_EXPEDITION_COOLDOWN_MS);
 
-  const [activeExpedition, recentTierExpedition, recentAnyExpedition] = await Promise.all([
+  const [activeExpedition, playerCooldown, recentAnyExpedition] = await Promise.all([
     prisma.guildExpedition.findFirst({
       where: { guildId, status: { in: ['recruiting', 'in_progress'] } },
     }),
-    prisma.guildExpedition.findFirst({
-      where: { guildId, tier, status: 'completed', completedAt: { gt: weeklyAgo } },
+    prisma.expeditionCooldown.findUnique({
+      where: { playerId_tier: { playerId, tier } },
     }),
     prisma.guildExpedition.findFirst({
-      where: { guildId, status: { in: ['completed', 'failed'] }, completedAt: { gt: dayAgo } },
+      where: { guildId, status: { in: ['completed', 'failed'] }, completedAt: { gt: betweenAgo } },
     }),
   ]);
 
   if (activeExpedition) {
     throw new AppError(400, 'Guild already has an active expedition', 'ACTIVE_EXPEDITION_EXISTS');
   }
-  if (recentTierExpedition) {
+  if (playerCooldown && playerCooldown.expiresAt > now) {
     throw new AppError(400, 'Weekly cooldown for this tier has not expired', 'WEEKLY_COOLDOWN');
   }
   if (recentAnyExpedition) {
@@ -433,6 +431,8 @@ export async function abandonExpedition(expeditionId: string, playerId: string):
     'Expedition abandoned by officer',
     { expeditionId },
   );
+
+  await setExpeditionCooldowns(expeditionId, expedition.tier);
 
   await cleanupExpeditionBots(expeditionId);
 }

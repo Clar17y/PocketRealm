@@ -241,7 +241,8 @@ describe('expeditionService', () => {
     it('creates expedition with recruiting status and deducts treasury', async () => {
       mockPrisma.guildMember.findUnique.mockResolvedValue(makeMembershipRow());
       mockPrisma.guildMember.findMany.mockResolvedValue([{ playerId: PLAYER_ID }]);
-      mockPrisma.guildExpedition.findFirst.mockResolvedValue(null); // no active, no weekly, no 24h
+      mockPrisma.guildExpedition.findFirst.mockResolvedValue(null); // no active, no 24h
+      mockPrisma.expeditionCooldown.findUnique.mockResolvedValue(null); // no player cooldown
       mockPrisma.mobTemplate.findMany.mockResolvedValue([makeMobTemplate()]);
       mockPrisma.guild.update.mockResolvedValue(makeGuildRow());
       mockPrisma.guildExpedition.create.mockResolvedValue(makeExpeditionRow());
@@ -257,7 +258,7 @@ describe('expeditionService', () => {
       expect(mockPrisma.guild.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: GUILD_ID },
-          data: { treasuryTurns: { decrement: 200_000 } },
+          data: { treasuryTurns: { decrement: 50_000 } },
         }),
       );
     });
@@ -277,6 +278,7 @@ describe('expeditionService', () => {
         makeMembershipRow({ guild: makeGuildRow({ treasuryTurns: 100 }) }),
       );
       mockPrisma.guildExpedition.findFirst.mockResolvedValue(null);
+      mockPrisma.expeditionCooldown.findUnique.mockResolvedValue(null);
 
       await expect(launchExpedition(PLAYER_ID, 1)).rejects.toThrow(
         'Insufficient guild treasury',
@@ -287,6 +289,8 @@ describe('expeditionService', () => {
       mockPrisma.guildMember.findUnique.mockResolvedValue(makeMembershipRow());
       // First findFirst call → active expedition found
       mockPrisma.guildExpedition.findFirst.mockResolvedValueOnce(makeExpeditionRow());
+      mockPrisma.expeditionCooldown.findUnique.mockResolvedValue(null);
+      mockPrisma.guildExpedition.findFirst.mockResolvedValueOnce(null); // no between cooldown
 
       await expect(launchExpedition(PLAYER_ID, 1)).rejects.toThrow(
         'Guild already has an active expedition',
@@ -297,10 +301,13 @@ describe('expeditionService', () => {
       mockPrisma.guildMember.findUnique.mockResolvedValue(makeMembershipRow());
       // No active expedition
       mockPrisma.guildExpedition.findFirst.mockResolvedValueOnce(null);
-      // Weekly tier cooldown hit
-      mockPrisma.guildExpedition.findFirst.mockResolvedValueOnce(
-        makeExpeditionRow({ status: 'completed', completedAt: new Date() }),
-      );
+      // Player has active per-tier cooldown
+      mockPrisma.expeditionCooldown.findUnique.mockResolvedValue({
+        playerId: PLAYER_ID,
+        tier: 1,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+      mockPrisma.guildExpedition.findFirst.mockResolvedValueOnce(null); // no between cooldown
 
       await expect(launchExpedition(PLAYER_ID, 1)).rejects.toThrow(
         'Weekly cooldown for this tier has not expired',

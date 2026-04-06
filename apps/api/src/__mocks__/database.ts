@@ -88,6 +88,7 @@ export const prisma = {
   playerBlock: mockModel(),
   friendMail: mockModel(),
   playerExpeditionBestiary: mockModel(),
+  expeditionCooldown: mockModel(),
   pushSubscription: mockModel(),
   emailVerificationToken: mockModel(),
   passwordResetToken: mockModel(),

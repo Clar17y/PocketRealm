@@ -58,13 +58,15 @@ describe('startProject', () => {
       .rejects.toThrow('Only officers and leaders can do this');
   });
 
-  it('throws if treasury is insufficient', async () => {
-    db.guildMember.findUnique.mockResolvedValue(makeMember('leader', { treasuryTurns: 100 }));
+  it('starts a project even with zero treasury (no treasury cost)', async () => {
+    db.guildMember.findUnique.mockResolvedValue(makeMember('leader', { treasuryTurns: 0 }));
     db.guildProject.findFirst.mockResolvedValue(null);
     db.guildProject.findMany.mockResolvedValue([]);
+    db.$transaction.mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(db));
+    db.guildProject.create.mockResolvedValue({ id: 'proj-1', projectKey: 'guild_forge', turnsContributed: 0, materialsProgress: {}, status: 'active', startedAt: new Date() });
 
-    await expect(startProject(PLAYER_ID, GUILD_ID, 'guild_forge'))
-      .rejects.toThrow('Insufficient treasury');
+    const result = await startProject(PLAYER_ID, GUILD_ID, 'guild_forge');
+    expect(result.projectKey).toBe('guild_forge');
   });
 
   it('throws if another project is already active', async () => {
@@ -290,7 +292,7 @@ describe('contributeMaterials', () => {
     });
     db.guildProject.findFirst.mockResolvedValue({
       id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
-      turnsContributed: 100_000, materialsProgress: { ore: 2000, ingot: 950 },
+      turnsContributed: 150_000, materialsProgress: { ore: 1000, ingot: 450 },
       status: 'active',
     });
     db.itemTemplate.findUnique.mockResolvedValue({
@@ -304,7 +306,7 @@ describe('contributeMaterials', () => {
     db.item.update.mockResolvedValue({});
     db.guildProject.update.mockResolvedValue({
       id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
-      turnsContributed: 100_000, materialsProgress: { ore: 2000, ingot: 1000 },
+      turnsContributed: 150_000, materialsProgress: { ore: 1000, ingot: 500 },
       status: 'completed', startedAt: new Date(), completedAt: new Date(),
     });
     db.guildProjectContribution.upsert.mockResolvedValue({});
@@ -313,7 +315,7 @@ describe('contributeMaterials', () => {
     db.guildLog.create.mockResolvedValue({});
     db.guildProject.findUnique.mockResolvedValue({
       id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
-      turnsContributed: 100_000, materialsProgress: { ore: 2000, ingot: 1000 },
+      turnsContributed: 150_000, materialsProgress: { ore: 1000, ingot: 500 },
       status: 'completed', startedAt: new Date(), completedAt: new Date(),
     });
 
@@ -328,7 +330,7 @@ describe('contributeMaterials', () => {
     });
     db.guildProject.findFirst.mockResolvedValue({
       id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
-      turnsContributed: 0, materialsProgress: { ore: 1990 },
+      turnsContributed: 0, materialsProgress: { ore: 990 },
       status: 'active',
     });
     db.itemTemplate.findUnique.mockResolvedValue({
@@ -342,19 +344,19 @@ describe('contributeMaterials', () => {
     db.item.update.mockResolvedValue({});
     db.guildProject.update.mockResolvedValue({
       id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
-      turnsContributed: 0, materialsProgress: { ore: 2000 },
+      turnsContributed: 0, materialsProgress: { ore: 1000 },
       status: 'active', startedAt: new Date(), completedAt: null,
     });
     db.guildProjectContribution.upsert.mockResolvedValue({});
     db.guildProject.findUnique.mockResolvedValue({
       id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
-      turnsContributed: 0, materialsProgress: { ore: 2000 },
+      turnsContributed: 0, materialsProgress: { ore: 1000 },
       status: 'active', startedAt: new Date(), completedAt: null,
     });
 
     const result = await contributeMaterials(PLAYER_ID, GUILD_ID, 'proj-1', 'tpl-iron-ore', 50);
-    // Only 10 should be consumed (2000 - 1990 = 10 remaining)
-    expect(result.materialsProgress.ore).toBe(2000);
+    // Only 10 should be consumed (1000 - 990 = 10 remaining)
+    expect(result.materialsProgress.ore).toBe(1000);
   });
 
   it('throws if category already fully contributed', async () => {
@@ -363,7 +365,7 @@ describe('contributeMaterials', () => {
     });
     db.guildProject.findFirst.mockResolvedValue({
       id: 'proj-1', guildId: GUILD_ID, projectKey: 'guild_forge',
-      turnsContributed: 0, materialsProgress: { ore: 2000 },
+      turnsContributed: 0, materialsProgress: { ore: 1000 },
       status: 'active',
     });
     db.itemTemplate.findUnique.mockResolvedValue({

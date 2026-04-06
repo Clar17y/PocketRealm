@@ -54,6 +54,7 @@ describe('generateWeeklyContracts', () => {
         status: 'active',
         rewardGuildXp: 300,
         rewardTreasuryTurns: 1000,
+        rewardRenown: 100,
         weekStartedAt: NOW,
         expiresAt: new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000),
       };
@@ -83,6 +84,7 @@ describe('getActiveContracts', () => {
         status: 'active',
         rewardGuildXp: 300,
         rewardTreasuryTurns: 1000,
+        rewardRenown: 100,
         weekStartedAt: weekStart,
         expiresAt: new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000),
       },
@@ -108,6 +110,7 @@ describe('getActiveContracts', () => {
         status: 'active',
         rewardGuildXp: 400,
         rewardTreasuryTurns: 800,
+        rewardRenown: 150,
         weekStartedAt: NOW,
         expiresAt: new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000),
       };
@@ -131,6 +134,7 @@ describe('incrementContractProgress', () => {
       status: 'active',
       rewardGuildXp: 300,
       rewardTreasuryTurns: 1000,
+      rewardRenown: 100,
     });
     db.guildContract.update.mockResolvedValue({});
 
@@ -153,6 +157,7 @@ describe('incrementContractProgress', () => {
       status: 'active',
       rewardGuildXp: 300,
       rewardTreasuryTurns: 1000,
+      rewardRenown: 100,
     });
     db.guildContract.updateMany.mockResolvedValue({ count: 1 });
     db.guild.update.mockResolvedValue({});
