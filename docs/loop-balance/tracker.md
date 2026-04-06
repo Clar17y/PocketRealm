@@ -16,8 +16,8 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 
 | # | System | Issue | Source Report | Status | Plan |
 |---|--------|-------|--------------|--------|------|
-| 1 | Guild | Treasury cap blocks L2/L3 projects and respec (cap maxes at 500k, projects cost 1.5-5M) | guild-constants | `confirmed` | Guild Economy Redesign |
-| 2 | Guild | Turn contribution caps make L2/L3 projects mathematically impossible (need 40-100 contributors, max guild size 30) | guild-constants | `confirmed` | Guild Economy Redesign |
+| 1 | Guild | Treasury cap blocks L2/L3 projects and respec (cap maxes at 500k, projects cost 1.5-5M) | guild-constants | `done` | Guild Economy Redesign — PR #174 |
+| 2 | Guild | Turn contribution caps make L2/L3 projects mathematically impossible (need 40-100 contributors, max guild size 30) | guild-constants | `done` | Guild Economy Redesign — PR #174 |
 
 ## High Severity
 
@@ -52,8 +52,8 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 | 24 | Gathering | Low-tier farming strictly dominant for resources (67% more resources, 92% more gems) | gathering-constants | `wontfix` | |
 | 25 | Flee | Knockout rate extremely high at level parity (70% on defeat) | flee-constants | `done` | PR #137 — BASE_FLEE_CHANCE 0.30 → 0.50 |
 | 26 | Casino | No per-player bet limit per round (unlimited bets, max-bet bypass via same-number stacking) | casino-constants | `done` | PR #144 — MAX_BETS_PER_ROUND: 12 |
-| 27 | Guild | Contract rewards negligible (<1% of treasury income) | guild-constants | `confirmed` | Guild Economy Redesign |
-| 28 | Guild | Boost scaling cliffs at 5 and 10 members (50%->75%->100% jumps) | guild-constants | `confirmed` | Guild Economy Redesign |
+| 27 | Guild | Contract rewards negligible (<1% of treasury income) | guild-constants | `done` | Guild Economy Redesign — PR #174 |
+| 28 | Guild | Boost scaling cliffs at 5 and 10 members (50%->75%->100% jumps) | guild-constants | `done` | Guild Economy Redesign — PR #174 |
 | 29 | Potion | Mana potion tier gap (T1 -> T4, no mid-game mana potion) | potion-constants | `done` | PR #141 — added T2/T3 mana potions |
 | 30 | Room/Clear | Decay exploit for full-clear (wait for mobs to decay, keep full-clear bonuses) | room-and-full-clear-constants | `done` | Encounter Site Rework |
 | 31 | Room/Clear | Large site mob count variance too high (6-20 mobs, 3.3x ratio) | room-and-full-clear-constants | `wontfix` | |
@@ -124,8 +124,8 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 | 91 | Inventory/Sell | 50% durability cliff on sell price (harsh binary threshold) | inventory-sell-constants | `wontfix` | |
 | 92 | Inventory/Sell | Gold has few sinks (accumulates indefinitely) | inventory-sell-constants | `deferred` | |
 | 93 | Inventory/Sell | Champion bonus slots dead code (hardcoded false) | inventory-sell-constants | `wontfix` | Planned feature — monetisation |
-| 94 | Guild | Discovery spec gathering yield may over-stack (up to 95%) | guild-constants | `confirmed` | Guild Economy Redesign |
-| 95 | Guild | XP_PER_BOSS_ROUND appears unused/unimplemented | guild-constants | `confirmed` | Guild Economy Redesign |
+| 94 | Guild | Discovery spec gathering yield may over-stack (up to 95%) | guild-constants | `wontfix` | Reviewed — not addressed in economy redesign |
+| 95 | Guild | XP_PER_BOSS_ROUND appears unused/unimplemented | guild-constants | `done` | Guild Economy Redesign — PR #174 |
 
 ## Implementation Plans
 
@@ -143,7 +143,6 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 
 ### Needs Brainstorm First
 
-- **Guild Economy Redesign** — #1, #2, #27, #28, #94, #95
 - **Boss/Threat System** — #20, #21
 
 ---

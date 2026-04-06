@@ -5,7 +5,7 @@ import { ITEM_RARITY_CONSTANTS, type NpcKey } from '@pocketrealm/shared';
 import { NpcDialogueBanner } from '@/components/common/NpcDialogueBanner';
 import { useNpcDialogue } from '@/hooks/useNpcDialogue';
 import { calculateCraftingTurnDiscount, calculateForgeUpgradeSuccessChance, getForgeRerollCost, getForgeUpgradeCost, getNextRarity } from '@pocketrealm/game-engine';
-import { Anvil, Sparkles, TrendingUp } from 'lucide-react';
+import { Anvil, HelpCircle, Sparkles, TrendingUp } from 'lucide-react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
@@ -160,6 +160,7 @@ export function Forge({
   const [confirmReroll, setConfirmReroll] = useState(false);
   const [upgradePickerOpen, setUpgradePickerOpen] = useState(false);
   const [rerollPickerOpen, setRerollPickerOpen] = useState(false);
+  const [showLuckInfo, setShowLuckInfo] = useState(false);
   const forgeNpcKey: NpcKey = zoneName?.toLowerCase() === 'thornwall' ? 'thornwall-blacksmith' : 'millbrook-blacksmith';
   const { dialogueEvent, triggerDialogueEvent } = useNpcDialogue(forgeNpcKey);
   const noFacility = zoneCraftingLevel === 0;
@@ -281,8 +282,26 @@ export function Forge({
 
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold font-almendra text-[var(--rpg-text-primary)]">Forge</h2>
-        <div className="text-sm text-[var(--rpg-text-secondary)]">Luck: <span className="font-pixel text-[12px]">{equippedLuck}</span></div>
+        <button
+          type="button"
+          onClick={() => setShowLuckInfo((v) => !v)}
+          className="flex items-center gap-1 text-sm text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors"
+        >
+          Luck: <span className="font-pixel text-[12px]">{equippedLuck}</span>
+          {forgeLuckUses > 0 && <span className="text-[var(--rpg-gold)] text-[10px] font-pixel">2x</span>}
+          <HelpCircle size={14} className="text-[var(--rpg-text-secondary)]" />
+        </button>
       </div>
+      {showLuckInfo && (
+        <div className="text-xs text-[var(--rpg-text-secondary)] bg-[var(--rpg-surface)] rounded-lg p-3 border border-[var(--rpg-border)] space-y-1">
+          <p>Each point of <span className="text-[var(--rpg-gold)]">Luck</span> increases your forge upgrade success chance by <span className="text-[var(--rpg-green-light)]">+0.1%</span>, up to a maximum bonus of <span className="text-[var(--rpg-green-light)]">+10%</span>.</p>
+          <p>Your current bonus: <span className="text-[var(--rpg-green-light)]">+{Math.min(equippedLuck * 0.1, 10).toFixed(1)}%</span></p>
+          <p>Luck comes from equipped gear and the luck attribute.</p>
+          {forgeLuckUses > 0 && (
+            <p className="text-[var(--rpg-gold)]">Forge Luck Scroll active — your next upgrade has 2x success chance ({forgeLuckUses} use{forgeLuckUses !== 1 ? 's' : ''} remaining).</p>
+          )}
+        </div>
+      )}
 
       {noFacility && (
         <div className="text-sm text-[var(--rpg-text-secondary)] bg-[var(--rpg-surface)] rounded-lg p-3 border border-[var(--rpg-border)]">
@@ -351,7 +370,7 @@ export function Forge({
                   {baseEntries.length === 0 && <div className="text-[var(--rpg-text-secondary)]">None</div>}
                   {baseEntries.map(([stat, value]) => (
                     <div key={`base-${stat}`} className="text-[var(--rpg-text-primary)]">
-                      +{value} {prettyStatName(stat)}
+                      +{formatStatValue(stat, value)} {prettyStatName(stat)}
                     </div>
                   ))}
                 </div>

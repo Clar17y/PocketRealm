@@ -288,8 +288,8 @@ export function CombatScreen({
         />
       )}
 
-      {/* Resource Status */}
-      {!combatPlaybackData && !hpState.isRecovering && (
+      {/* Resource Status — hidden during encounter site combat (it has its own per-round bar) */}
+      {!combatPlaybackData && !hpState.isRecovering && !activeSiteCombat && (
         <ResourceStatusBar
           currentHp={hpState.currentHp}
           maxHp={hpState.maxHp}

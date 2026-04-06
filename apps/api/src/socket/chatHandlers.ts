@@ -4,6 +4,8 @@ import { ACHIEVEMENTS_BY_ID, CHAT_CONSTANTS } from '@pocketrealm/shared';
 import type { ChatChannelType, ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@pocketrealm/shared';
 import { checkRateLimit, saveMessage } from '../services/chatService';
 import { sanitizeUserText } from '../utils/sanitize';
+import { getPlayerGuildId } from '../services/guildService';
+import { getPlayerZoneId } from '../services/zoneService';
 
 // In-memory pinned messages keyed by channelId (ephemeral, lost on server restart)
 const pinnedMessages = new Map<string, ChatPinnedMessageEvent>();
@@ -48,21 +50,21 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
     socket.emit('chat:pinned', worldPin);
   }
 
-  // Look up player's current zone and guild, join their rooms
+  // Look up player's current zone and guild via Redis cache (avoids DB queries on every connect)
   Promise.all([
-    prisma.player.findUnique({ where: { id: playerId }, select: { currentZoneId: true } }),
-    prisma.guildMember.findUnique({ where: { playerId }, select: { guildId: true } }),
+    getPlayerZoneId(playerId),
+    getPlayerGuildId(playerId),
   ])
-    .then(([player, guildMember]) => {
-      if (player?.currentZoneId) {
-        socket.join(`chat:zone:${player.currentZoneId}`);
-        const zonePin = pinnedMessages.get(`zone:${player.currentZoneId}`);
+    .then(([currentZoneId, guildId]) => {
+      if (currentZoneId) {
+        socket.join(`chat:zone:${currentZoneId}`);
+        const zonePin = pinnedMessages.get(`zone:${currentZoneId}`);
         if (zonePin) {
           socket.emit('chat:pinned', zonePin);
         }
       }
-      if (guildMember?.guildId) {
-        socket.join(`chat:guild:${guildMember.guildId}`);
+      if (guildId) {
+        socket.join(`chat:guild:${guildId}`);
       }
       schedulePresenceBroadcast(io);
     })

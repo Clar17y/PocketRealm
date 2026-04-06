@@ -71,7 +71,7 @@ export default function EncounterSitesPage() {
       </table>
       <p>
         Mobs are distributed across rooms when the site is generated. You must
-        clear rooms sequentially — the next room becomes available only after
+        clear rooms sequentially. The next room becomes available only after
         the current one is fully defeated.
       </p>
 
@@ -79,7 +79,7 @@ export default function EncounterSitesPage() {
       <p>
         Mobs in an unfinished encounter site decay at a rate of{' '}
         <Const>{EXPLORATION_CONSTANTS.ENCOUNTER_SITE_DECAY_RATE_PER_HOUR}</Const> mobs per hour
-        — equivalent to one mob every four hours. If all remaining mobs in
+        (equivalent to one mob every four hours). If all remaining mobs in
         unfinished rooms decay before you finish, the site auto-clears and you
         receive the chest reward.
       </p>
@@ -110,7 +110,7 @@ export default function EncounterSitesPage() {
         Manual combat lets you control each round individually. You can switch
         combat templates between rounds and target specific mobs within the
         room. Manual combat does not grant the auto-resolve chest bonus, but
-        gives you full tactical control — useful when your template is not
+        gives you full tactical control, which is useful when your template is not
         optimised for the mob types present.
       </p>
 
@@ -136,8 +136,17 @@ export default function EncounterSitesPage() {
         your attack misses its primary target, the attack bounces to another
         living enemy in the room. Each bounce independently re-rolls hit chance
         against the new target. This means missing one mob does not waste your
-        action entirely when multiple enemies remain — the attack can still
+        action entirely when multiple enemies remain. The attack can still
         connect with a different mob.
+      </p>
+
+      <h2>Equipment Durability</h2>
+      <p>
+        Encounter site combat degrades equipped weapon and armour durability
+        just like open-world encounters. Each hit you land reduces weapon
+        durability, and each hit you take reduces armour durability. See{' '}
+        <a href="/wiki/items/durability">Durability &amp; Selling</a> for the
+        per-hit degradation rate.
       </p>
 
       <h2>Resource Management</h2>
@@ -153,7 +162,7 @@ export default function EncounterSitesPage() {
         Defeating mobs in encounter sites grants combat skill XP through the
         same pipeline as zone combat. XP is distributed to the attack skill
         associated with your equipped weapon (melee, ranged, or magic). XP is
-        only granted when an entire room is fully cleared — defeating individual
+        only granted when an entire room is fully cleared. Defeating individual
         mobs within a room does not award XP until the last mob in that room
         falls. Mob prefixes that carry XP multipliers apply normally.
       </p>
@@ -223,8 +232,8 @@ export default function EncounterSitesPage() {
 
       <h2>Activity Lockout</h2>
       <p>
-        While you have an active encounter site, other combat actions — including
-        zone combat and expeditions — are disabled until the site is completed
+        While you have an active encounter site, other combat actions (including
+        zone combat and expeditions) are disabled until the site is completed
         or abandoned. This prevents resource states from conflicting across
         simultaneous combat contexts.
       </p>

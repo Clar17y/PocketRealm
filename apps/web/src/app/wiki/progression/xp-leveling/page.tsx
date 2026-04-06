@@ -36,7 +36,7 @@ export default function XpLevelingPage() {
       <h2>Skill XP Formula</h2>
       <p>
         The total XP required to reach a given skill level uses a power curve
-        with a reduced base for early levels (1&ndash;9) so new players progress
+        with a reduced base for early levels (1 to 9) so new players progress
         faster:
       </p>
       <FormulaBlock>

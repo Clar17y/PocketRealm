@@ -54,6 +54,9 @@ coverage/
 packages/database/prisma/*.db
 packages/database/prisma/*.db-journal
 
+# Next.js auto-generated
+next-env.d.ts
+
 # Misc
 *.tsbuildinfo
 .turbo/

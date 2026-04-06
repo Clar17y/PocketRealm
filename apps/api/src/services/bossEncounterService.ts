@@ -3,15 +3,14 @@ import type { Server as SocketServer } from 'socket.io';
 import { prisma } from '@pocketrealm/database';
 import {
   WORLD_EVENT_CONSTANTS,
+  GUILD_CONSTANTS,
   BASE_ACTION_DEFINITIONS,
   BOSS_ACTION_DEFINITIONS,
   BOSS_TEMPLATES,
-  type BossActiveEffect,
   type BossEncounterData,
   type BossEncounterStatus,
   type BossParticipantData,
   type BossParticipantStatus,
-  type BossPlayerReward,
   type BossRoundSummary,
 } from '@pocketrealm/shared';
 import {
@@ -38,9 +37,10 @@ import { getActiveTemplate } from './combatTemplateService';
 import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { distributeBossLoot } from './bossLootService';
 import { redis } from '../redis';
-import { parseJsonArray, parseJsonRecord } from '../utils/jsonColumnSchemas';
+import { parseBossEffects, parseBossRoundSummaries, parseBossRewardsByPlayer } from '../utils/bossJsonSchemas';
 import { sendPush } from './pushNotificationService';
 import { validateEnum } from '../utils/validateEnum';
+import { addGuildXp } from './guildService';
 
 const VALID_ENCOUNTER_STATUSES = new Set<BossEncounterStatus>(['waiting', 'in_progress', 'defeated', 'expired']);
 const VALID_PARTICIPANT_STATUSES = new Set<BossParticipantStatus>(['alive', 'knocked_out']);
@@ -62,12 +62,6 @@ function toBossEncounterData(row: {
   roundSummaries?: unknown;
   rewardsByPlayer?: unknown;
 }): BossEncounterData {
-  const parsedSummaries: BossRoundSummary[] | null = Array.isArray(row.roundSummaries)
-    ? parseJsonArray<BossRoundSummary>(row.roundSummaries, 'roundSummaries')
-    : null;
-  const parsedRewards: Record<string, BossPlayerReward> | null = (row.rewardsByPlayer && typeof row.rewardsByPlayer === 'object' && !Array.isArray(row.rewardsByPlayer))
-    ? parseJsonRecord<BossPlayerReward>(row.rewardsByPlayer, 'rewardsByPlayer')
-    : null;
   return {
     id: row.id,
     eventId: row.eventId,
@@ -75,13 +69,13 @@ function toBossEncounterData(row: {
     currentHp: row.currentHp,
     maxHp: row.maxHp,
     baseHp: row.baseHp,
-    bossEffects: parseJsonArray<BossActiveEffect>(row.bossEffects, 'bossEffects'),
+    bossEffects: parseBossEffects(row.bossEffects, 'bossEffects'),
     roundNumber: row.roundNumber,
     nextRoundAt: row.nextRoundAt?.toISOString() ?? null,
     status: validateEnum(row.status, VALID_ENCOUNTER_STATUSES, 'waiting'),
     killedBy: row.killedBy,
-    roundSummaries: parsedSummaries,
-    rewardsByPlayer: parsedRewards,
+    roundSummaries: parseBossRoundSummaries(row.roundSummaries, 'roundSummaries'),
+    rewardsByPlayer: parseBossRewardsByPlayer(row.rewardsByPlayer, 'rewardsByPlayer'),
   };
 }
 
@@ -394,7 +388,7 @@ async function resolveBossRoundInner(
     template: bossTemplate?.actions ?? [{ actionId: 'boss_physical_attack', targetMode: 'single_target' as const }],
     actionDefinitions: bossTemplate?.actionDefinitions ?? BOSS_ACTION_DEFINITIONS,
     roundNumber: nextRound,
-    activeEffects: parseJsonArray<BossActiveEffect>(encounter.bossEffects, 'encounter.bossEffects'),
+    activeEffects: parseBossEffects(encounter.bossEffects, 'encounter.bossEffects'),
   };
 
   // Build threat table from carried-forward threat values
@@ -425,7 +419,7 @@ async function resolveBossRoundInner(
     playersAlive,
     playersDead,
   };
-  const existingSummaries = parseJsonArray<BossRoundSummary>(encounter.roundSummaries, 'encounter.roundSummaries');
+  const existingSummaries = parseBossRoundSummaries(encounter.roundSummaries, 'encounter.roundSummaries') ?? [];
   const newSummaries = [...existingSummaries, roundSummary];
 
   const nextNextRoundAt = new Date(Date.now() + WORLD_EVENT_CONSTANTS.BOSS_ROUND_INTERVAL_MINUTES * 60 * 1000);
@@ -493,6 +487,17 @@ async function resolveBossRoundInner(
       }),
     ),
   );
+
+  // Award guild XP for this boss round (each participating guild gets XP)
+  const uniquePlayerIds = [...new Set(result.participantResults.map(r => r.playerId))];
+  const memberships = await prisma.guildMember.findMany({
+    where: { playerId: { in: uniquePlayerIds } },
+    select: { guildId: true },
+  });
+  const guildIds = new Set(memberships.map(m => m.guildId));
+  for (const guildId of guildIds) {
+    await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_BOSS_ROUND);
+  }
 
   // Progressive bestiary reveal: alive players learn the boss's action for this round
   const alivePlayerIdsForReveal = result.participantResults

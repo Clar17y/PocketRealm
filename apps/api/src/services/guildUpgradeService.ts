@@ -278,12 +278,10 @@ async function computePlayerGuildModifiers(playerId: string): Promise<PlayerGuil
     });
     const activeCount = members.filter((m) => isActiveWithinWindow(m.lastActiveAt)).length;
 
-    let scale: number = GUILD_CONSTANTS.BOOST_SCALING_LOW;
-    if (activeCount >= GUILD_CONSTANTS.BOOST_SCALING_MIN_FULL) {
-      scale = GUILD_CONSTANTS.BOOST_SCALING_FULL;
-    } else if (activeCount >= GUILD_CONSTANTS.BOOST_SCALING_MIN_MEDIUM) {
-      scale = GUILD_CONSTANTS.BOOST_SCALING_MEDIUM;
-    }
+    const scale = Math.min(
+      activeCount * GUILD_CONSTANTS.BOOST_SCALING_PER_MEMBER,
+      GUILD_CONSTANTS.BOOST_SCALING_MAX,
+    );
 
     for (const upgrade of activeUpgrades) {
       const def = GUILD_UPGRADE_DEFINITIONS.find((d) => d.key === upgrade.upgradeType);

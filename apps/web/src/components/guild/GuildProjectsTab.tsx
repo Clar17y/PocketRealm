@@ -429,15 +429,9 @@ function AvailableProjectCard({
         )}
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-        <div>
-          <span className="text-[var(--rpg-text-secondary)]">Treasury Cost</span>
-          <p className="text-[var(--rpg-gold)]">{formatNumber(project.treasuryCost)}</p>
-        </div>
-        <div>
-          <span className="text-[var(--rpg-text-secondary)]">Turn Goal</span>
-          <p>{formatNumber(project.memberTurnGoal)}</p>
-        </div>
+      <div className="mt-2 text-xs">
+        <span className="text-[var(--rpg-text-secondary)]">Turn Goal</span>
+        <p>{formatNumber(project.memberTurnGoal)}</p>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1">

@@ -78,4 +78,23 @@ describe('trackProgress', () => {
     expect(mockIncrementContractProgress).not.toHaveBeenCalled();
     expect(mockIncrementQuestProgress).toHaveBeenCalledWith('player-1', 'casino_wagers', 100, undefined);
   });
+
+  it('returns completed quest progress updates for frontend notification', async () => {
+    mockGetPlayerGuildId.mockResolvedValue(null);
+    mockIncrementQuestProgress.mockResolvedValue([
+      { questId: 'q1', questName: 'Slay 10 Monsters', current: 10, target: 10, completed: true },
+      { questId: 'q2', questName: 'Gather Resources', current: 3, target: 5, completed: false },
+    ]);
+    const result = await trackProgress('player-1', 'kill_count', 2);
+    expect(result).toHaveLength(2);
+
+    const completedUpdate = result.find(u => u.questId === 'q1');
+    expect(completedUpdate).toBeDefined();
+    expect(completedUpdate!.completed).toBe(true);
+    expect(completedUpdate!.current).toBe(completedUpdate!.target);
+
+    const activeUpdate = result.find(u => u.questId === 'q2');
+    expect(activeUpdate).toBeDefined();
+    expect(activeUpdate!.completed).toBe(false);
+  });
 });

@@ -165,6 +165,17 @@ describe('achievementService', () => {
       });
     });
 
+    it('returns empty when concurrent call already inserted all achievements (count=0)', async () => {
+      // Simulates race condition: both calls see achievements as not-yet-unlocked,
+      // but concurrent call inserts first; our createMany returns count=0 due to skipDuplicates
+      mockResolveStats.mockResolvedValue({ totalKills: 100 });
+      mockPrisma.playerAchievement.findMany.mockResolvedValue([]);
+      mockPrisma.playerAchievement.createMany.mockResolvedValue({ count: 0 });
+
+      const result = await checkAchievements('p1', { statKeys: ['totalKills'] });
+      expect(result).toEqual([]);
+    });
+
     it('uses family kills for progress on family achievements', async () => {
       mockResolveStats.mockResolvedValue({});
       mockResolveFamilyKills.mockResolvedValue(2500);
@@ -556,6 +567,8 @@ describe('achievementService', () => {
 
       // Item should not have been created
       expect(mockPrisma.item.create).not.toHaveBeenCalled();
+      // Validation runs inside $transaction, so Prisma rolls back rewardClaimed on error
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
     });
 
     it('throws INVALID_REWARD when item reward has no itemTemplateId', async () => {

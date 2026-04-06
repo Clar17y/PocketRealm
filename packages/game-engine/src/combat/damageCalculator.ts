@@ -136,6 +136,12 @@ export function calculateDefenceReduction(defence: number): number {
   return safeDefence / (safeDefence + COMBAT_CONSTANTS.DEFENCE_SCALING_FACTOR);
 }
 
+/** Apply diminishing-returns defence reduction to raw damage, floored at MIN_DAMAGE. */
+export function applyDefenceReduction(rawDamage: number, defence: number): number {
+  const reduction = calculateDefenceReduction(defence);
+  return Math.max(COMBAT_CONSTANTS.MIN_DAMAGE, Math.floor(rawDamage * (1 - reduction)));
+}
+
 /**
  * Convert a MobTemplate into CombatantStats.
  * Accepts optional currentHp/maxHp overrides for wounded or variant mobs.

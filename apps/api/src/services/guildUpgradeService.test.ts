@@ -40,7 +40,6 @@ vi.mock('@pocketrealm/shared', async (importOriginal) => {
         description: 'Test project with unmapped effectType',
         level: 1,
         prerequisites: [],
-        treasuryCost: 100,
         materialCosts: [],
         memberTurnGoal: 100,
         perks: [
@@ -231,7 +230,7 @@ describe('getPlayerGuildModifiers', () => {
     expect(mods.xpBoost).toBeCloseTo(0.10);
   });
 
-  it('applies medium scaling with 5-9 active members', async () => {
+  it('applies linear scaling at 10% per active member (7 members = 70%)', async () => {
     db.guildMember.findUnique.mockResolvedValue({
       guildId: GUILD_ID,
       lastActiveAt: NOW,
@@ -253,10 +252,11 @@ describe('getPlayerGuildModifiers', () => {
     db.guild.findUnique.mockResolvedValue({ specialization: null, level: 5 });
 
     const mods = await getPlayerGuildModifiers(PLAYER_ID);
-    expect(mods.combatDamage).toBeCloseTo(0.05 * GUILD_CONSTANTS.BOOST_SCALING_MEDIUM);
+    // 7 * 0.10 = 0.70 scale, effectValue = 0.05
+    expect(mods.combatDamage).toBeCloseTo(0.05 * 0.70);
   });
 
-  it('applies low scaling with <5 active members', async () => {
+  it('applies linear scaling at 10% per active member (3 members = 30%)', async () => {
     db.guildMember.findUnique.mockResolvedValue({
       guildId: GUILD_ID,
       lastActiveAt: NOW,
@@ -278,7 +278,34 @@ describe('getPlayerGuildModifiers', () => {
     db.guild.findUnique.mockResolvedValue({ specialization: null, level: 5 });
 
     const mods = await getPlayerGuildModifiers(PLAYER_ID);
-    expect(mods.defenseBoost).toBeCloseTo(0.05 * GUILD_CONSTANTS.BOOST_SCALING_LOW);
+    // 3 * 0.10 = 0.30 scale, effectValue = 0.05
+    expect(mods.defenseBoost).toBeCloseTo(0.05 * 0.30);
+  });
+
+  it('caps boost scaling at 100% with many active members', async () => {
+    db.guildMember.findUnique.mockResolvedValue({
+      guildId: GUILD_ID,
+      lastActiveAt: NOW,
+    });
+    db.guildUpgrade.findMany.mockResolvedValue([
+      {
+        id: 'u1',
+        guildId: GUILD_ID,
+        upgradeType: 'warriors_might',
+        tier: 1,
+        activatedAt: NOW,
+        expiresAt: new Date(NOW.getTime() + 3600000),
+        activatedBy: PLAYER_ID,
+      },
+    ]);
+    const members = Array.from({ length: 15 }, () => ({ lastActiveAt: NOW }));
+    db.guildMember.findMany.mockResolvedValue(members);
+    db.guildProject.findMany.mockResolvedValue([]);
+    db.guild.findUnique.mockResolvedValue({ specialization: null, level: 5 });
+
+    const mods = await getPlayerGuildModifiers(PLAYER_ID);
+    // 15 * 0.10 = 1.50, capped at 1.0, effectValue = 0.05
+    expect(mods.combatDamage).toBeCloseTo(0.05 * 1.0);
   });
 
   it('includes project perks from completed projects', async () => {

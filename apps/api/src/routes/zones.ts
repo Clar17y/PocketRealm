@@ -40,6 +40,7 @@ import { getActiveEventsForZone, getActiveWorldWideEvents, filterEventModifiers 
 import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
 import { getCachedZones, getCachedZoneConnections, getCachedMobTemplatesByZone } from '../services/staticDataCacheService';
+import { invalidateZoneIdCache } from '../services/zoneService';
 
 
 
@@ -88,6 +89,7 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
         where: { id: playerId },
         data: { currentZoneId: starterZone.id, homeTownId: starterZone.id },
       });
+      await invalidateZoneIdCache(playerId);
     }
   }
 
@@ -243,6 +245,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
         lastTravelledFromZoneId: currentZoneId,
       },
     });
+    await invalidateZoneIdCache(playerId);
 
     let newDiscoveries: Array<{ id: string; name: string }> = [];
     if (destinationZone.zoneType === 'town') {
@@ -261,6 +264,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     void trackProgress(playerId, 'zone_travel', 1);
 
     const breadcrumbStateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+    breadcrumbStateUpdates.currentZoneId = destinationZone.id;
     res.json({
       zone: { id: destinationZone.id, name: destinationZone.name, zoneType: destinationZone.zoneType },
       turns: await getTurnSnapshot(),
@@ -404,6 +408,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
           : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
         const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', travelDurabilityMult);
+        for (const d of durabilityLost) allTravelUpdatedItemIds.push(d.itemId);
 
         // Resolve mob family for event badges + achievement tracking (pre-fetched)
         const travelMobFamilyId = mobToFamilyMap.get(prefixedMob.id) ?? null;
@@ -617,6 +622,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
 
       if (ambushAbort?.type === 'knockout') {
         const knockoutStateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+        knockoutStateUpdates.currentZoneId = ambushAbort.respawn.townId;
         res.json({
           zone: { id: ambushAbort.respawn.townId, name: ambushAbort.respawn.townName, zoneType: 'town' },
           turns: await getTurnSnapshot(),
@@ -636,6 +642,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
 
       if (ambushAbort?.type === 'flee') {
         const fleeStateUpdates = await buildStateUpdates(playerId, ['hp', 'resources']);
+        fleeStateUpdates.currentZoneId = currentZoneId;
         res.json({
           zone: { id: currentZoneId, name: currentZone.name, zoneType: currentZone.zoneType },
           turns: await getTurnSnapshot(),
@@ -676,6 +683,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     where: { id: playerId },
     data: updateData,
   });
+  await invalidateZoneIdCache(playerId);
 
   void trackProgress(playerId, 'zone_travel', 1);
 
@@ -695,6 +703,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
     buildStateUpdates(playerId, ['hp', 'resources']),
   ]);
   await mergeLootIntoStateUpdates(playerId, allTravelNewItemIds, allTravelUpdatedItemIds, travelStateUpdates);
+  travelStateUpdates.currentZoneId = destinationId;
   res.json({
     zone: { id: destinationZone.id, name: destinationZone.name, zoneType: destinationZone.zoneType },
     turns: await getTurnSnapshot(),

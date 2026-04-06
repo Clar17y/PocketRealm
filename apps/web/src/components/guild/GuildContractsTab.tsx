@@ -59,8 +59,9 @@ export function GuildContractsTab({ guildId }: GuildContractsTabProps) {
               />
             </div>
             <div className="flex gap-3 text-xs text-[var(--rpg-text-secondary)]">
-              <span>+{contract.rewardGuildXp} Guild XP</span>
+              <span>+{formatNumber(contract.rewardGuildXp)} Guild XP</span>
               <span>+{formatNumber(contract.rewardTreasuryTurns)} Treasury</span>
+              <span>+{formatNumber(contract.rewardRenown)} Renown</span>
             </div>
           </PixelCard>
         );

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     default: 'Pocketrealm Wiki',
   },
   description:
-    'Complete game mechanics reference for Pocketrealm — every formula, constant, and calculation explained.',
+    'Complete game mechanics reference for Pocketrealm covering every formula, constant, and calculation.',
 };
 
 export default function WikiLayout({ children }: { children: React.ReactNode }) {

@@ -44,10 +44,10 @@ export default function BuffsDebuffsPage() {
       <h2>Effect Structure</h2>
       <p>Every buff or debuff has these core properties:</p>
       <ul>
-        <li><strong>stat</strong> -- the stat modified (attack, defence, evasion, accuracy, speed, etc.)</li>
-        <li><strong>modifier</strong> -- flat value added/subtracted; percent modifiers use <code>attackPercent</code></li>
-        <li><strong>duration</strong> -- rounds until the effect expires</li>
-        <li><strong>isDebuff</strong> -- if true, applied to the target; otherwise applied to self</li>
+        <li><strong>stat:</strong> the stat modified (attack, defence, evasion, accuracy, speed, etc.)</li>
+        <li><strong>modifier:</strong> flat value added/subtracted; percent modifiers use <code>attackPercent</code></li>
+        <li><strong>duration:</strong> rounds until the effect expires</li>
+        <li><strong>isDebuff:</strong> if true, applied to the target; otherwise applied to self</li>
       </ul>
       <p>
         A combatant can have at most{' '}

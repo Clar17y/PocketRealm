@@ -5,7 +5,7 @@ import { wikiNavigation } from './wikiNavigation';
 export const metadata: Metadata = {
   title: 'Pocketrealm Wiki',
   description:
-    'Complete game mechanics reference for Pocketrealm — every formula, constant, and calculation explained.',
+    'Complete game mechanics reference for Pocketrealm covering every formula, constant, and calculation.',
 };
 
 const sectionDescriptions: Record<string, string> = {
@@ -17,7 +17,7 @@ const sectionDescriptions: Record<string, string> = {
   progression:
     'XP formulas, leveling curves, efficiency decay, and skill point allocation.',
   resources:
-    'Health, stamina, and mana pools — max values, regen rates, rest, flee mechanics.',
+    'Health, stamina, and mana pools: max values, regen rates, rest, and flee mechanics.',
   items: 'Item rarity, drop tables, forge upgrades, durability, sell prices, and inventory.',
   crafting:
     'Crafting crit system, gathering yields, gem drops, and salvage rates.',
@@ -30,8 +30,8 @@ export default function WikiIndexPage() {
     <article>
       <h1 className="wiki-page-title">Pocketrealm Wiki</h1>
       <p className="wiki-page-summary">
-        Complete game mechanics reference — every formula, constant, and
-        calculation explained. Pick a category to dive in.
+        Complete game mechanics reference covering every formula, constant, and
+        calculation. Pick a category to dive in.
       </p>
 
       <div className="wiki-index-grid">

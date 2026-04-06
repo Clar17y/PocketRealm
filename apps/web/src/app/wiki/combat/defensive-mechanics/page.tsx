@@ -124,7 +124,7 @@ export default function DefensiveMechanicsPage() {
         </Comment>
       </FormulaBlock>
       <p>
-        This makes high-damage channeled abilities a calculated risk -- they
+        This makes high-damage channeled abilities a calculated risk. They
         deal more damage but leave you vulnerable if the opponent attacks on the
         same round.
       </p>
