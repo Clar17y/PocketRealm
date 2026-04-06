@@ -194,10 +194,12 @@ server.listen(PORT, () => {
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received — shutting down gracefully');
+  const io = getIo();
+  if (io) io.close();
   server.close(() => {
-    redis.quit().then(() => {
-      console.log('Redis connection closed');
-      process.exit(0);
-    });
+    redis.quit()
+      .then(() => console.log('Redis connection closed'))
+      .catch((err) => console.error('Redis quit error:', err.message))
+      .finally(() => process.exit(0));
   });
 });

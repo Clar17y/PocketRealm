@@ -171,6 +171,8 @@ export async function createGuild(
     return created;
   });
 
+  await invalidateGuildIdCache(playerId);
+
   return toGuildData(guild);
 }
 

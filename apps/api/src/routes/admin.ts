@@ -12,7 +12,7 @@ import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { sendPush } from '../services/pushNotificationService';
 import { normalizePlayerAttributes } from '../services/attributesService';
-import { invalidateZoneIdCache } from '../services/zoneService';
+import { teleportPlayer } from '../services/zoneService';
 import { createActivityLog } from '../services/activityLogService';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
@@ -468,12 +468,7 @@ const teleportSchema = z.object({ zoneId: z.string().uuid() });
 
 router.post('/zones/teleport', asyncHandler(async (req, res) => {
   const { zoneId } = teleportSchema.parse(req.body);
-  await prisma.zone.findUniqueOrThrow({ where: { id: zoneId } });
-  await prisma.player.update({
-    where: { id: req.player!.playerId },
-    data: { currentZoneId: zoneId },
-  });
-  void invalidateZoneIdCache(req.player!.playerId);
+  await teleportPlayer(req.player!.playerId, zoneId);
   await adminAudit(req.player!.playerId, 'teleport', { zoneId });
   res.json({ success: true, zoneId, stateUpdates: { currentZoneId: zoneId } });
 }));

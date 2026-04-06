@@ -438,28 +438,36 @@ async function refreshSkills() {
 }
 
 async function refreshCombat() {
-  // Total kills from bestiary — uses direct findMany because PlayerBestiary has
-  // a composite PK (playerId + mobTemplateId), incompatible with cursor pagination
-  const bestiaryRaw = await prisma.playerBestiary.findMany({
-    select: { playerId: true, kills: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
-  });
-
+  // Total kills from bestiary — uses offset-based pagination because
+  // PlayerBestiary has a composite PK (playerId + mobTemplateId),
+  // incompatible with cursor pagination.
+  const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
   const killTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }>();
-  for (const b of bestiaryRaw) {
-    const existing = killTotals.get(b.playerId);
-    if (existing) {
-      existing.score += b.kills;
-    } else {
-      killTotals.set(b.playerId, {
-        score: b.kills,
-        username: b.player.username,
-        characterLevel: b.player.characterLevel,
-        isBot: b.player.isBot,
-        isAdmin: b.player.role === 'admin',
-        ...resolveTitle(b.player.activeTitle),
-      });
+  let offset = 0;
+  let batch;
+  do {
+    batch = await prisma.playerBestiary.findMany({
+      select: { playerId: true, kills: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
+      take: batchSize,
+      skip: offset,
+    });
+    for (const b of batch) {
+      const existing = killTotals.get(b.playerId);
+      if (existing) {
+        existing.score += b.kills;
+      } else {
+        killTotals.set(b.playerId, {
+          score: b.kills,
+          username: b.player.username,
+          characterLevel: b.player.characterLevel,
+          isBot: b.player.isBot,
+          isAdmin: b.player.role === 'admin',
+          ...resolveTitle(b.player.activeTitle),
+        });
+      }
     }
-  }
+    offset += batchSize;
+  } while (batch.length === batchSize);
 
   await writeToZset(
     'total_kills',

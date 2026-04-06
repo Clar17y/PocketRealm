@@ -21,3 +21,12 @@ export async function getPlayerZoneId(playerId: string): Promise<string | null> 
 export async function invalidateZoneIdCache(playerId: string): Promise<void> {
   await invalidateCache(zoneIdCacheKey(playerId));
 }
+
+export async function teleportPlayer(playerId: string, zoneId: string): Promise<void> {
+  await prisma.zone.findUniqueOrThrow({ where: { id: zoneId } });
+  await prisma.player.update({
+    where: { id: playerId },
+    data: { currentZoneId: zoneId },
+  });
+  await invalidateZoneIdCache(playerId);
+}
