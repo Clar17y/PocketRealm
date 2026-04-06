@@ -12,6 +12,7 @@ import {
   rollBonusStatsForRarity,
 } from '@pocketrealm/game-engine';
 import { AppError } from '../../middleware/errorHandler';
+import { getPlayerProgressionState } from '../../services/attributesService';
 import { getBuffValue, hasActiveBuff, consumeBuff, consumeBuffStandalone } from '../../services/buffService';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { getEquipmentStats } from '../../services/equipmentService';
@@ -88,13 +89,11 @@ forgeRouter.post('/upgrade', asyncHandler(async (req, res) => {
       }
       return { turnSpend: spent, taxResult: tax };
     });
-    const [equipmentStats, playerAttrs] = await Promise.all([
+    const [equipmentStats, progression] = await Promise.all([
       getEquipmentStats(playerId),
-      prisma.player.findUnique({ where: { id: playerId }, select: { attributes: true } }),
+      getPlayerProgressionState(playerId),
     ]);
-    const attrLuck = typeof (playerAttrs?.attributes as Record<string, unknown> | null)?.luck === 'number'
-      ? (playerAttrs!.attributes as Record<string, number>).luck : 0;
-    const totalLuck = equipmentStats.luck + attrLuck;
+    const totalLuck = equipmentStats.luck + progression.attributes.luck;
     const successChance = calculateForgeUpgradeSuccessChance(currentRarity, totalLuck);
     if (successChance === null) {
       throw new AppError(400, 'Legendary items cannot be upgraded', 'MAX_RARITY');
