@@ -372,6 +372,7 @@ export async function checkAndSpawnEvents(io: SocketServer | null): Promise<void
   try {
     const expired = await expireStaleEvents();
     for (const event of expired) {
+      logger.info({ eventId: event.id, title: event.title }, 'World event expired');
       const location = event.zoneName ?? 'the world';
       await emitSystemMessage(io, 'world', 'world', `Event ended: ${event.title} in ${location}`);
       if (event.zoneId) {

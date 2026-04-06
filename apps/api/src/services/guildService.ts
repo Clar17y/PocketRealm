@@ -174,6 +174,8 @@ export async function createGuild(
 
   await invalidateGuildIdCache(playerId);
 
+  logger.info({ guildId: guild.id, founderId: playerId, guildName: guild.name }, 'Guild created');
+
   return toGuildData(guild);
 }
 

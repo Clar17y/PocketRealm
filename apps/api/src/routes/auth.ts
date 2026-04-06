@@ -185,6 +185,8 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
     },
   });
 
+  logger.info({ playerId: player.id, username: player.username }, 'Player registered');
+
   res.status(201).json({
     player: {
       id: player.id,
@@ -253,6 +255,8 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
       expiresAt: refreshTokenExpiresAt(now.getTime()),
     },
   });
+
+  logger.info({ playerId: player.id, username: player.username }, 'Player logged in');
 
   res.json({
     player: {

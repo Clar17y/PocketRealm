@@ -1,6 +1,7 @@
 import { prisma } from '@pocketrealm/database';
 import { GUILD_CONSTANTS, type GuildData } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { logger } from '../logger';
 import {
   requireRole, addGuildLog, calculateMaxMembers,
   addGuildXp, checkGuildAchievementsForAllMembers, getGuild, invalidateGuildIdCache,
@@ -318,4 +319,6 @@ export async function disbandGuild(leaderId: string, guildId: string): Promise<v
   ]);
 
   await prisma.guild.delete({ where: { id: guildId } });
+
+  logger.info({ guildId, dissolverId: leaderId }, 'Guild dissolved');
 }

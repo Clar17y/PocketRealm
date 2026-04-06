@@ -678,6 +678,12 @@ async function resolveBossRoundInner(
     );
   }
 
+  logger.info({
+    bossEncounterId: encounterId,
+    round: nextRound,
+    participantCount,
+  }, 'Boss round resolved');
+
   return { bossDefeated: result.bossDefeated, roundResult: result };
 }
 

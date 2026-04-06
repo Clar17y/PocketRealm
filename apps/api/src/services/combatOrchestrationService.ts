@@ -2,6 +2,7 @@ import {
   buildPlayerCombatStats,
   type TemplateCombatant,
 } from '@pocketrealm/game-engine';
+import { logger } from '../logger';
 import {
   ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
