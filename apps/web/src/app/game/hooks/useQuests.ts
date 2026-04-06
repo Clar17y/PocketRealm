@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getQuests, claimQuestReward, claimDailyBonus, rerollQuest } from '@/lib/api';
 import type { PlayerQuestData, PlayerQuestStateData, QuestProgressUpdate } from '@pocketrealm/shared';
+import { showQuestToasts } from '../gameControllerHelpers';
 
 export function useQuests() {
   const [quests, setQuests] = useState<PlayerQuestData[]>([]);
@@ -70,9 +71,10 @@ export function useQuests() {
     }
   }, []);
 
-  /** Update local quest state from progress updates returned by action endpoints. */
+  /** Show toast notifications and update local quest state from progress updates returned by action endpoints. */
   const updateQuestProgress = useCallback((updates?: QuestProgressUpdate[]) => {
     if (!updates?.length) return;
+    showQuestToasts(updates);
     setQuests((prev) => {
       const progressMap = new Map(updates.map((u) => [u.questId, u]));
       return prev.map((q) => {

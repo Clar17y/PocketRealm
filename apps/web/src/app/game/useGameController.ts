@@ -84,7 +84,6 @@ import { useCombatPlayback } from './hooks/useCombatPlayback';
 import { runSimpleAction } from './simpleAction';
 import { useApiReachable } from '@/hooks/useApiReachable';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
-import { showQuestToasts } from './gameControllerHelpers';
 import { useInventoryActions } from './hooks/useInventoryActions';
 import { useLootActions } from './hooks/useLootActions';
 import { useExplorationActions } from './hooks/useExplorationActions';
@@ -826,7 +825,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
-      showQuestToasts(data.questProgress);
       updateQuestProgress(data.questProgress);
       recordTurnsSpent(activeZoneId, turnSpend);
 
@@ -914,7 +912,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       }
 
       setTurns(data.turns.currentTurns);
-      showQuestToasts(data.questProgress);
       updateQuestProgress(data.questProgress);
 
       const newLogs: ActivityLogEntry[] = [];

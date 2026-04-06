@@ -4,7 +4,7 @@ import { startExploration } from '@/lib/api';
 import type { StateUpdates, QuestProgressUpdate } from '@pocketrealm/shared';
 import { TUTORIAL_STEP_EXPLORE } from '@/lib/tutorial';
 import { nowStamp } from './useActivityLog';
-import { mapPlaybackEventsToLogs, showQuestToasts } from '../gameControllerHelpers';
+import { mapPlaybackEventsToLogs } from '../gameControllerHelpers';
 import { applyStateUpdates, type StateSetters } from '../applyStateUpdates';
 import { recordTurnsSpent } from '../../../lib/activityTracker';
 import { fmtDur } from '@/lib/format';
@@ -127,7 +127,6 @@ export function useExplorationActions({
       }
 
       setTurns(data.turns.currentTurns);
-      showQuestToasts(data.questProgress);
       updateQuestProgress(data.questProgress);
       recordTurnsSpent(currentZone.id, turnSpend);
       updateZoneExploration(currentZone.id, data.explorationProgress);
