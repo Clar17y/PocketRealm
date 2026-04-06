@@ -63,12 +63,16 @@ export default function PvpCombatPage() {
         parameters differ significantly:
       </p>
       <FormulaBlock>
-        <Out>hitChance</Out> <Op>=</Op> <Const>min</Const> <Op>+</Op>{' '}
-        <Op>(</Op><Const>max</Const> <Op>-</Op> <Const>min</Const><Op>)</Op>{' '}
-        <Op>&times;</Op> <Op>(</Op><Var>attackerAcc</Var> <Op>/</Op>{' '}
-        <Op>(</Op><Var>attackerAcc</Var> <Op>+</Op> <Var>defenderEvasion</Var>{' '}
-        <Op>+</Op> <Const>bias</Const><Op>))</Op>
-        <Op>^</Op><Const>exponent</Const>
+        <Out>normalized</Out> <Op>=</Op> <Const>1</Const> <Op>/</Op>{' '}
+        <Op>(</Op><Const>1</Const> <Op>+</Op>{' '}
+        <Op>((</Op><Var>defenderEvasion</Var> <Op>+</Op> <Const>bias</Const>
+        <Op>)</Op> <Op>/</Op> <Var>attackerAcc</Var><Op>)</Op>{' '}
+        <Op>^</Op> <Const>exponent</Const><Op>)</Op>
+      </FormulaBlock>
+      <FormulaBlock>
+        <Out>hitChance</Out> <Op>=</Op> <Op>clamp(</Op>
+        <Out>normalized</Out><Op>,</Op> <Const>min</Const><Op>,</Op>{' '}
+        <Const>max</Const><Op>)</Op>
       </FormulaBlock>
       <table className="wiki-table">
         <thead>

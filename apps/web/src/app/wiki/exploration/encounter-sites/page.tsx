@@ -140,6 +140,15 @@ export default function EncounterSitesPage() {
         connect with a different mob.
       </p>
 
+      <h2>Equipment Durability</h2>
+      <p>
+        Encounter site combat degrades equipped weapon and armour durability
+        just like open-world encounters. Each hit you land reduces weapon
+        durability, and each hit you take reduces armour durability. See{' '}
+        <a href="/wiki/items/durability">Durability &amp; Selling</a> for the
+        per-hit degradation rate.
+      </p>
+
       <h2>Resource Management</h2>
       <p>
         HP, stamina, and mana carry over between rooms rather than resetting.

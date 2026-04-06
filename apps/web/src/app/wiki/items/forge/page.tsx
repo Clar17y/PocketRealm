@@ -19,7 +19,7 @@ export default function ForgePage() {
   return (
     <WikiSection
       title="Forge & Upgrades"
-      summary="The forge lets players upgrade item rarity or reroll bonus stats. Success chance depends on current rarity and equipped luck."
+      summary="The forge lets players upgrade item rarity or reroll bonus stats. Success chance depends on current rarity and your total luck (from equipment and the luck attribute)."
       related={[
         { label: 'Rarity System', href: '/wiki/items/rarity' },
         { label: 'Crafting Crits', href: '/wiki/crafting/crits' },
@@ -27,6 +27,10 @@ export default function ForgePage() {
       ]}
     >
       <h2>Upgrade Success Chance</h2>
+      <p>
+        Your <strong>luck stat</strong> improves forge success. Luck is the sum
+        of luck bonuses from all equipped gear plus your luck attribute points.
+      </p>
       <FormulaBlock>
         <Out>successChance</Out> <Op>=</Op> clamp<Op>(</Op>
         <Var>baseChance</Var> <Op>+</Op> min<Op>(</Op>
