@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
+import { QUERY_LIMITS } from '@pocketrealm/shared';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { getOwnedItem, assertInTown } from '../utils/routeHelpers.js';
@@ -32,6 +33,7 @@ inventoryRouter.get('/', asyncHandler(async (req, res) => {
       where: { ownerId: playerId, inStash: false },
       include: { template: true },
       orderBy: [{ createdAt: 'desc' }],
+      take: QUERY_LIMITS.MAX_INVENTORY_RESULTS,
     }),
     prisma.playerEquipment.findMany({
       where: { playerId, itemId: { not: null } },

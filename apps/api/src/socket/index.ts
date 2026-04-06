@@ -13,6 +13,8 @@ export function createSocketServer(
   httpServer: HttpServer,
   isAllowedOrigin: (origin: string) => boolean,
 ): SocketServer {
+  // TODO: Add @socket.io/redis-adapter for multi-instance deployment.
+  // See: https://socket.io/docs/v4/redis-adapter/
   const io = new SocketServer(httpServer, {
     cors: {
       origin: (origin, callback) => {

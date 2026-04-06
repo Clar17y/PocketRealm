@@ -39,6 +39,7 @@ import { friendsRouter } from './routes/friends';
 import { notificationsRouter } from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
 import { createSocketServer, getIo } from './socket';
+import { redis } from './redis';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
 import { refreshAllLeaderboards } from './services/leaderboardService';
 import { startRoundResolutionScheduler } from './services/roundResolutionScheduler';
@@ -189,4 +190,16 @@ server.listen(PORT, () => {
       console.error('Auth token cleanup error:', err);
     });
   }, AUTH_CONSTANTS.TOKEN_CLEANUP_INTERVAL_MS);
+});
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received — shutting down gracefully');
+  const io = getIo();
+  if (io) io.close();
+  server.close(() => {
+    redis.quit()
+      .then(() => console.log('Redis connection closed'))
+      .catch((err) => console.error('Redis quit error:', err.message))
+      .finally(() => process.exit(0));
+  });
 });

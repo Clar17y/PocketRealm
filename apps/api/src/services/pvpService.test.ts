@@ -108,7 +108,7 @@ import { calculateEloChange } from './eloService';
 import { degradeEquippedDurability } from './durabilityService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { trackAchievements } from '../utils/routeHelpers.js';
-import { PVP_CONSTANTS, FLEE_CONSTANTS } from '@pocketrealm/shared';
+import { PVP_CONSTANTS, FLEE_CONSTANTS, QUERY_LIMITS } from '@pocketrealm/shared';
 import {
   getOrCreateRating,
   getLadder,
@@ -1121,7 +1121,18 @@ describe('pvpService', () => {
           attacker: { select: { username: true } },
         },
         orderBy: { createdAt: 'desc' },
+        take: QUERY_LIMITS.MAX_PVP_NOTIFICATIONS,
       });
+    });
+
+    it('limits notifications to MAX_PVP_NOTIFICATIONS', async () => {
+      mockPrisma.pvpMatch.findMany.mockResolvedValue([]);
+
+      await getNotifications('player-1');
+
+      expect(mockPrisma.pvpMatch.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: QUERY_LIMITS.MAX_PVP_NOTIFICATIONS }),
+      );
     });
   });
 
@@ -1199,6 +1210,16 @@ describe('pvpService', () => {
       const result = await getScoutNotifications('p1');
 
       expect(result).toEqual([]);
+    });
+
+    it('limits scout notifications to MAX_SCOUT_NOTIFICATIONS', async () => {
+      mockPrisma.pvpScoutLog.findMany.mockResolvedValue([]);
+
+      await getScoutNotifications('player-1');
+
+      expect(mockPrisma.pvpScoutLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: QUERY_LIMITS.MAX_SCOUT_NOTIFICATIONS }),
+      );
     });
   });
 

@@ -426,6 +426,7 @@ describe('leaderboardService', () => {
     it('writes PvP data to redis', async () => {
       mockPrisma.pvpRating.findMany.mockResolvedValue([
         {
+          id: 'pvp-1',
           playerId: 'p1',
           rating: 1200,
           wins: 10,
@@ -496,7 +497,7 @@ describe('leaderboardService', () => {
       it('writes all four PvP categories to redis', async () => {
         mockPrisma.pvpRating.findMany.mockResolvedValue([
           {
-            playerId: 'p1', rating: 1500, wins: 20, bestRating: 1600, winStreak: 5,
+            id: 'pvp-1', playerId: 'p1', rating: 1500, wins: 20, bestRating: 1600, winStreak: 5,
             player: { username: 'Warrior', characterLevel: 30, isBot: false, role: 'player', activeTitle: null },
           },
         ]);
@@ -519,7 +520,7 @@ describe('leaderboardService', () => {
       it('maps correct scores for each PvP category', async () => {
         mockPrisma.pvpRating.findMany.mockResolvedValue([
           {
-            playerId: 'p1', rating: 1500, wins: 20, bestRating: 1600, winStreak: 5,
+            id: 'pvp-1', playerId: 'p1', rating: 1500, wins: 20, bestRating: 1600, winStreak: 5,
             player: { username: 'W', characterLevel: 1, isBot: false, role: 'player', activeTitle: null },
           },
         ]);
@@ -548,7 +549,7 @@ describe('leaderboardService', () => {
       it('sets isAdmin true for admin role players', async () => {
         mockPrisma.pvpRating.findMany.mockResolvedValue([
           {
-            playerId: 'admin1', rating: 2000, wins: 100, bestRating: 2100, winStreak: 10,
+            id: 'pvp-admin', playerId: 'admin1', rating: 2000, wins: 100, bestRating: 2100, winStreak: 10,
             player: { username: 'Admin', characterLevel: 99, isBot: false, role: 'admin', activeTitle: null },
           },
         ]);
@@ -574,7 +575,7 @@ describe('leaderboardService', () => {
         // Use a real achievement ID that has a titleReward — 'kill_100' gives 'The Warrior'
         mockPrisma.pvpRating.findMany.mockResolvedValue([
           {
-            playerId: 'titled-p', rating: 1000, wins: 1, bestRating: 1000, winStreak: 0,
+            id: 'pvp-titled', playerId: 'titled-p', rating: 1000, wins: 1, bestRating: 1000, winStreak: 0,
             player: { username: 'Titled', characterLevel: 5, isBot: false, role: 'player', activeTitle: 'combat_kills_500' },
           },
         ]);
@@ -597,7 +598,7 @@ describe('leaderboardService', () => {
       it('returns empty title for null activeTitle', async () => {
         mockPrisma.pvpRating.findMany.mockResolvedValue([
           {
-            playerId: 'no-title', rating: 1000, wins: 0, bestRating: 1000, winStreak: 0,
+            id: 'pvp-notitle', playerId: 'no-title', rating: 1000, wins: 0, bestRating: 1000, winStreak: 0,
             player: { username: 'NoTitle', characterLevel: 1, isBot: false, role: 'player', activeTitle: null },
           },
         ]);
@@ -620,7 +621,7 @@ describe('leaderboardService', () => {
       it('returns empty title for unknown activeTitle ID', async () => {
         mockPrisma.pvpRating.findMany.mockResolvedValue([
           {
-            playerId: 'bad-title', rating: 1000, wins: 0, bestRating: 1000, winStreak: 0,
+            id: 'pvp-badtitle', playerId: 'bad-title', rating: 1000, wins: 0, bestRating: 1000, winStreak: 0,
             player: { username: 'Bad', characterLevel: 1, isBot: false, role: 'player', activeTitle: 'nonexistent_achievement_id' },
           },
         ]);
@@ -732,8 +733,8 @@ describe('leaderboardService', () => {
         mockPrisma.pvpRating.findMany.mockResolvedValue([]);
         mockPrisma.player.findMany.mockResolvedValue([]);
         mockPrisma.playerSkill.findMany.mockResolvedValue([
-          { playerId: 'p1', skillType: 'melee', level: 10, player: { username: 'Bob', characterLevel: 3, isBot: false, role: 'player', activeTitle: null } },
-          { playerId: 'p1', skillType: 'mining', level: 5, player: { username: 'Bob', characterLevel: 3, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'skill-1', playerId: 'p1', skillType: 'melee', level: 10, player: { username: 'Bob', characterLevel: 3, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'skill-2', playerId: 'p1', skillType: 'mining', level: 5, player: { username: 'Bob', characterLevel: 3, isBot: false, role: 'player', activeTitle: null } },
         ]);
         mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
         mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
@@ -751,9 +752,9 @@ describe('leaderboardService', () => {
         mockPrisma.pvpRating.findMany.mockResolvedValue([]);
         mockPrisma.player.findMany.mockResolvedValue([]);
         mockPrisma.playerSkill.findMany.mockResolvedValue([
-          { playerId: 'p1', skillType: 'melee', level: 10, player: { username: 'A', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
-          { playerId: 'p1', skillType: 'ranged', level: 8, player: { username: 'A', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
-          { playerId: 'p1', skillType: 'mining', level: 12, player: { username: 'A', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'skill-1', playerId: 'p1', skillType: 'melee', level: 10, player: { username: 'A', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'skill-2', playerId: 'p1', skillType: 'ranged', level: 8, player: { username: 'A', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'skill-3', playerId: 'p1', skillType: 'mining', level: 12, player: { username: 'A', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
         ]);
         mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
         mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
@@ -772,9 +773,9 @@ describe('leaderboardService', () => {
         mockPrisma.pvpRating.findMany.mockResolvedValue([]);
         mockPrisma.player.findMany.mockResolvedValue([]);
         mockPrisma.playerSkill.findMany.mockResolvedValue([
-          { playerId: 'p1', skillType: 'melee', level: 10, player: { username: 'A', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
-          { playerId: 'p2', skillType: 'melee', level: 20, player: { username: 'B', characterLevel: 8, isBot: false, role: 'player', activeTitle: null } },
-          { playerId: 'p1', skillType: 'mining', level: 5, player: { username: 'A', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'skill-1', playerId: 'p1', skillType: 'melee', level: 10, player: { username: 'A', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'skill-2', playerId: 'p2', skillType: 'melee', level: 20, player: { username: 'B', characterLevel: 8, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'skill-3', playerId: 'p1', skillType: 'mining', level: 5, player: { username: 'A', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
         ]);
         mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
         mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
@@ -797,7 +798,7 @@ describe('leaderboardService', () => {
         mockPrisma.pvpRating.findMany.mockResolvedValue([]);
         mockPrisma.player.findMany.mockResolvedValue([]);
         mockPrisma.playerSkill.findMany.mockResolvedValue([
-          { playerId: 'p1', skillType: 'melee', level: 10, player: { username: 'A', characterLevel: 1, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'skill-1', playerId: 'p1', skillType: 'melee', level: 10, player: { username: 'A', characterLevel: 1, isBot: false, role: 'player', activeTitle: null } },
         ]);
         mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
         mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
@@ -821,8 +822,8 @@ describe('leaderboardService', () => {
         mockPrisma.player.findMany.mockResolvedValue([]);
         mockPrisma.playerSkill.findMany.mockResolvedValue([]);
         mockPrisma.playerBestiary.findMany.mockResolvedValue([
-          { playerId: 'p1', kills: 50, player: { username: 'Slayer', characterLevel: 8, isBot: false, role: 'player', activeTitle: null } },
-          { playerId: 'p1', kills: 30, player: { username: 'Slayer', characterLevel: 8, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'bestiary-1', playerId: 'p1', kills: 50, player: { username: 'Slayer', characterLevel: 8, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'bestiary-2', playerId: 'p1', kills: 30, player: { username: 'Slayer', characterLevel: 8, isBot: false, role: 'player', activeTitle: null } },
         ]);
         mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
         mockPrisma.guild.findMany.mockResolvedValue([]);
@@ -841,7 +842,7 @@ describe('leaderboardService', () => {
         mockPrisma.playerSkill.findMany.mockResolvedValue([]);
         mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
         mockPrisma.bossParticipant.findMany.mockResolvedValue([
-          { playerId: 'p1', totalDamage: 5000, player: { username: 'BossKiller', characterLevel: 40, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'boss-1', playerId: 'p1', totalDamage: 5000, player: { username: 'BossKiller', characterLevel: 40, isBot: false, role: 'player', activeTitle: null } },
         ]);
         mockPrisma.guild.findMany.mockResolvedValue([]);
         mockPrisma.$queryRaw.mockResolvedValue([]);
@@ -860,9 +861,9 @@ describe('leaderboardService', () => {
         mockPrisma.playerSkill.findMany.mockResolvedValue([]);
         mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
         mockPrisma.bossParticipant.findMany.mockResolvedValue([
-          { playerId: 'p1', totalDamage: 3000, player: { username: 'A', characterLevel: 30, isBot: false, role: 'player', activeTitle: null } },
-          { playerId: 'p1', totalDamage: 2000, player: { username: 'A', characterLevel: 30, isBot: false, role: 'player', activeTitle: null } },
-          { playerId: 'p2', totalDamage: 1000, player: { username: 'B', characterLevel: 20, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'boss-1', playerId: 'p1', totalDamage: 3000, player: { username: 'A', characterLevel: 30, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'boss-2', playerId: 'p1', totalDamage: 2000, player: { username: 'A', characterLevel: 30, isBot: false, role: 'player', activeTitle: null } },
+          { id: 'boss-3', playerId: 'p2', totalDamage: 1000, player: { username: 'B', characterLevel: 20, isBot: false, role: 'player', activeTitle: null } },
         ]);
         mockPrisma.guild.findMany.mockResolvedValue([]);
         mockPrisma.$queryRaw.mockResolvedValue([]);
@@ -1280,6 +1281,66 @@ describe('leaderboardService', () => {
           'leaderboard:last_refresh',
           expect.anything(),
         );
+      });
+    });
+
+    // ── paginated batching ─────────────────────────────────────────────────
+
+    describe('paginated batching', () => {
+      it('fetches playerSkill in batches when rows exceed batch size', async () => {
+        const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
+        const makeBatch = (count: number, startId: number) =>
+          Array.from({ length: count }, (_, i) => ({
+            id: `skill-${startId + i}`,
+            playerId: `p${startId + i}`,
+            skillType: 'melee',
+            level: 10 + i,
+            player: { username: `Player${startId + i}`, characterLevel: 5, isBot: false, role: 'player', activeTitle: null },
+          }));
+
+        const batch1 = makeBatch(batchSize, 0);
+        const batch2 = makeBatch(3, batchSize);
+
+        mockPrisma.playerSkill.findMany
+          .mockResolvedValueOnce(batch1)
+          .mockResolvedValueOnce(batch2);
+
+        mockPrisma.pvpRating.findMany.mockResolvedValue([]);
+        mockPrisma.player.findMany.mockResolvedValue([]);
+        mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
+        mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+        mockPrisma.guild.findMany.mockResolvedValue([]);
+        mockPrisma.$queryRaw.mockResolvedValue([]);
+
+        await refreshAllLeaderboards();
+
+        expect(mockPrisma.playerSkill.findMany).toHaveBeenCalledTimes(2);
+
+        const secondCall = mockPrisma.playerSkill.findMany.mock.calls[1][0];
+        expect(secondCall).toMatchObject({
+          take: batchSize,
+          skip: 1,
+          cursor: { id: batch1[batch1.length - 1].id },
+        });
+      });
+
+      it('fetches in a single batch when rows are fewer than batch size', async () => {
+        const smallBatch = [
+          { id: 'skill-1', playerId: 'p1', skillType: 'melee', level: 10,
+            player: { username: 'Player1', characterLevel: 5, isBot: false, role: 'player', activeTitle: null } },
+        ];
+        mockPrisma.playerSkill.findMany.mockResolvedValueOnce(smallBatch);
+
+        mockPrisma.pvpRating.findMany.mockResolvedValue([]);
+        mockPrisma.player.findMany.mockResolvedValue([]);
+        mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
+        mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+        mockPrisma.guild.findMany.mockResolvedValue([]);
+        mockPrisma.$queryRaw.mockResolvedValue([]);
+
+        await refreshAllLeaderboards();
+
+        expect(mockPrisma.playerSkill.findMany).toHaveBeenCalledTimes(1);
       });
     });
   });

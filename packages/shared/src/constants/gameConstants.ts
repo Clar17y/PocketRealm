@@ -873,6 +873,18 @@ export const LEADERBOARD_CONSTANTS = {
   REFRESH_INTERVAL_MS: 900_000,
   PAGE_SIZE: 25,
   TOP_N: 25,
+  BATCH_SIZE: 500,
+} as const;
+
+// =============================================================================
+// QUERY LIMITS
+// =============================================================================
+
+export const QUERY_LIMITS = {
+  MAX_PVP_NOTIFICATIONS: 50,
+  MAX_SCOUT_NOTIFICATIONS: 50,
+  MAX_BESTIARY_RESULTS: 200,
+  MAX_INVENTORY_RESULTS: 200,
 } as const;
 
 // =============================================================================
@@ -1514,6 +1526,8 @@ export const CACHE_TTL_CONSTANTS = {
   STATIC_DATA_TTL: 86400,
   /** Seconds — per-player guild modifier cache */
   GUILD_MODIFIERS_TTL: 90,
+  /** Seconds — per-player zone ID cache (socket room joins) */
+  PLAYER_ZONE_TTL: 60,
 } as const;
 
 // =============================================================================

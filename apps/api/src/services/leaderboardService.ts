@@ -3,6 +3,89 @@ import { LEADERBOARD_CONSTANTS, ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { AppError } from '../middleware/errorHandler';
 
+// ── Paginated fetch helper ───────────────────────────────────────────────────
+
+// Shared player sub-shape selected in leaderboard queries
+interface LeaderboardPlayerSummary {
+  username: string;
+  characterLevel: number;
+  isBot: boolean;
+  role: string;
+  activeTitle: string | null;
+}
+
+// Row shapes for each paginated query (must include `id` for cursor pagination)
+interface PvpRatingRow {
+  id: string;
+  playerId: string;
+  rating: number;
+  wins: number;
+  bestRating: number;
+  winStreak: number;
+  player: LeaderboardPlayerSummary;
+}
+interface PlayerRow {
+  id: string;
+  username: string;
+  characterLevel: number;
+  characterXp: bigint;
+  isBot: boolean;
+  role: string;
+  activeTitle: string | null;
+}
+interface PlayerSkillRow {
+  id: string;
+  playerId: string;
+  skillType: string;
+  level: number;
+  player: LeaderboardPlayerSummary;
+}
+interface BossParticipantRow {
+  id: string;
+  playerId: string;
+  totalDamage: number;
+  player: LeaderboardPlayerSummary;
+}
+interface GuildRow {
+  id: string;
+  name: string;
+  tag: string;
+  level: number;
+  renown: number;
+  _count: { members: number };
+}
+
+/**
+ * Fetches all rows from a Prisma model in cursor-based batches to avoid
+ * unbounded single-query memory pressure at scale.
+ */
+async function paginatedFindMany<T extends { id: string }>(
+  findMany: (args: { take: number; skip?: number; cursor?: { id: string }; select?: unknown; orderBy?: unknown }) => Promise<T[]>,
+  baseArgs: { select?: unknown },
+): Promise<T[]> {
+  const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
+  const allRows: T[] = [];
+  let cursor: string | undefined;
+  let batch: T[];
+
+  do {
+    batch = await findMany({
+      ...baseArgs,
+      orderBy: { id: 'asc' },
+      take: batchSize,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    });
+
+    allRows.push(...batch);
+
+    if (batch.length === batchSize) {
+      cursor = batch[batch.length - 1].id;
+    }
+  } while (batch.length === batchSize);
+
+  return allRows;
+}
+
 // ── Category definitions ────────────────────────────────────────────────────
 
 interface CategoryDef {
@@ -226,16 +309,20 @@ async function writeToZset(
 }
 
 async function refreshPvp() {
-  const ratings = await prisma.pvpRating.findMany({
-    select: {
-      playerId: true,
-      rating: true,
-      wins: true,
-      bestRating: true,
-      winStreak: true,
-      player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } },
+  const ratings = await paginatedFindMany<PvpRatingRow>(
+    (args) => prisma.pvpRating.findMany(args as Parameters<typeof prisma.pvpRating.findMany>[0]) as unknown as Promise<PvpRatingRow[]>,
+    {
+      select: {
+        id: true,
+        playerId: true,
+        rating: true,
+        wins: true,
+        bestRating: true,
+        winStreak: true,
+        player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } },
+      },
     },
-  });
+  );
 
   const fields: { slug: string; field: 'rating' | 'wins' | 'bestRating' | 'winStreak' }[] = [
     { slug: 'pvp_rating', field: 'rating' },
@@ -261,9 +348,12 @@ async function refreshPvp() {
 }
 
 async function refreshProgression() {
-  const players = await prisma.player.findMany({
-    select: { id: true, username: true, characterLevel: true, characterXp: true, isBot: true, role: true, activeTitle: true },
-  });
+  const players = await paginatedFindMany<PlayerRow>(
+    (args) => prisma.player.findMany(args as Parameters<typeof prisma.player.findMany>[0]) as unknown as Promise<PlayerRow[]>,
+    {
+      select: { id: true, username: true, characterLevel: true, characterXp: true, isBot: true, role: true, activeTitle: true },
+    },
+  );
 
   await writeToZset(
     'character_level',
@@ -293,14 +383,18 @@ async function refreshProgression() {
 }
 
 async function refreshSkills() {
-  const skills = await prisma.playerSkill.findMany({
-    select: {
-      playerId: true,
-      skillType: true,
-      level: true,
-      player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } },
+  const skills = await paginatedFindMany<PlayerSkillRow>(
+    (args) => prisma.playerSkill.findMany(args as Parameters<typeof prisma.playerSkill.findMany>[0]) as unknown as Promise<PlayerSkillRow[]>,
+    {
+      select: {
+        id: true,
+        playerId: true,
+        skillType: true,
+        level: true,
+        player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } },
+      },
     },
-  });
+  );
 
   // Individual skill leaderboards
   for (const skillType of SKILL_TYPES) {
@@ -344,27 +438,36 @@ async function refreshSkills() {
 }
 
 async function refreshCombat() {
-  // Total kills from bestiary
-  const bestiaryRaw = await prisma.playerBestiary.findMany({
-    select: { playerId: true, kills: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
-  });
-
+  // Total kills from bestiary — uses offset-based pagination because
+  // PlayerBestiary has a composite PK (playerId + mobTemplateId),
+  // incompatible with cursor pagination.
+  const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
   const killTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }>();
-  for (const b of bestiaryRaw) {
-    const existing = killTotals.get(b.playerId);
-    if (existing) {
-      existing.score += b.kills;
-    } else {
-      killTotals.set(b.playerId, {
-        score: b.kills,
-        username: b.player.username,
-        characterLevel: b.player.characterLevel,
-        isBot: b.player.isBot,
-        isAdmin: b.player.role === 'admin',
-        ...resolveTitle(b.player.activeTitle),
-      });
+  let offset = 0;
+  let batch;
+  do {
+    batch = await prisma.playerBestiary.findMany({
+      select: { playerId: true, kills: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
+      take: batchSize,
+      skip: offset,
+    });
+    for (const b of batch) {
+      const existing = killTotals.get(b.playerId);
+      if (existing) {
+        existing.score += b.kills;
+      } else {
+        killTotals.set(b.playerId, {
+          score: b.kills,
+          username: b.player.username,
+          characterLevel: b.player.characterLevel,
+          isBot: b.player.isBot,
+          isAdmin: b.player.role === 'admin',
+          ...resolveTitle(b.player.activeTitle),
+        });
+      }
     }
-  }
+    offset += batchSize;
+  } while (batch.length === batchSize);
 
   await writeToZset(
     'total_kills',
@@ -373,9 +476,12 @@ async function refreshCombat() {
 
   // Boss damage
   try {
-    const bossRaw = await prisma.bossParticipant.findMany({
-      select: { playerId: true, totalDamage: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
-    });
+    const bossRaw = await paginatedFindMany<BossParticipantRow>(
+      (args) => prisma.bossParticipant.findMany(args as Parameters<typeof prisma.bossParticipant.findMany>[0]) as unknown as Promise<BossParticipantRow[]>,
+      {
+        select: { id: true, playerId: true, totalDamage: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
+      },
+    );
 
     const dmgTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }>();
     for (const b of bossRaw) {
@@ -407,9 +513,12 @@ async function refreshCombat() {
 }
 
 async function refreshGuilds() {
-  const guilds = await prisma.guild.findMany({
-    select: { id: true, name: true, tag: true, level: true, renown: true, _count: { select: { members: true } } },
-  });
+  const guilds = await paginatedFindMany<GuildRow>(
+    (args) => prisma.guild.findMany(args as Parameters<typeof prisma.guild.findMany>[0]) as unknown as Promise<GuildRow[]>,
+    {
+      select: { id: true, name: true, tag: true, level: true, renown: true, _count: { select: { members: true } } },
+    },
+  );
 
   await writeToZset(
     'guild_level',
