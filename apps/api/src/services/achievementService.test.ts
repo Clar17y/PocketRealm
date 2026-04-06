@@ -165,6 +165,17 @@ describe('achievementService', () => {
       });
     });
 
+    it('returns empty when concurrent call already inserted all achievements (count=0)', async () => {
+      // Simulates race condition: both calls see achievements as not-yet-unlocked,
+      // but concurrent call inserts first; our createMany returns count=0 due to skipDuplicates
+      mockResolveStats.mockResolvedValue({ totalKills: 100 });
+      mockPrisma.playerAchievement.findMany.mockResolvedValue([]);
+      mockPrisma.playerAchievement.createMany.mockResolvedValue({ count: 0 });
+
+      const result = await checkAchievements('p1', { statKeys: ['totalKills'] });
+      expect(result).toEqual([]);
+    });
+
     it('uses family kills for progress on family achievements', async () => {
       mockResolveStats.mockResolvedValue({});
       mockResolveFamilyKills.mockResolvedValue(2500);
@@ -555,6 +566,40 @@ describe('achievementService', () => {
       }
 
       // Item should not have been created
+      expect(mockPrisma.item.create).not.toHaveBeenCalled();
+    });
+
+    it('rolls back rewardClaimed when item template is missing (transaction integrity)', async () => {
+      // This test verifies that the template validation happens inside the same
+      // transaction as the rewardClaimed update. In production, a thrown error
+      // inside $transaction causes Prisma to roll back all changes, so
+      // rewardClaimed stays false. We verify the error originates from within
+      // the transaction callback by tracking $transaction invocation.
+      let transactionThrew = false;
+
+      mockPrisma.playerAchievement.findUnique.mockResolvedValue({
+        playerId: 'p1',
+        achievementId: 'family_vermin_5000',
+        rewardClaimed: false,
+      });
+      mockPrisma.playerAchievement.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.itemTemplate.findUnique.mockResolvedValue(null);
+
+      // Replace $transaction to track that the error comes from inside it
+      mockPrisma.$transaction.mockImplementationOnce(async (fn: (tx: any) => Promise<any>) => {
+        try {
+          return await fn(mockPrisma);
+        } catch (err) {
+          transactionThrew = true;
+          throw err; // re-throw so Prisma would roll back in production
+        }
+      });
+
+      await expect(claimReward('p1', 'family_vermin_5000')).rejects.toThrow('not found');
+
+      // The error was thrown from inside $transaction, confirming the rewardClaimed
+      // update would be rolled back in a real database
+      expect(transactionThrew).toBe(true);
       expect(mockPrisma.item.create).not.toHaveBeenCalled();
     });
 
