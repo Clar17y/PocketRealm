@@ -75,18 +75,29 @@ docker exec "$CONTAINER" psql -U "$PG_USER" -tc \
 
 # --- Link env files ---
 CANONICAL_API_ENV="${CANONICAL_ROOT}/apps/api/.env"
+MAIN_REPO_API_ENV="${REPO_ROOT}/apps/api/.env"
 WORKTREE_API_ENV="${WORKTREE_PATH}/apps/api/.env"
 WORKTREE_DB_ENV="${WORKTREE_PATH}/packages/database/.env"
 
-# apps/api/.env — copy from canonical, patch DATABASE_URL
+# apps/api/.env — copy from canonical or main repo, patch DATABASE_URL
 if [[ -f "$CANONICAL_API_ENV" ]]; then
+  SOURCE_ENV="$CANONICAL_API_ENV"
+  info "Using canonical .env from $CANONICAL_API_ENV"
+elif [[ -f "$MAIN_REPO_API_ENV" ]]; then
+  SOURCE_ENV="$MAIN_REPO_API_ENV"
+  info "Using main repo .env from $MAIN_REPO_API_ENV"
+else
+  SOURCE_ENV=""
+fi
+
+if [[ -n "$SOURCE_ENV" ]]; then
   mkdir -p "$(dirname "$WORKTREE_API_ENV")"
-  cp "$CANONICAL_API_ENV" "$WORKTREE_API_ENV"
+  cp "$SOURCE_ENV" "$WORKTREE_API_ENV"
   # Replace DATABASE_URL to point at worktree-specific database
   sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql://${PG_USER}:${PG_USER}@localhost:${PG_PORT}/${DB_NAME}|" "$WORKTREE_API_ENV"
   info "Created apps/api/.env (DATABASE_URL -> $DB_NAME)"
 else
-  warn "Canonical API .env not found at $CANONICAL_API_ENV"
+  warn "No .env found at canonical ($CANONICAL_API_ENV) or main repo ($MAIN_REPO_API_ENV)"
   warn "Creating minimal .env with local defaults..."
   mkdir -p "$(dirname "$WORKTREE_API_ENV")"
   cat > "$WORKTREE_API_ENV" <<EOF
@@ -143,6 +154,22 @@ info "Running migrations..."
 if [[ "$NO_SEED" == false ]]; then
   info "Seeding database..."
   (cd "$WORKTREE_PATH" && npm run db:seed)
+fi
+
+# --- Flush stale Redis static-data cache ---
+# Seeds generate new UUIDs for zones/mobs/etc. Cached static data from a
+# previous DB (or the main clone) will have wrong IDs, causing ??? zones/recipes.
+# Use KEYS pattern rather than index set — the index may be incomplete if a
+# server was populating caches concurrently.
+REDIS_CONTAINER="pocketrealm-redis"
+if docker exec "$REDIS_CONTAINER" redis-cli KEYS "static:*" 2>/dev/null | grep -q 'static:'; then
+  info "Flushing stale static-data cache from Redis..."
+  docker exec "$REDIS_CONTAINER" redis-cli EVAL \
+    "local keys = redis.call('KEYS','static:*'); if #keys > 0 then redis.call('DEL', unpack(keys)); end; return #keys" 0 \
+    > /dev/null 2>&1
+  info "Static cache flushed"
+else
+  info "No stale static cache to flush"
 fi
 
 echo ""
