@@ -1,0 +1,65 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+vi.mock('../logger', () => ({
+  logger: { info: vi.fn() },
+}));
+
+import { logger } from '../logger';
+import { collectMetrics, startMetricsLogger } from './metricsLogger';
+
+describe('collectMetrics', () => {
+  it('returns metrics object with required fields', () => {
+    const mockIo = {
+      sockets: { sockets: new Map([['s1', { data: { playerId: 'p1' } }], ['s2', { data: { playerId: 'p2' } }], ['s3', { data: { playerId: 'p1' } }]]) },
+    } as any;
+
+    const metrics = collectMetrics(mockIo);
+
+    expect(metrics).toHaveProperty('activeConnections', 3);
+    expect(metrics).toHaveProperty('activePlayers', 2); // p1 deduplicated
+    expect(metrics).toHaveProperty('memoryUsageMb');
+    expect(typeof metrics.memoryUsageMb).toBe('number');
+    expect(metrics).toHaveProperty('eventLoopLagMs');
+    expect(typeof metrics.eventLoopLagMs).toBe('number');
+  });
+
+  it('handles null io gracefully', () => {
+    const metrics = collectMetrics(null);
+
+    expect(metrics.activeConnections).toBe(0);
+    expect(metrics.activePlayers).toBe(0);
+  });
+});
+
+describe('startMetricsLogger', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('logs metrics on the configured interval', () => {
+    const mockIo = {
+      sockets: { sockets: new Map() },
+    } as any;
+
+    const stop = startMetricsLogger(() => mockIo, 1000);
+
+    expect(logger.info).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1000);
+    expect(logger.info).toHaveBeenCalledOnce();
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ activeConnections: 0, activePlayers: 0 }),
+      'metrics',
+    );
+
+    vi.advanceTimersByTime(1000);
+    expect(logger.info).toHaveBeenCalledTimes(2);
+
+    stop();
+  });
+});

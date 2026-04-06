@@ -45,6 +45,7 @@ import { redis } from './redis';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
 import { refreshAllLeaderboards } from './services/leaderboardService';
 import { startRoundResolutionScheduler } from './services/roundResolutionScheduler';
+import { startMetricsLogger } from './services/metricsLogger';
 import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
 import { cleanupExpiredTokens } from './services/authTokenService';
 
@@ -170,6 +171,7 @@ server.listen(PORT, () => {
   // Adaptive round resolution: ticks every 5s when bosses/expeditions are
   // active, idles at 60s otherwise.
   startRoundResolutionScheduler(getIo);
+  startMetricsLogger(getIo);
 
   // Persisted mob cleanup timer (every 5 minutes)
   setInterval(() => {
