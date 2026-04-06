@@ -39,6 +39,7 @@ import { friendsRouter } from './routes/friends';
 import { notificationsRouter } from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
+import { logger } from './logger';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
@@ -164,7 +165,7 @@ const server = http.createServer(app);
 createSocketServer(server, isAllowedCorsOrigin);
 
 server.listen(PORT, () => {
-  console.log(`PocketRealm API running on port ${PORT}`);
+  logger.info({ port: PORT }, `PocketRealm API running on port ${PORT}`);
 
   // Adaptive round resolution: ticks every 5s when bosses/expeditions are
   // active, idles at 60s otherwise.
@@ -173,36 +174,36 @@ server.listen(PORT, () => {
   // Persisted mob cleanup timer (every 5 minutes)
   setInterval(() => {
     cleanupFullyHealedMobs().catch((err) => {
-      console.error('Persisted mob cleanup error:', err);
+      logger.error({ err }, 'Persisted mob cleanup error');
     });
   }, 300_000);
 
   // Leaderboard refresh (every 15 minutes)
   refreshAllLeaderboards().catch((err) => {
-    console.error('Initial leaderboard refresh error:', err);
+    logger.error({ err }, 'Initial leaderboard refresh error');
   });
   setInterval(() => {
     refreshAllLeaderboards().catch((err) => {
-      console.error('Leaderboard refresh error:', err);
+      logger.error({ err }, 'Leaderboard refresh error');
     });
   }, LEADERBOARD_CONSTANTS.REFRESH_INTERVAL_MS);
 
   // Auth token cleanup (every 6 hours)
   setInterval(() => {
     cleanupExpiredTokens().catch((err) => {
-      console.error('Auth token cleanup error:', err);
+      logger.error({ err }, 'Auth token cleanup error');
     });
   }, AUTH_CONSTANTS.TOKEN_CLEANUP_INTERVAL_MS);
 });
 
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received — shutting down gracefully');
+  logger.info('SIGTERM received — shutting down gracefully');
   const io = getIo();
   if (io) io.close();
   server.close(() => {
     redis.quit()
-      .then(() => console.log('Redis connection closed'))
-      .catch((err) => console.error('Redis quit error:', err.message))
+      .then(() => logger.info('Redis connection closed'))
+      .catch((err) => logger.error({ err }, 'Redis quit error'))
       .finally(() => process.exit(0));
   });
 });
