@@ -123,7 +123,7 @@ export function safeParseRedisJson<T, F = T>(
     const parsed = JSON.parse(raw);
     return schema.parse(parsed);
   } catch (err) {
-    logger.warn({ context, error: err instanceof Error ? err.message : String(err) }, 'Failed to parse Redis JSON');
+    logger.warn({ context, validationError: err instanceof Error ? err.message : String(err) }, 'Failed to parse Redis JSON');
     return fallback;
   }
 }

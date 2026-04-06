@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Prisma, prisma } from '@pocketrealm/database';
+import { logger } from '../../logger';
 import { createActivityLog } from '../../services/activityLogService';
 import type { EventModifierBadge } from '../../services/worldEventService';
 import {
@@ -263,6 +264,12 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
     if (shopCraftingCrit > 0) await consumeBuffStandalone(playerId, 'crafting_crit');
 
     const xpGrant = await grantSkillXp(playerId, recipe.skillType, recipe.xpReward * quantity);
+
+    logger.info({
+      playerId,
+      recipeId: recipe.id,
+      rarity: craftedItemDetails[0]?.rarity ?? 'common',
+    }, 'Item crafted');
 
     // --- Guild XP & contract/quest progress ---
     const guildId = await getPlayerGuildId(playerId);

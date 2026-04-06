@@ -86,7 +86,7 @@ export function parseBossEffects(
   }
   const result = z.array(bossActiveEffectSchema).safeParse(value);
   if (!result.success) {
-    logger.warn({ columnName, error: result.error.message }, 'Boss JSON column validation failed');
+    logger.warn({ columnName, validationError: result.error.message }, 'Boss JSON column validation failed');
     return [];
   }
   return result.data;
@@ -107,7 +107,7 @@ export function parseBossRoundSummaries(
   }
   const result = z.array(bossRoundSummarySchema).safeParse(value);
   if (!result.success) {
-    logger.warn({ columnName, error: result.error.message }, 'Boss JSON column validation failed');
+    logger.warn({ columnName, validationError: result.error.message }, 'Boss JSON column validation failed');
     return null;
   }
   return result.data;
@@ -128,7 +128,7 @@ export function parseBossRewardsByPlayer(
   }
   const result = z.record(z.string(), bossPlayerRewardSchema).safeParse(value);
   if (!result.success) {
-    logger.warn({ columnName, error: result.error.message }, 'Boss JSON column validation failed');
+    logger.warn({ columnName, validationError: result.error.message }, 'Boss JSON column validation failed');
     return null;
   }
   return result.data;

@@ -89,6 +89,18 @@ describe('requestLogger', () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  it('skips /health/ready requests', () => {
+    const req = createMockReq({ path: '/health/ready' });
+    const res = createMockRes();
+    const next = vi.fn();
+
+    requestLogger(req, res, next);
+    (res as any)._emit('finish');
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(logger.info).not.toHaveBeenCalled();
+  });
+
   it('logs 4xx as warn', () => {
     const req = createMockReq();
     const res = createMockRes();

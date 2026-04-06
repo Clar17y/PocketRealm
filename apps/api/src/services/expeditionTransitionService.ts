@@ -1,4 +1,5 @@
 import { Prisma, prisma } from '@pocketrealm/database';
+import { logger } from '../logger';
 import {
   EXPEDITION_CONSTANTS,
   EXPEDITION_THEMES_BY_ID,
@@ -240,6 +241,11 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
       expeditionAttemptLogs: JSON.parse(JSON.stringify(finalAttemptLogs)),
     },
   });
+
+  logger.info({
+    expeditionId,
+    guildId: expedition.guildId,
+  }, 'Expedition completed');
 
   // Award completion bonus tokens
   const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
