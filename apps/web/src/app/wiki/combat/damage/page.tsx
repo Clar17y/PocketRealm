@@ -104,7 +104,7 @@ export default function DamagePage() {
       <h2>Defence Reduction</h2>
       <p>
         Defence uses a diminishing-returns curve that applies identically in all
-        combat contexts — open-world, encounter sites, expeditions, raids, and
+        combat contexts: open-world, encounter sites, expeditions, raids, and
         PvP. Physical attacks check <code>defence</code>; magic attacks check{' '}
         <code>magicDefence</code>.
       </p>

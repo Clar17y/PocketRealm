@@ -100,7 +100,7 @@ export default function MobPrefixesPage() {
       <ul>
         {prefixes.map((p) => (
           <li key={p.key}>
-            <strong>{p.displayName}</strong> -- {p.description}
+            <strong>{p.displayName}:</strong> {p.description}
           </li>
         ))}
       </ul>

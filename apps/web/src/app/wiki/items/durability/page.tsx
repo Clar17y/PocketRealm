@@ -88,7 +88,7 @@ export default function DurabilityPage() {
       <h2>Encounter Sites</h2>
       <p>
         Encounter site combat degrades durability the same way as open-world
-        fights — each hit you land wears your weapon, and each hit you take
+        fights. Each hit you land wears your weapon, and each hit you take
         wears your armour. Equipment stats are locked at the start of each room,
         so even if an item reaches 0 durability mid-room its stat contributions
         are preserved until the room ends. The broken penalty applies from the

@@ -35,24 +35,24 @@ export default function PvpCombatPage() {
       <h2>Key Differences from PvE</h2>
       <ul>
         <li>
-          <strong>Hit curve</strong> — PvP uses a much tighter hit curve with
+          <strong>Hit curve:</strong> PvP uses a much tighter hit curve with
           lower minimum hit chance and higher exponent, making accuracy vs
           evasion matter more.
         </li>
         <li>
-          <strong>Ghost defender</strong> — the defender does not need to be
+          <strong>Ghost defender:</strong> the defender does not need to be
           online. A &ldquo;ghost&rdquo; copy fights using their saved combat
           template, current equipment, and maximum resources (full HP, stamina,
           and mana).
         </li>
         <li>
-          <strong>Template combat engine</strong> — both attacker and defender
+          <strong>Template combat engine:</strong> both attacker and defender
           fight using their active combat template. Each template slot defines
           an action and optional conditions (e.g., &ldquo;use heal when HP
           below 50%&rdquo;).
         </li>
         <li>
-          <strong>No flee</strong> — PvP fights resolve to completion. There is
+          <strong>No flee:</strong> PvP fights resolve to completion. There is
           no flee option.
         </li>
       </ul>

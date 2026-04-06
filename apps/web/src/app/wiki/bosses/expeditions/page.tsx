@@ -34,16 +34,16 @@ export default function ExpeditionsPage() {
       <h2>How Expeditions Differ from Boss Encounters</h2>
       <ul>
         <li>
-          <strong>Multi-room progression</strong> — instead of a single boss,
+          <strong>Multi-room progression:</strong> instead of a single boss,
           expeditions have a sequence of rooms: trash, elite, mini-boss, event,
           and a final boss.
         </li>
         <li>
-          <strong>Multiple mobs per room</strong> — each room contains several
+          <strong>Multiple mobs per room:</strong> each room contains several
           enemies that fight simultaneously, not just one boss.
         </li>
         <li>
-          <strong>Rest between rooms</strong> — after clearing a room, the party
+          <strong>Rest between rooms:</strong> after clearing a room, the party
           rests for{' '}
           {EXPEDITION_CONSTANTS.REST_DURATION_MS / 60_000} minutes,
           recovering{' '}
@@ -52,11 +52,11 @@ export default function ExpeditionsPage() {
           and {(EXPEDITION_CONSTANTS.REST_MANA_REGEN * 100).toFixed(0)}% mana.
         </li>
         <li>
-          <strong>Guild cost</strong> — launching an expedition costs guild
+          <strong>Guild cost:</strong> launching an expedition costs guild
           treasury gold and requires minimum participants.
         </li>
         <li>
-          <strong>Expedition hit curve</strong> — expeditions use the{' '}
+          <strong>Expedition hit curve:</strong> expeditions use the{' '}
           <code>pve_expedition</code> hit curve, which is stricter than open
           world PvE but more forgiving than PvP.
         </li>
@@ -116,19 +116,19 @@ export default function ExpeditionsPage() {
       </p>
       <ol>
         <li>
-          <strong>Player offensive actions</strong> — each player&rsquo;s chosen
+          <strong>Player offensive actions:</strong> each player&rsquo;s chosen
           action resolves against their targeted mob (or all mobs for AoE).
         </li>
         <li>
-          <strong>Player supportive actions</strong> — heals and buffs apply to
+          <strong>Player supportive actions:</strong> heals and buffs apply to
           allies.
         </li>
         <li>
-          <strong>Each mob acts</strong> — every living mob executes the next
+          <strong>Each mob acts:</strong> every living mob executes the next
           action in its rotation, cycling through its action template.
         </li>
         <li>
-          <strong>Tick effects</strong> — DoTs, HoTs, and buff durations update.
+          <strong>Tick effects:</strong> DoTs, HoTs, and buff durations update.
         </li>
       </ol>
       <p>
@@ -179,18 +179,18 @@ export default function ExpeditionsPage() {
       </p>
       <ul>
         <li>
-          <strong>Swapping gear between rooms</strong> — during the rest phase
+          <strong>Swapping gear between rooms:</strong> during the rest phase
           between rooms, you can freely change equipment. Your new stats will
           take effect when the next room begins.
         </li>
         <li>
-          <strong>Durability</strong> — equipment durability continues to degrade
+          <strong>Durability:</strong> equipment durability continues to degrade
           during the room, but stat contributions are based on the snapshot taken
           at room start. Even if a weapon reaches 0 durability mid-room, it
           retains its full stats until the room ends.
         </li>
         <li>
-          <strong>Why?</strong> — this ensures consistent combat calculations
+          <strong>Why?</strong> This ensures consistent combat calculations
           throughout each room and prevents mid-fight gear swapping.
         </li>
       </ul>
