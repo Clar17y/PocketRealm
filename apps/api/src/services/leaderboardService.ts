@@ -2,6 +2,7 @@ import { prisma, Prisma } from '@pocketrealm/database';
 import { LEADERBOARD_CONSTANTS, ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { AppError } from '../middleware/errorHandler';
+import { logger } from '../logger';
 
 // ── Paginated fetch helper ───────────────────────────────────────────────────
 
@@ -599,16 +600,16 @@ export async function refreshAllLeaderboards(): Promise<void> {
   const start = Date.now();
   let failures = 0;
 
-  try { await refreshPvp(); } catch (err) { failures++; console.error('Leaderboard refresh error (pvp):', err); }
-  try { await refreshProgression(); } catch (err) { failures++; console.error('Leaderboard refresh error (progression):', err); }
-  try { await refreshSkills(); } catch (err) { failures++; console.error('Leaderboard refresh error (skills):', err); }
-  try { await refreshCombat(); } catch (err) { failures++; console.error('Leaderboard refresh error (combat):', err); }
-  try { await refreshGuilds(); } catch (err) { failures++; console.error('Leaderboard refresh error (guilds):', err); }
-  try { await refreshCasino(); } catch (err) { failures++; console.error('Leaderboard refresh error (casino):', err); }
+  try { await refreshPvp(); } catch (err) { failures++; logger.error({ err, board: 'pvp' }, 'Leaderboard refresh error'); }
+  try { await refreshProgression(); } catch (err) { failures++; logger.error({ err, board: 'progression' }, 'Leaderboard refresh error'); }
+  try { await refreshSkills(); } catch (err) { failures++; logger.error({ err, board: 'skills' }, 'Leaderboard refresh error'); }
+  try { await refreshCombat(); } catch (err) { failures++; logger.error({ err, board: 'combat' }, 'Leaderboard refresh error'); }
+  try { await refreshGuilds(); } catch (err) { failures++; logger.error({ err, board: 'guilds' }, 'Leaderboard refresh error'); }
+  try { await refreshCasino(); } catch (err) { failures++; logger.error({ err, board: 'casino' }, 'Leaderboard refresh error'); }
 
   if (failures === 0) {
     await redis.set('leaderboard:last_refresh', new Date().toISOString());
   }
 
-  console.log(`Leaderboard refresh completed in ${Date.now() - start}ms (${failures} failures)`);
+  logger.info({ durationMs: Date.now() - start, failures }, 'Leaderboard refresh completed');
 }

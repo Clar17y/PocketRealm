@@ -3,6 +3,7 @@ import type { GuildContractType } from '@pocketrealm/shared';
 import { getPlayerGuildId } from './guildService';
 import { incrementContractProgress } from './guildContractService';
 import { incrementQuestProgress } from './questService';
+import { logger } from '../logger';
 
 const GUILD_CONTRACT_TYPES = new Set<string>([
   'kill_count', 'kill_family', 'boss_rounds', 'craft_items',
@@ -33,12 +34,12 @@ export async function trackProgress(
     ]);
 
     if (contractResult.status === 'rejected') {
-      console.warn('[trackProgress] contract increment failed', { playerId, type, err: contractResult.reason });
+      logger.warn({ playerId, type, err: contractResult.reason }, 'Contract increment failed');
     }
 
     return questResult.status === 'fulfilled' ? questResult.value : [];
   } catch (err) {
-    console.warn('[trackProgress] failed', { err, playerId, type });
+    logger.warn({ playerId, type, err }, 'Track progress failed');
     return [];
   }
 }

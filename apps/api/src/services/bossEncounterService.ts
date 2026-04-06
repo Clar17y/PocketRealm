@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { Server as SocketServer } from 'socket.io';
 import { prisma } from '@pocketrealm/database';
+import { logger } from '../logger';
 import {
   WORLD_EVENT_CONSTANTS,
   GUILD_CONSTANTS,
@@ -549,7 +550,7 @@ async function resolveBossRoundInner(
               if (err instanceof AppError && err.code === 'INSUFFICIENT_TURNS') {
                 // Expected — player doesn't have enough turns, skip
               } else {
-                console.error('Boss auto-signup failed unexpectedly', { err, playerId: participant.playerId });
+                logger.error({ err, playerId: participant.playerId }, 'Boss auto-signup failed unexpectedly');
               }
             }
           }),

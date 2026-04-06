@@ -1,6 +1,7 @@
 import { prisma } from '@pocketrealm/database';
 import { checkAndResolveDueBossRounds } from './bossEncounterService';
 import { checkAndResolveExpeditionRounds } from './expeditionService';
+import { logger } from '../logger';
 
 const ACTIVE_INTERVAL_MS = 5_000;
 const IDLE_INTERVAL_MS = 60_000;
@@ -31,7 +32,7 @@ export function startRoundResolutionScheduler(getIo: GetIo): void {
       }
       setTimeout(tick, active ? ACTIVE_INTERVAL_MS : IDLE_INTERVAL_MS);
     } catch (err) {
-      console.error('Round resolution error:', err);
+      logger.error({ err }, 'Round resolution error');
       setTimeout(tick, IDLE_INTERVAL_MS);
     }
   }

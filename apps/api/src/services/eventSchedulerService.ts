@@ -5,6 +5,7 @@ import {
   WORLD_EVENT_TEMPLATES,
   type WorldEventTemplate,
 } from '@pocketrealm/shared';
+import { logger } from '../logger';
 import { expireStaleEvents, spawnWorldEvent } from './worldEventService';
 import { getCachedZones, getCachedBossMobTemplates, getCachedZoneMobFamilies } from './staticDataCacheService';
 import { createBossEncounter, checkAndResolveDueBossRounds } from './bossEncounterService';
@@ -378,21 +379,21 @@ export async function checkAndSpawnEvents(io: SocketServer | null): Promise<void
       }
     }
   } catch (err) {
-    console.error('Scheduler step expireStaleEvents failed', err);
+    logger.error({ err, step: 'expireStaleEvents' }, 'Scheduler step failed');
   }
 
   // Step 2: Resolve any due boss rounds
   try {
     await checkAndResolveDueBossRounds(io);
   } catch (err) {
-    console.error('Scheduler step checkAndResolveDueBossRounds failed', err);
+    logger.error({ err, step: 'checkAndResolveDueBossRounds' }, 'Scheduler step failed');
   }
 
   // Step 3: Dedicated boss spawn timer (independent of event cooldowns)
   try {
     await checkAndSpawnBoss(io);
   } catch (err) {
-    console.error('Scheduler step checkAndSpawnBoss failed', err);
+    logger.error({ err, step: 'checkAndSpawnBoss' }, 'Scheduler step failed');
   }
 
   // Step 4: Spawn new world/zone event (respawn cooldown gated)
@@ -412,6 +413,6 @@ export async function checkAndSpawnEvents(io: SocketServer | null): Promise<void
       }
     }
   } catch (err) {
-    console.error('Scheduler step spawnNewEvent failed', err);
+    logger.error({ err, step: 'spawnNewEvent' }, 'Scheduler step failed');
   }
 }

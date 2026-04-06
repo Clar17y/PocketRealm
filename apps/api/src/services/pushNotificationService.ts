@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { prisma } from '@pocketrealm/database';
+import { logger } from '../logger';
 
 interface PushSubscriptionInput {
   endpoint: string;
@@ -42,11 +43,11 @@ const NOTIFICATION_SELECT = Object.fromEntries(
 function initVapid(): void {
   const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT } = process.env;
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) {
-    console.warn('[push] VAPID env vars missing — push notifications disabled');
+    logger.warn('Push notifications disabled — VAPID env vars missing');
     return;
   }
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-  console.log('[push] VAPID configured');
+  logger.info('VAPID configured for push notifications');
 }
 
 let vapidInitialized = false;
@@ -133,7 +134,7 @@ export async function sendPush(
         if (statusCode === 410 || statusCode === 404) {
           await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
         } else {
-          console.error('[push] sendNotification failed:', (err as Error).message ?? err);
+          logger.error({ err }, 'Push notification send failed');
         }
       }
     }),

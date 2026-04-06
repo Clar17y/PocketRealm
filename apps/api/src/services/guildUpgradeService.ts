@@ -8,6 +8,7 @@ import {
   type GuildUpgradeData,
   type GuildUpgradeEffectType,
 } from '@pocketrealm/shared';
+import { logger } from '../logger';
 import { AppError } from '../middleware/errorHandler';
 import { requireRole } from './guildService';
 import { isActiveWithinWindow } from './guildService';
@@ -314,7 +315,7 @@ async function computePlayerGuildModifiers(playerId: string): Promise<PlayerGuil
     for (const perk of def.perks) {
       const modKey = EFFECT_TO_MODIFIER[perk.effectType];
       if (!modKey) {
-        console.warn(`Unmapped guild project perk effect type: ${perk.effectType}`);
+        logger.warn({ effectType: perk.effectType }, 'Unmapped guild project perk effect type');
         continue;
       }
       projectPerks[modKey] = Math.max(projectPerks[modKey] ?? 0, perk.value);
@@ -342,7 +343,7 @@ async function computePlayerGuildModifiers(playerId: string): Promise<PlayerGuil
         for (const bonus of activeTier.bonuses) {
           const modKey = EFFECT_TO_MODIFIER[bonus.effectType];
           if (!modKey) {
-            console.warn(`Unmapped guild specialization effect type: ${bonus.effectType}`);
+            logger.warn({ effectType: bonus.effectType }, 'Unmapped guild specialization effect type');
             continue;
           }
           mods[modKey] += bonus.value;
