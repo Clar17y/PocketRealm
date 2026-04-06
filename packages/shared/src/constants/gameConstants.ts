@@ -905,9 +905,9 @@ export const GUILD_CONSTANTS = {
   /** Maximum tax rate (percentage) */
   MAX_TAX_RATE: 20,
   /** Base treasury capacity */
-  TREASURY_BASE_CAP: 100_000,
+  TREASURY_BASE_CAP: 200_000,
   /** Additional treasury capacity per guild level */
-  TREASURY_CAP_PER_LEVEL: 10_000,
+  TREASURY_CAP_PER_LEVEL: 15_000,
   /** Guild level required to unlock specialization */
   SPECIALIZATION_UNLOCK_LEVEL: 10,
   /** Treasury cost to respec specialization */
