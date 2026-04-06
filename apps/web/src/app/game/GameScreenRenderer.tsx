@@ -544,13 +544,7 @@ export function GameScreenRenderer({
                 recipeRequiredLevel: info?.recipeRequiredLevel ?? null,
               };
             })}
-          equippedLuck={equipment.reduce((sum, slot) => {
-            const base = slot.item?.template?.baseStats as Record<string, unknown> | undefined;
-            const bonus = slot.item?.bonusStats as Record<string, unknown> | undefined;
-            const baseLuck = typeof base?.luck === 'number' ? base.luck : 0;
-            const bonusLuck = typeof bonus?.luck === 'number' ? bonus.luck : 0;
-            return sum + baseLuck + bonusLuck;
-          }, 0) + characterProgression.attributes.luck}
+          equippedLuck={equipmentStats.luck + characterProgression.attributes.luck}
           activityLog={activityLog}
           onUpgrade={handleForgeUpgrade} onReroll={handleForgeReroll}
           isRecovering={hpState.isRecovering} recoveryCost={hpState.recoveryCost}
