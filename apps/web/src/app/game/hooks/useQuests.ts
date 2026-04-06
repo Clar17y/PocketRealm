@@ -83,7 +83,7 @@ export function useQuests() {
         return {
           ...q,
           currentValue: update.current,
-          status: update.completed ? 'completed' as const : q.status,
+          status: update.completed && q.status === 'active' ? 'completed' as const : q.status,
           completedAt: update.completed && !q.completedAt ? new Date().toISOString() : q.completedAt,
         };
       });
