@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getQuests, claimQuestReward, claimDailyBonus, rerollQuest } from '@/lib/api';
-import type { PlayerQuestData, PlayerQuestStateData } from '@pocketrealm/shared';
+import type { PlayerQuestData, PlayerQuestStateData, QuestProgressUpdate } from '@pocketrealm/shared';
 
 export function useQuests() {
   const [quests, setQuests] = useState<PlayerQuestData[]>([]);
@@ -70,6 +70,24 @@ export function useQuests() {
     }
   }, []);
 
+  /** Update local quest state from progress updates returned by action endpoints. */
+  const updateQuestProgress = useCallback((updates?: QuestProgressUpdate[]) => {
+    if (!updates?.length) return;
+    setQuests((prev) => {
+      const progressMap = new Map(updates.map((u) => [u.questId, u]));
+      return prev.map((q) => {
+        const update = progressMap.get(q.id);
+        if (!update) return q;
+        return {
+          ...q,
+          currentValue: update.current,
+          status: update.completed ? 'completed' as const : q.status,
+          completedAt: update.completed && !q.completedAt ? new Date().toISOString() : q.completedAt,
+        };
+      });
+    });
+  }, []);
+
   return {
     quests,
     questState,
@@ -79,5 +97,6 @@ export function useQuests() {
     handleClaimQuestReward,
     handleClaimDailyBonus,
     handleRerollQuest,
+    updateQuestProgress,
   } as const;
 }
