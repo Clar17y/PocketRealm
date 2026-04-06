@@ -303,9 +303,11 @@ export function registerSiteRoutes(router: Router): void {
         const stateUpdates = await buildStateUpdates(playerId, ['hp', 'resources', 'buffs', 'skills', 'characterProgression']);
         stateUpdates.activeEncounterSiteId = null;
 
-        // Merge chest reward items into stateUpdates so frontend inventory stays in sync
-        if (result.completionRewards) {
-          await mergeLootIntoStateUpdates(playerId, result.completionRewards.newItemIds, result.completionRewards.updatedItemIds, stateUpdates);
+        // Merge chest reward + durability-damaged items into stateUpdates so frontend stays in sync
+        const rewardNewIds = result.completionRewards?.newItemIds ?? [];
+        const rewardUpdatedIds = [...(result.completionRewards?.updatedItemIds ?? []), ...result.durabilityDamagedItemIds];
+        if (rewardNewIds.length > 0 || rewardUpdatedIds.length > 0) {
+          await mergeLootIntoStateUpdates(playerId, rewardNewIds, rewardUpdatedIds, stateUpdates);
         }
 
         // On defeat the player is respawned to a town — sync the zone in the UI
@@ -410,9 +412,13 @@ export function registerSiteRoutes(router: Router): void {
         : undefined;
       if (stateUpdates) stateUpdates.activeEncounterSiteId = null;
 
-      // Merge chest reward items into stateUpdates so frontend inventory stays in sync
-      if (stateUpdates && result.completionRewards) {
-        await mergeLootIntoStateUpdates(playerId, result.completionRewards.newItemIds, result.completionRewards.updatedItemIds, stateUpdates);
+      // Merge chest reward + durability-damaged items into stateUpdates so frontend stays in sync
+      if (stateUpdates) {
+        const rewardNewIds = result.completionRewards?.newItemIds ?? [];
+        const rewardUpdatedIds = [...(result.completionRewards?.updatedItemIds ?? []), ...result.durabilityDamagedItemIds];
+        if (rewardNewIds.length > 0 || rewardUpdatedIds.length > 0) {
+          await mergeLootIntoStateUpdates(playerId, rewardNewIds, rewardUpdatedIds, stateUpdates);
+        }
       }
 
       // On defeat the player is respawned to a town — sync the zone in the UI

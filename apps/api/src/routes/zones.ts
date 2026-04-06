@@ -405,6 +405,7 @@ zonesRouter.post('/travel', asyncHandler(async (req, res) => {
           ? DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.elite
           : DURABILITY_CONSTANTS.DEGRADATION_MULTIPLIER.default;
         const durabilityLost = await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', travelDurabilityMult);
+        for (const d of durabilityLost) allTravelUpdatedItemIds.push(d.itemId);
 
         // Resolve mob family for event badges + achievement tracking (pre-fetched)
         const travelMobFamilyId = mobToFamilyMap.get(prefixedMob.id) ?? null;

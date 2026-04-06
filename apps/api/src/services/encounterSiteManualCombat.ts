@@ -317,6 +317,7 @@ export interface ManualRoundResult {
   fleeResult: FleeResult | null;
   respawnedTo: { townId: string; townName: string } | null;
   xpGrants: GrantXpResult[];
+  durabilityDamagedItemIds: string[];
 }
 
 /**
@@ -416,6 +417,7 @@ export async function resolveManualEncounterRound(
       fleeResult: null,
       respawnedTo: null,
       xpGrants: [],
+      durabilityDamagedItemIds: [],
     };
   }
 
@@ -555,7 +557,8 @@ export async function resolveManualEncounterRound(
 
   // Degrade equipment durability from all rounds of manual encounter combat
   const { playerHitsLanded, mobHitsLanded } = countEncounterSiteHits(state.roundLogs);
-  await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded);
+  const durabilityLost = await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded);
+  const durabilityDamagedItemIds = durabilityLost.map(d => d.itemId);
 
   // Grant XP for defeated mobs (only on room clear, not on defeat)
   let xpGrants: GrantXpResult[] = [];
@@ -600,5 +603,6 @@ export async function resolveManualEncounterRound(
     fleeResult,
     respawnedTo,
     xpGrants,
+    durabilityDamagedItemIds,
   };
 }

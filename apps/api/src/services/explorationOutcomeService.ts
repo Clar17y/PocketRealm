@@ -299,6 +299,7 @@ export async function processExplorationOutcomes(
       const durabilityLost = buffUsesLeft.durability > 0
         ? []
         : await degradeEquippedDurability(playerId, combatResult.log, 'combatantA', explDurabilityMult);
+      for (const d of durabilityLost) allUpdatedItemIds.push(d.itemId);
 
       // Consume combat buff charges per ambush mob
       await prisma.$transaction(async (tx) => {

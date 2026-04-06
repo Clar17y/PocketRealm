@@ -68,6 +68,7 @@ export interface AutoResolveEncounterResult {
   xpGrants: GrantXpResult[];
   fleeResult: FleeResult | null;
   respawnedTo: { townId: string; townName: string } | null;
+  durabilityDamagedItemIds: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +140,7 @@ export async function autoResolveEncounterRoom(
       xpGrants: [],
       fleeResult: null,
       respawnedTo: null,
+      durabilityDamagedItemIds: [],
     };
   }
 
@@ -313,7 +315,8 @@ export async function autoResolveEncounterRoom(
 
   // Degrade equipment durability from encounter site combat
   const { playerHitsLanded, mobHitsLanded } = countEncounterSiteHits(combatResult.rounds.map(r => r.log));
-  await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded);
+  const durabilityLost = await degradeEquippedDurabilityByHits(playerId, playerHitsLanded, mobHitsLanded);
+  const durabilityDamagedItemIds = durabilityLost.map(d => d.itemId);
 
   // Grant XP for defeated mobs (only on room clear, not on defeat)
   let xpGrants: GrantXpResult[] = [];
@@ -355,5 +358,6 @@ export async function autoResolveEncounterRoom(
     xpGrants,
     fleeResult,
     respawnedTo,
+    durabilityDamagedItemIds,
   };
 }
