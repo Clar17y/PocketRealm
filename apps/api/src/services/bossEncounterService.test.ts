@@ -164,6 +164,8 @@ describe('bossEncounterService', () => {
     vi.mocked(resolveBossRoundEngine).mockReturnValue(defaultEngineResult as any);
     vi.mocked(initThreatTable).mockReturnValue([{ playerId: 'p1', threat: 0, tauntRoundsRemaining: 0 }]);
     vi.mocked(calculateFleeWithGold).mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 } as any);
+    // Guild XP: resolveBossRound looks up guild memberships for participating players
+    mockPrisma.guildMember.findMany.mockResolvedValue([]);
   });
 
   describe('createBossEncounter', () => {
