@@ -13,18 +13,17 @@ describe('collectMetrics', () => {
       sockets: { sockets: new Map([['s1', { data: { playerId: 'p1' } }], ['s2', { data: { playerId: 'p2' } }], ['s3', { data: { playerId: 'p1' } }]]) },
     } as any;
 
-    const metrics = collectMetrics(mockIo);
+    const metrics = collectMetrics(mockIo, null);
 
     expect(metrics).toHaveProperty('activeConnections', 3);
     expect(metrics).toHaveProperty('connectedPlayers', 2); // p1 deduplicated
     expect(metrics).toHaveProperty('memoryUsageMb');
     expect(typeof metrics.memoryUsageMb).toBe('number');
-    expect(metrics).toHaveProperty('eventLoopLagMs');
-    expect(typeof metrics.eventLoopLagMs).toBe('number');
+    expect(metrics.eventLoopLagMs).toBe(0); // null histogram
   });
 
   it('handles null io gracefully', () => {
-    const metrics = collectMetrics(null);
+    const metrics = collectMetrics(null, null);
 
     expect(metrics.activeConnections).toBe(0);
     expect(metrics.connectedPlayers).toBe(0);
@@ -54,7 +53,7 @@ describe('startMetricsLogger', () => {
     expect(logger.info).toHaveBeenCalledOnce();
     expect(logger.info).toHaveBeenCalledWith(
       expect.objectContaining({ activeConnections: 0, connectedPlayers: 0 }),
-      'metrics',
+      'Server metrics snapshot',
     );
 
     vi.advanceTimersByTime(1000);

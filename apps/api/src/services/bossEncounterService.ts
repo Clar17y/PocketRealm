@@ -494,7 +494,7 @@ async function resolveBossRoundInner(
   const memberships = await prisma.guildMember.findMany({
     where: { playerId: { in: uniquePlayerIds } },
     select: { guildId: true },
-  }) ?? [];
+  });
   const guildIds = new Set(memberships.map(m => m.guildId));
   for (const guildId of guildIds) {
     await addGuildXp(guildId, GUILD_CONSTANTS.XP_PER_BOSS_ROUND);

@@ -166,7 +166,7 @@ const server = http.createServer(app);
 createSocketServer(server, isAllowedCorsOrigin);
 
 server.listen(PORT, () => {
-  logger.info({ port: PORT }, `PocketRealm API running on port ${PORT}`);
+  logger.info({ port: PORT }, 'PocketRealm API running');
 
   // Adaptive round resolution: ticks every 5s when bosses/expeditions are
   // active, idles at 60s otherwise.

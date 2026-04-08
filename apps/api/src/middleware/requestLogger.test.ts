@@ -70,9 +70,7 @@ describe('requestLogger', () => {
     });
     expect(context).toHaveProperty('duration');
     expect(typeof context.duration).toBe('number');
-    expect(message).toContain('GET');
-    expect(message).toContain('/api/v1/player');
-    expect(message).toContain('200');
+    expect(message).toBe('request');
   });
 
   it('skips /health requests', () => {

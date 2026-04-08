@@ -17,7 +17,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       status: res.statusCode,
       duration,
       playerId: req.player?.playerId,
-    }, `${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+    }, 'request');
   });
 
   next();

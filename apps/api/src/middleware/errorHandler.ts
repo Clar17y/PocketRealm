@@ -23,7 +23,7 @@ export function errorHandler(
 
   if (err instanceof AppError) {
     const level = err.statusCode >= 500 ? 'error' : 'warn';
-    logger[level]({ requestId, statusCode: err.statusCode, code: err.code }, err.message);
+    logger[level]({ requestId, statusCode: err.statusCode, code: err.code, ...(err.statusCode >= 500 && { err }) }, err.message);
 
     res.status(err.statusCode).json({
       error: {
@@ -50,7 +50,6 @@ export function errorHandler(
     return;
   }
 
-  // Default to 500 — log full error object for stack trace
   logger.error({ requestId, err }, err.message);
 
   res.status(500).json({

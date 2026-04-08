@@ -1,9 +1,6 @@
-import { monitorEventLoopDelay } from 'perf_hooks';
+import { monitorEventLoopDelay, type IntervalHistogram } from 'perf_hooks';
 import type { Server as SocketServer } from 'socket.io';
 import { logger } from '../logger';
-
-const histogram = monitorEventLoopDelay({ resolution: 20 });
-histogram.enable();
 
 export interface Metrics {
   activeConnections: number;
@@ -12,7 +9,7 @@ export interface Metrics {
   eventLoopLagMs: number;
 }
 
-export function collectMetrics(io: SocketServer | null): Metrics {
+export function collectMetrics(io: SocketServer | null, histogram: IntervalHistogram | null): Metrics {
   let activeConnections = 0;
   let connectedPlayers = 0;
 
@@ -27,8 +24,10 @@ export function collectMetrics(io: SocketServer | null): Metrics {
   }
 
   const memoryUsageMb = Math.round(process.memoryUsage().heapUsed / 1024 / 1024 * 100) / 100;
-  const eventLoopLagMs = Math.round(histogram.mean / 1e6 * 100) / 100;
-  histogram.reset();
+  const eventLoopLagMs = histogram
+    ? Math.round(histogram.mean / 1e6 * 100) / 100
+    : 0;
+  if (histogram) histogram.reset();
 
   return { activeConnections, connectedPlayers, memoryUsageMb, eventLoopLagMs };
 }
@@ -39,10 +38,16 @@ export function startMetricsLogger(
   getIo: () => SocketServer | null,
   intervalMs = DEFAULT_INTERVAL_MS,
 ): () => void {
+  const histogram = monitorEventLoopDelay({ resolution: 20 });
+  histogram.enable();
+
   const timer = setInterval(() => {
-    const metrics = collectMetrics(getIo());
-    logger.info(metrics, 'metrics');
+    const metrics = collectMetrics(getIo(), histogram);
+    logger.info(metrics, 'Server metrics snapshot');
   }, intervalMs);
 
-  return () => clearInterval(timer);
+  return () => {
+    clearInterval(timer);
+    histogram.disable();
+  };
 }
