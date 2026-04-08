@@ -59,8 +59,8 @@ describe('requestLogger', () => {
     requestLogger(req, res, next);
     (res as any)._emit('finish');
 
-    expect(logger.info).toHaveBeenCalledOnce();
-    const [context, message] = (logger.info as any).mock.calls[0];
+    expect(logger.debug).toHaveBeenCalledOnce();
+    const [context, message] = (logger.debug as any).mock.calls[0];
     expect(context).toMatchObject({
       requestId: 'test-uuid-1234',
       method: 'GET',
