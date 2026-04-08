@@ -16,7 +16,7 @@ describe('collectMetrics', () => {
     const metrics = collectMetrics(mockIo);
 
     expect(metrics).toHaveProperty('activeConnections', 3);
-    expect(metrics).toHaveProperty('activePlayers', 2); // p1 deduplicated
+    expect(metrics).toHaveProperty('connectedPlayers', 2); // p1 deduplicated
     expect(metrics).toHaveProperty('memoryUsageMb');
     expect(typeof metrics.memoryUsageMb).toBe('number');
     expect(metrics).toHaveProperty('eventLoopLagMs');
@@ -27,7 +27,7 @@ describe('collectMetrics', () => {
     const metrics = collectMetrics(null);
 
     expect(metrics.activeConnections).toBe(0);
-    expect(metrics.activePlayers).toBe(0);
+    expect(metrics.connectedPlayers).toBe(0);
   });
 });
 
@@ -53,7 +53,7 @@ describe('startMetricsLogger', () => {
     vi.advanceTimersByTime(1000);
     expect(logger.info).toHaveBeenCalledOnce();
     expect(logger.info).toHaveBeenCalledWith(
-      expect.objectContaining({ activeConnections: 0, activePlayers: 0 }),
+      expect.objectContaining({ activeConnections: 0, connectedPlayers: 0 }),
       'metrics',
     );
 

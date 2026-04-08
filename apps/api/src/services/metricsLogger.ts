@@ -7,31 +7,30 @@ histogram.enable();
 
 export interface Metrics {
   activeConnections: number;
-  activePlayers: number;
+  connectedPlayers: number;
   memoryUsageMb: number;
   eventLoopLagMs: number;
 }
 
 export function collectMetrics(io: SocketServer | null): Metrics {
   let activeConnections = 0;
-  let activePlayers = 0;
+  let connectedPlayers = 0;
 
   if (io) {
     const sockets = io.sockets.sockets;
     activeConnections = sockets.size;
     const playerIds = new Set<string>();
     for (const [, socket] of sockets) {
-      const pid = (socket as any).data?.playerId;
-      if (pid) playerIds.add(pid);
+      if (socket.data?.playerId) playerIds.add(socket.data.playerId);
     }
-    activePlayers = playerIds.size;
+    connectedPlayers = playerIds.size;
   }
 
   const memoryUsageMb = Math.round(process.memoryUsage().heapUsed / 1024 / 1024 * 100) / 100;
   const eventLoopLagMs = Math.round(histogram.mean / 1e6 * 100) / 100;
   histogram.reset();
 
-  return { activeConnections, activePlayers, memoryUsageMb, eventLoopLagMs };
+  return { activeConnections, connectedPlayers, memoryUsageMb, eventLoopLagMs };
 }
 
 const DEFAULT_INTERVAL_MS = 60_000;
