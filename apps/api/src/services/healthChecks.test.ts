@@ -7,7 +7,7 @@ vi.mock('../redis', () => ({
 
 import { prisma } from '@pocketrealm/database';
 import { redis } from '../redis';
-import { checkDatabase, checkRedis, getSocketIoStats } from './healthChecks';
+import { checkDatabase, checkRedis, getSocketIoStats, PROBE_TIMEOUT_MS } from './healthChecks';
 
 describe('healthChecks', () => {
   beforeEach(() => {
@@ -40,6 +40,36 @@ describe('healthChecks', () => {
     it('returns "error" when ping resolves with unexpected value', async () => {
       (redis.ping as any).mockResolvedValueOnce('');
       await expect(checkRedis()).resolves.toBe('error');
+    });
+  });
+
+  describe('probe timeout', () => {
+    it('checkDatabase returns "error" if prisma hangs longer than PROBE_TIMEOUT_MS', async () => {
+      vi.useFakeTimers();
+      try {
+        (prisma.$queryRaw as any).mockImplementationOnce(
+          () => new Promise(() => { /* never resolves */ }),
+        );
+        const promise = checkDatabase();
+        await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS + 1);
+        await expect(promise).resolves.toBe('error');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('checkRedis returns "error" if ping hangs longer than PROBE_TIMEOUT_MS', async () => {
+      vi.useFakeTimers();
+      try {
+        (redis.ping as any).mockImplementationOnce(
+          () => new Promise(() => { /* never resolves */ }),
+        );
+        const promise = checkRedis();
+        await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS + 1);
+        await expect(promise).resolves.toBe('error');
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
