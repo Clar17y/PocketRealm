@@ -4,7 +4,7 @@
 
 import * as Sentry from '@sentry/node';
 import { logger } from './logger';
-import { resolveAppVersion } from './constants/appVersion';
+import { APP_VERSION } from './constants/appVersion';
 
 const dsn = process.env.SENTRY_DSN;
 const environment =
@@ -16,7 +16,7 @@ if (dsn) {
   Sentry.init({
     dsn,
     environment,
-    release: resolveAppVersion(),
+    release: APP_VERSION,
     // 10% of transactions traced in production, 100% in dev.
     tracesSampleRate: environment === 'production' ? 0.1 : 1.0,
     // Don't send PII by default — we explicitly attach playerId via setUser.
@@ -32,7 +32,7 @@ if (dsn) {
     },
   });
 
-  logger.info({ environment, release: resolveAppVersion() }, 'Sentry initialized');
+  logger.info({ environment, release: APP_VERSION }, 'Sentry initialized');
 
   // Process-level safety net. Express's error middleware only catches
   // errors that flow through req/next — this catches rogue promises and

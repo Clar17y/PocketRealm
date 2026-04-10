@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const initMock = vi.fn();
-const captureExceptionMock = vi.fn();
 
 vi.mock('@sentry/node', () => ({
   init: initMock,
-  captureException: captureExceptionMock,
+  captureException: vi.fn(),
   close: vi.fn().mockResolvedValue(true),
 }));
 
@@ -17,18 +16,34 @@ vi.mock('./logger', () => ({
   },
 }));
 
+type RejectionListener = NodeJS.UnhandledRejectionListener;
+type ExceptionListener = NodeJS.UncaughtExceptionListener;
+
 describe('instrument', () => {
   const ORIGINAL_ENV = { ...process.env };
+  let priorRejection: RejectionListener[] = [];
+  let priorException: ExceptionListener[] = [];
 
   beforeEach(() => {
     initMock.mockReset();
-    captureExceptionMock.mockReset();
     vi.resetModules();
     process.env = { ...ORIGINAL_ENV };
+    // Snapshot pre-existing listeners so we can strip anything instrument.ts
+    // adds on import without disturbing vitest's own handlers.
+    priorRejection = process.listeners('unhandledRejection') as RejectionListener[];
+    priorException = process.listeners('uncaughtException') as ExceptionListener[];
   });
 
   afterEach(() => {
     process.env = ORIGINAL_ENV;
+    const rej = process.listeners('unhandledRejection') as RejectionListener[];
+    for (const l of rej) {
+      if (!priorRejection.includes(l)) process.off('unhandledRejection', l);
+    }
+    const exc = process.listeners('uncaughtException') as ExceptionListener[];
+    for (const l of exc) {
+      if (!priorException.includes(l)) process.off('uncaughtException', l);
+    }
   });
 
   it('does not call Sentry.init when SENTRY_DSN is missing', async () => {
