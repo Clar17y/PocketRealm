@@ -12,6 +12,7 @@
   "dependencies": {
     "@pocketrealm/game-engine": "*",
     "@pocketrealm/shared": "*",
+    "@sentry/nextjs": "^10.48.0",
     "@serwist/next": "^9.5.7",
     "eslint": "9.39.2",
     "next": "^16.1.6",
