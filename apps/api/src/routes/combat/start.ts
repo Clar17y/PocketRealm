@@ -61,6 +61,7 @@ import {
 import { getCachedMobTemplatesByZone } from '../../services/staticDataCacheService';
 import { createEndpointLimiter } from '../../middleware/rateLimiter';
 import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
+import { logger } from '../../logger';
 
 const combatLimiter = createEndpointLimiter('combat', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.COMBAT_MAX);
 
@@ -367,6 +368,13 @@ export function registerStartRoutes(router: Router): void {
         fetchItemDTOs(zoneUpdatedItemIds),
         fetchMaterialTotals(playerId),
       ]);
+
+      logger.info({
+        playerId,
+        result: combatResult.outcome,
+        mobTemplateId: prefixedMob.id,
+        zone: zone.name,
+      }, 'Combat completed');
 
       res.json({
         logId: combatLog.id,

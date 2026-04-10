@@ -4,6 +4,7 @@ import { AUTH_CONSTANTS } from '@pocketrealm/shared';
 import { createEmailVerificationToken } from './authTokenService';
 import { sendVerificationEmail } from './emailService';
 import { AppError } from '../middleware/errorHandler';
+import { logger } from '../logger';
 
 /** Verify email and grant Champion trial if eligible. Returns whether trial was granted. */
 export async function verifyPlayerEmail(tokenRecord: { id: string; playerId: string }): Promise<boolean> {
@@ -74,7 +75,7 @@ export async function changePlayerEmail(playerId: string, newEmail: string, curr
 
   createEmailVerificationToken(playerId)
     .then(({ rawToken }) => sendVerificationEmail(newEmail, rawToken, player.username))
-    .catch((err) => console.error('Failed to send verification email:', err));
+    .catch((err) => logger.error({ err }, 'Failed to send verification email'));
 }
 
 /** Change a player's password. Revokes all sessions. */

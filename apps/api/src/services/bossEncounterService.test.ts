@@ -81,6 +81,7 @@ import {
 import { emitSystemMessage } from './systemMessageService';
 import { setHp, enterRecoveringState } from './hpService';
 import { distributeBossLoot } from './bossLootService';
+import { logger } from '../logger';
 import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { resolveBossRound as resolveBossRoundEngine, initThreatTable } from '@pocketrealm/game-engine';
 
@@ -163,6 +164,8 @@ describe('bossEncounterService', () => {
     vi.mocked(resolveBossRoundEngine).mockReturnValue(defaultEngineResult as any);
     vi.mocked(initThreatTable).mockReturnValue([{ playerId: 'p1', threat: 0, tauntRoundsRemaining: 0 }]);
     vi.mocked(calculateFleeWithGold).mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 } as any);
+    // Guild XP: resolveBossRound looks up guild memberships for participating players
+    mockPrisma.guildMember.findMany.mockResolvedValue([]);
   });
 
   describe('createBossEncounter', () => {
@@ -767,16 +770,16 @@ describe('bossEncounterService', () => {
       const signups = [makeParticipantRow({ autoSignUp: true })];
       setupBasicRound({}, signups);
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => logger);
 
       // Should not throw — but should log the unexpected error
       const result = await resolveBossRound('enc-1', null);
       expect(result).not.toBeNull();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Boss auto-signup failed unexpectedly',
+      expect(errorSpy).toHaveBeenCalledWith(
         expect.objectContaining({ playerId: 'p1' }),
+        'Boss auto-signup failed unexpectedly',
       );
-      consoleSpy.mockRestore();
+      errorSpy.mockRestore();
     });
 
     it('does not auto-signup when autoSignUp is false', async () => {

@@ -8,6 +8,7 @@ import {
   type WorldEventStatus,
   type WorldEventType,
 } from '@pocketrealm/shared';
+import { logger } from '../logger';
 
 function toWorldEventData(row: {
   id: string;
@@ -294,7 +295,10 @@ export async function spawnWorldEvent(params: {
     });
   }, { isolationLevel: 'Serializable' });
 
-  return row ? toWorldEventData(row) : null;
+  if (!row) return null;
+  const event = toWorldEventData(row);
+  logger.info({ eventId: event.id, title: event.title, zoneId: event.zoneId }, 'World event spawned');
+  return event;
 }
 
 export async function expireStaleEvents(): Promise<WorldEventData[]> {

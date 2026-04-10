@@ -55,6 +55,7 @@ vi.mock('@pocketrealm/shared', async (importOriginal) => {
 import { mockPrisma as db } from '../__test__/setup';
 import { activateUpgrade, getActiveUpgrades, getAvailableUpgrades, getPlayerGuildModifiers } from './guildUpgradeService';
 import { GUILD_CONSTANTS } from '@pocketrealm/shared';
+import { logger } from '../logger';
 
 const GUILD_ID = 'guild-1';
 const PLAYER_ID = 'player-1';
@@ -387,7 +388,7 @@ describe('getPlayerGuildModifiers', () => {
   });
 
   it('should not corrupt modifiers when project perk effectType has no matching modifier key', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
     db.guildMember.findUnique.mockResolvedValue({
       guildId: GUILD_ID, lastActiveAt: NOW,
     });
@@ -408,12 +409,12 @@ describe('getPlayerGuildModifiers', () => {
       expect(value, `modifier '${key}' should not be NaN`).not.toBeNaN();
     }
     // Should warn about the unmapped effectType
-    expect(warnSpy).toHaveBeenCalledWith('Unmapped guild project perk effect type: bogus_effect');
+    expect(warnSpy).toHaveBeenCalledWith({ effectType: 'bogus_effect' }, 'Unmapped guild project perk effect type');
     warnSpy.mockRestore();
   });
 
   it('should not corrupt modifiers when specialization effectType has no matching modifier key', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
     db.guildMember.findUnique.mockResolvedValue({
       guildId: GUILD_ID, lastActiveAt: NOW,
     });
@@ -435,7 +436,7 @@ describe('getPlayerGuildModifiers', () => {
     // travelCostReduction should remain at 0 (the snake_case key should be skipped)
     expect(mods.travelCostReduction).toBe(0);
     // Should warn about the unmapped effectType
-    expect(warnSpy).toHaveBeenCalledWith('Unmapped guild specialization effect type: travel_cost_reduction');
+    expect(warnSpy).toHaveBeenCalledWith({ effectType: 'travel_cost_reduction' }, 'Unmapped guild specialization effect type');
     warnSpy.mockRestore();
   });
 

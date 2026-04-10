@@ -4,6 +4,7 @@ import { spendPlayerTurnsTx } from './turnBankService';
 import { AppError } from '../middleware/errorHandler';
 import { redis } from '../redis';
 import { getIo } from '../socket';
+import { logger } from '../logger';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';
 import {
   isWinningBet,
@@ -239,7 +240,7 @@ export async function getCurrentRound(): Promise<RouletteRoundState> {
     const resolvedData = safeParseRedisJson(resolvedRaw, resolvedRoundSchema, null, 'roulette:resolved_round');
     if (!resolvedData) {
       // Corrupt resolved round — delete and fall through to active round check
-      console.error('[casino] corrupt roulette:resolved_round in Redis, discarding');
+      logger.error({ key: RESULT_KEY }, 'Corrupt casino resolved round in Redis, discarding');
       await redis.del(RESULT_KEY);
     } else {
       const { roundId, startedAt, result: resolvedResult } = resolvedData;
@@ -273,8 +274,8 @@ export async function getCurrentRound(): Promise<RouletteRoundState> {
 
   const parseResult = activeRoundSchema.safeParse(JSON.parse(existingRaw));
   if (!parseResult.success) {
-    console.error('[casino] corrupt roulette:current_round in Redis, starting fresh');
-    await redis.del('roulette:current_round');
+    logger.error({ key: ROUND_KEY }, 'Corrupt casino current round in Redis, starting fresh');
+    await redis.del(ROUND_KEY);
     // Start a new round directly instead of recursing (avoids infinite loop on persistent corruption)
     const { roundId, startedAt } = await getOrCreateRound();
     const freshTotalMs = CASINO_CONSTANTS.ROUND_DURATION_SECONDS * 1000;

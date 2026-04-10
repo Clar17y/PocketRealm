@@ -4,6 +4,7 @@ import {
   type GuildRecruitmentMode, type GuildRole, type GuildSpecialization,
 } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { logger } from '../logger';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';
 import { cachedQuery, invalidateCache } from './cacheService';
@@ -172,6 +173,8 @@ export async function createGuild(
   });
 
   await invalidateGuildIdCache(playerId);
+
+  logger.info({ guildId: guild.id, founderId: playerId, guildName: guild.name }, 'Guild created');
 
   return toGuildData(guild);
 }
@@ -449,6 +452,6 @@ export async function checkGuildAchievementsForAllMembers(guildId: string, statK
       await emitAchievementNotifications(playerId, newAchievements);
     }));
   } catch (err) {
-    console.error('Guild achievement check failed:', err);
+    logger.error({ err }, 'Guild achievement check failed');
   }
 }

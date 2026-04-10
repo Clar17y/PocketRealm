@@ -2,6 +2,7 @@ import { prisma } from '@pocketrealm/database';
 import { runTemplateCombat } from '@pocketrealm/game-engine';
 import { SPAR_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { logger } from '../logger';
 import { isBlocked } from './blockService';
 import { mapTemplateCombatLog } from './combatLogMapper';
 import { getHpState } from './hpService';
@@ -124,7 +125,7 @@ export async function runSpar(
 
   // Notify defender via system mail (fire-and-forget)
   sendSparResultMail(attackerId, attackerName, defenderId, attackerWon, winnerHp).catch(err =>
-    console.warn('sendSparResultMail failed', { err, attackerId, defenderId })
+    logger.warn({ err, attackerId, defenderId }, 'Spar result mail send failed')
   );
 
   return {

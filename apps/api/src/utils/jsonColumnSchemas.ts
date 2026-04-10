@@ -9,6 +9,7 @@
  */
 import { z } from 'zod';
 import type { ConsumableEffectType } from '@pocketrealm/shared';
+import { logger } from '../logger';
 
 // ---------------------------------------------------------------------------
 // Consumable Effect (used by consumableService, potionService)
@@ -86,7 +87,7 @@ export function parseJsonArray<T>(
 ): T[] {
   if (Array.isArray(value)) return value as T[];
   if (value === null || value === undefined) return fallback;
-  console.warn(`[jsonColumnSchemas] Expected array for ${columnName}, got ${typeof value}`);
+  logger.warn({ columnName, actualType: typeof value }, 'JSON column expected array');
   return fallback;
 }
 
@@ -103,7 +104,7 @@ export function parseJsonRecord<V = number>(
     return value as Record<string, V>;
   }
   if (value === null || value === undefined) return fallback;
-  console.warn(`[jsonColumnSchemas] Expected object for ${columnName}, got ${typeof value}`);
+  logger.warn({ columnName, actualType: typeof value }, 'JSON column expected object');
   return fallback;
 }
 
@@ -122,7 +123,7 @@ export function safeParseRedisJson<T, F = T>(
     const parsed = JSON.parse(raw);
     return schema.parse(parsed);
   } catch (err) {
-    console.warn(`[jsonColumnSchemas] Failed to parse Redis JSON for ${context}:`, err instanceof Error ? err.message : err);
+    logger.warn({ context, validationError: err instanceof Error ? err.message : String(err) }, 'Failed to parse Redis JSON');
     return fallback;
   }
 }
