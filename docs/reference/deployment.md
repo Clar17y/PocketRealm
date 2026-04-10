@@ -112,7 +112,7 @@ Running migrations through the pooler causes advisory-lock failures. If `directU
 ### How it is wired
 
 - **Root package.json** is the single source of truth (`pocketrealm` workspace, `version` field).
-- **API build** (`apps/api/package.json` `build` script) uses `cross-env-shell APP_VERSION=$(node -p "require('../../package.json').version")` before `tsc`, so Render's build step captures the version into `process.env.APP_VERSION` at compile time. Runtime code reads it from `apps/api/src/version.ts`.
+- **API build** (`apps/api/package.json` `build` script) delegates to `apps/api/scripts/build.cjs`, a small Node wrapper that reads root `package.json#version`, logs `[build:api] APP_VERSION=<x.y.z>` to the Render build log, and spawns `tsc` with `APP_VERSION` in `process.env`. Runtime code reads it from `apps/api/src/version.ts`. (A Node wrapper is used instead of `cross-env-shell $(...)` because `cross-env-shell` does not evaluate command substitution on Windows.)
 - **Web build** (`apps/web/next.config.mjs`) reads the same `package.json` via `createRequire(import.meta.url)` and sets `env: { APP_VERSION: pkg.version }`, which Next.js inlines into client and server bundles.
 - **Runtime fallback:** both surfaces fall back to `'0.0.0-dev'` if unset (local `npm run dev`, vitest).
 
