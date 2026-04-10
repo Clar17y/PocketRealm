@@ -165,13 +165,15 @@ app.use(errorHandler);
 const server = http.createServer(app);
 createSocketServer(server, isAllowedCorsOrigin);
 
+let stopMetricsLogger: (() => void) | null = null;
+
 server.listen(PORT, () => {
   logger.info({ port: PORT }, 'PocketRealm API running');
 
   // Adaptive round resolution: ticks every 5s when bosses/expeditions are
   // active, idles at 60s otherwise.
   startRoundResolutionScheduler(getIo);
-  startMetricsLogger(getIo);
+  stopMetricsLogger = startMetricsLogger(getIo);
 
   // Persisted mob cleanup timer (every 5 minutes)
   setInterval(() => {
@@ -200,6 +202,7 @@ server.listen(PORT, () => {
 
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received — shutting down gracefully');
+  stopMetricsLogger?.();
   const io = getIo();
   if (io) io.close();
   server.close(() => {

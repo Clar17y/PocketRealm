@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 
 vi.mock('../logger', () => ({
@@ -11,17 +12,17 @@ vi.mock('../logger', () => ({
 import { logger } from '../logger';
 import { AppError, errorHandler } from './errorHandler';
 
-function mockRes() {
-  const res: any = {};
+function mockRes(): Response {
+  const res: Partial<Response> = {};
   res.status = vi.fn().mockReturnValue(res);
   res.json = vi.fn().mockReturnValue(res);
-  return res;
+  return res as Response;
 }
 
-const mockNext = vi.fn();
+const mockNext: NextFunction = vi.fn();
 
-function mockReq(overrides: Record<string, unknown> = {}) {
-  return { requestId: 'req-123', ...overrides } as any;
+function mockReq(overrides: Partial<Request> = {}): Request {
+  return { requestId: 'req-123', ...overrides } as unknown as Request;
 }
 
 describe('AppError', () => {

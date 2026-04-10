@@ -30,11 +30,13 @@ function createMockRes(): Response {
   const listeners: Record<string, (() => void)[]> = {};
   return {
     statusCode: 200,
+    writableEnded: false,
     on(event: string, cb: () => void) {
       (listeners[event] ??= []).push(cb);
       return this;
     },
     _emit(event: string) {
+      if (event === 'finish') (this as any).writableEnded = true;
       for (const cb of listeners[event] ?? []) cb();
     },
   } as unknown as Response & { _emit: (event: string) => void };
@@ -121,5 +123,31 @@ describe('requestLogger', () => {
     (res as any)._emit('finish');
 
     expect(logger.error).toHaveBeenCalledOnce();
+  });
+
+  it('logs aborted request once on close before finish', () => {
+    const req = createMockReq();
+    const res = createMockRes();
+    const next = vi.fn();
+
+    requestLogger(req, res, next);
+    (res as any)._emit('close');
+
+    expect(logger.error).toHaveBeenCalledOnce();
+    const [context] = (logger.error as any).mock.calls[0];
+    expect(context).toMatchObject({ aborted: true });
+  });
+
+  it('does not double-log when close fires after finish', () => {
+    const req = createMockReq();
+    const res = createMockRes();
+    const next = vi.fn();
+
+    requestLogger(req, res, next);
+    (res as any)._emit('finish');
+    (res as any)._emit('close');
+
+    expect(logger.debug).toHaveBeenCalledOnce();
+    expect(logger.error).not.toHaveBeenCalled();
   });
 });
