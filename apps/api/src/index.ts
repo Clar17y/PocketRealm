@@ -37,6 +37,7 @@ import { expeditionRouter } from './routes/expedition';
 import { shopRouter } from './routes/shop';
 import { friendsRouter } from './routes/friends';
 import { notificationsRouter } from './routes/notifications';
+import { healthRouter } from './routes/health';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { logger } from './logger';
@@ -123,10 +124,8 @@ app.use('/api/v1/', createEndpointLimiter('global', RATE_LIMIT_CONSTANTS.DEFAULT
   skip: (req) => req.method === 'OPTIONS',
 }));
 
-// Health check
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: APP_VERSION });
-});
+// Health / readiness / liveness checks (see docs/reference/deployment.md)
+app.use(healthRouter);
 
 // API routes
 app.use('/api/v1/auth', authRouter);
