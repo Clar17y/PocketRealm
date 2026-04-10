@@ -97,10 +97,7 @@ if [[ -n "$SOURCE_ENV" ]]; then
   cp "$SOURCE_ENV" "$WORKTREE_API_ENV"
   # Replace DATABASE_URL to point at worktree-specific database
   sed -i "s|DATABASE_URL=.*|DATABASE_URL=${WORKTREE_DB_URL}|" "$WORKTREE_API_ENV"
-  # Mirror for DIRECT_DATABASE_URL — Prisma's directUrl requires it even in
-  # dev. If the source env had a DIRECT_DATABASE_URL we overwrote it via the
-  # sed above (which only matches DATABASE_URL). Append if missing, otherwise
-  # replace to point at the worktree DB.
+  # Prisma's directUrl needs its own env var even in dev.
   if grep -q '^DIRECT_DATABASE_URL=' "$WORKTREE_API_ENV"; then
     sed -i "s|DIRECT_DATABASE_URL=.*|DIRECT_DATABASE_URL=${WORKTREE_DB_URL}|" "$WORKTREE_API_ENV"
   else
@@ -123,8 +120,7 @@ EOF
   info "Created apps/api/.env with defaults"
 fi
 
-# packages/database/.env — Prisma needs DATABASE_URL and DIRECT_DATABASE_URL
-# (schema.prisma declares both via env("DATABASE_URL") and env("DIRECT_DATABASE_URL"))
+# packages/database/.env — Prisma needs both DATABASE_URL and DIRECT_DATABASE_URL
 mkdir -p "$(dirname "$WORKTREE_DB_ENV")"
 cat > "$WORKTREE_DB_ENV" <<EOF
 DATABASE_URL=${WORKTREE_DB_URL}

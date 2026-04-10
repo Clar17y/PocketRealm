@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// Read the canonical version directly from root package.json so this test
-// stays in lockstep with whatever version.ts resolves at runtime.
+// Read root package.json directly so the expected value stays in lockstep
+// with whatever version.ts resolves at runtime.
 const rootPkgJson = JSON.parse(
   readFileSync(resolve(__dirname, '..', '..', '..', 'package.json'), 'utf8'),
 ) as { version: string };
