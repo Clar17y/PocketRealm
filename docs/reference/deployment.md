@@ -292,3 +292,42 @@ Configure an external ping against `/health/ready` (NOT `/health`, so failures p
   - Timeout: 5s
 - [ ] Wire alerts to a Discord webhook or email distribution list
 - [ ] If using Render's built-in health check, point it at `/health/ready` so Render will restart the instance automatically when the probe fails
+
+---
+
+## Sentry Error Tracking
+
+Sentry is wired into both the API (`@sentry/node`) and the web app
+(`@sentry/nextjs`). Both SDKs no-op when no DSN is configured, so local
+development stays noise-free by default.
+
+### API environment variables
+
+| Var | Where | Notes |
+|-----|-------|-------|
+| `SENTRY_DSN` | API runtime | Public project DSN. Leave unset to disable Sentry entirely. |
+| `SENTRY_ENVIRONMENT` | API runtime | Overrides `NODE_ENV` for the Sentry environment tag. Set to `production` / `staging`. |
+| `APP_VERSION` | API runtime | Used as the Sentry release tag and surfaced in `/health` response as `version`. Falls back to `"unknown"`. |
+
+### Web environment variables
+
+| Var | Where | Notes |
+|-----|-------|-------|
+| `NEXT_PUBLIC_SENTRY_DSN` | Build + runtime | Public DSN. Exposed to the browser. |
+| `NEXT_PUBLIC_APP_VERSION` | Build | Release tag mirroring the API `APP_VERSION`. |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | Build | Optional override for the environment tag (client-side init). |
+| `SENTRY_ENVIRONMENT` | Build | Optional override for the environment tag (server/edge init). |
+| `SENTRY_AUTH_TOKEN` | **Build only** | Personal/project auth token used to upload source maps during `next build`. Never expose to the browser. |
+| `SENTRY_ORG` | Build only | Sentry org slug. |
+| `SENTRY_PROJECT` | Build only | Sentry project slug. |
+
+Source maps upload only when `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and
+`SENTRY_PROJECT` are all present during `next build`. Missing any of
+them logs a warning via `withSentryConfig`'s `errorHandler` and the
+build continues so offline dev and PR preview builds aren't blocked.
+
+Process-level unhandled rejections and uncaught exceptions in the API
+are forwarded to Sentry and logged via pino before the process exits.
+4xx `AppError` responses and `ZodError` validation failures are
+deliberately filtered out at the SDK boundary (`beforeSend`) so only
+true server errors reach the dashboard.
