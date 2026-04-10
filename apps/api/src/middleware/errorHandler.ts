@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import * as Sentry from '@sentry/node';
 import { logger } from '../logger';
 
 export class AppError extends Error {
@@ -24,6 +25,10 @@ export function errorHandler(
   if (err instanceof AppError) {
     const level = err.statusCode >= 500 ? 'error' : 'warn';
     logger[level]({ requestId, statusCode: err.statusCode, code: err.code, ...(err.statusCode >= 500 && { err }) }, err.message);
+
+    if (err.statusCode >= 500) {
+      Sentry.captureException(err);
+    }
 
     res.status(err.statusCode).json({
       error: {
@@ -51,6 +56,8 @@ export function errorHandler(
   }
 
   logger.error({ requestId, err }, err.message);
+
+  Sentry.captureException(err);
 
   res.status(500).json({
     error: {
