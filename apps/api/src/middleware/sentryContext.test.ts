@@ -13,7 +13,7 @@ vi.mock('@sentry/node', () => ({
   }),
 }));
 
-import { sentryContext } from './sentryContext';
+import { sentryContext, attachSentryUser } from './sentryContext';
 
 function makeReq(over: Partial<Request> = {}): Request {
   return {
@@ -42,16 +42,10 @@ describe('sentryContext middleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('sets Sentry user when req.player is populated', () => {
+  it('does not touch Sentry user (handled by attachSentryUser)', () => {
     const req = makeReq({ player: { playerId: 'p-1', username: 'hero', role: 'player' } });
     sentryContext(req, {} as Response, vi.fn());
-    expect(setUserMock).toHaveBeenCalledWith({ id: 'p-1', username: 'hero' });
-  });
-
-  it('clears Sentry user when unauthenticated', () => {
-    const req = makeReq();
-    sentryContext(req, {} as Response, vi.fn());
-    expect(setUserMock).toHaveBeenCalledWith(null);
+    expect(setUserMock).not.toHaveBeenCalled();
   });
 
   it('does not throw when requestId is missing', () => {
@@ -59,5 +53,31 @@ describe('sentryContext middleware', () => {
     const next = vi.fn();
     expect(() => sentryContext(req, {} as Response, next)).not.toThrow();
     expect(next).toHaveBeenCalled();
+  });
+});
+
+describe('attachSentryUser', () => {
+  beforeEach(() => {
+    setUserMock.mockReset();
+    setTagMock.mockReset();
+    setContextMock.mockReset();
+  });
+
+  it('sets Sentry user when req.player is populated', () => {
+    const req = makeReq({ player: { playerId: 'p-1', username: 'hero', role: 'player' } });
+    attachSentryUser(req);
+    expect(setUserMock).toHaveBeenCalledWith({ id: 'p-1', username: 'hero' });
+  });
+
+  it('clears Sentry user when no player is present', () => {
+    const req = makeReq();
+    attachSentryUser(req);
+    expect(setUserMock).toHaveBeenCalledWith(null);
+  });
+
+  it('does not throw with a partial request missing player', () => {
+    const req = { method: 'GET', path: '/x' } as unknown as Request;
+    expect(() => attachSentryUser(req)).not.toThrow();
+    expect(setUserMock).toHaveBeenCalledWith(null);
   });
 });

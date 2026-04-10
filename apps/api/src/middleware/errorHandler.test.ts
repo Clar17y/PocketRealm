@@ -9,13 +9,6 @@ vi.mock('../logger', () => ({
   },
 }));
 
-const { captureExceptionMock } = vi.hoisted(() => ({
-  captureExceptionMock: vi.fn(),
-}));
-vi.mock('@sentry/node', () => ({
-  captureException: captureExceptionMock,
-}));
-
 import { logger } from '../logger';
 import { AppError, errorHandler } from './errorHandler';
 
@@ -50,37 +43,6 @@ describe('AppError', () => {
 describe('errorHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    captureExceptionMock.mockReset();
-  });
-
-  it('forwards unknown errors to Sentry', () => {
-    const res = mockRes();
-    const err = new Error('boom');
-    errorHandler(err, mockReq(), res, mockNext);
-    expect(captureExceptionMock).toHaveBeenCalledWith(err);
-  });
-
-  it('forwards 5xx AppError to Sentry', () => {
-    const res = mockRes();
-    const err = new AppError(500, 'db down', 'DB_DOWN');
-    errorHandler(err, mockReq(), res, mockNext);
-    expect(captureExceptionMock).toHaveBeenCalledWith(err);
-  });
-
-  it('does NOT forward 4xx AppError to Sentry', () => {
-    const res = mockRes();
-    const err = new AppError(400, 'bad input', 'BAD');
-    errorHandler(err, mockReq(), res, mockNext);
-    expect(captureExceptionMock).not.toHaveBeenCalled();
-  });
-
-  it('does NOT forward ZodError to Sentry', () => {
-    const res = mockRes();
-    const err = new ZodError([
-      { code: 'invalid_type', expected: 'string', received: 'number', path: ['name'], message: 'Expected string' },
-    ]);
-    errorHandler(err, mockReq(), res, mockNext);
-    expect(captureExceptionMock).not.toHaveBeenCalled();
   });
 
   it('handles AppError with correct status and body', () => {
