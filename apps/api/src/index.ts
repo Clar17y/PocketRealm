@@ -40,6 +40,7 @@ import { notificationsRouter } from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { logger } from './logger';
+import { APP_VERSION } from './version';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
@@ -124,7 +125,7 @@ app.use('/api/v1/', createEndpointLimiter('global', RATE_LIMIT_CONSTANTS.DEFAULT
 
 // Health check
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: APP_VERSION });
 });
 
 // API routes
@@ -168,7 +169,7 @@ createSocketServer(server, isAllowedCorsOrigin);
 let stopMetricsLogger: (() => void) | null = null;
 
 server.listen(PORT, () => {
-  logger.info({ port: PORT }, 'PocketRealm API running');
+  logger.info({ port: PORT, version: APP_VERSION }, 'PocketRealm API running');
 
   // Adaptive round resolution: ticks every 5s when bosses/expeditions are
   // active, idles at 60s otherwise.
