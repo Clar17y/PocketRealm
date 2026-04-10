@@ -10,47 +10,35 @@
 
 ## Phase 1 — Data Integrity & Gameplay Bugs
 
-**Exit gate:** All items merged, `npm run test` and `npm run typecheck` green.
+**Exit gate:** All items merged, `npm run test` and `npm run typecheck` green. **STATUS: COMPLETE (2026-04-06)**
 
-- [ ] **1.1 — #247 Combat template conditionals not evaluating during battle**
-  - Branch: `fix/combat-template-conditionals-247`
-  - Scope: Template conditionals broken in combat — core gameplay bug
-  - Key files: investigate combat template evaluation in game-engine and API
-  - Tests: add/fix game-engine combat template tests
+- [x] **1.1 — #247 Combat template conditionals not evaluating during battle** — PR #253
+  - Root cause: `resolveParticipantActions()` hardcoded `[]` for `activeEffects` instead of forwarding participant effects
+  - Fix: added `activeEffects` to `CombatParticipantInput`, mapped and forwarded to `resolveAction()`
+  - 747/747 engine tests passing (2 new)
 
-- [ ] **1.2 — Achievement reward race condition**
-  - Branch: `fix/achievement-race-condition`
-  - Scope: Concurrent `checkAchievements()` can create duplicate records
-  - Key files: `apps/api/src/services/achievementService.ts` — `checkAchievements()`
-  - Fix: `createMany({ skipDuplicates: true })` or unique constraint handling
-  - Tests: concurrent achievement check test
+- [x] **1.2 — Achievement reward race condition** — already fixed, confirmation tests in PR #254
+  - Already uses `createMany({ skipDuplicates: true })` with composite primary key
+  - Added confirmation test for concurrent count=0 path
 
-- [ ] **1.3 — Silent achievement reward loss**
-  - Branch: `fix/achievement-reward-loss`
-  - Scope: If item template doesn't exist, reward marked claimed but never given
-  - Key files: `apps/api/src/services/achievementService.ts` — `claimReward()`
-  - Fix: validate template exists before setting `rewardClaimed` flag; throw or return error if missing
-  - Tests: test claimReward with nonexistent template
+- [x] **1.3 — Silent achievement reward loss** — already fixed, confirmation tests in PR #254
+  - Already validates template inside `$transaction`, rolls back on failure
+  - Added `$transaction` assertion to existing test
 
-- [ ] **1.4 — Silent error swallowing in boss auto-signup**
-  - Branch: `fix/boss-autosignup-error-handling`
-  - Scope: Empty `catch {}` silently discards all errors including DB failures
-  - Key files: `apps/api/src/services/bossEncounterService.ts` — auto-signup catch block
-  - Fix: catch only expected cases, log others
-  - Tests: verify unexpected errors propagate or are logged
+- [x] **1.4 — Silent error swallowing in boss auto-signup** — already fixed (commit `83dc2ab5`)
+  - Catch block now logs unexpected errors, silently skips only `INSUFFICIENT_TURNS`
+  - Tests already exist and pass
 
-- [ ] **1.5 — JSON column safety (Zod validation)**
-  - Branch: `fix/json-column-validation`
-  - Scope: Prisma JSON columns cast without runtime validation
-  - Key files: `apps/api/src/services/bossEncounterService.ts` (lines ~60, 63, 72, 390, 423)
-  - Fix: add Zod schemas for JSON column types, validate on read
-  - Tests: test with malformed JSON data
+- [x] **1.5 — JSON column safety (Zod validation)** — PR #255
+  - Created Zod schemas for `bossEffects`, `roundSummaries`, `rewardsByPlayer` with `z.ZodType<T>` compile-time enforcement
+  - Parse helpers use `.safeParse()` with graceful fallbacks + warning logs
+  - Replaced 4 unsafe casts, fixed 2 existing tests with wrong data shapes
+  - 117/117 boss encounter tests passing (32 new)
 
-- [ ] **1.6 — #179 Quest notification icon missing**
-  - Branch: `fix/quest-notification-icon-179`
-  - Scope: Quest completion icon doesn't appear until page nav — likely stateUpdates gap
-  - Key files: investigate quest state in `stateUpdates` response and frontend quest notification logic
-  - Tests: verify quest completion triggers notification state update
+- [x] **1.6 — #179 Quest notification icon missing** — PR #256
+  - Root cause: action endpoints returned `questProgress` but frontend only showed toast, never updated local `quests` state
+  - Fix: added `updateQuestProgress()` to `useQuests` hook, consolidated `showQuestToasts` inside it
+  - Note: encounter site combat and fire-and-forget routes (PvP, boss, casino, travel) are pre-existing gaps — tracked for follow-up
 
 ---
 
@@ -135,6 +123,6 @@
 | Push notifications | #205 | Feature, not fix |
 | Client analytics (Plausible) | #207 | Can add post-launch |
 | P2 scaling prep | #244 | Not needed at <100 users |
-| Guild economy redesign | #174 | Feature work |
+| ~~Guild economy redesign~~ | ~~#174~~ | ~~Merged as PR #257 during Phase 1 session~~ |
 | Seasonal architecture | #152 | Future infrastructure |
 | Full accessibility audit | — | Quick wins in 3.5 cover launch |
