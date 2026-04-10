@@ -8,61 +8,48 @@ export type DependencyStatus = 'ok' | 'error';
 export const PROBE_TIMEOUT_MS = 2000;
 
 /**
- * Wraps a probe promise with a timeout fallback. If the probe does not
- * resolve within PROBE_TIMEOUT_MS, the returned promise resolves with the
- * provided fallback value (typically 'error'). This prevents /health/ready
- * from hanging indefinitely when a dependency TCP-blackholes.
+ * Runs a dependency probe with a timeout and error handling. The probe thunk
+ * should return `true` on success, `false` on an explicit "unhealthy" reply.
+ * Thrown errors and timeouts both resolve to 'error'.
  *
- * The timer is .unref()'d so it doesn't keep the process (or vitest) alive,
- * and is cleared when the probe wins the race to avoid leaks.
+ * Prevents /health/ready from hanging indefinitely when a dependency
+ * TCP-blackholes. The timer is .unref()'d so it doesn't keep the process
+ * (or vitest) alive, and is cleared when the probe wins the race.
  */
-function withProbeTimeout<T>(label: string, probe: Promise<T>, fallback: T): Promise<T> {
+async function probeDependency(label: string, probe: () => Promise<boolean>): Promise<DependencyStatus> {
   let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<T>((resolve) => {
+  const timeoutPromise = new Promise<DependencyStatus>((resolve) => {
     timer = setTimeout(() => {
       logger.warn({ label, timeoutMs: PROBE_TIMEOUT_MS }, 'Health check: probe timed out');
-      resolve(fallback);
+      resolve('error');
     }, PROBE_TIMEOUT_MS);
     timer.unref?.();
   });
-  return Promise.race([
-    probe.finally(() => {
-      if (timer) clearTimeout(timer);
-    }),
-    timeout,
-  ]);
+  const probePromise: Promise<DependencyStatus> = (async () => {
+    try {
+      return (await probe()) ? 'ok' : 'error';
+    } catch (err) {
+      logger.warn({ err, label }, 'Health check: probe failed');
+      return 'error';
+    }
+  })().finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+  return Promise.race([probePromise, timeoutPromise]);
 }
 
 export async function checkDatabase(): Promise<DependencyStatus> {
-  return withProbeTimeout<DependencyStatus>(
-    'database',
-    (async (): Promise<DependencyStatus> => {
-      try {
-        await prisma.$queryRaw`SELECT 1`;
-        return 'ok';
-      } catch (err) {
-        logger.warn({ err }, 'Health check: database probe failed');
-        return 'error';
-      }
-    })(),
-    'error',
-  );
+  return probeDependency('database', async () => {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  });
 }
 
 export async function checkRedis(): Promise<DependencyStatus> {
-  return withProbeTimeout<DependencyStatus>(
-    'redis',
-    (async (): Promise<DependencyStatus> => {
-      try {
-        const reply = await redis.ping();
-        return reply === 'PONG' ? 'ok' : 'error';
-      } catch (err) {
-        logger.warn({ err }, 'Health check: redis probe failed');
-        return 'error';
-      }
-    })(),
-    'error',
-  );
+  return probeDependency('redis', async () => {
+    const reply = await redis.ping();
+    return reply === 'PONG';
+  });
 }
 
 export function getSocketIoStats(io: SocketServer | null): { connected: number } {
