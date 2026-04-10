@@ -47,7 +47,7 @@ All variables are required in production unless marked optional. Set them in Ren
 | `PORT` | no | `4000` | HTTP listen port. Render sets this automatically. |
 | `CORS_ORIGINS` | yes | `http://localhost:3002,http://127.0.0.1:3002` | Comma-separated allowed web origins. Production: the Vercel domain. |
 | `LOG_LEVEL` | no | `info` (prod), `debug` (dev/test) | pino log level — see [Logging](#logging) |
-| `APP_VERSION` | yes (build-time) | `0.0.0-dev` | Injected from root `package.json#version` at build — see [Release Versioning](#release-versioning) |
+| `APP_VERSION` | no | (root `package.json#version`) | Override for the version reported by `/health` and Sentry. If unset, the API reads root `package.json#version` at runtime — see [Release Versioning](#release-versioning) |
 | `SENTRY_DSN` | yes (Phase 2.2) | — | **Filled in by Phase 2.2 (#209).** Server-side Sentry project DSN. |
 | `SENTRY_AUTH_TOKEN` | yes (build-time, Phase 2.2) | — | **Filled in by Phase 2.2 (#209).** Sentry CLI token for source map upload. |
 | `VAPID_PUBLIC_KEY` | yes | — | Web Push VAPID public key |
@@ -69,6 +69,8 @@ If Phase 2.2 (#209 Sentry) or other parallel phases add more variables, append r
 ---
 
 ## Database Connection Pool
+
+> **Pre-merge gate:** Before merging the PR that introduces `directUrl` to `schema.prisma` to `main`, confirm Render has `DIRECT_DATABASE_URL` configured on the API service (unpooled Neon connection string — hostname **without** `-pooler`). Without it, `prisma migrate deploy` in the Render build step fails with `P1012: Environment variable not found: DIRECT_DATABASE_URL`. Local worktrees are provisioned automatically by `scripts/setup-worktree.sh`.
 
 Prisma defaults to `num_cpus * 2 + 1` connections. On Render's starter instance this is only 5, which will exhaust under load with 145 API endpoints plus background schedulers (round resolution, leaderboard refresh, metrics, mob cleanup).
 
@@ -107,14 +109,15 @@ Running migrations through the pooler causes advisory-lock failures. If `directU
 
 ## Release Versioning
 
-`APP_VERSION` is injected at build time from the root `package.json#version` field. Both the API and web apps read the same value so Sentry release tags, the `/health` payload, and the in-game changelog all agree.
+Both the API and web apps read the version from the same root `package.json#version` field so Sentry release tags, the `/health` payload, and the in-game changelog all agree.
 
 ### How it is wired
 
 - **Root package.json** is the single source of truth (`pocketrealm` workspace, `version` field).
-- **API build** (`apps/api/package.json` `build` script) delegates to `apps/api/scripts/build.cjs`, a small Node wrapper that reads root `package.json#version`, logs `[build:api] APP_VERSION=<x.y.z>` to the Render build log, and spawns `tsc` with `APP_VERSION` in `process.env`. Runtime code reads it from `apps/api/src/version.ts`. (A Node wrapper is used instead of `cross-env-shell $(...)` because `cross-env-shell` does not evaluate command substitution on Windows.)
+- **API runtime** reads root `package.json` directly via `require('../../../package.json')` in `apps/api/src/version.ts`. The `APP_VERSION` env var, if set, takes precedence — useful for testing, staging overrides, or pinning a release tag independently of the shipped `package.json`.
+- **API build audit log.** `apps/api/scripts/build.cjs` reads root `package.json#version` and logs `[build:api] APP_VERSION=<x.y.z>` to the Render build log so the release tag is visible in build output. It also sets `APP_VERSION` on the spawned `tsc` process, but this is for parity only — production runtime does not depend on that env var being set. (A Node wrapper is used instead of `cross-env-shell $(...)` because `cross-env-shell` does not evaluate command substitution on Windows.)
 - **Web build** (`apps/web/next.config.mjs`) reads the same `package.json` via `createRequire(import.meta.url)` and sets `env: { APP_VERSION: pkg.version }`, which Next.js inlines into client and server bundles.
-- **Runtime fallback:** both surfaces fall back to `'0.0.0-dev'` if unset (local `npm run dev`, vitest).
+- **Runtime fallback:** both surfaces fall back to `'0.0.0-dev'` only if the root `package.json` lookup throws (should not happen in practice).
 
 ### Consumers
 
@@ -178,22 +181,13 @@ Never hand-edit `_prisma_migrations` unless you are recovering from a failed par
 Run against the base URL of the environment you just deployed (staging or prod). Replace `$BASE` below.
 
 ```bash
-# 1. Liveness + version
+# Liveness + version
 curl -fsS "$BASE/health" | tee /dev/stderr | jq -e '.status == "ok" and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+"))'
-
-# 2. Auth round-trip (uses a seeded smoke-test account — credentials in 1Password "PocketRealm / Smoke Test")
-curl -fsS -X POST "$BASE/api/v1/auth/login" \
-  -H 'content-type: application/json' \
-  -d '{"username":"smoketest","password":"<from-1password>"}' | jq -e '.token'
-
-# 3. Player bootstrap (replace $TOKEN with the token from step 2)
-curl -fsS "$BASE/api/v1/player/state" -H "authorization: Bearer $TOKEN" | jq -e '.player.id'
-
-# 4. Inventory read (catches Prisma client / schema mismatches)
-curl -fsS "$BASE/api/v1/inventory" -H "authorization: Bearer $TOKEN" | jq -e '.items'
 ```
 
-If any step returns non-zero, halt and start the rollback plan.
+**TODO:** wire up an end-to-end auth smoke test (login → player read → inventory read) once a seeded smoke-test account is provisioned in staging and prod. The auth contract is `POST /api/v1/auth/login` with `{email, password}` returning `{accessToken, refreshToken, player}`; current player data is at `GET /api/v1/player/` with `Authorization: Bearer <accessToken>`; inventory is at `GET /api/v1/inventory`.
+
+If the liveness check fails or reports an old version, halt and start the rollback plan.
 
 ---
 
