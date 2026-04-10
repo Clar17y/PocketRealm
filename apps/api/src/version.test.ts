@@ -1,4 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// Read the canonical version directly from root package.json so this test
+// stays in lockstep with whatever version.ts resolves at runtime.
+const rootPkgJson = JSON.parse(
+  readFileSync(resolve(__dirname, '..', '..', '..', 'package.json'), 'utf8'),
+) as { version: string };
 
 describe('APP_VERSION', () => {
   const original = process.env.APP_VERSION;
@@ -17,9 +25,9 @@ describe('APP_VERSION', () => {
     vi.resetModules();
   });
 
-  it('falls back to 0.0.0-dev when env is unset', async () => {
+  it('reads version from root package.json when APP_VERSION env is unset', async () => {
     const mod = await import('./version.js');
-    expect(mod.APP_VERSION).toBe('0.0.0-dev');
+    expect(mod.APP_VERSION).toBe(rootPkgJson.version);
   });
 
   it('uses APP_VERSION from the environment', async () => {

@@ -2,13 +2,14 @@
 /**
  * Cross-platform build wrapper for @pocketrealm/api.
  *
- * Responsibilities:
- *  1. Read the root `package.json#version` (single source of truth).
- *  2. Inject it into `process.env.APP_VERSION` for the spawned tsc process
- *     (and, transitively, any runtime that inherits the same env set on
- *     Render when `npm run start:api` runs in the same environment).
- *  3. Log the resolved value so Render build logs visibly confirm the
- *     release tag that will be served by `GET /health`.
+ * Reads the root `package.json#version` (single source of truth) and logs
+ * `[build:api] APP_VERSION=<x.y.z>` so Render build logs visibly confirm the
+ * release tag that will be served by `GET /health`. The runtime itself
+ * resolves the version independently from root `package.json` via
+ * `apps/api/src/version.ts` — this script is purely an audit log at build
+ * time. It still sets `APP_VERSION` on the spawned tsc process so local
+ * `tsc` runs inherit the same value, but production runtime does not depend
+ * on that being set.
  *
  * Why not `cross-env-shell $(...)`? `cross-env-shell` uses `shell-quote`
  * under the hood which does not evaluate command substitution, so
