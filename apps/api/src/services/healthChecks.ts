@@ -27,16 +27,26 @@ export function resetShutdownState(): void {
   shuttingDown = false;
 }
 
-/**
- * Runs a dependency probe with a timeout and error handling. The probe thunk
- * should return `true` on success, `false` on an explicit "unhealthy" reply.
- * Thrown errors and timeouts both resolve to 'error'.
- *
- * Prevents /health/ready from hanging indefinitely when a dependency
- * TCP-blackholes. The timer is .unref()'d so it doesn't keep the process
- * (or vitest) alive, and is cleared when the probe wins the race.
- */
-async function probeDependency(label: string, probe: () => Promise<boolean>): Promise<DependencyStatus> {
+// Single-flight cache of the raw probe promise per dependency. When a probe
+// times out, the underlying prisma/redis call cannot actually be cancelled,
+// so we keep the same in-flight promise around and race NEW timeouts against
+// IT instead of spawning a fresh probe. Under periodic readiness polling
+// during a dependency outage, exactly one probe stays alive instead of one
+// per poll — orphaned probes no longer pile up on the connection pool.
+const inflightProbes: Record<string, Promise<DependencyStatus> | undefined> = {};
+
+function runRawProbe(label: string, probe: () => Promise<boolean>): Promise<DependencyStatus> {
+  return (async () => {
+    try {
+      return (await probe()) ? 'ok' : 'error';
+    } catch (err) {
+      logger.warn({ err, label }, 'Health check: probe failed');
+      return 'error';
+    }
+  })();
+}
+
+function withTimeout(label: string, rawProbe: Promise<DependencyStatus>): Promise<DependencyStatus> {
   let timer: NodeJS.Timeout | undefined;
   const timeoutPromise = new Promise<DependencyStatus>((resolve) => {
     timer = setTimeout(() => {
@@ -45,17 +55,36 @@ async function probeDependency(label: string, probe: () => Promise<boolean>): Pr
     }, PROBE_TIMEOUT_MS);
     timer.unref?.();
   });
-  const probePromise: Promise<DependencyStatus> = (async () => {
-    try {
-      return (await probe()) ? 'ok' : 'error';
-    } catch (err) {
-      logger.warn({ err, label }, 'Health check: probe failed');
-      return 'error';
-    }
-  })().finally(() => {
+  return Promise.race([rawProbe, timeoutPromise]).finally(() => {
     if (timer) clearTimeout(timer);
   });
-  return Promise.race([probePromise, timeoutPromise]);
+}
+
+/**
+ * Runs a dependency probe with a timeout and error handling. The probe thunk
+ * should return `true` on success, `false` on an explicit "unhealthy" reply.
+ * Thrown errors and timeouts both resolve to 'error'.
+ *
+ * Prevents /health/ready from hanging indefinitely when a dependency
+ * TCP-blackholes, and coalesces concurrent callers onto a single in-flight
+ * probe so a hung DB/Redis call cannot leak one orphan per poll interval.
+ */
+function probeDependency(label: string, probe: () => Promise<boolean>): Promise<DependencyStatus> {
+  let raw = inflightProbes[label];
+  if (!raw) {
+    raw = runRawProbe(label, probe);
+    inflightProbes[label] = raw;
+    raw.finally(() => {
+      if (inflightProbes[label] === raw) inflightProbes[label] = undefined;
+    });
+  }
+  return withTimeout(label, raw);
+}
+
+// Test-only: drop any cached in-flight probe between suites so a hung mock
+// doesn't bleed across tests.
+export function resetProbeInflight(): void {
+  for (const key of Object.keys(inflightProbes)) inflightProbes[key] = undefined;
 }
 
 export async function checkDatabase(): Promise<DependencyStatus> {

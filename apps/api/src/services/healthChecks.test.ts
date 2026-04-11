@@ -14,6 +14,7 @@ import {
   isShuttingDown,
   markShuttingDown,
   resetShutdownState,
+  resetProbeInflight,
   PROBE_TIMEOUT_MS,
 } from './healthChecks';
 
@@ -21,6 +22,7 @@ describe('healthChecks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetShutdownState();
+    resetProbeInflight();
   });
 
   describe('checkDatabase', () => {
@@ -98,6 +100,50 @@ describe('healthChecks', () => {
       expect(isShuttingDown()).toBe(false);
       markShuttingDown();
       expect(isShuttingDown()).toBe(true);
+    });
+  });
+
+  describe('single-flight probe coalescing', () => {
+    it('concurrent checkDatabase callers share a single underlying prisma call', async () => {
+      let resolveQuery: ((value: unknown) => void) | undefined;
+      (prisma.$queryRaw as any).mockImplementationOnce(
+        () => new Promise((resolve) => { resolveQuery = resolve; }),
+      );
+
+      const first = checkDatabase();
+      const second = checkDatabase();
+      const third = checkDatabase();
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+
+      resolveQuery?.([{ one: 1 }]);
+      await expect(first).resolves.toBe('ok');
+      await expect(second).resolves.toBe('ok');
+      await expect(third).resolves.toBe('ok');
+    });
+
+    it('timed-out probe does not spawn a second prisma call while it is still hanging', async () => {
+      vi.useFakeTimers();
+      try {
+        (prisma.$queryRaw as any).mockImplementation(
+          () => new Promise(() => { /* never resolves */ }),
+        );
+
+        const first = checkDatabase();
+        await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS + 1);
+        await expect(first).resolves.toBe('error');
+
+        // Second poll while the underlying call is still hanging: must NOT
+        // spawn a new prisma.$queryRaw — that's the leak Codex P1 flagged.
+        const second = checkDatabase();
+        expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS + 1);
+        await expect(second).resolves.toBe('error');
+        expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });
