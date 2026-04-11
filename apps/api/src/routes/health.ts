@@ -1,5 +1,10 @@
 import { Router, type Request, type Response } from 'express';
-import { checkDatabase, checkRedis, getSocketIoStats } from '../services/healthChecks';
+import {
+  checkDatabase,
+  checkRedis,
+  getSocketIoStats,
+  isShuttingDown,
+} from '../services/healthChecks';
 import { getIo } from '../socket';
 
 export const healthRouter = Router();
@@ -17,6 +22,12 @@ healthRouter.get('/health/live', (_req: Request, res: Response) => {
  * Used by Render and external uptime monitors (see docs/reference/deployment.md).
  */
 healthRouter.get('/health/ready', async (_req: Request, res: Response) => {
+  // During graceful shutdown, flip to 503 immediately so the load balancer
+  // can stop routing new traffic before dependencies actually close.
+  if (isShuttingDown()) {
+    res.status(503).json({ status: 'shutting_down' });
+    return;
+  }
   const [database, redis] = await Promise.all([checkDatabase(), checkRedis()]);
   const ok = database === 'ok' && redis === 'ok';
   res.status(ok ? 200 : 503).json({

@@ -6,13 +6,19 @@ vi.mock('../services/healthChecks', () => ({
   checkDatabase: vi.fn(),
   checkRedis: vi.fn(),
   getSocketIoStats: vi.fn(),
+  isShuttingDown: vi.fn(() => false),
 }));
 
 vi.mock('../socket', () => ({
   getIo: vi.fn(() => null),
 }));
 
-import { checkDatabase, checkRedis, getSocketIoStats } from '../services/healthChecks';
+import {
+  checkDatabase,
+  checkRedis,
+  getSocketIoStats,
+  isShuttingDown,
+} from '../services/healthChecks';
 import { healthRouter } from './health';
 
 function buildApp() {
@@ -25,6 +31,7 @@ describe('health router', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.APP_VERSION = '1.2.3-test';
+    (isShuttingDown as any).mockReturnValue(false);
   });
 
   describe('GET /health/live', () => {
@@ -73,6 +80,17 @@ describe('health router', () => {
       expect(res.body.status).toBe('error');
       expect(res.body.dependencies.database).toBe('ok');
       expect(res.body.dependencies.redis).toBe('error');
+    });
+
+    it('returns 503 { status: "shutting_down" } during graceful shutdown, without probing dependencies', async () => {
+      (isShuttingDown as any).mockReturnValueOnce(true);
+
+      const res = await request(buildApp()).get('/health/ready');
+
+      expect(res.status).toBe(503);
+      expect(res.body).toEqual({ status: 'shutting_down' });
+      expect(checkDatabase).not.toHaveBeenCalled();
+      expect(checkRedis).not.toHaveBeenCalled();
     });
   });
 

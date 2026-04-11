@@ -270,6 +270,10 @@ The API exposes three health endpoints, all mounted at the root (no `/api/v1` pr
 
 `status` is `"degraded"` if any dependency returns `"error"`. `/health` still returns `200` in that case — use `/health/ready` as the hard gate.
 
+> **Migrating existing monitors:** Prior to this release `/health` always returned `{"status":"ok"}`. Any uptime monitor using a keyword rule on that literal body MUST be repointed at `/health/ready` (which still returns a clean `200` + `"status":"ok"`). Leaving an existing keyword monitor on `/health` will cause false pages whenever a dependency flaps, because `/health` now reports `"status":"degraded"` without changing the HTTP status. Audit Render's built-in health check too — if it is still configured against `/health`, switch it to `/health/ready` before relying on auto-restart.
+
+During a SIGTERM graceful shutdown `/health/ready` returns `503` with `{"status":"shutting_down"}` before the process actually closes dependencies, so the load balancer can drain traffic cleanly.
+
 ### APP_VERSION env var
 
 Set `APP_VERSION` at build/deploy time so `/health` and Sentry releases report a real version. Suggested value: the `package.json` version or a git short SHA.

@@ -7,6 +7,26 @@ export type DependencyStatus = 'ok' | 'error';
 
 export const PROBE_TIMEOUT_MS = 2000;
 
+let shuttingDown = false;
+
+/**
+ * Marks the process as shutting down so /health/ready flips to 503
+ * immediately, allowing the load balancer to drain traffic before
+ * dependencies actually close. Called from the SIGTERM handler.
+ */
+export function markShuttingDown(): void {
+  shuttingDown = true;
+}
+
+export function isShuttingDown(): boolean {
+  return shuttingDown;
+}
+
+// Test-only: reset between suites.
+export function resetShutdownState(): void {
+  shuttingDown = false;
+}
+
 /**
  * Runs a dependency probe with a timeout and error handling. The probe thunk
  * should return `true` on success, `false` on an explicit "unhealthy" reply.

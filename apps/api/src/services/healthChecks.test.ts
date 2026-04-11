@@ -7,11 +7,20 @@ vi.mock('../redis', () => ({
 
 import { prisma } from '@pocketrealm/database';
 import { redis } from '../redis';
-import { checkDatabase, checkRedis, getSocketIoStats, PROBE_TIMEOUT_MS } from './healthChecks';
+import {
+  checkDatabase,
+  checkRedis,
+  getSocketIoStats,
+  isShuttingDown,
+  markShuttingDown,
+  resetShutdownState,
+  PROBE_TIMEOUT_MS,
+} from './healthChecks';
 
 describe('healthChecks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetShutdownState();
   });
 
   describe('checkDatabase', () => {
@@ -81,6 +90,14 @@ describe('healthChecks', () => {
     it('returns connected count from io.sockets.sockets.size', () => {
       const io = { sockets: { sockets: { size: 42 } } } as any;
       expect(getSocketIoStats(io)).toEqual({ connected: 42 });
+    });
+  });
+
+  describe('shutdown flag', () => {
+    it('starts false and flips to true after markShuttingDown()', () => {
+      expect(isShuttingDown()).toBe(false);
+      markShuttingDown();
+      expect(isShuttingDown()).toBe(true);
     });
   });
 });

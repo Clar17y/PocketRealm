@@ -38,6 +38,7 @@ import { shopRouter } from './routes/shop';
 import { friendsRouter } from './routes/friends';
 import { notificationsRouter } from './routes/notifications';
 import { healthRouter } from './routes/health';
+import { markShuttingDown } from './services/healthChecks';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { logger } from './logger';
@@ -202,6 +203,9 @@ server.listen(PORT, () => {
 
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received — shutting down gracefully');
+  // Flip /health/ready to 503 before closing anything so the load balancer
+  // drains traffic during the graceful-shutdown window.
+  markShuttingDown();
   stopMetricsLogger?.();
   const io = getIo();
   if (io) io.close();
