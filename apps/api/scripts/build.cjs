@@ -11,13 +11,18 @@ const appVersion = process.env.APP_VERSION || rootPkg.version || '0.0.0-dev';
 
 console.log(`[build:api] APP_VERSION=${appVersion} (from ${path.relative(process.cwd(), rootPkgPath)})`);
 
+const existingNodeOptions = process.env.NODE_OPTIONS ?? '';
+const nodeOptions = /--max-old-space-size=/.test(existingNodeOptions)
+  ? existingNodeOptions
+  : `${existingNodeOptions} --max-old-space-size=1024`.trim();
+
 const result = spawnSync('tsc', [], {
   stdio: 'inherit',
   shell: true,
   env: {
     ...process.env,
     APP_VERSION: appVersion,
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=1024`.trim(),
+    NODE_OPTIONS: nodeOptions,
   },
 });
 
