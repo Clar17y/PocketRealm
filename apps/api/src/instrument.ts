@@ -1,7 +1,12 @@
 // NOTE: This file MUST be imported FIRST in apps/api/src/index.ts
 // (before any other import) so Sentry's auto-instrumentation can patch
 // Node internals (http, undici, etc.) before Express/Prisma load.
-
+//
+// dotenv/config is loaded here (not in index.ts) because Sentry reads
+// SENTRY_DSN / SENTRY_ENVIRONMENT / APP_VERSION at module-top-level.
+// Loading .env from index.ts would happen AFTER this file and would
+// silently disable Sentry under `npm run dev` / `npm start` flows.
+import 'dotenv/config';
 import * as Sentry from '@sentry/node';
 import { logger } from './logger';
 import { APP_VERSION } from './constants/appVersion';

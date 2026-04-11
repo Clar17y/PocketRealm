@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const initMock = vi.fn();
 
+// Stop dotenv from reading a real .env file into process.env during tests —
+// we want full control over SENTRY_* vars per-case.
+vi.mock('dotenv/config', () => ({}));
+
 vi.mock('@sentry/node', () => ({
   init: initMock,
   captureException: vi.fn(),
