@@ -225,6 +225,9 @@ process.on('SIGTERM', () => {
     redis.quit()
       .then(() => logger.info('Redis connection closed'))
       .catch((err) => logger.error({ err }, 'Redis quit error'))
+      // Flush any Sentry events captured during the drain window before
+      // process.exit drops the transport buffer.
+      .then(() => Sentry.flush(2000).catch(() => undefined))
       .finally(() => process.exit(0));
   });
 });

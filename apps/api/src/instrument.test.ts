@@ -71,4 +71,42 @@ describe('instrument', () => {
     await import('./instrument.js');
     expect(initMock.mock.calls[0][0].environment).toBe('staging');
   });
+
+  describe('beforeSend filter', () => {
+    async function getBeforeSend() {
+      process.env.SENTRY_DSN = 'https://key@o0.ingest.sentry.io/1';
+      await import('./instrument.js');
+      return initMock.mock.calls[0][0].beforeSend as (
+        event: unknown,
+        hint: { originalException?: unknown },
+      ) => unknown;
+    }
+
+    it('drops ZodError events (identified by err.name)', async () => {
+      const beforeSend = await getBeforeSend();
+      const zodError = Object.assign(new Error('Expected string'), { name: 'ZodError' });
+      const result = beforeSend({ event_id: 'x' }, { originalException: zodError });
+      expect(result).toBeNull();
+    });
+
+    it('drops 4xx AppErrors with statusCode < 500', async () => {
+      const beforeSend = await getBeforeSend();
+      const appError = Object.assign(new Error('Bad request'), { statusCode: 404 });
+      const result = beforeSend({ event_id: 'x' }, { originalException: appError });
+      expect(result).toBeNull();
+    });
+
+    it('keeps 5xx AppErrors', async () => {
+      const beforeSend = await getBeforeSend();
+      const appError = Object.assign(new Error('Server error'), { statusCode: 500 });
+      const event = { event_id: 'x' };
+      expect(beforeSend(event, { originalException: appError })).toBe(event);
+    });
+
+    it('keeps generic Errors without statusCode', async () => {
+      const beforeSend = await getBeforeSend();
+      const event = { event_id: 'x' };
+      expect(beforeSend(event, { originalException: new Error('boom') })).toBe(event);
+    });
+  });
 });

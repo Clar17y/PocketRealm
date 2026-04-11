@@ -23,8 +23,16 @@ if (dsn) {
     sendDefaultPii: false,
     // Drop noisy low-severity events at the SDK boundary.
     beforeSend(event, hint) {
+      const err = hint?.originalException as
+        | { name?: string; statusCode?: number }
+        | undefined;
+      // Never forward Zod validation failures — they're 400s, they name
+      // request field paths/values (PII-adjacent), and the errorHandler
+      // already translates them into a clean client response.
+      if (err?.name === 'ZodError') {
+        return null;
+      }
       // Never forward 4xx AppErrors — they're client errors, not bugs.
-      const err = hint?.originalException as { statusCode?: number } | undefined;
       if (err && typeof err.statusCode === 'number' && err.statusCode < 500) {
         return null;
       }
@@ -37,15 +45,18 @@ if (dsn) {
   // Process-level safety net. Express's error middleware only catches
   // errors that flow through req/next — this catches rogue promises and
   // anything that escapes async contexts entirely.
+  // Both unhandledRejection and uncaughtException crash fast after
+  // flushing to Sentry so Render can restart on corrupt state — silently
+  // swallowing either would hide real bugs and risk data corruption.
   process.on('unhandledRejection', (reason) => {
     logger.error({ err: reason }, 'unhandledRejection');
     Sentry.captureException(reason);
+    Sentry.close(2000).finally(() => process.exit(1));
   });
 
   process.on('uncaughtException', (err) => {
     logger.error({ err }, 'uncaughtException');
     Sentry.captureException(err);
-    // Let the process crash after flushing — Render will restart it.
     Sentry.close(2000).finally(() => process.exit(1));
   });
 } else {
