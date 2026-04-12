@@ -14,7 +14,7 @@ PocketRealm is deployed as a split stack: the Next.js web app on Vercel and the 
 - Web Service, Node 20 environment
 - Build: `npm install && npm run build:api`
 - Start: `npm run start:api`
-- Health check path: `/health`
+- Health check path: `/health/ready` (see [Health Check Endpoints](#health-check-endpoints))
 - Background timers running inside the API process:
   - Adaptive round resolution (5 s when active, 60 s idle)
   - Persisted mob cleanup (5 min)
@@ -239,3 +239,56 @@ Neon restore is branch-based: you create a new branch at a prior LSN/timestamp, 
 ### Disaster-recovery drill
 
 Once per quarter, create a throwaway restore branch from a point 6 h in the past, connect a local dev API to it, and confirm the data looks sane. This catches silent backup regressions before they matter.
+
+---
+
+## Health Check Endpoints
+
+The API exposes three health endpoints, all mounted at the root (no `/api/v1` prefix, no auth, excluded from request logs and rate limits):
+
+| Endpoint | Purpose | Status Codes | Touches Dependencies |
+|----------|---------|--------------|----------------------|
+| `GET /health/live` | Liveness probe — "is the process alive?" | Always `200` | No |
+| `GET /health/ready` | Readiness probe — "can it serve traffic?" | `200` healthy, `503` unhealthy | Yes (DB + Redis) |
+| `GET /health` | Full snapshot (version, uptime, dependencies, socket count) | `200` (never 5xx) | Yes (DB + Redis) |
+
+### `/health` response shape
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-04-10T12:34:56.789Z",
+  "version": "0.43.0",
+  "uptime": 12345,
+  "dependencies": {
+    "database": "ok",
+    "redis": "ok",
+    "socketio": { "connected": 42 }
+  }
+}
+```
+
+`status` is `"degraded"` if any dependency returns `"error"`. `/health` still returns `200` in that case — use `/health/ready` as the hard gate.
+
+> **Migrating existing monitors:** Prior to this release `/health` always returned `{"status":"ok"}`. Any uptime monitor using a keyword rule on that literal body MUST be repointed at `/health/ready` (which still returns a clean `200` + `"status":"ok"`). Leaving an existing keyword monitor on `/health` will cause false pages whenever a dependency flaps, because `/health` now reports `"status":"degraded"` without changing the HTTP status. Audit Render's built-in health check too — if it is still configured against `/health`, switch it to `/health/ready` before relying on auto-restart.
+
+During a SIGTERM graceful shutdown `/health/ready` returns `503` with `{"status":"shutting_down"}` before the process actually closes dependencies, so the load balancer can drain traffic cleanly.
+
+### APP_VERSION env var
+
+Set `APP_VERSION` at build/deploy time so `/health` and Sentry releases report a real version. Suggested value: the `package.json` version or a git short SHA.
+
+On Render, add it under the service's **Environment** tab. Falls back to `"unknown"` when unset.
+
+### External Uptime Monitoring (launch checklist)
+
+Configure an external ping against `/health/ready` (NOT `/health`, so failures page):
+
+- [ ] Add a monitor in **UptimeRobot** (free tier) or **Render's built-in health check**:
+  - URL: `https://<your-api-host>/health/ready`
+  - Method: `GET`
+  - Interval: 60s
+  - Alert threshold: 2 consecutive failures
+  - Timeout: 5s
+- [ ] Wire alerts to a Discord webhook or email distribution list
+- [ ] If using Render's built-in health check, point it at `/health/ready` so Render will restart the instance automatically when the probe fails
