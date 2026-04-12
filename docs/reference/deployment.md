@@ -48,8 +48,9 @@ All variables are required in production unless marked optional. Set them in Ren
 | `CORS_ORIGINS` | yes | `http://localhost:3002,http://127.0.0.1:3002` | Comma-separated allowed web origins. Production: the Vercel domain. |
 | `LOG_LEVEL` | no | `info` (prod), `debug` (dev/test) | pino log level — see [Logging](#logging) |
 | `APP_VERSION` | no | (root `package.json#version`) | Override for the version reported by `/health` and Sentry. If unset, the API reads root `package.json#version` at runtime — see [Release Versioning](#release-versioning) |
-| `SENTRY_DSN` | yes (Phase 2.2) | — | **Filled in by Phase 2.2 (#209).** Server-side Sentry project DSN. |
-| `SENTRY_AUTH_TOKEN` | yes (build-time, Phase 2.2) | — | **Filled in by Phase 2.2 (#209).** Sentry CLI token for source map upload. |
+| `SENTRY_DSN` | yes (prod), no (dev) | — | Server-side Sentry project DSN. Leave unset to disable Sentry. See [Sentry Error Tracking](#sentry-error-tracking). |
+| `SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Overrides `NODE_ENV` for the Sentry environment tag (`production` / `staging`). |
+| `SENTRY_AUTH_TOKEN` | yes (web build-time) | — | Sentry CLI token used by `next build` to upload web source maps. Not read by the API. |
 | `VAPID_PUBLIC_KEY` | yes | — | Web Push VAPID public key |
 | `VAPID_PRIVATE_KEY` | yes | — | Web Push VAPID private key |
 | `VAPID_SUBJECT` | yes | — | `mailto:` contact for Web Push |
@@ -62,9 +63,12 @@ All variables are required in production unless marked optional. Set them in Ren
 |----------|----------|---------|-------------|
 | `NEXT_PUBLIC_API_URL` | yes | — | Public URL of the Render API, used by the browser |
 | `APP_VERSION` | yes (build-time) | `0.0.0-dev` | Injected from root `package.json#version` via `next.config.mjs` — see [Release Versioning](#release-versioning) |
-| `NEXT_PUBLIC_SENTRY_DSN` | yes (Phase 2.2) | — | **Filled in by Phase 2.2 (#209).** Browser Sentry DSN. |
+| `NEXT_PUBLIC_SENTRY_DSN` | yes (prod), no (dev) | — | Browser Sentry DSN. Leave unset to disable. See [Sentry Error Tracking](#sentry-error-tracking). |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Environment tag for client-side Sentry init. |
+| `SENTRY_ORG` | yes (web build-time) | — | Sentry org slug for `next build` source map upload. |
+| `SENTRY_PROJECT` | yes (web build-time) | — | Sentry project slug for `next build` source map upload. |
 
-If Phase 2.2 (#209 Sentry) or other parallel phases add more variables, append rows to these tables rather than creating a new section.
+Parallel phases adding new variables should append rows to these tables rather than creating a new section.
 
 ---
 

@@ -9,7 +9,7 @@
 import 'dotenv/config';
 import * as Sentry from '@sentry/node';
 import { logger } from './logger';
-import { APP_VERSION } from './constants/appVersion';
+import { APP_VERSION } from './version';
 
 const dsn = process.env.SENTRY_DSN;
 const environment =
