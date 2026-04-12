@@ -90,18 +90,27 @@ else
   SOURCE_ENV=""
 fi
 
+WORKTREE_DB_URL="postgresql://${PG_USER}:${PG_USER}@localhost:${PG_PORT}/${DB_NAME}"
+
 if [[ -n "$SOURCE_ENV" ]]; then
   mkdir -p "$(dirname "$WORKTREE_API_ENV")"
   cp "$SOURCE_ENV" "$WORKTREE_API_ENV"
   # Replace DATABASE_URL to point at worktree-specific database
-  sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql://${PG_USER}:${PG_USER}@localhost:${PG_PORT}/${DB_NAME}|" "$WORKTREE_API_ENV"
-  info "Created apps/api/.env (DATABASE_URL -> $DB_NAME)"
+  sed -i "s|DATABASE_URL=.*|DATABASE_URL=${WORKTREE_DB_URL}|" "$WORKTREE_API_ENV"
+  # Prisma's directUrl needs its own env var even in dev.
+  if grep -q '^DIRECT_DATABASE_URL=' "$WORKTREE_API_ENV"; then
+    sed -i "s|DIRECT_DATABASE_URL=.*|DIRECT_DATABASE_URL=${WORKTREE_DB_URL}|" "$WORKTREE_API_ENV"
+  else
+    echo "DIRECT_DATABASE_URL=${WORKTREE_DB_URL}" >> "$WORKTREE_API_ENV"
+  fi
+  info "Created apps/api/.env (DATABASE_URL + DIRECT_DATABASE_URL -> $DB_NAME)"
 else
   warn "No .env found at canonical ($CANONICAL_API_ENV) or main repo ($MAIN_REPO_API_ENV)"
   warn "Creating minimal .env with local defaults..."
   mkdir -p "$(dirname "$WORKTREE_API_ENV")"
   cat > "$WORKTREE_API_ENV" <<EOF
-DATABASE_URL=postgresql://${PG_USER}:${PG_USER}@localhost:${PG_PORT}/${DB_NAME}
+DATABASE_URL=${WORKTREE_DB_URL}
+DIRECT_DATABASE_URL=${WORKTREE_DB_URL}
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=dev-secret-minimum-32-characters-long
 PORT=4000
@@ -111,9 +120,12 @@ EOF
   info "Created apps/api/.env with defaults"
 fi
 
-# packages/database/.env — Prisma needs DATABASE_URL
+# packages/database/.env — Prisma needs both DATABASE_URL and DIRECT_DATABASE_URL
 mkdir -p "$(dirname "$WORKTREE_DB_ENV")"
-echo "DATABASE_URL=postgresql://${PG_USER}:${PG_USER}@localhost:${PG_PORT}/${DB_NAME}" > "$WORKTREE_DB_ENV"
+cat > "$WORKTREE_DB_ENV" <<EOF
+DATABASE_URL=${WORKTREE_DB_URL}
+DIRECT_DATABASE_URL=${WORKTREE_DB_URL}
+EOF
 info "Created packages/database/.env"
 
 # --- Link assets directory ---
