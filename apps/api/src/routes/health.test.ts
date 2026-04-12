@@ -13,6 +13,10 @@ vi.mock('../socket', () => ({
   getIo: vi.fn(() => null),
 }));
 
+vi.mock('../version', () => ({
+  APP_VERSION: '1.2.3-test',
+}));
+
 import {
   checkDatabase,
   checkRedis,
@@ -30,7 +34,6 @@ function buildApp() {
 describe('health router', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.APP_VERSION = '1.2.3-test';
     (isShuttingDown as any).mockReturnValue(false);
   });
 
@@ -131,15 +134,5 @@ describe('health router', () => {
       expect(res.body.dependencies.database).toBe('error');
     });
 
-    it('falls back to "unknown" when APP_VERSION is unset', async () => {
-      delete process.env.APP_VERSION;
-      (checkDatabase as any).mockResolvedValueOnce('ok');
-      (checkRedis as any).mockResolvedValueOnce('ok');
-      (getSocketIoStats as any).mockReturnValueOnce({ connected: 0 });
-
-      const res = await request(buildApp()).get('/health');
-
-      expect(res.body.version).toBe('unknown');
-    });
   });
 });

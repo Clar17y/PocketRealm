@@ -6,6 +6,7 @@ import {
   isShuttingDown,
 } from '../services/healthChecks';
 import { getIo } from '../socket';
+import { APP_VERSION } from '../version';
 
 export const healthRouter = Router();
 
@@ -48,8 +49,7 @@ healthRouter.get('/health', async (_req: Request, res: Response) => {
   res.status(200).json({
     status: degraded ? 'degraded' : 'ok',
     timestamp: new Date().toISOString(),
-    // TODO(#210): switch to canonical apps/api/src/version.ts once Phase 2.4 lands.
-    version: process.env.APP_VERSION ?? 'unknown',
+    version: APP_VERSION,
     uptime: Math.round(process.uptime()),
     dependencies: {
       database,
