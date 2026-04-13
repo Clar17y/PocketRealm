@@ -497,7 +497,7 @@ async function resolveBossRoundInner(
 
   // Optimistic lock: only update if roundNumber hasn't changed
   const updated = await prisma.bossEncounter.updateMany({
-    where: { id: encounterId, roundNumber: encounter.roundNumber },
+    where: { id: encounterId, roundNumber: encounter.roundNumber, status: 'in_progress' },
     data: {
       currentHp: result.bossHpAfter,
       roundNumber: nextRound,
@@ -514,7 +514,7 @@ async function resolveBossRoundInner(
   if (result.bossDefeated) {
     roundTimerRegistry.cancel('bossEncounter', encounterId);
   } else if (!result.allPlayersDead) {
-    roundTimerRegistry.schedule('bossEncounter', encounterId, nextNextRoundAt, () => io);
+    roundTimerRegistry.schedule('bossEncounter', encounterId, nextNextRoundAt, getIo);
   }
 
   // Persist per-participant results

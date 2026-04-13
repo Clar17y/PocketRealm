@@ -164,19 +164,17 @@ createSocketServer(server, isAllowedCorsOrigin);
 
 let stopMetricsLogger: (() => void) | null = null;
 
-async function startServer(): Promise<void> {
-  await roundTimerRegistry.rehydrate(getIo);
-
+function startServer(): void {
   server.listen(PORT, () => {
     logger.info({ port: PORT, version: APP_VERSION }, 'PocketRealm API running');
+    void roundTimerRegistry.rehydrate(getIo).catch((err) => {
+      logger.error({ err }, 'Round timer registry rehydrate failed');
+    });
     stopMetricsLogger = startMetricsLogger(getIo);
   });
 }
 
-void startServer().catch((err) => {
-  logger.error({ err }, 'API startup failed');
-  process.exit(1);
-});
+startServer();
 
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received — shutting down gracefully');

@@ -64,7 +64,7 @@ function scheduleInternal(
         return;
       }
 
-      const backoffMs = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.pow(2, attempts));
+      const backoffMs = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.pow(2, nextAttempts - 1));
       logger.error(
         { err, kind, id, attempts: nextAttempts, backoffMs },
         'Round timer resolver failed; retrying',
@@ -96,9 +96,7 @@ export const roundTimerRegistry = {
       select: { id: true, nextRoundAt: true },
     });
     for (const row of bossRows) {
-      if (row.nextRoundAt) {
-        this.schedule('bossEncounter', row.id, row.nextRoundAt, getIo);
-      }
+      this.schedule('bossEncounter', row.id, row.nextRoundAt!, getIo);
     }
 
     const expRows = await prisma.guildExpedition.findMany({
@@ -109,9 +107,7 @@ export const roundTimerRegistry = {
       select: { id: true, nextRoundAt: true },
     });
     for (const row of expRows) {
-      if (row.nextRoundAt) {
-        this.schedule('guildExpedition', row.id, row.nextRoundAt, getIo);
-      }
+      this.schedule('guildExpedition', row.id, row.nextRoundAt!, getIo);
     }
 
     logger.info(

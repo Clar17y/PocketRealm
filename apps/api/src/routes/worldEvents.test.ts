@@ -58,13 +58,8 @@ describe('worldEvents routes', () => {
 
       expect(checkAndSpawnEvents).toHaveBeenCalledTimes(1);
       expect(checkAndSpawnEvents).toHaveBeenCalledWith(null);
-      expect(expireStaleEvents).toHaveBeenCalledTimes(1);
+      expect(expireStaleEvents).not.toHaveBeenCalled();
       expect(getAllActiveEvents).toHaveBeenCalledTimes(1);
-      expect(
-        (checkAndSpawnEvents as unknown as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0],
-      ).toBeLessThan(
-        (expireStaleEvents as unknown as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0],
-      );
       expect(res.json).toHaveBeenCalledWith({ events });
       expect(next).not.toHaveBeenCalled();
     });

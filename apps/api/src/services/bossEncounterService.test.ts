@@ -47,6 +47,9 @@ vi.mock('./roundTimerRegistry', () => ({
     keys: vi.fn().mockReturnValue([]),
   },
 }));
+vi.mock('../socket', () => ({
+  getIo: vi.fn(() => null),
+}));
 
 vi.mock('@pocketrealm/game-engine', () => ({
   resolveBossRound: vi.fn().mockReturnValue({
@@ -96,6 +99,7 @@ import { logger } from '../logger';
 import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { resolveBossRound as resolveBossRoundEngine, initThreatTable } from '@pocketrealm/game-engine';
 import { roundTimerRegistry } from './roundTimerRegistry';
+import { getIo } from '../socket';
 
 const defaultEngineResult = {
   bossDefeated: false,
@@ -342,7 +346,7 @@ describe('bossEncounterService', () => {
         'bossEncounter',
         'enc-1',
         nextRoundAt,
-        expect.any(Function),
+        getIo,
       );
     });
 
@@ -355,7 +359,7 @@ describe('bossEncounterService', () => {
         'bossEncounter',
         'enc-1',
         expect.any(Date),
-        expect.any(Function),
+        getIo,
       );
     });
 
@@ -628,13 +632,13 @@ describe('bossEncounterService', () => {
 
     // --- Optimistic lock and persistence ---
 
-    it('uses optimistic lock on roundNumber in updateMany', async () => {
+    it('uses optimistic lock on roundNumber and in_progress status in updateMany', async () => {
       setupBasicRound({ roundNumber: 3 });
 
       await resolveBossRound('enc-1', null);
 
       expect(mockPrisma.bossEncounter.updateMany).toHaveBeenCalledWith({
-        where: { id: 'enc-1', roundNumber: 3 },
+        where: { id: 'enc-1', roundNumber: 3, status: 'in_progress' },
         data: expect.objectContaining({
           roundNumber: 4,
           currentHp: 500,

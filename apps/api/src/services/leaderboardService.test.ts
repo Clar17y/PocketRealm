@@ -17,6 +17,7 @@ vi.mock('../redis', () => ({
     hset: vi.fn(),
     del: vi.fn(),
     set: vi.fn(),
+    eval: vi.fn(),
   },
 }));
 
@@ -66,12 +67,17 @@ describe('leaderboardService', () => {
         'leaderboard:refresh_lock',
         'lock-token',
         'PX',
-        60_000,
+        LEADERBOARD_CONSTANTS.REFRESH_LOCK_TTL_MS,
         'NX',
       );
       expect(mockPrisma.pvpRating.findMany).toHaveBeenCalled();
       expect(mockRedis.set).toHaveBeenCalledWith('leaderboard:last_refresh', expect.any(String));
-      expect(mockRedis.del).toHaveBeenCalledWith('leaderboard:refresh_lock');
+      expect(mockRedis.eval).toHaveBeenCalledWith(
+        expect.stringContaining('redis.call("del"'),
+        1,
+        'leaderboard:refresh_lock',
+        'lock-token',
+      );
     });
 
     it('skips refresh when lock cannot be acquired', async () => {
@@ -81,7 +87,7 @@ describe('leaderboardService', () => {
       await ensureLeaderboardsFresh();
 
       expect(mockPrisma.pvpRating.findMany).not.toHaveBeenCalled();
-      expect(mockRedis.del).not.toHaveBeenCalled();
+      expect(mockRedis.eval).not.toHaveBeenCalled();
     });
   });
 

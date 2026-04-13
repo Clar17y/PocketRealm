@@ -362,12 +362,6 @@ async function trySpawnZoneEvent(io: SocketServer | null): Promise<void> {
 }
 
 export async function checkAndSpawnEvents(io: SocketServer | null): Promise<void> {
-  const now = Date.now();
-  if (now - lastRunAt < MIN_INTERVAL_MS) return;
-  lastRunAt = now;
-
-  // Each scheduler step is isolated so a failure in one doesn't skip the rest.
-
   // Step 1: Expire stale events
   try {
     const expired = await expireStaleEvents();
@@ -382,6 +376,12 @@ export async function checkAndSpawnEvents(io: SocketServer | null): Promise<void
   } catch (err) {
     logger.error({ err, step: 'expireStaleEvents' }, 'Scheduler step failed');
   }
+
+  const now = Date.now();
+  if (now - lastRunAt < MIN_INTERVAL_MS) return;
+  lastRunAt = now;
+
+  // Each scheduler step is isolated so a failure in one doesn't skip the rest.
 
   // Step 2: Resolve any due boss rounds
   try {

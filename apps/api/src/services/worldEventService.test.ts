@@ -1,5 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPrisma } from '../__test__/setup';
+import { roundTimerRegistry } from './roundTimerRegistry';
+
+vi.mock('./roundTimerRegistry', () => ({
+  roundTimerRegistry: {
+    schedule: vi.fn(),
+    cancel: vi.fn(),
+    rehydrate: vi.fn(),
+    clearAll: vi.fn(),
+    size: vi.fn().mockReturnValue(0),
+    keys: vi.fn().mockReturnValue([]),
+  },
+}));
+
 import {
   getActiveEventsForZone,
   getActiveWorldWideEvents,
@@ -253,6 +266,36 @@ describe('worldEventService', () => {
         },
         data: { status: 'expired' },
       });
+      expect(mockPrisma.bossEncounter.findMany).not.toHaveBeenCalled();
+      expect(roundTimerRegistry.cancel).not.toHaveBeenCalled();
+    });
+
+    it('expires linked boss encounters and cancels their timers when a boss event goes stale', async () => {
+      mockPrisma.worldEvent.findMany.mockResolvedValue([makeEventRow({ type: 'boss' })]);
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.bossEncounter.findMany.mockResolvedValue([{ id: 'enc-1' }]);
+      mockPrisma.bossEncounter.updateMany.mockResolvedValue({ count: 1 });
+
+      await expireStaleEvents();
+
+      expect(mockPrisma.bossEncounter.findMany).toHaveBeenCalledWith({
+        where: {
+          eventId: { in: ['evt-1'] },
+          status: { in: ['waiting', 'in_progress'] },
+        },
+        select: { id: true },
+      });
+      expect(mockPrisma.bossEncounter.updateMany).toHaveBeenCalledWith({
+        where: {
+          eventId: { in: ['evt-1'] },
+          status: { in: ['waiting', 'in_progress'] },
+        },
+        data: {
+          status: 'expired',
+          nextRoundAt: null,
+        },
+      });
+      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('bossEncounter', 'enc-1');
     });
   });
 

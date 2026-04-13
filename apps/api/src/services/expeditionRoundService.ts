@@ -266,14 +266,19 @@ async function resolveRecruitingWindowForExpedition(
     };
     const nextRoundAt = new Date(Date.now() + getRoundInterval(rooms, 0));
 
-    await prisma.guildExpedition.update({
-      where: { id: exp.id },
+    const updated = await prisma.guildExpedition.updateMany({
+      where: {
+        id: exp.id,
+        status: 'recruiting',
+        nextRoundAt: { lte: now },
+      },
       data: {
         status: 'in_progress',
         roomStartSnapshot: JSON.parse(JSON.stringify(snapshot)),
         nextRoundAt,
       },
     });
+    if (updated.count === 0) return;
     roundTimerRegistry.schedule('guildExpedition', exp.id, nextRoundAt, getIo);
 
     await addGuildLog(
@@ -286,14 +291,19 @@ async function resolveRecruitingWindowForExpedition(
     return;
   }
 
-  await prisma.guildExpedition.update({
-    where: { id: exp.id },
+  const updated = await prisma.guildExpedition.updateMany({
+    where: {
+      id: exp.id,
+      status: 'recruiting',
+      nextRoundAt: { lte: now },
+    },
     data: {
       status: 'failed',
       completedAt: now,
       nextRoundAt: null,
     },
   });
+  if (updated.count === 0) return;
   roundTimerRegistry.cancel('guildExpedition', exp.id);
 
   await addGuildLog(
@@ -439,7 +449,12 @@ export async function resolveExpeditionRound(
     : new Date(Date.now() + getRoundInterval(rooms, expedition.currentRoom));
 
   const updated = await prisma.guildExpedition.updateMany({
-    where: { id: expeditionId, roundNumber: expedition.roundNumber },
+    where: {
+      id: expeditionId,
+      roundNumber: expedition.roundNumber,
+      status: 'in_progress',
+      nextRoundAt: { not: null },
+    },
     data: {
       roundNumber: nextRound,
       roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),
@@ -450,7 +465,7 @@ export async function resolveExpeditionRound(
   if (updated.count === 0) return;
 
   if (nextRoundAt) {
-    roundTimerRegistry.schedule('guildExpedition', expeditionId, nextRoundAt, () => io);
+    roundTimerRegistry.schedule('guildExpedition', expeditionId, nextRoundAt, getIo);
   } else {
     roundTimerRegistry.cancel('guildExpedition', expeditionId);
   }
@@ -521,11 +536,13 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
     throw new AppError(400, 'Room already has rounds resolved — cannot auto-resolve', 'ROUND_IN_PROGRESS');
   }
 
-  await prisma.guildExpedition.update({
-    where: { id: expeditionId },
+  const claimed = await prisma.guildExpedition.updateMany({
+    where: { id: expeditionId, roundNumber: 0, status: 'in_progress' },
     data: { nextRoundAt: null },
   });
-  roundTimerRegistry.cancel('guildExpedition', expeditionId);
+  if (claimed.count === 0) {
+    throw new AppError(409, 'Room was modified by another process', 'CONCURRENT_MODIFICATION');
+  }
 
   const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const currentRoomDef = rooms[expedition.currentRoom];
@@ -622,7 +639,12 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
   const updatedRooms = buildUpdatedRoomMobs(currentRoomDef, mobs, rooms, expedition.currentRoom);
 
   const updated = await prisma.guildExpedition.updateMany({
-    where: { id: expeditionId, roundNumber: 0 },
+    where: {
+      id: expeditionId,
+      roundNumber: 0,
+      status: 'in_progress',
+      nextRoundAt: null,
+    },
     data: {
       roundNumber,
       roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),

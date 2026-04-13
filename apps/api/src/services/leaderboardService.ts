@@ -7,7 +7,7 @@ import { logger } from '../logger';
 
 const LAST_REFRESH_KEY = 'leaderboard:last_refresh';
 const LOCK_KEY = 'leaderboard:refresh_lock';
-const LOCK_TTL_MS = 60_000;
+const RELEASE_LOCK_LUA = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
 
 // ── Paginated fetch helper ───────────────────────────────────────────────────
 
@@ -284,7 +284,13 @@ export async function ensureLeaderboardsFresh(): Promise<void> {
     }
 
     const lockToken = randomUUID();
-    const acquired = await redis.set(LOCK_KEY, lockToken, 'PX', LOCK_TTL_MS, 'NX');
+    const acquired = await redis.set(
+      LOCK_KEY,
+      lockToken,
+      'PX',
+      LEADERBOARD_CONSTANTS.REFRESH_LOCK_TTL_MS,
+      'NX',
+    );
     if (!acquired) {
       return;
     }
@@ -292,10 +298,7 @@ export async function ensureLeaderboardsFresh(): Promise<void> {
     try {
       await refreshAllLeaderboards();
     } finally {
-      const currentLockToken = await redis.get(LOCK_KEY);
-      if (currentLockToken === lockToken) {
-        await redis.del(LOCK_KEY);
-      }
+      await redis.eval(RELEASE_LOCK_LUA, 1, LOCK_KEY, lockToken);
     }
   } catch (err) {
     logger.warn({ err }, 'ensureLeaderboardsFresh failed; serving existing data');

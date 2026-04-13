@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import {
-  expireStaleEvents,
   getAllActiveEvents,
   getActiveEventsForZone,
   getEventById,
@@ -25,7 +24,6 @@ worldEventsRouter.get('/', asyncHandler(async (_req, res) => {
   await checkAndSpawnEvents(getIo()).catch((err) => {
     logger.warn({ err }, 'World events list catch-up failed');
   });
-  await expireStaleEvents();
   const events = await getAllActiveEvents();
   res.json({ events });
 }));

@@ -9,6 +9,7 @@ import {
   type WorldEventType,
 } from '@pocketrealm/shared';
 import { logger } from '../logger';
+import { roundTimerRegistry } from './roundTimerRegistry';
 
 function toWorldEventData(row: {
   id: string;
@@ -313,13 +314,46 @@ export async function expireStaleEvents(): Promise<WorldEventData[]> {
 
   if (stale.length === 0) return [];
 
-  await prisma.worldEvent.updateMany({
-    where: {
-      id: { in: stale.map((e) => e.id) },
-      status: 'active',
-    },
-    data: { status: 'expired' },
-  });
+  const staleIds = stale.map((event) => event.id);
+  const staleBossEventIds = stale
+    .filter((event) => event.type === 'boss')
+    .map((event) => event.id);
+
+  const bossEncountersToCancel = staleBossEventIds.length > 0
+    ? await prisma.bossEncounter.findMany({
+      where: {
+        eventId: { in: staleBossEventIds },
+        status: { in: ['waiting', 'in_progress'] },
+      },
+      select: { id: true },
+    })
+    : [];
+
+  await prisma.$transaction([
+    prisma.worldEvent.updateMany({
+      where: {
+        id: { in: staleIds },
+        status: 'active',
+      },
+      data: { status: 'expired' },
+    }),
+    ...(staleBossEventIds.length > 0
+      ? [prisma.bossEncounter.updateMany({
+        where: {
+          eventId: { in: staleBossEventIds },
+          status: { in: ['waiting', 'in_progress'] },
+        },
+        data: {
+          status: 'expired',
+          nextRoundAt: null,
+        },
+      })]
+      : []),
+  ]);
+
+  for (const encounter of bossEncountersToCancel) {
+    roundTimerRegistry.cancel('bossEncounter', encounter.id);
+  }
 
   return stale.map(toWorldEventData);
 }
