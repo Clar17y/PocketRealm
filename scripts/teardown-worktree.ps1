@@ -29,6 +29,79 @@ function Convert-ToSafeName {
   return ($Name -replace '[^a-zA-Z0-9]', '_').ToLowerInvariant()
 }
 
+function Convert-ToComparablePath {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  return ([System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/') -replace '\\', '/').ToLowerInvariant()
+}
+
+function Get-RegisteredWorktreePaths {
+  return @(
+    (& git worktree list --porcelain) |
+      Where-Object { $_ -like 'worktree *' } |
+      ForEach-Object { Convert-ToComparablePath $_.Substring('worktree '.Length) }
+  )
+}
+
+function Remove-ToolingLeftovers {
+  param([Parameter(Mandatory = $true)][string]$WorktreePath)
+
+  foreach ($relativePath in @('.grepai')) {
+    $leftoverPath = Join-Path $WorktreePath $relativePath
+    if (-not (Test-Path -LiteralPath $leftoverPath)) {
+      continue
+    }
+
+    Write-Info "Removing leftover tooling directory '$relativePath'..."
+    try {
+      Remove-Item -LiteralPath $leftoverPath -Recurse -Force
+    } catch {
+      Write-Warn "Could not fully remove leftover tooling directory '$leftoverPath'"
+    }
+  }
+}
+
+function Remove-WorktreeDirectory {
+  param(
+    [Parameter(Mandatory = $true)][string]$WorktreePath,
+    [Parameter(Mandatory = $true)][string]$Message,
+    [int]$MaxAttempts = 4,
+    [int]$RetryDelayMs = 1000
+  )
+
+  if (-not (Test-Path -LiteralPath $WorktreePath)) {
+    return
+  }
+
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    if ($attempt -eq 1) {
+      Write-Info $Message
+    } else {
+      Write-Info "$Message (attempt $attempt/$MaxAttempts)..."
+    }
+    try {
+      Remove-Item -LiteralPath $WorktreePath -Recurse -Force
+    } catch {
+      if ($attempt -eq $MaxAttempts) {
+        Write-Warn "Could not fully remove $WorktreePath (files may be locked by another process)"
+        Write-Warn "Kill any processes using the directory, then run: Remove-Item -LiteralPath '$WorktreePath' -Recurse -Force"
+        return
+      }
+
+      Start-Sleep -Milliseconds $RetryDelayMs
+      continue
+    }
+
+    if (-not (Test-Path -LiteralPath $WorktreePath)) {
+      return
+    }
+
+    if ($attempt -lt $MaxAttempts) {
+      Start-Sleep -Milliseconds $RetryDelayMs
+    }
+  }
+}
+
 $CommonGitDir = (& git rev-parse --path-format=absolute --git-common-dir).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($CommonGitDir)) {
   throw 'Could not resolve git common directory.'
@@ -56,28 +129,42 @@ if (-not $Yes) {
   }
 }
 
-$worktreeList = (& git worktree list --porcelain) -join "`n"
-if ($worktreeList -match [regex]::Escape($worktreePath)) {
+$normalizedWorktreePath = Convert-ToComparablePath $worktreePath
+
+if ((Get-RegisteredWorktreePaths) -contains $normalizedWorktreePath) {
   Write-Info 'Removing worktree from git...'
   & git worktree remove $worktreePath --force
   if ($LASTEXITCODE -ne 0) {
-    Write-Warn 'git worktree remove failed, pruning stale entry...'
-    & git worktree prune
+    Write-Warn 'git worktree remove failed, removing tooling leftovers and retrying...'
+    Remove-ToolingLeftovers -WorktreePath $worktreePath
+    & git worktree remove $worktreePath --force
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warn 'git worktree remove still failed, pruning stale entry...'
+      & git worktree prune
+    }
   }
 }
 
+Remove-ToolingLeftovers -WorktreePath $worktreePath
+
+Remove-WorktreeDirectory -WorktreePath $worktreePath -Message 'Removing worktree directory...'
+
+# Tooling can recreate local indexes immediately after the first delete pass.
+Start-Sleep -Milliseconds 1000
 if (Test-Path -LiteralPath $worktreePath) {
-  Write-Info 'Removing worktree directory...'
-  try {
-    Remove-Item -LiteralPath $worktreePath -Recurse -Force
-  } catch {
-    Write-Warn "Could not fully remove $worktreePath (files may be locked by another process)"
-    Write-Warn "Kill any processes using the directory, then run: Remove-Item -LiteralPath '$worktreePath' -Recurse -Force"
-  }
+  Remove-ToolingLeftovers -WorktreePath $worktreePath
+  Remove-WorktreeDirectory -WorktreePath $worktreePath -Message 'Retrying worktree directory cleanup...'
 }
 
 & git worktree prune | Out-Null
-Write-Info 'Worktree removed'
+$worktreeStillRegistered = (Get-RegisteredWorktreePaths) -contains $normalizedWorktreePath
+if (Test-Path -LiteralPath $worktreePath) {
+  Write-Warn "Could not fully remove $worktreePath (directory still exists after cleanup)"
+} elseif ($worktreeStillRegistered) {
+  Write-Warn "Worktree '$worktreePath' is still registered after cleanup"
+} else {
+  Write-Info 'Worktree removed'
+}
 
 Write-Info "Dropping database '$dbName'..."
 $dbExists = & docker exec $Container psql -U $PgUser -tc "SELECT 1 FROM pg_database WHERE datname = '$dbName'"
