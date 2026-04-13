@@ -23,6 +23,7 @@ import { getPlayerProgressionState } from './attributesService';
 import { sendPush } from './pushNotificationService';
 import { clearRoomSnapshots } from './expeditionCombatCache';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
+import { getIo } from '../socket';
 import {
   toExpeditionData,
   toExpeditionMemberData,
@@ -33,9 +34,10 @@ import {
   buildUpdatedAttemptLogs,
   setExpeditionCooldowns,
 } from './expeditionHelpers';
+import { roundTimerRegistry } from './roundTimerRegistry';
 
 // Re-export from sub-services so existing importers don't break
-export { checkAndResolveExpeditionRounds, resolveExpeditionRound, autoResolveRoom } from './expeditionRoundService';
+export { checkAndResolveExpeditionRounds, resolveDueExpeditionStep, resolveExpeditionRound, autoResolveRoom } from './expeditionRoundService';
 export type { AutoResolveResult } from './expeditionRoundService';
 export { handleRoomCleared, handleWipe, completeExpedition } from './expeditionTransitionService';
 
@@ -173,6 +175,10 @@ export async function launchExpedition(
 
     return created;
   });
+
+  if (expedition.nextRoundAt) {
+    roundTimerRegistry.schedule('guildExpedition', expedition.id, expedition.nextRoundAt, getIo);
+  }
 
   const guildMembers = await prisma.guildMember.findMany({
     where: { guildId },
@@ -319,15 +325,18 @@ export async function forceStartExpedition(
     mobs: rooms[0]?.mobs ?? [],
     members: await getMembers(expeditionId),
   };
+  const nextRoundAt = new Date(Date.now() + getRoundInterval(rooms, 0));
 
   await prisma.guildExpedition.update({
     where: { id: expeditionId },
     data: {
       status: 'in_progress',
       roomStartSnapshot: JSON.parse(JSON.stringify(snapshot)),
-      nextRoundAt: new Date(Date.now() + getRoundInterval(rooms, 0)),
+      nextRoundAt,
     },
   });
+
+  roundTimerRegistry.schedule('guildExpedition', expeditionId, nextRoundAt, getIo);
 
   await addGuildLog(
     expedition.guildId,
@@ -424,6 +433,7 @@ export async function abandonExpedition(expeditionId: string, playerId: string):
       nextRoundAt: null,
     },
   });
+  roundTimerRegistry.cancel('guildExpedition', expeditionId);
 
   await addGuildLog(
     expedition.guildId,

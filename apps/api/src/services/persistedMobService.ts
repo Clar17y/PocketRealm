@@ -30,6 +30,13 @@ export async function persistMobHp(
   currentHp: number,
   maxHp: number,
 ): Promise<void> {
+  if (currentHp >= maxHp) {
+    await prisma.persistedMob.deleteMany({
+      where: { playerId, mobTemplateId, zoneId },
+    });
+    return;
+  }
+
   // Upsert: one persisted mob per player per mob template per zone
   const existing = await prisma.persistedMob.findFirst({
     where: { playerId, mobTemplateId, zoneId },
@@ -57,17 +64,17 @@ export async function checkPersistedMobReencounter(
   });
   if (!row) return null;
 
-  // Roll for reencounter
-  if (Math.random() > WORLD_EVENT_CONSTANTS.PERSISTED_MOB_REENCOUNTER_CHANCE) {
-    return null;
-  }
-
   const now = new Date();
   const regenHp = calculatePersistedMobHp(row.currentHp, row.maxHp, row.damagedAt, now);
 
-  // If fully healed, remove the persisted record
+  // Fully healed mobs are no longer eligible for persisted reencounters.
   if (regenHp >= row.maxHp) {
     await prisma.persistedMob.delete({ where: { id: row.id } });
+    return null;
+  }
+
+  // Roll for reencounter
+  if (Math.random() > WORLD_EVENT_CONSTANTS.PERSISTED_MOB_REENCOUNTER_CHANCE) {
     return null;
   }
 

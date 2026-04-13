@@ -4,6 +4,16 @@ import { GUILD_CONSTANTS } from '@pocketrealm/shared';
 vi.mock('../redis', () => ({
   redis: { get: vi.fn().mockResolvedValue(null), set: vi.fn(), del: vi.fn() },
 }));
+vi.mock('./roundTimerRegistry', () => ({
+  roundTimerRegistry: {
+    schedule: vi.fn(),
+    cancel: vi.fn(),
+    rehydrate: vi.fn(),
+    clearAll: vi.fn(),
+    size: vi.fn().mockReturnValue(0),
+    keys: vi.fn().mockReturnValue([]),
+  },
+}));
 
 import { mockPrisma } from '../__test__/setup';
 import {
@@ -19,6 +29,7 @@ import {
   disbandGuild,
 } from './guildMembershipService';
 import { calculateMaxMembers } from './guildService';
+import { roundTimerRegistry } from './roundTimerRegistry';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -807,5 +818,27 @@ describe('disbandGuild', () => {
     expect(mockPrisma.guild.delete).toHaveBeenCalledWith({
       where: { id: 'g1' },
     });
+  });
+
+  it('cancels timers for every active or recruiting expedition owned by the guild', async () => {
+    mockPrisma.guildMember.findUnique.mockResolvedValue({
+      guildId: 'g1', playerId: 'leader1', role: 'leader', guild: { id: 'g1' },
+    });
+    mockPrisma.guildExpedition.findMany.mockResolvedValue([
+      { id: 'exp-a' },
+      { id: 'exp-b' },
+    ]);
+
+    await disbandGuild('leader1', 'g1');
+
+    expect(mockPrisma.guildExpedition.findMany).toHaveBeenCalledWith({
+      where: {
+        guildId: 'g1',
+        status: { in: ['recruiting', 'in_progress'] },
+      },
+      select: { id: true },
+    });
+    expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('guildExpedition', 'exp-a');
+    expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('guildExpedition', 'exp-b');
   });
 });

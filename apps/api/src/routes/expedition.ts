@@ -27,6 +27,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
 import { paginationSchema, buildPagination } from '../utils/routeHelpers';
 import { EXPEDITION_THEMES } from '@pocketrealm/shared';
+import { getIo } from '../socket';
 
 export const expeditionRouter = Router();
 expeditionRouter.use(authenticate);
@@ -58,7 +59,7 @@ expeditionRouter.get('/active', asyncHandler(async (req, res) => {
   }
 
   // Resolve any due rounds before returning data (same pattern as boss routes)
-  await checkAndResolveExpeditionRounds(null);
+  await checkAndResolveExpeditionRounds(getIo());
 
   const expedition = await getActiveExpedition(membership.guildId);
   res.json({ expedition });
@@ -152,7 +153,7 @@ expeditionRouter.get('/:id', asyncHandler(async (req, res) => {
   const { id } = expeditionIdSchema.parse(req.params);
 
   // Resolve any due rounds before returning data
-  await checkAndResolveExpeditionRounds(null);
+  await checkAndResolveExpeditionRounds(getIo());
 
   const data = await getExpeditionStatus(id);
   if (!data) {
@@ -238,7 +239,7 @@ expeditionRouter.post('/:id/force-round', asyncHandler(async (req, res) => {
   }
 
   // Resolve this expedition's round directly (skip timer — that's the point of force-round)
-  await resolveExpeditionRound(id, null);
+  await resolveExpeditionRound(id, getIo());
 
   // Fetch updated state
   const updated = await prisma.guildExpedition.findUnique({

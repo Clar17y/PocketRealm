@@ -20,7 +20,9 @@ import { createEmailVerificationToken, verifyEmailToken, createPasswordResetToke
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
 import { recordFailedLogin, isLockedOut, clearLockout, checkEmailRateLimit } from '../services/lockoutService';
 import { verifyPlayerEmail, changePlayerEmail, changePlayerPassword } from '../services/authService';
+import { checkAndSpawnEvents } from '../services/eventSchedulerService';
 import { logger } from '../logger';
+import { getIo } from '../socket';
 
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
@@ -176,14 +178,22 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   const accessToken = generateAccessToken(payload);
   const refreshToken = generateRefreshToken(payload);
 
-  // Store refresh token
-  await prisma.refreshToken.create({
-    data: {
-      playerId: player.id,
-      token: refreshToken,
-      expiresAt: refreshTokenExpiresAt(now.getTime()),
-    },
-  });
+  // Store refresh token and opportunistically clear expired sessions.
+  await prisma.$transaction([
+    prisma.refreshToken.deleteMany({
+      where: {
+        playerId: player.id,
+        expiresAt: { lt: now },
+      },
+    }),
+    prisma.refreshToken.create({
+      data: {
+        playerId: player.id,
+        token: refreshToken,
+        expiresAt: refreshTokenExpiresAt(now.getTime()),
+      },
+    }),
+  ]);
 
   logger.info({ playerId: player.id, username: player.username }, 'Player registered');
 
@@ -247,14 +257,22 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
   const accessToken = generateAccessToken(payload);
   const refreshToken = generateRefreshToken(payload);
 
-  // Store refresh token
-  await prisma.refreshToken.create({
-    data: {
-      playerId: player.id,
-      token: refreshToken,
-      expiresAt: refreshTokenExpiresAt(now.getTime()),
-    },
-  });
+  // Store refresh token and opportunistically clear expired sessions.
+  await prisma.$transaction([
+    prisma.refreshToken.deleteMany({
+      where: {
+        playerId: player.id,
+        expiresAt: { lt: now },
+      },
+    }),
+    prisma.refreshToken.create({
+      data: {
+        playerId: player.id,
+        token: refreshToken,
+        expiresAt: refreshTokenExpiresAt(now.getTime()),
+      },
+    }),
+  ]);
 
   logger.info({ playerId: player.id, username: player.username }, 'Player logged in');
 
@@ -268,6 +286,10 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
     },
     accessToken,
     refreshToken,
+  });
+
+  void checkAndSpawnEvents(getIo()).catch((err) => {
+    logger.warn({ err, playerId: player.id }, 'Post-login world event catch-up failed');
   });
 }));
 
@@ -309,6 +331,12 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
 
   // Store new refresh token and keep activity timestamp fresh.
   await prisma.$transaction([
+    prisma.refreshToken.deleteMany({
+      where: {
+        playerId: payload.playerId,
+        expiresAt: { lt: now },
+      },
+    }),
     prisma.refreshToken.create({
       data: {
         playerId: payload.playerId,
@@ -325,6 +353,10 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
   res.json({
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
+  });
+
+  void checkAndSpawnEvents(getIo()).catch((err) => {
+    logger.warn({ err, playerId: payload.playerId }, 'Post-refresh world event catch-up failed');
   });
 }));
 

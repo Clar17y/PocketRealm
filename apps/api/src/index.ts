@@ -11,7 +11,7 @@ import 'dotenv/config';
 import compression from 'compression';
 import helmet from 'helmet';
 import { createEndpointLimiter } from './middleware/rateLimiter';
-import { RATE_LIMIT_CONSTANTS, AUTH_CONSTANTS } from '@pocketrealm/shared';
+import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
 import { authRouter } from './routes/auth';
 import { turnsRouter } from './routes/turns';
 import { playerRouter } from './routes/player';
@@ -51,12 +51,8 @@ import { logger } from './logger';
 import { APP_VERSION } from './version';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
-import { cleanupFullyHealedMobs } from './services/persistedMobService';
-import { refreshAllLeaderboards } from './services/leaderboardService';
-import { startRoundResolutionScheduler } from './services/roundResolutionScheduler';
 import { startMetricsLogger } from './services/metricsLogger';
-import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
-import { cleanupExpiredTokens } from './services/authTokenService';
+import { roundTimerRegistry } from './services/roundTimerRegistry';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -180,38 +176,17 @@ createSocketServer(server, isAllowedCorsOrigin);
 
 let stopMetricsLogger: (() => void) | null = null;
 
-server.listen(PORT, () => {
-  logger.info({ port: PORT, version: APP_VERSION }, 'PocketRealm API running');
-
-  // Adaptive round resolution: ticks every 5s when bosses/expeditions are
-  // active, idles at 60s otherwise.
-  startRoundResolutionScheduler(getIo);
-  stopMetricsLogger = startMetricsLogger(getIo);
-
-  // Persisted mob cleanup timer (every 5 minutes)
-  setInterval(() => {
-    cleanupFullyHealedMobs().catch((err) => {
-      logger.error({ err }, 'Persisted mob cleanup error');
+function startServer(): void {
+  server.listen(PORT, () => {
+    logger.info({ port: PORT, version: APP_VERSION }, 'PocketRealm API running');
+    void roundTimerRegistry.rehydrate(getIo).catch((err) => {
+      logger.error({ err }, 'Round timer registry rehydrate failed');
     });
-  }, 300_000);
-
-  // Leaderboard refresh (every 15 minutes)
-  refreshAllLeaderboards().catch((err) => {
-    logger.error({ err }, 'Initial leaderboard refresh error');
+    stopMetricsLogger = startMetricsLogger(getIo);
   });
-  setInterval(() => {
-    refreshAllLeaderboards().catch((err) => {
-      logger.error({ err }, 'Leaderboard refresh error');
-    });
-  }, LEADERBOARD_CONSTANTS.REFRESH_INTERVAL_MS);
+}
 
-  // Auth token cleanup (every 6 hours)
-  setInterval(() => {
-    cleanupExpiredTokens().catch((err) => {
-      logger.error({ err }, 'Auth token cleanup error');
-    });
-  }, AUTH_CONSTANTS.TOKEN_CLEANUP_INTERVAL_MS);
-});
+startServer();
 
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received — shutting down gracefully');

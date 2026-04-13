@@ -11,11 +11,19 @@ Turn-based async RPG with real-time turn regeneration. Players explore, fight mo
 **All work MUST be done in git worktrees.** Do not work directly in the main clone.
 
 ```bash
-./scripts/setup-worktree.sh feature-branch-name      # Create worktree + DB + deps
+# Windows PowerShell 7 (preferred for local Codex sessions)
+.\scripts\setup-worktree.ps1 feature-branch-name        # Create worktree + DB + deps
+.\scripts\setup-worktree.ps1 feature-branch-name -NoSeed
+.\scripts\teardown-worktree.ps1 feature-branch-name     # Remove worktree + drop DB + branch
+.\scripts\teardown-worktree.ps1 feature-branch-name -KeepBranch
+.\scripts\teardown-worktree.ps1 feature-branch-name -Yes # Non-interactive
+
+# Git Bash / Unix
+./scripts/setup-worktree.sh feature-branch-name
 ./scripts/setup-worktree.sh feature-branch-name --no-seed
-./scripts/teardown-worktree.sh feature-branch-name    # Remove worktree + drop DB
+./scripts/teardown-worktree.sh feature-branch-name
 ./scripts/teardown-worktree.sh feature-branch-name --keep-branch
-./scripts/teardown-worktree.sh feature-branch-name -y # Non-interactive
+./scripts/teardown-worktree.sh feature-branch-name -y
 ```
 
 Each worktree gets its own PostgreSQL database (`pocketrealm_<branch_name>`).

@@ -20,6 +20,23 @@ describe('persistedMobService', () => {
   });
 
   describe('persistMobHp', () => {
+    it('deletes matching persisted mobs when currentHp is fully recovered', async () => {
+      mockPrisma.persistedMob.deleteMany.mockResolvedValue({ count: 1 });
+
+      await persistMobHp('player-1', 'mob-1', 'zone-1', 100, 100);
+
+      expect(mockPrisma.persistedMob.deleteMany).toHaveBeenCalledWith({
+        where: {
+          playerId: 'player-1',
+          mobTemplateId: 'mob-1',
+          zoneId: 'zone-1',
+        },
+      });
+      expect(mockPrisma.persistedMob.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.persistedMob.create).not.toHaveBeenCalled();
+      expect(mockPrisma.persistedMob.update).not.toHaveBeenCalled();
+    });
+
     it('creates a new persisted mob when none exists', async () => {
       mockPrisma.persistedMob.findFirst.mockResolvedValue(null);
       mockPrisma.persistedMob.create.mockResolvedValue({});
@@ -122,6 +139,31 @@ describe('persistedMobService', () => {
       });
 
       vi.spyOn(Math, 'random').mockRestore();
+    });
+
+    it('deletes a fully regenerated mob before rolling reencounter', async () => {
+      mockPrisma.persistedMob.findFirst.mockResolvedValue({
+        id: 'pm-1',
+        playerId: 'p-1',
+        mobTemplateId: 'm-1',
+        zoneId: 'z-1',
+        currentHp: 5,
+        maxHp: 100,
+        damagedAt: new Date(Date.now() - 10 * 60 * 1000),
+      });
+
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
+      mockCalcHp.mockReturnValue(100);
+
+      const result = await checkPersistedMobReencounter('p-1', 'z-1', 'm-1');
+
+      expect(result).toBeNull();
+      expect(mockPrisma.persistedMob.delete).toHaveBeenCalledWith({
+        where: { id: 'pm-1' },
+      });
+      expect(randomSpy).not.toHaveBeenCalled();
+
+      randomSpy.mockRestore();
     });
   });
 
