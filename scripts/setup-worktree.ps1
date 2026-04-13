@@ -71,11 +71,6 @@ function Convert-ToSafeName {
   return ($Name -replace '[^a-zA-Z0-9]', '_').ToLowerInvariant()
 }
 
-function Get-BranchLeaf {
-  param([Parameter(Mandatory = $true)][string]$Name)
-  return ($Name -split '[/\\]')[-1]
-}
-
 $CommonGitDir = (& git rev-parse --path-format=absolute --git-common-dir).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($CommonGitDir)) {
   throw 'Could not resolve git common directory.'
@@ -94,8 +89,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $safeName = Convert-ToSafeName $Branch
 $dbName = "pocketrealm_$safeName"
-$branchLeaf = Get-BranchLeaf $Branch
-$worktreeDir = Join-Path '.worktrees' "pocketrealm-$branchLeaf"
+$worktreeDir = Join-Path '.worktrees' "pocketrealm-$safeName"
 $worktreePath = Join-Path $RepoRoot $worktreeDir
 $worktreeDbUrl = "postgresql://${PgUser}:${PgUser}@localhost:${PgPort}/${dbName}"
 
