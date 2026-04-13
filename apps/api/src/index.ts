@@ -45,7 +45,6 @@ import { logger } from './logger';
 import { APP_VERSION } from './version';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
-import { cleanupFullyHealedMobs } from './services/persistedMobService';
 import { refreshAllLeaderboards } from './services/leaderboardService';
 import { startMetricsLogger } from './services/metricsLogger';
 import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
@@ -175,13 +174,6 @@ server.listen(PORT, () => {
     logger.error({ err }, 'Round timer registry rehydrate error');
   });
   stopMetricsLogger = startMetricsLogger(getIo);
-
-  // Persisted mob cleanup timer (every 5 minutes)
-  setInterval(() => {
-    cleanupFullyHealedMobs().catch((err) => {
-      logger.error({ err }, 'Persisted mob cleanup error');
-    });
-  }, 300_000);
 
   // Leaderboard refresh (every 15 minutes)
   refreshAllLeaderboards().catch((err) => {
