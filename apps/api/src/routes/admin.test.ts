@@ -281,6 +281,63 @@ describe('admin routes', () => {
     });
   });
 
+  describe('GET /scheduler-status', () => {
+    it('returns registry size and DB counts', async () => {
+      mockPrisma.bossEncounter.count.mockResolvedValue(1);
+      mockPrisma.guildExpedition.count.mockResolvedValue(2);
+      (roundTimerRegistry.size as unknown as ReturnType<typeof vi.fn>).mockReturnValue(3);
+      (roundTimerRegistry.keys as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+        'bossEncounter:enc-1',
+        'guildExpedition:exp-1',
+        'guildExpedition:exp-2',
+      ]);
+
+      const req = { player: { playerId: 'p1' } } as any;
+      const res = mockRes();
+      const handler = findHandler('get', '/scheduler-status');
+      await handler(req, res, vi.fn());
+
+      expect(mockPrisma.bossEncounter.count).toHaveBeenCalledWith({
+        where: { status: 'in_progress', nextRoundAt: { not: null } },
+      });
+      expect(mockPrisma.guildExpedition.count).toHaveBeenCalledWith({
+        where: {
+          status: { in: ['recruiting', 'in_progress'] },
+          nextRoundAt: { not: null },
+        },
+      });
+      expect(res.json).toHaveBeenCalledWith({
+        pendingTimers: 3,
+        timerKeys: ['bossEncounter:enc-1', 'guildExpedition:exp-1', 'guildExpedition:exp-2'],
+        pendingBossEncounters: 1,
+        pendingGuildExpeditions: 2,
+        pendingEnumeratedFromDb: 3,
+        hasDrift: false,
+      });
+    });
+
+    it('reports drift when registry disagrees with DB counts', async () => {
+      mockPrisma.bossEncounter.count.mockResolvedValue(1);
+      mockPrisma.guildExpedition.count.mockResolvedValue(1);
+      (roundTimerRegistry.size as unknown as ReturnType<typeof vi.fn>).mockReturnValue(0);
+      (roundTimerRegistry.keys as unknown as ReturnType<typeof vi.fn>).mockReturnValue([]);
+
+      const req = { player: { playerId: 'p1' } } as any;
+      const res = mockRes();
+      const handler = findHandler('get', '/scheduler-status');
+      await handler(req, res, vi.fn());
+
+      expect(res.json).toHaveBeenCalledWith({
+        pendingTimers: 0,
+        timerKeys: [],
+        pendingBossEncounters: 1,
+        pendingGuildExpeditions: 1,
+        pendingEnumeratedFromDb: 2,
+        hasDrift: true,
+      });
+    });
+  });
+
   describe('POST /zones/teleport', () => {
     it('teleports player to target zone', async () => {
       mockPrisma.zone.findUniqueOrThrow.mockResolvedValue({ id: 'z1' });

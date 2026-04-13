@@ -828,6 +828,32 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
 
 // ---------- Analytics ----------
 
+router.get('/scheduler-status', asyncHandler(async (_req, res) => {
+  const [pendingBossEncounters, pendingGuildExpeditions] = await Promise.all([
+    prisma.bossEncounter.count({
+      where: { status: 'in_progress', nextRoundAt: { not: null } },
+    }),
+    prisma.guildExpedition.count({
+      where: {
+        status: { in: ['recruiting', 'in_progress'] },
+        nextRoundAt: { not: null },
+      },
+    }),
+  ]);
+
+  const pendingTimers = roundTimerRegistry.size();
+  const pendingEnumeratedFromDb = pendingBossEncounters + pendingGuildExpeditions;
+
+  res.json({
+    pendingTimers,
+    timerKeys: roundTimerRegistry.keys(),
+    pendingBossEncounters,
+    pendingGuildExpeditions,
+    pendingEnumeratedFromDb,
+    hasDrift: pendingTimers !== pendingEnumeratedFromDb,
+  });
+}));
+
 const balancePeriodSchema = z.object({
   period: z.enum(['1h', '24h', '7d', '30d']).default('7d'),
 });
