@@ -35,6 +35,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pocketrealm_ci
+      DIRECT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pocketrealm_ci
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: ci-test-secret-that-is-at-least-32-chars
       NODE_ENV: test

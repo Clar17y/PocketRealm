@@ -37,9 +37,12 @@ import { expeditionRouter } from './routes/expedition';
 import { shopRouter } from './routes/shop';
 import { friendsRouter } from './routes/friends';
 import { notificationsRouter } from './routes/notifications';
+import { healthRouter } from './routes/health';
+import { markShuttingDown } from './services/healthChecks';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { logger } from './logger';
+import { APP_VERSION } from './version';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
@@ -122,10 +125,8 @@ app.use('/api/v1/', createEndpointLimiter('global', RATE_LIMIT_CONSTANTS.DEFAULT
   skip: (req) => req.method === 'OPTIONS',
 }));
 
-// Health check
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Health / readiness / liveness checks (see docs/reference/deployment.md)
+app.use(healthRouter);
 
 // API routes
 app.use('/api/v1/auth', authRouter);
@@ -168,7 +169,7 @@ createSocketServer(server, isAllowedCorsOrigin);
 let stopMetricsLogger: (() => void) | null = null;
 
 server.listen(PORT, () => {
-  logger.info({ port: PORT }, 'PocketRealm API running');
+  logger.info({ port: PORT, version: APP_VERSION }, 'PocketRealm API running');
 
   // Adaptive round resolution: ticks every 5s when bosses/expeditions are
   // active, idles at 60s otherwise.
@@ -202,6 +203,9 @@ server.listen(PORT, () => {
 
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received — shutting down gracefully');
+  // Flip /health/ready to 503 before closing anything so the load balancer
+  // drains traffic during the graceful-shutdown window.
+  markShuttingDown();
   stopMetricsLogger?.();
   const io = getIo();
   if (io) io.close();
