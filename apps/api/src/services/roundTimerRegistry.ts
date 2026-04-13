@@ -18,6 +18,7 @@ const timers = new Map<string, Entry>();
 
 const RETRY_BASE_MS = 5_000;
 const RETRY_MAX_MS = 5 * 60_000;
+const MAX_RETRY_ATTEMPTS = 3;
 
 function key(kind: ScheduledRoundKind, id: string): string {
   return `${kind}:${id}`;
@@ -55,6 +56,14 @@ function scheduleInternal(
       await resolveFor(kind, id, getIo());
     } catch (err) {
       const nextAttempts = attempts + 1;
+      if (nextAttempts >= MAX_RETRY_ATTEMPTS) {
+        logger.error(
+          { err, kind, id, attempts: nextAttempts },
+          'Round timer resolver failed; giving up',
+        );
+        return;
+      }
+
       const backoffMs = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.pow(2, attempts));
       logger.error(
         { err, kind, id, attempts: nextAttempts, backoffMs },

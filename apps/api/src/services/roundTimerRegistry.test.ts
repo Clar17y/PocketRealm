@@ -8,6 +8,13 @@ vi.mock('@pocketrealm/database', () => ({
   },
 }));
 
+vi.mock('../logger', () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 vi.mock('./bossEncounterService', () => ({
   resolveDueBossEncounter: vi.fn().mockResolvedValue(undefined),
 }));
@@ -85,5 +92,76 @@ describe('roundTimerRegistry', () => {
     roundTimerRegistry.schedule('guildExpedition', 'exp-1', new Date(Date.now() + 1000), noIo);
     expect(roundTimerRegistry.size()).toBe(2);
     expect(roundTimerRegistry.keys().sort()).toEqual(['bossEncounter:boss-1', 'guildExpedition:exp-1']);
+  });
+});
+
+describe('roundTimerRegistry.rehydrate', () => {
+  const noIo = () => null;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    roundTimerRegistry.clearAll();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('rehydrates pending boss and expedition rows from DB', async () => {
+    const { prisma } = await import('@pocketrealm/database');
+    const { resolveDueBossEncounter } = (await import('./bossEncounterService.js')) as any;
+    const { resolveDueExpeditionStep } = (await import('./expeditionRoundService.js')) as any;
+
+    const futureBoss = new Date(Date.now() + 5_000);
+    const pastExp = new Date(Date.now() - 1_000);
+    (prisma.bossEncounter.findMany as any).mockResolvedValueOnce([
+      { id: 'boss-future', nextRoundAt: futureBoss },
+    ]);
+    (prisma.guildExpedition.findMany as any).mockResolvedValueOnce([
+      { id: 'exp-past', nextRoundAt: pastExp },
+    ]);
+
+    await roundTimerRegistry.rehydrate(noIo);
+    expect(roundTimerRegistry.size()).toBe(2);
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(resolveDueExpeditionStep).toHaveBeenCalledWith('exp-past', null);
+
+    expect(resolveDueBossEncounter).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(resolveDueBossEncounter).toHaveBeenCalledWith('boss-future', null);
+  });
+
+  it('resolver error triggers bounded backoff retry', async () => {
+    const { resolveDueBossEncounter } = (await import('./bossEncounterService.js')) as any;
+    (resolveDueBossEncounter as any)
+      .mockRejectedValueOnce(new Error('transient'))
+      .mockResolvedValueOnce(undefined);
+
+    roundTimerRegistry.schedule('bossEncounter', 'boss-retry', new Date(Date.now() + 100), noIo);
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(resolveDueBossEncounter).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(resolveDueBossEncounter).toHaveBeenCalledTimes(2);
+    expect(roundTimerRegistry.size()).toBe(0);
+  });
+
+  it('resolver error gives up after MAX_RETRY_ATTEMPTS', async () => {
+    const { resolveDueBossEncounter } = (await import('./bossEncounterService.js')) as any;
+    (resolveDueBossEncounter as any).mockRejectedValue(new Error('permanent'));
+
+    roundTimerRegistry.schedule('bossEncounter', 'boss-dead', new Date(Date.now() + 100), noIo);
+
+    await vi.advanceTimersByTimeAsync(100);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(resolveDueBossEncounter).toHaveBeenCalledTimes(3);
+    expect(roundTimerRegistry.size()).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(resolveDueBossEncounter).toHaveBeenCalledTimes(3);
   });
 });
