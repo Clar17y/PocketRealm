@@ -44,8 +44,9 @@ interface UseTravelActionsParams {
   advanceTutorial: (fromStep: number) => void | Promise<void>;
   refreshCraftingRecipes: () => Promise<void>;
   loadAll: () => Promise<void>;
-  pendingLootSession: { sessionId: string } | null;
+  pendingLootSession: { sessionId: string; sessionIds: string[] } | null;
   clearPendingLootSession: () => void;
+  reloadPendingLootSession: (sessionIds?: string[]) => Promise<void>;
   pendingLootQueueRef: React.MutableRefObject<string[]>;
   activateNextQueuedLoot: () => Promise<void>;
   logDurabilityWarnings: (losses: Array<{
@@ -71,6 +72,7 @@ export function useTravelActions({
   loadAll,
   pendingLootSession,
   clearPendingLootSession,
+  reloadPendingLootSession,
   pendingLootQueueRef,
   activateNextQueuedLoot,
   logDurabilityWarnings,
@@ -213,8 +215,11 @@ export function useTravelActions({
     await completeQueuedTravelRoute();
   };
 
-  const handleTravelToZone = async (id: string) => {
-    if (pendingLootSession) {
+  const beginTravelToZone = async (
+    id: string,
+    options: { ignorePendingLoot?: boolean } = {},
+  ) => {
+    if (pendingLootSession && !options.ignorePendingLoot) {
       setConfirmAbandonLoot({ travelZoneId: id });
       return;
     }
@@ -241,6 +246,10 @@ export function useTravelActions({
     await runAction('travel', async () => {
       await executeNextTravelHop();
     });
+  };
+
+  const handleTravelToZone = async (id: string) => {
+    await beginTravelToZone(id);
   };
 
   const handleTravelPlaybackComplete = async () => {
@@ -303,12 +312,24 @@ export function useTravelActions({
     if (!confirmAbandonLoot) return;
     const zoneId = confirmAbandonLoot.travelZoneId;
     if (pendingLootSession) {
-      await claimLoot(pendingLootSession.sessionId, []).catch(() => {});
+      for (const [sessionIndex, sessionId] of pendingLootSession.sessionIds.entries()) {
+        const res = await claimLoot(sessionId, []);
+        if (!res.data && res.error?.code !== 'LOOT_EXPIRED') {
+          setConfirmAbandonLoot(null);
+          try {
+            await reloadPendingLootSession(pendingLootSession.sessionIds.slice(sessionIndex));
+          } catch {
+            // Keep the locally preserved retry state and surface the original discard error.
+          }
+          setActionError(res.error?.message ?? 'Discarding overflow loot failed');
+          return;
+        }
+      }
       clearPendingLootSession();
     }
     pendingLootQueueRef.current = [];
     setConfirmAbandonLoot(null);
-    await handleTravelToZone(zoneId);
+    await beginTravelToZone(zoneId, { ignorePendingLoot: true });
   };
 
   return {

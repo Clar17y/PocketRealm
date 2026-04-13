@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { getSocket } from '@/lib/socket';
+import { useApiReachable } from './useApiReachable';
 
 export type ConnectionState = 'connected' | 'disconnected' | 'reconnecting' | 'failed';
 
 export function useConnectionStatus(): ConnectionState {
+  const apiReachable = useApiReachable();
   const [state, setState] = useState<ConnectionState>(() => {
     if (typeof window === 'undefined') return 'disconnected';
     return getSocket().connected ? 'connected' : 'disconnected';
@@ -32,6 +34,10 @@ export function useConnectionStatus(): ConnectionState {
       socket.io.off('reconnect_failed', onReconnectFailed);
     };
   }, []);
+
+  if (!apiReachable && state === 'connected') {
+    return 'disconnected';
+  }
 
   return state;
 }

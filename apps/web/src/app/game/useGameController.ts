@@ -82,7 +82,6 @@ import { useAchievements } from './hooks/useAchievements';
 import { useQuests } from './hooks/useQuests';
 import { useCombatPlayback } from './hooks/useCombatPlayback';
 import { runSimpleAction } from './simpleAction';
-import { useApiReachable } from '@/hooks/useApiReachable';
 import { useConnectionStatus } from '@/hooks/useConnectionStatus';
 import { useInventoryActions } from './hooks/useInventoryActions';
 import { useLootActions } from './hooks/useLootActions';
@@ -193,11 +192,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const { refreshPendingEncounters, pendingEncounters } = encounterSites;
   const [lastCombat, setLastCombat] = useState<LastCombat | null>(null);
   const connectionStatus = useConnectionStatus();
-  const apiReachable = useApiReachable();
-  const isOffline = !apiReachable
-    || connectionStatus === 'disconnected'
-    || connectionStatus === 'reconnecting'
-    || connectionStatus === 'failed';
+  const isOffline = connectionStatus !== 'connected';
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [slowAction, setSlowAction] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -770,6 +765,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     refreshCraftingRecipes, loadAll,
     pendingLootSession: loot.pendingLootSession,
     clearPendingLootSession: () => loot.setPendingLootSession(null),
+    reloadPendingLootSession: loot.reloadPendingLootSession,
     pendingLootQueueRef,
     activateNextQueuedLoot: loot.activateNextQueuedLoot,
     logDurabilityWarnings: explorationActions.logDurabilityWarnings,

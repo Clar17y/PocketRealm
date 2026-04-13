@@ -1,6 +1,7 @@
 'use client';
 
 import { Component, type ReactNode } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 interface Props {
   children: ReactNode;
@@ -21,24 +22,31 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
-    console.error('ErrorBoundary caught:', error, info.componentStack);
+    Sentry.captureException(error, {
+      extra: {
+        componentStack: info.componentStack,
+      },
+    });
   }
 
   render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <div style={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#0c0a08',
-          color: '#e8e8e0',
-          fontFamily: 'serif',
-          padding: '2rem',
-          textAlign: 'center',
-        }}>
+        <div
+          role="alert"
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#0c0a08',
+            color: '#e8e8e0',
+            fontFamily: 'serif',
+            padding: '2rem',
+            textAlign: 'center',
+          }}
+        >
           <h1 style={{ color: '#d4a84b', fontSize: '1.5rem', marginBottom: '1rem' }}>
             Something went wrong
           </h1>
