@@ -42,6 +42,8 @@ import { parseBossEffects, parseBossRoundSummaries, parseBossRewardsByPlayer } f
 import { sendPush } from './pushNotificationService';
 import { validateEnum } from '../utils/validateEnum';
 import { addGuildXp } from './guildService';
+import { roundTimerRegistry } from './roundTimerRegistry';
+import { getIo } from '../socket';
 
 const VALID_ENCOUNTER_STATUSES = new Set<BossEncounterStatus>(['waiting', 'in_progress', 'defeated', 'expired']);
 const VALID_PARTICIPANT_STATUSES = new Set<BossParticipantStatus>(['alive', 'knocked_out']);
@@ -277,6 +279,9 @@ export async function signUpForBossRound(
       where: { id: encounterId },
       data: { status: 'in_progress' },
     });
+    if (encounter.nextRoundAt) {
+      roundTimerRegistry.schedule('bossEncounter', encounterId, encounter.nextRoundAt, getIo);
+    }
   }
 
   return toBossParticipantData(row);
@@ -463,6 +468,7 @@ async function resolveBossRoundInner(
   const newSummaries = [...existingSummaries, roundSummary];
 
   const nextNextRoundAt = new Date(Date.now() + WORLD_EVENT_CONSTANTS.BOSS_ROUND_INTERVAL_MINUTES * 60 * 1000);
+  const shouldKeepScheduling = !result.bossDefeated && !result.allPlayersDead;
 
   // Find top cumulative damage dealer for killedBy
   let killedBy: string | null = null;
@@ -495,7 +501,7 @@ async function resolveBossRoundInner(
     data: {
       currentHp: result.bossHpAfter,
       roundNumber: nextRound,
-      nextRoundAt: nextNextRoundAt,
+      nextRoundAt: shouldKeepScheduling ? nextNextRoundAt : null,
       status: result.bossDefeated ? 'defeated' : 'in_progress',
       killedBy,
       bossEffects: JSON.parse(JSON.stringify(result.bossActiveEffectsAfter)),
@@ -504,6 +510,12 @@ async function resolveBossRoundInner(
   });
 
   if (updated.count === 0) return null;
+
+  if (result.bossDefeated) {
+    roundTimerRegistry.cancel('bossEncounter', encounterId);
+  } else if (!result.allPlayersDead) {
+    roundTimerRegistry.schedule('bossEncounter', encounterId, nextNextRoundAt, () => io);
+  }
 
   // Persist per-participant results
   await Promise.all(
@@ -626,6 +638,7 @@ async function resolveBossRoundInner(
         scaledAt: null,
       },
     });
+    roundTimerRegistry.cancel('bossEncounter', encounterId);
 
     const zoneName = encounter.event.zone?.name ?? 'unknown';
     await emitSystemMessage(io, 'world', 'world', `The raid against ${encounter.mobTemplate.name} in ${zoneName} has been wiped!`);

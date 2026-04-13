@@ -37,6 +37,16 @@ vi.mock('../utils/routeHelpers.js', () => ({
   trackAchievements: vi.fn().mockResolvedValue(undefined),
   calculateFleeWithGold: vi.fn().mockReturnValue({ outcome: 'escape', remainingHp: 1, goldLost: 0 }),
 }));
+vi.mock('./roundTimerRegistry', () => ({
+  roundTimerRegistry: {
+    schedule: vi.fn(),
+    cancel: vi.fn(),
+    rehydrate: vi.fn(),
+    clearAll: vi.fn(),
+    size: vi.fn().mockReturnValue(0),
+    keys: vi.fn().mockReturnValue([]),
+  },
+}));
 
 vi.mock('@pocketrealm/game-engine', () => ({
   resolveBossRound: vi.fn().mockReturnValue({
@@ -85,6 +95,7 @@ import { distributeBossLoot } from './bossLootService';
 import { logger } from '../logger';
 import { trackAchievements, calculateFleeWithGold } from '../utils/routeHelpers.js';
 import { resolveBossRound as resolveBossRoundEngine, initThreatTable } from '@pocketrealm/game-engine';
+import { roundTimerRegistry } from './roundTimerRegistry';
 
 const defaultEngineResult = {
   bossDefeated: false,
@@ -291,6 +302,92 @@ describe('bossEncounterService', () => {
       expect(mockPrisma.bossEncounter.update).not.toHaveBeenCalled();
     });
 
+  });
+
+  describe('boss lifecycle scheduling hooks', () => {
+    function setupResolvableRound(encounterOverrides: Record<string, any> = {}, signups = [makeParticipantRow()]) {
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
+        makeEncounterWithIncludes(encounterOverrides),
+      );
+      mockPrisma.bossParticipant.findMany.mockResolvedValue(signups);
+      mockPrisma.bossEncounter.update.mockResolvedValue({});
+      mockPrisma.bossEncounter.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.bossParticipant.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Hero' });
+      mockPrisma.player.findMany.mockResolvedValue([]);
+    }
+
+    it('createBossEncounter does not schedule while status is waiting', async () => {
+      mockPrisma.bossEncounter.create.mockResolvedValue(makeEncounterRow());
+
+      await createBossEncounter('evt-1', 'mob-1', 1000);
+
+      expect(roundTimerRegistry.schedule).not.toHaveBeenCalled();
+    });
+
+    it('signUpForBossRound schedules when status transitions waiting to in_progress', async () => {
+      const nextRoundAt = new Date(Date.now() + 60_000);
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
+        makeEncounterRow({ status: 'waiting', nextRoundAt }),
+      );
+      mockPrisma.bossParticipant.findUnique.mockResolvedValue(null);
+      mockPrisma.bossParticipant.create.mockResolvedValue(makeParticipantRow());
+      mockPrisma.bossEncounter.update.mockResolvedValue({});
+
+      await signUpForBossRound('enc-1', 'p1', 100);
+
+      expect(roundTimerRegistry.schedule).toHaveBeenCalledWith(
+        'bossEncounter',
+        'enc-1',
+        nextRoundAt,
+        expect.any(Function),
+      );
+    });
+
+    it('successful non-defeating round resolution schedules the next round', async () => {
+      setupResolvableRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(roundTimerRegistry.schedule).toHaveBeenCalledWith(
+        'bossEncounter',
+        'enc-1',
+        expect.any(Date),
+        expect.any(Function),
+      );
+    });
+
+    it('boss defeated cancels the timer', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        bossDefeated: true,
+        bossHpAfter: 0,
+      } as any);
+      setupResolvableRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('bossEncounter', 'enc-1');
+    });
+
+    it('boss wipe cancels the timer when status returns to waiting', async () => {
+      vi.mocked(resolveBossRoundEngine).mockReturnValue({
+        ...defaultEngineResult,
+        allPlayersDead: true,
+        participantResults: [{
+          ...defaultEngineResult.participantResults[0],
+          isDead: true,
+          hpAfter: 0,
+        }],
+      } as any);
+      setupResolvableRound();
+
+      await resolveBossRound('enc-1', null);
+
+      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('bossEncounter', 'enc-1');
+    });
   });
 
   describe('getBossEncounterStatus', () => {

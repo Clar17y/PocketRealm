@@ -14,6 +14,7 @@ import { sendPush } from '../services/pushNotificationService';
 import { normalizePlayerAttributes } from '../services/attributesService';
 import { teleportPlayer } from '../services/zoneService';
 import { createActivityLog } from '../services/activityLogService';
+import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import {
@@ -372,6 +373,15 @@ router.post('/events/:id/cancel', asyncHandler(async (req, res) => {
     where: { id: req.params.id },
     data: { status: 'expired', expiresAt: new Date() },
   });
+  if (event.type === 'boss') {
+    const activeBossEncounters = await prisma.bossEncounter.findMany({
+      where: { eventId: req.params.id, status: 'in_progress' },
+      select: { id: true },
+    });
+    for (const encounter of activeBossEncounters) {
+      roundTimerRegistry.cancel('bossEncounter', encounter.id);
+    }
+  }
   await adminAudit(req.player!.playerId, 'cancel_event', { eventId: req.params.id, eventTitle: event.title });
   res.json({ success: true });
 }));

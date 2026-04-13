@@ -22,6 +22,16 @@ vi.mock('../services/activityLogService', () => ({
 vi.mock('../services/pushNotificationService', () => ({
   sendPush: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../services/roundTimerRegistry', () => ({
+  roundTimerRegistry: {
+    schedule: vi.fn(),
+    cancel: vi.fn(),
+    rehydrate: vi.fn(),
+    clearAll: vi.fn(),
+    size: vi.fn().mockReturnValue(0),
+    keys: vi.fn().mockReturnValue([]),
+  },
+}));
 vi.mock('@pocketrealm/game-engine', () => ({
   xpForLevel: vi.fn((lvl: number) => lvl * 100),
   characterLevelFromXp: vi.fn((xp: number) => Math.floor(xp / 100)),
@@ -66,6 +76,7 @@ import { addStackableItem } from '../services/inventoryService';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
+import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { adminRouter } from './admin';
 
 const mockSpawnWorldEvent = spawnWorldEvent as ReturnType<typeof vi.fn>;
@@ -225,6 +236,27 @@ describe('admin routes', () => {
       await handler(req, res, vi.fn());
 
       expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it('cancels related active boss encounter timers when cancelling a boss event', async () => {
+      mockGetEventById.mockResolvedValue({ id: 'evt-boss', status: 'active', type: 'boss', title: 'Boss' });
+      mockPrisma.worldEvent.update.mockResolvedValue({});
+      mockPrisma.bossEncounter.findMany.mockResolvedValue([
+        { id: 'enc-1' },
+        { id: 'enc-2' },
+      ]);
+
+      const req = { player: { playerId: 'p1' }, params: { id: 'evt-boss' } } as any;
+      const res = mockRes();
+      const handler = findHandler('post', '/events/:id/cancel');
+      await handler(req, res, vi.fn());
+
+      expect(mockPrisma.bossEncounter.findMany).toHaveBeenCalledWith({
+        where: { eventId: 'evt-boss', status: 'in_progress' },
+        select: { id: true },
+      });
+      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('bossEncounter', 'enc-1');
+      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('bossEncounter', 'enc-2');
     });
   });
 
