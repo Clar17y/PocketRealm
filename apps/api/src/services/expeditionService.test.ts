@@ -125,6 +125,7 @@ import {
   completeExpedition,
   recoverFromKO,
 } from './expeditionService';
+import { resolveDueExpeditionStep } from './expeditionRoundService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { getHpState } from './hpService';
 import { resolveRaidRound } from '@pocketrealm/game-engine';
@@ -489,6 +490,54 @@ describe('expeditionService', () => {
 
       const result = await getExpeditionStatus('nonexistent');
       expect(result).toBeNull();
+    });
+  });
+
+  // =========================================================================
+  // resolveDueExpeditionStep
+  // =========================================================================
+
+  describe('resolveDueExpeditionStep', () => {
+    it('no-ops when expedition status is neither recruiting nor in_progress', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          id: 'e1',
+          status: 'completed',
+          nextRoundAt: new Date(),
+        }),
+      );
+
+      await resolveDueExpeditionStep('e1', null);
+
+      expect(mockPrisma.guildExpedition.update).not.toHaveBeenCalled();
+    });
+
+    it('no-ops when nextRoundAt is null', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          id: 'e1',
+          status: 'in_progress',
+          nextRoundAt: null,
+        }),
+      );
+
+      await resolveDueExpeditionStep('e1', null);
+
+      expect(mockPrisma.guildExpedition.update).not.toHaveBeenCalled();
+    });
+
+    it('no-ops when nextRoundAt is in the future', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          id: 'e1',
+          status: 'in_progress',
+          nextRoundAt: new Date(Date.now() + 30_000),
+        }),
+      );
+
+      await resolveDueExpeditionStep('e1', null);
+
+      expect(mockPrisma.guildExpedition.update).not.toHaveBeenCalled();
     });
   });
 

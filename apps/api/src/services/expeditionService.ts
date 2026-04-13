@@ -35,7 +35,7 @@ import {
 } from './expeditionHelpers';
 
 // Re-export from sub-services so existing importers don't break
-export { checkAndResolveExpeditionRounds, resolveExpeditionRound, autoResolveRoom } from './expeditionRoundService';
+export { checkAndResolveExpeditionRounds, resolveDueExpeditionStep, resolveExpeditionRound, autoResolveRoom } from './expeditionRoundService';
 export type { AutoResolveResult } from './expeditionRoundService';
 export { handleRoomCleared, handleWipe, completeExpedition } from './expeditionTransitionService';
 
