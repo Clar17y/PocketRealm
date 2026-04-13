@@ -124,6 +124,31 @@ describe('useLootActions', () => {
     expect(hook.result.current.pendingLootSession?.items).toHaveLength(1);
   });
 
+  it('logs claimed items before surfacing a later grouped-session failure', async () => {
+    apiMock.fetchPendingLoot
+      .mockResolvedValueOnce({ data: { items: [sampleItem('item-1', 'Bronze Sword')] } })
+      .mockResolvedValueOnce({ data: { items: [sampleItem('item-2', 'Silver Ore')] } })
+      .mockResolvedValueOnce({ data: { items: [sampleItem('item-2', 'Silver Ore')] } });
+    apiMock.claimLoot
+      .mockResolvedValueOnce({ data: { success: true, stateUpdates: { inventoryAdded: [{ id: 'inv-1' }] } } })
+      .mockResolvedValueOnce({ error: { message: 'Loot claim failed', code: 'NETWORK_ERROR' } });
+
+    const hook = buildHook();
+    hook.pendingLootQueueRef.current = ['session-2'];
+
+    await act(async () => {
+      await hook.result.current.activatePendingLoot('session-1');
+    });
+
+    await act(async () => {
+      await hook.result.current.handleClaimLoot('session-1', [0, 1]);
+    });
+
+    expect(applyStateUpdatesMock.applyStateUpdates).toHaveBeenCalledTimes(1);
+    expect(hook.pushLog).toHaveBeenCalledWith(expect.objectContaining({ message: 'Claimed 1 loot items' }));
+    expect(hook.setActionError).toHaveBeenCalledWith('Loot claim failed');
+  });
+
   it('reopening a minimized bundle pulls in newly queued sessions', async () => {
     apiMock.fetchPendingLoot
       .mockResolvedValueOnce({ data: { items: [sampleItem('item-1', 'Bronze Sword')] } })
@@ -190,5 +215,78 @@ describe('useLootActions', () => {
     expect(hook.setActionError).toHaveBeenCalledWith('Refresh failed');
     expect(hook.pendingLootQueueRef.current).toEqual(['session-1']);
     expect(hook.result.current.pendingLootSession).toBeNull();
+  });
+
+  it('activates queued loot after a successful claim without refetching the claimed session', async () => {
+    let loadedInitialSession = false;
+    apiMock.fetchPendingLoot.mockImplementation(async (sessionId: string) => {
+      if (sessionId === 'session-1' && !loadedInitialSession) {
+        loadedInitialSession = true;
+        return { data: { items: [sampleItem('item-1', 'Bronze Sword')] } };
+      }
+      if (sessionId === 'session-1') {
+        return { error: { message: 'Claimed session should not be reloaded', code: 'NETWORK_ERROR' } };
+      }
+      if (sessionId === 'session-2') {
+        return { data: { items: [sampleItem('item-2', 'Silver Ore')] } };
+      }
+      throw new Error(`Unexpected session ${sessionId}`);
+    });
+    apiMock.claimLoot
+      .mockResolvedValueOnce({ data: { success: true, stateUpdates: { inventoryAdded: [{ id: 'inv-1' }] } } });
+
+    const hook = buildHook();
+
+    await act(async () => {
+      await hook.result.current.activatePendingLoot('session-1');
+    });
+
+    act(() => {
+      hook.pendingLootQueueRef.current.push('session-2');
+    });
+
+    await act(async () => {
+      await hook.result.current.handleClaimLoot('session-1', [0]);
+    });
+
+    expect(apiMock.fetchPendingLoot.mock.calls.map(([sessionId]) => sessionId)).toEqual(['session-1', 'session-2']);
+    expect(hook.setActionError).not.toHaveBeenCalled();
+    expect(hook.result.current.pendingLootSession?.sessionIds).toEqual(['session-2']);
+  });
+
+  it('keeps the synced session ref in step when the exposed setter clears pending loot', async () => {
+    let loadedInitialSession = false;
+    apiMock.fetchPendingLoot.mockImplementation(async (sessionId: string) => {
+      if (sessionId === 'session-1' && !loadedInitialSession) {
+        loadedInitialSession = true;
+        return { data: { items: [sampleItem('item-1', 'Bronze Sword')] } };
+      }
+      if (sessionId === 'session-1') {
+        return { error: { message: 'Cleared session should not be reloaded', code: 'NETWORK_ERROR' } };
+      }
+      if (sessionId === 'session-2') {
+        return { data: { items: [sampleItem('item-2', 'Silver Ore')] } };
+      }
+      throw new Error(`Unexpected session ${sessionId}`);
+    });
+
+    const hook = buildHook();
+
+    await act(async () => {
+      await hook.result.current.activatePendingLoot('session-1');
+    });
+
+    act(() => {
+      hook.result.current.setPendingLootSession(null);
+      hook.pendingLootQueueRef.current.push('session-2');
+    });
+
+    await act(async () => {
+      await hook.result.current.activatePendingLoot('session-2');
+    });
+
+    expect(apiMock.fetchPendingLoot.mock.calls.map(([sessionId]) => sessionId)).toEqual(['session-1', 'session-2']);
+    expect(hook.setActionError).not.toHaveBeenCalled();
+    expect(hook.result.current.pendingLootSession?.sessionIds).toEqual(['session-2']);
   });
 });

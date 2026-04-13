@@ -44,7 +44,7 @@
 
 ## Phase 2 — Observability & Operational Readiness
 
-**Exit gate:** Pino JSON logs flowing, Sentry capturing errors, `/health/ready` returning dependency status, error boundary catching frontend crashes. **STATUS: COMPLETE (verified 2026-04-13)**
+**Exit gate:** Pino JSON logs flowing, Sentry capturing errors, `/health/ready` returning dependency status, error boundary catching frontend crashes. **STATUS: MAIN VERIFIED; follow-up branch pending merge (2026-04-13)**
 
 **Detailed designs:** `docs/superpowers/specs/2026-03-08-launch-readiness-design.md` §5–§6
 
@@ -57,20 +57,20 @@
   - Foundation for Sentry and health check work
   - Verified on `main`: pino logger wiring, request logging middleware, and structured game/server logging landed in PR #258
 
-- [x] **2.2 — #209 Sentry error tracking** — PR #261 + follow-up verification fixes
+- [x] **2.2 — #209 Sentry error tracking** — PR #261 + follow-up pending merge from `finish/pre-launch-final-phases`
   - Branch: `feat/sentry-error-tracking-209`
   - Spec: launch readiness spec §5 "Error Tracking"
   - Scope: `@sentry/node` for API, `@sentry/nextjs` for web, source map uploads, error boundary
   - Depends on: 2.1 (for structured context)
   - Verified on `main`: API + Next.js Sentry wiring landed in PR #261
-  - Follow-up in `finish/pre-launch-final-phases`: web release tags now read canonical `APP_VERSION`, and the game error boundary reports crashes to Sentry
+  - Follow-up pending merge from `finish/pre-launch-final-phases`: web release tags read the canonical version env for each runtime, and the game error boundary reports crashes to Sentry
 
-- [x] **2.3 — #210 Health check enhancement** — PR #260 + follow-up verification fixes
+- [x] **2.3 — #210 Health check enhancement** — PR #260 + follow-up pending merge from `finish/pre-launch-final-phases`
   - Branch: `feat/health-check-enhancement-210`
   - Spec: launch readiness spec §5 "Health Check Enhancement"
   - Scope: `/health/ready` with DB/Redis checks, `/health/live`, external uptime monitor
   - Verified on `main`: `/health`, `/health/ready`, `/health/live`, probe timeouts, and single-flight probe protection landed in PR #260
-  - Follow-up in `finish/pre-launch-final-phases`: `/health/ready` now includes `version` and `socketio` dependency status in the readiness payload
+  - Follow-up pending merge from `finish/pre-launch-final-phases`: `/health/ready` includes `version` and `socketio` dependency status in the readiness payload
 
 - [x] **2.4 — #211 Operational readiness** — PR #259
   - Branch: `feat/operational-readiness-211`
@@ -78,19 +78,19 @@
   - Scope: env var docs, APP_VERSION, connection pool config, migration checklist, backup verification
   - Verified on `main`: deployment docs, canonical `APP_VERSION`, worktree `DIRECT_DATABASE_URL`, and operational runbook updates landed in PR #259
 
-- [x] **2.5 — Error boundary + connection status** — earlier UI work + final follow-up in `finish/pre-launch-final-phases`
+- [x] **2.5 — Error boundary + connection status** — earlier UI work + follow-up pending merge from `finish/pre-launch-final-phases`
   - Branch: `feat/error-boundary-connection-status`
   - Spec: launch readiness spec §3
   - Scope: `useConnectionStatus` hook, disconnected banner, React error boundary (Sentry)
   - Depends on: 2.2 (Sentry error boundary)
   - Existing `main`: connection banner, socket-aware hook, offline gating, and error boundary shell landed via earlier error resilience work
-  - Final follow-up in `finish/pre-launch-final-phases`: connection status now also reflects API reachability, and the React boundary sends crashes to Sentry
+  - Follow-up pending merge from `finish/pre-launch-final-phases`: the connection banner now falls back to disconnected when API reachability drops without a socket disconnect, and the React boundary sends crashes to Sentry
 
 ---
 
 ## Phase 3 — Performance & Polish
 
-**Exit gate:** Combat queries under 15 per fight, indexes deployed, loot UX consolidated, basic ARIA on core screens. **STATUS: COMPLETE (verified 2026-04-13)**
+**Exit gate:** Combat queries under 15 per fight, indexes deployed, loot UX consolidated, basic ARIA on core screens. **STATUS: MAIN VERIFIED; final follow-up branch pending merge (2026-04-13)**
 
 **Ordering:** 3.3 first (quick) → 3.1 (big lift) → 3.2 (coordinates with 3.1) → 3.4/3.5 anytime
 
@@ -116,17 +116,17 @@
   - Key files: `packages/database/prisma/schema.prisma`
   - Verified on `main`: migration `20260323122426_add_missing_indexes` plus schema updates cover the shipped index sweep, including `DropTable.mobTemplateId` and `GuildUpgrade(guildId, expiresAt)`
 
-- [x] **3.4 — #250 Overflow loot screens** — finalized in `finish/pre-launch-final-phases`
+- [x] **3.4 — #250 Overflow loot screens** — final consolidation pending merge from `finish/pre-launch-final-phases`
   - Branch: `feat/combined-overflow-loot-250`
   - Scope: combine multiple overflow loot modals into single consolidated view
-  - Follow-up in `finish/pre-launch-final-phases`: queued overflow sessions are now consolidated into one loot picker flow instead of presenting players with serial modal churn
+  - Follow-up pending merge from `finish/pre-launch-final-phases`: queued overflow sessions are consolidated into one loot picker flow instead of presenting players with serial modal churn
 
-- [x] **3.5 — Accessibility quick wins** — existing partial work + final follow-up in `finish/pre-launch-final-phases`
+- [x] **3.5 — Accessibility quick wins** — existing partial work + follow-up pending merge from `finish/pre-launch-final-phases`
   - Branch: `fix/accessibility-quick-wins`
   - Scope: ARIA roles on game page tabs, `role="alert"` on error banners, `aria-label` on modal close buttons
   - Key files: `apps/web/src/app/game/page.tsx`, inventory component, combat screen, forge, quest page
   - Verified on `main`: `SubNav` tab roles, action/status alerts, and many labeled modal controls already landed
-  - Follow-up in `finish/pre-launch-final-phases`: shared `ErrorBanner` now announces with `role="alert"` and the overflow loot dismiss control has an explicit accessible label
+  - Follow-up pending merge from `finish/pre-launch-final-phases`: shared `ErrorBanner` announces with `role="alert"` and the overflow loot dismiss control has an explicit accessible label
 
 ---
 

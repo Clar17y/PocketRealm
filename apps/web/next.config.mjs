@@ -31,6 +31,7 @@ const baseConfig = withPlausibleProxy()(withSerwist({
   },
   env: {
     APP_VERSION,
+    NEXT_PUBLIC_APP_VERSION: APP_VERSION,
   },
 }));
 

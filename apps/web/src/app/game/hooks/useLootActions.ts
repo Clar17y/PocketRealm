@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { claimLoot, fetchPendingLoot, type PendingLootItem } from '@/lib/api';
 import { nowStamp } from './useActivityLog';
 import { applyStateUpdates, type StateSetters } from '../applyStateUpdates';
@@ -14,6 +14,13 @@ interface UseLootActionsParams {
   pendingLootQueueRef: React.MutableRefObject<string[]>;
 }
 
+type PendingLootSessionState = {
+  sessionId: string;
+  sessionIds: string[];
+  items: Array<PendingLootItem & { sessionId: string; itemIndex: number }>;
+  minimized?: boolean;
+};
+
 export function useLootActions({
   runAction,
   pushLog,
@@ -22,12 +29,13 @@ export function useLootActions({
   activatePendingLootRef,
   pendingLootQueueRef,
 }: UseLootActionsParams) {
-  const [pendingLootSession, setPendingLootSession] = useState<{
-    sessionId: string;
-    sessionIds: string[];
-    items: Array<PendingLootItem & { sessionId: string; itemIndex: number }>;
-    minimized?: boolean;
-  } | null>(null);
+  const [pendingLootSession, setPendingLootSession] = useState<PendingLootSessionState | null>(null);
+  const pendingLootSessionRef = useRef<PendingLootSessionState | null>(null);
+
+  const syncPendingLootSession = (next: PendingLootSessionState | null) => {
+    pendingLootSessionRef.current = next;
+    setPendingLootSession(next);
+  };
 
   const collectQueuedSessionIds = (seedSessionIds: string[]): string[] => {
     const orderedIds = new Set<string>(seedSessionIds);
@@ -82,19 +90,28 @@ export function useLootActions({
     }
   };
 
+  const pushClaimSuccessLog = (claimedCount: number) => {
+    if (claimedCount <= 0) return;
+    pushLog({
+      timestamp: nowStamp(),
+      type: 'success',
+      message: `Claimed ${claimedCount} loot items`,
+    });
+  };
+
   const clearExpiredLoot = async () => {
-    setPendingLootSession(null);
+    syncPendingLootSession(null);
     pushLog({ timestamp: nowStamp(), type: 'warning', message: 'Overflow loot expired — unclaimed items were lost.' });
     await activateNextQueuedLoot();
   };
 
   const reloadPendingLootSession = async (
-    sessionIds = pendingLootSession?.sessionIds ?? [],
+    sessionIds = pendingLootSessionRef.current?.sessionIds ?? [],
     options: { minimized?: boolean } = {},
   ) => {
     const mergedSessionIds = collectQueuedSessionIds(sessionIds);
     if (mergedSessionIds.length === 0) {
-      setPendingLootSession(null);
+      syncPendingLootSession(null);
       return;
     }
 
@@ -107,7 +124,7 @@ export function useLootActions({
         if (!prev) return prev;
         if (remainingSessionIds.size === 0) return prev;
 
-        return {
+        const next = {
           ...prev,
           sessionId: remainingSessionIds.has(prev.sessionId)
             ? prev.sessionId
@@ -115,16 +132,19 @@ export function useLootActions({
           sessionIds: prev.sessionIds.filter((id) => remainingSessionIds.has(id)),
           items: prev.items.filter((item) => remainingSessionIds.has(item.sessionId)),
         };
+        pendingLootSessionRef.current = next;
+        return next;
       });
       throw error;
     }
 
     consumeQueuedSessionIds(mergedSessionIds);
     if (refreshedSession) {
-      setPendingLootSession({
+      const nextSession = {
         ...refreshedSession,
-        minimized: options.minimized ?? pendingLootSession?.minimized ?? false,
-      });
+        minimized: options.minimized ?? pendingLootSessionRef.current?.minimized ?? false,
+      };
+      syncPendingLootSession(nextSession);
       return;
     }
 
@@ -132,7 +152,7 @@ export function useLootActions({
   };
 
   const activatePendingLoot = async (sessionId: string) => {
-    const mergedSessionIds = collectQueuedSessionIds([...(pendingLootSession?.sessionIds ?? []), sessionId]);
+    const mergedSessionIds = collectQueuedSessionIds([...(pendingLootSessionRef.current?.sessionIds ?? []), sessionId]);
     let nextSession;
     try {
       nextSession = await loadPendingLootSessions(mergedSessionIds);
@@ -142,7 +162,7 @@ export function useLootActions({
     }
     consumeQueuedSessionIds(mergedSessionIds);
     if (nextSession) {
-      setPendingLootSession(nextSession);
+      syncPendingLootSession(nextSession);
       pushLog({
         timestamp: nowStamp(),
         type: 'warning',
@@ -184,6 +204,7 @@ export function useLootActions({
           } catch {
             // Keep the locally filtered retry state if the refresh itself fails.
           }
+          pushClaimSuccessLog(claimedCount);
           if (hadExpiredSession) {
             pushLog({
               timestamp: nowStamp(),
@@ -198,14 +219,8 @@ export function useLootActions({
         applyStateUpdates(res.data.stateUpdates, stateSetters);
       }
 
-      setPendingLootSession(null);
-      if (claimedCount > 0) {
-        pushLog({
-          timestamp: nowStamp(),
-          type: 'success',
-          message: `Claimed ${claimedCount} loot items`,
-        });
-      }
+      syncPendingLootSession(null);
+      pushClaimSuccessLog(claimedCount);
       if (hadExpiredSession) {
         pushLog({
           timestamp: nowStamp(),
@@ -218,7 +233,11 @@ export function useLootActions({
   };
 
   const handleDismissLoot = () => {
-    setPendingLootSession((prev) => prev ? { ...prev, minimized: true } : null);
+    setPendingLootSession((prev) => {
+      const next = prev ? { ...prev, minimized: true } : null;
+      pendingLootSessionRef.current = next;
+      return next;
+    });
   };
 
   const handleReopenLoot = async () => {
@@ -233,7 +252,7 @@ export function useLootActions({
 
   return {
     pendingLootSession,
-    setPendingLootSession,
+    setPendingLootSession: syncPendingLootSession,
     activatePendingLoot,
     activateNextQueuedLoot,
     reloadPendingLootSession,
