@@ -81,6 +81,8 @@ export function useTravelActions({
   const [confirmAbandonLoot, setConfirmAbandonLoot] = useState<{ travelZoneId: string } | null>(null);
   const travelRouteRef = useRef<TravelRouteState | null>(null);
   const arrivedInTownRef = useRef(false);
+  const pendingLootSessionRef = useRef(pendingLootSession);
+  pendingLootSessionRef.current = pendingLootSession;
 
   const completeQueuedTravelRoute = async () => {
     travelRouteRef.current = null;
@@ -92,7 +94,7 @@ export function useTravelActions({
       advanceTutorial(TUTORIAL_STEP_TRAVEL);
     }
 
-    if (!pendingLootSession && pendingLootQueueRef.current.length > 0) {
+    if (!pendingLootSessionRef.current && pendingLootQueueRef.current.length > 0) {
       await activateNextQueuedLoot();
     }
   };
@@ -219,7 +221,7 @@ export function useTravelActions({
     id: string,
     options: { ignorePendingLoot?: boolean } = {},
   ) => {
-    if (pendingLootSession && !options.ignorePendingLoot) {
+    if (pendingLootSessionRef.current && !options.ignorePendingLoot) {
       setConfirmAbandonLoot({ travelZoneId: id });
       return;
     }
@@ -311,13 +313,14 @@ export function useTravelActions({
   const abandonLootAndTravel = async () => {
     if (!confirmAbandonLoot) return;
     const zoneId = confirmAbandonLoot.travelZoneId;
-    if (pendingLootSession) {
-      for (const [sessionIndex, sessionId] of pendingLootSession.sessionIds.entries()) {
+    const currentPendingLootSession = pendingLootSessionRef.current;
+    if (currentPendingLootSession) {
+      for (const [sessionIndex, sessionId] of currentPendingLootSession.sessionIds.entries()) {
         const res = await claimLoot(sessionId, []);
         if (!res.data && res.error?.code !== 'LOOT_EXPIRED') {
           setConfirmAbandonLoot(null);
           try {
-            await reloadPendingLootSession(pendingLootSession.sessionIds.slice(sessionIndex));
+            await reloadPendingLootSession(currentPendingLootSession.sessionIds.slice(sessionIndex));
           } catch {
             // Keep the locally preserved retry state and surface the original discard error.
           }
@@ -325,6 +328,7 @@ export function useTravelActions({
           return;
         }
       }
+      pendingLootSessionRef.current = null;
       clearPendingLootSession();
     }
     pendingLootQueueRef.current = [];

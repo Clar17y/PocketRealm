@@ -1,4 +1,5 @@
 import { renderHook, act } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTravelActions } from './useTravelActions';
 
@@ -42,6 +43,55 @@ function buildHook({
   return {
     ...hook,
     clearPendingLootSession,
+    reloadPendingLootSession,
+    setActionError,
+  };
+}
+
+function buildHookWithManagedPendingLoot({
+  initialPendingLootSession = { sessionId: 'session-1', sessionIds: ['session-1', 'session-2'] },
+  reloadPendingLootSession = vi.fn().mockResolvedValue(undefined),
+} = {}) {
+  const setActionError = vi.fn();
+  const activateNextQueuedLoot = vi.fn().mockResolvedValue(undefined);
+  const pendingLootQueueRef = { current: [] as string[] };
+
+  const hook = renderHook(() => {
+    const [pendingLootSession, setPendingLootSession] = useState(initialPendingLootSession);
+
+    const actions = useTravelActions({
+      hpStateRef: { current: { currentHp: 100, maxHp: 100 } } as never,
+      activeZoneId: 'zone-a',
+      zones: [{ id: 'zone-a', name: 'Town', zoneType: 'town' }, { id: 'zone-b', name: 'Forest', zoneType: 'wilds' }],
+      zoneConnections: [{ fromId: 'zone-a', toId: 'zone-b', explorationThreshold: 0 }],
+      runAction: async (_name, fn) => { await fn(); },
+      pushLog: vi.fn(),
+      setTurns: vi.fn(),
+      setActiveZoneId: vi.fn(),
+      setActionError,
+      setPlaybackActive: vi.fn(),
+      stateSetters: {} as never,
+      advanceTutorial: vi.fn(),
+      refreshCraftingRecipes: vi.fn().mockResolvedValue(undefined),
+      loadAll: vi.fn().mockResolvedValue(undefined),
+      pendingLootSession,
+      clearPendingLootSession: () => setPendingLootSession(null),
+      reloadPendingLootSession,
+      pendingLootQueueRef,
+      activateNextQueuedLoot,
+      logDurabilityWarnings: vi.fn(),
+    });
+
+    return {
+      ...actions,
+      pendingLootSession,
+    };
+  });
+
+  return {
+    ...hook,
+    activateNextQueuedLoot,
+    pendingLootQueueRef,
     reloadPendingLootSession,
     setActionError,
   };
@@ -122,5 +172,39 @@ describe('useTravelActions', () => {
     expect(hook.clearPendingLootSession).toHaveBeenCalledTimes(1);
     expect(hook.reloadPendingLootSession).not.toHaveBeenCalled();
     expect(apiMock.travelToZone).toHaveBeenCalledWith('zone-b');
+  });
+
+  it('activates newly queued overflow loot after abandon-and-travel clears the current bundle', async () => {
+    apiMock.claimLoot
+      .mockResolvedValueOnce({ data: { success: true } })
+      .mockResolvedValueOnce({ data: { success: true } });
+    apiMock.travelToZone.mockResolvedValueOnce({
+      data: {
+        turns: { currentTurns: 9 },
+        zone: { id: 'zone-b', name: 'Forest', zoneType: 'wilds' },
+        events: [],
+        aborted: false,
+        refundedTurns: 0,
+        travelCost: 0,
+        pendingLootSessionId: 'session-3',
+        stateUpdates: {},
+      },
+    });
+
+    const hook = buildHookWithManagedPendingLoot();
+
+    await act(async () => {
+      await hook.result.current.handleTravelToZone('zone-b');
+    });
+
+    expect(hook.result.current.confirmAbandonLoot).toEqual({ travelZoneId: 'zone-b' });
+
+    await act(async () => {
+      await hook.result.current.abandonLootAndTravel();
+    });
+
+    expect(apiMock.travelToZone).toHaveBeenCalledWith('zone-b');
+    expect(hook.pendingLootQueueRef.current).toContain('session-3');
+    expect(hook.activateNextQueuedLoot).toHaveBeenCalledTimes(1);
   });
 });
