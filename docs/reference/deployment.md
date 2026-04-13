@@ -15,12 +15,8 @@ PocketRealm is deployed as a split stack: the Next.js web app on Vercel and the 
 - Build: `npm install && npm run build:api`
 - Start: `npm run start:api`
 - Health check path: `/health/ready` (see [Health Check Endpoints](#health-check-endpoints))
-- Background timers running inside the API process:
-  - Adaptive round resolution (5 s when active, 60 s idle)
-  - Persisted mob cleanup (5 min)
-  - Leaderboard refresh (15 min)
-  - Auth token cleanup (6 h)
-  - Metrics logger (60 s)
+- Background timers: none fixed-cadence. Boss and expedition rounds resolve via an in-process `setTimeout` registry keyed by `nextRoundAt`, rehydrated from DB on boot. Other maintenance work is activity-triggered or lazy-on-touch. See `docs/superpowers/specs/2026-04-11-event-driven-scheduling-design.md`.
+- Metrics logger (60 s, in-memory only; does not touch Postgres)
 
 ### Database (Neon Postgres)
 - Managed Postgres with daily automated backups — see [Backup Verification & Restore](#backup-verification--restore)
@@ -72,7 +68,7 @@ If Phase 2.2 (#209 Sentry) or other parallel phases add more variables, append r
 
 > **Pre-merge gate:** Before merging the PR that introduces `directUrl` to `schema.prisma` to `main`, confirm Render has `DIRECT_DATABASE_URL` configured on the API service (unpooled Neon connection string — hostname **without** `-pooler`). Without it, `prisma migrate deploy` in the Render build step fails with `P1012: Environment variable not found: DIRECT_DATABASE_URL`. Local worktrees are provisioned automatically by `scripts/setup-worktree.sh`.
 
-Prisma defaults to `num_cpus * 2 + 1` connections. On Render's starter instance this is only 5, which will exhaust under load with 145 API endpoints plus background schedulers (round resolution, leaderboard refresh, metrics, mob cleanup).
+Prisma defaults to `num_cpus * 2 + 1` connections. On Render's starter instance this is only 5, which will exhaust under load with 145 API endpoints plus bursty activity-triggered maintenance.
 
 Neon's pooled endpoint (port `5432` on the `-pooler` host) uses PgBouncer in transaction mode, which Prisma requires `pgbouncer=true` for so it skips prepared statements.
 
@@ -88,7 +84,7 @@ postgresql://<user>:<pass>@<project>-pooler.<region>.aws.neon.tech/<db>?sslmode=
 |-------|-------------|--------|
 | `sslmode=require` | required | Neon enforces TLS |
 | `pgbouncer=true` | required when using `-pooler` host | Disables Prisma's prepared statement cache (PgBouncer transaction mode is incompatible with them) |
-| `connection_limit=20` | 20 | Stays well under Neon's compute-tier connection ceiling; room for background schedulers + request traffic |
+| `connection_limit=20` | 20 | Stays well under Neon's compute-tier connection ceiling; room for request bursts plus activity-triggered maintenance |
 | `pool_timeout=15` | 15 | Seconds Prisma waits for a free connection before throwing `P2024`. Default 10 is too tight during burst traffic. |
 
 ### Migration `DATABASE_URL` (direct connection)
