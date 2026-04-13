@@ -176,14 +176,22 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   const accessToken = generateAccessToken(payload);
   const refreshToken = generateRefreshToken(payload);
 
-  // Store refresh token
-  await prisma.refreshToken.create({
-    data: {
-      playerId: player.id,
-      token: refreshToken,
-      expiresAt: refreshTokenExpiresAt(now.getTime()),
-    },
-  });
+  // Store refresh token and opportunistically clear expired sessions.
+  await prisma.$transaction([
+    prisma.refreshToken.deleteMany({
+      where: {
+        playerId: player.id,
+        expiresAt: { lt: now },
+      },
+    }),
+    prisma.refreshToken.create({
+      data: {
+        playerId: player.id,
+        token: refreshToken,
+        expiresAt: refreshTokenExpiresAt(now.getTime()),
+      },
+    }),
+  ]);
 
   logger.info({ playerId: player.id, username: player.username }, 'Player registered');
 
@@ -247,14 +255,22 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
   const accessToken = generateAccessToken(payload);
   const refreshToken = generateRefreshToken(payload);
 
-  // Store refresh token
-  await prisma.refreshToken.create({
-    data: {
-      playerId: player.id,
-      token: refreshToken,
-      expiresAt: refreshTokenExpiresAt(now.getTime()),
-    },
-  });
+  // Store refresh token and opportunistically clear expired sessions.
+  await prisma.$transaction([
+    prisma.refreshToken.deleteMany({
+      where: {
+        playerId: player.id,
+        expiresAt: { lt: now },
+      },
+    }),
+    prisma.refreshToken.create({
+      data: {
+        playerId: player.id,
+        token: refreshToken,
+        expiresAt: refreshTokenExpiresAt(now.getTime()),
+      },
+    }),
+  ]);
 
   logger.info({ playerId: player.id, username: player.username }, 'Player logged in');
 
@@ -309,6 +325,12 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
 
   // Store new refresh token and keep activity timestamp fresh.
   await prisma.$transaction([
+    prisma.refreshToken.deleteMany({
+      where: {
+        playerId: payload.playerId,
+        expiresAt: { lt: now },
+      },
+    }),
     prisma.refreshToken.create({
       data: {
         playerId: payload.playerId,

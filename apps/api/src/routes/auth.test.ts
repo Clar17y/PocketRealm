@@ -44,6 +44,8 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 import { mockPrisma } from '../__test__/setup';
+import bcrypt from 'bcrypt';
+import { verifyRefreshToken } from '../middleware/auth';
 import { authRouter } from './auth';
 
 function findHandler(method: string, path: string) {
@@ -62,6 +64,58 @@ function mockRes() {
   return res;
 }
 
+function setupSuccessfulRegisterState() {
+  mockPrisma.player.findFirst.mockResolvedValue(null);
+  mockPrisma.zone.findFirst.mockResolvedValue({ id: 'starter-town' });
+  mockPrisma.zoneConnection.findFirst.mockResolvedValue({
+    toZone: { id: 'forest-edge' },
+  });
+  mockPrisma.itemTemplate.findUnique.mockResolvedValue({
+    id: STARTER_LOADOUT.tutorialOffHandTemplateId,
+    maxDurability: 40,
+  });
+
+  const txCalls: string[] = [];
+  const txClient: any = new Proxy({}, {
+    get(_target, prop) {
+      if (prop === 'player') return {
+        create: vi.fn().mockImplementation(() => {
+          txCalls.push('player.create');
+          return Promise.resolve({
+            id: 'player-1', username: 'Rook', email: 'rook@example.com', role: 'player',
+          });
+        }),
+      };
+      if (prop === 'playerEquipment') return {
+        findMany: vi.fn().mockImplementation(() => { txCalls.push('playerEquipment.findMany'); return Promise.resolve([]); }),
+        createMany: vi.fn().mockImplementation(() => { txCalls.push('playerEquipment.createMany'); return Promise.resolve({}); }),
+        upsert: vi.fn().mockImplementation(() => { txCalls.push('playerEquipment.upsert'); return Promise.resolve({}); }),
+      };
+      if (prop === 'item') return {
+        create: vi.fn().mockImplementation(() => { txCalls.push('item.create'); return Promise.resolve({ id: 'starter-item-1' }); }),
+      };
+      if (prop === 'zone') return {
+        findMany: vi.fn().mockImplementation(() => { txCalls.push('zone.findMany'); return Promise.resolve([{ id: 'starter-town' }]); }),
+        findFirst: vi.fn().mockImplementation(() => { txCalls.push('zone.findFirst'); return Promise.resolve({ id: 'starter-town' }); }),
+      };
+      if (prop === 'zoneConnection') return {
+        findMany: vi.fn().mockImplementation(() => { txCalls.push('zoneConnection.findMany'); return Promise.resolve([]); }),
+      };
+      if (prop === 'playerZoneDiscovery') return {
+        createMany: vi.fn().mockImplementation(() => { txCalls.push('playerZoneDiscovery.createMany'); return Promise.resolve({}); }),
+      };
+      return new Proxy({}, { get: () => vi.fn().mockResolvedValue(null) });
+    },
+  });
+
+  mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+    if (typeof fn === 'function') return fn(txClient);
+    return Promise.all(fn);
+  });
+
+  return txCalls;
+}
+
 describe('POST /register', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,55 +127,7 @@ describe('POST /register', () => {
   });
 
   it('wraps all registration steps in a transaction', async () => {
-    mockPrisma.player.findFirst.mockResolvedValue(null);
-    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'starter-town' });
-    mockPrisma.zoneConnection.findFirst.mockResolvedValue({
-      toZone: { id: 'forest-edge' },
-    });
-    mockPrisma.itemTemplate.findUnique.mockResolvedValue({
-      id: STARTER_LOADOUT.tutorialOffHandTemplateId,
-      maxDurability: 40,
-    });
-
-    // Track calls made via the transaction client (tx)
-    const txCalls: string[] = [];
-    const txClient: any = new Proxy({}, {
-      get(_target, prop) {
-        if (prop === 'player') return {
-          create: vi.fn().mockImplementation(() => {
-            txCalls.push('player.create');
-            return Promise.resolve({
-              id: 'player-1', username: 'Rook', email: 'rook@example.com', role: 'player',
-            });
-          }),
-        };
-        if (prop === 'playerEquipment') return {
-          findMany: vi.fn().mockImplementation(() => { txCalls.push('playerEquipment.findMany'); return Promise.resolve([]); }),
-          createMany: vi.fn().mockImplementation(() => { txCalls.push('playerEquipment.createMany'); return Promise.resolve({}); }),
-          upsert: vi.fn().mockImplementation(() => { txCalls.push('playerEquipment.upsert'); return Promise.resolve({}); }),
-        };
-        if (prop === 'item') return {
-          create: vi.fn().mockImplementation(() => { txCalls.push('item.create'); return Promise.resolve({ id: 'starter-item-1' }); }),
-        };
-        if (prop === 'zone') return {
-          findMany: vi.fn().mockImplementation(() => { txCalls.push('zone.findMany'); return Promise.resolve([{ id: 'starter-town' }]); }),
-          findFirst: vi.fn().mockImplementation(() => { txCalls.push('zone.findFirst'); return Promise.resolve({ id: 'starter-town' }); }),
-        };
-        if (prop === 'zoneConnection') return {
-          findMany: vi.fn().mockImplementation(() => { txCalls.push('zoneConnection.findMany'); return Promise.resolve([]); }),
-        };
-        if (prop === 'playerZoneDiscovery') return {
-          createMany: vi.fn().mockImplementation(() => { txCalls.push('playerZoneDiscovery.createMany'); return Promise.resolve({}); }),
-        };
-        // Return no-op for any other model
-        return new Proxy({}, { get: () => vi.fn().mockResolvedValue(null) });
-      },
-    });
-
-    mockPrisma.$transaction.mockImplementation(async (fn: any) => {
-      if (typeof fn === 'function') return fn(txClient);
-      return Promise.all(fn);
-    });
+    const txCalls = setupSuccessfulRegisterState();
 
     const req = {
       body: {
@@ -147,6 +153,151 @@ describe('POST /register', () => {
 
     // Verify the response
     expect(res.status).toHaveBeenCalledWith(201);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('cleans up expired refresh tokens before storing a registration refresh token', async () => {
+    setupSuccessfulRegisterState();
+
+    const req = {
+      body: {
+        username: 'Rook',
+        email: 'rook@example.com',
+        password: 'supersecure',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/register');
+    await handler(req, res, next);
+
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: {
+        playerId: 'player-1',
+        expiresAt: { lt: expect.any(Date) },
+      },
+    });
+    expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
+      data: {
+        playerId: 'player-1',
+        token: 'refresh-token',
+        expiresAt: new Date('2026-03-10T12:00:00.000Z'),
+      },
+    });
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(next).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /login', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.refreshToken = {
+      create: vi.fn().mockResolvedValue({}),
+      findUnique: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    };
+  });
+
+  it('cleans up expired refresh tokens before storing a new login refresh token', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      id: 'player-1',
+      username: 'Rook',
+      email: 'rook@example.com',
+      role: 'player',
+      passwordHash: 'stored-hash',
+      isBot: false,
+      emailVerified: true,
+    });
+    mockPrisma.player.update.mockResolvedValue({});
+    (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+    const req = {
+      body: {
+        email: 'rook@example.com',
+        password: 'supersecure',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/login');
+    await handler(req, res, next);
+
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: {
+        playerId: 'player-1',
+        expiresAt: { lt: expect.any(Date) },
+      },
+    });
+    expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
+      data: {
+        playerId: 'player-1',
+        token: 'refresh-token',
+        expiresAt: new Date('2026-03-10T12:00:00.000Z'),
+      },
+    });
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(next).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /refresh', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.refreshToken = {
+      create: vi.fn().mockResolvedValue({}),
+      findUnique: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    };
+  });
+
+  it('extends refresh token rotation transaction with expired-token cleanup', async () => {
+    (verifyRefreshToken as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      playerId: 'player-1',
+      username: 'Rook',
+      role: 'player',
+    });
+    mockPrisma.refreshToken.findUnique.mockResolvedValue({
+      token: 'old-refresh-token',
+      playerId: 'player-1',
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    mockPrisma.player.findUnique.mockResolvedValue({
+      id: 'player-1',
+      role: 'player',
+    });
+    mockPrisma.player.update.mockResolvedValue({});
+
+    const req = {
+      body: {
+        refreshToken: 'old-refresh-token',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/refresh');
+    await handler(req, res, next);
+
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenNthCalledWith(1, {
+      where: { token: 'old-refresh-token' },
+    });
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: {
+        playerId: 'player-1',
+        expiresAt: { lt: expect.any(Date) },
+      },
+    });
+    expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
+      data: {
+        playerId: 'player-1',
+        token: 'refresh-token',
+        expiresAt: new Date('2026-03-10T12:00:00.000Z'),
+      },
+    });
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
     expect(next).not.toHaveBeenCalled();
   });
 });

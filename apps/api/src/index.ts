@@ -6,7 +6,7 @@ import 'dotenv/config';
 import compression from 'compression';
 import helmet from 'helmet';
 import { createEndpointLimiter } from './middleware/rateLimiter';
-import { RATE_LIMIT_CONSTANTS, AUTH_CONSTANTS } from '@pocketrealm/shared';
+import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
 import { authRouter } from './routes/auth';
 import { turnsRouter } from './routes/turns';
 import { playerRouter } from './routes/player';
@@ -46,7 +46,6 @@ import { APP_VERSION } from './version';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
 import { startMetricsLogger } from './services/metricsLogger';
-import { cleanupExpiredTokens } from './services/authTokenService';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
 
 const app = express();
@@ -172,13 +171,6 @@ server.listen(PORT, () => {
     logger.error({ err }, 'Round timer registry rehydrate error');
   });
   stopMetricsLogger = startMetricsLogger(getIo);
-
-  // Auth token cleanup (every 6 hours)
-  setInterval(() => {
-    cleanupExpiredTokens().catch((err) => {
-      logger.error({ err }, 'Auth token cleanup error');
-    });
-  }, AUTH_CONSTANTS.TOKEN_CLEANUP_INTERVAL_MS);
 });
 
 process.on('SIGTERM', () => {
