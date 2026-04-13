@@ -21,6 +21,7 @@ import { addGuildLog } from './guildService';
 import { preparePlayerForCombat, applyGuildCombatModifiers, fetchFreshTemplateData } from './combatOrchestrationService';
 import { deductConsumedPotions } from './potionService';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
+import { getIo } from '../socket';
 import { snapshotCombatData, getCombatSnapshot, type ExpeditionCombatSnapshot } from './expeditionCombatCache';
 import { getCachedExpeditionMobTemplates } from './staticDataCacheService';
 import { getEquipmentStats } from './equipmentService';
@@ -28,6 +29,7 @@ import { getPlayerProgressionState } from './attributesService';
 import { calculateMaxHp } from '@pocketrealm/game-engine';
 import { getRoundInterval, getMembers, cleanupExpeditionBots } from './expeditionHelpers';
 import { handleRoomCleared, handleWipe } from './expeditionTransitionService';
+import { roundTimerRegistry } from './roundTimerRegistry';
 
 type DueExpeditionRef = {
   id: string;
@@ -262,15 +264,17 @@ async function resolveRecruitingWindowForExpedition(
       mobs: rooms[0]?.mobs ?? [],
       members: await getMembers(exp.id),
     };
+    const nextRoundAt = new Date(Date.now() + getRoundInterval(rooms, 0));
 
     await prisma.guildExpedition.update({
       where: { id: exp.id },
       data: {
         status: 'in_progress',
         roomStartSnapshot: JSON.parse(JSON.stringify(snapshot)),
-        nextRoundAt: new Date(Date.now() + getRoundInterval(rooms, 0)),
+        nextRoundAt,
       },
     });
+    roundTimerRegistry.schedule('guildExpedition', exp.id, nextRoundAt, getIo);
 
     await addGuildLog(
       exp.guildId,
@@ -290,6 +294,7 @@ async function resolveRecruitingWindowForExpedition(
       nextRoundAt: null,
     },
   });
+  roundTimerRegistry.cancel('guildExpedition', exp.id);
 
   await addGuildLog(
     exp.guildId,
@@ -444,6 +449,12 @@ export async function resolveExpeditionRound(
   });
   if (updated.count === 0) return;
 
+  if (nextRoundAt) {
+    roundTimerRegistry.schedule('guildExpedition', expeditionId, nextRoundAt, () => io);
+  } else {
+    roundTimerRegistry.cancel('guildExpedition', expeditionId);
+  }
+
   await Promise.all(
     result.participantResults.map(pr => {
       const threatEntry = result.threatTableAfter.find(t => t.playerId === pr.playerId);
@@ -514,6 +525,7 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
     where: { id: expeditionId },
     data: { nextRoundAt: null },
   });
+  roundTimerRegistry.cancel('guildExpedition', expeditionId);
 
   const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const currentRoomDef = rooms[expedition.currentRoom];
@@ -621,6 +633,7 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
   if (updated.count === 0) {
     throw new AppError(409, 'Room was modified by another process', 'CONCURRENT_MODIFICATION');
   }
+  roundTimerRegistry.cancel('guildExpedition', expeditionId);
 
   await Promise.all(
     participants.map(p => {
