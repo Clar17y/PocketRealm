@@ -73,6 +73,7 @@ tests/e2e/test-results/
 tests/e2e/dist/
 git.exe.stackdump
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 
 # Superpowers brainstorm
 .superpowers/brainstorm
