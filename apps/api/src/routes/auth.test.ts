@@ -17,6 +17,10 @@ vi.mock('../services/emailService', () => ({
   sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../services/eventSchedulerService', () => ({
+  checkAndSpawnEvents: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../middleware/rateLimiter', () => ({
   createEndpointLimiter: vi.fn(() => (_req: any, _res: any, next: any) => next()),
 }));
@@ -43,9 +47,14 @@ vi.mock('../middleware/auth', () => ({
   authenticate: vi.fn((_req: any, _res: any, next: any) => next()),
 }));
 
+vi.mock('../socket', () => ({
+  getIo: vi.fn(() => null),
+}));
+
 import { mockPrisma } from '../__test__/setup';
 import bcrypt from 'bcrypt';
 import { verifyRefreshToken } from '../middleware/auth';
+import { checkAndSpawnEvents } from '../services/eventSchedulerService';
 import { authRouter } from './auth';
 
 function findHandler(method: string, path: string) {
@@ -241,6 +250,64 @@ describe('POST /login', () => {
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
     expect(next).not.toHaveBeenCalled();
   });
+
+  it('triggers world event catch-up after successful login', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      id: 'player-1',
+      username: 'Rook',
+      email: 'rook@example.com',
+      role: 'player',
+      passwordHash: 'stored-hash',
+      isBot: false,
+      emailVerified: true,
+    });
+    mockPrisma.player.update.mockResolvedValue({});
+    (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+    const req = {
+      body: {
+        email: 'rook@example.com',
+        password: 'supersecure',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/login');
+    await handler(req, res, next);
+
+    expect(checkAndSpawnEvents).toHaveBeenCalledTimes(1);
+    expect(checkAndSpawnEvents).toHaveBeenCalledWith(null);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('does not trigger world event catch-up when login fails', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      id: 'player-1',
+      username: 'Rook',
+      email: 'rook@example.com',
+      role: 'player',
+      passwordHash: 'stored-hash',
+      isBot: false,
+      emailVerified: true,
+    });
+    (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+
+    const req = {
+      body: {
+        email: 'rook@example.com',
+        password: 'wrong-password',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/login');
+    await handler(req, res, next);
+
+    expect(checkAndSpawnEvents).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('POST /refresh', () => {
@@ -298,6 +365,39 @@ describe('POST /refresh', () => {
       },
     });
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('triggers world event catch-up after a successful refresh', async () => {
+    (verifyRefreshToken as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      playerId: 'player-1',
+      username: 'Rook',
+      role: 'player',
+    });
+    mockPrisma.refreshToken.findUnique.mockResolvedValue({
+      token: 'old-refresh-token',
+      playerId: 'player-1',
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    mockPrisma.player.findUnique.mockResolvedValue({
+      id: 'player-1',
+      role: 'player',
+    });
+    mockPrisma.player.update.mockResolvedValue({});
+
+    const req = {
+      body: {
+        refreshToken: 'old-refresh-token',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/refresh');
+    await handler(req, res, next);
+
+    expect(checkAndSpawnEvents).toHaveBeenCalledTimes(1);
+    expect(checkAndSpawnEvents).toHaveBeenCalledWith(null);
     expect(next).not.toHaveBeenCalled();
   });
 });

@@ -20,7 +20,9 @@ import { createEmailVerificationToken, verifyEmailToken, createPasswordResetToke
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
 import { recordFailedLogin, isLockedOut, clearLockout, checkEmailRateLimit } from '../services/lockoutService';
 import { verifyPlayerEmail, changePlayerEmail, changePlayerPassword } from '../services/authService';
+import { checkAndSpawnEvents } from '../services/eventSchedulerService';
 import { logger } from '../logger';
+import { getIo } from '../socket';
 
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
@@ -273,6 +275,9 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
   ]);
 
   logger.info({ playerId: player.id, username: player.username }, 'Player logged in');
+  await checkAndSpawnEvents(getIo()).catch((err) => {
+    logger.warn({ err, playerId: player.id }, 'Post-login world event catch-up failed');
+  });
 
   res.json({
     player: {
@@ -343,6 +348,10 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
       data: { lastActiveAt: now },
     }),
   ]);
+
+  await checkAndSpawnEvents(getIo()).catch((err) => {
+    logger.warn({ err, playerId: payload.playerId }, 'Post-refresh world event catch-up failed');
+  });
 
   res.json({
     accessToken: newAccessToken,
