@@ -314,48 +314,54 @@ export async function expireStaleEvents(): Promise<WorldEventData[]> {
 
   if (stale.length === 0) return [];
 
-  const staleIds = stale.map((event) => event.id);
-  const staleBossEventIds = stale
-    .filter((event) => event.type === 'boss')
-    .map((event) => event.id);
+  const transitioned = [] as typeof stale;
+  const bossEncountersToCancel: Array<{ id: string }> = [];
 
-  const bossEncountersToCancel = staleBossEventIds.length > 0
-    ? await prisma.bossEncounter.findMany({
+  await prisma.$transaction(async (tx) => {
+    for (const event of stale) {
+      const updated = await tx.worldEvent.updateMany({
+        where: {
+          id: event.id,
+          status: 'active',
+        },
+        data: { status: 'expired' },
+      });
+      if (updated.count === 1) {
+        transitioned.push(event);
+      }
+    }
+
+    const staleBossEventIds = transitioned
+      .filter((event) => event.type === 'boss')
+      .map((event) => event.id);
+
+    if (staleBossEventIds.length === 0) return;
+
+    bossEncountersToCancel.push(...await tx.bossEncounter.findMany({
       where: {
         eventId: { in: staleBossEventIds },
         status: { in: ['waiting', 'in_progress'] },
       },
       select: { id: true },
-    })
-    : [];
+    }));
 
-  await prisma.$transaction([
-    prisma.worldEvent.updateMany({
+    await tx.bossEncounter.updateMany({
       where: {
-        id: { in: staleIds },
-        status: 'active',
+        eventId: { in: staleBossEventIds },
+        status: { in: ['waiting', 'in_progress'] },
       },
-      data: { status: 'expired' },
-    }),
-    ...(staleBossEventIds.length > 0
-      ? [prisma.bossEncounter.updateMany({
-        where: {
-          eventId: { in: staleBossEventIds },
-          status: { in: ['waiting', 'in_progress'] },
-        },
-        data: {
-          status: 'expired',
-          nextRoundAt: null,
-        },
-      })]
-      : []),
-  ]);
+      data: {
+        status: 'expired',
+        nextRoundAt: null,
+      },
+    });
+  });
 
   for (const encounter of bossEncountersToCancel) {
     roundTimerRegistry.cancel('bossEncounter', encounter.id);
   }
 
-  return stale.map(toWorldEventData);
+  return transitioned.map(toWorldEventData);
 }
 
 /** Extract compact event summaries from pre-fetched events (no DB calls). */

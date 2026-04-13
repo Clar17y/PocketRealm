@@ -261,11 +261,22 @@ describe('worldEventService', () => {
       expect(result).toHaveLength(1);
       expect(mockPrisma.worldEvent.updateMany).toHaveBeenCalledWith({
         where: {
-          id: { in: ['evt-1'] },
+          id: 'evt-1',
           status: 'active',
         },
         data: { status: 'expired' },
       });
+      expect(mockPrisma.bossEncounter.findMany).not.toHaveBeenCalled();
+      expect(roundTimerRegistry.cancel).not.toHaveBeenCalled();
+    });
+
+    it('returns only events actually expired by this invocation', async () => {
+      mockPrisma.worldEvent.findMany.mockResolvedValue([makeEventRow()]);
+      mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await expireStaleEvents();
+
+      expect(result).toEqual([]);
       expect(mockPrisma.bossEncounter.findMany).not.toHaveBeenCalled();
       expect(roundTimerRegistry.cancel).not.toHaveBeenCalled();
     });

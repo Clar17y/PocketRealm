@@ -149,7 +149,7 @@ describe('roundTimerRegistry.rehydrate', () => {
     expect(roundTimerRegistry.size()).toBe(0);
   });
 
-  it('resolver error gives up after MAX_RETRY_ATTEMPTS', async () => {
+  it('resolver error stays scheduled after the fast retry budget is exhausted', async () => {
     const { resolveDueBossEncounter } = (await import('./bossEncounterService.js')) as any;
     (resolveDueBossEncounter as any).mockRejectedValue(new Error('permanent'));
 
@@ -159,9 +159,10 @@ describe('roundTimerRegistry.rehydrate', () => {
     await vi.advanceTimersByTimeAsync(5_000);
     await vi.advanceTimersByTimeAsync(10_000);
     expect(resolveDueBossEncounter).toHaveBeenCalledTimes(3);
-    expect(roundTimerRegistry.size()).toBe(0);
+    expect(roundTimerRegistry.size()).toBe(1);
 
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(resolveDueBossEncounter).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(resolveDueBossEncounter).toHaveBeenCalledTimes(4);
+    expect(roundTimerRegistry.size()).toBe(1);
   });
 });

@@ -56,18 +56,19 @@ function scheduleInternal(
       await resolveFor(kind, id, getIo());
     } catch (err) {
       const nextAttempts = attempts + 1;
-      if (nextAttempts >= MAX_RETRY_ATTEMPTS) {
-        logger.error(
-          { err, kind, id, attempts: nextAttempts },
-          'Round timer resolver failed; giving up',
-        );
-        return;
-      }
-
       const backoffMs = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.pow(2, nextAttempts - 1));
       logger.error(
-        { err, kind, id, attempts: nextAttempts, backoffMs },
-        'Round timer resolver failed; retrying',
+        {
+          err,
+          kind,
+          id,
+          attempts: nextAttempts,
+          backoffMs,
+          retryBudgetExceeded: nextAttempts >= MAX_RETRY_ATTEMPTS,
+        },
+        nextAttempts >= MAX_RETRY_ATTEMPTS
+          ? 'Round timer resolver failed; continuing with capped backoff'
+          : 'Round timer resolver failed; retrying',
       );
       scheduleInternal(kind, id, new Date(Date.now() + backoffMs), getIo, nextAttempts);
     }

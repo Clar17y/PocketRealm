@@ -1,6 +1,11 @@
+// IMPORTANT: Sentry must be initialized before any other import so its
+// auto-instrumentation can patch Node internals (http, express, prisma).
+import './instrument';
+
 import http from 'http';
 import { randomUUID } from 'crypto';
 import express from 'express';
+import * as Sentry from '@sentry/node';
 import cors from 'cors';
 import 'dotenv/config';
 import compression from 'compression';
@@ -41,6 +46,7 @@ import { healthRouter } from './routes/health';
 import { markShuttingDown } from './services/healthChecks';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
+import { sentryContext } from './middleware/sentryContext';
 import { logger } from './logger';
 import { APP_VERSION } from './version';
 import { createSocketServer, getIo } from './socket';
@@ -109,6 +115,7 @@ app.use((req, res, next) => {
 });
 
 app.use(requestLogger);
+app.use(sentryContext);
 
 // Trust the first proxy hop (e.g. nginx/Caddy) so Express resolves req.ip
 // to the real client IP rather than the reverse proxy's address.  Without
@@ -156,6 +163,11 @@ app.use('/api/v1/shop', shopRouter);
 app.use('/api/v1/friends', friendsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
 
+// Sentry's Express error handler — captures errors before our own
+// errorHandler formats the response. `beforeSend` in instrument.ts
+// drops 4xx AppErrors so only true server errors get reported.
+Sentry.setupExpressErrorHandler(app);
+
 // Error handler
 app.use(errorHandler);
 
@@ -188,6 +200,9 @@ process.on('SIGTERM', () => {
     redis.quit()
       .then(() => logger.info('Redis connection closed'))
       .catch((err) => logger.error({ err }, 'Redis quit error'))
+      // Flush any Sentry events captured during the drain window before
+      // process.exit drops the transport buffer.
+      .then(() => Sentry.flush(2000).catch(() => undefined))
       .finally(() => process.exit(0));
   });
 });

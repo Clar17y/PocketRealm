@@ -44,8 +44,9 @@ All variables are required in production unless marked optional. Set them in Ren
 | `CORS_ORIGINS` | yes | `http://localhost:3002,http://127.0.0.1:3002` | Comma-separated allowed web origins. Production: the Vercel domain. |
 | `LOG_LEVEL` | no | `info` (prod), `debug` (dev/test) | pino log level — see [Logging](#logging) |
 | `APP_VERSION` | no | (root `package.json#version`) | Override for the version reported by `/health` and Sentry. If unset, the API reads root `package.json#version` at runtime — see [Release Versioning](#release-versioning) |
-| `SENTRY_DSN` | yes (Phase 2.2) | — | **Filled in by Phase 2.2 (#209).** Server-side Sentry project DSN. |
-| `SENTRY_AUTH_TOKEN` | yes (build-time, Phase 2.2) | — | **Filled in by Phase 2.2 (#209).** Sentry CLI token for source map upload. |
+| `SENTRY_DSN` | yes (prod), no (dev) | — | Server-side Sentry project DSN. Leave unset to disable Sentry. See [Sentry Error Tracking](#sentry-error-tracking). |
+| `SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Overrides `NODE_ENV` for the Sentry environment tag (`production` / `staging`). |
+| `SENTRY_AUTH_TOKEN` | yes (web build-time) | — | Sentry CLI token used by `next build` to upload web source maps. Not read by the API. |
 | `VAPID_PUBLIC_KEY` | yes | — | Web Push VAPID public key |
 | `VAPID_PRIVATE_KEY` | yes | — | Web Push VAPID private key |
 | `VAPID_SUBJECT` | yes | — | `mailto:` contact for Web Push |
@@ -58,9 +59,12 @@ All variables are required in production unless marked optional. Set them in Ren
 |----------|----------|---------|-------------|
 | `NEXT_PUBLIC_API_URL` | yes | — | Public URL of the Render API, used by the browser |
 | `APP_VERSION` | yes (build-time) | `0.0.0-dev` | Injected from root `package.json#version` via `next.config.mjs` — see [Release Versioning](#release-versioning) |
-| `NEXT_PUBLIC_SENTRY_DSN` | yes (Phase 2.2) | — | **Filled in by Phase 2.2 (#209).** Browser Sentry DSN. |
+| `NEXT_PUBLIC_SENTRY_DSN` | yes (prod), no (dev) | — | Browser Sentry DSN. Leave unset to disable. See [Sentry Error Tracking](#sentry-error-tracking). |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | no | `NODE_ENV` | Environment tag for client-side Sentry init. |
+| `SENTRY_ORG` | yes (web build-time) | — | Sentry org slug for `next build` source map upload. |
+| `SENTRY_PROJECT` | yes (web build-time) | — | Sentry project slug for `next build` source map upload. |
 
-If Phase 2.2 (#209 Sentry) or other parallel phases add more variables, append rows to these tables rather than creating a new section.
+Parallel phases adding new variables should append rows to these tables rather than creating a new section.
 
 ---
 
@@ -288,3 +292,42 @@ Configure an external ping against `/health/ready` (NOT `/health`, so failures p
   - Timeout: 5s
 - [ ] Wire alerts to a Discord webhook or email distribution list
 - [ ] If using Render's built-in health check, point it at `/health/ready` so Render will restart the instance automatically when the probe fails
+
+---
+
+## Sentry Error Tracking
+
+Sentry is wired into both the API (`@sentry/node`) and the web app
+(`@sentry/nextjs`). Both SDKs no-op when no DSN is configured, so local
+development stays noise-free by default.
+
+### API environment variables
+
+| Var | Where | Notes |
+|-----|-------|-------|
+| `SENTRY_DSN` | API runtime | Public project DSN. Leave unset to disable Sentry entirely. |
+| `SENTRY_ENVIRONMENT` | API runtime | Overrides `NODE_ENV` for the Sentry environment tag. Set to `production` / `staging`. |
+| `APP_VERSION` | API runtime | Used as the Sentry release tag and surfaced in `/health` response as `version`. Falls back to `"unknown"`. |
+
+### Web environment variables
+
+| Var | Where | Notes |
+|-----|-------|-------|
+| `NEXT_PUBLIC_SENTRY_DSN` | Build + runtime | Public DSN. Exposed to the browser. |
+| `NEXT_PUBLIC_APP_VERSION` | Build | Release tag mirroring the API `APP_VERSION`. |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | Build | Optional override for the environment tag (client-side init). |
+| `SENTRY_ENVIRONMENT` | Build | Optional override for the environment tag (server/edge init). |
+| `SENTRY_AUTH_TOKEN` | **Build only** | Personal/project auth token used to upload source maps during `next build`. Never expose to the browser. |
+| `SENTRY_ORG` | Build only | Sentry org slug. |
+| `SENTRY_PROJECT` | Build only | Sentry project slug. |
+
+Source maps upload only when `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and
+`SENTRY_PROJECT` are all present during `next build`. Missing any of
+them logs a warning via `withSentryConfig`'s `errorHandler` and the
+build continues so offline dev and PR preview builds aren't blocked.
+
+Process-level unhandled rejections and uncaught exceptions in the API
+are forwarded to Sentry and logged via pino before the process exits.
+4xx `AppError` responses and `ZodError` validation failures are
+deliberately filtered out at the SDK boundary (`beforeSend`) so only
+true server errors reach the dashboard.

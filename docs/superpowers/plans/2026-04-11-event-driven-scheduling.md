@@ -41,8 +41,10 @@ Check the project memory note: `bossEncounterService.test.ts` has 46 pre-existin
 | Modify | `apps/api/src/routes/expedition.ts` | Retain activity-triggered due catch-up |
 | Modify | `apps/api/src/routes/worldEvents.ts` | Call `checkAndSpawnEvents(getIo())` before listing events |
 | Modify | `apps/api/src/routes/auth.ts` | Call `checkAndSpawnEvents(getIo())` on login/session-resume; add refresh-token cleanup on write |
-| Modify | `apps/api/src/services/authService.ts` | Opportunistic expired-refresh-token cleanup on login/register (new small transactions); extend refresh transaction |
 | Modify | `apps/api/src/services/authTokenService.ts` | Opportunistic expired-verification/reset-token cleanup inside existing transactions |
+| Modify | `apps/api/src/routes/auth.test.ts` | Route-level tests for login/register/refresh token cleanup and login event catch-up |
+| Modify | `apps/api/src/services/authTokenService.test.ts` | Tests for verification/reset token cleanup |
+| Create/Modify | `apps/api/src/routes/worldEvents.test.ts` | Events-list catch-up route tests |
 | Modify | `apps/api/src/services/persistedMobService.ts` | Lazy-on-touch full-heal deletion in `checkPersistedMobReencounter` and `persistMobHp` |
 | Modify | `apps/api/src/services/leaderboardService.ts` | `ensureLeaderboardsFresh` with Redis lock before `getLeaderboard` reads |
 | Modify | `apps/api/src/routes/admin.ts` | `GET /api/v1/admin/scheduler-status` manual debug endpoint |
@@ -210,7 +212,7 @@ describe('roundTimerRegistry', () => {
   });
 
   it('schedule fires resolver at the given time', async () => {
-    const { resolveDueBossEncounter } = await import('./bossEncounterService');
+    const { resolveDueBossEncounter } = (await import('./bossEncounterService')) as any;
     const at = new Date(Date.now() + 1000);
     roundTimerRegistry.schedule('bossEncounter', 'boss-1', at, noIo);
     expect(roundTimerRegistry.size()).toBe(1);
@@ -221,7 +223,7 @@ describe('roundTimerRegistry', () => {
   });
 
   it('cancel prevents resolver from firing', async () => {
-    const { resolveDueBossEncounter } = await import('./bossEncounterService');
+    const { resolveDueBossEncounter } = (await import('./bossEncounterService')) as any;
     const at = new Date(Date.now() + 1000);
     roundTimerRegistry.schedule('bossEncounter', 'boss-1', at, noIo);
     roundTimerRegistry.cancel('bossEncounter', 'boss-1');
@@ -232,7 +234,7 @@ describe('roundTimerRegistry', () => {
   });
 
   it('rescheduling the same key clears the first timer', async () => {
-    const { resolveDueBossEncounter } = await import('./bossEncounterService');
+    const { resolveDueBossEncounter } = (await import('./bossEncounterService')) as any;
     roundTimerRegistry.schedule('bossEncounter', 'boss-1', new Date(Date.now() + 500), noIo);
     roundTimerRegistry.schedule('bossEncounter', 'boss-1', new Date(Date.now() + 2000), noIo);
 
@@ -244,7 +246,7 @@ describe('roundTimerRegistry', () => {
   });
 
   it('past-due delay fires immediately', async () => {
-    const { resolveDueBossEncounter } = await import('./bossEncounterService');
+    const { resolveDueBossEncounter } = (await import('./bossEncounterService')) as any;
     const at = new Date(Date.now() - 10_000);
     roundTimerRegistry.schedule('bossEncounter', 'boss-1', at, noIo);
 
@@ -253,7 +255,7 @@ describe('roundTimerRegistry', () => {
   });
 
   it('expedition kind routes to expedition resolver', async () => {
-    const { resolveDueExpeditionStep } = await import('./expeditionRoundService');
+    const { resolveDueExpeditionStep } = (await import('./expeditionRoundService')) as any;
     roundTimerRegistry.schedule('guildExpedition', 'exp-1', new Date(Date.now() + 100), noIo);
 
     await vi.advanceTimersByTimeAsync(100);
@@ -285,11 +287,12 @@ Create `apps/api/src/services/roundTimerRegistry.ts`:
 import type { Server as SocketServer } from 'socket.io';
 import { prisma } from '@pocketrealm/database';
 import { logger } from '../logger';
-import { resolveDueBossEncounter } from './bossEncounterService';
-import { resolveDueExpeditionStep } from './expeditionRoundService';
 
 export type ScheduledRoundKind = 'bossEncounter' | 'guildExpedition';
 export type GetIo = () => SocketServer | null;
+type DueResolver = (id: string, io: SocketServer | null) => Promise<void>;
+type BossResolverModule = { resolveDueBossEncounter: DueResolver };
+type ExpeditionResolverModule = { resolveDueExpeditionStep: DueResolver };
 
 type Entry = {
   timer: NodeJS.Timeout;
@@ -298,16 +301,22 @@ type Entry = {
 
 const timers = new Map<string, Entry>();
 
-const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_BASE_MS = 5_000;
+const RETRY_MAX_MS = 5 * 60_000;
 
 function key(kind: ScheduledRoundKind, id: string): string {
   return `${kind}:${id}`;
 }
 
-function resolveFor(kind: ScheduledRoundKind, id: string, io: SocketServer | null): Promise<void> {
-  if (kind === 'bossEncounter') return resolveDueBossEncounter(id, io);
-  return resolveDueExpeditionStep(id, io);
+async function resolveFor(kind: ScheduledRoundKind, id: string, io: SocketServer | null): Promise<void> {
+  // Dynamic imports avoid a top-level cycle:
+  // registry -> boss/expedition service -> registry.
+  if (kind === 'bossEncounter') {
+    const mod = (await import('./bossEncounterService')) as unknown as BossResolverModule;
+    return mod.resolveDueBossEncounter(id, io);
+  }
+  const mod = (await import('./expeditionRoundService')) as unknown as ExpeditionResolverModule;
+  return mod.resolveDueExpeditionStep(id, io);
 }
 
 function scheduleInternal(
@@ -328,13 +337,13 @@ function scheduleInternal(
     try {
       await resolveFor(kind, id, getIo());
     } catch (err) {
-      logger.error({ err, kind, id, attempts }, 'Round timer resolver failed');
-      if (attempts + 1 >= MAX_RETRY_ATTEMPTS) {
-        logger.error({ kind, id }, 'Round timer max retries exhausted — giving up');
-        return;
-      }
-      const backoffMs = RETRY_BASE_MS * Math.pow(2, attempts);
-      scheduleInternal(kind, id, new Date(Date.now() + backoffMs), getIo, attempts + 1);
+      const nextAttempts = attempts + 1;
+      const backoffMs = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.pow(2, attempts));
+      logger.error(
+        { err, kind, id, attempts: nextAttempts, backoffMs },
+        'Round timer resolver failed; retrying',
+      );
+      scheduleInternal(kind, id, new Date(Date.now() + backoffMs), getIo, nextAttempts);
     }
   }, delay);
 
@@ -413,7 +422,7 @@ Expected: PASS (all 6 tests).
 npm run typecheck
 ```
 
-Expected: PASS. (At this point `resolveDueBossEncounter` and `resolveDueExpeditionStep` don't exist yet — if typecheck fails complaining about missing exports, temporarily add stub exports in the target services: `export async function resolveDueBossEncounter(_id: string, _io: any): Promise<void> {}` and same for expedition. These stubs get real bodies in Tasks 4 and 5.)
+Expected: PASS. Do **not** add temporary resolver stubs. The registry uses dynamic imports with local resolver module types specifically to avoid both top-level circular imports and stub exports. Tasks 4 and 5 add the real exported resolver functions before this branch is deployable.
 
 - [ ] **Step 6: Commit**
 
@@ -449,8 +458,8 @@ describe('roundTimerRegistry.rehydrate', () => {
 
   it('rehydrates pending boss and expedition rows from DB', async () => {
     const { prisma } = await import('@pocketrealm/database');
-    const { resolveDueBossEncounter } = await import('./bossEncounterService');
-    const { resolveDueExpeditionStep } = await import('./expeditionRoundService');
+    const { resolveDueBossEncounter } = (await import('./bossEncounterService')) as any;
+    const { resolveDueExpeditionStep } = (await import('./expeditionRoundService')) as any;
 
     const futureBoss = new Date(Date.now() + 5_000);
     const pastExp = new Date(Date.now() - 1_000);
@@ -475,7 +484,7 @@ describe('roundTimerRegistry.rehydrate', () => {
   });
 
   it('resolver error triggers bounded backoff retry', async () => {
-    const { resolveDueBossEncounter } = await import('./bossEncounterService');
+    const { resolveDueBossEncounter } = (await import('./bossEncounterService')) as any;
     (resolveDueBossEncounter as any)
       .mockRejectedValueOnce(new Error('transient'))
       .mockResolvedValueOnce(undefined);
@@ -490,25 +499,20 @@ describe('roundTimerRegistry.rehydrate', () => {
     expect(roundTimerRegistry.size()).toBe(0);
   });
 
-  it('resolver error gives up after MAX_RETRY_ATTEMPTS', async () => {
-    const { resolveDueBossEncounter } = await import('./bossEncounterService');
+  it('resolver error keeps retrying with capped backoff instead of dropping the timer', async () => {
+    const { resolveDueBossEncounter } = (await import('./bossEncounterService')) as any;
     (resolveDueBossEncounter as any).mockRejectedValue(new Error('permanent'));
 
-    roundTimerRegistry.schedule('bossEncounter', 'boss-dead', new Date(Date.now() + 100), noIo);
+    roundTimerRegistry.schedule('bossEncounter', 'boss-active', new Date(Date.now() + 100), noIo);
 
-    // First fire
     await vi.advanceTimersByTimeAsync(100);
-    // Retry 1 at +5s
-    await vi.advanceTimersByTimeAsync(5_000);
-    // Retry 2 at +10s (5 * 2^1)
-    await vi.advanceTimersByTimeAsync(10_000);
-    // Retry 3 would be at +20s, but MAX=3 so we stop
-    expect(resolveDueBossEncounter).toHaveBeenCalledTimes(3);
-    expect(roundTimerRegistry.size()).toBe(0);
+    expect(resolveDueBossEncounter).toHaveBeenCalledTimes(1);
 
-    // Advance past all possible retries and confirm no further calls
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(resolveDueBossEncounter).toHaveBeenCalledTimes(3);
+    for (const [index, delayMs] of [5_000, 10_000, 20_000, 40_000, 80_000, 160_000, 300_000, 300_000].entries()) {
+      await vi.advanceTimersByTimeAsync(delayMs);
+      expect(resolveDueBossEncounter).toHaveBeenCalledTimes(index + 2);
+      expect(roundTimerRegistry.size()).toBe(1);
+    }
   });
 });
 ```
@@ -539,10 +543,10 @@ git commit -m "test(scheduling): rehydrate and bounded backoff for round timer r
 - [ ] **Step 1: Locate the existing round resolution path**
 
 ```bash
-rg -n "resolveBossRoundInner|checkAndResolveDueBossRounds" apps/api/src/services/bossEncounterService.ts
+rg -n "export async function resolveBossRound|function resolveBossRoundInner|checkAndResolveDueBossRounds" apps/api/src/services/bossEncounterService.ts
 ```
 
-Note the line ranges for `resolveBossRoundInner` (the body that actually resolves one round) and `checkAndResolveDueBossRounds` (the broad scanner).
+Note the line ranges for the exported `resolveBossRound` wrapper, `resolveBossRoundInner`, and `checkAndResolveDueBossRounds` (the broad scanner). The due resolver must call the exported wrapper so the Redis lock remains in force.
 
 - [ ] **Step 2: Write failing test for the single-entity resolver**
 
@@ -599,7 +603,7 @@ Expected: FAIL — `resolveDueBossEncounter is not a function` (or similar).
 
 - [ ] **Step 4: Implement `resolveDueBossEncounter`**
 
-In `apps/api/src/services/bossEncounterService.ts`, replace any Task-2 stub and add (near `checkAndResolveDueBossRounds`):
+In `apps/api/src/services/bossEncounterService.ts`, add this near `checkAndResolveDueBossRounds`:
 
 ```typescript
 import type { Server as SocketServer } from 'socket.io';
@@ -617,15 +621,13 @@ export async function resolveDueBossEncounter(
   if (!encounter.nextRoundAt) return;
   if (encounter.nextRoundAt.getTime() > Date.now()) return;
 
-  // Delegate to the existing one-encounter resolution function.
-  // If resolveBossRoundInner currently takes a different signature, adapt this
-  // to call the same Prisma-update-guarded path used by checkAndResolveDueBossRounds
-  // when it processes a single row.
-  await resolveBossRoundInner(encounter.id, io);
+  // Delegate to the existing public resolver so the Redis lock and existing
+  // single-encounter idempotency behavior stay in force.
+  await resolveBossRound(encounter.id, io);
 }
 ```
 
-If `resolveBossRoundInner` is not currently exported or has a different signature, either (a) export it and adapt its signature to accept a single encounter id, or (b) inline the single-encounter branch of `checkAndResolveDueBossRounds` into `resolveDueBossEncounter`. Do NOT call the broad scanner.
+Use the existing exported `resolveBossRound`, not `resolveBossRoundInner`. `resolveBossRound` owns the Redis lock; calling the inner function directly would bypass duplicate-resolution protection. Do NOT call the broad scanner.
 
 - [ ] **Step 5: Run the three new tests**
 
@@ -842,25 +844,25 @@ describe('boss lifecycle scheduling hooks', () => {
 
   it('successful non-defeating round resolution schedules the next round', async () => {
     // Arrange: mock prisma.bossEncounter.update to return a row with new nextRoundAt + in_progress
-    await resolveBossRoundInner(/* existing args */);
+    await resolveBossRound(/* existing args */);
     expect(roundTimerRegistry.schedule).toHaveBeenCalled();
   });
 
   it('boss defeated cancels the timer', async () => {
     // Arrange: mock resolution with hp <= 0 outcome
-    await resolveBossRoundInner(/* existing args */);
+    await resolveBossRound(/* existing args */);
     expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('bossEncounter', expect.any(String));
   });
 
   it('boss wipe cancels the timer (status back to waiting)', async () => {
     // Arrange: mock wipe outcome that sets status back to waiting
-    await resolveBossRoundInner(/* existing args */);
+    await resolveBossRound(/* existing args */);
     expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('bossEncounter', expect.any(String));
   });
 });
 ```
 
-> **Note:** The exact call-site fixtures depend on existing test patterns. Match what the file already does for `createBossEncounter` / `signUpForBossRound` / `resolveBossRoundInner`. The audit file lists the exact call sites; if any are not covered here, add a test row for each.
+> **Note:** The exact call-site fixtures depend on existing test patterns. Match what the file already does for `createBossEncounter` / `signUpForBossRound` / `resolveBossRound`. The audit file lists the exact call sites; if any are not covered here, add a test row for each.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -891,6 +893,8 @@ roundTimerRegistry.cancel('bossEncounter', encounterId);
 ```typescript
 import { roundTimerRegistry } from './roundTimerRegistry';
 ```
+
+Use the correct relative path for the file being edited (`./roundTimerRegistry` from service files in the same directory, `../services/roundTimerRegistry` from routes). This import is safe because the registry does **not** top-level import boss/expedition services; its due resolvers are loaded dynamically when a timer fires.
 
 **`getIo` parameter:** the registry's `schedule` needs a `() => SocketServer | null` function, not a `SocketServer` instance. If the existing function receives `io: SocketServer | null`, pass `() => io`. If it receives `getIo: () => SocketServer | null`, pass `getIo` directly.
 
@@ -1123,15 +1127,19 @@ Add (before `stopMetricsLogger = startMetricsLogger(getIo);`):
 import { roundTimerRegistry } from './services/roundTimerRegistry';
 
 // ...inside server.listen callback...
-await roundTimerRegistry.rehydrate(getIo);
+void roundTimerRegistry.rehydrate(getIo).catch((err) => {
+  logger.error({ err }, 'Round timer registry rehydrate failed');
+});
 ```
 
-Make the `server.listen` callback `async` if it isn't already:
+Keep the `server.listen` callback synchronous. Node does not await an async listen callback, so awaiting rehydrate there can become an unhandled rejection and can skip later startup work.
 
 ```typescript
-server.listen(PORT, async () => {
+server.listen(PORT, () => {
   logger.info({ port: PORT }, 'PocketRealm API running');
-  await roundTimerRegistry.rehydrate(getIo);
+  void roundTimerRegistry.rehydrate(getIo).catch((err) => {
+    logger.error({ err }, 'Round timer registry rehydrate failed');
+  });
   stopMetricsLogger = startMetricsLogger(getIo);
   // ... rest unchanged until Tasks 9-12 remove the setIntervals
 });
@@ -1301,42 +1309,74 @@ rg -n "refreshAllLeaderboards|getLeaderboard|leaderboard:last_refresh|leaderboar
 
 - [ ] **Step 2: Write failing tests**
 
-Add to `apps/api/src/services/leaderboardService.test.ts`:
+Add `eval: vi.fn()` to the existing `../redis` mock in `apps/api/src/services/leaderboardService.test.ts`, add `ensureLeaderboardsFresh` to the import from `./leaderboardService`, and append:
 
 ```typescript
-import { randomUUID } from 'crypto';
-
 describe('ensureLeaderboardsFresh', () => {
   it('skips refresh when last_refresh is within TTL', async () => {
-    const { redis } = await import('../redis');
-    (redis.get as any) = vi.fn().mockResolvedValue(new Date().toISOString());
-    const refreshSpy = vi.spyOn(await import('./leaderboardService'), 'refreshAllLeaderboards');
+    mockRedis.get.mockResolvedValue(new Date().toISOString());
 
     await ensureLeaderboardsFresh();
-    expect(refreshSpy).not.toHaveBeenCalled();
+
+    expect(mockRedis.set).not.toHaveBeenCalledWith(
+      'leaderboard:refresh_lock',
+      expect.any(String),
+      'PX',
+      60_000,
+      'NX',
+    );
   });
 
   it('refreshes when last_refresh is stale and lock is acquired', async () => {
-    const { redis } = await import('../redis');
-    (redis.get as any) = vi.fn().mockResolvedValue(new Date(Date.now() - 999_999_999).toISOString());
-    (redis.set as any) = vi.fn().mockResolvedValue('OK'); // lock acquired
-    const refreshSpy = vi.spyOn(await import('./leaderboardService'), 'refreshAllLeaderboards').mockResolvedValue(undefined);
+    stubEmptyRefresh();
+    mockRedis.get.mockResolvedValue(new Date(Date.now() - 999_999_999).toISOString());
+    mockRedis.set.mockResolvedValue('OK');
+    mockRedis.eval.mockResolvedValue(1);
 
     await ensureLeaderboardsFresh();
-    expect(refreshSpy).toHaveBeenCalled();
+
+    expect(mockRedis.set).toHaveBeenCalledWith(
+      'leaderboard:refresh_lock',
+      expect.any(String),
+      'PX',
+      60_000,
+      'NX',
+    );
+    expect(mockRedis.set).toHaveBeenCalledWith(
+      'leaderboard:last_refresh',
+      expect.any(String),
+    );
+    expect(mockRedis.eval).toHaveBeenCalledWith(
+      expect.stringContaining('redis.call("get"'),
+      1,
+      'leaderboard:refresh_lock',
+      expect.any(String),
+    );
   });
 
   it('skips refresh when lock cannot be acquired', async () => {
-    const { redis } = await import('../redis');
-    (redis.get as any) = vi.fn().mockResolvedValue(null);
-    (redis.set as any) = vi.fn().mockResolvedValue(null); // lock NOT acquired
-    const refreshSpy = vi.spyOn(await import('./leaderboardService'), 'refreshAllLeaderboards');
+    mockRedis.get.mockResolvedValue(null);
+    mockRedis.set.mockResolvedValue(null);
 
     await ensureLeaderboardsFresh();
-    expect(refreshSpy).not.toHaveBeenCalled();
+
+    expect(mockRedis.set).toHaveBeenCalledWith(
+      'leaderboard:refresh_lock',
+      expect.any(String),
+      'PX',
+      60_000,
+      'NX',
+    );
+    expect(mockRedis.set).not.toHaveBeenCalledWith(
+      'leaderboard:last_refresh',
+      expect.any(String),
+    );
+    expect(mockRedis.eval).not.toHaveBeenCalled();
   });
 });
 ```
+
+Do not use `vi.spyOn(await import('./leaderboardService'), 'refreshAllLeaderboards')` for this; `ensureLeaderboardsFresh` calls the local function binding, so a same-module spy can miss the call. Assert Redis/DB side effects instead, matching this file's existing `mockRedis` and `stubEmptyRefresh()` pattern.
 
 - [ ] **Step 3: Run tests to verify they fail**
 
@@ -1359,6 +1399,12 @@ import { logger } from '../logger';
 const LAST_REFRESH_KEY = 'leaderboard:last_refresh';
 const LOCK_KEY = 'leaderboard:refresh_lock';
 const LOCK_TTL_MS = 60_000;
+const RELEASE_LOCK_SCRIPT = `
+  if redis.call("get", KEYS[1]) == ARGV[1] then
+    return redis.call("del", KEYS[1])
+  end
+  return 0
+`;
 
 export async function ensureLeaderboardsFresh(): Promise<void> {
   try {
@@ -1379,11 +1425,8 @@ export async function ensureLeaderboardsFresh(): Promise<void> {
     try {
       await refreshAllLeaderboards();
     } finally {
-      // Compare-and-delete release: only delete if we still hold the lock.
-      const current = await redis.get(LOCK_KEY);
-      if (current === lockToken) {
-        await redis.del(LOCK_KEY);
-      }
+      // Atomic compare-and-delete: only delete if we still hold the lock.
+      await redis.eval(RELEASE_LOCK_SCRIPT, 1, LOCK_KEY, lockToken);
     }
   } catch (err) {
     logger.warn({ err }, 'ensureLeaderboardsFresh failed; serving existing data');
@@ -1394,7 +1437,11 @@ export async function ensureLeaderboardsFresh(): Promise<void> {
 Modify every exported `getLeaderboard`-style function to call `ensureLeaderboardsFresh()` before reading:
 
 ```typescript
-export async function getLeaderboard(category: LeaderboardCategory): Promise<LeaderboardEntry[]> {
+export async function getLeaderboard(
+  category: string,
+  playerId?: string,
+  aroundMe = false,
+): Promise<LeaderboardResponse> {
   await ensureLeaderboardsFresh();
   // ... existing zset/hash read logic unchanged
 }
@@ -1441,8 +1488,9 @@ git commit -m "refactor(scheduling): lazy leaderboard refresh with redis lock"
 
 **Files:**
 - Modify: `apps/api/src/services/authTokenService.ts` (email/password tokens)
-- Modify: `apps/api/src/services/authService.ts` (refresh token paths)
-- Modify: `apps/api/src/services/authService.test.ts` (or authTokenService.test.ts)
+- Modify: `apps/api/src/services/authTokenService.test.ts`
+- Modify: `apps/api/src/routes/auth.ts` (refresh token paths)
+- Modify: `apps/api/src/routes/auth.test.ts`
 - Modify: `apps/api/src/index.ts`
 
 **Reference:** Audit file **Auth token write paths**.
@@ -1450,67 +1498,105 @@ git commit -m "refactor(scheduling): lazy leaderboard refresh with redis lock"
 - [ ] **Step 1: Read current token creation paths**
 
 ```bash
-rg -n "createEmailVerificationToken|createPasswordResetToken|refreshToken\.create|cleanupExpiredTokens" apps/api/src/services/auth*.ts
+rg -n "createEmailVerificationToken|createPasswordResetToken|cleanupExpiredTokens" apps/api/src/services/authTokenService.ts apps/api/src/services/authTokenService.test.ts
+rg -n "refreshToken\.create|refreshToken\.deleteMany|router\.(post|get).*['\"]/(register|login|refresh)['\"]" apps/api/src/routes/auth.ts apps/api/src/routes/auth.test.ts
 ```
 
-Confirm the existing `prisma.$transaction([...])` for email/password and the bare `refreshToken.create` for login/register.
+Confirm:
+- `createEmailVerificationToken` and `createPasswordResetToken` already use array-form `prisma.$transaction([...])` and return `{ rawToken }`.
+- `register` and `login` in `apps/api/src/routes/auth.ts` still use bare `prisma.refreshToken.create(...)`.
+- `/refresh` already has a `prisma.$transaction([...])` for new refresh token + `lastActiveAt`.
 
 - [ ] **Step 2: Write failing tests**
 
-Add to `apps/api/src/services/authService.test.ts`:
+Add focused assertions to the existing tests instead of creating new helper flows.
+
+In `apps/api/src/services/authTokenService.test.ts`, extend the existing `createEmailVerificationToken` test block and add a matching password-reset test:
 
 ```typescript
 describe('opportunistic auth token cleanup', () => {
   it('createEmailVerificationToken deletes expired verification tokens', async () => {
-    const { prisma } = await import('@pocketrealm/database');
-    const deleteMany = vi.fn().mockResolvedValue({ count: 2 });
-    (prisma.$transaction as any) = vi.fn().mockImplementation(async (ops) => {
-      // Validate the transaction includes a deleteMany with expiresAt filter
-      expect(ops).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ /* any form that includes deleteMany with expiresAt lt now */ }),
-        ]),
-      );
-      return [];
-    });
-
     await createEmailVerificationToken('player-1');
-    expect(prisma.$transaction).toHaveBeenCalled();
+
+    expect(mockPrisma.emailVerificationToken.deleteMany).toHaveBeenCalledWith({
+      where: { playerId: 'player-1' },
+    });
+    expect(mockPrisma.emailVerificationToken.deleteMany).toHaveBeenCalledWith({
+      where: { expiresAt: { lt: expect.any(Date) } },
+    });
   });
 
-  it('login creates a refresh token transaction that also deletes expired', async () => {
-    const { prisma } = await import('@pocketrealm/database');
-    (prisma.$transaction as any) = vi.fn().mockResolvedValue([]);
+  it('createPasswordResetToken deletes expired and used reset tokens', async () => {
+    mockPrisma.passwordResetToken = {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      create: vi.fn().mockResolvedValue({ id: 'tok-1' }),
+    };
 
-    await loginFlow(/* existing args */);
-    expect(prisma.$transaction).toHaveBeenCalled();
-  });
+    await createPasswordResetToken('player-1');
 
-  it('register creates a refresh token transaction that also deletes expired', async () => {
-    const { prisma } = await import('@pocketrealm/database');
-    (prisma.$transaction as any) = vi.fn().mockResolvedValue([]);
-
-    await registerFlow(/* existing args */);
-    expect(prisma.$transaction).toHaveBeenCalled();
-  });
-
-  it('refresh extends its existing transaction to delete expired', async () => {
-    // Verify refresh path's $transaction call contains both deleteMany and create
-    const { prisma } = await import('@pocketrealm/database');
-    (prisma.$transaction as any) = vi.fn().mockResolvedValue([]);
-
-    await refreshFlow(/* existing args */);
-    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+      where: { playerId: 'player-1' },
+    });
+    expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+      where: { OR: [{ expiresAt: { lt: expect.any(Date) } }, { usedAt: { not: null } }] },
+    });
   });
 });
 ```
 
-> The transaction-inspection assertions above are illustrative. Use the patterns already established in `authService.test.ts` — match the existing mock shape (either array-form `prisma.$transaction([...])` or callback-form `prisma.$transaction(async (tx) => {...})`). Prefer behavioral tests that verify `deleteMany` on the expired-tokens table is actually requested.
+In `apps/api/src/routes/auth.test.ts`, use the existing `findHandler()` and `mockRes()` helpers. Add route-level assertions for register, login, and refresh:
+
+```typescript
+describe('opportunistic refresh token cleanup', () => {
+  it('register deletes expired refresh tokens before storing the new one', async () => {
+    // Arrange by matching the existing POST /register tests so the handler succeeds.
+    const handler = findHandler('post', '/register');
+    const req = { body: { /* valid register body from existing tests */ } } as any;
+    const res = mockRes();
+
+    await handler(req, res, vi.fn());
+
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { playerId: expect.any(String), expiresAt: { lt: expect.any(Date) } },
+    });
+    expect(mockPrisma.refreshToken.create).toHaveBeenCalled();
+  });
+
+  it('login deletes expired refresh tokens before storing the new one', async () => {
+    // Arrange by matching the existing successful login tests.
+    const handler = findHandler('post', '/login');
+    const req = { body: { /* valid login body from existing tests */ } } as any;
+    const res = mockRes();
+
+    await handler(req, res, vi.fn());
+
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { playerId: expect.any(String), expiresAt: { lt: expect.any(Date) } },
+    });
+    expect(mockPrisma.refreshToken.create).toHaveBeenCalled();
+  });
+
+  it('refresh extends its existing transaction to delete expired refresh tokens', async () => {
+    // Arrange by matching the existing successful refresh tests.
+    const handler = findHandler('post', '/refresh');
+    const req = { body: { refreshToken: 'valid-refresh-token' } } as any;
+    const res = mockRes();
+
+    await handler(req, res, vi.fn());
+
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { playerId: expect.any(String), expiresAt: { lt: expect.any(Date) } },
+    });
+  });
+});
+```
+
+The route snippets above intentionally omit the full arrange boilerplate; copy it from adjacent successful register/login/refresh tests in `auth.test.ts`. Do not introduce new helper flows just for this task.
 
 - [ ] **Step 3: Run tests to verify they fail**
 
 ```bash
-cd apps/api && npx vitest run src/services/authService.test.ts -t "opportunistic auth token cleanup"
+cd apps/api && npx vitest run src/services/authTokenService.test.ts src/routes/auth.test.ts -t "opportunistic"
 ```
 
 Expected: FAIL.
@@ -1520,9 +1606,10 @@ Expected: FAIL.
 In `apps/api/src/services/authTokenService.ts`, extend the existing `prisma.$transaction` for `createEmailVerificationToken`:
 
 ```typescript
-export async function createEmailVerificationToken(playerId: string): Promise<string> {
-  const token = generateToken();
-  const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
+export async function createEmailVerificationToken(playerId: string): Promise<{ rawToken: string }> {
+  const rawToken = generateToken();
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = new Date(Date.now() + AUTH_CONSTANTS.VERIFICATION_TOKEN_TTL_HOURS * 60 * 60 * 1000);
 
   await prisma.$transaction([
     prisma.emailVerificationToken.deleteMany({
@@ -1532,11 +1619,11 @@ export async function createEmailVerificationToken(playerId: string): Promise<st
       where: { expiresAt: { lt: new Date() } }, // NEW: opportunistic expired cleanup
     }),
     prisma.emailVerificationToken.create({
-      data: { playerId, token, expiresAt },
+      data: { playerId, tokenHash, expiresAt },
     }),
   ]);
 
-  return token;
+  return { rawToken };
 }
 ```
 
@@ -1554,15 +1641,19 @@ await prisma.$transaction([
 
 - [ ] **Step 5: Wrap login/register refresh-token creation in a transaction with cleanup**
 
-In `apps/api/src/services/authService.ts`, locate the login and register paths that currently call bare `prisma.refreshToken.create(...)`. Replace each with:
+In `apps/api/src/routes/auth.ts`, locate the login and register paths that currently call bare `prisma.refreshToken.create(...)`. Replace each with:
 
 ```typescript
 await prisma.$transaction([
   prisma.refreshToken.deleteMany({
-    where: { playerId, expiresAt: { lt: new Date() } },
+    where: { playerId: player.id, expiresAt: { lt: now } },
   }),
   prisma.refreshToken.create({
-    data: { playerId, token, expiresAt },
+    data: {
+      playerId: player.id,
+      token: refreshToken,
+      expiresAt: refreshTokenExpiresAt(now.getTime()),
+    },
   }),
 ]);
 ```
@@ -1574,10 +1665,16 @@ Find the existing `prisma.$transaction` in the refresh path and add a `deleteMan
 ```typescript
 await prisma.$transaction([
   prisma.refreshToken.deleteMany({
-    where: { playerId, expiresAt: { lt: new Date() } },
+    where: { playerId: payload.playerId, expiresAt: { lt: now } },
   }),
-  prisma.refreshToken.create({ data: { playerId, token: newToken, expiresAt } }),
-  prisma.player.update({ where: { id: playerId }, data: { lastActiveAt: new Date() } }),
+  prisma.refreshToken.create({
+    data: {
+      playerId: payload.playerId,
+      token: newRefreshToken,
+      expiresAt: refreshTokenExpiresAt(now.getTime()),
+    },
+  }),
+  prisma.player.update({ where: { id: payload.playerId }, data: { lastActiveAt: now } }),
 ]);
 ```
 
@@ -1599,7 +1696,7 @@ Remove the `cleanupExpiredTokens` import if nothing else references it in `index
 - [ ] **Step 8: Run tests**
 
 ```bash
-cd apps/api && npx vitest run src/services/authService.test.ts src/services/authTokenService.test.ts
+cd apps/api && npx vitest run src/services/authTokenService.test.ts src/routes/auth.test.ts
 ```
 
 Expected: PASS.
@@ -1607,7 +1704,7 @@ Expected: PASS.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add apps/api/src/services/authTokenService.ts apps/api/src/services/authService.ts apps/api/src/services/authService.test.ts apps/api/src/services/authTokenService.test.ts apps/api/src/index.ts
+git add apps/api/src/services/authTokenService.ts apps/api/src/services/authTokenService.test.ts apps/api/src/routes/auth.ts apps/api/src/routes/auth.test.ts apps/api/src/index.ts
 git commit -m "refactor(scheduling): opportunistic auth token cleanup on write"
 ```
 
@@ -1619,7 +1716,7 @@ git commit -m "refactor(scheduling): opportunistic auth token cleanup on write"
 - Modify: `apps/api/src/routes/auth.ts`
 - Modify: `apps/api/src/routes/worldEvents.ts` (actual path per audit Step 5 — may be different)
 - Modify: `apps/api/src/routes/auth.test.ts`
-- Modify: `apps/api/src/routes/worldEvents.test.ts`
+- Create or Modify: `apps/api/src/routes/worldEvents.test.ts`
 
 **Reference:** Audit file **Route handler locations**.
 
@@ -1628,31 +1725,68 @@ git commit -m "refactor(scheduling): opportunistic auth token cleanup on write"
 Add to `apps/api/src/routes/auth.test.ts`:
 
 ```typescript
-import * as eventScheduler from '../services/eventSchedulerService';
+// Put these mocks with the other vi.mock(...) calls before importing authRouter.
+vi.mock('../socket', () => ({ getIo: vi.fn(() => null) }));
+vi.mock('../services/eventSchedulerService', () => ({
+  checkAndSpawnEvents: vi.fn().mockResolvedValue(undefined),
+}));
 
-describe('login triggers world event catch-up', () => {
+// Put this with the other imports.
+import { checkAndSpawnEvents } from '../services/eventSchedulerService';
+
+describe('auth activity triggers world event catch-up', () => {
   it('successful login calls checkAndSpawnEvents once', async () => {
-    const spy = vi.spyOn(eventScheduler, 'checkAndSpawnEvents').mockResolvedValue(undefined);
-    await supertest(app).post('/api/v1/auth/login').send({ /* valid creds */ });
-    expect(spy).toHaveBeenCalledTimes(1);
+    // Arrange by matching the existing successful login test.
+    const handler = findHandler('post', '/login');
+    const req = { body: { /* valid login body from existing tests */ } } as any;
+    const res = mockRes();
+
+    await handler(req, res, vi.fn());
+
+    expect(checkAndSpawnEvents).toHaveBeenCalledTimes(1);
   });
 
   it('failed login does NOT call checkAndSpawnEvents', async () => {
-    const spy = vi.spyOn(eventScheduler, 'checkAndSpawnEvents').mockResolvedValue(undefined);
-    await supertest(app).post('/api/v1/auth/login').send({ /* invalid creds */ });
-    expect(spy).not.toHaveBeenCalled();
+    // Arrange by matching the existing failed-login test.
+    const handler = findHandler('post', '/login');
+    const req = { body: { /* invalid login body from existing tests */ } } as any;
+    const res = mockRes();
+
+    await expect(handler(req, res, vi.fn())).rejects.toThrow();
+    expect(checkAndSpawnEvents).not.toHaveBeenCalled();
+  });
+
+  it('successful refresh calls checkAndSpawnEvents once', async () => {
+    // Treat refresh as session-resume activity.
+    const handler = findHandler('post', '/refresh');
+    const req = { body: { refreshToken: 'valid-refresh-token' } } as any;
+    const res = mockRes();
+
+    await handler(req, res, vi.fn());
+
+    expect(checkAndSpawnEvents).toHaveBeenCalledTimes(1);
   });
 });
 ```
 
+Use the existing `auth.test.ts` route-handler style (`findHandler` / `mockRes`), not a new `supertest(app)` harness.
+
 Add to `apps/api/src/routes/worldEvents.test.ts`:
 
 ```typescript
+// If this file does not exist yet, mirror the route-test setup used by auth/admin tests.
+vi.mock('../socket', () => ({ getIo: vi.fn(() => null) }));
+vi.mock('../services/eventSchedulerService', () => ({
+  checkAndSpawnEvents: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { checkAndSpawnEvents } from '../services/eventSchedulerService';
+
 describe('GET world events triggers catch-up', () => {
   it('calls checkAndSpawnEvents before returning events', async () => {
-    const spy = vi.spyOn(eventScheduler, 'checkAndSpawnEvents').mockResolvedValue(undefined);
+    // Build the route under test using the existing route-test style in this repo.
     await supertest(app).get('/api/v1/events').set('Authorization', `Bearer ${validToken}`);
-    expect(spy).toHaveBeenCalled();
+    expect(checkAndSpawnEvents).toHaveBeenCalled();
   });
 });
 ```
@@ -1665,21 +1799,37 @@ cd apps/api && npx vitest run src/routes/auth.test.ts src/routes/worldEvents.tes
 
 Expected: FAIL.
 
-- [ ] **Step 3: Add trigger in login handler**
+- [ ] **Step 3: Add trigger in login and refresh handlers**
 
-In `apps/api/src/routes/auth.ts`, after the successful login path (before sending the response):
+In `apps/api/src/routes/auth.ts`, import the scheduler and socket helper:
 
 ```typescript
 import { checkAndSpawnEvents } from '../services/eventSchedulerService';
-import { getIo } from '../socket/io';
-
-// ...inside login handler, after successful auth...
-await checkAndSpawnEvents(getIo()).catch((err) => {
-  logger.warn({ err }, 'Post-login world event catch-up failed');
-});
+import { getIo } from '../socket';
 ```
 
-> Wrap in `.catch` because world event catch-up must never fail a login. Log and continue.
+Add a small local helper near the top of the file:
+
+```typescript
+function triggerWorldEventCatchUp(reason: string): void {
+  void checkAndSpawnEvents(getIo()).catch((err) => {
+    logger.warn({ err, reason }, 'World event catch-up failed after auth activity');
+  });
+}
+```
+
+Call it after the successful login response is sent, and after the successful refresh response is sent:
+
+```typescript
+res.json({ /* existing login response */ });
+triggerWorldEventCatchUp('login');
+
+// ...in /refresh after res.json(...)
+res.json({ /* existing refresh response */ });
+triggerWorldEventCatchUp('refresh');
+```
+
+Keep this fire-and-forget. World event catch-up must never fail or add scheduler latency to login/refresh.
 
 - [ ] **Step 4: Add trigger in world events GET handler**
 
@@ -1687,14 +1837,14 @@ In `apps/api/src/routes/worldEvents.ts` (adjust path per audit):
 
 ```typescript
 import { checkAndSpawnEvents } from '../services/eventSchedulerService';
-import { getIo } from '../socket/io';
+import { getIo } from '../socket';
 
-router.get('/', async (req, res) => {
+worldEventsRouter.get('/', asyncHandler(async (_req, res) => {
   await checkAndSpawnEvents(getIo()).catch((err) => {
     logger.warn({ err }, 'World events list catch-up failed');
   });
   // ... existing response logic
-});
+}));
 ```
 
 > If the current handler only calls `expireStaleEvents()`, replace that with the `checkAndSpawnEvents(getIo())` call (it already includes expiration).
@@ -1783,7 +1933,7 @@ In `apps/api/src/routes/admin.ts`, next to the existing admin routes:
 import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { prisma } from '@pocketrealm/database';
 
-router.get('/scheduler-status', authenticate, requireAdmin, async (_req, res) => {
+router.get('/scheduler-status', async (_req, res) => {
   const [pendingBossEncounters, pendingGuildExpeditions] = await Promise.all([
     prisma.bossEncounter.count({
       where: { status: 'in_progress', nextRoundAt: { not: null } },
@@ -1809,6 +1959,8 @@ router.get('/scheduler-status', authenticate, requireAdmin, async (_req, res) =>
   });
 });
 ```
+
+`admin.ts` already applies `router.use(authenticate, requireAdmin)` for the whole router; do not repeat that middleware on this route unless the file has changed.
 
 > Use whatever middleware names are actually in use (`authenticate`, `requireAdmin`, or `requireRole('admin')`) — match sibling routes in the same file.
 
