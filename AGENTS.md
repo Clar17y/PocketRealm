@@ -11,6 +11,7 @@ This file supplements `CLAUDE.md` for Codex-specific guidance. Keep it short. Do
 
 - Primary shell is Windows PowerShell 7. Prefer `pwsh`/PowerShell-compatible commands and examples.
 - This repository runs on Windows in local Codex sessions unless the current environment explicitly says otherwise.
+- Prefer `scripts/setup-worktree.ps1` and `scripts/teardown-worktree.ps1` for local Codex worktree lifecycle. The `.sh` scripts are for Git Bash/Unix environments.
 
 ## Working Rules
 
