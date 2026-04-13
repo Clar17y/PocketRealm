@@ -238,25 +238,32 @@ describe('admin routes', () => {
       expect(res.status).toHaveBeenCalledWith(404);
     });
 
-    it('cancels related active boss encounter timers when cancelling a boss event', async () => {
+    it('expires the related boss encounter and cancels its timer when cancelling a boss event', async () => {
       mockGetEventById.mockResolvedValue({ id: 'evt-boss', status: 'active', type: 'boss', title: 'Boss' });
       mockPrisma.worldEvent.update.mockResolvedValue({});
-      mockPrisma.bossEncounter.findMany.mockResolvedValue([
-        { id: 'enc-1' },
-        { id: 'enc-2' },
-      ]);
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue({
+        id: 'enc-1',
+        status: 'waiting',
+      });
+      mockPrisma.bossEncounter.update.mockResolvedValue({});
 
       const req = { player: { playerId: 'p1' }, params: { id: 'evt-boss' } } as any;
       const res = mockRes();
       const handler = findHandler('post', '/events/:id/cancel');
       await handler(req, res, vi.fn());
 
-      expect(mockPrisma.bossEncounter.findMany).toHaveBeenCalledWith({
-        where: { eventId: 'evt-boss', status: 'in_progress' },
-        select: { id: true },
+      expect(mockPrisma.bossEncounter.findUnique).toHaveBeenCalledWith({
+        where: { eventId: 'evt-boss' },
+        select: { id: true, status: true },
+      });
+      expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
+        where: { eventId: 'evt-boss' },
+        data: {
+          status: 'expired',
+          nextRoundAt: null,
+        },
       });
       expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('bossEncounter', 'enc-1');
-      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('bossEncounter', 'enc-2');
     });
   });
 

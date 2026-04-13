@@ -374,11 +374,18 @@ router.post('/events/:id/cancel', asyncHandler(async (req, res) => {
     data: { status: 'expired', expiresAt: new Date() },
   });
   if (event.type === 'boss') {
-    const activeBossEncounters = await prisma.bossEncounter.findMany({
-      where: { eventId: req.params.id, status: 'in_progress' },
-      select: { id: true },
+    const encounter = await prisma.bossEncounter.findUnique({
+      where: { eventId: req.params.id },
+      select: { id: true, status: true },
     });
-    for (const encounter of activeBossEncounters) {
+    if (encounter && (encounter.status === 'waiting' || encounter.status === 'in_progress')) {
+      await prisma.bossEncounter.update({
+        where: { eventId: req.params.id },
+        data: {
+          status: 'expired',
+          nextRoundAt: null,
+        },
+      });
       roundTimerRegistry.cancel('bossEncounter', encounter.id);
     }
   }
