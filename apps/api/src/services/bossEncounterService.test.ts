@@ -74,6 +74,7 @@ import {
   signUpForBossRound,
   getBossEncounterStatus,
   resolveBossRound,
+  resolveDueBossEncounter,
   checkAndResolveDueBossRounds,
   getActiveBossEncounters,
   getBossHistory,
@@ -1300,6 +1301,42 @@ describe('bossEncounterService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('resolveDueBossEncounter', () => {
+    it('is a no-op when encounter is not in_progress', async () => {
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
+        makeEncounterRow({ id: 'b1', status: 'waiting', nextRoundAt: new Date() }),
+      );
+
+      await resolveDueBossEncounter('b1', null);
+
+      expect(mockPrisma.bossEncounter.update).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when nextRoundAt is null', async () => {
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
+        makeEncounterRow({ id: 'b1', status: 'in_progress', nextRoundAt: null }),
+      );
+
+      await resolveDueBossEncounter('b1', null);
+
+      expect(mockPrisma.bossEncounter.update).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when nextRoundAt is in the future', async () => {
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue(
+        makeEncounterRow({
+          id: 'b1',
+          status: 'in_progress',
+          nextRoundAt: new Date(Date.now() + 60_000),
+        }),
+      );
+
+      await resolveDueBossEncounter('b1', null);
+
+      expect(mockPrisma.bossEncounter.update).not.toHaveBeenCalled();
     });
   });
 

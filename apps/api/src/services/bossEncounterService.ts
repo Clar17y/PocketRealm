@@ -46,6 +46,12 @@ import { addGuildXp } from './guildService';
 const VALID_ENCOUNTER_STATUSES = new Set<BossEncounterStatus>(['waiting', 'in_progress', 'defeated', 'expired']);
 const VALID_PARTICIPANT_STATUSES = new Set<BossParticipantStatus>(['alive', 'knocked_out']);
 
+type DueBossEncounterRef = {
+  id: string;
+  status: string;
+  nextRoundAt: Date | null;
+};
+
 // --- Mappers ---
 
 function toBossEncounterData(row: {
@@ -149,6 +155,34 @@ async function computeResourcePools(playerId: string): Promise<{ maxStamina: num
     magicLevel,
     evasionLevel,
   };
+}
+
+function isBossEncounterDue(encounter: DueBossEncounterRef | null): encounter is DueBossEncounterRef {
+  return Boolean(
+    encounter
+    && encounter.status === 'in_progress'
+    && encounter.nextRoundAt
+    && encounter.nextRoundAt.getTime() <= Date.now(),
+  );
+}
+
+async function withBossRoundLock<T>(
+  encounterId: string,
+  resolve: () => Promise<T>,
+): Promise<T | null> {
+  // Distributed lock to prevent concurrent resolution corrupting boss HP.
+  // A unique token is stored so the finally block can only release the lock
+  // it owns, guarding against TTL expiry while resolution is still running.
+  const lockKey = `boss_resolve:${encounterId}`;
+  const lockToken = randomUUID();
+  const acquired = await redis.set(lockKey, lockToken, 'EX', 30, 'NX');
+  if (!acquired) return null;
+  try {
+    return await resolve();
+  } finally {
+    const luaScript = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
+    await redis.eval(luaScript, 1, lockKey, lockToken);
+  }
 }
 
 // --- Public API ---
@@ -272,26 +306,28 @@ export async function resolveBossRound(
   encounterId: string,
   io: SocketServer | null,
 ): Promise<{ bossDefeated: boolean; roundResult: BossRoundResult } | null> {
-  // Distributed lock to prevent concurrent resolution corrupting boss HP.
-  // A unique token is stored so the finally block can only release the lock
-  // it owns — guarding against the case where the 30s TTL expires mid-execution
-  // and a second caller acquires a fresh lock before this caller's finally runs.
-  const lockKey = `boss_resolve:${encounterId}`;
-  const lockToken = randomUUID();
-  const acquired = await redis.set(lockKey, lockToken, 'EX', 30, 'NX');
-  if (!acquired) return null;
-  try {
-    return await resolveBossRoundInner(encounterId, io);
-  } finally {
-    // Lua compare-and-delete: only delete if we still own the lock
-    const luaScript = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
-    await redis.eval(luaScript, 1, lockKey, lockToken);
-  }
+  return withBossRoundLock(encounterId, () => resolveBossRoundInner(encounterId, io));
+}
+
+export async function resolveDueBossEncounter(
+  encounterId: string,
+  io: SocketServer | null,
+): Promise<void> {
+  const encounter = await prisma.bossEncounter.findUnique({
+    where: { id: encounterId },
+    select: { id: true, status: true, nextRoundAt: true },
+  });
+  if (!isBossEncounterDue(encounter)) return;
+
+  await withBossRoundLock(encounter.id, () =>
+    resolveBossRoundInner(encounter.id, io, { requireDue: true }),
+  );
 }
 
 async function resolveBossRoundInner(
   encounterId: string,
   io: SocketServer | null,
+  options: { requireDue?: boolean } = {},
 ): Promise<{ bossDefeated: boolean; roundResult: BossRoundResult } | null> {
   const encounter = await prisma.bossEncounter.findUnique({
     where: { id: encounterId },
@@ -301,6 +337,9 @@ async function resolveBossRoundInner(
     },
   });
   if (!encounter || encounter.status === 'defeated' || encounter.status === 'expired') {
+    return null;
+  }
+  if (options.requireDue && !isBossEncounterDue(encounter)) {
     return null;
   }
 
