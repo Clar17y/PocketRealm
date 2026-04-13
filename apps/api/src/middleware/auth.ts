@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@pocketrealm/database';
 import { AppError } from './errorHandler';
+import { attachSentryUser } from './sentryContext';
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   throw new Error('JWT_SECRET env var must be set and at least 32 characters');
@@ -85,6 +86,7 @@ export function authenticate(
     const payload = jwt.verify(token, JWT_SECRET) as AuthPayload;
     req.player = payload;
     touchPlayerLastActive(payload.playerId);
+    attachSentryUser(req);
     next();
   } catch (err) {
     throw new AppError(401, 'Invalid or expired token', 'INVALID_TOKEN');
@@ -99,6 +101,7 @@ export function optionalAuthenticate(
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith('Bearer ')) {
+    attachSentryUser(req);
     return next();
   }
 
@@ -112,6 +115,7 @@ export function optionalAuthenticate(
     // Invalid token — proceed unauthenticated
   }
 
+  attachSentryUser(req);
   next();
 }
 

@@ -13,6 +13,7 @@
     "@pocketrealm/database": "*",
     "@pocketrealm/game-engine": "*",
     "@pocketrealm/shared": "*",
+    "@sentry/node": "^10.48.0",
     "@typescript-eslint/eslint-plugin": "8.54.0",
     "@typescript-eslint/parser": "8.54.0",
     "bcrypt": "^6.0.0",
