@@ -49,9 +49,13 @@ done
 
 SAFE_NAME=$(echo "$BRANCH" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:upper:]' '[:lower:]')
 DB_NAME="pocketrealm_${SAFE_NAME}"
-WORKTREE_DIR=".worktrees/pocketrealm-${BRANCH##*/}"
+WORKTREE_DIR=".worktrees/pocketrealm-${SAFE_NAME}"
 
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+COMMON_GIT_DIR=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || {
+  err "Could not resolve git common directory."
+  exit 1
+}
+REPO_ROOT=$(dirname "$COMMON_GIT_DIR")
 WORKTREE_PATH="${REPO_ROOT}/${WORKTREE_DIR}"
 
 info "Branch:    $BRANCH"
