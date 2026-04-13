@@ -47,10 +47,10 @@ import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
 import { cleanupFullyHealedMobs } from './services/persistedMobService';
 import { refreshAllLeaderboards } from './services/leaderboardService';
-import { startRoundResolutionScheduler } from './services/roundResolutionScheduler';
 import { startMetricsLogger } from './services/metricsLogger';
 import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
 import { cleanupExpiredTokens } from './services/authTokenService';
+import { roundTimerRegistry } from './services/roundTimerRegistry';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -171,9 +171,9 @@ let stopMetricsLogger: (() => void) | null = null;
 server.listen(PORT, () => {
   logger.info({ port: PORT, version: APP_VERSION }, 'PocketRealm API running');
 
-  // Adaptive round resolution: ticks every 5s when bosses/expeditions are
-  // active, idles at 60s otherwise.
-  startRoundResolutionScheduler(getIo);
+  void roundTimerRegistry.rehydrate(getIo).catch((err) => {
+    logger.error({ err }, 'Round timer registry rehydrate error');
+  });
   stopMetricsLogger = startMetricsLogger(getIo);
 
   // Persisted mob cleanup timer (every 5 minutes)
