@@ -63,6 +63,7 @@ export function LootPicker({ sessionId, items, availableSlots, onClaim, onDismis
           </div>
           <button
             onClick={onDismiss}
+            aria-label="Close"
             className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)]"
           >
             <X size={20} />
