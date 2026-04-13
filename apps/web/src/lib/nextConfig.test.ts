@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("next config", () => {
@@ -6,5 +7,13 @@ describe("next config", () => {
 
     expect(config.env?.APP_VERSION).toBeTruthy();
     expect(config.env?.NEXT_PUBLIC_APP_VERSION).toBe(config.env?.APP_VERSION);
+  });
+
+  it("pins outputFileTracingRoot to the worktree root", async () => {
+    const { default: config } = await import("../../next.config.mjs");
+
+    expect(path.normalize(config.outputFileTracingRoot)).toBe(
+      path.resolve(process.cwd(), "..", ".."),
+    );
   });
 });

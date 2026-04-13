@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { createRequire } from "node:module";
 import withSerwistInit from "@serwist/next";
 import { withPlausibleProxy } from "next-plausible";
@@ -7,6 +8,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 const require = createRequire(import.meta.url);
 const rootPkg = require("../../package.json");
 const APP_VERSION = process.env.APP_VERSION ?? rootPkg.version ?? "0.0.0-dev";
+const OUTPUT_FILE_TRACING_ROOT = path.resolve(process.cwd(), "..", "..");
 
 const revision =
   spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" }).stdout?.trim() ||
@@ -26,6 +28,7 @@ const withSerwist = withSerwistInit({
 const baseConfig = withPlausibleProxy()(withSerwist({
   reactStrictMode: true,
   transpilePackages: ["@pocketrealm/shared", "@pocketrealm/game-engine"],
+  outputFileTracingRoot: OUTPUT_FILE_TRACING_ROOT,
   images: {
     minimumCacheTTL: 2592000,
   },
@@ -46,6 +49,10 @@ export default withSentryConfig(baseConfig, {
   errorHandler: (err) => {
     console.warn('[sentry] source map upload skipped:', err?.message ?? err);
   },
-  // Disable logger tree-shake for launch (we want warnings visible).
-  disableLogger: false,
+  webpack: {
+    treeshake: {
+      // Keep Sentry warnings and debug hooks available in launch builds.
+      removeDebugLogging: false,
+    },
+  },
 });
