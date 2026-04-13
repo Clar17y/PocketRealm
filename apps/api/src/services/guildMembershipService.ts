@@ -7,6 +7,7 @@ import {
   addGuildXp, checkGuildAchievementsForAllMembers, getGuild, invalidateGuildIdCache,
 } from './guildService';
 import { invalidateGuildModifiersForGuild } from './guildUpgradeService';
+import { roundTimerRegistry } from './roundTimerRegistry';
 
 // ---------------------------------------------------------------------------
 // Join / Leave
@@ -317,6 +318,17 @@ export async function disbandGuild(leaderId: string, guildId: string): Promise<v
     invalidateGuildIdCache(...members.map((m) => m.playerId)),
     invalidateGuildModifiersForGuild(guildId),
   ]);
+
+  const activeExpeditions = await prisma.guildExpedition.findMany({
+    where: {
+      guildId,
+      status: { in: ['recruiting', 'in_progress'] },
+    },
+    select: { id: true },
+  }) ?? [];
+  for (const expedition of activeExpeditions) {
+    roundTimerRegistry.cancel('guildExpedition', expedition.id);
+  }
 
   await prisma.guild.delete({ where: { id: guildId } });
 

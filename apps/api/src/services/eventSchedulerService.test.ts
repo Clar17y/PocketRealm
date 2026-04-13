@@ -77,11 +77,11 @@ describe('eventSchedulerService', () => {
       expect(expireStaleEvents).toHaveBeenCalledTimes(1);
 
       await checkAndSpawnEvents(null);
-      expect(expireStaleEvents).toHaveBeenCalledTimes(1);
+      expect(expireStaleEvents).toHaveBeenCalledTimes(2);
 
       vi.advanceTimersByTime(61_000);
       await checkAndSpawnEvents(null);
-      expect(expireStaleEvents).toHaveBeenCalledTimes(2);
+      expect(expireStaleEvents).toHaveBeenCalledTimes(3);
     });
 
     it('calls expireStaleEvents and checkAndResolveDueBossRounds', async () => {

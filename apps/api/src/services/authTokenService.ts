@@ -17,9 +17,11 @@ export async function createEmailVerificationToken(playerId: string): Promise<{ 
   const rawToken = generateToken();
   const tokenHash = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + AUTH_CONSTANTS.VERIFICATION_TOKEN_TTL_HOURS * 60 * 60 * 1000);
+  const now = new Date();
 
   await prisma.$transaction([
     prisma.emailVerificationToken.deleteMany({ where: { playerId } }),
+    prisma.emailVerificationToken.deleteMany({ where: { expiresAt: { lt: now } } }),
     prisma.emailVerificationToken.create({
       data: { playerId, tokenHash, expiresAt },
     }),
@@ -47,9 +49,18 @@ export async function createPasswordResetToken(playerId: string): Promise<{ rawT
   const rawToken = generateToken();
   const tokenHash = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + AUTH_CONSTANTS.RESET_TOKEN_TTL_HOURS * 60 * 60 * 1000);
+  const now = new Date();
 
   await prisma.$transaction([
     prisma.passwordResetToken.deleteMany({ where: { playerId } }),
+    prisma.passwordResetToken.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lt: now } },
+          { usedAt: { not: null } },
+        ],
+      },
+    }),
     prisma.passwordResetToken.create({
       data: { playerId, tokenHash, expiresAt },
     }),

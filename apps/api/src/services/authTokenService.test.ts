@@ -54,10 +54,42 @@ describe('createEmailVerificationToken', () => {
   it('deletes existing tokens for the player before creating a new one', async () => {
     const { rawToken } = await createEmailVerificationToken('player-1');
 
-    expect(mockPrisma.emailVerificationToken.deleteMany).toHaveBeenCalledWith({
+    expect(mockPrisma.emailVerificationToken.deleteMany).toHaveBeenNthCalledWith(1, {
       where: { playerId: 'player-1' },
     });
+    expect(mockPrisma.emailVerificationToken.deleteMany).toHaveBeenNthCalledWith(2, {
+      where: { expiresAt: { lt: expect.any(Date) } },
+    });
     expect(mockPrisma.emailVerificationToken.create).toHaveBeenCalled();
+    expect(rawToken).toHaveLength(64);
+  });
+});
+
+describe('createPasswordResetToken', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.passwordResetToken = {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      create: vi.fn().mockResolvedValue({ id: 'reset-1' }),
+      findUnique: vi.fn(),
+    };
+  });
+
+  it('deletes existing, expired, and used reset tokens before creating a new one', async () => {
+    const { rawToken } = await createPasswordResetToken('player-1');
+
+    expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenNthCalledWith(1, {
+      where: { playerId: 'player-1' },
+    });
+    expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        OR: [
+          { expiresAt: { lt: expect.any(Date) } },
+          { usedAt: { not: null } },
+        ],
+      },
+    });
+    expect(mockPrisma.passwordResetToken.create).toHaveBeenCalled();
     expect(rawToken).toHaveLength(64);
   });
 });

@@ -5,6 +5,7 @@ vi.mock('../middleware/auth', () => ({
 }));
 
 vi.mock('../services/expeditionService', () => ({
+  checkAndResolveExpeditionRounds: vi.fn(),
   getActiveExpedition: vi.fn(),
   getExpeditionStatus: vi.fn(),
   getExpeditionCooldowns: vi.fn(),
@@ -24,11 +25,20 @@ vi.mock('../services/expeditionShopService', () => ({
   purchaseShopItem: vi.fn(),
 }));
 
+vi.mock('../socket', () => ({
+  getIo: vi.fn(),
+}));
+
 import { mockPrisma } from '../__test__/setup';
-import { getExpeditionCooldowns } from '../services/expeditionService';
+import { checkAndResolveExpeditionRounds, getExpeditionCooldowns, getExpeditionStatus, resolveExpeditionRound } from '../services/expeditionService';
+import { getIo } from '../socket';
 import { expeditionRouter } from './expedition';
 
 const mockGetExpeditionCooldowns = getExpeditionCooldowns as ReturnType<typeof vi.fn>;
+const mockCheckAndResolveExpeditionRounds = checkAndResolveExpeditionRounds as ReturnType<typeof vi.fn>;
+const mockGetExpeditionStatus = getExpeditionStatus as ReturnType<typeof vi.fn>;
+const mockResolveExpeditionRound = resolveExpeditionRound as ReturnType<typeof vi.fn>;
+const mockGetIo = getIo as ReturnType<typeof vi.fn>;
 
 function findHandler(method: string, path: string) {
   const layer = (expeditionRouter as any).stack.find(
@@ -49,6 +59,7 @@ function mockRes() {
 describe('expedition routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetIo.mockReturnValue({ kind: 'io' });
   });
 
   describe('GET /cooldowns', () => {
@@ -89,6 +100,77 @@ describe('expedition routes', () => {
         betweenCooldown: null,
         hasActiveExpedition: false,
       });
+    });
+  });
+
+  describe('GET /active', () => {
+    it('resolves due rounds with the current socket server before reading status', async () => {
+      mockPrisma.guildMember.findUnique.mockResolvedValue({ guildId: 'guild-1' });
+
+      const req = { player: { playerId: 'player-1' } } as any;
+      const res = mockRes();
+      const handler = findHandler('get', '/active');
+
+      await handler(req, res, vi.fn());
+
+      expect(mockCheckAndResolveExpeditionRounds).toHaveBeenCalledWith({ kind: 'io' });
+    });
+  });
+
+  describe('GET /:id', () => {
+    it('resolves due rounds with the current socket server before returning expedition details', async () => {
+      mockCheckAndResolveExpeditionRounds.mockResolvedValue(undefined);
+      mockGetExpeditionStatus.mockResolvedValue({
+        expedition: {
+          id: 'exp-1',
+          guildId: 'guild-1',
+          launchedBy: 'player-1',
+        },
+        members: [],
+      });
+      mockPrisma.guildMember.findUnique.mockResolvedValue({ guildId: 'guild-1' });
+      mockPrisma.player.findUnique.mockResolvedValue({ username: 'Rook' });
+
+      const req = {
+        player: { playerId: 'player-1' },
+        params: { id: '00000000-0000-0000-0000-000000000001' },
+      } as any;
+      const res = mockRes();
+      const handler = findHandler('get', '/:id');
+
+      await handler(req, res, vi.fn());
+
+      expect(mockCheckAndResolveExpeditionRounds).toHaveBeenCalledWith({ kind: 'io' });
+    });
+  });
+
+  describe('POST /:id/force-round', () => {
+    it('passes the current socket server into force-round resolution', async () => {
+      mockPrisma.guildExpedition.findUnique
+        .mockResolvedValueOnce({
+          id: '00000000-0000-0000-0000-000000000001',
+          guildId: 'guild-1',
+          status: 'in_progress',
+          nextRoundAt: new Date(),
+        })
+        .mockResolvedValueOnce({
+          status: 'in_progress',
+          currentRoom: 0,
+          roundNumber: 1,
+        });
+      mockPrisma.guildMember.findUnique.mockResolvedValue({ guildId: 'guild-1', role: 'leader' });
+      mockResolveExpeditionRound.mockResolvedValue(undefined);
+
+      const req = {
+        player: { playerId: 'player-1' },
+        params: { id: '00000000-0000-0000-0000-000000000001' },
+      } as any;
+      const res = mockRes();
+      const handler = findHandler('post', '/:id/force-round');
+
+      await handler(req, res, vi.fn());
+
+      expect(mockResolveExpeditionRound).toHaveBeenCalledWith('00000000-0000-0000-0000-000000000001', { kind: 'io' });
     });
   });
 });

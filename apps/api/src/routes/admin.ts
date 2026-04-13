@@ -14,6 +14,7 @@ import { sendPush } from '../services/pushNotificationService';
 import { normalizePlayerAttributes } from '../services/attributesService';
 import { teleportPlayer } from '../services/zoneService';
 import { createActivityLog } from '../services/activityLogService';
+import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import {
@@ -372,6 +373,22 @@ router.post('/events/:id/cancel', asyncHandler(async (req, res) => {
     where: { id: req.params.id },
     data: { status: 'expired', expiresAt: new Date() },
   });
+  if (event.type === 'boss') {
+    const encounter = await prisma.bossEncounter.findUnique({
+      where: { eventId: req.params.id },
+      select: { id: true, status: true },
+    });
+    if (encounter && (encounter.status === 'waiting' || encounter.status === 'in_progress')) {
+      await prisma.bossEncounter.update({
+        where: { eventId: req.params.id },
+        data: {
+          status: 'expired',
+          nextRoundAt: null,
+        },
+      });
+      roundTimerRegistry.cancel('bossEncounter', encounter.id);
+    }
+  }
   await adminAudit(req.player!.playerId, 'cancel_event', { eventId: req.params.id, eventTitle: event.title });
   res.json({ success: true });
 }));
@@ -817,6 +834,32 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
 }));
 
 // ---------- Analytics ----------
+
+router.get('/scheduler-status', asyncHandler(async (_req, res) => {
+  const [pendingBossEncounters, pendingGuildExpeditions] = await Promise.all([
+    prisma.bossEncounter.count({
+      where: { status: 'in_progress', nextRoundAt: { not: null } },
+    }),
+    prisma.guildExpedition.count({
+      where: {
+        status: { in: ['recruiting', 'in_progress'] },
+        nextRoundAt: { not: null },
+      },
+    }),
+  ]);
+
+  const pendingTimers = roundTimerRegistry.size();
+  const pendingEnumeratedFromDb = pendingBossEncounters + pendingGuildExpeditions;
+
+  res.json({
+    pendingTimers,
+    timerKeys: roundTimerRegistry.keys(),
+    pendingBossEncounters,
+    pendingGuildExpeditions,
+    pendingEnumeratedFromDb,
+    hasDrift: pendingTimers !== pendingEnumeratedFromDb,
+  });
+}));
 
 const balancePeriodSchema = z.object({
   period: z.enum(['1h', '24h', '7d', '30d']).default('7d'),

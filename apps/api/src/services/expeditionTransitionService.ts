@@ -13,6 +13,7 @@ import { addGuildLog } from './guildService';
 import { sendPush } from './pushNotificationService';
 import { clearRoomSnapshots } from './expeditionCombatCache';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
+import { getIo } from '../socket';
 import {
   getRoundInterval,
   getMembers,
@@ -21,6 +22,7 @@ import {
   buildUpdatedAttemptLogs,
   setExpeditionCooldowns,
 } from './expeditionHelpers';
+import { roundTimerRegistry } from './roundTimerRegistry';
 
 // ---------------------------------------------------------------------------
 // Handle Room Cleared
@@ -103,6 +105,7 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
     mobs: nextRoomDef?.mobs ?? [],
     members: updatedMembers,
   };
+  const nextRoundAt = new Date(Date.now() + EXPEDITION_CONSTANTS.REST_DURATION_MS);
 
   await prisma.guildExpedition.update({
     where: { id: expeditionId },
@@ -110,9 +113,10 @@ export async function handleRoomCleared(expeditionId: string): Promise<void> {
       currentRoom: nextRoom,
       roundNumber: 0,
       roomStartSnapshot: JSON.parse(JSON.stringify(snapshot)),
-      nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.REST_DURATION_MS),
+      nextRoundAt,
     },
   });
+  roundTimerRegistry.schedule('guildExpedition', expeditionId, nextRoundAt, getIo);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +148,8 @@ export async function handleWipe(expeditionId: string): Promise<void> {
         nextRoundAt: null,
       },
     });
+    roundTimerRegistry.cancel('guildExpedition', expeditionId);
+
     await addGuildLog(
       expedition.guildId,
       'expedition_failed',
@@ -181,6 +187,7 @@ export async function handleWipe(expeditionId: string): Promise<void> {
     where: { expeditionId, player: { isBot: true } },
     select: { playerId: true },
   });
+  const nextRoundAt = new Date(Date.now() + EXPEDITION_CONSTANTS.SIGNUP_WINDOW_MS);
 
   await prisma.$transaction(async (tx) => {
     await tx.guildExpeditionMember.deleteMany({ where: { expeditionId } });
@@ -197,10 +204,11 @@ export async function handleWipe(expeditionId: string): Promise<void> {
         roomStartSnapshot: Prisma.DbNull,
         roundNumber: 0,
         roundSummaries: Prisma.DbNull,
-        nextRoundAt: new Date(Date.now() + EXPEDITION_CONSTANTS.SIGNUP_WINDOW_MS),
+        nextRoundAt,
       },
     });
   });
+  roundTimerRegistry.schedule('guildExpedition', expeditionId, nextRoundAt, getIo);
 
   // Delete bot Player records after members are removed
   if (botMembers.length > 0) {
@@ -241,6 +249,7 @@ export async function completeExpedition(expeditionId: string): Promise<void> {
       expeditionAttemptLogs: JSON.parse(JSON.stringify(finalAttemptLogs)),
     },
   });
+  roundTimerRegistry.cancel('guildExpedition', expeditionId);
 
   logger.info({
     expeditionId,

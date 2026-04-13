@@ -22,6 +22,16 @@ vi.mock('../services/activityLogService', () => ({
 vi.mock('../services/pushNotificationService', () => ({
   sendPush: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../services/roundTimerRegistry', () => ({
+  roundTimerRegistry: {
+    schedule: vi.fn(),
+    cancel: vi.fn(),
+    rehydrate: vi.fn(),
+    clearAll: vi.fn(),
+    size: vi.fn().mockReturnValue(0),
+    keys: vi.fn().mockReturnValue([]),
+  },
+}));
 vi.mock('@pocketrealm/game-engine', () => ({
   xpForLevel: vi.fn((lvl: number) => lvl * 100),
   characterLevelFromXp: vi.fn((xp: number) => Math.floor(xp / 100)),
@@ -66,6 +76,7 @@ import { addStackableItem } from '../services/inventoryService';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
+import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { adminRouter } from './admin';
 
 const mockSpawnWorldEvent = spawnWorldEvent as ReturnType<typeof vi.fn>;
@@ -226,6 +237,34 @@ describe('admin routes', () => {
 
       expect(res.status).toHaveBeenCalledWith(404);
     });
+
+    it('expires the related boss encounter and cancels its timer when cancelling a boss event', async () => {
+      mockGetEventById.mockResolvedValue({ id: 'evt-boss', status: 'active', type: 'boss', title: 'Boss' });
+      mockPrisma.worldEvent.update.mockResolvedValue({});
+      mockPrisma.bossEncounter.findUnique.mockResolvedValue({
+        id: 'enc-1',
+        status: 'waiting',
+      });
+      mockPrisma.bossEncounter.update.mockResolvedValue({});
+
+      const req = { player: { playerId: 'p1' }, params: { id: 'evt-boss' } } as any;
+      const res = mockRes();
+      const handler = findHandler('post', '/events/:id/cancel');
+      await handler(req, res, vi.fn());
+
+      expect(mockPrisma.bossEncounter.findUnique).toHaveBeenCalledWith({
+        where: { eventId: 'evt-boss' },
+        select: { id: true, status: true },
+      });
+      expect(mockPrisma.bossEncounter.update).toHaveBeenCalledWith({
+        where: { eventId: 'evt-boss' },
+        data: {
+          status: 'expired',
+          nextRoundAt: null,
+        },
+      });
+      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('bossEncounter', 'enc-1');
+    });
   });
 
   describe('POST /boss/spawn', () => {
@@ -246,6 +285,63 @@ describe('admin routes', () => {
 
       expect(createBossEncounter).toHaveBeenCalledWith('evt-boss', '00000000-0000-0000-0000-000000000001', 5000);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+    });
+  });
+
+  describe('GET /scheduler-status', () => {
+    it('returns registry size and DB counts', async () => {
+      mockPrisma.bossEncounter.count.mockResolvedValue(1);
+      mockPrisma.guildExpedition.count.mockResolvedValue(2);
+      (roundTimerRegistry.size as unknown as ReturnType<typeof vi.fn>).mockReturnValue(3);
+      (roundTimerRegistry.keys as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+        'bossEncounter:enc-1',
+        'guildExpedition:exp-1',
+        'guildExpedition:exp-2',
+      ]);
+
+      const req = { player: { playerId: 'p1' } } as any;
+      const res = mockRes();
+      const handler = findHandler('get', '/scheduler-status');
+      await handler(req, res, vi.fn());
+
+      expect(mockPrisma.bossEncounter.count).toHaveBeenCalledWith({
+        where: { status: 'in_progress', nextRoundAt: { not: null } },
+      });
+      expect(mockPrisma.guildExpedition.count).toHaveBeenCalledWith({
+        where: {
+          status: { in: ['recruiting', 'in_progress'] },
+          nextRoundAt: { not: null },
+        },
+      });
+      expect(res.json).toHaveBeenCalledWith({
+        pendingTimers: 3,
+        timerKeys: ['bossEncounter:enc-1', 'guildExpedition:exp-1', 'guildExpedition:exp-2'],
+        pendingBossEncounters: 1,
+        pendingGuildExpeditions: 2,
+        pendingEnumeratedFromDb: 3,
+        hasDrift: false,
+      });
+    });
+
+    it('reports drift when registry disagrees with DB counts', async () => {
+      mockPrisma.bossEncounter.count.mockResolvedValue(1);
+      mockPrisma.guildExpedition.count.mockResolvedValue(1);
+      (roundTimerRegistry.size as unknown as ReturnType<typeof vi.fn>).mockReturnValue(0);
+      (roundTimerRegistry.keys as unknown as ReturnType<typeof vi.fn>).mockReturnValue([]);
+
+      const req = { player: { playerId: 'p1' } } as any;
+      const res = mockRes();
+      const handler = findHandler('get', '/scheduler-status');
+      await handler(req, res, vi.fn());
+
+      expect(res.json).toHaveBeenCalledWith({
+        pendingTimers: 0,
+        timerKeys: [],
+        pendingBossEncounters: 1,
+        pendingGuildExpeditions: 1,
+        pendingEnumeratedFromDb: 2,
+        hasDrift: true,
+      });
     });
   });
 

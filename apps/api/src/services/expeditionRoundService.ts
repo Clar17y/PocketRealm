@@ -21,6 +21,7 @@ import { addGuildLog } from './guildService';
 import { preparePlayerForCombat, applyGuildCombatModifiers, fetchFreshTemplateData } from './combatOrchestrationService';
 import { deductConsumedPotions } from './potionService';
 import { parseJsonArray } from '../utils/jsonColumnSchemas';
+import { getIo } from '../socket';
 import { snapshotCombatData, getCombatSnapshot, type ExpeditionCombatSnapshot } from './expeditionCombatCache';
 import { getCachedExpeditionMobTemplates } from './staticDataCacheService';
 import { getEquipmentStats } from './equipmentService';
@@ -28,6 +29,20 @@ import { getPlayerProgressionState } from './attributesService';
 import { calculateMaxHp } from '@pocketrealm/game-engine';
 import { getRoundInterval, getMembers, cleanupExpeditionBots } from './expeditionHelpers';
 import { handleRoomCleared, handleWipe } from './expeditionTransitionService';
+import { roundTimerRegistry } from './roundTimerRegistry';
+
+type DueExpeditionRef = {
+  id: string;
+  status: string;
+  nextRoundAt: Date | null;
+};
+
+type RecruitingExpeditionForResolution = DueExpeditionRef & {
+  guildId: string;
+  tier: number;
+  roomDefinitions: unknown;
+  _count: { members: number };
+};
 
 // ---------------------------------------------------------------------------
 // Shared Helpers: Summon Pool & Room Mob State
@@ -220,6 +235,94 @@ async function buildRaidParticipant(
   return buildParticipantFromSnapshot(member, freshSnapshot);
 }
 
+function isExpeditionStepDue(expedition: DueExpeditionRef | null): expedition is DueExpeditionRef {
+  return Boolean(
+    expedition
+    && (expedition.status === 'recruiting' || expedition.status === 'in_progress')
+    && expedition.nextRoundAt
+    && expedition.nextRoundAt.getTime() <= Date.now(),
+  );
+}
+
+async function resolveRecruitingWindowForExpedition(
+  expeditionId: string,
+  preloaded?: RecruitingExpeditionForResolution,
+): Promise<void> {
+  const now = new Date();
+  const exp = preloaded ?? await prisma.guildExpedition.findUnique({
+    where: { id: expeditionId },
+    include: { _count: { select: { members: true } } },
+  });
+  if (!isExpeditionStepDue(exp) || exp.status !== 'recruiting') return;
+
+  const minParticipants = EXPEDITION_CONSTANTS.MIN_PARTICIPANTS_BY_TIER[exp.tier - 1];
+  const memberCount = exp._count.members;
+
+  if (memberCount >= minParticipants) {
+    const rooms = parseJsonArray<ExpeditionRoomDefinition>(exp.roomDefinitions, 'roomDefinitions');
+    const snapshot = {
+      mobs: rooms[0]?.mobs ?? [],
+      members: await getMembers(exp.id),
+    };
+    const nextRoundAt = new Date(Date.now() + getRoundInterval(rooms, 0));
+
+    const updated = await prisma.guildExpedition.updateMany({
+      where: {
+        id: exp.id,
+        status: 'recruiting',
+        nextRoundAt: { lte: now },
+      },
+      data: {
+        status: 'in_progress',
+        roomStartSnapshot: JSON.parse(JSON.stringify(snapshot)),
+        nextRoundAt,
+      },
+    });
+    if (updated.count === 0) return;
+    roundTimerRegistry.schedule('guildExpedition', exp.id, nextRoundAt, getIo);
+
+    await addGuildLog(
+      exp.guildId,
+      'expedition_started',
+      `Tier ${exp.tier} expedition started with ${memberCount} members`,
+      { expeditionId: exp.id },
+    );
+
+    return;
+  }
+
+  const updated = await prisma.guildExpedition.updateMany({
+    where: {
+      id: exp.id,
+      status: 'recruiting',
+      nextRoundAt: { lte: now },
+    },
+    data: {
+      status: 'failed',
+      completedAt: now,
+      nextRoundAt: null,
+    },
+  });
+  if (updated.count === 0) return;
+  roundTimerRegistry.cancel('guildExpedition', exp.id);
+
+  await addGuildLog(
+    exp.guildId,
+    'expedition_failed',
+    `Tier ${exp.tier} expedition failed - not enough participants (${memberCount}/${minParticipants})`,
+    { expeditionId: exp.id },
+  );
+
+  await cleanupExpeditionBots(exp.id);
+}
+
+async function resolveCombatRoundForExpedition(
+  expeditionId: string,
+  io: Server | null,
+): Promise<void> {
+  await resolveExpeditionRound(expeditionId, io, { requireDue: true });
+}
+
 // ---------------------------------------------------------------------------
 // Check & Resolve Expedition Rounds (background timer entry point)
 // ---------------------------------------------------------------------------
@@ -236,62 +339,40 @@ export async function checkAndResolveExpeditionRounds(io: Server | null): Promis
 
   for (const exp of dueExpeditions) {
     if (exp.status === 'recruiting') {
-      const minParticipants = EXPEDITION_CONSTANTS.MIN_PARTICIPANTS_BY_TIER[exp.tier - 1];
-      const memberCount = exp._count.members;
-
-      if (memberCount >= minParticipants) {
-        const rooms = parseJsonArray<ExpeditionRoomDefinition>(exp.roomDefinitions, 'roomDefinitions');
-        const snapshot = {
-          mobs: rooms[0]?.mobs ?? [],
-          members: await getMembers(exp.id),
-        };
-
-        await prisma.guildExpedition.update({
-          where: { id: exp.id },
-          data: {
-            status: 'in_progress',
-            roomStartSnapshot: JSON.parse(JSON.stringify(snapshot)),
-            nextRoundAt: new Date(Date.now() + getRoundInterval(rooms, 0)),
-          },
-        });
-
-        await addGuildLog(
-          exp.guildId,
-          'expedition_started',
-          `Tier ${exp.tier} expedition started with ${memberCount} members`,
-          { expeditionId: exp.id },
-        );
-
-      } else {
-        await prisma.guildExpedition.update({
-          where: { id: exp.id },
-          data: {
-            status: 'failed',
-            completedAt: now,
-            nextRoundAt: null,
-          },
-        });
-
-        await addGuildLog(
-          exp.guildId,
-          'expedition_failed',
-          `Tier ${exp.tier} expedition failed - not enough participants (${memberCount}/${minParticipants})`,
-          { expeditionId: exp.id },
-        );
-
-        await cleanupExpeditionBots(exp.id);
-      }
+      await resolveRecruitingWindowForExpedition(exp.id, exp);
     } else if (exp.status === 'in_progress') {
-      await resolveExpeditionRound(exp.id, io);
+      await resolveCombatRoundForExpedition(exp.id, io);
     }
   }
+}
+
+export async function resolveDueExpeditionStep(
+  expeditionId: string,
+  io: Server | null,
+): Promise<void> {
+  const expedition = await prisma.guildExpedition.findUnique({
+    where: { id: expeditionId },
+    select: { id: true, status: true, nextRoundAt: true },
+  });
+  if (!isExpeditionStepDue(expedition)) return;
+
+  if (expedition.status === 'recruiting') {
+    await resolveRecruitingWindowForExpedition(expedition.id);
+    return;
+  }
+
+  await resolveCombatRoundForExpedition(expedition.id, io);
 }
 
 // ---------------------------------------------------------------------------
 // Resolve Expedition Round
 // ---------------------------------------------------------------------------
 
-export async function resolveExpeditionRound(expeditionId: string, io: Server | null): Promise<void> {
+export async function resolveExpeditionRound(
+  expeditionId: string,
+  io: Server | null,
+  options: { requireDue?: boolean } = {},
+): Promise<void> {
   const expedition = await prisma.guildExpedition.findUnique({
     where: { id: expeditionId },
     include: {
@@ -299,6 +380,7 @@ export async function resolveExpeditionRound(expeditionId: string, io: Server | 
     },
   });
   if (!expedition || expedition.status !== 'in_progress') return;
+  if (options.requireDue && !isExpeditionStepDue(expedition)) return;
 
   const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const currentRoomDef = rooms[expedition.currentRoom];
@@ -367,7 +449,12 @@ export async function resolveExpeditionRound(expeditionId: string, io: Server | 
     : new Date(Date.now() + getRoundInterval(rooms, expedition.currentRoom));
 
   const updated = await prisma.guildExpedition.updateMany({
-    where: { id: expeditionId, roundNumber: expedition.roundNumber },
+    where: {
+      id: expeditionId,
+      roundNumber: expedition.roundNumber,
+      status: 'in_progress',
+      nextRoundAt: { not: null },
+    },
     data: {
       roundNumber: nextRound,
       roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),
@@ -376,6 +463,12 @@ export async function resolveExpeditionRound(expeditionId: string, io: Server | 
     },
   });
   if (updated.count === 0) return;
+
+  if (nextRoundAt) {
+    roundTimerRegistry.schedule('guildExpedition', expeditionId, nextRoundAt, getIo);
+  } else {
+    roundTimerRegistry.cancel('guildExpedition', expeditionId);
+  }
 
   await Promise.all(
     result.participantResults.map(pr => {
@@ -443,10 +536,13 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
     throw new AppError(400, 'Room already has rounds resolved — cannot auto-resolve', 'ROUND_IN_PROGRESS');
   }
 
-  await prisma.guildExpedition.update({
-    where: { id: expeditionId },
+  const claimed = await prisma.guildExpedition.updateMany({
+    where: { id: expeditionId, roundNumber: 0, status: 'in_progress' },
     data: { nextRoundAt: null },
   });
+  if (claimed.count === 0) {
+    throw new AppError(409, 'Room was modified by another process', 'CONCURRENT_MODIFICATION');
+  }
 
   const rooms = parseJsonArray<ExpeditionRoomDefinition>(expedition.roomDefinitions, 'roomDefinitions');
   const currentRoomDef = rooms[expedition.currentRoom];
@@ -543,7 +639,12 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
   const updatedRooms = buildUpdatedRoomMobs(currentRoomDef, mobs, rooms, expedition.currentRoom);
 
   const updated = await prisma.guildExpedition.updateMany({
-    where: { id: expeditionId, roundNumber: 0 },
+    where: {
+      id: expeditionId,
+      roundNumber: 0,
+      status: 'in_progress',
+      nextRoundAt: null,
+    },
     data: {
       roundNumber,
       roomDefinitions: JSON.parse(JSON.stringify(updatedRooms)),
@@ -554,6 +655,7 @@ export async function autoResolveRoom(expeditionId: string): Promise<AutoResolve
   if (updated.count === 0) {
     throw new AppError(409, 'Room was modified by another process', 'CONCURRENT_MODIFICATION');
   }
+  roundTimerRegistry.cancel('guildExpedition', expeditionId);
 
   await Promise.all(
     participants.map(p => {

@@ -67,6 +67,19 @@ vi.mock('./combatTemplateService', () => ({
 vi.mock('./pushNotificationService', () => ({
   sendPush: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('./roundTimerRegistry', () => ({
+  roundTimerRegistry: {
+    schedule: vi.fn(),
+    cancel: vi.fn(),
+    rehydrate: vi.fn(),
+    clearAll: vi.fn(),
+    size: vi.fn().mockReturnValue(0),
+    keys: vi.fn().mockReturnValue([]),
+  },
+}));
+vi.mock('../socket', () => ({
+  getIo: vi.fn(() => null),
+}));
 vi.mock('@pocketrealm/game-engine', async () => {
   const actual = await vi.importActual<typeof import('@pocketrealm/game-engine')>('@pocketrealm/game-engine');
   return {
@@ -115,19 +128,24 @@ import { mockPrisma } from '../__test__/setup';
 import {
   launchExpedition,
   signUpForExpedition,
+  forceStartExpedition,
   getActiveExpedition,
   getExpeditionStatus,
   checkAndResolveExpeditionRounds,
   resolveExpeditionRound,
   autoResolveRoom,
+  abandonExpedition,
   handleRoomCleared,
   handleWipe,
   completeExpedition,
   recoverFromKO,
 } from './expeditionService';
+import { resolveDueExpeditionStep } from './expeditionRoundService';
 import { spendPlayerTurnsTx } from './turnBankService';
 import { getHpState } from './hpService';
 import { resolveRaidRound } from '@pocketrealm/game-engine';
+import { roundTimerRegistry } from './roundTimerRegistry';
+import { getIo } from '../socket';
 
 const GUILD_ID = 'guild-1';
 const PLAYER_ID = 'player-1';
@@ -493,6 +511,246 @@ describe('expeditionService', () => {
   });
 
   // =========================================================================
+  // expedition lifecycle scheduling hooks
+  // =========================================================================
+
+  describe('expedition lifecycle scheduling hooks', () => {
+    const fullRoomDefs = [
+      {
+        roomIndex: 0,
+        roomType: 'trash',
+        mobs: [{
+          id: 'mob-0-0',
+          mobTemplateId: 'tmpl-1',
+          name: 'Goblin',
+          prefix: null,
+          hp: 100,
+          maxHp: 100,
+          stats: { hp: 100, maxHp: 100, attack: 10, accuracy: 10, defence: 5, magicDefence: 3, dodge: 2, evasion: 0, damageMin: 5, damageMax: 10, speed: 0, damageType: 'physical' },
+          actionTemplate: [{ actionId: 'boss_physical_attack', targetMode: 'single_target' }],
+          activeEffects: [],
+        }],
+      },
+      { roomIndex: 1, roomType: 'elite', mobs: [] },
+      { roomIndex: 2, roomType: 'final_boss', mobs: [] },
+    ];
+
+    function setupLaunch() {
+      mockPrisma.guildMember.findUnique.mockResolvedValue(makeMembershipRow());
+      mockPrisma.guildMember.findMany.mockResolvedValue([{ playerId: PLAYER_ID }]);
+      mockPrisma.guildExpedition.findFirst.mockResolvedValue(null);
+      mockPrisma.expeditionCooldown.findUnique.mockResolvedValue(null);
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([makeMobTemplate()]);
+      mockPrisma.guild.update.mockResolvedValue(makeGuildRow());
+      mockPrisma.guildExpedition.create.mockResolvedValue(makeExpeditionRow());
+      mockPrisma.guildLog.create.mockResolvedValue({});
+    }
+
+    it('launchExpedition schedules the signup window', async () => {
+      setupLaunch();
+
+      await launchExpedition(PLAYER_ID, 1);
+
+      expect(roundTimerRegistry.schedule).toHaveBeenCalledWith(
+        'guildExpedition',
+        EXPEDITION_ID,
+        expect.any(Date),
+        getIo,
+      );
+    });
+
+    it('forceStartExpedition reschedules at new combat nextRoundAt', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({ status: 'recruiting', _count: { members: 2 } }),
+      );
+      mockPrisma.guildMember.findUnique.mockResolvedValue({
+        playerId: PLAYER_ID,
+        guildId: GUILD_ID,
+        role: 'officer',
+      });
+      mockPrisma.guildExpeditionMember.findMany.mockResolvedValue([makeMemberRow()]);
+      mockPrisma.guildExpedition.update.mockResolvedValue(makeExpeditionRow({ status: 'in_progress' }));
+      mockPrisma.guildLog.create.mockResolvedValue({});
+
+      await forceStartExpedition(EXPEDITION_ID, PLAYER_ID);
+
+      expect(roundTimerRegistry.schedule).toHaveBeenCalledWith(
+        'guildExpedition',
+        EXPEDITION_ID,
+        expect.any(Date),
+        getIo,
+      );
+    });
+
+    it('recruiting failure cancels', async () => {
+      mockPrisma.guildExpedition.findMany.mockResolvedValue([
+        makeExpeditionRow({
+          status: 'recruiting',
+          nextRoundAt: new Date(Date.now() - 1000),
+          _count: { members: 0 },
+        }),
+      ]);
+      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildLog.create.mockResolvedValue({});
+
+      await checkAndResolveExpeditionRounds(null);
+
+      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('guildExpedition', EXPEDITION_ID);
+    });
+
+    it('combat round continuation reschedules', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          status: 'in_progress',
+          roundNumber: 0,
+          roomDefinitions: fullRoomDefs,
+          members: [makeMemberRow()],
+          nextRoundAt: new Date(Date.now() - 1000),
+        }),
+      );
+      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildExpeditionMember.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildExpedition.update.mockResolvedValue({});
+
+      await resolveExpeditionRound(EXPEDITION_ID, null);
+
+      expect(roundTimerRegistry.schedule).toHaveBeenCalledWith(
+        'guildExpedition',
+        EXPEDITION_ID,
+        expect.any(Date),
+        getIo,
+      );
+    });
+
+    it('wipe with retry reschedules recruiting window', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          status: 'in_progress',
+          wipeCount: 0,
+          expeditionAttemptLogs: [],
+          members: [{ playerId: PLAYER_ID, totalDamage: 50n, totalHealing: 0n, player: { username: 'TestPlayer' } }],
+        }),
+      );
+      mockPrisma.mobTemplate.findMany.mockResolvedValue([makeMobTemplate()]);
+      mockPrisma.guildExpeditionMember.findMany.mockResolvedValue([]);
+      mockPrisma.guildExpeditionMember.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildExpedition.update.mockResolvedValue({});
+      mockPrisma.guildLog.create.mockResolvedValue({});
+
+      await handleWipe(EXPEDITION_ID);
+
+      expect(roundTimerRegistry.schedule).toHaveBeenCalledWith(
+        'guildExpedition',
+        EXPEDITION_ID,
+        expect.any(Date),
+        getIo,
+      );
+    });
+
+    it('max-attempt wipe cancels', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          status: 'in_progress',
+          wipeCount: 999,
+          expeditionAttemptLogs: [],
+          members: [{ playerId: PLAYER_ID, totalDamage: 50n, totalHealing: 0n, player: { username: 'TestPlayer' } }],
+        }),
+      );
+      mockPrisma.guildExpedition.update.mockResolvedValue({});
+      mockPrisma.guildLog.create.mockResolvedValue({});
+
+      await handleWipe(EXPEDITION_ID);
+
+      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('guildExpedition', EXPEDITION_ID);
+    });
+
+    it('completeExpedition cancels', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          status: 'in_progress',
+          members: [makeMemberRow()],
+        }),
+      );
+      mockPrisma.guildExpedition.update.mockResolvedValue({});
+      mockPrisma.player.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guild.update.mockResolvedValue({});
+      mockPrisma.guildLog.create.mockResolvedValue({});
+
+      await completeExpedition(EXPEDITION_ID);
+
+      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('guildExpedition', EXPEDITION_ID);
+    });
+
+    it('abandonExpedition cancels', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          status: 'recruiting',
+          members: [{ playerId: PLAYER_ID, totalDamage: 0n, totalHealing: 0n }],
+        }),
+      );
+      mockPrisma.guildMember.findUnique.mockResolvedValue({
+        playerId: PLAYER_ID,
+        guildId: GUILD_ID,
+        role: 'officer',
+      });
+      mockPrisma.guildExpedition.update.mockResolvedValue({});
+      mockPrisma.guildLog.create.mockResolvedValue({});
+
+      await abandonExpedition(EXPEDITION_ID, PLAYER_ID);
+
+      expect(roundTimerRegistry.cancel).toHaveBeenCalledWith('guildExpedition', EXPEDITION_ID);
+    });
+  });
+
+  // =========================================================================
+  // resolveDueExpeditionStep
+  // =========================================================================
+
+  describe('resolveDueExpeditionStep', () => {
+    it('no-ops when expedition status is neither recruiting nor in_progress', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          id: 'e1',
+          status: 'completed',
+          nextRoundAt: new Date(),
+        }),
+      );
+
+      await resolveDueExpeditionStep('e1', null);
+
+      expect(mockPrisma.guildExpedition.update).not.toHaveBeenCalled();
+    });
+
+    it('no-ops when nextRoundAt is null', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          id: 'e1',
+          status: 'in_progress',
+          nextRoundAt: null,
+        }),
+      );
+
+      await resolveDueExpeditionStep('e1', null);
+
+      expect(mockPrisma.guildExpedition.update).not.toHaveBeenCalled();
+    });
+
+    it('no-ops when nextRoundAt is in the future', async () => {
+      mockPrisma.guildExpedition.findUnique.mockResolvedValue(
+        makeExpeditionRow({
+          id: 'e1',
+          status: 'in_progress',
+          nextRoundAt: new Date(Date.now() + 30_000),
+        }),
+      );
+
+      await resolveDueExpeditionStep('e1', null);
+
+      expect(mockPrisma.guildExpedition.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
   // checkAndResolveExpeditionRounds
   // =========================================================================
 
@@ -509,19 +767,21 @@ describe('expeditionService', () => {
       mockPrisma.guildExpeditionMember.findMany.mockResolvedValue([
         makeMemberRow(),
       ]);
-      mockPrisma.guildExpedition.update.mockResolvedValue(makeExpeditionRow({ status: 'in_progress' }));
+      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.guildLog.create.mockResolvedValue({});
 
       await checkAndResolveExpeditionRounds(null);
 
-      expect(mockPrisma.guildExpedition.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: EXPEDITION_ID },
-          data: expect.objectContaining({
-            status: 'in_progress',
-          }),
+      expect(mockPrisma.guildExpedition.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: EXPEDITION_ID,
+          status: 'recruiting',
+          nextRoundAt: { lte: expect.any(Date) },
+        },
+        data: expect.objectContaining({
+          status: 'in_progress',
         }),
-      );
+      });
     });
 
     it('fails recruiting expedition with too few members', async () => {
@@ -532,19 +792,56 @@ describe('expeditionService', () => {
           _count: { members: 2 },
         }),
       ]);
-      mockPrisma.guildExpedition.update.mockResolvedValue(makeExpeditionRow({ status: 'failed' }));
+      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.guildLog.create.mockResolvedValue({});
 
       await checkAndResolveExpeditionRounds(null);
 
-      expect(mockPrisma.guildExpedition.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: EXPEDITION_ID },
-          data: expect.objectContaining({
-            status: 'failed',
-          }),
+      expect(mockPrisma.guildExpedition.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: EXPEDITION_ID,
+          status: 'recruiting',
+          nextRoundAt: { lte: expect.any(Date) },
+        },
+        data: expect.objectContaining({
+          status: 'failed',
         }),
-      );
+      });
+    });
+
+    it('does not schedule or log when recruiting start loses the compare-and-swap', async () => {
+      mockPrisma.guildExpedition.findMany.mockResolvedValue([
+        makeExpeditionRow({
+          status: 'recruiting',
+          nextRoundAt: new Date(Date.now() - 1000),
+          _count: { members: 5 },
+        }),
+      ]);
+      mockPrisma.guildExpeditionMember.findMany.mockResolvedValue([makeMemberRow()]);
+      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.guildLog.create.mockResolvedValue({});
+
+      await checkAndResolveExpeditionRounds(null);
+
+      expect(roundTimerRegistry.schedule).not.toHaveBeenCalled();
+      expect(mockPrisma.guildLog.create).not.toHaveBeenCalled();
+    });
+
+    it('does not cancel or log when recruiting failure loses the compare-and-swap', async () => {
+      mockPrisma.guildExpedition.findMany.mockResolvedValue([
+        makeExpeditionRow({
+          status: 'recruiting',
+          nextRoundAt: new Date(Date.now() - 1000),
+          _count: { members: 1 },
+        }),
+      ]);
+      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.guildLog.create.mockResolvedValue({});
+
+      await checkAndResolveExpeditionRounds(null);
+
+      expect(roundTimerRegistry.cancel).not.toHaveBeenCalled();
+      expect(mockPrisma.guildLog.create).not.toHaveBeenCalled();
     });
   });
 
@@ -587,7 +884,12 @@ describe('expeditionService', () => {
       // Atomic optimistic-locked update (roundNumber + roundSummaries + roomDefinitions)
       expect(mockPrisma.guildExpedition.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: EXPEDITION_ID, roundNumber: 0 },
+          where: {
+            id: EXPEDITION_ID,
+            roundNumber: 0,
+            status: 'in_progress',
+            nextRoundAt: { not: null },
+          },
           data: expect.objectContaining({ roundNumber: 1 }),
         }),
       );
@@ -869,8 +1171,9 @@ describe('expeditionService', () => {
       } as any);
 
       mockPrisma.guildExpedition.findUnique.mockResolvedValue(inProgressExpedition());
-      mockPrisma.guildExpedition.update.mockResolvedValue({});
-      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildExpedition.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 });
       mockPrisma.guildExpeditionMember.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.guildExpeditionMember.findMany.mockResolvedValue([makeMemberRow()]);
       mockPrisma.guildExpeditionMember.update.mockResolvedValue(makeMemberRow());
@@ -888,9 +1191,19 @@ describe('expeditionService', () => {
       expect(result.tokensAwarded).toBe(6); // 5 base + 1 bonus
 
       // Verify optimistic lock used roundNumber: 0
-      expect(mockPrisma.guildExpedition.updateMany).toHaveBeenCalledWith(
+      expect(mockPrisma.guildExpedition.updateMany).toHaveBeenNthCalledWith(1, {
+        where: { id: EXPEDITION_ID, roundNumber: 0, status: 'in_progress' },
+        data: { nextRoundAt: null },
+      });
+      expect(mockPrisma.guildExpedition.updateMany).toHaveBeenNthCalledWith(
+        2,
         expect.objectContaining({
-          where: { id: EXPEDITION_ID, roundNumber: 0 },
+          where: {
+            id: EXPEDITION_ID,
+            roundNumber: 0,
+            status: 'in_progress',
+            nextRoundAt: null,
+          },
         }),
       );
     });
@@ -914,8 +1227,9 @@ describe('expeditionService', () => {
       } as any);
 
       mockPrisma.guildExpedition.findUnique.mockResolvedValue(inProgressExpedition({ wipeCount: 0, expeditionAttemptLogs: [] }));
-      mockPrisma.guildExpedition.update.mockResolvedValue({});
-      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.guildExpedition.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 });
       mockPrisma.guildExpeditionMember.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.guildExpeditionMember.deleteMany.mockResolvedValue({ count: 1 });
       mockPrisma.guildLog.create.mockResolvedValue({});
@@ -969,11 +1283,13 @@ describe('expeditionService', () => {
       } as any);
 
       mockPrisma.guildExpedition.findUnique.mockResolvedValue(inProgressExpedition());
-      mockPrisma.guildExpedition.update.mockResolvedValue({});
-      mockPrisma.guildExpedition.updateMany.mockResolvedValue({ count: 0 }); // Lock failed
+      mockPrisma.guildExpedition.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 }); // Final optimistic lock failed
       mockPrisma.mobTemplate.findMany.mockResolvedValue([]);
 
       await expect(autoResolveRoom(EXPEDITION_ID)).rejects.toThrow('Room was modified by another process');
+      expect(roundTimerRegistry.cancel).not.toHaveBeenCalled();
     });
   });
 });
