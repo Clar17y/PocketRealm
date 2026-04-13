@@ -5,6 +5,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      '@pocketrealm/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
+      '@pocketrealm/game-engine': path.resolve(__dirname, '../../packages/game-engine/src/index.ts'),
     },
   },
   test: {

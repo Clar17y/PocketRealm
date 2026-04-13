@@ -57,6 +57,7 @@ npm run clean
 ## Working Rules
 
 - Prefer focused verification first, then broader verification only as needed.
+- When a task changes code, invoke the global `$simplify` skill before final handoff; review only the touched diff, apply worthwhile simplifications, then run focused verification again.
 - Use `apply_patch` for manual file edits. Do not write files with `cat`, `echo`, heredocs, or shell redirection.
 - Keep changes scoped. Do not revert user changes or unrelated worktree changes.
 - Strict TypeScript: avoid `any`; preserve type safety across package boundaries.
