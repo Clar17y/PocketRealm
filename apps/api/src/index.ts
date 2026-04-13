@@ -45,9 +45,7 @@ import { logger } from './logger';
 import { APP_VERSION } from './version';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
-import { refreshAllLeaderboards } from './services/leaderboardService';
 import { startMetricsLogger } from './services/metricsLogger';
-import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
 import { cleanupExpiredTokens } from './services/authTokenService';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
 
@@ -174,16 +172,6 @@ server.listen(PORT, () => {
     logger.error({ err }, 'Round timer registry rehydrate error');
   });
   stopMetricsLogger = startMetricsLogger(getIo);
-
-  // Leaderboard refresh (every 15 minutes)
-  refreshAllLeaderboards().catch((err) => {
-    logger.error({ err }, 'Initial leaderboard refresh error');
-  });
-  setInterval(() => {
-    refreshAllLeaderboards().catch((err) => {
-      logger.error({ err }, 'Leaderboard refresh error');
-    });
-  }, LEADERBOARD_CONSTANTS.REFRESH_INTERVAL_MS);
 
   // Auth token cleanup (every 6 hours)
   setInterval(() => {

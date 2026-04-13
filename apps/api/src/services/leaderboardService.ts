@@ -1,8 +1,13 @@
+import { randomUUID } from 'crypto';
 import { prisma, Prisma } from '@pocketrealm/database';
 import { LEADERBOARD_CONSTANTS, ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../logger';
+
+const LAST_REFRESH_KEY = 'leaderboard:last_refresh';
+const LOCK_KEY = 'leaderboard:refresh_lock';
+const LOCK_TTL_MS = 60_000;
 
 // ── Paginated fetch helper ───────────────────────────────────────────────────
 
@@ -194,12 +199,14 @@ export async function getLeaderboard(
     throw new AppError(400, `Invalid leaderboard category: ${category}`, 'INVALID_CATEGORY');
   }
 
+  await ensureLeaderboardsFresh();
+
   const key = `leaderboard:${category}`;
   const metaKey = `leaderboard:meta:${category}`;
   const { PAGE_SIZE } = LEADERBOARD_CONSTANTS;
 
   const totalPlayers = await redis.zcard(key);
-  const lastRefreshedAt = await redis.get('leaderboard:last_refresh');
+  const lastRefreshedAt = await redis.get(LAST_REFRESH_KEY);
 
   let start = 0;
   let stop = PAGE_SIZE - 1;
@@ -264,6 +271,35 @@ export async function getLeaderboard(
   }
 
   return { category, entries, myRank, totalPlayers, lastRefreshedAt };
+}
+
+export async function ensureLeaderboardsFresh(): Promise<void> {
+  try {
+    const lastRefreshedAt = await redis.get(LAST_REFRESH_KEY);
+    if (lastRefreshedAt) {
+      const ageMs = Date.now() - Date.parse(lastRefreshedAt);
+      if (Number.isFinite(ageMs) && ageMs < LEADERBOARD_CONSTANTS.REFRESH_INTERVAL_MS) {
+        return;
+      }
+    }
+
+    const lockToken = randomUUID();
+    const acquired = await redis.set(LOCK_KEY, lockToken, 'PX', LOCK_TTL_MS, 'NX');
+    if (!acquired) {
+      return;
+    }
+
+    try {
+      await refreshAllLeaderboards();
+    } finally {
+      const currentLockToken = await redis.get(LOCK_KEY);
+      if (currentLockToken === lockToken) {
+        await redis.del(LOCK_KEY);
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, 'ensureLeaderboardsFresh failed; serving existing data');
+  }
 }
 
 // ── Refresh logic ───────────────────────────────────────────────────────────
@@ -608,7 +644,7 @@ export async function refreshAllLeaderboards(): Promise<void> {
   try { await refreshCasino(); } catch (err) { failures++; logger.error({ err, board: 'casino' }, 'Leaderboard refresh error'); }
 
   if (failures === 0) {
-    await redis.set('leaderboard:last_refresh', new Date().toISOString());
+    await redis.set(LAST_REFRESH_KEY, new Date().toISOString());
   }
 
   logger.info({ durationMs: Date.now() - start, failures }, 'Leaderboard refresh completed');

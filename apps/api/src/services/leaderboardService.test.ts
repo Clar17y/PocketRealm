@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('crypto', () => ({
+  randomUUID: vi.fn(() => 'lock-token'),
+}));
+
 vi.mock('../redis', () => ({
   redis: {
     zcard: vi.fn(),
@@ -18,7 +22,7 @@ vi.mock('../redis', () => ({
 
 import { mockPrisma } from '../__test__/setup';
 import { redis } from '../redis';
-import { getCategories, getLeaderboard, refreshAllLeaderboards } from './leaderboardService';
+import { ensureLeaderboardsFresh, getCategories, getLeaderboard, refreshAllLeaderboards } from './leaderboardService';
 import { AppError } from '../middleware/errorHandler';
 import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
 const mockRedis = redis as unknown as Record<string, ReturnType<typeof vi.fn>>;
@@ -37,6 +41,48 @@ function stubEmptyRefresh() {
 describe('leaderboardService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('ensureLeaderboardsFresh', () => {
+    it('skips refresh when last_refresh is within TTL', async () => {
+      mockRedis.get.mockResolvedValue(new Date().toISOString());
+
+      await ensureLeaderboardsFresh();
+
+      expect(mockPrisma.pvpRating.findMany).not.toHaveBeenCalled();
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+
+    it('refreshes when last_refresh is stale and lock is acquired', async () => {
+      stubEmptyRefresh();
+      mockRedis.get
+        .mockResolvedValueOnce(new Date(Date.now() - LEADERBOARD_CONSTANTS.REFRESH_INTERVAL_MS - 1).toISOString())
+        .mockResolvedValueOnce('lock-token');
+      mockRedis.set.mockResolvedValue('OK');
+
+      await ensureLeaderboardsFresh();
+
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        'leaderboard:refresh_lock',
+        'lock-token',
+        'PX',
+        60_000,
+        'NX',
+      );
+      expect(mockPrisma.pvpRating.findMany).toHaveBeenCalled();
+      expect(mockRedis.set).toHaveBeenCalledWith('leaderboard:last_refresh', expect.any(String));
+      expect(mockRedis.del).toHaveBeenCalledWith('leaderboard:refresh_lock');
+    });
+
+    it('skips refresh when lock cannot be acquired', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      mockRedis.set.mockResolvedValue(null);
+
+      await ensureLeaderboardsFresh();
+
+      expect(mockPrisma.pvpRating.findMany).not.toHaveBeenCalled();
+      expect(mockRedis.del).not.toHaveBeenCalled();
+    });
   });
 
   // ── getCategories ────────────────────────────────────────────────────────
