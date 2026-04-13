@@ -76,8 +76,13 @@ function Get-BranchLeaf {
   return ($Name -split '[/\\]')[-1]
 }
 
-$RepoRoot = (& git rev-parse --show-toplevel).Trim()
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($RepoRoot)) {
+$CommonGitDir = (& git rev-parse --path-format=absolute --git-common-dir).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($CommonGitDir)) {
+  throw 'Could not resolve git common directory.'
+}
+
+$RepoRoot = Split-Path -Parent $CommonGitDir
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
   throw 'Could not resolve git repository root.'
 }
 
