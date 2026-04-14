@@ -246,10 +246,11 @@ import { startRouter } from './start';
 import {
   applyTrackedFamilyWeightBias,
   buildEncounterSiteMobs,
+  type ZoneFamilyRow,
 } from './helpers';
 import { getCachedZoneMobFamilies } from '../../services/staticDataCacheService';
 import { buildTrackableMobFamiliesByZone } from '../../services/explorationTrackingService';
-import { processExplorationOutcomes } from '../../services/explorationOutcomeService';
+import { processExplorationOutcomes, type ExplorationOutcomeContext } from '../../services/explorationOutcomeService';
 import { simulateExploration } from '@pocketrealm/game-engine';
 import { EXPLORATION_TRACKING_CONSTANTS, TUTORIAL_STEP_EXPLORE } from '@pocketrealm/shared';
 
@@ -276,6 +277,134 @@ function mockRes() {
 }
 
 const ZONE_ID = '00000000-0000-0000-0000-000000000001';
+
+const BASE_EXPLORATION_OUTCOME_CONTEXT = {
+  playerId: 'p1',
+  username: 'TestPlayer',
+  zoneId: ZONE_ID,
+  zone: { id: ZONE_ID, name: 'Test Zone', difficulty: 1 },
+  hpState: { currentHp: 100, maxHp: 100 },
+  combatPrep: {
+    attackSkill: 'melee' as const,
+    attackLevel: 1,
+    guildMods: {
+      combatDamage: 0,
+      defenseBoost: 0,
+      xpBoost: 0,
+      travelCostReduction: 0,
+      gatheringYield: 0,
+      craftingCrit: 0,
+      repairCostReduction: 0,
+    },
+    perActionScaling: {
+      skillLevels: { melee: 1, ranged: 1, magic: 1 },
+      attributes: { strength: 0, dexterity: 0, intelligence: 0 },
+      weaponPower: { attack: 5, rangedPower: 0, magicPower: 0 },
+      equipmentAccuracy: 0,
+      weaponRequiredSkill: 'melee' as const,
+    },
+    playerTemplate: [{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }],
+    potionPool: [],
+    resources: { stamina: 100, maxStamina: 100, staminaRegenPerRound: 5, mana: 50, maxMana: 50, manaRegenPerRound: 3 },
+    unlockedActions: [],
+  },
+  combatBuffs: { damageBoost: 0, defenceBoost: 0, durabilityShield: 0 },
+  buffUsesLeft: { damage: 0, defence: 0, durability: 0 },
+  progression: {
+    characterXp: 0,
+    characterLevel: 1,
+    attributePoints: 0,
+    attributes: { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 },
+  },
+  equipmentStats: {
+    attack: 5,
+    rangedPower: 0,
+    magicPower: 0,
+    accuracy: 5,
+    armor: 5,
+    magicDefence: 0,
+    health: 0,
+    dodge: 0,
+    luck: 0,
+    critChance: 0,
+    critDamage: 1,
+    inventorySlots: 0,
+  },
+  mobTemplates: [],
+  zoneTiers: null,
+  selectedTier: 1,
+  explorationProgress: { percent: 0, turnsExplored: 0, turnsToExplore: null },
+  zoneModifiers: {
+    mobDamageMultiplier: 1,
+    mobHpMultiplier: 1,
+    mobSpawnRateMultiplier: 1,
+    resourceDropRateMultiplier: 1,
+    resourceYieldMultiplier: 1,
+  },
+  spawnMods: { global: 1, byFamily: new Map() },
+  cachedZoneEvents: [],
+  cachedWorldEvents: [],
+  isTutorialExplore: false,
+  resourceNodes: [],
+  undiscoveredNeighbors: [],
+  thresholdByToId: new Map(),
+} satisfies Omit<ExplorationOutcomeContext, 'zoneFamilies' | 'mobToFamilyMap' | 'trackingFamilyId'>;
+
+function createZoneFamily({
+  mobFamilyId,
+  name,
+  discoveryWeight = 100,
+  members,
+}: {
+  mobFamilyId: string;
+  name: string;
+  discoveryWeight?: number;
+  members: ZoneFamilyRow['mobFamily']['members'];
+}): ZoneFamilyRow {
+  return {
+    zoneId: ZONE_ID,
+    mobFamilyId,
+    discoveryWeight,
+    minSize: 'small',
+    maxSize: 'small',
+    mobFamily: {
+      id: mobFamilyId,
+      name,
+      siteNounSmall: 'Nest',
+      siteNounMedium: 'Nest',
+      siteNounLarge: 'Nest',
+      members,
+    },
+  };
+}
+
+function buildMobToFamilyMap(zoneFamilies: ZoneFamilyRow[]) {
+  return new Map(
+    zoneFamilies.flatMap((family) =>
+      family.mobFamily.members.map((member) => [member.mobTemplate.id, family.mobFamilyId] as const),
+    ),
+  );
+}
+
+function createOutcomeContext(
+  overrides: Partial<ExplorationOutcomeContext> & Pick<ExplorationOutcomeContext, 'zoneFamilies'>,
+): ExplorationOutcomeContext {
+  const zoneFamilies = overrides.zoneFamilies;
+  return {
+    ...BASE_EXPLORATION_OUTCOME_CONTEXT,
+    ...overrides,
+    zoneFamilies,
+    mobToFamilyMap: overrides.mobToFamilyMap ?? buildMobToFamilyMap(zoneFamilies),
+    trackingFamilyId: overrides.trackingFamilyId ?? null,
+  };
+}
+
+async function loadRealProcessExplorationOutcomes() {
+  const module = await vi.importActual<typeof import('../../services/explorationOutcomeService')>(
+    '../../services/explorationOutcomeService',
+  );
+  return module.processExplorationOutcomes;
+}
 
 describe('POST /exploration/start tracking contract', () => {
   beforeEach(() => {
@@ -497,127 +626,46 @@ describe('POST /exploration/start tracking contract', () => {
   });
 
   it('does not bias encounter-site selection toward a tracked family with no eligible members', async () => {
-    const { processExplorationOutcomes: realProcessExplorationOutcomes } =
-      await vi.importActual<typeof import('../../services/explorationOutcomeService')>(
-        '../../services/explorationOutcomeService',
-      );
+    const realProcessExplorationOutcomes = await loadRealProcessExplorationOutcomes();
 
     const result = await realProcessExplorationOutcomes(
-      {
-        playerId: 'p1',
-        username: 'TestPlayer',
-        zoneId: ZONE_ID,
-        zone: { id: ZONE_ID, name: 'Test Zone', difficulty: 1 },
-        hpState: { currentHp: 100, maxHp: 100 },
-        combatPrep: {
-          attackSkill: 'melee',
-          attackLevel: 1,
-          guildMods: {
-            combatDamage: 0,
-            defenseBoost: 0,
-            xpBoost: 0,
-            travelCostReduction: 0,
-            gatheringYield: 0,
-            craftingCrit: 0,
-            repairCostReduction: 0,
-          },
-          perActionScaling: {
-            skillLevels: { melee: 1, ranged: 1, magic: 1 },
-            attributes: { strength: 0, dexterity: 0, intelligence: 0 },
-            weaponPower: { attack: 5, rangedPower: 0, magicPower: 0 },
-            equipmentAccuracy: 0,
-            weaponRequiredSkill: 'melee',
-          },
-          playerTemplate: [{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }],
-          potionPool: [],
-          resources: { stamina: 100, maxStamina: 100, staminaRegenPerRound: 5, mana: 50, maxMana: 50, manaRegenPerRound: 3 },
-          unlockedActions: [],
-        },
-        combatBuffs: { damageBoost: 0, defenceBoost: 0, durabilityShield: 0 },
-        buffUsesLeft: { damage: 0, defence: 0, durability: 0 },
-        progression: {
-          characterXp: 0,
-          characterLevel: 1,
-          attributePoints: 0,
-          attributes: { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 },
-        },
-        equipmentStats: { attack: 5, rangedPower: 0, magicPower: 0, accuracy: 5, armor: 5, magicDefence: 0, health: 0, dodge: 0, luck: 0, critChance: 0, critDamage: 1, inventorySlots: 0 },
-        mobTemplates: [],
+      createOutcomeContext({
         zoneFamilies: [
-          {
-            zoneId: ZONE_ID,
+          createZoneFamily({
             mobFamilyId: 'family-spider',
+            name: 'Spiders',
             discoveryWeight: 50,
-            minSize: 'small',
-            maxSize: 'small',
-            mobFamily: {
-              id: 'family-spider',
-              name: 'Spiders',
-              siteNounSmall: 'Nest',
-              siteNounMedium: 'Nest',
-              siteNounLarge: 'Nest',
-              members: [
-                {
-                  role: 'trash',
-                  mobTemplate: {
-                    id: 'spider-elite',
-                    name: 'Elite Spider',
-                    zoneId: ZONE_ID,
-                    explorationTier: 3,
-                  },
+            members: [
+              {
+                role: 'trash',
+                mobTemplate: {
+                  id: 'spider-elite',
+                  name: 'Elite Spider',
+                  zoneId: ZONE_ID,
+                  explorationTier: 3,
                 },
-              ],
-            },
-          },
-          {
-            zoneId: ZONE_ID,
+              },
+            ],
+          }),
+          createZoneFamily({
             mobFamilyId: 'family-rat',
+            name: 'Rats',
             discoveryWeight: 100,
-            minSize: 'small',
-            maxSize: 'small',
-            mobFamily: {
-              id: 'family-rat',
-              name: 'Rats',
-              siteNounSmall: 'Nest',
-              siteNounMedium: 'Nest',
-              siteNounLarge: 'Nest',
-              members: [
-                {
-                  role: 'trash',
-                  mobTemplate: {
-                    id: 'rat-basic',
-                    name: 'Rat',
-                    zoneId: ZONE_ID,
-                    explorationTier: 1,
-                  },
+            members: [
+              {
+                role: 'trash',
+                mobTemplate: {
+                  id: 'rat-basic',
+                  name: 'Rat',
+                  zoneId: ZONE_ID,
+                  explorationTier: 1,
                 },
-              ],
-            },
-          },
+              },
+            ],
+          }),
         ],
-        zoneTiers: null,
-        selectedTier: 1,
-        explorationProgress: { percent: 0, turnsExplored: 0, turnsToExplore: null },
-        zoneModifiers: {
-          mobDamageMultiplier: 1,
-          mobHpMultiplier: 1,
-          mobSpawnRateMultiplier: 1,
-          resourceDropRateMultiplier: 1,
-          resourceYieldMultiplier: 1,
-        },
-        spawnMods: { global: 1, byFamily: new Map() },
-        mobToFamilyMap: new Map([
-          ['spider-elite', 'family-spider'],
-          ['rat-basic', 'family-rat'],
-        ]),
         trackingFamilyId: 'family-spider',
-        cachedZoneEvents: [],
-        cachedWorldEvents: [],
-        isTutorialExplore: false,
-        resourceNodes: [],
-        undiscoveredNeighbors: [],
-        thresholdByToId: new Map(),
-      },
+      }),
       [{ turnOccurred: 10, type: 'encounter_site' }],
     );
 
@@ -643,127 +691,45 @@ describe('POST /exploration/start tracking contract', () => {
           }]
     ));
 
-    const { processExplorationOutcomes: realProcessExplorationOutcomes } =
-      await vi.importActual<typeof import('../../services/explorationOutcomeService')>(
-        '../../services/explorationOutcomeService',
-      );
+    const realProcessExplorationOutcomes = await loadRealProcessExplorationOutcomes();
 
     const result = await realProcessExplorationOutcomes(
-      {
-        playerId: 'p1',
-        username: 'TestPlayer',
-        zoneId: ZONE_ID,
-        zone: { id: ZONE_ID, name: 'Test Zone', difficulty: 1 },
-        hpState: { currentHp: 100, maxHp: 100 },
-        combatPrep: {
-          attackSkill: 'melee',
-          attackLevel: 1,
-          guildMods: {
-            combatDamage: 0,
-            defenseBoost: 0,
-            xpBoost: 0,
-            travelCostReduction: 0,
-            gatheringYield: 0,
-            craftingCrit: 0,
-            repairCostReduction: 0,
-          },
-          perActionScaling: {
-            skillLevels: { melee: 1, ranged: 1, magic: 1 },
-            attributes: { strength: 0, dexterity: 0, intelligence: 0 },
-            weaponPower: { attack: 5, rangedPower: 0, magicPower: 0 },
-            equipmentAccuracy: 0,
-            weaponRequiredSkill: 'melee',
-          },
-          playerTemplate: [{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }],
-          potionPool: [],
-          resources: { stamina: 100, maxStamina: 100, staminaRegenPerRound: 5, mana: 50, maxMana: 50, manaRegenPerRound: 3 },
-          unlockedActions: [],
-        },
-        combatBuffs: { damageBoost: 0, defenceBoost: 0, durabilityShield: 0 },
-        buffUsesLeft: { damage: 0, defence: 0, durability: 0 },
-        progression: {
-          characterXp: 0,
-          characterLevel: 1,
-          attributePoints: 0,
-          attributes: { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 },
-        },
-        equipmentStats: { attack: 5, rangedPower: 0, magicPower: 0, accuracy: 5, armor: 5, magicDefence: 0, health: 0, dodge: 0, luck: 0, critChance: 0, critDamage: 1, inventorySlots: 0 },
-        mobTemplates: [],
+      createOutcomeContext({
         zoneFamilies: [
-          {
-            zoneId: ZONE_ID,
+          createZoneFamily({
             mobFamilyId: 'family-spider',
+            name: 'Spiders',
             discoveryWeight: 200,
-            minSize: 'small',
-            maxSize: 'small',
-            mobFamily: {
-              id: 'family-spider',
-              name: 'Spiders',
-              siteNounSmall: 'Nest',
-              siteNounMedium: 'Nest',
-              siteNounLarge: 'Nest',
-              members: [
-                {
-                  role: 'trash',
-                  mobTemplate: {
-                    id: 'spider-elite',
-                    name: 'Elite Spider',
-                    zoneId: ZONE_ID,
-                    explorationTier: 3,
-                  },
+            members: [
+              {
+                role: 'trash',
+                mobTemplate: {
+                  id: 'spider-elite',
+                  name: 'Elite Spider',
+                  zoneId: ZONE_ID,
+                  explorationTier: 3,
                 },
-              ],
-            },
-          },
-          {
-            zoneId: ZONE_ID,
+              },
+            ],
+          }),
+          createZoneFamily({
             mobFamilyId: 'family-rat',
+            name: 'Rats',
             discoveryWeight: 100,
-            minSize: 'small',
-            maxSize: 'small',
-            mobFamily: {
-              id: 'family-rat',
-              name: 'Rats',
-              siteNounSmall: 'Nest',
-              siteNounMedium: 'Nest',
-              siteNounLarge: 'Nest',
-              members: [
-                {
-                  role: 'trash',
-                  mobTemplate: {
-                    id: 'rat-basic',
-                    name: 'Rat',
-                    zoneId: ZONE_ID,
-                    explorationTier: 1,
-                  },
+            members: [
+              {
+                role: 'trash',
+                mobTemplate: {
+                  id: 'rat-basic',
+                  name: 'Rat',
+                  zoneId: ZONE_ID,
+                  explorationTier: 1,
                 },
-              ],
-            },
-          },
+              },
+            ],
+          }),
         ],
-        zoneTiers: null,
-        selectedTier: 1,
-        explorationProgress: { percent: 0, turnsExplored: 0, turnsToExplore: null },
-        zoneModifiers: {
-          mobDamageMultiplier: 1,
-          mobHpMultiplier: 1,
-          mobSpawnRateMultiplier: 1,
-          resourceDropRateMultiplier: 1,
-          resourceYieldMultiplier: 1,
-        },
-        spawnMods: { global: 1, byFamily: new Map() },
-        mobToFamilyMap: new Map([
-          ['spider-elite', 'family-spider'],
-          ['rat-basic', 'family-rat'],
-        ]),
-        trackingFamilyId: null,
-        cachedZoneEvents: [],
-        cachedWorldEvents: [],
-        isTutorialExplore: false,
-        resourceNodes: [],
-        undiscoveredNeighbors: [],
-        thresholdByToId: new Map(),
-      },
+      }),
       [{ turnOccurred: 10, type: 'encounter_site' }],
     );
 
@@ -791,133 +757,56 @@ describe('POST /exploration/start tracking contract', () => {
           }]
     ));
 
-    const { processExplorationOutcomes: realProcessExplorationOutcomes } =
-      await vi.importActual<typeof import('../../services/explorationOutcomeService')>(
-        '../../services/explorationOutcomeService',
-      );
+    const realProcessExplorationOutcomes = await loadRealProcessExplorationOutcomes();
 
     const result = await realProcessExplorationOutcomes(
-      {
-        playerId: 'p1',
-        username: 'TestPlayer',
-        zoneId: ZONE_ID,
-        zone: { id: ZONE_ID, name: 'Test Zone', difficulty: 1 },
-        hpState: { currentHp: 100, maxHp: 100 },
-        combatPrep: {
-          attackSkill: 'melee',
-          attackLevel: 1,
-          guildMods: {
-            combatDamage: 0,
-            defenseBoost: 0,
-            xpBoost: 0,
-            travelCostReduction: 0,
-            gatheringYield: 0,
-            craftingCrit: 0,
-            repairCostReduction: 0,
-          },
-          perActionScaling: {
-            skillLevels: { melee: 1, ranged: 1, magic: 1 },
-            attributes: { strength: 0, dexterity: 0, intelligence: 0 },
-            weaponPower: { attack: 5, rangedPower: 0, magicPower: 0 },
-            equipmentAccuracy: 0,
-            weaponRequiredSkill: 'melee',
-          },
-          playerTemplate: [{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }],
-          potionPool: [],
-          resources: { stamina: 100, maxStamina: 100, staminaRegenPerRound: 5, mana: 50, maxMana: 50, manaRegenPerRound: 3 },
-          unlockedActions: [],
-        },
-        combatBuffs: { damageBoost: 0, defenceBoost: 0, durabilityShield: 0 },
-        buffUsesLeft: { damage: 0, defence: 0, durability: 0 },
-        progression: {
-          characterXp: 0,
-          characterLevel: 1,
-          attributePoints: 0,
-          attributes: { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 },
-        },
-        equipmentStats: { attack: 5, rangedPower: 0, magicPower: 0, accuracy: 5, armor: 5, magicDefence: 0, health: 0, dodge: 0, luck: 0, critChance: 0, critDamage: 1, inventorySlots: 0 },
-        mobTemplates: [],
+      createOutcomeContext({
         zoneFamilies: [
-          {
-            zoneId: ZONE_ID,
+          createZoneFamily({
             mobFamilyId: trackedFamilyId,
+            name: 'Spiders',
             discoveryWeight: 50,
-            minSize: 'small',
-            maxSize: 'small',
-            mobFamily: {
-              id: trackedFamilyId,
-              name: 'Spiders',
-              siteNounSmall: 'Nest',
-              siteNounMedium: 'Nest',
-              siteNounLarge: 'Nest',
-              members: [
-                {
-                  role: 'trash',
-                  mobTemplate: {
-                    id: 'spider-basic',
-                    name: 'Spiderling',
-                    zoneId: ZONE_ID,
-                    explorationTier: 1,
-                  },
+            members: [
+              {
+                role: 'trash',
+                mobTemplate: {
+                  id: 'spider-basic',
+                  name: 'Spiderling',
+                  zoneId: ZONE_ID,
+                  explorationTier: 1,
                 },
-                {
-                  role: 'elite',
-                  mobTemplate: {
-                    id: 'spider-elite',
-                    name: 'Elite Spider',
-                    zoneId: ZONE_ID,
-                    explorationTier: 3,
-                  },
+              },
+              {
+                role: 'elite',
+                mobTemplate: {
+                  id: 'spider-elite',
+                  name: 'Elite Spider',
+                  zoneId: ZONE_ID,
+                  explorationTier: 3,
                 },
-              ],
-            },
-          },
-          {
-            zoneId: ZONE_ID,
+              },
+            ],
+          }),
+          createZoneFamily({
             mobFamilyId: fallbackFamilyId,
+            name: 'Rats',
             discoveryWeight: 100,
-            minSize: 'small',
-            maxSize: 'small',
-            mobFamily: {
-              id: fallbackFamilyId,
-              name: 'Rats',
-              siteNounSmall: 'Nest',
-              siteNounMedium: 'Nest',
-              siteNounLarge: 'Nest',
-              members: [
-                {
-                  role: 'trash',
-                  mobTemplate: {
-                    id: 'rat-basic',
-                    name: 'Rat',
-                    zoneId: ZONE_ID,
-                    explorationTier: 1,
-                  },
+            members: [
+              {
+                role: 'trash',
+                mobTemplate: {
+                  id: 'rat-basic',
+                  name: 'Rat',
+                  zoneId: ZONE_ID,
+                  explorationTier: 1,
                 },
-              ],
-            },
-          },
+              },
+            ],
+          }),
         ],
-        zoneTiers: null,
-        selectedTier: 1,
-        explorationProgress: { percent: 0, turnsExplored: 0, turnsToExplore: null },
-        zoneModifiers: {
-          mobDamageMultiplier: 1,
-          mobHpMultiplier: 1,
-          mobSpawnRateMultiplier: 1,
-          resourceDropRateMultiplier: 1,
-          resourceYieldMultiplier: 1,
-        },
-        spawnMods: { global: 1, byFamily: new Map() },
         mobToFamilyMap: new Map(),
         trackingFamilyId: trackedFamilyId,
-        cachedZoneEvents: [],
-        cachedWorldEvents: [],
-        isTutorialExplore: false,
-        resourceNodes: [],
-        undiscoveredNeighbors: [],
-        thresholdByToId: new Map(),
-      } as any,
+      }),
       [{ turnOccurred: 10, type: 'encounter_site' }],
     );
 
