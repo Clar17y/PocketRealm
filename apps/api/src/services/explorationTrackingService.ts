@@ -53,15 +53,38 @@ export async function buildTrackableMobFamiliesByZone(
       mobFamily: { select: { name: true } },
     },
   });
+  if (members.length === 0) return new Map<string, TrackableMobFamily[]>();
+
+  const unlockedPairs = new Set(
+    members.map((member) => `${member.mobTemplate.zoneId}:${member.mobFamilyId}`),
+  );
+  const allZoneFamilyMembers = await prisma.mobFamilyMember.findMany({
+    where: {
+      mobFamilyId: { in: [...new Set(members.map((member) => member.mobFamilyId))] },
+      mobTemplate: { zoneId: { in: zoneIds } },
+    },
+    select: {
+      mobFamilyId: true,
+      mobTemplate: { select: { zoneId: true, explorationTier: true } },
+    },
+  });
 
   const byZone = new Map<string, Map<string, TrackableMobFamily>>();
-  for (const member of members) {
+  for (const member of allZoneFamilyMembers) {
+    const pairKey = `${member.mobTemplate.zoneId}:${member.mobFamilyId}`;
+    if (!unlockedPairs.has(pairKey)) continue;
+
     const zoneFamilies = byZone.get(member.mobTemplate.zoneId) ?? new Map<string, TrackableMobFamily>();
     const minTier = member.mobTemplate.explorationTier ?? 1;
     const existing = zoneFamilies.get(member.mobFamilyId);
+    const unlockedMember = members.find(
+      (candidate) =>
+        candidate.mobFamilyId === member.mobFamilyId
+        && candidate.mobTemplate.zoneId === member.mobTemplate.zoneId,
+    );
     zoneFamilies.set(member.mobFamilyId, {
       mobFamilyId: member.mobFamilyId,
-      name: member.mobFamily.name,
+      name: unlockedMember?.mobFamily.name ?? existing?.name ?? '',
       minTier: existing ? Math.min(existing.minTier, minTier) : minTier,
     });
     byZone.set(member.mobTemplate.zoneId, zoneFamilies);
