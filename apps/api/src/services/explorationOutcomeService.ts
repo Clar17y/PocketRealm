@@ -495,12 +495,15 @@ export async function processExplorationOutcomes(
         ...f,
         discoveryWeight: f.discoveryWeight * (spawnMods.byFamily.get(f.mobFamilyId) ?? 1) * spawnMods.global,
       }));
+      const eligibleFamilies = adjustedFamilies.filter((family) => familyHasTierEligibleMember(family));
+      if (eligibleFamilies.length === 0) continue;
+
       const trackedFamilyHasEligibleMembers = trackingFamilyId
-        ? adjustedFamilies.some((family) => family.mobFamilyId === trackingFamilyId && familyHasTierEligibleMember(family))
+        ? eligibleFamilies.some((family) => family.mobFamilyId === trackingFamilyId)
         : false;
       const weightedFamilies = trackedFamilyHasEligibleMembers
-        ? applyTrackedFamilyWeightBias(adjustedFamilies, trackingFamilyId, 'discoveryWeight')
-        : adjustedFamilies;
+        ? applyTrackedFamilyWeightBias(eligibleFamilies, trackingFamilyId, 'discoveryWeight')
+        : eligibleFamilies;
       let pickedFamily = pickWeighted(weightedFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
       if (!pickedFamily) continue;
 
@@ -515,7 +518,7 @@ export async function processExplorationOutcomes(
       );
 
       if (mobs.length === 0 && trackingFamilyId && pickedFamily.mobFamilyId === trackingFamilyId) {
-        const fallbackFamilies = adjustedFamilies.filter((family) => family.mobFamilyId !== trackingFamilyId);
+        const fallbackFamilies = eligibleFamilies.filter((family) => family.mobFamilyId !== trackingFamilyId);
         pickedFamily = pickWeighted(fallbackFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
         if (!pickedFamily) continue;
 

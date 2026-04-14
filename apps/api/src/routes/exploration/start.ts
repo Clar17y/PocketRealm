@@ -87,6 +87,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     });
     const isTutorialExplore = playerRecord?.tutorialStep === TUTORIAL_STEP_EXPLORE;
     const trackingFamilyId = isTutorialExplore ? null : body.trackingFamilyId ?? null;
+    let effectiveTrackingFamilyId = trackingFamilyId;
 
     const zone = await prisma.zone.findUnique({ where: { id: body.zoneId } });
     if (!zone) {
@@ -135,7 +136,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
       const trackingFamily = zoneFamilies.find((family) => family.mobFamilyId === trackingFamilyId);
       if (!trackingFamily || !familyHasEligibleMembersForTier(trackingFamily, body.zoneId, selectedTier)) {
-        throw new AppError(400, 'That mob family cannot affect the selected exploration tier.', 'INVALID_TRACKING_FAMILY');
+        effectiveTrackingFamilyId = null;
       }
     }
 
@@ -197,7 +198,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       }, 0);
       spawnRateMultiplier = baseTotal > 0 ? adjustedTotal / baseTotal : 1;
     }
-    if (trackingFamilyId) {
+    if (effectiveTrackingFamilyId) {
       spawnRateMultiplier *= EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER;
     }
 
@@ -226,7 +227,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         zoneModifiers,
         spawnMods,
         mobToFamilyMap,
-        trackingFamilyId,
+        trackingFamilyId: effectiveTrackingFamilyId,
         cachedZoneEvents,
         cachedWorldEvents,
         isTutorialExplore,

@@ -404,7 +404,7 @@ describe('POST /exploration/start tracking contract', () => {
     );
   });
 
-  it('rejects tracking when the selected family cannot affect the current tier', async () => {
+  it('falls back to normal exploration when the selected family cannot affect the current tier', async () => {
     const trackingFamilyId = '33333333-3333-3333-3333-333333333333';
     mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([
       [ZONE_ID, [{ mobFamilyId: trackingFamilyId, name: 'Spiders' }]],
@@ -451,13 +451,14 @@ describe('POST /exploration/start tracking contract', () => {
     const handler = findHandler('post', '/start');
     await handler(req, res, next);
 
-    expect(next).toHaveBeenCalledWith(
+    expect(next).not.toHaveBeenCalled();
+    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, 1);
+    expect(mockProcessExplorationOutcomes).toHaveBeenCalledWith(
       expect.objectContaining({
-        statusCode: 400,
-        code: 'INVALID_TRACKING_FAMILY',
+        trackingFamilyId: null,
       }),
+      expect.any(Array),
     );
-    expect(mockSimulateExploration).not.toHaveBeenCalled();
   });
 
   it('ignores tracking entirely during tutorial exploration', async () => {
@@ -610,6 +611,152 @@ describe('POST /exploration/start tracking contract', () => {
           ['rat-basic', 'family-rat'],
         ]),
         trackingFamilyId: 'family-spider',
+        cachedZoneEvents: [],
+        cachedWorldEvents: [],
+        isTutorialExplore: false,
+        resourceNodes: [],
+        undiscoveredNeighbors: [],
+        thresholdByToId: new Map(),
+      },
+      [{ turnOccurred: 10, type: 'encounter_site' }],
+    );
+
+    expect(result.events[0]).toEqual(
+      expect.objectContaining({
+        type: 'encounter_site',
+        details: expect.objectContaining({ mobFamilyId: 'family-rat' }),
+      }),
+    );
+  });
+
+  it('ignores higher-weight families that cannot build encounter sites at the selected tier', async () => {
+    mockBuildEncounterSiteMobs.mockImplementation((family: { id: string }) => (
+      family.id === 'family-spider'
+        ? []
+        : [{
+            slot: 0,
+            mobTemplateId: 'rat-basic',
+            role: 'trash',
+            prefix: null,
+            status: 'alive',
+            room: 1,
+          }]
+    ));
+
+    const { processExplorationOutcomes: realProcessExplorationOutcomes } =
+      await vi.importActual<typeof import('../../services/explorationOutcomeService')>(
+        '../../services/explorationOutcomeService',
+      );
+
+    const result = await realProcessExplorationOutcomes(
+      {
+        playerId: 'p1',
+        username: 'TestPlayer',
+        zoneId: ZONE_ID,
+        zone: { id: ZONE_ID, name: 'Test Zone', difficulty: 1 },
+        hpState: { currentHp: 100, maxHp: 100 },
+        combatPrep: {
+          attackSkill: 'melee',
+          attackLevel: 1,
+          guildMods: {
+            combatDamage: 0,
+            defenseBoost: 0,
+            xpBoost: 0,
+            travelCostReduction: 0,
+            gatheringYield: 0,
+            craftingCrit: 0,
+            repairCostReduction: 0,
+          },
+          perActionScaling: {
+            skillLevels: { melee: 1, ranged: 1, magic: 1 },
+            attributes: { strength: 0, dexterity: 0, intelligence: 0 },
+            weaponPower: { attack: 5, rangedPower: 0, magicPower: 0 },
+            equipmentAccuracy: 0,
+            weaponRequiredSkill: 'melee',
+          },
+          playerTemplate: [{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }],
+          potionPool: [],
+          resources: { stamina: 100, maxStamina: 100, staminaRegenPerRound: 5, mana: 50, maxMana: 50, manaRegenPerRound: 3 },
+          unlockedActions: [],
+        },
+        combatBuffs: { damageBoost: 0, defenceBoost: 0, durabilityShield: 0 },
+        buffUsesLeft: { damage: 0, defence: 0, durability: 0 },
+        progression: {
+          characterXp: 0,
+          characterLevel: 1,
+          attributePoints: 0,
+          attributes: { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 },
+        },
+        equipmentStats: { attack: 5, rangedPower: 0, magicPower: 0, accuracy: 5, armor: 5, magicDefence: 0, health: 0, dodge: 0, luck: 0, critChance: 0, critDamage: 1, inventorySlots: 0 },
+        mobTemplates: [],
+        zoneFamilies: [
+          {
+            zoneId: ZONE_ID,
+            mobFamilyId: 'family-spider',
+            discoveryWeight: 200,
+            minSize: 'small',
+            maxSize: 'small',
+            mobFamily: {
+              id: 'family-spider',
+              name: 'Spiders',
+              siteNounSmall: 'Nest',
+              siteNounMedium: 'Nest',
+              siteNounLarge: 'Nest',
+              members: [
+                {
+                  role: 'trash',
+                  mobTemplate: {
+                    id: 'spider-elite',
+                    name: 'Elite Spider',
+                    zoneId: ZONE_ID,
+                    explorationTier: 3,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            zoneId: ZONE_ID,
+            mobFamilyId: 'family-rat',
+            discoveryWeight: 100,
+            minSize: 'small',
+            maxSize: 'small',
+            mobFamily: {
+              id: 'family-rat',
+              name: 'Rats',
+              siteNounSmall: 'Nest',
+              siteNounMedium: 'Nest',
+              siteNounLarge: 'Nest',
+              members: [
+                {
+                  role: 'trash',
+                  mobTemplate: {
+                    id: 'rat-basic',
+                    name: 'Rat',
+                    zoneId: ZONE_ID,
+                    explorationTier: 1,
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        zoneTiers: null,
+        selectedTier: 1,
+        explorationProgress: { percent: 0, turnsExplored: 0, turnsToExplore: null },
+        zoneModifiers: {
+          mobDamageMultiplier: 1,
+          mobHpMultiplier: 1,
+          mobSpawnRateMultiplier: 1,
+          resourceDropRateMultiplier: 1,
+          resourceYieldMultiplier: 1,
+        },
+        spawnMods: { global: 1, byFamily: new Map() },
+        mobToFamilyMap: new Map([
+          ['spider-elite', 'family-spider'],
+          ['rat-basic', 'family-rat'],
+        ]),
+        trackingFamilyId: null,
         cachedZoneEvents: [],
         cachedWorldEvents: [],
         isTutorialExplore: false,
