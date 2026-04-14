@@ -489,7 +489,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }, []);
 
   const reloadZones = useCallback(async () => {
-    const zonesRes = await getZones();
+    const zonesRes = await getZones({ fresh: true });
     if (zonesRes.data) applyZonesData(zonesRes.data);
   }, [applyZonesData]);
 

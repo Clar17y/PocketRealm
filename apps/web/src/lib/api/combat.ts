@@ -25,7 +25,11 @@ export interface TrackableMobFamilyResponse {
 
 // Zones
 
-export async function getZones() {
+export async function getZones(options?: { fresh?: boolean }) {
+  const endpoint = options?.fresh
+    ? `/api/v1/zones?fresh=${Date.now()}`
+    : '/api/v1/zones';
+
   return fetchApi<{
     zones: Array<{
       id: string;
@@ -52,7 +56,7 @@ export async function getZones() {
     connections: Array<{ fromId: string; toId: string; explorationThreshold: number }>;
     undiscoveredZones: Array<{ id: string; name: string; explorationThreshold: number; fromZoneId: string; discovered: false }>;
     currentZoneId: string;
-  }>('/api/v1/zones');
+  }>(endpoint, options?.fresh ? { cache: 'no-store' } : undefined);
 }
 
 export async function travelToZone(zoneId: string) {
