@@ -501,11 +501,35 @@ export async function processExplorationOutcomes(
       const weightedFamilies = trackedFamilyHasEligibleMembers
         ? applyTrackedFamilyWeightBias(adjustedFamilies, trackingFamilyId, 'discoveryWeight')
         : adjustedFamilies;
-      const pickedFamily = pickWeighted(weightedFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
+      let pickedFamily = pickWeighted(weightedFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
       if (!pickedFamily) continue;
 
-      const size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);
-      const mobs = buildEncounterSiteMobs(pickedFamily.mobFamily, size, zoneId, explorationProgress.percent, zoneTiers, selectedTier);
+      let size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);
+      let mobs = buildEncounterSiteMobs(
+        pickedFamily.mobFamily,
+        size,
+        zoneId,
+        explorationProgress.percent,
+        zoneTiers,
+        selectedTier,
+      );
+
+      if (mobs.length === 0 && trackingFamilyId && pickedFamily.mobFamilyId === trackingFamilyId) {
+        const fallbackFamilies = adjustedFamilies.filter((family) => family.mobFamilyId !== trackingFamilyId);
+        pickedFamily = pickWeighted(fallbackFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
+        if (!pickedFamily) continue;
+
+        size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);
+        mobs = buildEncounterSiteMobs(
+          pickedFamily.mobFamily,
+          size,
+          zoneId,
+          explorationProgress.percent,
+          zoneTiers,
+          selectedTier,
+        );
+      }
+
       if (mobs.length === 0) continue;
 
       const siteName = getSiteName(pickedFamily.mobFamily.name, size, pickedFamily.mobFamily);

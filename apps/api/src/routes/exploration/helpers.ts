@@ -263,14 +263,15 @@ export function buildEncounterSiteMobs(
     currentTier = overrideTier;
   }
 
-  // Get ALL zone members (not filtered by tier)
-  const zoneMembers = family.members
-    .filter((member) => member.mobTemplate.zoneId === zoneId);
-  if (zoneMembers.length === 0) return [];
+  const zoneMembers = family.members.filter((member) => member.mobTemplate.zoneId === zoneId);
+  const eligibleZoneMembers = zoneMembers.filter(
+    (member) => (member.mobTemplate.explorationTier ?? 1) <= currentTier,
+  );
+  if (eligibleZoneMembers.length === 0) return [];
 
   // Group members by tier
   const membersByTier = new Map<number, ZoneFamilyMember[]>();
-  for (const member of zoneMembers) {
+  for (const member of eligibleZoneMembers) {
     const tier = member.mobTemplate.explorationTier ?? 1;
     if (!membersByTier.has(tier)) membersByTier.set(tier, []);
     membersByTier.get(tier)!.push(member);
@@ -288,7 +289,7 @@ export function buildEncounterSiteMobs(
       const picked = pickFamilyMemberByRole(tierMembers, role, fallbackRoles);
       if (picked) return picked;
     }
-    return pickFamilyMemberByRole(zoneMembers, role, fallbackRoles);
+    return pickFamilyMemberByRole(eligibleZoneMembers, role, fallbackRoles);
   }
 
   const { rooms, totalMobs } = generateRoomAssignments(size);
@@ -336,8 +337,8 @@ export function buildEncounterSiteMobs(
   }
 
   // Fallback: if no mobs were generated
-  if (mobs.length === 0 && zoneMembers.length > 0) {
-    const member = zoneMembers[0]!;
+  if (mobs.length === 0 && eligibleZoneMembers.length > 0) {
+    const member = eligibleZoneMembers[0]!;
     mobs.push({
       slot: 0,
       mobTemplateId: member.mobTemplate.id,
