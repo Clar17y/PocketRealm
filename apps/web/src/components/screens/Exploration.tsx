@@ -113,7 +113,9 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
   const maxUnlockedTier = unlockedTierNumbers.length > 0
     ? unlockedTierNumbers[unlockedTierNumbers.length - 1]!
     : null;
-  const effectiveSelectedTier = selectedTier ?? maxUnlockedTier;
+  const effectiveSelectedTier = trackingEnabled
+    ? maxUnlockedTier
+    : (selectedTier ?? maxUnlockedTier);
 
   const calculateProbabilities = (turns: number) => {
     const trackedResultRateMultiplier = trackingEnabled
@@ -297,22 +299,28 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Exploration Tier</h3>
-                  {effectiveSelectedTier !== maxUnlockedTier && (
+                  {trackingEnabled ? (
+                    <span className="text-xs text-[var(--rpg-text-secondary)]">
+                      Tracking uses your highest unlocked tier
+                    </span>
+                  ) : effectiveSelectedTier !== maxUnlockedTier ? (
                     <span className="text-xs text-[var(--rpg-text-secondary)]">
                       No exploration progress at this tier
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 <div className="flex gap-2">
                   {unlockedTiers.map(({ tier }) => (
                     <button
                       key={tier}
+                      type="button"
                       onClick={() => setSelectedTier(tier)}
+                      disabled={trackingEnabled}
                       className={`flex-1 px-3 py-1.5 text-sm rounded border transition-colors ${
                         (effectiveSelectedTier === tier)
                           ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] border-[var(--rpg-gold)] font-bold'
                           : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
-                      }`}
+                      } ${trackingEnabled ? 'cursor-not-allowed opacity-60' : ''}`}
                     >
                       {getTierName(tier)}
                     </button>
@@ -376,6 +384,11 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                         );
                       })}
                     </div>
+                    {unlockedTiers.length > 1 && (
+                      <p className="text-xs text-[var(--rpg-text-secondary)] opacity-70">
+                        Tracking searches across your unlocked tiers and locks exploration to the highest one.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <p className="text-xs text-[var(--rpg-text-secondary)]">

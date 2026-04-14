@@ -39,6 +39,7 @@ interface UseExplorationActionsParams {
   activatePendingLoot: (sessionId: string) => Promise<void>;
   updateZoneExploration: (zoneId: string, exploration: { turnsExplored: number; percent: number; turnsToExplore: number | null }) => void;
   updateQuestProgress: (updates?: QuestProgressUpdate[]) => void;
+  reloadZones: () => Promise<void>;
 }
 
 export function useExplorationActions({
@@ -58,6 +59,7 @@ export function useExplorationActions({
   activatePendingLoot,
   updateZoneExploration,
   updateQuestProgress,
+  reloadZones,
 }: UseExplorationActionsParams) {
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<ExplorationPlaybackData | null>(null);
 
@@ -134,6 +136,7 @@ export function useExplorationActions({
       updateQuestProgress(data.questProgress);
       recordTurnsSpent(currentZone.id, turnSpend);
       updateZoneExploration(currentZone.id, data.explorationProgress);
+      await reloadZones();
 
       setExplorationPlaybackData({
         totalTurns: turnSpend,

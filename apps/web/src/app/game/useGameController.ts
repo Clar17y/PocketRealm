@@ -757,6 +757,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setZones(prev => prev.map(z => z.id === zoneId ? { ...z, exploration: { ...z.exploration, ...exploration, tiers: z.exploration?.tiers ?? null } } : z));
     },
     updateQuestProgress,
+    reloadZones,
   });
 
   const travelActions = useTravelActions({

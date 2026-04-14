@@ -68,6 +68,19 @@ describe('Exploration', () => {
     expect(onStartExploration).toHaveBeenCalledWith(100, 2, 'family-spider');
   });
 
+  it('uses the highest unlocked tier while tracking is enabled', () => {
+    const { onStartExploration } = renderExploration({
+      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Outskirts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enable tracking' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start Exploration' }));
+
+    expect(onStartExploration).toHaveBeenCalledWith(100, 2, 'family-wolf');
+    expect(screen.getByText('Tracking uses your highest unlocked tier')).toBeTruthy();
+  });
+
   it('updates the expected ambush and site preview while tracking is enabled', () => {
     renderExploration({
       trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
