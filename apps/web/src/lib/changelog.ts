@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.50',
+    date: '2026-04-14',
+    title: 'Guild Economy & Quest QoL',
+    summary:
+      'Guild progression has been rebalanced to make group play smoother and more rewarding. Guild projects now rely on member contributions instead of draining the treasury, contracts pay out much larger rewards and now grant renown, expedition cooldowns are tracked per player instead of blocking the whole guild, and active-member boosts now scale more smoothly. Guilds also earn XP from boss participation, treasury capacity has been increased, and expedition requirements and costs have been retuned. On the quality-of-life side, quest completion notifications now appear immediately when you finish them, and overflow loot handling is more reliable when claiming rewards or moving on to travel.',
+  },
+  {
     version: '0.49',
     date: '2026-03-23',
     title: 'Early Leveling Rebalance',
