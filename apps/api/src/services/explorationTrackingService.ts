@@ -4,6 +4,7 @@ import { EXPLORATION_TRACKING_CONSTANTS } from '@pocketrealm/shared';
 export interface TrackableMobFamily {
   mobFamilyId: string;
   name: string;
+  minTier: number;
 }
 
 type WeightedFamilyRecord = {
@@ -48,7 +49,7 @@ export async function buildTrackableMobFamiliesByZone(
     },
     select: {
       mobFamilyId: true,
-      mobTemplate: { select: { zoneId: true } },
+      mobTemplate: { select: { zoneId: true, explorationTier: true } },
       mobFamily: { select: { name: true } },
     },
   });
@@ -56,9 +57,12 @@ export async function buildTrackableMobFamiliesByZone(
   const byZone = new Map<string, Map<string, TrackableMobFamily>>();
   for (const member of members) {
     const zoneFamilies = byZone.get(member.mobTemplate.zoneId) ?? new Map<string, TrackableMobFamily>();
+    const minTier = member.mobTemplate.explorationTier ?? 1;
+    const existing = zoneFamilies.get(member.mobFamilyId);
     zoneFamilies.set(member.mobFamilyId, {
       mobFamilyId: member.mobFamilyId,
       name: member.mobFamily.name,
+      minTier: existing ? Math.min(existing.minTier, minTier) : minTier,
     });
     byZone.set(member.mobTemplate.zoneId, zoneFamilies);
   }

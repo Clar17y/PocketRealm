@@ -97,7 +97,7 @@ describe('GET /zones tracking contract', () => {
     mockPrisma.player.findUnique.mockResolvedValue({ currentZoneId: 'zone-forest' });
     mockPrisma.playerZoneExploration.findMany.mockResolvedValue([]);
     mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([
-      ['zone-forest', [{ mobFamilyId: 'family-spider', name: 'Spiders' }]],
+      ['zone-forest', [{ mobFamilyId: 'family-spider', name: 'Spiders', minTier: 2 }]],
     ]));
   });
 
@@ -117,7 +117,7 @@ describe('GET /zones tracking contract', () => {
         expect.objectContaining({
           id: 'zone-forest',
           discovered: true,
-          trackableMobFamilies: [{ mobFamilyId: 'family-spider', name: 'Spiders' }],
+          trackableMobFamilies: [{ mobFamilyId: 'family-spider', name: 'Spiders', minTier: 2 }],
         }),
       ]),
     );

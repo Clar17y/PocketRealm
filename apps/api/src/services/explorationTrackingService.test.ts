@@ -45,17 +45,17 @@ describe('buildTrackableMobFamiliesByZone', () => {
     mockPrisma.mobFamilyMember.findMany.mockResolvedValue([
       {
         mobFamilyId: 'family-spider',
-        mobTemplate: { zoneId: 'zone-forest' },
+        mobTemplate: { zoneId: 'zone-forest', explorationTier: 2 },
         mobFamily: { name: 'Spiders' },
       },
       {
         mobFamilyId: 'family-spider',
-        mobTemplate: { zoneId: 'zone-forest' },
+        mobTemplate: { zoneId: 'zone-forest', explorationTier: 1 },
         mobFamily: { name: 'Spiders' },
       },
       {
         mobFamilyId: 'family-rat',
-        mobTemplate: { zoneId: 'zone-forest' },
+        mobTemplate: { zoneId: 'zone-forest', explorationTier: 3 },
         mobFamily: { name: 'Rats' },
       },
     ]);
@@ -63,8 +63,8 @@ describe('buildTrackableMobFamiliesByZone', () => {
     const result = await buildTrackableMobFamiliesByZone('player-1', ['zone-forest']);
 
     expect(result.get('zone-forest')).toEqual([
-      { mobFamilyId: 'family-rat', name: 'Rats' },
-      { mobFamilyId: 'family-spider', name: 'Spiders' },
+      { mobFamilyId: 'family-rat', name: 'Rats', minTier: 3 },
+      { mobFamilyId: 'family-spider', name: 'Spiders', minTier: 1 },
     ]);
   });
 });

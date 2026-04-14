@@ -43,7 +43,7 @@ describe('Exploration', () => {
 
   it('does not pass a tracking family while tracking is off', () => {
     const { onStartExploration } = renderExploration({
-      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
+      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 }],
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Start Exploration' }));
@@ -54,8 +54,8 @@ describe('Exploration', () => {
   it('passes the selected tracking family when tracking is enabled', () => {
     const { onStartExploration } = renderExploration({
       trackableMobFamilies: [
-        { mobFamilyId: 'family-wolf', name: 'Wolves' },
-        { mobFamilyId: 'family-spider', name: 'Spiders' },
+        { mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 },
+        { mobFamilyId: 'family-spider', name: 'Spiders', minTier: 2 },
       ],
     });
 
@@ -68,22 +68,26 @@ describe('Exploration', () => {
     expect(onStartExploration).toHaveBeenCalledWith(100, 2, 'family-spider');
   });
 
-  it('uses the highest unlocked tier while tracking is enabled', () => {
+  it('keeps lower-tier tracking valid while filtering out families locked behind a higher tier', () => {
     const { onStartExploration } = renderExploration({
-      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
+      trackableMobFamilies: [
+        { mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 },
+        { mobFamilyId: 'family-spider', name: 'Spiders', minTier: 2 },
+      ],
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Outskirts' }));
     fireEvent.click(screen.getByRole('button', { name: 'Enable tracking' }));
+
+    expect(screen.queryByRole('button', { name: 'Track Spiders' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Start Exploration' }));
 
-    expect(onStartExploration).toHaveBeenCalledWith(100, 2, 'family-wolf');
-    expect(screen.getByText('Tracking uses your highest unlocked tier')).toBeTruthy();
+    expect(onStartExploration).toHaveBeenCalledWith(100, 1, 'family-wolf');
   });
 
   it('drops an invalid selected tier after the zone tier set changes', () => {
     const { onStartExploration, rerender } = renderExploration({
-      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
+      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 }],
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Interior' }));
@@ -96,7 +100,7 @@ describe('Exploration', () => {
         percent: 10,
         tiers: { '1': 0, '2': 10 },
       },
-      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
+      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 }],
       availableTurns: 1000,
       onStartExploration,
       activityLog: [],
@@ -109,7 +113,7 @@ describe('Exploration', () => {
 
   it('updates the expected ambush and site preview while tracking is enabled', () => {
     renderExploration({
-      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
+      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 }],
     });
 
     expect(screen.getByText('0.5')).toBeTruthy();
@@ -124,7 +128,7 @@ describe('Exploration', () => {
   it('hides tracking controls during the tutorial flow', () => {
     renderExploration({
       tutorialLocked: true,
-      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
+      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 }],
     });
 
     expect(screen.queryAllByText('Tracking')).toHaveLength(0);

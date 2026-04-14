@@ -20,6 +20,7 @@ export interface CombatActiveEvent {
 export interface TrackableMobFamilyResponse {
   mobFamilyId: string;
   name: string;
+  minTier: number;
 }
 
 // Zones

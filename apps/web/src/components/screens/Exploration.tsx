@@ -36,7 +36,7 @@ interface ExplorationProps {
     percent: number;
     tiers: Record<string, number> | null;
   } | null;
-  trackableMobFamilies?: Array<{ mobFamilyId: string; name: string }>;
+  trackableMobFamilies?: Array<{ mobFamilyId: string; name: string; minTier: number }>;
   availableTurns: number;
   onStartExploration: (turns: number, tier?: number, trackingFamilyId?: string) => void;
   activityLog: ActivityLogEntry[];
@@ -113,12 +113,17 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
   const maxUnlockedTier = unlockedTierNumbers.length > 0
     ? unlockedTierNumbers[unlockedTierNumbers.length - 1]!
     : null;
-  const effectiveSelectedTier = trackingEnabled
-    ? maxUnlockedTier
-    : (selectedTier ?? maxUnlockedTier);
+  const effectiveSelectedTier = selectedTier ?? maxUnlockedTier;
+  const availableTrackingFamilies = trackableMobFamilies.filter((family) =>
+    effectiveSelectedTier == null || family.minTier <= effectiveSelectedTier,
+  );
+  const activeTrackingFamilyId = trackingEnabled && selectedTrackingFamilyId
+    && availableTrackingFamilies.some((family) => family.mobFamilyId === selectedTrackingFamilyId)
+      ? selectedTrackingFamilyId
+      : null;
 
   const calculateProbabilities = (turns: number) => {
-    const trackedResultRateMultiplier = trackingEnabled
+    const trackedResultRateMultiplier = activeTrackingFamilyId
       ? EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER
       : 1;
     const expectedAmbushes = turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * trackedResultRateMultiplier;
@@ -142,24 +147,24 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
   }, [selectedTier, unlockedTierNumbers]);
 
   useEffect(() => {
-    if (tutorialLocked || trackableMobFamilies.length === 0) {
+    if (tutorialLocked || trackableMobFamilies.length === 0 || availableTrackingFamilies.length === 0) {
       setTrackingEnabled(false);
       setSelectedTrackingFamilyId(null);
       return;
     }
 
     setSelectedTrackingFamilyId((prev) =>
-      prev && trackableMobFamilies.some((family) => family.mobFamilyId === prev)
+      prev && availableTrackingFamilies.some((family) => family.mobFamilyId === prev)
         ? prev
-        : trackableMobFamilies[0]!.mobFamilyId,
+        : availableTrackingFamilies[0]!.mobFamilyId,
     );
-  }, [trackableMobFamilies, tutorialLocked]);
+  }, [availableTrackingFamilies, trackableMobFamilies.length, tutorialLocked]);
 
   const startExplorationRun = () => {
     onStartExploration(
       turnInvestment[0],
       effectiveSelectedTier ?? undefined,
-      trackingEnabled ? selectedTrackingFamilyId ?? undefined : undefined,
+      activeTrackingFamilyId ?? undefined,
     );
   };
 
@@ -305,11 +310,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Exploration Tier</h3>
-                  {trackingEnabled ? (
-                    <span className="text-xs text-[var(--rpg-text-secondary)]">
-                      Tracking uses your highest unlocked tier
-                    </span>
-                  ) : effectiveSelectedTier !== maxUnlockedTier ? (
+                  {effectiveSelectedTier !== maxUnlockedTier ? (
                     <span className="text-xs text-[var(--rpg-text-secondary)]">
                       No exploration progress at this tier
                     </span>
@@ -321,12 +322,11 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                       key={tier}
                       type="button"
                       onClick={() => setSelectedTier(tier)}
-                      disabled={trackingEnabled}
                       className={`flex-1 px-3 py-1.5 text-sm rounded border transition-colors ${
                         (effectiveSelectedTier === tier)
                           ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] border-[var(--rpg-gold)] font-bold'
                           : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
-                      } ${trackingEnabled ? 'cursor-not-allowed opacity-60' : ''}`}
+                      }`}
                     >
                       {getTierName(tier)}
                     </button>
@@ -351,12 +351,12 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                   </div>
                   <ToggleSwitch
                     checked={trackingEnabled}
-                    disabled={trackableMobFamilies.length === 0}
+                    disabled={availableTrackingFamilies.length === 0}
                     ariaLabel={trackingEnabled ? 'Disable tracking' : 'Enable tracking'}
                     onChange={(checked) => {
                       setTrackingEnabled(checked);
                       if (checked) {
-                        setSelectedTrackingFamilyId((prev) => prev ?? trackableMobFamilies[0]?.mobFamilyId ?? null);
+                        setSelectedTrackingFamilyId((prev) => prev ?? availableTrackingFamilies[0]?.mobFamilyId ?? null);
                       }
                     }}
                   />
@@ -366,11 +366,15 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                   <p className="text-xs text-[var(--rpg-text-secondary)]">
                     Discover a mob family in this zone before you can track it.
                   </p>
+                ) : availableTrackingFamilies.length === 0 ? (
+                  <p className="text-xs text-[var(--rpg-text-secondary)]">
+                    No discovered families can be tracked at this tier.
+                  </p>
                 ) : trackingEnabled ? (
                   <div className="space-y-2">
                     <p className="text-xs text-[var(--rpg-text-secondary)]">Focus on a discovered family:</p>
                     <div className="flex flex-wrap gap-2" role="group" aria-label="Tracking family">
-                      {trackableMobFamilies.map((family) => {
+                      {availableTrackingFamilies.map((family) => {
                         const isSelected = selectedTrackingFamilyId === family.mobFamilyId;
                         return (
                           <button
@@ -390,11 +394,6 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                         );
                       })}
                     </div>
-                    {unlockedTiers.length > 1 && (
-                      <p className="text-xs text-[var(--rpg-text-secondary)] opacity-70">
-                        Tracking searches across your unlocked tiers and locks exploration to the highest one.
-                      </p>
-                    )}
                   </div>
                 ) : (
                   <p className="text-xs text-[var(--rpg-text-secondary)]">
