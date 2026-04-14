@@ -16,8 +16,8 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 
 | # | System | Issue | Source Report | Status | Plan |
 |---|--------|-------|--------------|--------|------|
-| 1 | Guild | Treasury cap blocks L2/L3 projects and respec (cap maxes at 500k, projects cost 1.5-5M) | guild-constants | `done` | Guild Economy Redesign — PR #174 |
-| 2 | Guild | Turn contribution caps make L2/L3 projects mathematically impossible (need 40-100 contributors, max guild size 30) | guild-constants | `done` | Guild Economy Redesign — PR #174 |
+| 1 | Guild | Treasury cap blocks L2/L3 projects and respec (cap maxes at 500k, projects cost 1.5-5M) | guild-constants | `done` | Guild Economy Redesign — PR #257 |
+| 2 | Guild | Turn contribution caps make L2/L3 projects mathematically impossible (need 40-100 contributors, max guild size 30) | guild-constants | `done` | Guild Economy Redesign — PR #257 |
 
 ## High Severity
 
@@ -52,8 +52,8 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 | 24 | Gathering | Low-tier farming strictly dominant for resources (67% more resources, 92% more gems) | gathering-constants | `wontfix` | |
 | 25 | Flee | Knockout rate extremely high at level parity (70% on defeat) | flee-constants | `done` | PR #137 — BASE_FLEE_CHANCE 0.30 → 0.50 |
 | 26 | Casino | No per-player bet limit per round (unlimited bets, max-bet bypass via same-number stacking) | casino-constants | `done` | PR #144 — MAX_BETS_PER_ROUND: 12 |
-| 27 | Guild | Contract rewards negligible (<1% of treasury income) | guild-constants | `done` | Guild Economy Redesign — PR #174 |
-| 28 | Guild | Boost scaling cliffs at 5 and 10 members (50%->75%->100% jumps) | guild-constants | `done` | Guild Economy Redesign — PR #174 |
+| 27 | Guild | Contract rewards negligible (<1% of treasury income) | guild-constants | `done` | Guild Economy Redesign — PR #257 |
+| 28 | Guild | Boost scaling cliffs at 5 and 10 members (50%->75%->100% jumps) | guild-constants | `done` | Guild Economy Redesign — PR #257 |
 | 29 | Potion | Mana potion tier gap (T1 -> T4, no mid-game mana potion) | potion-constants | `done` | PR #141 — added T2/T3 mana potions |
 | 30 | Room/Clear | Decay exploit for full-clear (wait for mobs to decay, keep full-clear bonuses) | room-and-full-clear-constants | `done` | Encounter Site Rework |
 | 31 | Room/Clear | Large site mob count variance too high (6-20 mobs, 3.3x ratio) | room-and-full-clear-constants | `wontfix` | |
@@ -125,7 +125,7 @@ Generated from overnight balance audit (2026-03-13). Each issue is reviewed via 
 | 92 | Inventory/Sell | Gold has few sinks (accumulates indefinitely) | inventory-sell-constants | `deferred` | |
 | 93 | Inventory/Sell | Champion bonus slots dead code (hardcoded false) | inventory-sell-constants | `wontfix` | Planned feature — monetisation |
 | 94 | Guild | Discovery spec gathering yield may over-stack (up to 95%) | guild-constants | `wontfix` | Reviewed — not addressed in economy redesign |
-| 95 | Guild | XP_PER_BOSS_ROUND appears unused/unimplemented | guild-constants | `done` | Guild Economy Redesign — PR #174 |
+| 95 | Guild | XP_PER_BOSS_ROUND appears unused/unimplemented | guild-constants | `done` | Guild Economy Redesign — PR #257 |
 
 ## Implementation Plans
 
@@ -231,3 +231,5 @@ Needs playtesting after change. At exponent 2.0: combat skill level 100 ~107 day
 ### 2026-03-13 — Issues #1, #2, #27, #28, #94, #95: Guild Economy
 
 **Decision:** Confirmed. All bundled under **Guild Economy Redesign** — needs a full brainstorming/design session, not just constant tweaks. The entire guild treasury economy is overtuned: costs assume turn income that doesn't exist at realistic guild sizes and tax rates. Project contribution categories (e.g. exploration turns) don't match real player behavior. Target pacing: T1 project in ~1 week, T2 in ~1 month, T3 in ~2-3 months for a 10-member guild at 10% tax. Needs redesign before general release.
+
+**Update (2026-04-06):** Implemented in PR #257. Resolved #1, #2, #27, #28, and #95. Issue #94 was reviewed and left as `wontfix`.

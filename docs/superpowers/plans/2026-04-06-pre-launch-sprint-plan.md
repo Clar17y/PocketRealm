@@ -136,7 +136,7 @@
 |------|-------|--------|
 | PWA fundamentals | #203, #204 | Nice-to-have, not blocking |
 | Push notifications | #205 | Feature, not fix |
-| Client analytics (Plausible) | #207 | Can add post-launch |
+| ~~Client analytics (Plausible)~~ | ~~#207~~ | ~~Merged as PR #239~~ |
 | P2 scaling prep | #244 | Not needed at <100 users |
 | ~~Guild economy redesign~~ | ~~#174~~ | ~~Merged as PR #257 during Phase 1 session~~ |
 | Seasonal architecture | #152 | Future infrastructure |
