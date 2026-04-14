@@ -56,6 +56,7 @@ export const prisma = {
   bossParticipant: mockModel(),
   persistedMob: mockModel(),
   mobTemplate: mockModel(),
+  mobFamilyMember: mockModel(),
   zoneMobFamily: mockModel(),
   resourceNode: mockModel(),
   playerBestiary: mockModel(),

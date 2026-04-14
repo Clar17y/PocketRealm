@@ -1,0 +1,70 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mockPrisma } from '../__test__/setup';
+import {
+  applyTrackedFamilyWeightBias,
+  buildTrackableMobFamiliesByZone,
+} from './explorationTrackingService';
+
+describe('applyTrackedFamilyWeightBias', () => {
+  it('boosts tracked candidates and suppresses non-tracked ones', () => {
+    const result = applyTrackedFamilyWeightBias(
+      [
+        { mobFamilyId: 'family-spider', encounterWeight: 100 },
+        { mobFamilyId: 'family-rat', encounterWeight: 100 },
+      ],
+      'family-spider',
+      'encounterWeight',
+    );
+
+    expect(result).toEqual([
+      { mobFamilyId: 'family-spider', encounterWeight: 400 },
+      { mobFamilyId: 'family-rat', encounterWeight: 35 },
+    ]);
+  });
+
+  it('returns the original candidates when the tracked family is absent', () => {
+    const input = [
+      { mobFamilyId: 'family-rat', encounterWeight: 100 },
+    ];
+
+    expect(applyTrackedFamilyWeightBias(input, 'family-spider', 'encounterWeight')).toEqual(input);
+  });
+});
+
+describe('buildTrackableMobFamiliesByZone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns unique discovered families per zone', async () => {
+    mockPrisma.playerBestiary.findMany.mockResolvedValue([
+      { mobTemplateId: 'mob-spider-a' },
+      { mobTemplateId: 'mob-spider-b' },
+      { mobTemplateId: 'mob-rat-a' },
+    ]);
+    mockPrisma.mobFamilyMember.findMany.mockResolvedValue([
+      {
+        mobFamilyId: 'family-spider',
+        mobTemplate: { zoneId: 'zone-forest' },
+        mobFamily: { name: 'Spiders' },
+      },
+      {
+        mobFamilyId: 'family-spider',
+        mobTemplate: { zoneId: 'zone-forest' },
+        mobFamily: { name: 'Spiders' },
+      },
+      {
+        mobFamilyId: 'family-rat',
+        mobTemplate: { zoneId: 'zone-forest' },
+        mobFamily: { name: 'Rats' },
+      },
+    ]);
+
+    const result = await buildTrackableMobFamiliesByZone('player-1', ['zone-forest']);
+
+    expect(result.get('zone-forest')).toEqual([
+      { mobFamilyId: 'family-rat', name: 'Rats' },
+      { mobFamilyId: 'family-spider', name: 'Spiders' },
+    ]);
+  });
+});
