@@ -20,14 +20,18 @@ export function applyTrackedFamilyWeightBias<T extends WeightedFamilyRecord>(
   if (!trackedFamilyId) return items;
   if (!items.some((item) => item.mobFamilyId === trackedFamilyId)) return items;
 
-  return items.map((item) => ({
-    ...item,
-    [weightKey]: Number(item[weightKey] ?? 0) * (
-      item.mobFamilyId === trackedFamilyId
-        ? EXPLORATION_TRACKING_CONSTANTS.TRACKED_FAMILY_WEIGHT_MULTIPLIER
-        : EXPLORATION_TRACKING_CONSTANTS.NON_TRACKED_WEIGHT_MULTIPLIER
-    ),
-  })) as T[];
+  return items.map((item) => {
+    if (!item.mobFamilyId) return item;
+
+    return {
+      ...item,
+      [weightKey]: Number(item[weightKey] ?? 0) * (
+        item.mobFamilyId === trackedFamilyId
+          ? EXPLORATION_TRACKING_CONSTANTS.TRACKED_FAMILY_WEIGHT_MULTIPLIER
+          : EXPLORATION_TRACKING_CONSTANTS.NON_TRACKED_WEIGHT_MULTIPLIER
+      ),
+    };
+  }) as T[];
 }
 
 export async function buildTrackableMobFamiliesByZone(

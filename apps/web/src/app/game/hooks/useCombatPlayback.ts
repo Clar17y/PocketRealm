@@ -9,7 +9,9 @@ interface UseCombatPlaybackDeps {
   setLastCombat: (lc: LastCombat | null) => void;
   setPlaybackActive: (active: boolean) => void;
   refreshPendingEncounters: () => Promise<void>;
+  reloadZones: (options?: { expectedActiveZoneId?: string | null }) => Promise<void>;
   advanceTutorial: (fromStep: number) => Promise<void>;
+  activeZoneIdRef: MutableRefObject<string | null>;
   /** Ref to activatePendingLoot (avoids circular definition order issues) */
   activatePendingLootRef: MutableRefObject<(sessionId: string) => Promise<void>>;
 }
@@ -20,7 +22,9 @@ export function useCombatPlayback(deps: UseCombatPlaybackDeps) {
     setLastCombat,
     setPlaybackActive,
     refreshPendingEncounters,
+    reloadZones,
     advanceTutorial,
+    activeZoneIdRef,
     activatePendingLootRef,
   } = deps;
 
@@ -59,7 +63,7 @@ export function useCombatPlayback(deps: UseCombatPlaybackDeps) {
     }
   }, [combatPlaybackQueue, combatPlaybackIndex, combatLogPrefetch]);
 
-  const handleCombatPlaybackComplete = () => {
+  const handleCombatPlaybackComplete = async () => {
     if (combatPlaybackQueue && combatPlaybackIndex < combatPlaybackQueue.length - 1) {
       const currentFight = combatPlaybackQueue[combatPlaybackIndex];
       const nextFight = combatPlaybackQueue[combatPlaybackIndex + 1];
@@ -91,7 +95,8 @@ export function useCombatPlayback(deps: UseCombatPlaybackDeps) {
     pendingCombatRewardsRef.current = null;
     combatLogPrefetch.clear();
     setPlaybackActive(false);
-    void refreshPendingEncounters();
+    await refreshPendingEncounters();
+    await reloadZones({ expectedActiveZoneId: activeZoneIdRef.current }).catch(() => undefined);
 
     if (siteJustClearedRef.current) {
       siteJustClearedRef.current = false;

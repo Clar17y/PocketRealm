@@ -13,7 +13,7 @@ describe('useExplorationActions', () => {
     vi.clearAllMocks();
   });
 
-  it('passes trackingFamilyId into the exploration api helper and refreshes zones after success', async () => {
+  it('passes trackingFamilyId into the exploration api helper and refreshes zones after playback completes', async () => {
     apiMock.startExploration.mockResolvedValue({
       data: {
         turns: { currentTurns: 500 },
@@ -56,10 +56,16 @@ describe('useExplorationActions', () => {
     });
 
     expect(apiMock.startExploration).toHaveBeenCalledWith('zone-forest', 500, 2, 'family-spider');
+    expect(reloadZones).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await hook.result.current.handleExplorationPlaybackComplete();
+    });
+
     expect(reloadZones).toHaveBeenCalledTimes(1);
   });
 
-  it('still queues playback when the post-success zone refresh fails', async () => {
+  it('still finalizes playback when the post-playback zone refresh fails', async () => {
     apiMock.startExploration.mockResolvedValue({
       data: {
         turns: { currentTurns: 500 },
@@ -104,6 +110,12 @@ describe('useExplorationActions', () => {
 
     expect(setPlaybackActive).toHaveBeenCalledWith(true);
     expect(hook.result.current.explorationPlaybackData?.zoneName).toBe('Forest Edge');
+
+    await act(async () => {
+      await hook.result.current.handlePlaybackSkip();
+    });
+
+    expect(setPlaybackActive).toHaveBeenCalledWith(false);
     expect(reloadZones).toHaveBeenCalledTimes(1);
   });
 });

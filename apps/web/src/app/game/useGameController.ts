@@ -267,6 +267,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   useEffect(() => {
     hpStateRef.current = hpState;
   }, [hpState]);
+  const activeZoneIdRef = useRef(activeZoneId);
+  useEffect(() => {
+    activeZoneIdRef.current = activeZoneId;
+  }, [activeZoneId]);
   const staminaStateRef = useRef(staminaState);
   useEffect(() => {
     staminaStateRef.current = staminaState;
@@ -488,9 +492,17 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     }
   }, []);
 
-  const reloadZones = useCallback(async () => {
+  const reloadZones = useCallback(async (options?: { expectedActiveZoneId?: string | null }) => {
     const zonesRes = await getZones({ fresh: true });
-    if (zonesRes.data) applyZonesData(zonesRes.data);
+    if (!zonesRes.data) return;
+    if (
+      options
+      && 'expectedActiveZoneId' in options
+      && activeZoneIdRef.current !== options.expectedActiveZoneId
+    ) {
+      return;
+    }
+    applyZonesData(zonesRes.data);
   }, [applyZonesData]);
 
   const loadAll = useCallback(async () => {
@@ -655,7 +667,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setLastCombat,
     setPlaybackActive,
     refreshPendingEncounters,
+    reloadZones,
     advanceTutorial,
+    activeZoneIdRef,
     activatePendingLootRef,
   });
   const {

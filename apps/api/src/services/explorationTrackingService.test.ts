@@ -29,6 +29,22 @@ describe('applyTrackedFamilyWeightBias', () => {
 
     expect(applyTrackedFamilyWeightBias(input, 'family-spider', 'encounterWeight')).toEqual(input);
   });
+
+  it('leaves unknown-family candidates unchanged while biasing known families', () => {
+    const result = applyTrackedFamilyWeightBias(
+      [
+        { mobFamilyId: 'family-spider', encounterWeight: 100 },
+        { mobFamilyId: '', encounterWeight: 100 },
+      ],
+      'family-spider',
+      'encounterWeight',
+    );
+
+    expect(result).toEqual([
+      { mobFamilyId: 'family-spider', encounterWeight: 400 },
+      { mobFamilyId: '', encounterWeight: 100 },
+    ]);
+  });
 });
 
 describe('buildTrackableMobFamiliesByZone', () => {

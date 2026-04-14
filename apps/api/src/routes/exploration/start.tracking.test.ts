@@ -533,6 +533,40 @@ describe('POST /exploration/start tracking contract', () => {
     );
   });
 
+  it('still rejects tiers above the unlocked maximum when tracking is requested', async () => {
+    mockPrisma.zone.findUnique.mockResolvedValue({
+      id: ZONE_ID,
+      name: 'Test Zone',
+      difficulty: 1,
+      zoneType: 'wild',
+      zoneExitChance: 0.01,
+      explorationTiers: { '1': 0, '2': 25, '3': 50 },
+    });
+
+    const req = {
+      player: { playerId: 'p1', username: 'TestPlayer' },
+      body: {
+        zoneId: ZONE_ID,
+        turns: 500,
+        tier: 3,
+        trackingFamilyId: '22222222-2222-2222-2222-222222222222',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/start');
+    await handler(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 400,
+        code: 'INVALID_TIER',
+      }),
+    );
+    expect(mockBuildTrackableMobFamiliesByZone).not.toHaveBeenCalled();
+  });
+
   it('falls back to normal exploration when the selected family cannot affect the current tier', async () => {
     const trackingFamilyId = '33333333-3333-3333-3333-333333333333';
     mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([

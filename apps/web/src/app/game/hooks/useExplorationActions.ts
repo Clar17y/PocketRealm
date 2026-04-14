@@ -39,7 +39,7 @@ interface UseExplorationActionsParams {
   activatePendingLoot: (sessionId: string) => Promise<void>;
   updateZoneExploration: (zoneId: string, exploration: { turnsExplored: number; percent: number; turnsToExplore: number | null }) => void;
   updateQuestProgress: (updates?: QuestProgressUpdate[]) => void;
-  reloadZones: () => Promise<void>;
+  reloadZones: (options?: { expectedActiveZoneId?: string | null }) => Promise<void>;
 }
 
 export function useExplorationActions({
@@ -95,6 +95,7 @@ export function useExplorationActions({
   const finalizeExplorationPlayback = async () => {
     const pendingIds = explorationPlaybackData?.pendingLootSessionIds;
     const savedStateUpdates = explorationPlaybackData?.stateUpdates;
+    const expectedActiveZoneId = currentZone?.id ?? null;
 
     if (explorationPlaybackData) {
       trackEvent('action', {
@@ -109,6 +110,7 @@ export function useExplorationActions({
     setPlaybackActive(false);
     await advanceTutorial(TUTORIAL_STEP_EXPLORE);
     applyStateUpdates(savedStateUpdates, stateSetters);
+    await reloadZones({ expectedActiveZoneId }).catch(() => undefined);
     if (pendingIds?.length) {
       pendingLootQueueRef.current = pendingIds.slice(1);
       await activatePendingLoot(pendingIds[0]);
@@ -149,7 +151,6 @@ export function useExplorationActions({
         stateUpdates: data.stateUpdates,
       });
       setPlaybackActive(true);
-      void reloadZones().catch(() => undefined);
 
       if (data.encounterSites.length > 0) {
         await refreshPendingEncounters();
