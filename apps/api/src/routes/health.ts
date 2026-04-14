@@ -30,10 +30,12 @@ healthRouter.get('/health/ready', async (_req: Request, res: Response) => {
     return;
   }
   const [database, redis] = await Promise.all([checkDatabase(), checkRedis()]);
+  const socketio = getSocketIoStats(getIo());
   const ok = database === 'ok' && redis === 'ok';
   res.status(ok ? 200 : 503).json({
     status: ok ? 'ok' : 'error',
-    dependencies: { database, redis },
+    version: APP_VERSION,
+    dependencies: { database, redis, socketio },
   });
 });
 

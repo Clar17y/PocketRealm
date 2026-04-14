@@ -1,44 +1,98 @@
-import { describe, it, expect } from 'vitest';
-import type { ConnectionState } from './useConnectionStatus';
+import { act, renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useConnectionStatus } from './useConnectionStatus';
 
-// Extract the isOffline logic as a pure function for testing
-function computeIsOffline(apiReachable: boolean, connectionStatus: ConnectionState): boolean {
-  return !apiReachable
-    || connectionStatus === 'disconnected'
-    || connectionStatus === 'reconnecting'
-    || connectionStatus === 'failed';
+type Listener = (...args: any[]) => void;
+
+function createEmitter() {
+  const listeners = new Map<string, Set<Listener>>();
+
+  return {
+    on(event: string, listener: Listener) {
+      const bucket = listeners.get(event) ?? new Set<Listener>();
+      bucket.add(listener);
+      listeners.set(event, bucket);
+    },
+    off(event: string, listener: Listener) {
+      listeners.get(event)?.delete(listener);
+    },
+    emit(event: string, ...args: any[]) {
+      listeners.get(event)?.forEach((listener) => listener(...args));
+    },
+  };
 }
 
-describe('isOffline combination logic', () => {
-  it('is false when both connected and API reachable', () => {
-    expect(computeIsOffline(true, 'connected')).toBe(false);
+const socketMock = vi.hoisted(() => {
+  const socketEmitter = createEmitter();
+  const ioEmitter = createEmitter();
+
+  return {
+    connected: true,
+    on: socketEmitter.on,
+    off: socketEmitter.off,
+    emit: socketEmitter.emit,
+    io: {
+      on: ioEmitter.on,
+      off: ioEmitter.off,
+      emit: ioEmitter.emit,
+    },
+  };
+});
+
+vi.mock('@/lib/socket', () => ({
+  getSocket: () => socketMock,
+}));
+
+function fireReachable(ok: boolean) {
+  window.dispatchEvent(new CustomEvent('api:reachable', { detail: { ok } }));
+}
+
+describe('useConnectionStatus', () => {
+  beforeEach(() => {
+    socketMock.connected = true;
   });
 
-  it('is true when socket disconnected but API reachable', () => {
-    expect(computeIsOffline(true, 'disconnected')).toBe(true);
+  it('stays connected when socket is connected and API is reachable', () => {
+    const { result } = renderHook(() => useConnectionStatus());
+
+    expect(result.current).toBe('connected');
   });
 
-  it('is true when socket reconnecting but API reachable', () => {
-    expect(computeIsOffline(true, 'reconnecting')).toBe(true);
+  it('reports disconnected after consecutive API failures even if the socket stays connected', () => {
+    const { result } = renderHook(() => useConnectionStatus());
+
+    act(() => {
+      fireReachable(false);
+      fireReachable(false);
+    });
+
+    expect(result.current).toBe('disconnected');
   });
 
-  it('is true when socket failed but API reachable', () => {
-    expect(computeIsOffline(true, 'failed')).toBe(true);
+  it('keeps socket reconnect states while the API is still reachable', () => {
+    const { result } = renderHook(() => useConnectionStatus());
+
+    act(() => {
+      socketMock.io.emit('reconnect_attempt');
+    });
+    expect(result.current).toBe('reconnecting');
+
+    act(() => {
+      fireReachable(true);
+      socketMock.emit('connect');
+    });
+    expect(result.current).toBe('connected');
   });
 
-  it('is true when socket connected but API unreachable', () => {
-    expect(computeIsOffline(false, 'connected')).toBe(true);
-  });
+  it('preserves the failed socket state when the API is unreachable', () => {
+    const { result } = renderHook(() => useConnectionStatus());
 
-  it('is true when both disconnected and API unreachable', () => {
-    expect(computeIsOffline(false, 'disconnected')).toBe(true);
-  });
+    act(() => {
+      socketMock.io.emit('reconnect_failed');
+      fireReachable(false);
+      fireReachable(false);
+    });
 
-  it('is true when both reconnecting and API unreachable', () => {
-    expect(computeIsOffline(false, 'reconnecting')).toBe(true);
-  });
-
-  it('is true when both failed and API unreachable', () => {
-    expect(computeIsOffline(false, 'failed')).toBe(true);
+    expect(result.current).toBe('failed');
   });
 });

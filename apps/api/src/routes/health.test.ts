@@ -51,38 +51,46 @@ describe('health router', () => {
     it('returns 200 when DB + Redis are ok', async () => {
       (checkDatabase as any).mockResolvedValueOnce('ok');
       (checkRedis as any).mockResolvedValueOnce('ok');
+      (getSocketIoStats as any).mockReturnValueOnce({ connected: 4 });
 
       const res = await request(buildApp()).get('/health/ready');
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({
         status: 'ok',
-        dependencies: { database: 'ok', redis: 'ok' },
+        version: '1.2.3-test',
+        dependencies: { database: 'ok', redis: 'ok', socketio: { connected: 4 } },
       });
     });
 
     it('returns 503 when database check throws/errors', async () => {
       (checkDatabase as any).mockResolvedValueOnce('error');
       (checkRedis as any).mockResolvedValueOnce('ok');
+      (getSocketIoStats as any).mockReturnValueOnce({ connected: 0 });
 
       const res = await request(buildApp()).get('/health/ready');
 
       expect(res.status).toBe(503);
       expect(res.body.status).toBe('error');
+      expect(res.body.version).toBe('1.2.3-test');
       expect(res.body.dependencies.database).toBe('error');
       expect(res.body.dependencies.redis).toBe('ok');
+      expect(res.body.dependencies.socketio).toEqual({ connected: 0 });
     });
 
     it('returns 503 when Redis ping fails', async () => {
       (checkDatabase as any).mockResolvedValueOnce('ok');
       (checkRedis as any).mockResolvedValueOnce('error');
+      (getSocketIoStats as any).mockReturnValueOnce({ connected: 1 });
 
       const res = await request(buildApp()).get('/health/ready');
 
       expect(res.status).toBe(503);
       expect(res.body.status).toBe('error');
+      expect(res.body.version).toBe('1.2.3-test');
       expect(res.body.dependencies.database).toBe('ok');
       expect(res.body.dependencies.redis).toBe('error');
+      expect(res.body.dependencies.socketio).toEqual({ connected: 1 });
     });
 
     it('returns 503 { status: "shutting_down" } during graceful shutdown, without probing dependencies', async () => {

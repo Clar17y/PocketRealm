@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import { getClientSentryRelease } from './src/lib/sentryRelease';
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const environment =
@@ -10,7 +11,7 @@ if (dsn) {
   Sentry.init({
     dsn,
     environment,
-    release: process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown',
+    release: getClientSentryRelease(),
     tracesSampleRate: environment === 'production' ? 0.1 : 1.0,
     // Session Replay is opt-in later; disable at launch to avoid PII surprises.
     replaysSessionSampleRate: 0,
