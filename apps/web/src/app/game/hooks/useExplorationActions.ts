@@ -113,13 +113,17 @@ export function useExplorationActions({
     }
   };
 
-  const handleStartExploration = async (turnSpend: number, tier?: number) => {
+  const handleStartExploration = async (
+    turnSpend: number,
+    tier?: number,
+    trackingFamilyId?: string,
+  ) => {
     if (!currentZone) return;
 
     await runAction('exploration', async () => {
       const hpBefore = hpStateRef.current.currentHp;
       const maxHpBefore = hpStateRef.current.maxHp;
-      const res = await startExploration(currentZone.id, turnSpend, tier);
+      const res = await startExploration(currentZone.id, turnSpend, tier, trackingFamilyId);
       const data = res.data;
       if (!data) {
         setActionError(res.error?.message ?? 'Exploration failed');

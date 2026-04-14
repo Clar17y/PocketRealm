@@ -127,6 +127,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     arrivalText: string | null;
     ambientTexts: Record<string, string> | null;
     environmentalTexts: Record<string, string> | null;
+    trackableMobFamilies?: Array<{ mobFamilyId: string; name: string }>;
     exploration: {
       turnsExplored: number;
       turnsToExplore: number | null;
