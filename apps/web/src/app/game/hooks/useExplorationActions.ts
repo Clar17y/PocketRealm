@@ -136,7 +136,6 @@ export function useExplorationActions({
       updateQuestProgress(data.questProgress);
       recordTurnsSpent(currentZone.id, turnSpend);
       updateZoneExploration(currentZone.id, data.explorationProgress);
-      await reloadZones();
 
       setExplorationPlaybackData({
         totalTurns: turnSpend,
@@ -150,6 +149,7 @@ export function useExplorationActions({
         stateUpdates: data.stateUpdates,
       });
       setPlaybackActive(true);
+      void reloadZones().catch(() => undefined);
 
       if (data.encounterSites.length > 0) {
         await refreshPendingEncounters();

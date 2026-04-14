@@ -58,4 +58,52 @@ describe('useExplorationActions', () => {
     expect(apiMock.startExploration).toHaveBeenCalledWith('zone-forest', 500, 2, 'family-spider');
     expect(reloadZones).toHaveBeenCalledTimes(1);
   });
+
+  it('still queues playback when the post-success zone refresh fails', async () => {
+    apiMock.startExploration.mockResolvedValue({
+      data: {
+        turns: { currentTurns: 500 },
+        zone: { id: 'zone-forest', name: 'Forest Edge', difficulty: 1 },
+        aborted: false,
+        refundedTurns: 0,
+        events: [],
+        encounterSites: [],
+        resourceDiscoveries: [],
+        hiddenCaches: [],
+        zoneExitDiscovered: false,
+        explorationProgress: { turnsExplored: 900, percent: 30, turnsToExplore: 3000 },
+        tax: null,
+      },
+    });
+
+    const setPlaybackActive = vi.fn();
+    const reloadZones = vi.fn().mockRejectedValue(new Error('zones unavailable'));
+    const hook = renderHook(() => useExplorationActions({
+      hpStateRef: { current: { currentHp: 100, maxHp: 100 } } as never,
+      currentZone: { id: 'zone-forest', name: 'Forest Edge' },
+      runAction: async (_name, fn) => { await fn(); },
+      pushLog: vi.fn(),
+      setTurns: vi.fn(),
+      setActionError: vi.fn(),
+      setPlaybackActive,
+      stateSetters: {} as never,
+      advanceTutorial: vi.fn(),
+      combatLogPrefetchClear: vi.fn(),
+      refreshPendingEncounters: vi.fn().mockResolvedValue(undefined),
+      loadGatheringNodes: vi.fn().mockResolvedValue(undefined),
+      pendingLootQueueRef: { current: [] },
+      activatePendingLoot: vi.fn().mockResolvedValue(undefined),
+      updateZoneExploration: vi.fn(),
+      updateQuestProgress: vi.fn(),
+      reloadZones,
+    }));
+
+    await act(async () => {
+      await hook.result.current.handleStartExploration(500, 2, 'family-spider');
+    });
+
+    expect(setPlaybackActive).toHaveBeenCalledWith(true);
+    expect(hook.result.current.explorationPlaybackData?.zoneName).toBe('Forest Edge');
+    expect(reloadZones).toHaveBeenCalledTimes(1);
+  });
 });
