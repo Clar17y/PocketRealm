@@ -40,6 +40,10 @@ import {
 import { processExplorationOutcomes } from '../../services/explorationOutcomeService';
 import { persistExplorationResults } from '../../services/explorationPersistenceService';
 import {
+  EXPLORATION_TRACKING_CONSTANTS,
+  buildTrackableMobFamiliesByZone,
+} from './helpers';
+import {
   startSchema,
   type ZoneFamilyRow,
 } from './helpers';
@@ -69,12 +73,22 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       throw new AppError(400, validation.error ?? 'Invalid turns', 'INVALID_TURNS');
     }
 
+    const trackingFamilyId = body.trackingFamilyId ?? null;
+
     const zone = await prisma.zone.findUnique({ where: { id: body.zoneId } });
     if (!zone) {
       throw new AppError(404, 'Zone not found', 'NOT_FOUND');
     }
     if (zone.zoneType === 'town') {
       throw new AppError(400, 'Cannot explore in towns. Travel to a wild zone first.', 'TOWN_ZONE');
+    }
+
+    if (trackingFamilyId) {
+      const trackableFamiliesByZone = await buildTrackableMobFamiliesByZone(playerId, [body.zoneId]);
+      const unlockedFamilies = trackableFamiliesByZone.get(body.zoneId) ?? [];
+      if (!unlockedFamilies.some((family) => family.mobFamilyId === trackingFamilyId)) {
+        throw new AppError(400, 'That mob family is not unlocked for tracking in this zone.', 'INVALID_TRACKING_FAMILY');
+      }
     }
 
     const [mobTemplates, resourceNodes, zoneFamilies, progression, equipmentStats, mainHandAttackSkill] = await Promise.all([
@@ -171,6 +185,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       }, 0);
       spawnRateMultiplier = baseTotal > 0 ? adjustedTotal / baseTotal : 1;
     }
+    if (trackingFamilyId) {
+      spawnRateMultiplier *= EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER;
+    }
 
     const outcomes = isTutorialExplore
       ? [{ turnOccurred: 50, type: 'ambush' as const }]
@@ -197,6 +214,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         zoneModifiers,
         spawnMods,
         mobToFamilyMap,
+        trackingFamilyId,
         cachedZoneEvents,
         cachedWorldEvents,
         isTutorialExplore,

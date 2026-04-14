@@ -42,6 +42,7 @@ import type { AttackSkill } from './combatStatsService';
 import {
   pickWeighted,
   randomIntInclusive,
+  applyTrackedFamilyWeightBias,
   type NarrativeEvent,
   type ZoneFamilyRow,
   type ZoneFamilyMember,
@@ -92,6 +93,7 @@ export interface ExplorationOutcomeContext {
     byFamily: Map<string, number>;
   };
   mobToFamilyMap: Map<string, string>;
+  trackingFamilyId: string | null;
   cachedZoneEvents: WorldEventData[];
   cachedWorldEvents: WorldEventData[];
   isTutorialExplore: boolean;
@@ -152,6 +154,7 @@ export async function processExplorationOutcomes(
     selectedTier,
     explorationProgress,
     spawnMods,
+    trackingFamilyId,
     cachedZoneEvents,
     cachedWorldEvents,
     isTutorialExplore,
@@ -235,8 +238,16 @@ export async function processExplorationOutcomes(
           }
           return weightMod !== 1 ? { ...c, encounterWeight: (c as { encounterWeight: number }).encounterWeight * weightMod } : c;
         });
+        const trackedWeightedCandidates = applyTrackedFamilyWeightBias(
+          weightedCandidates.map((c) => ({
+            ...c,
+            mobFamilyId: ctx.mobToFamilyMap.get((c as { id: string }).id) ?? '',
+          })) as Array<(typeof weightedCandidates)[number] & { mobFamilyId: string }>,
+          trackingFamilyId,
+          'encounterWeight',
+        );
 
-        const mob = pickWeighted(weightedCandidates, 'encounterWeight') as typeof candidates[number] | null;
+        const mob = pickWeighted(trackedWeightedCandidates, 'encounterWeight') as typeof candidates[number] | null;
         if (!mob) continue;
 
         baseMob = toMobTemplate(mob as Parameters<typeof toMobTemplate>[0]);
@@ -477,7 +488,10 @@ export async function processExplorationOutcomes(
         ...f,
         discoveryWeight: f.discoveryWeight * (spawnMods.byFamily.get(f.mobFamilyId) ?? 1) * spawnMods.global,
       }));
-      const pickedFamily = pickWeighted(adjustedFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
+      const pickedFamily = pickWeighted(
+        applyTrackedFamilyWeightBias(adjustedFamilies, trackingFamilyId, 'discoveryWeight'),
+        'discoveryWeight',
+      ) as ZoneFamilyRow | null;
       if (!pickedFamily) continue;
 
       const size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);

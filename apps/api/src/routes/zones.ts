@@ -41,6 +41,7 @@ import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
 import { getCachedZones, getCachedZoneConnections, getCachedMobTemplatesByZone } from '../services/staticDataCacheService';
 import { invalidateZoneIdCache } from '../services/zoneService';
+import { buildTrackableMobFamiliesByZone } from './exploration/helpers';
 
 
 
@@ -78,6 +79,14 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
   if (zones.length === 0) {
     throw new AppError(500, 'No zones configured. Run database seed.', 'NO_ZONES_CONFIGURED');
   }
+
+  const trackableWildZoneIds = zones
+    .filter((z) => discoveredZoneIds.has(z.id) && z.zoneType === 'wild')
+    .map((z) => z.id);
+  const trackableFamiliesByZone = await buildTrackableMobFamiliesByZone(
+    playerId,
+    trackableWildZoneIds,
+  );
 
   // Lazy-init currentZoneId if null (existing players from before this feature)
   let currentZoneId = player?.currentZoneId ?? null;
@@ -136,6 +145,9 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
         arrivalText: discovered ? z.arrivalText : null,
         ambientTexts: discovered ? z.ambientTexts : null,
         environmentalTexts: discovered ? z.environmentalTexts : null,
+        ...(discovered && z.zoneType === 'wild'
+          ? { trackableMobFamilies: trackableFamiliesByZone.get(z.id) ?? [] }
+          : {}),
         exploration: z.zoneType === 'town' ? null : {
           turnsExplored: explorationByZoneId.get(z.id) ?? 0,
           turnsToExplore: z.turnsToExplore ?? null,
