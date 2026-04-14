@@ -16,7 +16,7 @@ afterEach(() => {
 function renderExploration(props: Partial<React.ComponentProps<typeof Exploration>> = {}) {
   const onStartExploration = vi.fn();
 
-  render(React.createElement(Exploration, {
+  const view = render(React.createElement(Exploration, {
     currentZone: { name: 'Forest Edge', description: 'Trees', minLevel: 1 },
     explorationProgress: {
       turnsExplored: 7500,
@@ -31,7 +31,7 @@ function renderExploration(props: Partial<React.ComponentProps<typeof Exploratio
     ...props,
   }));
 
-  return { onStartExploration };
+  return { onStartExploration, ...view };
 }
 
 describe('Exploration', () => {
@@ -79,6 +79,32 @@ describe('Exploration', () => {
 
     expect(onStartExploration).toHaveBeenCalledWith(100, 2, 'family-wolf');
     expect(screen.getByText('Tracking uses your highest unlocked tier')).toBeTruthy();
+  });
+
+  it('drops an invalid selected tier after the zone tier set changes', () => {
+    const { onStartExploration, rerender } = renderExploration({
+      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Interior' }));
+
+    rerender(React.createElement(Exploration, {
+      currentZone: { name: 'Cavern Mouth', description: 'Stone', minLevel: 1 },
+      explorationProgress: {
+        turnsExplored: 500,
+        turnsToExplore: 30000,
+        percent: 10,
+        tiers: { '1': 0, '2': 10 },
+      },
+      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
+      availableTurns: 1000,
+      onStartExploration,
+      activityLog: [],
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start Exploration' }));
+
+    expect(onStartExploration).toHaveBeenCalledWith(100, 2, undefined);
   });
 
   it('updates the expected ambush and site preview while tracking is enabled', () => {

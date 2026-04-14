@@ -136,6 +136,12 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
   const { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance } = calculateProbabilities(effective);
 
   useEffect(() => {
+    if (selectedTier == null) return;
+    if (unlockedTierNumbers.includes(selectedTier)) return;
+    setSelectedTier(null);
+  }, [selectedTier, unlockedTierNumbers]);
+
+  useEffect(() => {
     if (tutorialLocked || trackableMobFamilies.length === 0) {
       setTrackingEnabled(false);
       setSelectedTrackingFamilyId(null);
