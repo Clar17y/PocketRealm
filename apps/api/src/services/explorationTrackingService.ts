@@ -8,7 +8,7 @@ export interface TrackableMobFamily {
 
 type WeightedFamilyRecord = {
   mobFamilyId: string;
-  [key: string]: string | number | null | undefined;
+  [key: string]: unknown;
 };
 
 export function applyTrackedFamilyWeightBias<T extends WeightedFamilyRecord>(
@@ -26,7 +26,7 @@ export function applyTrackedFamilyWeightBias<T extends WeightedFamilyRecord>(
         ? EXPLORATION_TRACKING_CONSTANTS.TRACKED_FAMILY_WEIGHT_MULTIPLIER
         : EXPLORATION_TRACKING_CONSTANTS.NON_TRACKED_WEIGHT_MULTIPLIER
     ),
-  }));
+  })) as T[];
 }
 
 export async function buildTrackableMobFamiliesByZone(

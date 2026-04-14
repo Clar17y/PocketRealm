@@ -105,6 +105,13 @@ vi.mock('../../services/staticDataCacheService', () => ({
   getCachedResourceNodesByZone: vi.fn().mockResolvedValue([]),
   getCachedZoneMobFamilies: vi.fn().mockResolvedValue([]),
 }));
+vi.mock('../../services/explorationTrackingService', async () => {
+  const actual = await vi.importActual<typeof import('../../services/explorationTrackingService')>('../../services/explorationTrackingService');
+  return {
+    ...actual,
+    buildTrackableMobFamiliesByZone: vi.fn(),
+  };
+});
 vi.mock('./helpers', async () => {
   const actual = await vi.importActual<typeof import('./helpers')>('./helpers');
   return {
@@ -237,17 +244,18 @@ vi.mock('@pocketrealm/database', () => import('../../__mocks__/database.js'));
 import { mockPrisma } from '../../__test__/setup';
 import { startRouter } from './start';
 import {
-  EXPLORATION_TRACKING_CONSTANTS,
   applyTrackedFamilyWeightBias,
   buildEncounterSiteMobs,
-  buildTrackableMobFamiliesByZone,
 } from './helpers';
+import { getCachedZoneMobFamilies } from '../../services/staticDataCacheService';
+import { buildTrackableMobFamiliesByZone } from '../../services/explorationTrackingService';
 import { processExplorationOutcomes } from '../../services/explorationOutcomeService';
 import { simulateExploration } from '@pocketrealm/game-engine';
-import { TUTORIAL_STEP_EXPLORE } from '@pocketrealm/shared';
+import { EXPLORATION_TRACKING_CONSTANTS, TUTORIAL_STEP_EXPLORE } from '@pocketrealm/shared';
 
 const mockBuildTrackableMobFamiliesByZone = buildTrackableMobFamiliesByZone as ReturnType<typeof vi.fn>;
 const mockBuildEncounterSiteMobs = buildEncounterSiteMobs as ReturnType<typeof vi.fn>;
+const mockGetCachedZoneMobFamilies = getCachedZoneMobFamilies as ReturnType<typeof vi.fn>;
 const mockProcessExplorationOutcomes = processExplorationOutcomes as ReturnType<typeof vi.fn>;
 const mockSimulateExploration = simulateExploration as ReturnType<typeof vi.fn>;
 
@@ -283,6 +291,7 @@ describe('POST /exploration/start tracking contract', () => {
         room: 1,
       },
     ]));
+    mockGetCachedZoneMobFamilies.mockResolvedValue([]);
     mockProcessExplorationOutcomes.mockResolvedValue({
       events: [],
       pendingResources: [],
@@ -346,6 +355,33 @@ describe('POST /exploration/start tracking contract', () => {
     mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([
       [ZONE_ID, [{ mobFamilyId: trackingFamilyId, name: 'Spiders' }]],
     ]));
+    mockGetCachedZoneMobFamilies.mockResolvedValue([
+      {
+        zoneId: ZONE_ID,
+        mobFamilyId: trackingFamilyId,
+        discoveryWeight: 100,
+        minSize: 'small',
+        maxSize: 'small',
+        mobFamily: {
+          id: trackingFamilyId,
+          name: 'Spiders',
+          siteNounSmall: 'Nest',
+          siteNounMedium: 'Nest',
+          siteNounLarge: 'Nest',
+          members: [
+            {
+              role: 'trash',
+              mobTemplate: {
+                id: 'spider-basic',
+                name: 'Spiderling',
+                zoneId: ZONE_ID,
+                explorationTier: 1,
+              },
+            },
+          ],
+        },
+      },
+    ]);
 
     const req = {
       player: { playerId: 'p1', username: 'TestPlayer' },
@@ -366,6 +402,62 @@ describe('POST /exploration/start tracking contract', () => {
       expect.objectContaining({ trackingFamilyId }),
       expect.any(Array),
     );
+  });
+
+  it('rejects tracking when the selected family cannot affect the current tier', async () => {
+    const trackingFamilyId = '33333333-3333-3333-3333-333333333333';
+    mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([
+      [ZONE_ID, [{ mobFamilyId: trackingFamilyId, name: 'Spiders' }]],
+    ]));
+    mockGetCachedZoneMobFamilies.mockResolvedValue([
+      {
+        zoneId: ZONE_ID,
+        mobFamilyId: trackingFamilyId,
+        discoveryWeight: 100,
+        minSize: 'small',
+        maxSize: 'small',
+        mobFamily: {
+          id: trackingFamilyId,
+          name: 'Spiders',
+          siteNounSmall: 'Nest',
+          siteNounMedium: 'Nest',
+          siteNounLarge: 'Nest',
+          members: [
+            {
+              role: 'trash',
+              mobTemplate: {
+                id: 'spider-elite',
+                name: 'Elite Spider',
+                zoneId: ZONE_ID,
+                explorationTier: 3,
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const req = {
+      player: { playerId: 'p1', username: 'TestPlayer' },
+      body: {
+        zoneId: ZONE_ID,
+        turns: 500,
+        trackingFamilyId,
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/start');
+    await handler(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 400,
+        code: 'INVALID_TRACKING_FAMILY',
+      }),
+    );
+    expect(mockSimulateExploration).not.toHaveBeenCalled();
   });
 
   it('ignores tracking entirely during tutorial exploration', async () => {

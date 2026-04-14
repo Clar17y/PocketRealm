@@ -34,6 +34,7 @@ import { getIo } from '../socket';
 import { emitSystemMessage } from './systemMessageService';
 import { mapTemplateCombatLog } from './combatLogMapper';
 import { serializeXpGrant, toMobTemplate, calculateFleeWithGold, buildPveCombatOptions } from '../utils/routeHelpers.js';
+import { applyTrackedFamilyWeightBias } from './explorationTrackingService';
 import type { GrantXpResult } from './xpService';
 import type { PlayerProgressionState } from './attributesService';
 import type { EquipmentStats } from './equipmentService';
@@ -42,7 +43,6 @@ import type { AttackSkill } from './combatStatsService';
 import {
   pickWeighted,
   randomIntInclusive,
-  applyTrackedFamilyWeightBias,
   type NarrativeEvent,
   type ZoneFamilyRow,
   type ZoneFamilyMember,

@@ -45,8 +45,8 @@ vi.mock('../services/staticDataCacheService', () => ({
   getCachedZoneConnections: vi.fn().mockResolvedValue([]),
   getCachedMobTemplatesByZone: vi.fn(),
 }));
-vi.mock('./exploration/helpers', async () => {
-  const actual = await vi.importActual<typeof import('./exploration/helpers')>('./exploration/helpers');
+vi.mock('../services/explorationTrackingService', async () => {
+  const actual = await vi.importActual<typeof import('../services/explorationTrackingService')>('../services/explorationTrackingService');
   return {
     ...actual,
     buildTrackableMobFamiliesByZone: vi.fn(),
@@ -70,7 +70,7 @@ vi.mock('@pocketrealm/database', () => import('../__mocks__/database.js'));
 
 import { mockPrisma } from '../__test__/setup';
 import { zonesRouter } from './zones';
-import { buildTrackableMobFamiliesByZone } from './exploration/helpers';
+import { buildTrackableMobFamiliesByZone } from '../services/explorationTrackingService';
 
 const mockBuildTrackableMobFamiliesByZone = buildTrackableMobFamiliesByZone as ReturnType<typeof vi.fn>;
 

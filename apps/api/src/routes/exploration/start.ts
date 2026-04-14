@@ -11,6 +11,7 @@ import {
   getHighestUnlockedTier,
   type PotionConsumed,
   type QuestProgressUpdate,
+  EXPLORATION_TRACKING_CONSTANTS,
   TUTORIAL_STEP_EXPLORE,
 } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
@@ -37,12 +38,9 @@ import {
   getCachedResourceNodesByZone,
   getCachedZoneMobFamilies,
 } from '../../services/staticDataCacheService';
+import { buildTrackableMobFamiliesByZone } from '../../services/explorationTrackingService';
 import { processExplorationOutcomes } from '../../services/explorationOutcomeService';
 import { persistExplorationResults } from '../../services/explorationPersistenceService';
-import {
-  EXPLORATION_TRACKING_CONSTANTS,
-  buildTrackableMobFamiliesByZone,
-} from './helpers';
 import {
   startSchema,
   type ZoneFamilyRow,
@@ -50,6 +48,16 @@ import {
 
 
 export const startRouter = Router();
+
+function familyHasEligibleMembersForTier(
+  family: ZoneFamilyRow,
+  zoneId: string,
+  selectedTier: number,
+): boolean {
+  return family.mobFamily.members.some((member) =>
+    member.mobTemplate.zoneId === zoneId && (member.mobTemplate.explorationTier ?? 1) <= selectedTier,
+  );
+}
 
 
 /**
@@ -88,14 +96,6 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       throw new AppError(400, 'Cannot explore in towns. Travel to a wild zone first.', 'TOWN_ZONE');
     }
 
-    if (trackingFamilyId) {
-      const trackableFamiliesByZone = await buildTrackableMobFamiliesByZone(playerId, [body.zoneId]);
-      const unlockedFamilies = trackableFamiliesByZone.get(body.zoneId) ?? [];
-      if (!unlockedFamilies.some((family) => family.mobFamilyId === trackingFamilyId)) {
-        throw new AppError(400, 'That mob family is not unlocked for tracking in this zone.', 'INVALID_TRACKING_FAMILY');
-      }
-    }
-
     const [mobTemplates, resourceNodes, zoneFamilies, progression, equipmentStats, mainHandAttackSkill] = await Promise.all([
       getCachedMobTemplatesByZone(body.zoneId),
       getCachedResourceNodesByZone(body.zoneId),
@@ -124,6 +124,19 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
     if (body.tier !== undefined && !unlockedTiers.includes(selectedTier)) {
       throw new AppError(400, `Tier ${selectedTier} is not unlocked. Max unlocked: ${maxUnlockedTier}`, 'INVALID_TIER');
+    }
+
+    if (trackingFamilyId) {
+      const trackableFamiliesByZone = await buildTrackableMobFamiliesByZone(playerId, [body.zoneId]);
+      const unlockedFamilies = trackableFamiliesByZone.get(body.zoneId) ?? [];
+      if (!unlockedFamilies.some((family) => family.mobFamilyId === trackingFamilyId)) {
+        throw new AppError(400, 'That mob family is not unlocked for tracking in this zone.', 'INVALID_TRACKING_FAMILY');
+      }
+
+      const trackingFamily = zoneFamilies.find((family) => family.mobFamilyId === trackingFamilyId);
+      if (!trackingFamily || !familyHasEligibleMembersForTier(trackingFamily, body.zoneId, selectedTier)) {
+        throw new AppError(400, 'That mob family cannot affect the selected exploration tier.', 'INVALID_TRACKING_FAMILY');
+      }
     }
 
     const undiscoveredNeighbors = await getUndiscoveredNeighborZones(playerId, body.zoneId);
