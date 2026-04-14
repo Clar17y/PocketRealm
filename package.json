@@ -19,7 +19,7 @@
     "build:web": "npm run build -w packages/shared && npm run build -w packages/game-engine && npm run build -w apps/web",
     "start:api": "npm run start -w apps/api",
     "start:web": "npm run start -w apps/web",
-    "typecheck": "tsc -b",
+    "typecheck": "npm run build -w packages/database && tsc -b --force",
     "lint": "eslint . --ext .ts,.tsx",
     "test": "npm run test --workspaces --if-present",
     "test:engine": "npm run build -w @pocketrealm/shared && npm run test -w packages/game-engine",
