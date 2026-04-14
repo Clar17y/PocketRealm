@@ -73,7 +73,12 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       throw new AppError(400, validation.error ?? 'Invalid turns', 'INVALID_TURNS');
     }
 
-    const trackingFamilyId = body.trackingFamilyId ?? null;
+    const playerRecord = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { tutorialStep: true },
+    });
+    const isTutorialExplore = playerRecord?.tutorialStep === TUTORIAL_STEP_EXPLORE;
+    const trackingFamilyId = isTutorialExplore ? null : body.trackingFamilyId ?? null;
 
     const zone = await prisma.zone.findUnique({ where: { id: body.zoneId } });
     if (!zone) {
@@ -156,12 +161,6 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     }
 
     // Tutorial detection
-    const playerRecord = await prisma.player.findUnique({
-      where: { id: playerId },
-      select: { tutorialStep: true },
-    });
-    const isTutorialExplore = playerRecord?.tutorialStep === TUTORIAL_STEP_EXPLORE;
-
     // Tutorial explore step: force 100 turns and a single guaranteed ambush
     const turnsToSpend = isTutorialExplore ? 100 : body.turns;
 

@@ -194,6 +194,13 @@ export async function processExplorationOutcomes(
   let respawnedTo: { townId: string; townName: string } | null = null;
   let zoneExitDiscovered = false;
 
+  function familyHasTierEligibleMember(family: ZoneFamilyRow): boolean {
+    return family.mobFamily.members.some(
+      (member: ZoneFamilyMember) =>
+        member.mobTemplate.zoneId === zoneId && (member.mobTemplate.explorationTier ?? 1) <= selectedTier,
+    );
+  }
+
   for (const outcome of outcomes) {
     if (aborted) break;
 
@@ -488,10 +495,13 @@ export async function processExplorationOutcomes(
         ...f,
         discoveryWeight: f.discoveryWeight * (spawnMods.byFamily.get(f.mobFamilyId) ?? 1) * spawnMods.global,
       }));
-      const pickedFamily = pickWeighted(
-        applyTrackedFamilyWeightBias(adjustedFamilies, trackingFamilyId, 'discoveryWeight'),
-        'discoveryWeight',
-      ) as ZoneFamilyRow | null;
+      const trackedFamilyHasEligibleMembers = trackingFamilyId
+        ? adjustedFamilies.some((family) => family.mobFamilyId === trackingFamilyId && familyHasTierEligibleMember(family))
+        : false;
+      const weightedFamilies = trackedFamilyHasEligibleMembers
+        ? applyTrackedFamilyWeightBias(adjustedFamilies, trackingFamilyId, 'discoveryWeight')
+        : adjustedFamilies;
+      const pickedFamily = pickWeighted(weightedFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
       if (!pickedFamily) continue;
 
       const size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);

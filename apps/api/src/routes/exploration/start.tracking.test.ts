@@ -109,6 +109,20 @@ vi.mock('./helpers', async () => {
   const actual = await vi.importActual<typeof import('./helpers')>('./helpers');
   return {
     ...actual,
+    pickWeighted: vi.fn((items: unknown[], weightKey: string) => {
+      if (items.length === 0) return null;
+      let best = items[0] as Record<string, unknown>;
+      let bestWeight = Number(best[weightKey] ?? 0);
+      for (const item of items.slice(1)) {
+        const candidate = item as Record<string, unknown>;
+        const weight = Number(candidate[weightKey] ?? 0);
+        if (weight > bestWeight) {
+          best = candidate;
+          bestWeight = weight;
+        }
+      }
+      return best;
+    }),
     buildTrackableMobFamiliesByZone: vi.fn(),
   };
 });
@@ -159,6 +173,16 @@ vi.mock('@pocketrealm/game-engine', () => ({
   getScaledZoneExitChance: vi.fn(() => 0.01),
   simulateExploration: vi.fn(() => []),
   validateExplorationTurns: vi.fn(() => ({ valid: true })),
+  generateRoomAssignments: vi.fn((size: 'small' | 'medium' | 'large') => ({
+    rooms: size === 'small'
+      ? [{ roomNumber: 1, mobCount: 1 }]
+      : size === 'medium'
+        ? [{ roomNumber: 1, mobCount: 2 }]
+        : [{ roomNumber: 1, mobCount: 3 }],
+    totalMobs: size === 'small' ? 1 : size === 'medium' ? 2 : 3,
+  })),
+  rollMobPrefix: vi.fn(() => null),
+  selectTierWithBleedthrough: vi.fn((tier: number) => tier),
 }));
 vi.mock('../../services/explorationOutcomeService', () => ({
   processExplorationOutcomes: vi.fn().mockResolvedValue({
@@ -218,6 +242,7 @@ import {
 } from './helpers';
 import { processExplorationOutcomes } from '../../services/explorationOutcomeService';
 import { simulateExploration } from '@pocketrealm/game-engine';
+import { TUTORIAL_STEP_EXPLORE } from '@pocketrealm/shared';
 
 const mockBuildTrackableMobFamiliesByZone = buildTrackableMobFamiliesByZone as ReturnType<typeof vi.fn>;
 const mockProcessExplorationOutcomes = processExplorationOutcomes as ReturnType<typeof vi.fn>;
@@ -330,6 +355,25 @@ describe('POST /exploration/start tracking contract', () => {
     );
   });
 
+  it('ignores tracking entirely during tutorial exploration', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ tutorialStep: TUTORIAL_STEP_EXPLORE });
+
+    const req = {
+      player: { playerId: 'p1', username: 'TestPlayer' },
+      body: {
+        zoneId: ZONE_ID,
+        turns: 500,
+        trackingFamilyId: '11111111-1111-1111-1111-111111111111',
+      },
+    } as any;
+    const res = mockRes();
+    const handler = findHandler('post', '/start');
+    await handler(req, res, vi.fn());
+
+    expect(mockBuildTrackableMobFamiliesByZone).not.toHaveBeenCalled();
+    expect(mockSimulateExploration).not.toHaveBeenCalled();
+  });
+
   it('boosts tracked family weights while suppressing non-tracked ones', () => {
     const result = applyTrackedFamilyWeightBias(
       [
@@ -344,5 +388,138 @@ describe('POST /exploration/start tracking contract', () => {
       { mobFamilyId: 'family-spider', discoveryWeight: 400 },
       { mobFamilyId: 'family-rat', discoveryWeight: 35 },
     ]);
+  });
+
+  it('does not bias encounter-site selection toward a tracked family with no eligible members', async () => {
+    const { processExplorationOutcomes: realProcessExplorationOutcomes } =
+      await vi.importActual<typeof import('../../services/explorationOutcomeService')>(
+        '../../services/explorationOutcomeService',
+      );
+
+    const result = await realProcessExplorationOutcomes(
+      {
+        playerId: 'p1',
+        username: 'TestPlayer',
+        zoneId: ZONE_ID,
+        zone: { id: ZONE_ID, name: 'Test Zone', difficulty: 1 },
+        hpState: { currentHp: 100, maxHp: 100 },
+        combatPrep: {
+          attackSkill: 'melee',
+          attackLevel: 1,
+          guildMods: {
+            combatDamage: 0,
+            defenseBoost: 0,
+            xpBoost: 0,
+            travelCostReduction: 0,
+            gatheringYield: 0,
+            craftingCrit: 0,
+            repairCostReduction: 0,
+          },
+          perActionScaling: {
+            skillLevels: { melee: 1, ranged: 1, magic: 1 },
+            attributes: { strength: 0, dexterity: 0, intelligence: 0 },
+            weaponPower: { attack: 5, rangedPower: 0, magicPower: 0 },
+            equipmentAccuracy: 0,
+            weaponRequiredSkill: 'melee',
+          },
+          playerTemplate: [{ id: 'slot-0', sortOrder: 0, actionId: 'light_attack' }],
+          potionPool: [],
+          resources: { stamina: 100, maxStamina: 100, staminaRegenPerRound: 5, mana: 50, maxMana: 50, manaRegenPerRound: 3 },
+          unlockedActions: [],
+        },
+        combatBuffs: { damageBoost: 0, defenceBoost: 0, durabilityShield: 0 },
+        buffUsesLeft: { damage: 0, defence: 0, durability: 0 },
+        progression: {
+          characterXp: 0,
+          characterLevel: 1,
+          attributePoints: 0,
+          attributes: { vitality: 1, strength: 1, dexterity: 1, intelligence: 1, luck: 1, evasion: 1 },
+        },
+        equipmentStats: { attack: 5, rangedPower: 0, magicPower: 0, accuracy: 5, armor: 5, magicDefence: 0, health: 0, dodge: 0, luck: 0, critChance: 0, critDamage: 1, inventorySlots: 0 },
+        mobTemplates: [],
+        zoneFamilies: [
+          {
+            zoneId: ZONE_ID,
+            mobFamilyId: 'family-spider',
+            discoveryWeight: 50,
+            minSize: 'small',
+            maxSize: 'small',
+            mobFamily: {
+              id: 'family-spider',
+              name: 'Spiders',
+              siteNounSmall: 'Nest',
+              siteNounMedium: 'Nest',
+              siteNounLarge: 'Nest',
+              members: [
+                {
+                  role: 'trash',
+                  mobTemplate: {
+                    id: 'spider-elite',
+                    name: 'Elite Spider',
+                    zoneId: ZONE_ID,
+                    explorationTier: 3,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            zoneId: ZONE_ID,
+            mobFamilyId: 'family-rat',
+            discoveryWeight: 100,
+            minSize: 'small',
+            maxSize: 'small',
+            mobFamily: {
+              id: 'family-rat',
+              name: 'Rats',
+              siteNounSmall: 'Nest',
+              siteNounMedium: 'Nest',
+              siteNounLarge: 'Nest',
+              members: [
+                {
+                  role: 'trash',
+                  mobTemplate: {
+                    id: 'rat-basic',
+                    name: 'Rat',
+                    zoneId: ZONE_ID,
+                    explorationTier: 1,
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        zoneTiers: null,
+        selectedTier: 1,
+        explorationProgress: { percent: 0, turnsExplored: 0, turnsToExplore: null },
+        zoneModifiers: {
+          mobDamageMultiplier: 1,
+          mobHpMultiplier: 1,
+          mobSpawnRateMultiplier: 1,
+          resourceDropRateMultiplier: 1,
+          resourceYieldMultiplier: 1,
+        },
+        spawnMods: { global: 1, byFamily: new Map() },
+        mobToFamilyMap: new Map([
+          ['spider-elite', 'family-spider'],
+          ['rat-basic', 'family-rat'],
+        ]),
+        trackingFamilyId: 'family-spider',
+        cachedZoneEvents: [],
+        cachedWorldEvents: [],
+        isTutorialExplore: false,
+        resourceNodes: [],
+        undiscoveredNeighbors: [],
+        thresholdByToId: new Map(),
+      },
+      [{ turnOccurred: 10, type: 'encounter_site' }],
+    );
+
+    expect(result.events[0]).toEqual(
+      expect.objectContaining({
+        type: 'encounter_site',
+        details: expect.objectContaining({ mobFamilyId: 'family-rat' }),
+      }),
+    );
   });
 });
