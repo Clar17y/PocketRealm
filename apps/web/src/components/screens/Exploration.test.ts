@@ -63,7 +63,23 @@ describe('Exploration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Track Spiders' }));
     fireEvent.click(screen.getByRole('button', { name: 'Start Exploration' }));
 
+    expect(screen.getByRole('button', { name: 'Track Spiders' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Track Wolves' }).getAttribute('aria-pressed')).toBe('false');
     expect(onStartExploration).toHaveBeenCalledWith(100, 2, 'family-spider');
+  });
+
+  it('updates the expected ambush and site preview while tracking is enabled', () => {
+    renderExploration({
+      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves' }],
+    });
+
+    expect(screen.getByText('0.5')).toBeTruthy();
+    expect(screen.getByText('0.15')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enable tracking' }));
+
+    expect(screen.getByText('0.4')).toBeTruthy();
+    expect(screen.getByText('0.11')).toBeTruthy();
   });
 
   it('hides tracking controls during the tutorial flow', () => {

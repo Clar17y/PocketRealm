@@ -9,7 +9,7 @@ import { ActivityLockBanner } from '@/components/common/ActivityLockBanner';
 import { ResourceStatusBar } from '../common/ResourceStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
 import { Loader2, Mountain, Play } from 'lucide-react';
-import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@pocketrealm/shared';
+import { EXPLORATION_CONSTANTS, EXPLORATION_TRACKING_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@pocketrealm/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { TurnPresets } from '@/components/common/TurnPresets';
@@ -116,8 +116,11 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
   const effectiveSelectedTier = selectedTier ?? maxUnlockedTier;
 
   const calculateProbabilities = (turns: number) => {
-    const expectedAmbushes = turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN;
-    const expectedSites = turns * EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN;
+    const trackedResultRateMultiplier = trackingEnabled
+      ? EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER
+      : 1;
+    const expectedAmbushes = turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * trackedResultRateMultiplier;
+    const expectedSites = turns * EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN * trackedResultRateMultiplier;
     const expectedResources = turns * EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE;
     // Cumulative probability of at least one hidden cache: 1 - (1 - p)^n
     const hiddenCacheChance = Math.min(
@@ -352,7 +355,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                 ) : trackingEnabled ? (
                   <div className="space-y-2">
                     <p className="text-xs text-[var(--rpg-text-secondary)]">Focus on a discovered family:</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="Tracking family">
                       {trackableMobFamilies.map((family) => {
                         const isSelected = selectedTrackingFamilyId === family.mobFamilyId;
                         return (
@@ -360,6 +363,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                             key={family.mobFamilyId}
                             type="button"
                             aria-label={`Track ${family.name}`}
+                            aria-pressed={isSelected}
                             onClick={() => setSelectedTrackingFamilyId(family.mobFamilyId)}
                             className={`px-3 py-1.5 text-sm rounded border transition-colors ${
                               isSelected
