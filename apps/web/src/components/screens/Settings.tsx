@@ -32,10 +32,10 @@ const NOTIFICATION_LABELS: { key: keyof NotificationPrefs; label: string }[] = [
 
 interface SettingsProps {
   username: string | undefined;
-  email?: string;
-  emailVerified?: boolean;
-  onAccountRefresh?: () => Promise<void>;
-  onForceRelogin?: () => void;
+  email: string;
+  emailVerified: boolean;
+  onAccountRefresh: () => Promise<void>;
+  onForceRelogin: () => void;
 
   // Combat
   combatLogSpeedMs: number;
@@ -109,10 +109,10 @@ const secondaryButtonClassName =
 
 export function Settings({
   username,
-  email = '',
-  emailVerified = false,
-  onAccountRefresh = async () => undefined,
-  onForceRelogin = () => undefined,
+  email,
+  emailVerified,
+  onAccountRefresh,
+  onForceRelogin,
   combatLogSpeedMs,
   onCombatLogSpeedChange,
   onCombatLogSpeedCommit,
