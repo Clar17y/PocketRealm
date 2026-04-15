@@ -279,6 +279,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   const activeScreenRef = useRef(activeScreen);
   useEffect(() => { activeScreenRef.current = activeScreen; }, [activeScreen]);
 
+  const gathering = useGathering(isAuthenticated, activeScreen, activeZoneId);
+  const { loadGatheringNodes, setActiveGatheringSkill } = gathering;
+  const encounterSites = useEncounterSites(isAuthenticated, activeScreen, activeZoneId);
+  const { refreshPendingEncounters, pendingEncounters } = encounterSites;
+
   // Immediate fetch when navigating to a screen that needs HP/resources and values are below max
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -741,11 +746,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     zones.find((z) => z.discovered) ??
     zones.find((z) => z.isStarter) ??
     null, [zones, activeZoneId]);
-
-  const gathering = useGathering(isAuthenticated, activeScreen, activeZoneId);
-  const { loadGatheringNodes, setActiveGatheringSkill } = gathering;
-  const encounterSites = useEncounterSites(isAuthenticated, activeScreen, activeZoneId);
-  const { refreshPendingEncounters, pendingEncounters } = encounterSites;
 
   const ownedByTemplateId = useMemo(() => {
     const map = new Map<string, number>();
