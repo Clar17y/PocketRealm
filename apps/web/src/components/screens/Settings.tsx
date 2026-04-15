@@ -197,6 +197,9 @@ export function Settings({
     setEmailForm((prev) => ({ ...prev, password: '' }));
     try {
       await onAccountRefresh();
+    } catch {
+      setAccountMessage(null);
+      setAccountError('Email updated, but failed to refresh account.');
     } finally {
       setAccountBusy(null);
     }

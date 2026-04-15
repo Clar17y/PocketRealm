@@ -130,6 +130,24 @@ describe('Settings', () => {
     await waitFor(() => expect(updatePasswordButton.disabled).toBe(false));
   });
 
+  it('shows a refresh error when the post-email account refresh rejects', async () => {
+    const onAccountRefresh = vi.fn().mockRejectedValue(new Error('refresh failed'));
+    vi.mocked(changeEmail).mockResolvedValue({ data: { message: 'Email updated' } });
+    renderSettings({ onAccountRefresh });
+
+    fireEvent.change(screen.getByLabelText('New email'), { target: { value: 'new@example.com' } });
+    fireEvent.change(screen.getByLabelText('Current password for email change'), { target: { value: 'hunter2-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update email' }));
+
+    await waitFor(() => expect(changeEmail).toHaveBeenCalledWith('new@example.com', 'hunter2-password'));
+    await waitFor(() => expect(onAccountRefresh).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByText('Email updated, but failed to refresh account.')).toBeTruthy());
+
+    expect(screen.queryByText('Email updated')).toBeNull();
+    expect((screen.getByLabelText('Current password for email change') as HTMLInputElement).value).toBe('');
+    expect((screen.getByRole('button', { name: 'Update email' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('forces re-login after a successful password change', async () => {
     const onForceRelogin = vi.fn();
     vi.mocked(changePassword).mockResolvedValue({ data: { message: 'Password updated' } });
