@@ -46,7 +46,7 @@ export function useAuth() {
       }
 
       setState({ player: null, isLoading: false, isAuthenticated: false });
-      return;
+      throw new Error('Failed to refresh account.');
     }
 
     const { data, error } = await getPlayer();
@@ -74,7 +74,7 @@ export function useAuth() {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       setState({ player: null, isLoading: false, isAuthenticated: false });
-      return;
+      throw new Error('Failed to refresh account.');
     }
 
     setState({
@@ -85,7 +85,7 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    checkAuth();
+    void checkAuth().catch(() => undefined);
   }, [checkAuth]);
 
   const setTokens = useCallback((accessToken: string, refreshToken: string, player: Player) => {
