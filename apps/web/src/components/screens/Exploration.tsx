@@ -8,7 +8,7 @@ import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ActivityLockBanner } from '@/components/common/ActivityLockBanner';
 import { ResourceStatusBar } from '../common/ResourceStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
-import { Loader2, Mountain, Play } from 'lucide-react';
+import { Info, Loader2, Mountain, Play } from 'lucide-react';
 import { EXPLORATION_CONSTANTS, EXPLORATION_TRACKING_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@pocketrealm/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
@@ -101,6 +101,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [selectedTrackingFamilyId, setSelectedTrackingFamilyId] = useState<string | null>(null);
+  const [trackingInfoOpen, setTrackingInfoOpen] = useState(false);
 
   const unlockedTierNumbers = getUnlockedTiers(
     explorationProgress?.percent ?? 0,
@@ -340,14 +341,32 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
             <PixelCard>
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Tracking</h3>
-                    <p className="text-xs text-[var(--rpg-text-secondary)]">
-                      Reduce total yield to bias ambushes and sites toward one discovered mob family.
-                    </p>
-                    <p className="text-xs text-[var(--rpg-text-secondary)] opacity-70">
-                      Tracking never bypasses unlocked tiers, and non-family outcomes still remain.
-                    </p>
+                  <div className="relative">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Tracking</h3>
+                      <button
+                        type="button"
+                        aria-label="Tracking info"
+                        aria-expanded={trackingInfoOpen}
+                        onFocus={() => setTrackingInfoOpen(true)}
+                        onBlur={() => setTrackingInfoOpen(false)}
+                        onMouseEnter={() => setTrackingInfoOpen(true)}
+                        onMouseLeave={() => setTrackingInfoOpen(false)}
+                        className="rounded-full text-[var(--rpg-text-secondary)] transition-colors hover:text-[var(--rpg-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rpg-gold)]"
+                      >
+                        <Info size={14} />
+                      </button>
+                    </div>
+                    {trackingInfoOpen ? (
+                      <div className="absolute left-0 top-full z-10 mt-2 w-64 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] p-3 shadow-lg">
+                        <p className="text-xs text-[var(--rpg-text-secondary)]">
+                          Reduce total yield to bias ambushes and sites toward one discovered mob family.
+                        </p>
+                        <p className="mt-2 text-xs text-[var(--rpg-text-secondary)] opacity-70">
+                          Tracking never bypasses unlocked tiers, and non-family outcomes still remain.
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                   <ToggleSwitch
                     checked={trackingEnabled}

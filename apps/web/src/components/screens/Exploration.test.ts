@@ -41,6 +41,19 @@ describe('Exploration', () => {
     expect(screen.getByText('Discover a mob family in this zone before you can track it.')).toBeTruthy();
   });
 
+  it('shows tracking guidance from the info icon instead of inline helper text', () => {
+    renderExploration({
+      trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 }],
+    });
+
+    expect(screen.queryByText('Reduce total yield to bias ambushes and sites toward one discovered mob family.')).toBeNull();
+
+    fireEvent.focus(screen.getByRole('button', { name: 'Tracking info' }));
+
+    expect(screen.getByText('Reduce total yield to bias ambushes and sites toward one discovered mob family.')).toBeTruthy();
+    expect(screen.getByText('Tracking never bypasses unlocked tiers, and non-family outcomes still remain.')).toBeTruthy();
+  });
+
   it('does not pass a tracking family while tracking is off', () => {
     const { onStartExploration } = renderExploration({
       trackableMobFamilies: [{ mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 }],
