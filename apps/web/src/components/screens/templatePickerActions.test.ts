@@ -17,10 +17,13 @@ describe('getTemplatePickerSections', () => {
   it('includes unlocked talent actions in the combat core section', () => {
     const sections = getTemplatePickerSections(['power_strike', 'minor_heal']);
     const combatCore = sections.find((section) => section.key === 'combat-core');
+    const utility = sections.find((section) => section.key === 'utility');
 
     expect(combatCore?.title).toBe('Combat Core');
     expect(combatCore?.actions.map((action) => action.id)).toContain('power_strike');
-    expect(combatCore?.actions.map((action) => action.id)).toContain('minor_heal');
+    expect(combatCore?.actions.map((action) => action.id)).not.toContain('minor_heal');
+    expect(utility?.title).toBe('Utility');
+    expect(utility?.actions.map((action) => action.id)).toContain('minor_heal');
   });
 
   it('keeps health potions above the lower-priority utility actions', () => {
@@ -83,15 +86,40 @@ describe('getTemplatePickerSections', () => {
       const { getTemplatePickerSections: getTemplatePickerSectionsWithMockedTalents } = await import('./templatePickerActions');
       const sections = getTemplatePickerSectionsWithMockedTalents(['power_strike', 'minor_heal']);
       const combatCore = sections.find((section) => section.key === 'combat-core');
+      const utility = sections.find((section) => section.key === 'utility');
 
       expect(combatCore?.actions.map((action) => action.id)).toEqual([
         'light_attack',
         'normal_attack',
         'heavy_attack',
         'use_hp_potion',
-        'minor_heal',
         'power_strike',
       ]);
+      expect(utility?.actions.map((action) => action.id)).toContain('minor_heal');
+    } finally {
+      vi.doUnmock('@pocketrealm/shared');
+      vi.resetModules();
+    }
+  });
+
+  it('places future always-available actions by shared metadata when they are not explicitly ordered', async () => {
+    vi.doMock('@pocketrealm/shared', async () => {
+      const actual = await vi.importActual<typeof import('@pocketrealm/shared')>('@pocketrealm/shared');
+      return {
+        ...actual,
+        ALWAYS_AVAILABLE_ACTION_IDS: new Set([...actual.ALWAYS_AVAILABLE_ACTION_IDS, 'battle_cry']),
+      };
+    });
+
+    try {
+      vi.resetModules();
+      const { getTemplatePickerSections: getTemplatePickerSectionsWithMockedActions } = await import('./templatePickerActions');
+      const sections = getTemplatePickerSectionsWithMockedActions([]);
+      const combatCore = sections.find((section) => section.key === 'combat-core');
+      const utility = sections.find((section) => section.key === 'utility');
+
+      expect(combatCore?.actions.map((action) => action.id)).not.toContain('battle_cry');
+      expect(utility?.actions.map((action) => action.id)).toContain('battle_cry');
     } finally {
       vi.doUnmock('@pocketrealm/shared');
       vi.resetModules();

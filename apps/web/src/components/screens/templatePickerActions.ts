@@ -29,9 +29,18 @@ const UTILITY_ACTION_IDS = [
   'use_elixir_of_power',
 ] as const;
 
+const EXPLICIT_ACTION_IDS = new Set([
+  ...COMBAT_CORE_BASE_ACTION_IDS,
+  ...UTILITY_ACTION_IDS,
+]);
+
 const ORDERED_TALENT_ACTION_IDS = getAllTalentNodes()
   .map((node) => node.unlocksAction)
   .filter((id): id is string => Boolean(id) && !ALWAYS_AVAILABLE_ACTION_IDS.has(id));
+
+function isCombatCoreAction(action: ActionDefinition): boolean {
+  return action.category === 'offensive';
+}
 
 function buildActions(ids: readonly string[]): ActionDefinition[] {
   return ids.flatMap((id) => {
@@ -40,13 +49,44 @@ function buildActions(ids: readonly string[]): ActionDefinition[] {
   });
 }
 
+function partitionActionIds(ids: readonly string[]): { combatCore: string[]; utility: string[] } {
+  return ids.reduce<{ combatCore: string[]; utility: string[] }>(
+    (sections, id) => {
+      const action = BASE_ACTION_DEFINITIONS[id];
+      if (!action) {
+        return sections;
+      }
+
+      if (isCombatCoreAction(action)) {
+        sections.combatCore.push(id);
+      } else {
+        sections.utility.push(id);
+      }
+
+      return sections;
+    },
+    { combatCore: [], utility: [] },
+  );
+}
+
 export function getTemplatePickerSections(unlockedActions: string[]): TemplatePickerSection[] {
   const unlockedSet = new Set(unlockedActions);
+  const visibleTalentActionIds = ORDERED_TALENT_ACTION_IDS.filter((id) => unlockedSet.has(id));
+  const remainingAlwaysAvailableActionIds = Array.from(ALWAYS_AVAILABLE_ACTION_IDS).filter(
+    (id) => !EXPLICIT_ACTION_IDS.has(id),
+  );
+  const visibleTalentSections = partitionActionIds(visibleTalentActionIds);
+  const remainingAlwaysAvailableSections = partitionActionIds(remainingAlwaysAvailableActionIds);
   const combatCoreActions = buildActions([
     ...COMBAT_CORE_BASE_ACTION_IDS,
-    ...ORDERED_TALENT_ACTION_IDS.filter((id) => unlockedSet.has(id)),
+    ...remainingAlwaysAvailableSections.combatCore,
+    ...visibleTalentSections.combatCore,
   ]);
-  const utilityActions = buildActions(UTILITY_ACTION_IDS);
+  const utilityActions = buildActions([
+    ...UTILITY_ACTION_IDS,
+    ...remainingAlwaysAvailableSections.utility,
+    ...visibleTalentSections.utility,
+  ]);
 
   return [
     {
