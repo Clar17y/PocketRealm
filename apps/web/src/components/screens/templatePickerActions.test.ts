@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getTemplatePickerSections } from './templatePickerActions';
 
 describe('getTemplatePickerSections', () => {
@@ -43,5 +43,39 @@ describe('getTemplatePickerSections', () => {
       'use_resist_potion',
       'use_elixir_of_power',
     ]);
+  });
+
+  it('keeps unlocked talent ordering stable when object key order changes', async () => {
+    const actualKeys = Object.keys;
+    const keysSpy = vi.spyOn(Object, 'keys').mockImplementation((value) => {
+      if (
+        value &&
+        typeof value === 'object' &&
+        'power_strike' in value &&
+        'minor_heal' in value
+      ) {
+        return actualKeys(value).reverse();
+      }
+
+      return actualKeys(value);
+    });
+
+    try {
+      vi.resetModules();
+      const { getTemplatePickerSections: getTemplatePickerSectionsWithMockedKeys } = await import('./templatePickerActions');
+      const sections = getTemplatePickerSectionsWithMockedKeys(['power_strike', 'minor_heal']);
+      const combatCore = sections.find((section) => section.key === 'combat-core');
+
+      expect(combatCore?.actions.map((action) => action.id)).toEqual([
+        'light_attack',
+        'normal_attack',
+        'heavy_attack',
+        'use_hp_potion',
+        'power_strike',
+        'minor_heal',
+      ]);
+    } finally {
+      keysSpy.mockRestore();
+    }
   });
 });
