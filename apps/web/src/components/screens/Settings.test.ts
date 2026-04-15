@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/components/ui/Slider', () => ({
@@ -122,5 +122,18 @@ describe('Settings', () => {
 
     await waitFor(() => expect(changePassword).toHaveBeenCalledWith('old-password', 'much-better-password'));
     await waitFor(() => expect(onForceRelogin).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows password mismatch inline and does not submit the password change', () => {
+    renderSettings({ emailVerified: true });
+
+    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'old-password' } });
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'much-better-password' } });
+    fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'different-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
+
+    const passwordCard = screen.getByRole('heading', { name: 'Change password' }).parentElement!;
+    expect(within(passwordCard).getByText('New password confirmation does not match.')).toBeTruthy();
+    expect(changePassword).not.toHaveBeenCalled();
   });
 });

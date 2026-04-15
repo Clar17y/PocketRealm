@@ -155,6 +155,7 @@ export function Settings({
     newPassword: '',
     confirmPassword: '',
   });
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [accountMessage, setAccountMessage] = useState<string | null>(null);
   const [accountBusy, setAccountBusy] = useState<'email' | 'password' | 'verify' | null>(null);
@@ -199,11 +200,13 @@ export function Settings({
 
   const handleSubmitPassword = async () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setAccountError('New password confirmation does not match.');
+      setPasswordError('New password confirmation does not match.');
+      setAccountError(null);
       setAccountMessage(null);
       return;
     }
 
+    setPasswordError(null);
     setAccountBusy('password');
     setAccountError(null);
     setAccountMessage(null);
@@ -332,7 +335,10 @@ export function Settings({
                 id="settings-new-password"
                 type="password"
                 value={passwordForm.newPassword}
-                onChange={(event) => setPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))}
+                onChange={(event) => {
+                  setPasswordError(null);
+                  setPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }));
+                }}
                 className={inputClassName}
               />
 
@@ -343,9 +349,20 @@ export function Settings({
                 id="settings-confirm-password"
                 type="password"
                 value={passwordForm.confirmPassword}
-                onChange={(event) => setPasswordForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
+                aria-invalid={Boolean(passwordError)}
+                aria-describedby={passwordError ? 'settings-confirm-password-error' : undefined}
+                onChange={(event) => {
+                  setPasswordError(null);
+                  setPasswordForm((prev) => ({ ...prev, confirmPassword: event.target.value }));
+                }}
                 className={inputClassName}
               />
+
+              {passwordError && (
+                <p id="settings-confirm-password-error" className="text-xs font-bold text-[var(--rpg-red)]">
+                  {passwordError}
+                </p>
+              )}
 
               <button
                 type="button"
