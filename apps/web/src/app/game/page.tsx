@@ -45,7 +45,7 @@ import { GameScreenRenderer } from './GameScreenRenderer';
 
 export default function GamePage() {
   const router = useRouter();
-  const { player, isLoading, isAuthenticated, logout } = useAuth();
+  const { player, isLoading, isAuthenticated, logout, checkAuth } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -369,6 +369,8 @@ export default function GamePage() {
           pushState={pushState}
           pushToggle={pushToggle}
           onLogout={() => { logout(); router.push('/'); }}
+          onAccountRefresh={checkAuth}
+          onForceRelogin={() => { logout(); router.push('/login'); }}
         />
         <XpRateTutorial skillName={lowestXpRate.skillName} rate={lowestXpRate.rate} />
       </AppShell>
