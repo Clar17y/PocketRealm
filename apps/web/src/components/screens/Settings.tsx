@@ -164,10 +164,14 @@ export function Settings({
     setEmailForm((prev) => ({ ...prev, email }));
   }, [email]);
 
-  const handleResendVerification = async () => {
-    setAccountBusy('verify');
+  const clearAccountFeedback = () => {
     setAccountError(null);
     setAccountMessage(null);
+  };
+
+  const handleResendVerification = async () => {
+    setAccountBusy('verify');
+    clearAccountFeedback();
 
     const res = await resendVerification();
 
@@ -182,8 +186,7 @@ export function Settings({
 
   const handleSubmitEmail = async () => {
     setAccountBusy('email');
-    setAccountError(null);
-    setAccountMessage(null);
+    clearAccountFeedback();
 
     const res = await changeEmail(emailForm.email, emailForm.password);
 
@@ -208,15 +211,13 @@ export function Settings({
   const handleSubmitPassword = async () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setPasswordError('New password confirmation does not match.');
-      setAccountError(null);
-      setAccountMessage(null);
+      clearAccountFeedback();
       return;
     }
 
     setPasswordError(null);
     setAccountBusy('password');
-    setAccountError(null);
-    setAccountMessage(null);
+    clearAccountFeedback();
 
     const res = await changePassword(passwordForm.currentPassword, passwordForm.newPassword);
 

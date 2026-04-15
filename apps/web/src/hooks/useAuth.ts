@@ -24,6 +24,19 @@ export function useAuth() {
     isAuthenticated: false,
   });
 
+  const setAuthenticatedState = (player: Player) => {
+    setState({
+      player,
+      isLoading: false,
+      isAuthenticated: true,
+    });
+  };
+
+  const failRefresh = () => {
+    setState({ player: null, isLoading: false, isAuthenticated: false });
+    throw new Error('Failed to refresh account.');
+  };
+
   const checkAuth = useCallback(async () => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
@@ -35,18 +48,13 @@ export function useAuth() {
           localStorage.setItem('refreshToken', refreshResult.data.refreshToken);
           const retryResult = await getPlayer();
           if (retryResult.data) {
-            setState({
-              player: retryResult.data.player,
-              isLoading: false,
-              isAuthenticated: true,
-            });
+            setAuthenticatedState(retryResult.data.player);
             return;
           }
         }
       }
 
-      setState({ player: null, isLoading: false, isAuthenticated: false });
-      throw new Error('Failed to refresh account.');
+      failRefresh();
     }
 
     const { data, error } = await getPlayer();
@@ -61,11 +69,7 @@ export function useAuth() {
           // Retry
           const retryResult = await getPlayer();
           if (retryResult.data) {
-            setState({
-              player: retryResult.data.player,
-              isLoading: false,
-              isAuthenticated: true,
-            });
+            setAuthenticatedState(retryResult.data.player);
             return;
           }
         }
@@ -73,15 +77,10 @@ export function useAuth() {
       // Failed
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
-      setState({ player: null, isLoading: false, isAuthenticated: false });
-      throw new Error('Failed to refresh account.');
+      failRefresh();
     }
 
-    setState({
-      player: data.player,
-      isLoading: false,
-      isAuthenticated: true,
-    });
+    setAuthenticatedState(data.player);
   }, []);
 
   useEffect(() => {
