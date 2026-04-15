@@ -1,6 +1,7 @@
 import {
   ALWAYS_AVAILABLE_ACTION_IDS,
   BASE_ACTION_DEFINITIONS,
+  getAllTalentNodes,
   type ActionDefinition,
 } from '@pocketrealm/shared';
 
@@ -28,50 +29,9 @@ const UTILITY_ACTION_IDS = [
   'use_elixir_of_power',
 ] as const;
 
-const TALENT_ACTION_IDS = [
-  'power_strike',
-  'cleave',
-  'battle_cry',
-  'devastating_blow',
-  'berserker_rage',
-  'execute',
-  'titans_wrath',
-  'aimed_shot',
-  'crippling_shot',
-  'eagle_eye',
-  'volley',
-  'snipers_mark',
-  'piercing_shot',
-  'death_mark',
-  'fire_bolt',
-  'minor_heal',
-  'frost_nova',
-  'enhanced_fortitude',
-  'heal_ally',
-  'arcane_blast',
-  'regeneration',
-  'meteor_strike',
-  'flame_sword',
-  'venomous_strike',
-  'rending_slash',
-  'flame_arrow',
-  'barbed_arrow',
-  'shadow_arrow',
-  'earth_spikes',
-  'life_drain',
-  'curse',
-  'enfeeble',
-  'whirlwind',
-  'scatter_shot',
-  'blizzard',
-  'rally',
-  'taunt',
-  'fortify',
-] as const;
-
-const ORDERED_TALENT_ACTION_IDS = TALENT_ACTION_IDS.filter(
-  (id) => !ALWAYS_AVAILABLE_ACTION_IDS.has(id),
-);
+const ORDERED_TALENT_ACTION_IDS = getAllTalentNodes()
+  .map((node) => node.unlocksAction)
+  .filter((id): id is string => Boolean(id) && !ALWAYS_AVAILABLE_ACTION_IDS.has(id));
 
 function buildActions(ids: readonly string[]): ActionDefinition[] {
   return ids.flatMap((id) => {

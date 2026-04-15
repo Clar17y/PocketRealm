@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { TalentNodeDefinition } from '@pocketrealm/shared';
 import { getTemplatePickerSections } from './templatePickerActions';
 
 describe('getTemplatePickerSections', () => {
@@ -45,25 +46,42 @@ describe('getTemplatePickerSections', () => {
     ]);
   });
 
-  it('keeps unlocked talent ordering stable when object key order changes', async () => {
-    const actualKeys = Object.keys;
-    const keysSpy = vi.spyOn(Object, 'keys').mockImplementation((value) => {
-      if (
-        value &&
-        typeof value === 'object' &&
-        'power_strike' in value &&
-        'minor_heal' in value
-      ) {
-        return actualKeys(value).reverse();
-      }
+  it('derives unlocked talent ordering from shared talent definitions', async () => {
+    const mockedTalentNodes: TalentNodeDefinition[] = [
+      {
+        id: 'mock_minor_heal_node',
+        tree: 'magic',
+        tier: 1,
+        name: 'Minor Heal',
+        description: 'Mock node for ordering.',
+        pointCost: 1,
+        prerequisites: [],
+        unlocksAction: 'minor_heal',
+      },
+      {
+        id: 'mock_power_strike_node',
+        tree: 'melee',
+        tier: 1,
+        name: 'Power Strike',
+        description: 'Mock node for ordering.',
+        pointCost: 1,
+        prerequisites: [],
+        unlocksAction: 'power_strike',
+      },
+    ];
 
-      return actualKeys(value);
+    vi.doMock('@pocketrealm/shared', async () => {
+      const actual = await vi.importActual<typeof import('@pocketrealm/shared')>('@pocketrealm/shared');
+      return {
+        ...actual,
+        getAllTalentNodes: () => mockedTalentNodes,
+      };
     });
 
     try {
       vi.resetModules();
-      const { getTemplatePickerSections: getTemplatePickerSectionsWithMockedKeys } = await import('./templatePickerActions');
-      const sections = getTemplatePickerSectionsWithMockedKeys(['power_strike', 'minor_heal']);
+      const { getTemplatePickerSections: getTemplatePickerSectionsWithMockedTalents } = await import('./templatePickerActions');
+      const sections = getTemplatePickerSectionsWithMockedTalents(['power_strike', 'minor_heal']);
       const combatCore = sections.find((section) => section.key === 'combat-core');
 
       expect(combatCore?.actions.map((action) => action.id)).toEqual([
@@ -71,11 +89,12 @@ describe('getTemplatePickerSections', () => {
         'normal_attack',
         'heavy_attack',
         'use_hp_potion',
-        'power_strike',
         'minor_heal',
+        'power_strike',
       ]);
     } finally {
-      keysSpy.mockRestore();
+      vi.doUnmock('@pocketrealm/shared');
+      vi.resetModules();
     }
   });
 });
