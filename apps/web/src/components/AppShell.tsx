@@ -21,7 +21,7 @@ interface AppShellProps {
 
 export function AppShell({ children, turns = 0, username, mailUnreadCount = 0, onMailClick, onSettings, onLogout, onWhatsNew, hasUnseenChangelog, backgroundSrc }: AppShellProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const hasMenu = Boolean(onSettings || onLogout || onWhatsNew);
+  const hasMenu = Boolean(onLogout || onWhatsNew);
 
   return (
     <div className="min-h-dvh w-full bg-[var(--rpg-background)]/95 flex flex-col safe-area-top">
@@ -58,6 +58,18 @@ export function AppShell({ children, turns = 0, username, mailUnreadCount = 0, o
                     {mailUnreadCount > 99 ? '99+' : mailUnreadCount}
                   </span>
                 )}
+              </button>
+            )}
+            {onSettings && (
+              <button
+                onClick={onSettings}
+                className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)] transition-colors"
+                aria-label="Open settings"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 9 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
               </button>
             )}
             {username && (
@@ -100,15 +112,6 @@ export function AppShell({ children, turns = 0, username, mailUnreadCount = 0, o
                           {hasUnseenChangelog && (
                             <span className="w-2 h-2 rounded-full bg-[var(--rpg-gold)]" />
                           )}
-                        </button>
-                      )}
-                      {onSettings && (
-                        <button
-                          role="menuitem"
-                          onClick={() => { setDropdownOpen(false); onSettings(); }}
-                          className="w-full text-left px-4 py-2 text-sm text-[var(--rpg-text-primary)] hover:bg-[var(--rpg-background)] transition-colors"
-                        >
-                          Settings
                         </button>
                       )}
                       {onLogout && (
