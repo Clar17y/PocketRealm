@@ -267,6 +267,10 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   useEffect(() => {
     activeZoneIdRef.current = activeZoneId;
   }, [activeZoneId]);
+  const setActiveZoneIdImmediate = useCallback((nextZoneId: string | null) => {
+    activeZoneIdRef.current = nextZoneId;
+    setActiveZoneId(nextZoneId);
+  }, []);
   const staminaStateRef = useRef(staminaState);
   useEffect(() => {
     staminaStateRef.current = staminaState;
@@ -347,9 +351,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setCharacterProgression: (cp) => setCharacterProgression((prev) => ({ ...prev, ...cp })),
     setMaterialTotals,
     setActiveEncounterSiteId,
-    setActiveZoneId,
-  }), []);
-  // All useState setters are stable references, so empty deps is correct
+    setActiveZoneId: setActiveZoneIdImmediate,
+  }), [setActiveZoneIdImmediate]);
+  // State setters are stable; only the ref-synchronizing zone setter needs to stay in deps.
 
   const runAction = async (actionName: string, fn: () => Promise<void>) => {
     if (busyAction) return;
@@ -485,13 +489,13 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setZones(data.zones);
     setZoneConnections(data.connections);
     setUndiscoveredZones(data.undiscoveredZones ?? []);
-    setActiveZoneId(data.currentZoneId);
+    setActiveZoneIdImmediate(data.currentZoneId);
     if (data.currentZoneId) {
       getZoneEvents(data.currentZoneId).then((res) => {
         if (res.data) setActiveEvents(res.data.events);
       });
     }
-  }, []);
+  }, [setActiveZoneIdImmediate]);
 
   const reloadZones = useCallback(async (options?: { expectedActiveZoneId?: string | null }) => {
     const zonesRes = await getZones({ fresh: true });
@@ -777,7 +781,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const travelActions = useTravelActions({
     hpStateRef, activeZoneId, zones, zoneConnections,
-    runAction, pushLog, setTurns, setActiveZoneId, setActionError,
+    runAction, pushLog, setTurns, setActiveZoneId: setActiveZoneIdImmediate, setActionError,
     setPlaybackActive, stateSetters, advanceTutorial,
     refreshCraftingRecipes, loadAll,
     pendingLootSession: loot.pendingLootSession,

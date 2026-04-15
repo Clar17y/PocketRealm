@@ -1,6 +1,7 @@
-import { renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGameController } from './useGameController';
+import { getZoneEvents, getZones } from '@/lib/api';
 
 vi.mock('@/lib/analytics', () => ({
   trackEvent: vi.fn(),
@@ -270,7 +271,54 @@ vi.mock('./hooks/useTravelActions', () => ({
 }));
 
 describe('useGameController', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getZones).mockResolvedValue({
+      data: {
+        zones: [
+          {
+            id: 'zone-forest',
+            name: 'Forest Edge',
+            description: null,
+            difficulty: 1,
+            travelCost: 10,
+            isStarter: true,
+            discovered: true,
+            zoneType: 'wild',
+            zoneExitChance: null,
+            maxCraftingLevel: null,
+            arrivalText: null,
+            ambientTexts: null,
+            environmentalTexts: null,
+            exploration: null,
+          },
+        ],
+        connections: [],
+        undiscoveredZones: [],
+        currentZoneId: 'zone-forest',
+      },
+      error: null,
+    } as never);
+    vi.mocked(getZoneEvents).mockResolvedValue({ data: { events: [] }, error: null } as never);
+  });
+
   it('initializes without throwing when encounter-site refresh is passed to combat playback', () => {
     expect(() => renderHook(() => useGameController({ isAuthenticated: false }))).not.toThrow();
+  });
+
+  it('blocks a stale zone reload immediately after the active zone changes', async () => {
+    const hook = renderHook(() => useGameController({ isAuthenticated: false }));
+
+    await act(async () => {
+      hook.result.current.stateSetters.setActiveZoneId('zone-forest');
+    });
+
+    await act(async () => {
+      hook.result.current.stateSetters.setActiveZoneId('zone-cave');
+      await hook.result.current.reloadZones({ expectedActiveZoneId: 'zone-forest' });
+    });
+
+    expect(hook.result.current.activeZoneId).toBe('zone-cave');
+    expect(getZoneEvents).not.toHaveBeenCalled();
   });
 });
