@@ -5,12 +5,12 @@ import type { Screen, PendingEncounter } from '../gameController.types';
 
 const PENDING_ENCOUNTER_PAGE_SIZE = 8;
 
-export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen) {
+export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen, currentZoneId: string | null) {
   const [pendingEncounters, setPendingEncounters] = useState<PendingEncounter[]>([]);
   const [pendingEncountersLoading, setPendingEncountersLoading] = useState(false);
   const [pendingEncountersError, setPendingEncountersError] = useState<string | null>(null);
   const [pendingEncounterPage, setPendingEncounterPage] = useState(1);
-  const [pendingEncounterZoneFilter, setPendingEncounterZoneFilter] = useState('all');
+  const [pendingEncounterZoneFilter, setPendingEncounterZoneFilter] = useState(() => currentZoneId ?? 'all');
   const [pendingEncounterMobFilter, setPendingEncounterMobFilter] = useState('all');
   const [pendingEncounterSort, setPendingEncounterSort] = useState<'recent' | 'danger'>('danger');
   const [pendingEncounterPagination, setPendingEncounterPagination] = useState({
@@ -117,6 +117,15 @@ export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen
     setPendingClockMs(Date.now());
     void refreshPendingEncounters();
   }, [encounterPollEnabled, refreshPendingEncounters]);
+
+  useEffect(() => {
+    const nextZoneFilter = currentZoneId ?? 'all';
+    setPendingEncounterZoneFilter((prev) => {
+      if (prev === nextZoneFilter) return prev;
+      setPendingEncounterPage(1);
+      return nextZoneFilter;
+    });
+  }, [currentZoneId]);
   useVisibleInterval(() => {
     setPendingClockMs(Date.now());
     void refreshPendingEncounters({ background: true });

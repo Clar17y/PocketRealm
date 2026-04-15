@@ -127,6 +127,7 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     arrivalText: string | null;
     ambientTexts: Record<string, string> | null;
     environmentalTexts: Record<string, string> | null;
+    trackableMobFamilies?: Array<{ mobFamilyId: string; name: string; minTier: number }>;
     exploration: {
       turnsExplored: number;
       turnsToExplore: number | null;
@@ -167,8 +168,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       };
     };
   }>>([]);
-  const gathering = useGathering(isAuthenticated, activeScreen);
-  const { loadGatheringNodes, setActiveGatheringSkill } = gathering;
   const [zoneCraftingLevel, setZoneCraftingLevel] = useState<number | null>(0);
   const [zoneCraftingName, setZoneCraftingName] = useState<string | null>(null);
   const [craftingRecipes, setCraftingRecipes] = useState<Array<{
@@ -188,8 +187,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }>>([]);
   const [activeCraftingSkill, setActiveCraftingSkill] = useState<'refining' | 'tanning' | 'weaving' | 'weaponsmithing' | 'armorsmithing' | 'leatherworking' | 'tailoring' | 'alchemy' | 'jewelcrafting'>('weaponsmithing');
   const { activityLog, setActivityLog, pushLog } = useActivityLog();
-  const encounterSites = useEncounterSites(isAuthenticated, activeScreen);
-  const { refreshPendingEncounters, pendingEncounters } = encounterSites;
   const [lastCombat, setLastCombat] = useState<LastCombat | null>(null);
   const connectionStatus = useConnectionStatus();
   const isOffline = connectionStatus !== 'connected';
@@ -266,6 +263,14 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   useEffect(() => {
     hpStateRef.current = hpState;
   }, [hpState]);
+  const activeZoneIdRef = useRef(activeZoneId);
+  useEffect(() => {
+    activeZoneIdRef.current = activeZoneId;
+  }, [activeZoneId]);
+  const setActiveZoneIdImmediate = useCallback((nextZoneId: string | null) => {
+    activeZoneIdRef.current = nextZoneId;
+    setActiveZoneId(nextZoneId);
+  }, []);
   const staminaStateRef = useRef(staminaState);
   useEffect(() => {
     staminaStateRef.current = staminaState;
@@ -277,6 +282,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
 
   const activeScreenRef = useRef(activeScreen);
   useEffect(() => { activeScreenRef.current = activeScreen; }, [activeScreen]);
+
+  const gathering = useGathering(isAuthenticated, activeScreen, activeZoneId);
+  const { loadGatheringNodes, setActiveGatheringSkill } = gathering;
+  const encounterSites = useEncounterSites(isAuthenticated, activeScreen, activeZoneId);
+  const { refreshPendingEncounters, pendingEncounters } = encounterSites;
 
   // Immediate fetch when navigating to a screen that needs HP/resources and values are below max
   useEffect(() => {
@@ -341,9 +351,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setCharacterProgression: (cp) => setCharacterProgression((prev) => ({ ...prev, ...cp })),
     setMaterialTotals,
     setActiveEncounterSiteId,
-    setActiveZoneId,
-  }), []);
-  // All useState setters are stable references, so empty deps is correct
+    setActiveZoneId: setActiveZoneIdImmediate,
+  }), [setActiveZoneIdImmediate]);
+  // State setters are stable; only the ref-synchronizing zone setter needs to stay in deps.
 
   const runAction = async (actionName: string, fn: () => Promise<void>) => {
     if (busyAction) return;
@@ -479,17 +489,25 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setZones(data.zones);
     setZoneConnections(data.connections);
     setUndiscoveredZones(data.undiscoveredZones ?? []);
-    setActiveZoneId(data.currentZoneId);
+    setActiveZoneIdImmediate(data.currentZoneId);
     if (data.currentZoneId) {
       getZoneEvents(data.currentZoneId).then((res) => {
         if (res.data) setActiveEvents(res.data.events);
       });
     }
-  }, []);
+  }, [setActiveZoneIdImmediate]);
 
-  const reloadZones = useCallback(async () => {
-    const zonesRes = await getZones();
-    if (zonesRes.data) applyZonesData(zonesRes.data);
+  const reloadZones = useCallback(async (options?: { expectedActiveZoneId?: string | null }) => {
+    const zonesRes = await getZones({ fresh: true });
+    if (!zonesRes.data) return;
+    if (
+      options
+      && 'expectedActiveZoneId' in options
+      && activeZoneIdRef.current !== options.expectedActiveZoneId
+    ) {
+      return;
+    }
+    applyZonesData(zonesRes.data);
   }, [applyZonesData]);
 
   const loadAll = useCallback(async () => {
@@ -654,7 +672,9 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     setLastCombat,
     setPlaybackActive,
     refreshPendingEncounters,
+    reloadZones,
     advanceTutorial,
+    activeZoneIdRef,
     activatePendingLootRef,
   });
   const {
@@ -756,11 +776,12 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       setZones(prev => prev.map(z => z.id === zoneId ? { ...z, exploration: { ...z.exploration, ...exploration, tiers: z.exploration?.tiers ?? null } } : z));
     },
     updateQuestProgress,
+    reloadZones,
   });
 
   const travelActions = useTravelActions({
     hpStateRef, activeZoneId, zones, zoneConnections,
-    runAction, pushLog, setTurns, setActiveZoneId, setActionError,
+    runAction, pushLog, setTurns, setActiveZoneId: setActiveZoneIdImmediate, setActionError,
     setPlaybackActive, stateSetters, advanceTutorial,
     refreshCraftingRecipes, loadAll,
     pendingLootSession: loot.pendingLootSession,

@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.51',
+    date: '2026-04-14',
+    title: 'Exploration Family Tracking',
+    summary:
+      'Exploration now supports mob family tracking. Once you have discovered a family in a zone, you can toggle tracking on the exploration screen and focus your runs toward that family for better material farming, such as hunting spiders for silk. Tracking still respects zone tier unlocks, keeps non-family outcomes like resources and exits in the pool, and lowers total combat and site yield so normal exploration remains better for broad progression. Zone data now refreshes more reliably after exploration, and tracking gracefully falls back to normal behavior if a saved selection no longer applies to your current tier.',
+  },
+  {
     version: '0.50',
     date: '2026-04-14',
     title: 'Guild Economy & Quest QoL',

@@ -17,9 +17,19 @@ export interface CombatActiveEvent {
   appliedToThisMob?: boolean;
 }
 
+export interface TrackableMobFamilyResponse {
+  mobFamilyId: string;
+  name: string;
+  minTier: number;
+}
+
 // Zones
 
-export async function getZones() {
+export async function getZones(options?: { fresh?: boolean }) {
+  const endpoint = options?.fresh
+    ? `/api/v1/zones?fresh=${Date.now()}`
+    : '/api/v1/zones';
+
   return fetchApi<{
     zones: Array<{
       id: string;
@@ -35,6 +45,7 @@ export async function getZones() {
       arrivalText: string | null;
       ambientTexts: Record<string, string> | null;
       environmentalTexts: Record<string, string> | null;
+      trackableMobFamilies?: TrackableMobFamilyResponse[];
       exploration: {
         turnsExplored: number;
         turnsToExplore: number | null;
@@ -45,7 +56,7 @@ export async function getZones() {
     connections: Array<{ fromId: string; toId: string; explorationThreshold: number }>;
     undiscoveredZones: Array<{ id: string; name: string; explorationThreshold: number; fromZoneId: string; discovered: false }>;
     currentZoneId: string;
-  }>('/api/v1/zones');
+  }>(endpoint, options?.fresh ? { cache: 'no-store' } : undefined);
 }
 
 export async function travelToZone(zoneId: string) {
@@ -91,7 +102,12 @@ export async function estimateExploration(turns: number) {
   }>(`/api/v1/exploration/estimate?turns=${turns}`);
 }
 
-export async function startExploration(zoneId: string, turns: number, tier?: number) {
+export async function startExploration(
+  zoneId: string,
+  turns: number,
+  tier?: number,
+  trackingFamilyId?: string,
+) {
   return fetchApi<{
     logId: string;
     zone: { id: string; name: string; difficulty: number };
@@ -138,7 +154,12 @@ export async function startExploration(zoneId: string, turns: number, tier?: num
     stateUpdates?: StateUpdates;
   }>('/api/v1/exploration/start', {
     method: 'POST',
-    body: JSON.stringify({ zoneId, turns, ...(tier !== undefined && { tier }) }),
+    body: JSON.stringify({
+      zoneId,
+      turns,
+      ...(tier !== undefined && { tier }),
+      ...(trackingFamilyId && { trackingFamilyId }),
+    }),
   });
 }
 

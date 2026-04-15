@@ -34,6 +34,7 @@ import { getIo } from '../socket';
 import { emitSystemMessage } from './systemMessageService';
 import { mapTemplateCombatLog } from './combatLogMapper';
 import { serializeXpGrant, toMobTemplate, calculateFleeWithGold, buildPveCombatOptions } from '../utils/routeHelpers.js';
+import { applyTrackedFamilyWeightBias } from './explorationTrackingService';
 import type { GrantXpResult } from './xpService';
 import type { PlayerProgressionState } from './attributesService';
 import type { EquipmentStats } from './equipmentService';
@@ -92,6 +93,7 @@ export interface ExplorationOutcomeContext {
     byFamily: Map<string, number>;
   };
   mobToFamilyMap: Map<string, string>;
+  trackingFamilyId: string | null;
   cachedZoneEvents: WorldEventData[];
   cachedWorldEvents: WorldEventData[];
   isTutorialExplore: boolean;
@@ -152,6 +154,7 @@ export async function processExplorationOutcomes(
     selectedTier,
     explorationProgress,
     spawnMods,
+    trackingFamilyId,
     cachedZoneEvents,
     cachedWorldEvents,
     isTutorialExplore,
@@ -190,6 +193,13 @@ export async function processExplorationOutcomes(
   let wasKnockedOut = false;
   let respawnedTo: { townId: string; townName: string } | null = null;
   let zoneExitDiscovered = false;
+
+  function familyHasTierEligibleMember(family: ZoneFamilyRow): boolean {
+    return family.mobFamily.members.some(
+      (member: ZoneFamilyMember) =>
+        member.mobTemplate.zoneId === zoneId && (member.mobTemplate.explorationTier ?? 1) <= selectedTier,
+    );
+  }
 
   for (const outcome of outcomes) {
     if (aborted) break;
@@ -235,8 +245,16 @@ export async function processExplorationOutcomes(
           }
           return weightMod !== 1 ? { ...c, encounterWeight: (c as { encounterWeight: number }).encounterWeight * weightMod } : c;
         });
+        const trackedWeightedCandidates = applyTrackedFamilyWeightBias(
+          weightedCandidates.map((c) => ({
+            ...c,
+            mobFamilyId: ctx.mobToFamilyMap.get((c as { id: string }).id) ?? '',
+          })) as Array<(typeof weightedCandidates)[number] & { mobFamilyId: string }>,
+          trackingFamilyId,
+          'encounterWeight',
+        );
 
-        const mob = pickWeighted(weightedCandidates, 'encounterWeight') as typeof candidates[number] | null;
+        const mob = pickWeighted(trackedWeightedCandidates, 'encounterWeight') as typeof candidates[number] | null;
         if (!mob) continue;
 
         baseMob = toMobTemplate(mob as Parameters<typeof toMobTemplate>[0]);
@@ -477,11 +495,44 @@ export async function processExplorationOutcomes(
         ...f,
         discoveryWeight: f.discoveryWeight * (spawnMods.byFamily.get(f.mobFamilyId) ?? 1) * spawnMods.global,
       }));
-      const pickedFamily = pickWeighted(adjustedFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
+      const eligibleFamilies = adjustedFamilies.filter((family) => familyHasTierEligibleMember(family));
+      if (eligibleFamilies.length === 0) continue;
+
+      const trackedFamilyHasEligibleMembers = trackingFamilyId
+        ? eligibleFamilies.some((family) => family.mobFamilyId === trackingFamilyId)
+        : false;
+      const weightedFamilies = trackedFamilyHasEligibleMembers
+        ? applyTrackedFamilyWeightBias(eligibleFamilies, trackingFamilyId, 'discoveryWeight')
+        : eligibleFamilies;
+      let pickedFamily = pickWeighted(weightedFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
       if (!pickedFamily) continue;
 
-      const size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);
-      const mobs = buildEncounterSiteMobs(pickedFamily.mobFamily, size, zoneId, explorationProgress.percent, zoneTiers, selectedTier);
+      let size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);
+      let mobs = buildEncounterSiteMobs(
+        pickedFamily.mobFamily,
+        size,
+        zoneId,
+        explorationProgress.percent,
+        zoneTiers,
+        selectedTier,
+      );
+
+      if (mobs.length === 0 && trackingFamilyId && pickedFamily.mobFamilyId === trackingFamilyId) {
+        const fallbackFamilies = eligibleFamilies.filter((family) => family.mobFamilyId !== trackingFamilyId);
+        pickedFamily = pickWeighted(fallbackFamilies, 'discoveryWeight') as ZoneFamilyRow | null;
+        if (!pickedFamily) continue;
+
+        size = pickEncounterSize(pickedFamily.minSize, pickedFamily.maxSize);
+        mobs = buildEncounterSiteMobs(
+          pickedFamily.mobFamily,
+          size,
+          zoneId,
+          explorationProgress.percent,
+          zoneTiers,
+          selectedTier,
+        );
+      }
+
       if (mobs.length === 0) continue;
 
       const siteName = getSiteName(pickedFamily.mobFamily.name, size, pickedFamily.mobFamily);

@@ -8,8 +8,8 @@ import { KnockoutBanner } from '@/components/KnockoutBanner';
 import { ActivityLockBanner } from '@/components/common/ActivityLockBanner';
 import { ResourceStatusBar } from '../common/ResourceStatusBar';
 import { LowHpWarningDialog } from '../common/LowHpWarningDialog';
-import { Loader2, Mountain, Play } from 'lucide-react';
-import { EXPLORATION_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@pocketrealm/shared';
+import { Info, Loader2, Mountain, Play } from 'lucide-react';
+import { EXPLORATION_CONSTANTS, EXPLORATION_TRACKING_CONSTANTS, HP_CONSTANTS, getUnlockedTiers, getTierName } from '@pocketrealm/shared';
 import { effectiveTurns as calcEffectiveTurns } from '@/lib/taxCalc';
 import { XpRateBadge } from '@/components/common/XpRateBadge';
 import { TurnPresets } from '@/components/common/TurnPresets';
@@ -21,6 +21,7 @@ import type { ActivityLogEntry, BestiarySkipEntry } from '@/app/game/gameControl
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { ScreenContainer } from '../common/ScreenContainer';
 import { getNpcLine, NPC_DIALOGUE_CONSTANTS } from '@pocketrealm/shared';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 
 interface ExplorationProps {
   currentZone: {
@@ -35,8 +36,9 @@ interface ExplorationProps {
     percent: number;
     tiers: Record<string, number> | null;
   } | null;
+  trackableMobFamilies?: Array<{ mobFamilyId: string; name: string; minTier: number }>;
   availableTurns: number;
-  onStartExploration: (turns: number, tier?: number) => void;
+  onStartExploration: (turns: number, tier?: number, trackingFamilyId?: string) => void;
   activityLog: ActivityLogEntry[];
   isRecovering?: boolean;
   isOverEncumbered?: boolean;
@@ -81,7 +83,7 @@ interface ExplorationProps {
   combatXpRate?: { skillName: string; rate: number };
 }
 
-export function Exploration({ currentZone, explorationProgress, availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, isActivityLocked = false, activityLockReason, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, isOffline, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
+export function Exploration({ currentZone, explorationProgress, trackableMobFamilies = [], availableTurns, onStartExploration, activityLog, isRecovering = false, isOverEncumbered = false, isActivityLocked = false, activityLockReason, recoveryCost, currentHp, maxHp, currentStamina, maxStamina, currentMana, maxMana, regenPerSecond, staminaRegenPerSecond, manaRegenPerSecond, playbackData, onPlaybackComplete, onPlaybackSkip, onPushLog, combatSpeedMs, explorationSpeedMs, autoSkipKnownCombat, bestiaryMobs, defaultTurns, tutorialLocked = false, lowHpWarning, onQuickRest, quickRestPercent, busyAction, isOffline, onNavigateToRest, guildTaxRate = 0, combatLogPrefetch, combatXpRate }: ExplorationProps) {
   const strangerLineRef = useRef<string | null>(null);
   const prevPlaybackDataRef = useRef(playbackData);
 
@@ -97,6 +99,9 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
   const [turnInvestment, setTurnInvestment] = useState([tutorialLocked ? 100 : Math.min(defaultTurns ?? 100, availableTurns)]);
   const [showLowHpWarning, setShowLowHpWarning] = useState(false);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
+  const [trackingEnabled, setTrackingEnabled] = useState(false);
+  const [selectedTrackingFamilyId, setSelectedTrackingFamilyId] = useState<string | null>(null);
+  const [trackingInfoOpen, setTrackingInfoOpen] = useState(false);
 
   const unlockedTierNumbers = getUnlockedTiers(
     explorationProgress?.percent ?? 0,
@@ -110,10 +115,21 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
     ? unlockedTierNumbers[unlockedTierNumbers.length - 1]!
     : null;
   const effectiveSelectedTier = selectedTier ?? maxUnlockedTier;
+  const trackingSelectedTier = maxUnlockedTier;
+  const availableTrackingFamilies = trackableMobFamilies.filter((family) =>
+    trackingSelectedTier == null || family.minTier <= trackingSelectedTier,
+  );
+  const activeTrackingFamilyId = trackingEnabled && selectedTrackingFamilyId
+    && availableTrackingFamilies.some((family) => family.mobFamilyId === selectedTrackingFamilyId)
+      ? selectedTrackingFamilyId
+      : null;
 
   const calculateProbabilities = (turns: number) => {
-    const expectedAmbushes = turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN;
-    const expectedSites = turns * EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN;
+    const trackedResultRateMultiplier = activeTrackingFamilyId
+      ? EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER
+      : 1;
+    const expectedAmbushes = turns * EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * trackedResultRateMultiplier;
+    const expectedSites = turns * EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN * trackedResultRateMultiplier;
     const expectedResources = turns * EXPLORATION_CONSTANTS.RESOURCE_NODE_CHANCE;
     // Cumulative probability of at least one hidden cache: 1 - (1 - p)^n
     const hiddenCacheChance = Math.min(
@@ -126,6 +142,34 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
   const effective = calcEffectiveTurns(turnInvestment[0], guildTaxRate);
   const { expectedAmbushes, expectedSites, expectedResources, hiddenCacheChance } = calculateProbabilities(effective);
 
+  useEffect(() => {
+    if (selectedTier == null) return;
+    if (unlockedTierNumbers.includes(selectedTier)) return;
+    setSelectedTier(null);
+  }, [selectedTier, unlockedTierNumbers]);
+
+  useEffect(() => {
+    if (tutorialLocked || trackableMobFamilies.length === 0 || availableTrackingFamilies.length === 0) {
+      setTrackingEnabled(false);
+      setSelectedTrackingFamilyId(null);
+      return;
+    }
+
+    setSelectedTrackingFamilyId((prev) =>
+      prev && availableTrackingFamilies.some((family) => family.mobFamilyId === prev)
+        ? prev
+        : availableTrackingFamilies[0]!.mobFamilyId,
+    );
+  }, [availableTrackingFamilies, trackableMobFamilies.length, tutorialLocked]);
+
+  const startExplorationRun = () => {
+    onStartExploration(
+      turnInvestment[0],
+      activeTrackingFamilyId ? trackingSelectedTier ?? undefined : effectiveSelectedTier ?? undefined,
+      activeTrackingFamilyId ?? undefined,
+    );
+  };
+
   return (
     <ScreenContainer>
       {/* Low HP Warning Dialog */}
@@ -135,7 +179,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           maxHp={maxHp}
           onProceed={() => {
             setShowLowHpWarning(false);
-            onStartExploration(turnInvestment[0], effectiveSelectedTier ?? undefined);
+            startExplorationRun();
           }}
           onCancel={() => setShowLowHpWarning(false)}
         />
@@ -263,21 +307,22 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
           )}
 
           {/* Tier Selector */}
-          {unlockedTiers.length > 1 && !tutorialLocked && (
+          {unlockedTiers.length > 1 && !tutorialLocked && !trackingEnabled && (
             <PixelCard>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Exploration Tier</h3>
-                  {effectiveSelectedTier !== maxUnlockedTier && (
+                  {effectiveSelectedTier !== maxUnlockedTier ? (
                     <span className="text-xs text-[var(--rpg-text-secondary)]">
                       No exploration progress at this tier
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 <div className="flex gap-2">
                   {unlockedTiers.map(({ tier }) => (
                     <button
                       key={tier}
+                      type="button"
                       onClick={() => setSelectedTier(tier)}
                       className={`flex-1 px-3 py-1.5 text-sm rounded border transition-colors ${
                         (effectiveSelectedTier === tier)
@@ -289,6 +334,92 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
                     </button>
                   ))}
                 </div>
+              </div>
+            </PixelCard>
+          )}
+
+          {!tutorialLocked && (
+            <PixelCard>
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="relative">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm text-[var(--rpg-text-primary)]">Tracking</h3>
+                      <button
+                        type="button"
+                        aria-label="Tracking info"
+                        aria-expanded={trackingInfoOpen}
+                        onFocus={() => setTrackingInfoOpen(true)}
+                        onBlur={() => setTrackingInfoOpen(false)}
+                        onMouseEnter={() => setTrackingInfoOpen(true)}
+                        onMouseLeave={() => setTrackingInfoOpen(false)}
+                        className="rounded-full text-[var(--rpg-text-secondary)] transition-colors hover:text-[var(--rpg-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rpg-gold)]"
+                      >
+                        <Info size={14} />
+                      </button>
+                    </div>
+                    {trackingInfoOpen ? (
+                      <div className="absolute left-0 top-full z-10 mt-2 w-64 rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] p-3 shadow-lg">
+                        <p className="text-xs text-[var(--rpg-text-secondary)]">
+                          Reduce total yield to bias ambushes and sites toward one discovered mob family.
+                        </p>
+                        <p className="mt-2 text-xs text-[var(--rpg-text-secondary)] opacity-70">
+                          Tracking never bypasses unlocked tiers, and non-family outcomes still remain.
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                  <ToggleSwitch
+                    checked={trackingEnabled}
+                    disabled={availableTrackingFamilies.length === 0}
+                    ariaLabel={trackingEnabled ? 'Disable tracking' : 'Enable tracking'}
+                    onChange={(checked) => {
+                      setTrackingEnabled(checked);
+                      if (checked) {
+                        setSelectedTrackingFamilyId((prev) => prev ?? availableTrackingFamilies[0]?.mobFamilyId ?? null);
+                      }
+                    }}
+                  />
+                </div>
+
+                {trackableMobFamilies.length === 0 ? (
+                  <p className="text-xs text-[var(--rpg-text-secondary)]">
+                    Discover a mob family in this zone before you can track it.
+                  </p>
+                ) : availableTrackingFamilies.length === 0 ? (
+                  <p className="text-xs text-[var(--rpg-text-secondary)]">
+                    No discovered families can be tracked with your unlocked tiers yet.
+                  </p>
+                ) : trackingEnabled ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-[var(--rpg-text-secondary)]">Focus on a discovered family:</p>
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="Tracking family">
+                      {availableTrackingFamilies.map((family) => {
+                        const isSelected = selectedTrackingFamilyId === family.mobFamilyId;
+                        return (
+                          <button
+                            key={family.mobFamilyId}
+                            type="button"
+                            aria-label={`Track ${family.name}`}
+                            aria-pressed={isSelected}
+                            onClick={() => setSelectedTrackingFamilyId(family.mobFamilyId)}
+                            className={`px-3 py-1.5 text-sm rounded border transition-colors ${
+                              isSelected
+                                ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)] border-[var(--rpg-gold)] font-bold'
+                                : 'bg-[var(--rpg-background)] text-[var(--rpg-text-secondary)] border-[var(--rpg-border)] hover:border-[var(--rpg-gold)]'
+                            }`}
+                          >
+                            {family.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--rpg-text-secondary)]">
+                    Tracking is off. Exploration keeps its normal family spread.
+                  </p>
+                )}
               </div>
             </PixelCard>
           )}
@@ -390,7 +521,7 @@ export function Exploration({ currentZone, explorationProgress, availableTurns, 
               ) {
                 setShowLowHpWarning(true);
               } else {
-                onStartExploration(turnInvestment[0], effectiveSelectedTier ?? undefined);
+                startExplorationRun();
               }
             }}
             disabled={isRecovering || isOverEncumbered || isActivityLocked || turnInvestment[0] > availableTurns || !!busyAction || isOffline}

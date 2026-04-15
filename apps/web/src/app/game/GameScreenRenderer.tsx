@@ -272,6 +272,7 @@ export function GameScreenRenderer({
             percent: currentZone.exploration.percent,
             tiers: currentZone.exploration.tiers,
           } : null}
+          trackableMobFamilies={currentZone?.trackableMobFamilies ?? []}
           availableTurns={turns}
           onStartExploration={handleStartExploration}
           activityLog={activityLog}

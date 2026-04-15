@@ -39,6 +39,7 @@ interface UseExplorationActionsParams {
   activatePendingLoot: (sessionId: string) => Promise<void>;
   updateZoneExploration: (zoneId: string, exploration: { turnsExplored: number; percent: number; turnsToExplore: number | null }) => void;
   updateQuestProgress: (updates?: QuestProgressUpdate[]) => void;
+  reloadZones: (options?: { expectedActiveZoneId?: string | null }) => Promise<void>;
 }
 
 export function useExplorationActions({
@@ -58,6 +59,7 @@ export function useExplorationActions({
   activatePendingLoot,
   updateZoneExploration,
   updateQuestProgress,
+  reloadZones,
 }: UseExplorationActionsParams) {
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<ExplorationPlaybackData | null>(null);
 
@@ -93,6 +95,7 @@ export function useExplorationActions({
   const finalizeExplorationPlayback = async () => {
     const pendingIds = explorationPlaybackData?.pendingLootSessionIds;
     const savedStateUpdates = explorationPlaybackData?.stateUpdates;
+    const expectedActiveZoneId = currentZone?.id ?? null;
 
     if (explorationPlaybackData) {
       trackEvent('action', {
@@ -107,19 +110,24 @@ export function useExplorationActions({
     setPlaybackActive(false);
     await advanceTutorial(TUTORIAL_STEP_EXPLORE);
     applyStateUpdates(savedStateUpdates, stateSetters);
+    await reloadZones({ expectedActiveZoneId }).catch(() => undefined);
     if (pendingIds?.length) {
       pendingLootQueueRef.current = pendingIds.slice(1);
       await activatePendingLoot(pendingIds[0]);
     }
   };
 
-  const handleStartExploration = async (turnSpend: number, tier?: number) => {
+  const handleStartExploration = async (
+    turnSpend: number,
+    tier?: number,
+    trackingFamilyId?: string,
+  ) => {
     if (!currentZone) return;
 
     await runAction('exploration', async () => {
       const hpBefore = hpStateRef.current.currentHp;
       const maxHpBefore = hpStateRef.current.maxHp;
-      const res = await startExploration(currentZone.id, turnSpend, tier);
+      const res = await startExploration(currentZone.id, turnSpend, tier, trackingFamilyId);
       const data = res.data;
       if (!data) {
         setActionError(res.error?.message ?? 'Exploration failed');

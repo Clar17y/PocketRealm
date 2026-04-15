@@ -11,6 +11,7 @@ import {
   getHighestUnlockedTier,
   type PotionConsumed,
   type QuestProgressUpdate,
+  EXPLORATION_TRACKING_CONSTANTS,
   TUTORIAL_STEP_EXPLORE,
 } from '@pocketrealm/shared';
 import { AppError } from '../../middleware/errorHandler';
@@ -37,6 +38,7 @@ import {
   getCachedResourceNodesByZone,
   getCachedZoneMobFamilies,
 } from '../../services/staticDataCacheService';
+import { buildTrackableMobFamiliesByZone } from '../../services/explorationTrackingService';
 import { processExplorationOutcomes } from '../../services/explorationOutcomeService';
 import { persistExplorationResults } from '../../services/explorationPersistenceService';
 import {
@@ -46,6 +48,16 @@ import {
 
 
 export const startRouter = Router();
+
+function familyHasEligibleMembersForTier(
+  family: ZoneFamilyRow,
+  zoneId: string,
+  selectedTier: number,
+): boolean {
+  return family.mobFamily.members.some((member) =>
+    member.mobTemplate.zoneId === zoneId && (member.mobTemplate.explorationTier ?? 1) <= selectedTier,
+  );
+}
 
 
 /**
@@ -68,6 +80,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     if (!validation.valid) {
       throw new AppError(400, validation.error ?? 'Invalid turns', 'INVALID_TURNS');
     }
+
+    const playerRecord = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { tutorialStep: true },
+    });
+    const isTutorialExplore = playerRecord?.tutorialStep === TUTORIAL_STEP_EXPLORE;
+    const trackingFamilyId = isTutorialExplore ? null : body.trackingFamilyId ?? null;
+    let effectiveTrackingFamilyId = trackingFamilyId;
 
     const zone = await prisma.zone.findUnique({ where: { id: body.zoneId } });
     if (!zone) {
@@ -101,10 +121,23 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     // Determine unlocked tiers and selected tier
     const unlockedTiers = getUnlockedTiers(explorationProgress.percent, zoneTiers);
     const maxUnlockedTier = getHighestUnlockedTier(explorationProgress.percent, zoneTiers);
-    const selectedTier = body.tier ?? maxUnlockedTier;
+    const selectedTier = trackingFamilyId ? maxUnlockedTier : (body.tier ?? maxUnlockedTier);
 
-    if (body.tier !== undefined && !unlockedTiers.includes(selectedTier)) {
+    if (!trackingFamilyId && body.tier !== undefined && !unlockedTiers.includes(selectedTier)) {
       throw new AppError(400, `Tier ${selectedTier} is not unlocked. Max unlocked: ${maxUnlockedTier}`, 'INVALID_TIER');
+    }
+
+    if (trackingFamilyId) {
+      const trackableFamiliesByZone = await buildTrackableMobFamiliesByZone(playerId, [body.zoneId]);
+      const unlockedFamilies = trackableFamiliesByZone.get(body.zoneId) ?? [];
+      if (!unlockedFamilies.some((family) => family.mobFamilyId === trackingFamilyId)) {
+        throw new AppError(400, 'That mob family is not unlocked for tracking in this zone.', 'INVALID_TRACKING_FAMILY');
+      }
+
+      const trackingFamily = zoneFamilies.find((family) => family.mobFamilyId === trackingFamilyId);
+      if (!trackingFamily || !familyHasEligibleMembersForTier(trackingFamily, body.zoneId, selectedTier)) {
+        effectiveTrackingFamilyId = null;
+      }
     }
 
     const undiscoveredNeighbors = await getUndiscoveredNeighborZones(playerId, body.zoneId);
@@ -142,12 +175,6 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     }
 
     // Tutorial detection
-    const playerRecord = await prisma.player.findUnique({
-      where: { id: playerId },
-      select: { tutorialStep: true },
-    });
-    const isTutorialExplore = playerRecord?.tutorialStep === TUTORIAL_STEP_EXPLORE;
-
     // Tutorial explore step: force 100 turns and a single guaranteed ambush
     const turnsToSpend = isTutorialExplore ? 100 : body.turns;
 
@@ -170,6 +197,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         return sum + f.discoveryWeight * familyMod * spawnMods.global;
       }, 0);
       spawnRateMultiplier = baseTotal > 0 ? adjustedTotal / baseTotal : 1;
+    }
+    if (effectiveTrackingFamilyId) {
+      spawnRateMultiplier *= EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER;
     }
 
     const outcomes = isTutorialExplore
@@ -197,6 +227,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
         zoneModifiers,
         spawnMods,
         mobToFamilyMap,
+        trackingFamilyId: effectiveTrackingFamilyId,
         cachedZoneEvents,
         cachedWorldEvents,
         isTutorialExplore,

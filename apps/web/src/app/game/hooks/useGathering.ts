@@ -8,12 +8,12 @@ type GatheringNode = GatheringNodesResponse['nodes'][number];
 type GatheringPagination = GatheringNodesResponse['pagination'];
 type GatheringFilters = GatheringNodesResponse['filters'];
 
-export function useGathering(isAuthenticated: boolean, activeScreen: Screen) {
+export function useGathering(isAuthenticated: boolean, activeScreen: Screen, currentZoneId: string | null) {
   const [gatheringNodes, setGatheringNodes] = useState<GatheringNode[]>([]);
   const [gatheringLoading, setGatheringLoading] = useState(false);
   const [gatheringError, setGatheringError] = useState<string | null>(null);
   const [gatheringPage, setGatheringPage] = useState(1);
-  const [gatheringZoneFilter, setGatheringZoneFilter] = useState('all');
+  const [gatheringZoneFilter, setGatheringZoneFilter] = useState(() => currentZoneId ?? 'all');
   const [gatheringResourceTypeFilter, setGatheringResourceTypeFilter] = useState('all');
   const [activeGatheringSkill, setActiveGatheringSkill] = useState<'mining' | 'foraging' | 'woodcutting'>('mining');
   const [gatheringPagination, setGatheringPagination] = useState<GatheringPagination>({
@@ -66,6 +66,15 @@ export function useGathering(isAuthenticated: boolean, activeScreen: Screen) {
     if (activeScreen !== 'gathering') return;
     void loadGatheringNodes();
   }, [isAuthenticated, activeScreen, loadGatheringNodes]);
+
+  useEffect(() => {
+    const nextZoneFilter = currentZoneId ?? 'all';
+    setGatheringZoneFilter((prev) => {
+      if (prev === nextZoneFilter) return prev;
+      setGatheringPage(1);
+      return nextZoneFilter;
+    });
+  }, [currentZoneId]);
 
   const handleGatheringPageChange = useCallback((page: number) => {
     setGatheringPage(page);
