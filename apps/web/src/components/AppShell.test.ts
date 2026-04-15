@@ -88,4 +88,28 @@ describe('AppShell', () => {
     expect(onSettings).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('menu')).toBeNull();
   });
+
+  it('closes the username dropdown before opening mail from the header button', () => {
+    const onMailClick = vi.fn();
+
+    render(
+      React.createElement(
+        AppShell,
+        {
+          username: 'Rook',
+          mailUnreadCount: 3,
+          onMailClick,
+          onLogout: vi.fn(),
+          onWhatsNew: vi.fn(),
+        },
+        React.createElement('div', null, 'Child'),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Rook/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mail (3 unread)' }));
+
+    expect(onMailClick).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
 });

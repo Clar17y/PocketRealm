@@ -45,7 +45,11 @@ export function AppShell({ children, turns = 0, username, mailUnreadCount = 0, o
             </div>
             {onMailClick && (
               <button
-                onClick={onMailClick}
+                type="button"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  onMailClick();
+                }}
                 className="relative text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)] transition-colors"
                 aria-label={`Mail${mailUnreadCount > 0 ? ` (${mailUnreadCount} unread)` : ''}`}
               >
