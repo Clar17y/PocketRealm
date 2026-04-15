@@ -253,12 +253,15 @@ import { buildTrackableMobFamiliesByZone } from '../../services/explorationTrack
 import { processExplorationOutcomes, type ExplorationOutcomeContext } from '../../services/explorationOutcomeService';
 import { simulateExploration } from '@pocketrealm/game-engine';
 import { EXPLORATION_TRACKING_CONSTANTS, TUTORIAL_STEP_EXPLORE } from '@pocketrealm/shared';
+import { addExplorationTurns, getExplorationPercent } from '../../services/zoneExplorationService';
 
 const mockBuildTrackableMobFamiliesByZone = buildTrackableMobFamiliesByZone as ReturnType<typeof vi.fn>;
 const mockBuildEncounterSiteMobs = buildEncounterSiteMobs as ReturnType<typeof vi.fn>;
 const mockGetCachedZoneMobFamilies = getCachedZoneMobFamilies as ReturnType<typeof vi.fn>;
 const mockProcessExplorationOutcomes = processExplorationOutcomes as ReturnType<typeof vi.fn>;
 const mockSimulateExploration = simulateExploration as ReturnType<typeof vi.fn>;
+const mockAddExplorationTurns = addExplorationTurns as ReturnType<typeof vi.fn>;
+const mockGetExplorationPercent = getExplorationPercent as ReturnType<typeof vi.fn>;
 
 function findHandler(method: string, path: string) {
   const layer = (startRouter as any).stack.find(
@@ -533,7 +536,7 @@ describe('POST /exploration/start tracking contract', () => {
     );
   });
 
-  it('still rejects tiers above the unlocked maximum when tracking is requested', async () => {
+  it('ignores a submitted tier while tracking and uses the highest unlocked tier for progression', async () => {
     mockPrisma.zone.findUnique.mockResolvedValue({
       id: ZONE_ID,
       name: 'Test Zone',
@@ -542,13 +545,62 @@ describe('POST /exploration/start tracking contract', () => {
       zoneExitChance: 0.01,
       explorationTiers: { '1': 0, '2': 25, '3': 50 },
     });
+    mockBuildTrackableMobFamiliesByZone.mockResolvedValue(new Map([
+      [ZONE_ID, [{ mobFamilyId: '22222222-2222-2222-2222-222222222222', name: 'Spiders' }]],
+    ]));
+    mockGetCachedZoneMobFamilies.mockResolvedValue([
+      {
+        zoneId: ZONE_ID,
+        mobFamilyId: '22222222-2222-2222-2222-222222222222',
+        discoveryWeight: 100,
+        minSize: 'small',
+        maxSize: 'small',
+        mobFamily: {
+          id: '22222222-2222-2222-2222-222222222222',
+          name: 'Spiders',
+          siteNounSmall: 'Nest',
+          siteNounMedium: 'Nest',
+          siteNounLarge: 'Nest',
+          members: [
+            {
+              role: 'trash',
+              mobTemplate: {
+                id: 'spider-basic',
+                name: 'Spiderling',
+                zoneId: ZONE_ID,
+                explorationTier: 1,
+              },
+            },
+            {
+              role: 'elite',
+              mobTemplate: {
+                id: 'spider-elite',
+                name: 'Elite Spider',
+                zoneId: ZONE_ID,
+                explorationTier: 3,
+              },
+            },
+          ],
+        },
+      },
+    ]);
+    mockGetExplorationPercent.mockResolvedValueOnce({
+      turnsExplored: 5000,
+      percent: 50,
+      turnsToExplore: 10000,
+    });
+    mockGetExplorationPercent.mockResolvedValueOnce({
+      turnsExplored: 5500,
+      percent: 55,
+      turnsToExplore: 10000,
+    });
 
     const req = {
       player: { playerId: 'p1', username: 'TestPlayer' },
       body: {
         zoneId: ZONE_ID,
         turns: 500,
-        tier: 3,
+        tier: 1,
         trackingFamilyId: '22222222-2222-2222-2222-222222222222',
       },
     } as any;
@@ -558,13 +610,28 @@ describe('POST /exploration/start tracking contract', () => {
     const handler = findHandler('post', '/start');
     await handler(req, res, next);
 
-    expect(next).toHaveBeenCalledWith(
+    expect(next).not.toHaveBeenCalled();
+    expect(mockProcessExplorationOutcomes).toHaveBeenCalledWith(
       expect.objectContaining({
-        statusCode: 400,
-        code: 'INVALID_TIER',
+        selectedTier: 3,
+        trackingFamilyId: '22222222-2222-2222-2222-222222222222',
+      }),
+      expect.any(Array),
+    );
+    expect(mockAddExplorationTurns).toHaveBeenCalledWith(
+      'p1',
+      ZONE_ID,
+      500,
+      expect.objectContaining({
+        currentTurnsExplored: 5000,
+        turnsToExplore: 10000,
       }),
     );
-    expect(mockBuildTrackableMobFamiliesByZone).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      explorationProgress: expect.objectContaining({
+        turnsExplored: 5500,
+      }),
+    }));
   });
 
   it('falls back to normal exploration when the selected family cannot affect the current tier', async () => {

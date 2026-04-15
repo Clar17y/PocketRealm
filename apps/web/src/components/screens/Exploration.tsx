@@ -115,8 +115,9 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
     ? unlockedTierNumbers[unlockedTierNumbers.length - 1]!
     : null;
   const effectiveSelectedTier = selectedTier ?? maxUnlockedTier;
+  const trackingSelectedTier = maxUnlockedTier;
   const availableTrackingFamilies = trackableMobFamilies.filter((family) =>
-    effectiveSelectedTier == null || family.minTier <= effectiveSelectedTier,
+    trackingSelectedTier == null || family.minTier <= trackingSelectedTier,
   );
   const activeTrackingFamilyId = trackingEnabled && selectedTrackingFamilyId
     && availableTrackingFamilies.some((family) => family.mobFamilyId === selectedTrackingFamilyId)
@@ -164,7 +165,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
   const startExplorationRun = () => {
     onStartExploration(
       turnInvestment[0],
-      effectiveSelectedTier ?? undefined,
+      activeTrackingFamilyId ? trackingSelectedTier ?? undefined : effectiveSelectedTier ?? undefined,
       activeTrackingFamilyId ?? undefined,
     );
   };
@@ -306,7 +307,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
           )}
 
           {/* Tier Selector */}
-          {unlockedTiers.length > 1 && !tutorialLocked && (
+          {unlockedTiers.length > 1 && !tutorialLocked && !trackingEnabled && (
             <PixelCard>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
@@ -387,7 +388,7 @@ export function Exploration({ currentZone, explorationProgress, trackableMobFami
                   </p>
                 ) : availableTrackingFamilies.length === 0 ? (
                   <p className="text-xs text-[var(--rpg-text-secondary)]">
-                    No discovered families can be tracked at this tier.
+                    No discovered families can be tracked with your unlocked tiers yet.
                   </p>
                 ) : trackingEnabled ? (
                   <div className="space-y-2">

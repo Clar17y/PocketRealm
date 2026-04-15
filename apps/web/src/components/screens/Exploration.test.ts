@@ -81,7 +81,7 @@ describe('Exploration', () => {
     expect(onStartExploration).toHaveBeenCalledWith(100, 2, 'family-spider');
   });
 
-  it('keeps lower-tier tracking valid while filtering out families locked behind a higher tier', () => {
+  it('hides tier selection while tracking and always uses the highest unlocked tier', () => {
     const { onStartExploration } = renderExploration({
       trackableMobFamilies: [
         { mobFamilyId: 'family-wolf', name: 'Wolves', minTier: 1 },
@@ -91,11 +91,14 @@ describe('Exploration', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Outskirts' }));
     fireEvent.click(screen.getByRole('button', { name: 'Enable tracking' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Track Spiders' }));
 
-    expect(screen.queryByRole('button', { name: 'Track Spiders' })).toBeNull();
+    expect(screen.queryByText('Exploration Tier')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Track Spiders' }).getAttribute('aria-pressed')).toBe('true');
+
     fireEvent.click(screen.getByRole('button', { name: 'Start Exploration' }));
 
-    expect(onStartExploration).toHaveBeenCalledWith(100, 1, 'family-wolf');
+    expect(onStartExploration).toHaveBeenCalledWith(100, 2, 'family-spider');
   });
 
   it('drops an invalid selected tier after the zone tier set changes', () => {

@@ -121,9 +121,9 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
     // Determine unlocked tiers and selected tier
     const unlockedTiers = getUnlockedTiers(explorationProgress.percent, zoneTiers);
     const maxUnlockedTier = getHighestUnlockedTier(explorationProgress.percent, zoneTiers);
-    const selectedTier = body.tier ?? maxUnlockedTier;
+    const selectedTier = trackingFamilyId ? maxUnlockedTier : (body.tier ?? maxUnlockedTier);
 
-    if (body.tier !== undefined && !unlockedTiers.includes(selectedTier)) {
+    if (!trackingFamilyId && body.tier !== undefined && !unlockedTiers.includes(selectedTier)) {
       throw new AppError(400, `Tier ${selectedTier} is not unlocked. Max unlocked: ${maxUnlockedTier}`, 'INVALID_TIER');
     }
 
