@@ -168,8 +168,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
       };
     };
   }>>([]);
-  const gathering = useGathering(isAuthenticated, activeScreen);
-  const { loadGatheringNodes, setActiveGatheringSkill } = gathering;
   const [zoneCraftingLevel, setZoneCraftingLevel] = useState<number | null>(0);
   const [zoneCraftingName, setZoneCraftingName] = useState<string | null>(null);
   const [craftingRecipes, setCraftingRecipes] = useState<Array<{
@@ -189,8 +187,6 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
   }>>([]);
   const [activeCraftingSkill, setActiveCraftingSkill] = useState<'refining' | 'tanning' | 'weaving' | 'weaponsmithing' | 'armorsmithing' | 'leatherworking' | 'tailoring' | 'alchemy' | 'jewelcrafting'>('weaponsmithing');
   const { activityLog, setActivityLog, pushLog } = useActivityLog();
-  const encounterSites = useEncounterSites(isAuthenticated, activeScreen);
-  const { refreshPendingEncounters, pendingEncounters } = encounterSites;
   const [lastCombat, setLastCombat] = useState<LastCombat | null>(null);
   const connectionStatus = useConnectionStatus();
   const isOffline = connectionStatus !== 'connected';
@@ -745,6 +741,11 @@ export function useGameController({ isAuthenticated }: { isAuthenticated: boolea
     zones.find((z) => z.discovered) ??
     zones.find((z) => z.isStarter) ??
     null, [zones, activeZoneId]);
+
+  const gathering = useGathering(isAuthenticated, activeScreen, activeZoneId);
+  const { loadGatheringNodes, setActiveGatheringSkill } = gathering;
+  const encounterSites = useEncounterSites(isAuthenticated, activeScreen, activeZoneId);
+  const { refreshPendingEncounters, pendingEncounters } = encounterSites;
 
   const ownedByTemplateId = useMemo(() => {
     const map = new Map<string, number>();
