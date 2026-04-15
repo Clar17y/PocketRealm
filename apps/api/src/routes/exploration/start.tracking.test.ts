@@ -254,6 +254,7 @@ import { processExplorationOutcomes, type ExplorationOutcomeContext } from '../.
 import { simulateExploration } from '@pocketrealm/game-engine';
 import { EXPLORATION_TRACKING_CONSTANTS, TUTORIAL_STEP_EXPLORE } from '@pocketrealm/shared';
 import { addExplorationTurns, getExplorationPercent } from '../../services/zoneExplorationService';
+import { getUndiscoveredNeighborZones } from '../../services/zoneDiscoveryService';
 
 const mockBuildTrackableMobFamiliesByZone = buildTrackableMobFamiliesByZone as ReturnType<typeof vi.fn>;
 const mockBuildEncounterSiteMobs = buildEncounterSiteMobs as ReturnType<typeof vi.fn>;
@@ -262,6 +263,7 @@ const mockProcessExplorationOutcomes = processExplorationOutcomes as ReturnType<
 const mockSimulateExploration = simulateExploration as ReturnType<typeof vi.fn>;
 const mockAddExplorationTurns = addExplorationTurns as ReturnType<typeof vi.fn>;
 const mockGetExplorationPercent = getExplorationPercent as ReturnType<typeof vi.fn>;
+const mockGetUndiscoveredNeighborZones = getUndiscoveredNeighborZones as ReturnType<typeof vi.fn>;
 
 function findHandler(method: string, path: string) {
   const layer = (startRouter as any).stack.find(
@@ -424,6 +426,7 @@ describe('POST /exploration/start tracking contract', () => {
       },
     ]));
     mockGetCachedZoneMobFamilies.mockResolvedValue([]);
+    mockGetUndiscoveredNeighborZones.mockResolvedValue([]);
     mockProcessExplorationOutcomes.mockResolvedValue({
       events: [],
       pendingResources: [],
@@ -536,6 +539,30 @@ describe('POST /exploration/start tracking contract', () => {
     );
   });
 
+  it('keeps discovered zone keys on direct zone-exit outcomes', async () => {
+    const realProcessExplorationOutcomes = await loadRealProcessExplorationOutcomes();
+
+    const result = await realProcessExplorationOutcomes(
+      createOutcomeContext({
+        zoneFamilies: [],
+        undiscoveredNeighbors: [{ id: 'zone-grove', name: 'Ancient Grove' }],
+        thresholdByToId: new Map([['zone-grove', 0]]),
+        explorationProgress: { percent: 100, turnsExplored: 1000, turnsToExplore: 1000 },
+      }),
+      [{ turnOccurred: 12, type: 'zone_exit' }],
+    );
+
+    expect(result.events[0]).toEqual(
+      expect.objectContaining({
+        type: 'zone_exit',
+        details: {
+          discoveredZoneId: 'zone-grove',
+          discoveredZoneName: 'Ancient Grove',
+        },
+      }),
+    );
+  });
+
   it('ignores a submitted tier while tracking and uses the highest unlocked tier for progression', async () => {
     mockPrisma.zone.findUnique.mockResolvedValue({
       id: ZONE_ID,
@@ -631,6 +658,51 @@ describe('POST /exploration/start tracking contract', () => {
       explorationProgress: expect.objectContaining({
         turnsExplored: 5500,
       }),
+    }));
+  });
+
+  it('uses discovered zone keys when full exploration auto-discovers a neighbor', async () => {
+    mockGetExplorationPercent.mockResolvedValueOnce({
+      turnsExplored: 990,
+      percent: 99,
+      turnsToExplore: 1000,
+    });
+    mockGetExplorationPercent.mockResolvedValueOnce({
+      turnsExplored: 1000,
+      percent: 100,
+      turnsToExplore: 1000,
+    });
+    mockPrisma.zoneConnection.findMany.mockResolvedValue([
+      { toId: 'zone-grove', explorationThreshold: 100 },
+    ]);
+    mockGetUndiscoveredNeighborZones.mockResolvedValue([
+      { id: 'zone-grove', name: 'Ancient Grove' },
+    ]);
+
+    const req = {
+      player: { playerId: 'p1', username: 'TestPlayer' },
+      body: {
+        zoneId: ZONE_ID,
+        turns: 1000,
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/start');
+    await handler(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      events: expect.arrayContaining([
+        expect.objectContaining({
+          type: 'zone_exit',
+          details: {
+            discoveredZoneId: 'zone-grove',
+            discoveredZoneName: 'Ancient Grove',
+          },
+        }),
+      ]),
     }));
   });
 
