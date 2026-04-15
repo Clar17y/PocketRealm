@@ -62,7 +62,7 @@ describe('AppShell', () => {
       ),
     );
 
-    expect(screen.getByText('Rook', { selector: 'span' })).toBeTruthy();
+    expect(screen.getByText('Rook')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Rook/i })).toBeNull();
   });
 });

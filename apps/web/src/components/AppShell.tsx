@@ -98,7 +98,7 @@ export function AppShell({ children, turns = 0, username, mailUnreadCount = 0, o
                   <>
                     {/* Backdrop — closes dropdown on outside click */}
                     <div
-                      className="fixed inset-0 z-40"
+                      className="fixed inset-0 z-30"
                       onClick={() => setDropdownOpen(false)}
                     />
                     <div role="menu" className="absolute right-0 top-full mt-1 z-50 min-w-[120px] bg-[var(--rpg-surface)] border border-[var(--rpg-border)] rounded-lg shadow-lg overflow-hidden">
