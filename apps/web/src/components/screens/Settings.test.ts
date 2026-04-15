@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/components/ui/Slider', () => ({
@@ -23,6 +23,15 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver;
+  });
+
+  return { promise, resolve };
+}
 
 function renderSettings(overrides: Partial<React.ComponentProps<typeof Settings>> = {}) {
   return render(React.createElement(Settings, {
@@ -98,7 +107,8 @@ describe('Settings', () => {
   });
 
   it('submits email changes then refreshes account state', async () => {
-    const onAccountRefresh = vi.fn().mockResolvedValue(undefined);
+    const refresh = createDeferred<void>();
+    const onAccountRefresh = vi.fn().mockReturnValue(refresh.promise);
     vi.mocked(changeEmail).mockResolvedValue({ data: { message: 'Email updated' } });
     renderSettings({ onAccountRefresh });
 
@@ -108,6 +118,16 @@ describe('Settings', () => {
 
     await waitFor(() => expect(changeEmail).toHaveBeenCalledWith('new@example.com', 'hunter2-password'));
     await waitFor(() => expect(onAccountRefresh).toHaveBeenCalledTimes(1));
+    const updatePasswordButton = screen.getByRole('button', { name: 'Update password' }) as HTMLButtonElement;
+    expect(updatePasswordButton.disabled).toBe(true);
+    expect(screen.getByText('Email updated')).toBeTruthy();
+    expect((screen.getByLabelText('Current password for email change') as HTMLInputElement).value).toBe('');
+
+    await act(async () => {
+      refresh.resolve(undefined);
+    });
+
+    await waitFor(() => expect(updatePasswordButton.disabled).toBe(false));
   });
 
   it('forces re-login after a successful password change', async () => {
@@ -122,6 +142,10 @@ describe('Settings', () => {
 
     await waitFor(() => expect(changePassword).toHaveBeenCalledWith('old-password', 'much-better-password'));
     await waitFor(() => expect(onForceRelogin).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('Password updated. Please log in again.')).toBeTruthy();
+    expect((screen.getByLabelText('Current password') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('New password') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('Confirm new password') as HTMLInputElement).value).toBe('');
   });
 
   it('shows password mismatch inline and does not submit the password change', () => {

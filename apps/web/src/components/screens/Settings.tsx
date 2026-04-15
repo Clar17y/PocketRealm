@@ -187,15 +187,19 @@ export function Settings({
 
     const res = await changeEmail(emailForm.email, emailForm.password);
 
-    setAccountBusy(null);
     if (!res.data) {
+      setAccountBusy(null);
       setAccountError(res.error?.message ?? 'Failed to update email.');
       return;
     }
 
     setAccountMessage(res.data.message);
     setEmailForm((prev) => ({ ...prev, password: '' }));
-    await onAccountRefresh();
+    try {
+      await onAccountRefresh();
+    } finally {
+      setAccountBusy(null);
+    }
   };
 
   const handleSubmitPassword = async () => {
@@ -220,6 +224,11 @@ export function Settings({
     }
 
     setAccountMessage('Password updated. Please log in again.');
+    setPasswordForm({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    });
     onForceRelogin();
   };
 
