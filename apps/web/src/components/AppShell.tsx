@@ -62,7 +62,11 @@ export function AppShell({ children, turns = 0, username, mailUnreadCount = 0, o
             )}
             {onSettings && (
               <button
-                onClick={onSettings}
+                type="button"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  onSettings();
+                }}
                 className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)] transition-colors"
                 aria-label="Open settings"
               >

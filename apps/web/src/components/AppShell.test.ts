@@ -65,4 +65,27 @@ describe('AppShell', () => {
     expect(screen.getByText('Rook')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Rook/i })).toBeNull();
   });
+
+  it('closes the username dropdown before opening settings from the cog', () => {
+    const onSettings = vi.fn();
+
+    render(
+      React.createElement(
+        AppShell,
+        {
+          username: 'Rook',
+          onSettings,
+          onLogout: vi.fn(),
+          onWhatsNew: vi.fn(),
+        },
+        React.createElement('div', null, 'Child'),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Rook/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+
+    expect(onSettings).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
 });
