@@ -125,4 +125,40 @@ describe('getTemplatePickerSections', () => {
       vi.resetModules();
     }
   });
+
+  it('places future unlocked non-talent actions by shared metadata when they are present in unlockedActions', async () => {
+    vi.doMock('@pocketrealm/shared', async () => {
+      const actual = await vi.importActual<typeof import('@pocketrealm/shared')>('@pocketrealm/shared');
+      return {
+        ...actual,
+        BASE_ACTION_DEFINITIONS: {
+          ...actual.BASE_ACTION_DEFINITIONS,
+          field_bandage: {
+            id: 'field_bandage',
+            name: 'Field Bandage',
+            description: 'A quick battlefield patch-up.',
+            actionType: 'heal_self',
+            category: 'supportive',
+            scalingStat: 'weapon',
+            cost: { stamina: 0, mana: 0 },
+            healFlat: 10,
+          },
+        },
+      };
+    });
+
+    try {
+      vi.resetModules();
+      const { getTemplatePickerSections: getTemplatePickerSectionsWithMockedActions } = await import('./templatePickerActions');
+      const sections = getTemplatePickerSectionsWithMockedActions(['field_bandage']);
+      const combatCore = sections.find((section) => section.key === 'combat-core');
+      const utility = sections.find((section) => section.key === 'utility');
+
+      expect(combatCore?.actions.map((action) => action.id)).not.toContain('field_bandage');
+      expect(utility?.actions.map((action) => action.id)).toContain('field_bandage');
+    } finally {
+      vi.doUnmock('@pocketrealm/shared');
+      vi.resetModules();
+    }
+  });
 });

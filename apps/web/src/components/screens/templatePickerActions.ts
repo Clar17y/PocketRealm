@@ -29,14 +29,15 @@ const UTILITY_ACTION_IDS = [
   'use_elixir_of_power',
 ] as const;
 
-const EXPLICIT_ACTION_IDS = new Set([
+const EXPLICIT_ACTION_IDS = new Set<string>([
   ...COMBAT_CORE_BASE_ACTION_IDS,
   ...UTILITY_ACTION_IDS,
 ]);
 
 const ORDERED_TALENT_ACTION_IDS = getAllTalentNodes()
   .map((node) => node.unlocksAction)
-  .filter((id): id is string => Boolean(id) && !ALWAYS_AVAILABLE_ACTION_IDS.has(id));
+  .filter((id): id is string => Boolean(id))
+  .filter((id) => !ALWAYS_AVAILABLE_ACTION_IDS.has(id));
 
 function isCombatCoreAction(action: ActionDefinition): boolean {
   return action.category === 'offensive';
@@ -72,20 +73,34 @@ function partitionActionIds(ids: readonly string[]): { combatCore: string[]; uti
 export function getTemplatePickerSections(unlockedActions: string[]): TemplatePickerSection[] {
   const unlockedSet = new Set(unlockedActions);
   const visibleTalentActionIds = ORDERED_TALENT_ACTION_IDS.filter((id) => unlockedSet.has(id));
+  const visibleUnlockedFallbackActionIds = unlockedActions.filter((id) => {
+    if (EXPLICIT_ACTION_IDS.has(id) || ALWAYS_AVAILABLE_ACTION_IDS.has(id)) {
+      return false;
+    }
+
+    if (visibleTalentActionIds.includes(id)) {
+      return false;
+    }
+
+    return Boolean(BASE_ACTION_DEFINITIONS[id]);
+  });
   const remainingAlwaysAvailableActionIds = Array.from(ALWAYS_AVAILABLE_ACTION_IDS).filter(
     (id) => !EXPLICIT_ACTION_IDS.has(id),
   );
   const visibleTalentSections = partitionActionIds(visibleTalentActionIds);
+  const visibleUnlockedFallbackSections = partitionActionIds(visibleUnlockedFallbackActionIds);
   const remainingAlwaysAvailableSections = partitionActionIds(remainingAlwaysAvailableActionIds);
   const combatCoreActions = buildActions([
     ...COMBAT_CORE_BASE_ACTION_IDS,
     ...remainingAlwaysAvailableSections.combatCore,
     ...visibleTalentSections.combatCore,
+    ...visibleUnlockedFallbackSections.combatCore,
   ]);
   const utilityActions = buildActions([
     ...UTILITY_ACTION_IDS,
     ...remainingAlwaysAvailableSections.utility,
     ...visibleTalentSections.utility,
+    ...visibleUnlockedFallbackSections.utility,
   ]);
 
   return [

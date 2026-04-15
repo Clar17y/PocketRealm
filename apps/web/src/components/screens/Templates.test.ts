@@ -1,7 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ActionDefinition } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
 
 vi.mock('@/lib/api', () => ({
   createTemplate: vi.fn(),
@@ -29,27 +29,12 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function createAction(id: string, name: string): ActionDefinition {
-  return {
-    id,
-    name,
-    description: `${name} description`,
-    cost: { stamina: 0, mana: 0 },
-    target: 'enemy',
-    type: 'attack',
-    category: 'physical',
-    scaling: { stat: 'strength', ratio: 1 },
-    effects: [],
-    cooldown: 0,
-  };
-}
-
 function renderTemplates(unlockedActions: string[] = []) {
   return render(React.createElement(Templates, {
     templates: [],
     unlockedActions,
-    staminaState: { current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 },
-    manaState: { current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1 },
+    staminaState: { current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 0 },
+    manaState: { current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 0 },
     onLoadTemplates: vi.fn().mockResolvedValue(undefined),
     onNavigate: vi.fn(),
     onTemplateSaved: vi.fn(),
@@ -62,12 +47,12 @@ describe('Templates picker', () => {
       {
         key: 'combat-core',
         title: 'Custom Combat',
-        actions: [createAction('mock_action', 'Mock Slash')],
+        actions: [BASE_ACTION_DEFINITIONS.light_attack],
       },
       {
         key: 'utility',
         title: 'Custom Utility',
-        actions: [createAction('support_action', 'Support Pulse')],
+        actions: [BASE_ACTION_DEFINITIONS.minor_heal],
       },
     ]);
 
@@ -81,8 +66,8 @@ describe('Templates picker', () => {
     expect(getTemplatePickerSections).toHaveBeenCalledWith(['minor_heal']);
     expect(screen.getByText('Custom Combat')).toBeTruthy();
     expect(screen.getByText('Custom Utility')).toBeTruthy();
-    expect(screen.getByText('Mock Slash')).toBeTruthy();
-    expect(screen.getByText('Support Pulse')).toBeTruthy();
-    expect(screen.queryByText('Light Attack')).toBeNull();
+    expect(screen.getByText('Light Attack')).toBeTruthy();
+    expect(screen.getByText('Minor Heal')).toBeTruthy();
+    expect(screen.queryByText('Defend')).toBeNull();
   });
 });
