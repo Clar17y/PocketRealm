@@ -358,11 +358,10 @@ export function Templates({
 
   const isEditing = editingTemplate !== null || isNew;
 
-  const pickerSections = getTemplatePickerSections(unlockedActions);
-
   // --- Action picker view ---
 
   if (pickerTarget) {
+    const pickerSections = getTemplatePickerSections(unlockedActions);
     let pickerTitle: string;
     let pickerButtonLabel: string;
     if (pickerTarget.type === 'add') {
