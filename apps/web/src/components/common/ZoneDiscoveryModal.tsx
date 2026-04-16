@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { ModalOverlay } from './ModalOverlay';
 
 interface ZoneDiscoveryModalProps {
@@ -9,6 +10,8 @@ interface ZoneDiscoveryModalProps {
 }
 
 export function ZoneDiscoveryModal({ zoneName, imageSrc, onDismiss }: ZoneDiscoveryModalProps) {
+  const [showImage, setShowImage] = useState(Boolean(imageSrc));
+
   return (
     <ModalOverlay>
       <div className="bg-[var(--rpg-surface)] border border-[var(--rpg-gold)] rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
@@ -17,11 +20,12 @@ export function ZoneDiscoveryModal({ zoneName, imageSrc, onDismiss }: ZoneDiscov
         </h2>
 
         <div className="space-y-4">
-          {imageSrc && (
+          {imageSrc && showImage && (
             <img
               src={imageSrc}
               alt={zoneName}
               className="w-full h-48 object-cover rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-background)]"
+              onError={() => setShowImage(false)}
             />
           )}
 

@@ -47,6 +47,11 @@ describe('TurnPlayback zone discovery', () => {
 
     expect(screen.getByText('New Zone Discovered')).toBeTruthy();
     expect(onPushLog).toHaveBeenCalledTimes(1);
+    expect(onPushLog).toHaveBeenCalledWith({
+      timestamp: expect.any(String),
+      type: 'success',
+      message: 'Turn 4: Discovered Ancient Grove.',
+    });
 
     act(() => {
       vi.advanceTimersByTime(4000);

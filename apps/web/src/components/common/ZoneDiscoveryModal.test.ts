@@ -41,4 +41,20 @@ describe('ZoneDiscoveryModal', () => {
     expect(screen.getByText('This zone is now available for travel.')).toBeTruthy();
     expect(screen.queryByRole('img', { name: 'Ancient Grove' })).toBeNull();
   });
+
+  it('hides a broken image and keeps the text content visible', () => {
+    render(
+      React.createElement(ZoneDiscoveryModal, {
+        zoneName: 'Ancient Grove',
+        imageSrc: '/assets/zones/zone_ancient_grove.webp',
+        onDismiss: vi.fn(),
+      }),
+    );
+
+    fireEvent.error(screen.getByRole('img', { name: 'Ancient Grove' }));
+
+    expect(screen.queryByRole('img', { name: 'Ancient Grove' })).toBeNull();
+    expect(screen.getByText('Ancient Grove')).toBeTruthy();
+    expect(screen.getByText('This zone is now available for travel.')).toBeTruthy();
+  });
 });

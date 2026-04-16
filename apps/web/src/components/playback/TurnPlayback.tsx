@@ -30,6 +30,11 @@ function isZoneDiscoveryEvent(event: ExplorationPlaybackEvent): boolean {
     && typeof event.details?.discoveredZoneName === 'string';
 }
 
+function getZoneDiscoveryLogMessage(event: ExplorationPlaybackEvent): string {
+  const discoveredZoneName = event.details?.discoveredZoneName as string | undefined;
+  return discoveredZoneName ? `Discovered ${discoveredZoneName}.` : event.description;
+}
+
 interface TurnPlaybackProps {
   totalTurns: number;
   label: string;
@@ -150,7 +155,7 @@ export function TurnPlayback({
     onPushLog?.({
       timestamp: nowStamp(),
       type: 'success',
-      message: `Turn ${event.turn}: ${event.description}`,
+      message: `Turn ${event.turn}: ${getZoneDiscoveryLogMessage(event)}`,
     });
 
     setZoneDiscoveryEvent(event);
