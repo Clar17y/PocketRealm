@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
-import { Star, Plus, ArrowUp, ArrowDown, X, Lock, ChevronLeft } from 'lucide-react';
+import { Star, Plus, ArrowUp, ArrowDown, X, ChevronLeft } from 'lucide-react';
 import {
   createTemplate,
   updateTemplate,
@@ -14,12 +14,13 @@ import type { Screen } from '@/app/game/gameController.types';
 import { handleKeyActivate } from '@/lib/utils';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
-import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@pocketrealm/shared';
-import type { ActionDefinition, CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@pocketrealm/shared';
+import type { CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { getTemplatePickerSections } from './templatePickerActions';
 
 // --- Constants ---
 
@@ -35,8 +36,6 @@ for (const node of getAllTalentNodes()) {
   }
 }
 
-const GROUP_ORDER = ['Basic', 'Melee', 'Ranged', 'Magic', 'General'];
-
 const GROUP_COLORS: Record<string, string> = {
   Basic: 'var(--rpg-text-secondary)',
   Melee: 'var(--rpg-red)',
@@ -44,6 +43,11 @@ const GROUP_COLORS: Record<string, string> = {
   Magic: 'var(--rpg-blue-light)',
   General: 'var(--rpg-gold)',
 };
+
+const PICKER_SECTION_COLORS = {
+  'combat-core': 'var(--rpg-gold)',
+  utility: 'var(--rpg-text-secondary)',
+} as const;
 
 // --- Condition helpers ---
 
@@ -359,19 +363,10 @@ export function Templates({
 
   const isEditing = editingTemplate !== null || isNew;
 
-  // Action picker -- base actions always available; talent actions require unlockedActions
-  const unlockedSet = new Set(unlockedActions);
-  const allActions = Object.values(BASE_ACTION_DEFINITIONS);
-  const grouped: Record<string, ActionDefinition[]> = {};
-  for (const group of GROUP_ORDER) grouped[group] = [];
-  for (const def of allActions) {
-    const group = ACTION_GROUPS[def.id] ?? 'Basic';
-    if (grouped[group]) grouped[group].push(def);
-  }
-
   // --- Action picker view ---
 
   if (pickerTarget) {
+    const pickerSections = getTemplatePickerSections(unlockedActions);
     let pickerTitle: string;
     let pickerButtonLabel: string;
     if (pickerTarget.type === 'add') {
@@ -393,38 +388,33 @@ export function Templates({
           </button>
           <h2 className="text-lg font-bold text-[var(--rpg-text-primary)]">{pickerTitle}</h2>
         </div>
-        {GROUP_ORDER.map(group => (
-          <div key={group}>
-            <h3 className="text-sm font-bold mb-2" style={{ color: GROUP_COLORS[group] ?? 'var(--rpg-text-secondary)' }}>
-              {group}
+        {pickerSections.map((section) => (
+          <div key={section.key}>
+            <h3 className="text-sm font-bold mb-2" style={{ color: PICKER_SECTION_COLORS[section.key] }}>
+              {section.title}
             </h3>
             <div className="space-y-1">
-              {grouped[group].map(def => {
-                const locked = !ALWAYS_AVAILABLE_ACTION_IDS.has(def.id) && !unlockedSet.has(def.id);
-                return (
-                  <PixelCard key={def.id} padding="sm" className={locked ? 'opacity-50' : ''}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {locked && <Lock size={12} className="text-[var(--rpg-text-secondary)] shrink-0" />}
-                          <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{def.name}</span>
-                        </div>
-                        <p className="text-[11px] text-[var(--rpg-text-secondary)] mt-0.5 truncate">{def.description}</p>
-                        <div className="mt-0.5"><ActionCostLabel cost={def.cost} /></div>
+              {section.actions.map((def) => (
+                <PixelCard key={def.id} padding="sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-[var(--rpg-text-primary)]">{def.name}</span>
                       </div>
-                      <PixelButton
-                        size="sm"
-                        variant="secondary"
-                        disabled={locked}
-                        onClick={() => addAction(def.id)}
-                        className="ml-2 shrink-0"
-                      >
-                        {pickerButtonLabel}
-                      </PixelButton>
+                      <p className="text-[11px] text-[var(--rpg-text-secondary)] mt-0.5 truncate">{def.description}</p>
+                      <div className="mt-0.5"><ActionCostLabel cost={def.cost} /></div>
                     </div>
-                  </PixelCard>
-                );
-              })}
+                    <PixelButton
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => addAction(def.id)}
+                      className="ml-2 shrink-0"
+                    >
+                      {pickerButtonLabel}
+                    </PixelButton>
+                  </div>
+                </PixelCard>
+              ))}
             </div>
           </div>
         ))}
