@@ -21,7 +21,7 @@ describe('ZoneDiscoveryModal', () => {
 
     expect(screen.getByText('New Zone Discovered')).toBeTruthy();
     expect(screen.getByText('Ancient Grove')).toBeTruthy();
-    expect(screen.getByText('This zone is now available for travel.')).toBeTruthy();
+    expect(screen.getByText('You discovered a path to Ancient Grove. This zone is now available for travel.')).toBeTruthy();
     expect(screen.getByRole('img', { name: 'Ancient Grove' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
@@ -38,7 +38,7 @@ describe('ZoneDiscoveryModal', () => {
     );
 
     expect(screen.getByText('Ancient Grove')).toBeTruthy();
-    expect(screen.getByText('This zone is now available for travel.')).toBeTruthy();
+    expect(screen.getByText('You discovered a path to Ancient Grove. This zone is now available for travel.')).toBeTruthy();
     expect(screen.queryByRole('img', { name: 'Ancient Grove' })).toBeNull();
   });
 
@@ -55,6 +55,6 @@ describe('ZoneDiscoveryModal', () => {
 
     expect(screen.queryByRole('img', { name: 'Ancient Grove' })).toBeNull();
     expect(screen.getByText('Ancient Grove')).toBeTruthy();
-    expect(screen.getByText('This zone is now available for travel.')).toBeTruthy();
+    expect(screen.getByText('You discovered a path to Ancient Grove. This zone is now available for travel.')).toBeTruthy();
   });
 });

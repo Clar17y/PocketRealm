@@ -32,7 +32,7 @@ export function ZoneDiscoveryModal({ zoneName, imageSrc, onDismiss }: ZoneDiscov
           <div className="text-center space-y-2">
             <p className="text-xl font-semibold text-[var(--rpg-text-primary)]">{zoneName}</p>
             <p className="text-sm leading-relaxed text-[var(--rpg-text-secondary)]">
-              This zone is now available for travel.
+              You discovered a path to {zoneName}. This zone is now available for travel.
             </p>
           </div>
         </div>

@@ -157,7 +157,19 @@ export function ExplorationPlayback({
     }, Math.round(speedMs * 2000 / 800));
 
     return () => clearTimeout(completeTimer);
-  }, [phase, revealedEventCount, sortedEvents, totalTurns, onEventRevealed, onCombatStart, onComplete, addTimer, speedMs]);
+  }, [
+    phase,
+    revealedEventCount,
+    sortedEvents,
+    totalTurns,
+    onEventRevealed,
+    onCombatStart,
+    onComplete,
+    shouldPauseOnEvent,
+    onEventPause,
+    addTimer,
+    speedMs,
+  ]);
 
   const progressPercent = totalTurns > 0 ? (currentTurn / totalTurns) * 100 : 0;
 
