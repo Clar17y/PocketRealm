@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
+import { ZoneDiscoveryModal } from '@/components/common/ZoneDiscoveryModal';
 import { ExplorationPlayback, type ExplorationPlaybackEvent } from '@/components/exploration/ExplorationPlayback';
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
-import { monsterImageSrc } from '@/lib/assets';
+import { monsterImageSrc, zoneImageSrc } from '@/lib/assets';
 import type { CombatLogEntryResponse, EventModifierBadge } from '@/lib/api/combat';
 import type { CombatLogPrefetch } from '@/hooks/useCombatLogPrefetch';
 import { isAmbushWithCombatLog } from '@/lib/explorationUtils';
@@ -21,6 +22,17 @@ const EVENT_SEVERITY: Record<string, 'info' | 'success' | 'danger'> = {
 
 function nowStamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function isZoneDiscoveryEvent(event: ExplorationPlaybackEvent): boolean {
+  return event.type === 'zone_exit'
+    && typeof event.details?.discoveredZoneId === 'string'
+    && typeof event.details?.discoveredZoneName === 'string';
+}
+
+function getZoneDiscoveryLogMessage(event: ExplorationPlaybackEvent): string {
+  const discoveredZoneName = event.details?.discoveredZoneName as string | undefined;
+  return discoveredZoneName ? `Discovered ${discoveredZoneName}.` : event.description;
 }
 
 interface TurnPlaybackProps {
@@ -71,7 +83,9 @@ export function TurnPlayback({
   strangerLine,
 }: TurnPlaybackProps) {
   const [combatEvent, setCombatEvent] = useState<ExplorationPlaybackEvent | null>(null);
+  const [zoneDiscoveryEvent, setZoneDiscoveryEvent] = useState<ExplorationPlaybackEvent | null>(null);
   const [resumeFromCombat, setResumeFromCombat] = useState(false);
+  const [resumeFromExternalPause, setResumeFromExternalPause] = useState(0);
   const [playerHpForNextCombat, setPlayerHpForNextCombat] = useState<number | null>(null);
   const [playerStaminaForNextCombat, setPlayerStaminaForNextCombat] = useState<number | null>(null);
   const [playerManaForNextCombat, setPlayerManaForNextCombat] = useState<number | null>(null);
@@ -128,13 +142,28 @@ export function TurnPlayback({
   })();
 
   const handleEventRevealed = (event: ExplorationPlaybackEvent) => {
-    if (isAmbushWithCombatLog(event)) return;
+    if (isAmbushWithCombatLog(event) || isZoneDiscoveryEvent(event)) return;
 
     onPushLog?.({
       timestamp: nowStamp(),
       type: EVENT_SEVERITY[event.type] ?? 'info',
       message: `Turn ${event.turn}: ${event.description}`,
     });
+  };
+
+  const handleZoneDiscoveryPause = (event: ExplorationPlaybackEvent) => {
+    onPushLog?.({
+      timestamp: nowStamp(),
+      type: 'success',
+      message: `Turn ${event.turn}: ${getZoneDiscoveryLogMessage(event)}`,
+    });
+
+    setZoneDiscoveryEvent(event);
+  };
+
+  const handleZoneDiscoveryDismiss = () => {
+    setZoneDiscoveryEvent(null);
+    setResumeFromExternalPause((value) => value + 1);
   };
 
   const handleCombatStart = (event: ExplorationPlaybackEvent) => {
@@ -229,6 +258,9 @@ export function TurnPlayback({
       onComplete={onComplete}
       onSkip={onSkip}
       strangerLine={strangerLine}
+      shouldPauseOnEvent={isZoneDiscoveryEvent}
+      onEventPause={handleZoneDiscoveryPause}
+      resumeSignal={resumeFromExternalPause}
     />
   );
 
@@ -289,6 +321,14 @@ export function TurnPlayback({
 
       {/* Combat Playback — embedded combat animation during exploration/travel */}
       {combatEvent && wrappedCombatPlayback}
+
+      {zoneDiscoveryEvent && (
+        <ZoneDiscoveryModal
+          zoneName={zoneDiscoveryEvent.details?.discoveredZoneName as string}
+          imageSrc={zoneImageSrc(zoneDiscoveryEvent.details?.discoveredZoneName as string)}
+          onDismiss={handleZoneDiscoveryDismiss}
+        />
+      )}
     </>
   );
 }

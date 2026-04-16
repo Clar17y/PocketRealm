@@ -25,6 +25,9 @@ interface ExplorationPlaybackProps {
   speedMs?: number;
   resumeFromCombat?: boolean;
   strangerLine?: string | null;
+  shouldPauseOnEvent?: (event: ExplorationPlaybackEvent) => boolean;
+  onEventPause?: (event: ExplorationPlaybackEvent) => void;
+  resumeSignal?: number;
 }
 
 function getEventDisplay(type: string): { icon: string; color: string } {
@@ -58,13 +61,17 @@ export function ExplorationPlayback({
   speedMs = 800,
   resumeFromCombat,
   strangerLine,
+  shouldPauseOnEvent,
+  onEventPause,
+  resumeSignal,
 }: ExplorationPlaybackProps) {
   const [currentTurn, setCurrentTurn] = useState(0);
   const [revealedEventCount, setRevealedEventCount] = useState(0);
-  const [phase, setPhase] = useState<'running' | 'paused-event' | 'paused-combat' | 'complete'>('running');
+  const [phase, setPhase] = useState<'running' | 'paused-event' | 'paused-combat' | 'paused-external' | 'skipped' | 'complete'>('running');
   const [activeEventLabel, setActiveEventLabel] = useState<{ icon: string; text: string; color: string; eventModifiers?: EventModifierBadge[] } | null>(null);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const lastResumeSignalRef = useRef(resumeSignal ?? 0);
 
   const sortedEvents = useMemo(
     () => [...events].sort((a, b) => a.turn - b.turn),
@@ -95,6 +102,14 @@ export function ExplorationPlayback({
     }
   }, [resumeFromCombat, phase]);
 
+  useEffect(() => {
+    if (phase !== 'paused-external') return;
+    if ((resumeSignal ?? 0) === lastResumeSignalRef.current) return;
+
+    lastResumeSignalRef.current = resumeSignal ?? 0;
+    setPhase('running');
+  }, [phase, resumeSignal]);
+
   // Main playback loop
   useEffect(() => {
     if (phase !== 'running') return;
@@ -117,6 +132,13 @@ export function ExplorationPlayback({
           return;
         }
 
+        if (shouldPauseOnEvent?.(nextEvent)) {
+          setActiveEventLabel(null);
+          setPhase('paused-external');
+          onEventPause?.(nextEvent);
+          return;
+        }
+
         setPhase('paused-event');
         addTimer(() => {
           setActiveEventLabel(null);
@@ -135,9 +157,28 @@ export function ExplorationPlayback({
     }, Math.round(speedMs * 2000 / 800));
 
     return () => clearTimeout(completeTimer);
-  }, [phase, revealedEventCount, sortedEvents, totalTurns, onEventRevealed, onCombatStart, onComplete, addTimer, speedMs]);
+  }, [
+    phase,
+    revealedEventCount,
+    sortedEvents,
+    totalTurns,
+    onEventRevealed,
+    onCombatStart,
+    onComplete,
+    shouldPauseOnEvent,
+    onEventPause,
+    addTimer,
+    speedMs,
+  ]);
 
   const progressPercent = totalTurns > 0 ? (currentTurn / totalTurns) * 100 : 0;
+
+  const handleSkip = () => {
+    clearAllTimers();
+    setActiveEventLabel(null);
+    setPhase('skipped');
+    onSkip();
+  };
 
   return (
     <div className="space-y-4">
@@ -206,11 +247,11 @@ export function ExplorationPlayback({
       </div>
 
       {/* Skip button */}
-      {phase !== 'complete' && (
+      {phase !== 'complete' && phase !== 'skipped' && (
         <div className="text-center">
           <button
             className="text-xs text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] underline"
-            onClick={onSkip}
+            onClick={handleSkip}
           >
             Skip
           </button>

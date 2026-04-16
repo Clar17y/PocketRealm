@@ -297,7 +297,10 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
           turn: effectiveTurns,
           type: 'zone_exit',
           description: `Zone fully explored! You discovered ${neighbor.name}.`,
-          details: { zoneId: neighbor.id, zoneName: neighbor.name },
+          details: {
+            discoveredZoneId: neighbor.id,
+            discoveredZoneName: neighbor.name,
+          },
         });
       }
     }
