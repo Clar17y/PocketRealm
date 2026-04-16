@@ -73,12 +73,13 @@ function partitionActionIds(ids: readonly string[]): { combatCore: string[]; uti
 export function getTemplatePickerSections(unlockedActions: string[]): TemplatePickerSection[] {
   const unlockedSet = new Set(unlockedActions);
   const visibleTalentActionIds = ORDERED_TALENT_ACTION_IDS.filter((id) => unlockedSet.has(id));
+  const visibleTalentActionIdSet = new Set(visibleTalentActionIds);
   const visibleUnlockedFallbackActionIds = unlockedActions.filter((id) => {
     if (EXPLICIT_ACTION_IDS.has(id) || ALWAYS_AVAILABLE_ACTION_IDS.has(id)) {
       return false;
     }
 
-    if (visibleTalentActionIds.includes(id)) {
+    if (visibleTalentActionIdSet.has(id)) {
       return false;
     }
 

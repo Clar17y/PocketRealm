@@ -44,6 +44,11 @@ const GROUP_COLORS: Record<string, string> = {
   General: 'var(--rpg-gold)',
 };
 
+const PICKER_SECTION_COLORS = {
+  'combat-core': 'var(--rpg-gold)',
+  utility: 'var(--rpg-text-secondary)',
+} as const;
+
 // --- Condition helpers ---
 
 interface ConditionOption {
@@ -385,7 +390,7 @@ export function Templates({
         </div>
         {pickerSections.map((section) => (
           <div key={section.key}>
-            <h3 className="text-sm font-bold mb-2" style={{ color: GROUP_COLORS[section.title] ?? 'var(--rpg-text-secondary)' }}>
+            <h3 className="text-sm font-bold mb-2" style={{ color: PICKER_SECTION_COLORS[section.key] }}>
               {section.title}
             </h3>
             <div className="space-y-1">
