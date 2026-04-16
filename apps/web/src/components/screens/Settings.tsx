@@ -185,8 +185,12 @@ export function Settings({
   };
 
   const handleSubmitEmail = async () => {
-    setAccountBusy('email');
     clearAccountFeedback();
+    if (emailForm.email.trim().toLowerCase() === email.trim().toLowerCase()) {
+      setAccountError('Enter a different email address to update.');
+      return;
+    }
+    setAccountBusy('email');
 
     const res = await changeEmail(emailForm.email, emailForm.password);
 

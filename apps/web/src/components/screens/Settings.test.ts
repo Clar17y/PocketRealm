@@ -130,6 +130,16 @@ describe('Settings', () => {
     await waitFor(() => expect(updatePasswordButton.disabled).toBe(false));
   });
 
+  it('blocks email submission when the address matches the current email', () => {
+    renderSettings();
+
+    fireEvent.change(screen.getByLabelText('Current password for email change'), { target: { value: 'hunter2-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update email' }));
+
+    expect(changeEmail).not.toHaveBeenCalled();
+    expect(screen.getByText('Enter a different email address to update.')).toBeTruthy();
+  });
+
   it('shows a refresh error when the post-email account refresh rejects', async () => {
     const onAccountRefresh = vi.fn().mockRejectedValue(new Error('refresh failed'));
     vi.mocked(changeEmail).mockResolvedValue({ data: { message: 'Email updated' } });
