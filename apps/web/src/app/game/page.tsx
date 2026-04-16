@@ -370,7 +370,7 @@ export default function GamePage() {
           pushState={pushState}
           pushToggle={pushToggle}
           onLogout={() => { logout(); router.push('/'); }}
-          onAccountRefresh={refreshPlayer}
+          onAccountRefresh={async () => { await refreshPlayer(); }}
           onForceRelogin={() => {
             sessionStorage.setItem(RELOGIN_MESSAGE_KEY, PASSWORD_UPDATED_RELOGIN_MESSAGE);
             logout();
