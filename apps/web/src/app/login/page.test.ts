@@ -1,0 +1,47 @@
+import React from 'react';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PASSWORD_UPDATED_RELOGIN_MESSAGE, RELOGIN_MESSAGE_KEY } from './reloginMessage';
+
+const push = vi.fn();
+const setTokens = vi.fn();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
+}));
+
+vi.mock('next/image', () => ({
+  default: ({ fill: _fill, priority: _priority, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean; priority?: boolean }) =>
+    React.createElement('img', props),
+}));
+
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({
+    setTokens,
+    isLoading: false,
+    isAuthenticated: false,
+  }),
+}));
+
+vi.mock('@/lib/api', () => ({
+  login: vi.fn(),
+}));
+
+import LoginPage from './page';
+
+afterEach(() => {
+  cleanup();
+  sessionStorage.clear();
+  vi.clearAllMocks();
+});
+
+describe('LoginPage', () => {
+  it('shows and clears the relogin success message after a forced password reset logout', () => {
+    sessionStorage.setItem(RELOGIN_MESSAGE_KEY, PASSWORD_UPDATED_RELOGIN_MESSAGE);
+
+    render(React.createElement(LoginPage));
+
+    expect(screen.getByText(PASSWORD_UPDATED_RELOGIN_MESSAGE)).toBeTruthy();
+    expect(sessionStorage.getItem(RELOGIN_MESSAGE_KEY)).toBeNull();
+  });
+});

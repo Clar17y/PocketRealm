@@ -227,7 +227,6 @@ export function Settings({
       return;
     }
 
-    setAccountMessage('Password updated. Please log in again.');
     setPasswordForm({
       currentPassword: '',
       newPassword: '',

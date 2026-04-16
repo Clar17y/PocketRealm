@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { login } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { PixelButton } from '@/components/PixelButton';
+import { RELOGIN_MESSAGE_KEY } from './reloginMessage';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,7 +14,16 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const loginMessage = sessionStorage.getItem(RELOGIN_MESSAGE_KEY);
+    if (!loginMessage) return;
+
+    setMessage(loginMessage);
+    sessionStorage.removeItem(RELOGIN_MESSAGE_KEY);
+  }, []);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -24,6 +34,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setMessage('');
     setLoading(true);
 
     const { data, error: apiError } = await login(email, password);
@@ -93,6 +104,10 @@ export default function LoginPage() {
               Forgot password?
             </a>
           </div>
+
+          {message && (
+            <p className="text-sm text-[var(--rpg-blue-light)] text-center">{message}</p>
+          )}
 
           {error && (
             <p className="text-sm text-[var(--rpg-red)] text-center">{error}</p>

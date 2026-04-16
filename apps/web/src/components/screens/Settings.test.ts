@@ -160,7 +160,6 @@ describe('Settings', () => {
 
     await waitFor(() => expect(changePassword).toHaveBeenCalledWith('old-password', 'much-better-password'));
     await waitFor(() => expect(onForceRelogin).toHaveBeenCalledTimes(1));
-    expect(screen.getByText('Password updated. Please log in again.')).toBeTruthy();
     expect((screen.getByLabelText('Current password') as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText('New password') as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText('Confirm new password') as HTMLInputElement).value).toBe('');

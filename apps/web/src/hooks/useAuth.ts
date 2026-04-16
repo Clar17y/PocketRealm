@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getPlayer, refreshToken as refreshTokenApi } from '@/lib/api';
+import { clearStoredTokens, getPlayer, refreshToken as refreshTokenApi } from '@/lib/api';
 
 interface Player {
   id: string;
@@ -24,18 +24,33 @@ export function useAuth() {
     isAuthenticated: false,
   });
 
-  const setAuthenticatedState = (player: Player) => {
+  const setAuthenticatedState = useCallback((player: Player) => {
     setState({
       player,
       isLoading: false,
       isAuthenticated: true,
     });
-  };
+  }, []);
 
-  const failRefresh = () => {
+  const failRefresh = useCallback(() => {
+    clearStoredTokens();
     setState({ player: null, isLoading: false, isAuthenticated: false });
     throw new Error('Failed to refresh account.');
-  };
+  }, []);
+
+  const refreshPlayer = useCallback(async () => {
+    const { data, error } = await getPlayer();
+    if (data) {
+      setAuthenticatedState(data.player);
+      return data.player;
+    }
+
+    if (error?.code === 'INVALID_TOKEN' || error?.code === 'MISSING_TOKEN') {
+      failRefresh();
+    }
+
+    throw new Error('Failed to refresh account.');
+  }, [failRefresh, setAuthenticatedState]);
 
   const checkAuth = useCallback(async () => {
     const token = localStorage.getItem('accessToken');
@@ -81,7 +96,7 @@ export function useAuth() {
     }
 
     setAuthenticatedState(data.player);
-  }, []);
+  }, [failRefresh, setAuthenticatedState]);
 
   useEffect(() => {
     void checkAuth().catch(() => undefined);
@@ -104,5 +119,6 @@ export function useAuth() {
     setTokens,
     logout,
     checkAuth,
+    refreshPlayer,
   };
 }

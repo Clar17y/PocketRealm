@@ -42,10 +42,11 @@ import { useCasinoSocket } from '@/hooks/useCasinoSocket';
 import { ChatPanel } from '@/components/ChatPanel';
 import { SKILL_META } from './pageConstants';
 import { GameScreenRenderer } from './GameScreenRenderer';
+import { PASSWORD_UPDATED_RELOGIN_MESSAGE, RELOGIN_MESSAGE_KEY } from '../login/reloginMessage';
 
 export default function GamePage() {
   const router = useRouter();
-  const { player, isLoading, isAuthenticated, logout, checkAuth } = useAuth();
+  const { player, isLoading, isAuthenticated, logout, refreshPlayer } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -369,8 +370,12 @@ export default function GamePage() {
           pushState={pushState}
           pushToggle={pushToggle}
           onLogout={() => { logout(); router.push('/'); }}
-          onAccountRefresh={checkAuth}
-          onForceRelogin={() => { logout(); router.push('/login'); }}
+          onAccountRefresh={refreshPlayer}
+          onForceRelogin={() => {
+            sessionStorage.setItem(RELOGIN_MESSAGE_KEY, PASSWORD_UPDATED_RELOGIN_MESSAGE);
+            logout();
+            router.push('/login');
+          }}
         />
         <XpRateTutorial skillName={lowestXpRate.skillName} rate={lowestXpRate.rate} />
       </AppShell>
