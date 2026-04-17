@@ -9,10 +9,26 @@ export interface TurnState {
   lastRegenAt: string;
 }
 
+export interface PremiumStatusSnapshot {
+  isPremium: boolean;
+  premiumExpiresAt: Date | null;
+}
+
+export function hasActivePremium(
+  player: PremiumStatusSnapshot | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  return Boolean(
+    player?.isPremium
+    && player.premiumExpiresAt
+    && player.premiumExpiresAt.getTime() > now.getTime(),
+  );
+}
+
 export async function getTurnState(playerId: string, now: Date = new Date()): Promise<TurnState> {
   const [turnBank, turnConfig] = await Promise.all([
     prisma.turnBank.findUnique({ where: { playerId } }),
-    getTurnConfig(prisma, playerId),
+    getTurnConfig(prisma, playerId, now),
   ]);
 
   if (!turnBank) {
@@ -65,13 +81,14 @@ interface TurnConfig {
 async function getTurnConfig(
   client: Pick<TurnBankClient, 'player'>,
   playerId: string,
+  now: Date,
 ): Promise<TurnConfig> {
   const player = await client.player.findUnique({
     where: { id: playerId },
-    select: { isPremium: true },
+    select: { isPremium: true, premiumExpiresAt: true },
   });
 
-  if (player?.isPremium) {
+  if (hasActivePremium(player, now)) {
     return {
       regenRate: PREMIUM_CONSTANTS.TURN_REGEN_RATE,
       bankCap: PREMIUM_CONSTANTS.TURN_BANK_CAP,
@@ -94,7 +111,7 @@ async function spendPlayerTurnsWithClient(
     throw new AppError(400, 'Turn spend amount must be a positive integer', 'INVALID_TURNS');
   }
 
-  const turnConfig = await getTurnConfig(client, playerId);
+  const turnConfig = await getTurnConfig(client, playerId, now);
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const turnBank = await client.turnBank.findUnique({ where: { playerId } });
@@ -185,7 +202,7 @@ async function refundPlayerTurnsWithClient(
     throw new AppError(400, 'Turn refund amount must be a positive integer', 'INVALID_TURNS');
   }
 
-  const turnConfig = await getTurnConfig(client, playerId);
+  const turnConfig = await getTurnConfig(client, playerId, now);
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const turnBank = await client.turnBank.findUnique({ where: { playerId } });

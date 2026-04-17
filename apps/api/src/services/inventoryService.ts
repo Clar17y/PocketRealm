@@ -2,6 +2,7 @@ import { Prisma, prisma } from '@pocketrealm/database';
 import { getInventoryCapacity } from '@pocketrealm/game-engine';
 import type { ItemRarity } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { hasActivePremium } from './turnBankService';
 
 interface InventoryClient {
   itemTemplate: {
@@ -216,7 +217,7 @@ export async function getPlayerCapacity(playerId: string): Promise<number> {
   const [player, equipped] = await Promise.all([
     prisma.player.findUnique({
       where: { id: playerId },
-      select: { isPremium: true },
+      select: { isPremium: true, premiumExpiresAt: true },
     }),
     prisma.playerEquipment.findMany({
       where: { playerId, slot: { in: ['backpack', 'belt'] }, itemId: { not: null } },
@@ -252,7 +253,7 @@ export async function getPlayerCapacity(playerId: string): Promise<number> {
     backpackTier,
     backpackRarity,
     beltSlotBonus,
-    isChampion: player?.isPremium ?? false,
+    isChampion: hasActivePremium(player),
   });
 }
 

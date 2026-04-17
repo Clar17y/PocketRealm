@@ -3,6 +3,7 @@ import type { CombatTemplate, CombatTemplateSlot } from '@pocketrealm/database';
 import type { CombatTemplateSlotData, CombatTemplateData, SlotCondition } from '@pocketrealm/shared';
 import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, PREMIUM_CONSTANTS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { hasActivePremium } from './turnBankService';
 
 interface CreateSlotInput {
   sortOrder?: number;
@@ -62,10 +63,10 @@ export async function createTemplate(
     prisma.combatTemplate.count({ where: { playerId } }),
     prisma.player.findUnique({
       where: { id: playerId },
-      select: { isPremium: true },
+      select: { isPremium: true, premiumExpiresAt: true },
     }),
   ]);
-  const templateLimit = player?.isPremium
+  const templateLimit = hasActivePremium(player)
     ? PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION
     : PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE;
 
