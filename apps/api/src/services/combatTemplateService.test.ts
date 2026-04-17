@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
+import { COMBAT_TEMPLATE_CONSTANTS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 
 import { mockPrisma } from '../__test__/setup';
 import {
@@ -119,11 +119,11 @@ describe('createTemplate', () => {
   });
 
   it('rejects when over MAX_TEMPLATES limit', async () => {
-    mockPrisma.combatTemplate.count.mockResolvedValue(SKILL_POINT_CONSTANTS.MAX_TEMPLATES);
+    mockPrisma.combatTemplate.count.mockResolvedValue(COMBAT_TEMPLATE_CONSTANTS.MAX_TEMPLATES);
 
     await expect(
       createTemplate(PLAYER_ID, 'Overflow', [{ actionId: 'light_attack' }]),
-    ).rejects.toThrow(`Maximum ${SKILL_POINT_CONSTANTS.MAX_TEMPLATES} templates allowed`);
+    ).rejects.toThrow(`Maximum ${COMBAT_TEMPLATE_CONSTANTS.MAX_TEMPLATES} templates allowed`);
   });
 
   it('rejects unknown action IDs', async () => {

@@ -3,6 +3,7 @@ import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 import {
+  COMBAT_TEMPLATE_CONSTANTS,
   SKILL_POINT_CONSTANTS,
   TALENT_TREE_DEFINITIONS,
 } from '@pocketrealm/shared';
@@ -129,7 +130,7 @@ export default function SkillPointsPage() {
       <p>
         Unlocked talent actions become available in your combat templates. You
         can save up to{' '}
-        <Const>{SKILL_POINT_CONSTANTS.MAX_TEMPLATES}</Const> combat templates
+        <Const>{COMBAT_TEMPLATE_CONSTANTS.MAX_TEMPLATES}</Const> combat templates
         with different action configurations. The default action for empty
         template slots is{' '}
         <code>{SKILL_POINT_CONSTANTS.DEFAULT_ACTION_ID}</code>.
@@ -150,7 +151,7 @@ export default function SkillPointsPage() {
           },
           {
             name: 'MAX_TEMPLATES',
-            value: SKILL_POINT_CONSTANTS.MAX_TEMPLATES,
+            value: COMBAT_TEMPLATE_CONSTANTS.MAX_TEMPLATES,
             description: 'Maximum saved combat templates',
           },
         ]}

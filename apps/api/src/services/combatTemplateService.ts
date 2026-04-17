@@ -1,7 +1,7 @@
 import { prisma, Prisma } from '@pocketrealm/database';
 import type { CombatTemplate, CombatTemplateSlot } from '@pocketrealm/database';
 import type { CombatTemplateSlotData, CombatTemplateData, SlotCondition } from '@pocketrealm/shared';
-import { ALWAYS_AVAILABLE_ACTION_IDS, SKILL_POINT_CONSTANTS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, COMBAT_TEMPLATE_CONSTANTS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
 interface CreateSlotInput {
@@ -59,8 +59,8 @@ export async function createTemplate(
   unlockedActions: string[] = [],
 ): Promise<CombatTemplateData> {
   const count = await prisma.combatTemplate.count({ where: { playerId } });
-  if (count >= SKILL_POINT_CONSTANTS.MAX_TEMPLATES) {
-    throw new AppError(400, `Maximum ${SKILL_POINT_CONSTANTS.MAX_TEMPLATES} templates allowed`, 'TEMPLATE_LIMIT');
+  if (count >= COMBAT_TEMPLATE_CONSTANTS.MAX_TEMPLATES) {
+    throw new AppError(400, `Maximum ${COMBAT_TEMPLATE_CONSTANTS.MAX_TEMPLATES} templates allowed`, 'TEMPLATE_LIMIT');
   }
 
   validateTemplateSlots(slots, unlockedActions);
