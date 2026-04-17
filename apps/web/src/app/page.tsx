@@ -150,18 +150,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Champion Subscription */}
+      {/* Support Pocketrealm */}
       <section className="py-20 px-4">
         <div className="max-w-3xl mx-auto">
           <div className="border border-rpg-gold/40 rounded-xl p-8 md:p-12 bg-gradient-to-b from-rpg-gold/5 to-transparent">
             <h2 className="text-3xl md:text-4xl font-bold font-almendra text-center text-[var(--rpg-gold)] mb-2 rpg-gold-text-glow">
-              Go Champion
+              Support Pocketrealm
             </h2>
             <p className="text-center text-2xl font-bold font-crimson text-[var(--rpg-text-primary)] mb-2">
-              £4.99/month
+              £4.99 one-time
             </p>
             <p className="text-center font-crimson text-[var(--rpg-text-secondary)] mb-8">
-              Everything you do, 10% better.
+              One-time purchase. Grants 30 days of Champion. Stacks if purchased again.
             </p>
 
             {/* Mock leaderboard preview */}
@@ -193,7 +193,7 @@ export default function Home() {
             </div>
 
             <div className="text-center">
-              <a href="/register" className={linkGold}>Become Champion</a>
+              <a href="/register" className={linkGold}>Support Pocketrealm</a>
               <p className="text-xs font-crimson text-[var(--rpg-text-secondary)] mt-3">
                 No combat advantages. No pay-to-win. Just efficiency.
               </p>
@@ -210,7 +210,7 @@ export default function Home() {
           </h2>
           <div className="flex gap-4 justify-center mb-6 flex-wrap">
             <a href="/register" className={linkPrimary}>Play Free</a>
-            <a href="/register" className={linkGold}>Become Champion</a>
+            <a href="/register" className={linkGold}>Support Pocketrealm</a>
           </div>
           <div className="flex gap-6 justify-center text-sm font-crimson">
             <a href="/login" className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-text-primary)] transition-colors">

@@ -375,12 +375,16 @@ describe('exploration tutorial path', () => {
 
   it('passes Champion-adjusted hidden cache chance into simulateExploration for premium players', async () => {
     setupZoneAndMobs(TUTORIAL_STEP_WELCOME);
-    mockPrisma.player.findUnique
-      .mockResolvedValueOnce({ tutorialStep: TUTORIAL_STEP_WELCOME })
-      .mockResolvedValueOnce({
-        isPremium: true,
-        premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
-      });
+    mockPrisma.player.findUnique.mockImplementation(({ select }: { select?: Record<string, boolean> }) => {
+      if (select?.premiumExpiresAt || select?.isPremium) {
+        return Promise.resolve({
+          isPremium: true,
+          premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+        });
+      }
+
+      return Promise.resolve({ tutorialStep: TUTORIAL_STEP_WELCOME });
+    });
     mockSimulateExploration.mockReturnValue([]);
 
     const req = baseReq({ body: { zoneId: ZONE_ID, turns: 500 } });

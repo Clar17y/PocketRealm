@@ -23,6 +23,7 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { rarityFromTier } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
+import { hasActivePremium } from '@/lib/premium';
 import { buildRecipeDiscountLookup, getDiscountedCost, getRecipeSkillInfo } from '@/lib/recipeDiscount';
 import { CRAFTING_CONSTANTS, PREMIUM_CONSTANTS, TURN_CONSTANTS, type SkillType } from '@pocketrealm/shared';
 import { calculateEfficiency, xpForLevel } from '@pocketrealm/game-engine';
@@ -213,11 +214,7 @@ export function GameScreenRenderer({
   const activeCraftingSkillMeta = SKILL_META[activeCraftingSkill];
   const activeGatheringSkillData = skills.find((s) => s.skillType === activeGatheringSkill);
   const activeCraftingSkillData = skills.find((s) => s.skillType === activeCraftingSkill);
-  const hasActivePremiumTurns = Boolean(
-    player?.isPremium
-    && player.premiumExpiresAt
-    && new Date(player.premiumExpiresAt).getTime() > Date.now(),
-  );
+  const hasActivePremiumTurns = hasActivePremium(player);
   const displayedTurnCap = hasActivePremiumTurns ? PREMIUM_CONSTANTS.TURN_BANK_CAP : TURN_CONSTANTS.BANK_CAP;
   const displayedTurnRegenRate = hasActivePremiumTurns ? PREMIUM_CONSTANTS.TURN_REGEN_RATE : TURN_CONSTANTS.REGEN_RATE;
 
@@ -697,6 +694,8 @@ export function GameScreenRenderer({
           username={player?.username}
           email={player?.email ?? ''}
           emailVerified={player?.emailVerified ?? false}
+          isPremium={player?.isPremium ?? false}
+          premiumExpiresAt={player?.premiumExpiresAt ?? null}
           combatLogSpeedMs={combatLogSpeedMs} onCombatLogSpeedChange={setCombatLogSpeedMs}
           onCombatLogSpeedCommit={handleSetCombatLogSpeed}
           autoSkipKnownCombat={autoSkipKnownCombat} onAutoSkipKnownCombatChange={handleSetAutoSkipKnownCombat}

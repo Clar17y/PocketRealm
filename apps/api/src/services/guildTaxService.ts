@@ -3,6 +3,7 @@ import { PREMIUM_CONSTANTS, TURN_CONSTANTS, type TaxInfo } from '@pocketrealm/sh
 import { calculateCurrentTurns, calculateTimeToCapMs } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { calculateTreasuryCap } from './guildService';
+import { getHasActivePremiumEntitlement } from './premiumEntitlement';
 import { spendPlayerTurnsTx, type SpendTurnsResult } from './turnBankService';
 
 export interface TaxResult {
@@ -63,16 +64,13 @@ export async function spendWithTaxTx(
   baseCost: number,
 ): Promise<{ turnSpend: SpendTurnsResult; taxResult: TaxResult }> {
   if (baseCost <= 0) {
-    const [bank, player] = await Promise.all([
+    const [bank, hasActivePremiumEntitlement] = await Promise.all([
       tx.turnBank.findUnique({ where: { playerId } }),
-      tx.player.findUnique({
-        where: { id: playerId },
-        select: { isPremium: true },
-      }),
+      getHasActivePremiumEntitlement(tx, playerId),
     ]);
     if (!bank) throw new AppError(404, 'Turn bank not found', 'NOT_FOUND');
-    const regenRate = player?.isPremium ? PREMIUM_CONSTANTS.TURN_REGEN_RATE : TURN_CONSTANTS.REGEN_RATE;
-    const bankCap = player?.isPremium ? PREMIUM_CONSTANTS.TURN_BANK_CAP : TURN_CONSTANTS.BANK_CAP;
+    const regenRate = hasActivePremiumEntitlement ? PREMIUM_CONSTANTS.TURN_REGEN_RATE : TURN_CONSTANTS.REGEN_RATE;
+    const bankCap = hasActivePremiumEntitlement ? PREMIUM_CONSTANTS.TURN_BANK_CAP : TURN_CONSTANTS.BANK_CAP;
     const current = calculateCurrentTurns(bank.currentTurns, bank.lastRegenAt, new Date(), regenRate, bankCap);
     return {
       turnSpend: {

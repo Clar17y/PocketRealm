@@ -303,13 +303,16 @@ describe('spendWithTaxTx', () => {
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       playerId: 'p1', currentTurns: 2000, lastRegenAt,
     });
-    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: true });
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date('2026-05-02T00:00:00.000Z'),
+    });
 
     await spendWithTaxTx(prisma, 'p1', 0);
 
     expect(mockPrisma.player.findUnique).toHaveBeenCalledWith({
       where: { id: 'p1' },
-      select: { isPremium: true },
+      select: { isPremium: true, premiumExpiresAt: true },
     });
     expect(calculateCurrentTurns).toHaveBeenCalledWith(
       2000,
@@ -322,6 +325,32 @@ describe('spendWithTaxTx', () => {
       5000,
       PREMIUM_CONSTANTS.TURN_REGEN_RATE,
       PREMIUM_CONSTANTS.TURN_BANK_CAP,
+    );
+  });
+
+  it('falls back to free turn overrides when premium entitlement is expired and baseCost is 0', async () => {
+    const lastRegenAt = new Date('2026-01-01T00:00:00.000Z');
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      playerId: 'p1', currentTurns: 2000, lastRegenAt,
+    });
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date('2025-12-31T23:59:59.000Z'),
+    });
+
+    await spendWithTaxTx(prisma, 'p1', 0);
+
+    expect(calculateCurrentTurns).toHaveBeenCalledWith(
+      2000,
+      lastRegenAt,
+      expect.any(Date),
+      TURN_CONSTANTS.REGEN_RATE,
+      TURN_CONSTANTS.BANK_CAP,
+    );
+    expect(calculateTimeToCapMs).toHaveBeenCalledWith(
+      5000,
+      TURN_CONSTANTS.REGEN_RATE,
+      TURN_CONSTANTS.BANK_CAP,
     );
   });
 

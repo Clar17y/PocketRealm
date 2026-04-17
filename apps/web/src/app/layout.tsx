@@ -9,7 +9,7 @@ const silkscreen = Silkscreen({ weight: ['400', '700'], subsets: ['latin'], vari
 
 export const metadata: Metadata = {
   title: 'PocketRealm — Turn-Based Async RPG',
-  description: 'A turn-based RPG that respects your time. Explore 11 zones, battle 80+ monsters, master 14 crafting skills, and raid world bosses. Play free or go Champion.',
+  description: 'A turn-based RPG that respects your time. Explore 11 zones, battle 80+ monsters, master 14 crafting skills, and support PocketRealm with optional Champion time.',
   manifest: '/manifest.json',
   icons: {
     icon: '/favicon.ico',

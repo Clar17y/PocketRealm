@@ -1,6 +1,16 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const {
+  createPremiumCheckoutMock,
+  getPremiumStatusMock,
+  getPremiumPurchasesMock,
+} = vi.hoisted(() => ({
+  createPremiumCheckoutMock: vi.fn(),
+  getPremiumStatusMock: vi.fn(),
+  getPremiumPurchasesMock: vi.fn(),
+}));
 
 vi.mock('@/components/ui/Slider', () => ({
   Slider: () => React.createElement('div', { 'data-testid': 'slider' }),
@@ -13,6 +23,9 @@ vi.mock('@/lib/api', async () => {
     resendVerification: vi.fn(),
     changeEmail: vi.fn(),
     changePassword: vi.fn(),
+    createPremiumCheckout: createPremiumCheckoutMock,
+    getPremiumStatus: getPremiumStatusMock,
+    getPremiumPurchases: getPremiumPurchasesMock,
   };
 });
 
@@ -22,6 +35,13 @@ import { Settings } from './Settings';
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+
+beforeEach(() => {
+  getPremiumStatusMock.mockResolvedValue({
+    data: { premium: { isPremium: false, premiumExpiresAt: null } },
+  });
+  getPremiumPurchasesMock.mockResolvedValue({ data: { purchases: [] } });
 });
 
 function createDeferred<T>() {
@@ -38,6 +58,8 @@ function renderSettings(overrides: Partial<React.ComponentProps<typeof Settings>
     username: 'Rook',
     email: 'rook@example.com',
     emailVerified: false,
+    isPremium: false,
+    premiumExpiresAt: null,
     onAccountRefresh: vi.fn().mockResolvedValue(undefined),
     onForceRelogin: vi.fn(),
     combatLogSpeedMs: 800,
@@ -86,6 +108,37 @@ function renderSettings(overrides: Partial<React.ComponentProps<typeof Settings>
 }
 
 describe('Settings', () => {
+  it('renders the Support Pocketrealm panel with one-time purchase copy', async () => {
+    renderSettings();
+
+    expect(await screen.findByRole('heading', { name: 'Support Pocketrealm' })).toBeTruthy();
+    expect(screen.getByText(/One-time purchase\. Grants 30 days of Champion\./i)).toBeTruthy();
+    expect(screen.getByText('Free account')).toBeTruthy();
+  });
+
+  it('renders recent Support Pocketrealm purchase history', async () => {
+    getPremiumStatusMock.mockResolvedValue({
+      data: { premium: { isPremium: true, premiumExpiresAt: '2026-05-17T12:00:00.000Z' } },
+    });
+    getPremiumPurchasesMock.mockResolvedValue({
+      data: {
+        purchases: [
+          {
+            id: 'purchase-1',
+            championDaysGranted: 30,
+            grantedUntil: '2026-05-17T12:00:00.000Z',
+            createdAt: '2026-04-17T12:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    renderSettings();
+
+    expect(await screen.findByText(/Champion until/i)).toBeTruthy();
+    expect(screen.getByText((content) => content.includes('30') && content.includes('days (until'))).toBeTruthy();
+  });
+
   it('defaults to the Account tab and can switch to Game', () => {
     renderSettings();
 

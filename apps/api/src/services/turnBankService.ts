@@ -2,27 +2,12 @@ import { Prisma, prisma } from '@pocketrealm/database';
 import { calculateCurrentTurns, calculateTimeToCapMs, spendTurns } from '@pocketrealm/game-engine';
 import { PREMIUM_CONSTANTS, TURN_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { getHasActivePremiumEntitlement } from './premiumEntitlement';
 
 export interface TurnState {
   currentTurns: number;
   timeToCapMs: number | null;
   lastRegenAt: string;
-}
-
-export interface PremiumStatusSnapshot {
-  isPremium: boolean;
-  premiumExpiresAt: Date | null;
-}
-
-export function hasActivePremium(
-  player: PremiumStatusSnapshot | null | undefined,
-  now: Date = new Date(),
-): boolean {
-  return Boolean(
-    player?.isPremium
-    && player.premiumExpiresAt
-    && player.premiumExpiresAt.getTime() > now.getTime(),
-  );
 }
 
 export async function getTurnState(playerId: string, now: Date = new Date()): Promise<TurnState> {
@@ -83,12 +68,7 @@ async function getTurnConfig(
   playerId: string,
   now: Date,
 ): Promise<TurnConfig> {
-  const player = await client.player.findUnique({
-    where: { id: playerId },
-    select: { isPremium: true, premiumExpiresAt: true },
-  });
-
-  if (hasActivePremium(player, now)) {
+  if (await getHasActivePremiumEntitlement(client, playerId, now)) {
     return {
       regenRate: PREMIUM_CONSTANTS.TURN_REGEN_RATE,
       bankCap: PREMIUM_CONSTANTS.TURN_BANK_CAP,

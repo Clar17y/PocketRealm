@@ -9,6 +9,7 @@ import type { ConfirmRarity } from '@/lib/rarity';
 import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 import { RaritySelector } from '../common/RaritySelector';
 import { ScreenContainer } from '../common/ScreenContainer';
+import { SupportPocketrealmCard } from './SupportPocketrealmCard';
 
 export interface NotificationPrefs {
   notifyPvpAttack: boolean;
@@ -34,6 +35,8 @@ interface SettingsProps {
   username: string | undefined;
   email: string;
   emailVerified: boolean;
+  isPremium: boolean;
+  premiumExpiresAt: string | null;
   onAccountRefresh: () => Promise<void>;
   onForceRelogin: () => void;
 
@@ -111,6 +114,8 @@ export function Settings({
   username,
   email,
   emailVerified,
+  isPremium,
+  premiumExpiresAt,
   onAccountRefresh,
   onForceRelogin,
   combatLogSpeedMs,
@@ -390,6 +395,11 @@ export function Settings({
               </button>
             </div>
           </PixelCard>
+
+          <SupportPocketrealmCard
+            initialIsPremium={isPremium}
+            initialPremiumExpiresAt={premiumExpiresAt}
+          />
 
           {onLogout && (
             <button

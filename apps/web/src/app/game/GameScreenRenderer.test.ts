@@ -1,0 +1,271 @@
+import React from 'react';
+import { render } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PREMIUM_CONSTANTS, TURN_CONSTANTS } from '@pocketrealm/shared';
+import { GameScreenRenderer } from './GameScreenRenderer';
+
+const { dashboardSpy } = vi.hoisted(() => ({
+  dashboardSpy: vi.fn(),
+}));
+
+vi.mock('@/components/screens/Dashboard', () => ({
+  Dashboard: (props: unknown) => {
+    dashboardSpy(props);
+    return null;
+  },
+}));
+
+afterEach(() => {
+  dashboardSpy.mockReset();
+});
+
+function createBaseGc() {
+  return {
+    activeScreen: 'home',
+    setActiveScreen: vi.fn(),
+    handleNavigate: vi.fn(),
+    turns: 1200,
+    setTurns: vi.fn(),
+    gold: 500,
+    zones: [],
+    activeZoneId: null,
+    zoneConnections: [],
+    undiscoveredZones: [],
+    reloadZones: vi.fn(),
+    skills: [],
+    characterProgression: {
+      characterLevel: 5,
+      characterXp: 500,
+      attributePoints: 0,
+      attributes: {
+        vitality: 1,
+        strength: 1,
+        dexterity: 1,
+        intelligence: 1,
+        luck: 1,
+        evasion: 1,
+      },
+    },
+    inventory: [],
+    equipment: [],
+    gatheringNodes: [],
+    activeGatheringSkill: 'mining',
+    setActiveGatheringSkill: vi.fn(),
+    craftingRecipes: [],
+    activeCraftingSkill: 'weaponsmithing',
+    setActiveCraftingSkill: vi.fn(),
+    activityLog: [],
+    pendingEncounters: [],
+    pendingEncountersLoading: false,
+    pendingEncountersError: null,
+    pendingEncounterPage: 1,
+    pendingEncounterPagination: null,
+    pendingEncounterFilters: [],
+    pendingEncounterZoneFilter: null,
+    pendingEncounterMobFilter: null,
+    pendingEncounterSort: null,
+    pendingClockMs: 0,
+    lastCombat: null,
+    busyAction: null,
+    slowAction: false,
+    isOffline: false,
+    actionError: null,
+    bestiaryMobs: [],
+    bestiaryLoading: false,
+    bestiaryError: null,
+    bestiaryPrefixSummary: [],
+    expeditionThemes: [],
+    worldBosses: [],
+    hpState: {
+      currentHp: 100,
+      maxHp: 100,
+      regenPerSecond: 1,
+      isRecovering: false,
+      recoveryCost: null,
+    },
+    setHpState: vi.fn(),
+    staminaState: { current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 5 },
+    manaState: { current: 100, max: 100, regenPerRound: 10, regenPerSecond: 1, restHealPerTurn: 5 },
+    skillPointState: { unlockedActions: [] },
+    handleAllocateSkillPoint: vi.fn(),
+    handleRespecSkillPoints: vi.fn(),
+    templates: [],
+    handleLoadTemplates: vi.fn(),
+    handleTemplateSaved: vi.fn(),
+    pvpNotificationCount: 0,
+    loadPvpNotificationCount: vi.fn(),
+    playbackActive: false,
+    combatPlaybackData: null,
+    combatPlaybackQueue: null,
+    combatPlaybackIndex: 0,
+    roomTransition: null,
+    explorationPlaybackData: null,
+    travelPlaybackData: null,
+    currentZone: { name: 'Starter Town', zoneType: 'town' },
+    ownedByTemplateId: new Map<string, number>(),
+    handleStartExploration: vi.fn(),
+    handleExplorationPlaybackComplete: vi.fn(),
+    handlePlaybackSkip: vi.fn(),
+    handleCombatPlaybackComplete: vi.fn(),
+    handleTravelPlaybackComplete: vi.fn(),
+    handleTravelPlaybackSkip: vi.fn(),
+    handleMine: vi.fn(),
+    handleCraft: vi.fn(),
+    handleGatheringPageChange: vi.fn(),
+    handleGatheringZoneFilterChange: vi.fn(),
+    handleGatheringResourceTypeFilterChange: vi.fn(),
+    handlePendingEncounterPageChange: vi.fn(),
+    handlePendingEncounterZoneFilterChange: vi.fn(),
+    handlePendingEncounterMobFilterChange: vi.fn(),
+    handlePendingEncounterSortChange: vi.fn(),
+    handleSalvageItem: vi.fn(),
+    handleSalvageBatch: vi.fn(),
+    handleForgeUpgrade: vi.fn(),
+    handleForgeReroll: vi.fn(),
+    handleDestroyItem: vi.fn(),
+    handleRepairItem: vi.fn(),
+    handleRepairAllEquipped: vi.fn(),
+    handleUseItem: vi.fn(),
+    handleEquipItem: vi.fn(),
+    handleUnequipSlot: vi.fn(),
+    handleAllocateAttribute: vi.fn(),
+    combatLogSpeedMs: 300,
+    setCombatLogSpeedMs: vi.fn(),
+    handleSetCombatLogSpeed: vi.fn(),
+    explorationSpeedMs: 300,
+    setExplorationSpeedMs: vi.fn(),
+    handleSetExplorationSpeed: vi.fn(),
+    autoSkipKnownCombat: false,
+    handleSetAutoSkipKnownCombat: vi.fn(),
+    defaultExploreTurns: 10,
+    setDefaultExploreTurns: vi.fn(),
+    handleSetDefaultExploreTurns: vi.fn(),
+    quickRestHealPercent: 50,
+    handleSetQuickRestHealPercent: vi.fn(),
+    defaultRefiningMax: false,
+    handleSetDefaultRefiningMax: vi.fn(),
+    lowHpWarning: false,
+    handleSetLowHpWarning: vi.fn(),
+    confirmRarity: 'none',
+    handleSetConfirmRarity: vi.fn(),
+    lootRevealRarity: 'none',
+    handleSetLootRevealRarity: vi.fn(),
+    forgeConfirmRarity: 'none',
+    handleSetForgeConfirmRarity: vi.fn(),
+    handleQuickRest: vi.fn(),
+    guildTaxRate: 0,
+    homeTownId: null,
+    handleSetHomeTown: vi.fn(),
+    showNpcDialogue: true,
+    showItemFlavourText: true,
+    showBestiaryLore: true,
+    handleSetShowNpcDialogue: vi.fn(),
+    handleSetShowItemFlavourText: vi.fn(),
+    handleSetShowBestiaryLore: vi.fn(),
+    notificationPrefs: {},
+    handleSetNotificationPref: vi.fn(),
+    zoneCraftingLevel: 1,
+    zoneCraftingName: 'Starter Town',
+    achievementData: null,
+    achievementUnclaimedCount: 0,
+    activeTitle: null,
+    handleClaimAchievement: vi.fn(),
+    handleSetActiveTitle: vi.fn(),
+    loadAchievements: vi.fn(),
+    quests: [],
+    questState: null,
+    questsLoading: false,
+    questsError: null,
+    loadQuests: vi.fn(),
+    handleClaimQuestReward: vi.fn(),
+    handleClaimDailyBonus: vi.fn(),
+    handleRerollQuest: vi.fn(),
+    tutorialStep: 0,
+    advanceTutorial: vi.fn(),
+    starterWeaponType: null,
+    loadAll: vi.fn(),
+    activeBuffs: [],
+    combatLogPrefetch: null,
+    inventoryCapacity: 24,
+    inventoryUsedSlots: 0,
+    isOverEncumbered: false,
+    backpackFull: false,
+    trainingCooldown: 0,
+    setTrainingCooldown: vi.fn(),
+    handleExchangeGold: vi.fn(),
+    handlePlaceBet: vi.fn(),
+    handleSellItem: vi.fn(),
+    handleSellBatch: vi.fn(),
+    handleDepositItem: vi.fn(),
+    handleDepositBatch: vi.fn(),
+    handleWithdrawItem: vi.fn(),
+    handleWithdrawBatch: vi.fn(),
+    handleTravelToZone: vi.fn(),
+    stateSetters: {},
+    refreshPendingEncounters: vi.fn(),
+    setActionError: vi.fn(),
+    activeEncounterSiteId: null,
+    setActiveEncounterSiteId: vi.fn(),
+    isActivityLocked: false,
+    activityLockReason: null,
+    loadFriendCounts: vi.fn(),
+  };
+}
+
+function renderGameScreen(player: { isPremium?: boolean; premiumExpiresAt?: string | null } | null) {
+  render(React.createElement(GameScreenRenderer, {
+    gc: createBaseGc(),
+    player,
+    casinoSocket: {
+      liveBets: [],
+      sessionBets: [],
+      sessionProfit: 0,
+      lastResult: null,
+      trackBet: vi.fn(),
+      dealerMessages: [],
+    },
+    achievementCategory: null,
+    setAchievementCategory: vi.fn(),
+    expeditionContext: null,
+    setExpeditionContext: vi.fn(),
+    mailRecipient: null,
+    setMailRecipient: vi.fn(),
+    deepLinkTab: null,
+    pushState: null,
+    pushToggle: vi.fn(),
+    onLogout: vi.fn(),
+    onAccountRefresh: vi.fn(),
+    onForceRelogin: vi.fn(),
+  }));
+}
+
+describe('GameScreenRenderer', () => {
+  it('passes Champion turn display values to Dashboard for active premium players', () => {
+    renderGameScreen({
+      isPremium: true,
+      premiumExpiresAt: '2026-05-02T00:00:00.000Z',
+    });
+
+    expect(dashboardSpy).toHaveBeenCalledTimes(1);
+    expect(dashboardSpy.mock.calls[0][0]).toMatchObject({
+      playerData: {
+        maxTurns: PREMIUM_CONSTANTS.TURN_BANK_CAP,
+        turnsRegenRate: PREMIUM_CONSTANTS.TURN_REGEN_RATE * 60,
+      },
+    });
+  });
+
+  it('passes free turn display values to Dashboard for expired premium players', () => {
+    renderGameScreen({
+      isPremium: true,
+      premiumExpiresAt: '2025-12-31T23:59:59.000Z',
+    });
+
+    expect(dashboardSpy.mock.calls[0][0]).toMatchObject({
+      playerData: {
+        maxTurns: TURN_CONSTANTS.BANK_CAP,
+        turnsRegenRate: TURN_CONSTANTS.REGEN_RATE * 60,
+      },
+    });
+  });
+});
