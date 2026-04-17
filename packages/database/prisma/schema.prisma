@@ -42,30 +42,30 @@ model Player {
   recoveryCost  Int?     @map("recovery_cost")
 
   // Stamina & Mana
-  currentStamina      Int      @default(100) @map("current_stamina")
-  lastStaminaRegenAt  DateTime @default(now()) @map("last_stamina_regen_at")
-  currentMana         Int      @default(50) @map("current_mana")
-  lastManaRegenAt     DateTime @default(now()) @map("last_mana_regen_at")
+  currentStamina     Int      @default(100) @map("current_stamina")
+  lastStaminaRegenAt DateTime @default(now()) @map("last_stamina_regen_at")
+  currentMana        Int      @default(50) @map("current_mana")
+  lastManaRegenAt    DateTime @default(now()) @map("last_mana_regen_at")
 
   // Tutorial
-  tutorialStep    Int      @default(0) @map("tutorial_step")
+  tutorialStep Int @default(0) @map("tutorial_step")
 
   // Preferences
-  combatLogSpeedMs    Int     @default(800)  @map("combat_log_speed_ms")
-  explorationSpeedMs  Int     @default(800)  @map("exploration_speed_ms")
-  autoSkipKnownCombat Boolean @default(false) @map("auto_skip_known_combat")
-  defaultExploreTurns Int     @default(100)  @map("default_explore_turns")
-  quickRestHealPercent Int    @default(100)  @map("quick_rest_heal_percent")
-  defaultRefiningMax  Boolean @default(false) @map("default_refining_max")
-  lowHpWarning        Boolean @default(true)  @map("low_hp_warning")
-  confirmRarity       String  @default("uncommon") @map("confirm_rarity") @db.VarChar(16)
-  lootRevealRarity    String  @default("uncommon") @map("loot_reveal_rarity") @db.VarChar(16)
-  forgeConfirmRarity  String  @default("rare") @map("forge_confirm_rarity") @db.VarChar(16)
+  combatLogSpeedMs     Int     @default(800) @map("combat_log_speed_ms")
+  explorationSpeedMs   Int     @default(800) @map("exploration_speed_ms")
+  autoSkipKnownCombat  Boolean @default(false) @map("auto_skip_known_combat")
+  defaultExploreTurns  Int     @default(100) @map("default_explore_turns")
+  quickRestHealPercent Int     @default(100) @map("quick_rest_heal_percent")
+  defaultRefiningMax   Boolean @default(false) @map("default_refining_max")
+  lowHpWarning         Boolean @default(true) @map("low_hp_warning")
+  confirmRarity        String  @default("uncommon") @map("confirm_rarity") @db.VarChar(16)
+  lootRevealRarity     String  @default("uncommon") @map("loot_reveal_rarity") @db.VarChar(16)
+  forgeConfirmRarity   String  @default("rare") @map("forge_confirm_rarity") @db.VarChar(16)
 
   // Flavour text preferences
-  showNpcDialogue      Boolean @default(true) @map("show_npc_dialogue")
-  showItemFlavourText  Boolean @default(true) @map("show_item_flavour_text")
-  showBestiaryLore     Boolean @default(true) @map("show_bestiary_lore")
+  showNpcDialogue     Boolean @default(true) @map("show_npc_dialogue")
+  showItemFlavourText Boolean @default(true) @map("show_item_flavour_text")
+  showBestiaryLore    Boolean @default(true) @map("show_bestiary_lore")
 
   // Notification preferences
   notifyPvpAttack          Boolean @default(true) @map("notify_pvp_attack")
@@ -77,61 +77,62 @@ model Player {
   notifyExpeditionFinished Boolean @default(true) @map("notify_expedition_finished")
 
   // Zone / Travel
-  currentZoneId          String? @map("current_zone_id")
+  currentZoneId           String? @map("current_zone_id")
   lastTravelledFromZoneId String? @map("last_travelled_from_zone_id")
-  homeTownId             String? @map("home_town_id")
+  homeTownId              String? @map("home_town_id")
 
-  currentZone            Zone?   @relation("current_zone", fields: [currentZoneId], references: [id])
-  lastTravelledFromZone  Zone?   @relation("breadcrumb_zone", fields: [lastTravelledFromZoneId], references: [id])
-  homeTown               Zone?   @relation("home_town", fields: [homeTownId], references: [id])
+  currentZone           Zone? @relation("current_zone", fields: [currentZoneId], references: [id])
+  lastTravelledFromZone Zone? @relation("breadcrumb_zone", fields: [lastTravelledFromZoneId], references: [id])
+  homeTown              Zone? @relation("home_town", fields: [homeTownId], references: [id])
 
   // Active achievement title
-  activeTitle        String?   @map("active_title")
+  activeTitle String? @map("active_title")
 
-  turnBank           TurnBank?
-  rouletteBets       RouletteBet[]
-  skills             PlayerSkill[]
-  equipment          PlayerEquipment[]
-  items              Item[]
-  bestiary           PlayerBestiary[]
-  bestiaryPrefixes   PlayerBestiaryPrefix[]
-  activityLogs       ActivityLog[]
-  encounterSites     EncounterSite[]
-  knownRecipes       PlayerRecipe[]
-  refreshTokens      RefreshToken[]
+  turnBank                TurnBank?
+  rouletteBets            RouletteBet[]
+  skills                  PlayerSkill[]
+  equipment               PlayerEquipment[]
+  items                   Item[]
+  bestiary                PlayerBestiary[]
+  bestiaryPrefixes        PlayerBestiaryPrefix[]
+  activityLogs            ActivityLog[]
+  encounterSites          EncounterSite[]
+  knownRecipes            PlayerRecipe[]
+  refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
-  resourceNodes      PlayerResourceNode[]
-  zoneDiscoveries    PlayerZoneDiscovery[]
-  zoneExplorations   PlayerZoneExploration[]
-  pvpRating                PvpRating?
-  pvpAttacks               PvpMatch[]    @relation("PvpAttacker")
-  pvpDefenses              PvpMatch[]    @relation("PvpDefender")
-  pvpCooldownsAsAttacker   PvpCooldown[] @relation("pvpCooldownAttacker")
-  pvpCooldownsAsDefender   PvpCooldown[] @relation("pvpCooldownDefender")
-  bossParticipants   BossParticipant[]
-  persistedMobs      PersistedMob[]
-  stats              PlayerStats?
-  achievements       PlayerAchievement[]
-  guildMember        GuildMember?
-  guildJoinRequests  GuildJoinRequest[]
-  combatTemplates      CombatTemplate[]
-  skillPointAllocation SkillPointAllocation?
-  pvpScoutsSent        PvpScoutLog[] @relation("PvpScouter")
-  pvpScoutsReceived    PvpScoutLog[] @relation("PvpScoutTarget")
-  bossRotations        PlayerBossRotation[]
-  quests               PlayerQuest[]
-  questState           PlayerQuestState?
-  shopPurchases        PlayerShopPurchase[]
-  buffs                PlayerBuff[]
+  resourceNodes           PlayerResourceNode[]
+  zoneDiscoveries         PlayerZoneDiscovery[]
+  zoneExplorations        PlayerZoneExploration[]
+  pvpRating               PvpRating?
+  pvpAttacks              PvpMatch[]               @relation("PvpAttacker")
+  pvpDefenses             PvpMatch[]               @relation("PvpDefender")
+  pvpCooldownsAsAttacker  PvpCooldown[]            @relation("pvpCooldownAttacker")
+  pvpCooldownsAsDefender  PvpCooldown[]            @relation("pvpCooldownDefender")
+  bossParticipants        BossParticipant[]
+  persistedMobs           PersistedMob[]
+  stats                   PlayerStats?
+  achievements            PlayerAchievement[]
+  premiumPurchases        PremiumPurchase[]
+  guildMember             GuildMember?
+  guildJoinRequests       GuildJoinRequest[]
+  combatTemplates         CombatTemplate[]
+  skillPointAllocation    SkillPointAllocation?
+  pvpScoutsSent           PvpScoutLog[]            @relation("PvpScouter")
+  pvpScoutsReceived       PvpScoutLog[]            @relation("PvpScoutTarget")
+  bossRotations           PlayerBossRotation[]
+  quests                  PlayerQuest[]
+  questState              PlayerQuestState?
+  shopPurchases           PlayerShopPurchase[]
+  buffs                   PlayerBuff[]
 
   // Friends & Social
-  friendshipsSent     Friendship[]  @relation("FriendshipSender")
-  friendshipsReceived Friendship[]  @relation("FriendshipReceiver")
-  blocksInitiated     PlayerBlock[] @relation("PlayerBlockBlocker")
-  blocksReceived      PlayerBlock[] @relation("PlayerBlockBlocked")
-  friendMailsSent     FriendMail[]  @relation("FriendMailSender")
-  friendMailsReceived FriendMail[]  @relation("FriendMailRecipient")
+  friendshipsSent     Friendship[]       @relation("FriendshipSender")
+  friendshipsReceived Friendship[]       @relation("FriendshipReceiver")
+  blocksInitiated     PlayerBlock[]      @relation("PlayerBlockBlocker")
+  blocksReceived      PlayerBlock[]      @relation("PlayerBlockBlocked")
+  friendMailsSent     FriendMail[]       @relation("FriendMailSender")
+  friendMailsReceived FriendMail[]       @relation("FriendMailRecipient")
   pushSubscriptions   PushSubscription[]
 
   // Encounter site lockout
@@ -139,7 +140,7 @@ model Player {
 
   // Expeditions
   expeditionTokens          Int                        @default(0) @map("expedition_tokens")
-  expeditionsLaunched       GuildExpedition[]           @relation("ExpeditionLauncher")
+  expeditionsLaunched       GuildExpedition[]          @relation("ExpeditionLauncher")
   expeditionMemberships     GuildExpeditionMember[]
   expeditionBestiaryEntries PlayerExpeditionBestiary[]
   expeditionCooldowns       ExpeditionCooldown[]
@@ -188,6 +189,28 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+model PremiumPurchase {
+  id                      String   @id @default(uuid())
+  playerId                String   @map("player_id")
+  provider                String   @db.VarChar(32)
+  providerSessionId       String?  @unique @map("provider_session_id")
+  providerPaymentIntentId String?  @unique @map("provider_payment_intent_id")
+  productType             String   @map("product_type") @db.VarChar(32)
+  status                  String   @db.VarChar(16)
+  amount                  Int
+  currency                String   @db.VarChar(8)
+  championDaysGranted     Int      @map("champion_days_granted")
+  grantedFrom             DateTime @map("granted_from")
+  grantedUntil            DateTime @map("granted_until")
+  metadata                Json?
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, createdAt])
+  @@map("premium_purchases")
+}
+
 // =============================================================================
 // TURN ECONOMY
 // =============================================================================
@@ -207,13 +230,13 @@ model TurnBank {
 // =============================================================================
 
 model PlayerSkill {
-  id             String   @id @default(uuid())
-  playerId       String   @map("player_id")
-  skillType      String   @map("skill_type") @db.VarChar(32)
-  level          Int      @default(1)
-  xp             BigInt   @default(0)
-  dailyXpGained  Int      @default(0) @map("daily_xp_gained")
-  lastXpResetAt  DateTime @default(now()) @map("last_xp_reset_at")
+  id            String   @id @default(uuid())
+  playerId      String   @map("player_id")
+  skillType     String   @map("skill_type") @db.VarChar(32)
+  level         Int      @default(1)
+  xp            BigInt   @default(0)
+  dailyXpGained Int      @default(0) @map("daily_xp_gained")
+  lastXpResetAt DateTime @default(now()) @map("last_xp_reset_at")
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
@@ -242,21 +265,21 @@ model PlayerEquipment {
 // =============================================================================
 
 model ItemTemplate {
-  id             String  @id @default(uuid())
-  name           String  @db.VarChar(64)
-  itemType       String  @map("item_type") @db.VarChar(32)
-  weightClass    String? @map("weight_class") @db.VarChar(16)
-  setId          String? @map("set_id") @db.VarChar(64)
-  slot           String? @db.VarChar(16)
-  tier           Int     @default(1)
-  baseStats      Json    @default("{}") @map("base_stats")
-  requiredSkill  String? @map("required_skill") @db.VarChar(32)
-  requiredLevel  Int     @default(1) @map("required_level")
-  maxDurability  Int     @default(100) @map("max_durability")
+  id               String  @id @default(uuid())
+  name             String  @db.VarChar(64)
+  itemType         String  @map("item_type") @db.VarChar(32)
+  weightClass      String? @map("weight_class") @db.VarChar(16)
+  setId            String? @map("set_id") @db.VarChar(64)
+  slot             String? @db.VarChar(16)
+  tier             Int     @default(1)
+  baseStats        Json    @default("{}") @map("base_stats")
+  requiredSkill    String? @map("required_skill") @db.VarChar(32)
+  requiredLevel    Int     @default(1) @map("required_level")
+  maxDurability    Int     @default(100) @map("max_durability")
   stackable        Boolean @default(false)
   consumableEffect Json?   @map("consumable_effect")
-  sellPrice       Int?    @map("sell_price")
-  flavorText      String? @map("flavor_text") @db.Text
+  sellPrice        Int?    @map("sell_price")
+  flavorText       String? @map("flavor_text") @db.Text
 
   items           Item[]
   dropTables      DropTable[]
@@ -293,42 +316,42 @@ model Item {
 // =============================================================================
 
 model Zone {
-  id          String  @id @default(uuid())
-  name        String  @db.VarChar(64)
-  description String? @db.Text
+  id                 String  @id @default(uuid())
+  name               String  @db.VarChar(64)
+  description        String? @db.Text
   arrivalText        String? @map("arrival_text") @db.Text
   ambientTexts       Json?   @map("ambient_texts")
   environmentalTexts Json?   @map("environmental_texts")
-  difficulty  Int     @default(1)
-  travelCost  Int     @map("travel_cost")
-  isStarter   Boolean @default(false) @map("is_starter")
-  zoneType       String  @default("wild") @map("zone_type") @db.VarChar(16) // wild | town
-  zoneExitChance Float?  @map("zone_exit_chance")
-  maxCraftingLevel Int?    @default(0) @map("max_crafting_level")
-  turnsToExplore   Int?  @map("turns_to_explore")
-  explorationTiers Json? @map("exploration_tiers")
+  difficulty         Int     @default(1)
+  travelCost         Int     @map("travel_cost")
+  isStarter          Boolean @default(false) @map("is_starter")
+  zoneType           String  @default("wild") @map("zone_type") @db.VarChar(16) // wild | town
+  zoneExitChance     Float?  @map("zone_exit_chance")
+  maxCraftingLevel   Int?    @default(0) @map("max_crafting_level")
+  turnsToExplore     Int?    @map("turns_to_explore")
+  explorationTiers   Json?   @map("exploration_tiers")
 
-  mobs               MobTemplate[]
-  resourceNodes      ResourceNode[]
-  zoneMobFamilies    ZoneMobFamily[]
-  encounterSites     EncounterSite[]
-  connectionsFrom    ZoneConnection[]        @relation("from_zone")
-  connectionsTo      ZoneConnection[]        @relation("to_zone")
-  discoveries        PlayerZoneDiscovery[]
-  explorations       PlayerZoneExploration[]
-  playersHere        Player[]                @relation("current_zone")
-  playersBreadcrumb  Player[]                @relation("breadcrumb_zone")
-  playersHome        Player[]                @relation("home_town")
-  worldEvents        WorldEvent[]
+  mobs              MobTemplate[]
+  resourceNodes     ResourceNode[]
+  zoneMobFamilies   ZoneMobFamily[]
+  encounterSites    EncounterSite[]
+  connectionsFrom   ZoneConnection[]        @relation("from_zone")
+  connectionsTo     ZoneConnection[]        @relation("to_zone")
+  discoveries       PlayerZoneDiscovery[]
+  explorations      PlayerZoneExploration[]
+  playersHere       Player[]                @relation("current_zone")
+  playersBreadcrumb Player[]                @relation("breadcrumb_zone")
+  playersHome       Player[]                @relation("home_town")
+  worldEvents       WorldEvent[]
 
   @@map("zones")
 }
 
 model ZoneConnection {
-  id       String @id @default(uuid())
-  fromId   String @map("from_zone_id")
-  toId     String @map("to_zone_id")
-  explorationThreshold Float @default(0) @map("exploration_threshold")
+  id                   String @id @default(uuid())
+  fromId               String @map("from_zone_id")
+  toId                 String @map("to_zone_id")
+  explorationThreshold Float  @default(0) @map("exploration_threshold")
 
   fromZone Zone @relation("from_zone", fields: [fromId], references: [id], onDelete: Cascade)
   toZone   Zone @relation("to_zone", fields: [toId], references: [id], onDelete: Cascade)
@@ -370,38 +393,38 @@ model PlayerZoneExploration {
 // =============================================================================
 
 model MobTemplate {
-  id              String  @id @default(uuid())
-  name            String  @db.VarChar(64)
-  zoneId          String  @map("zone_id")
-  level           Int     @default(1)
-  hp              Int
-  accuracy        Int
-  defence         Int
-  magicDefence    Int     @default(0) @map("magic_defence")
-  evasion         Int
-  damageMin       Int     @map("damage_min")
-  damageMax       Int     @map("damage_max")
-  xpReward        Int     @map("xp_reward")
-  encounterWeight Int     @default(100) @map("encounter_weight")
-  explorationTier Int     @default(1) @map("exploration_tier")
-  spellPattern    Json    @default("[]") @map("spell_pattern")
-  damageType      String  @default("physical") @map("damage_type")
-  isExpeditionMob Boolean @default(false) @map("is_expedition_mob")
-  isBoss          Boolean @default(false) @map("is_boss")
-  bossAoeDmg      Int?    @map("boss_aoe_dmg")
-  bossBaseHp      Int?    @map("boss_base_hp")
+  id               String  @id @default(uuid())
+  name             String  @db.VarChar(64)
+  zoneId           String  @map("zone_id")
+  level            Int     @default(1)
+  hp               Int
+  accuracy         Int
+  defence          Int
+  magicDefence     Int     @default(0) @map("magic_defence")
+  evasion          Int
+  damageMin        Int     @map("damage_min")
+  damageMax        Int     @map("damage_max")
+  xpReward         Int     @map("xp_reward")
+  encounterWeight  Int     @default(100) @map("encounter_weight")
+  explorationTier  Int     @default(1) @map("exploration_tier")
+  spellPattern     Json    @default("[]") @map("spell_pattern")
+  damageType       String  @default("physical") @map("damage_type")
+  isExpeditionMob  Boolean @default(false) @map("is_expedition_mob")
+  isBoss           Boolean @default(false) @map("is_boss")
+  bossAoeDmg       Int?    @map("boss_aoe_dmg")
+  bossBaseHp       Int?    @map("boss_base_hp")
   flavorAppearance String? @map("flavor_appearance") @db.Text
   flavorBehavior   String? @map("flavor_behavior") @db.Text
   flavorLore       String? @map("flavor_lore") @db.Text
 
-  zone              Zone               @relation(fields: [zoneId], references: [id])
-  dropTables        DropTable[]
-  bestiary          PlayerBestiary[]
-  bestiaryPrefixes  PlayerBestiaryPrefix[]
-  familyMembers     MobFamilyMember[]
-  bossEncounters    BossEncounter[]
-  persistedMobs     PersistedMob[]
-  bossRotations     PlayerBossRotation[]
+  zone             Zone                   @relation(fields: [zoneId], references: [id])
+  dropTables       DropTable[]
+  bestiary         PlayerBestiary[]
+  bestiaryPrefixes PlayerBestiaryPrefix[]
+  familyMembers    MobFamilyMember[]
+  bossEncounters   BossEncounter[]
+  persistedMobs    PersistedMob[]
+  bossRotations    PlayerBossRotation[]
 
   @@index([zoneId])
   @@index([isBoss])
@@ -485,8 +508,8 @@ model ResourceNode {
   maxCapacity     Int     @default(100) @map("max_capacity")
   discoveryWeight Int     @default(100) @map("discovery_weight")
 
-  zone            Zone                 @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  playerNodes     PlayerResourceNode[]
+  zone        Zone                 @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  playerNodes PlayerResourceNode[]
 
   @@index([zoneId])
   @@map("resource_nodes")
@@ -513,19 +536,19 @@ model PlayerResourceNode {
 // =============================================================================
 
 model CraftingRecipe {
-  id               String @id @default(uuid())
-  skillType        String @map("skill_type") @db.VarChar(32)
-  requiredLevel    Int    @map("required_level")
-  resultTemplateId String @map("result_template_id")
+  id               String  @id @default(uuid())
+  skillType        String  @map("skill_type") @db.VarChar(32)
+  requiredLevel    Int     @map("required_level")
+  resultTemplateId String  @map("result_template_id")
   isAdvanced       Boolean @default(false) @map("is_advanced")
   soulbound        Boolean @default(false)
   mobFamilyId      String? @map("mob_family_id")
-  turnCost         Int    @map("turn_cost")
+  turnCost         Int     @map("turn_cost")
   materials        Json
-  xpReward         Int    @map("xp_reward")
+  xpReward         Int     @map("xp_reward")
 
-  resultTemplate ItemTemplate @relation(fields: [resultTemplateId], references: [id])
-  mobFamily      MobFamily?   @relation(fields: [mobFamilyId], references: [id], onDelete: SetNull)
+  resultTemplate ItemTemplate   @relation(fields: [resultTemplateId], references: [id])
+  mobFamily      MobFamily?     @relation(fields: [mobFamilyId], references: [id], onDelete: SetNull)
   learnedBy      PlayerRecipe[]
 
   @@index([isAdvanced])
@@ -545,7 +568,7 @@ model ActivityLog {
   result       Json
   createdAt    DateTime @default(now()) @map("created_at")
 
-  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  player         Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
   encounterSites EncounterSite[]
 
   @@index([playerId, createdAt])
@@ -553,16 +576,16 @@ model ActivityLog {
 }
 
 model MobFamily {
-  id             String @id @default(uuid())
-  name           String @db.VarChar(64)
-  siteNounSmall  String @map("site_noun_small") @db.VarChar(64)
-  siteNounMedium String @map("site_noun_medium") @db.VarChar(64)
-  siteNounLarge  String @map("site_noun_large") @db.VarChar(64)
+  id             String  @id @default(uuid())
+  name           String  @db.VarChar(64)
+  siteNounSmall  String  @map("site_noun_small") @db.VarChar(64)
+  siteNounMedium String  @map("site_noun_medium") @db.VarChar(64)
+  siteNounLarge  String  @map("site_noun_large") @db.VarChar(64)
   flavorOverview String? @map("flavor_overview") @db.Text
 
-  members        MobFamilyMember[]
-  zoneMappings   ZoneMobFamily[]
-  encounterSites EncounterSite[]
+  members         MobFamilyMember[]
+  zoneMappings    ZoneMobFamily[]
+  encounterSites  EncounterSite[]
   advancedRecipes CraftingRecipe[]
   chestDropTables ChestDropTable[]
 
@@ -583,11 +606,11 @@ model MobFamilyMember {
 }
 
 model ZoneMobFamily {
-  zoneId           String @map("zone_id")
-  mobFamilyId      String @map("mob_family_id")
-  discoveryWeight  Int    @default(100) @map("discovery_weight")
-  minSize          String @map("min_size") @db.VarChar(16)
-  maxSize          String @map("max_size") @db.VarChar(16)
+  zoneId          String @map("zone_id")
+  mobFamilyId     String @map("mob_family_id")
+  discoveryWeight Int    @default(100) @map("discovery_weight")
+  minSize         String @map("min_size") @db.VarChar(16)
+  maxSize         String @map("max_size") @db.VarChar(16)
 
   zone      Zone      @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   mobFamily MobFamily @relation(fields: [mobFamilyId], references: [id], onDelete: Cascade)
@@ -598,24 +621,24 @@ model ZoneMobFamily {
 }
 
 model EncounterSite {
-  id          String   @id @default(uuid())
-  playerId    String   @map("player_id")
-  zoneId      String   @map("zone_id")
-  mobFamilyId String   @map("mob_family_id")
-  name        String   @db.VarChar(128)
-  size        String   @db.VarChar(16)
-  mobs        Json
+  id           String   @id @default(uuid())
+  playerId     String   @map("player_id")
+  zoneId       String   @map("zone_id")
+  mobFamilyId  String   @map("mob_family_id")
+  name         String   @db.VarChar(128)
+  size         String   @db.VarChar(16)
+  mobs         Json
   discoveredAt DateTime @default(now()) @map("discovered_at")
-  sourceLogId String?  @map("source_log_id")
+  sourceLogId  String?  @map("source_log_id")
 
-  currentRoom      Int      @default(1) @map("current_room")
-  roomStrategy    Json?     @map("room_strategy")
-  roomCarryState  Json?     @map("room_carry_state")
-  totalRooms      Int       @default(1) @map("total_rooms")
+  currentRoom    Int   @default(1) @map("current_room")
+  roomStrategy   Json? @map("room_strategy")
+  roomCarryState Json? @map("room_carry_state")
+  totalRooms     Int   @default(1) @map("total_rooms")
 
-  player    Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  zone      Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  mobFamily MobFamily  @relation(fields: [mobFamilyId], references: [id], onDelete: Cascade)
+  player    Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  zone      Zone         @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  mobFamily MobFamily    @relation(fields: [mobFamilyId], references: [id], onDelete: Cascade)
   sourceLog ActivityLog? @relation(fields: [sourceLogId], references: [id], onDelete: SetNull)
 
   @@index([playerId, discoveredAt])
@@ -675,19 +698,19 @@ model ChatMessage {
 // =============================================================================
 
 model PvpRating {
-  id           String    @id @default(uuid())
-  playerId     String    @unique @map("player_id")
-  player       Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  rating       Int       @default(1000)
-  wins         Int       @default(0)
-  losses       Int       @default(0)
-  draws        Int       @default(0)
-  winStreak    Int       @default(0) @map("win_streak")
-  bestWinStreak Int      @default(0) @map("best_win_streak")
-  bestRating   Int       @default(1000) @map("best_rating")
-  lastFoughtAt DateTime? @map("last_fought_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id            String    @id @default(uuid())
+  playerId      String    @unique @map("player_id")
+  player        Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  rating        Int       @default(1000)
+  wins          Int       @default(0)
+  losses        Int       @default(0)
+  draws         Int       @default(0)
+  winStreak     Int       @default(0) @map("win_streak")
+  bestWinStreak Int       @default(0) @map("best_win_streak")
+  bestRating    Int       @default(1000) @map("best_rating")
+  lastFoughtAt  DateTime? @map("last_fought_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@index([rating])
   @@map("pvp_ratings")
@@ -738,23 +761,23 @@ model PvpCooldown {
 // =============================================================================
 
 model WorldEvent {
-  id             String   @id @default(uuid())
-  type           String   @db.VarChar(16)
-  zoneId         String?  @map("zone_id")
-  title          String   @db.VarChar(128)
-  description    String   @db.Text
-  effectType     String   @map("effect_type") @db.VarChar(32)
-  effectValue    Float    @map("effect_value")
-  targetMobId    String?  @map("target_mob_id")
-  targetFamily   String?  @map("target_family")
-  targetResource String?  @map("target_resource") @db.VarChar(64)
-  startedAt      DateTime @default(now()) @map("started_at")
+  id             String    @id @default(uuid())
+  type           String    @db.VarChar(16)
+  zoneId         String?   @map("zone_id")
+  title          String    @db.VarChar(128)
+  description    String    @db.Text
+  effectType     String    @map("effect_type") @db.VarChar(32)
+  effectValue    Float     @map("effect_value")
+  targetMobId    String?   @map("target_mob_id")
+  targetFamily   String?   @map("target_family")
+  targetResource String?   @map("target_resource") @db.VarChar(64)
+  startedAt      DateTime  @default(now()) @map("started_at")
   expiresAt      DateTime? @map("expires_at")
-  status         String   @default("active") @db.VarChar(16)
-  createdBy      String   @default("system") @map("created_by") @db.VarChar(32)
+  status         String    @default("active") @db.VarChar(16)
+  createdBy      String    @default("system") @map("created_by") @db.VarChar(32)
 
-  zone           Zone?           @relation(fields: [zoneId], references: [id])
-  bossEncounter  BossEncounter?
+  zone          Zone?          @relation(fields: [zoneId], references: [id])
+  bossEncounter BossEncounter?
 
   @@index([status, type])
   @@index([zoneId, status])
@@ -762,48 +785,48 @@ model WorldEvent {
 }
 
 model BossEncounter {
-  id             String    @id @default(uuid())
-  eventId        String    @unique @map("event_id")
-  mobTemplateId  String    @map("mob_template_id")
-  currentHp      Int       @map("current_hp")
-  maxHp          Int       @map("max_hp")
-  baseHp         Int       @map("base_hp")
-  bossEffects    Json      @default("[]") @map("boss_effects")
-  scaledAt       DateTime? @map("scaled_at")
-  roundNumber    Int       @default(0) @map("round_number")
-  nextRoundAt    DateTime? @map("next_round_at")
-  status         String    @default("waiting") @db.VarChar(16)
-  killedBy       String?   @map("killed_by")
-  roundSummaries Json?     @map("round_summaries")
-  rewardsByPlayer Json?    @map("rewards_by_player")
+  id              String    @id @default(uuid())
+  eventId         String    @unique @map("event_id")
+  mobTemplateId   String    @map("mob_template_id")
+  currentHp       Int       @map("current_hp")
+  maxHp           Int       @map("max_hp")
+  baseHp          Int       @map("base_hp")
+  bossEffects     Json      @default("[]") @map("boss_effects")
+  scaledAt        DateTime? @map("scaled_at")
+  roundNumber     Int       @default(0) @map("round_number")
+  nextRoundAt     DateTime? @map("next_round_at")
+  status          String    @default("waiting") @db.VarChar(16)
+  killedBy        String?   @map("killed_by")
+  roundSummaries  Json?     @map("round_summaries")
+  rewardsByPlayer Json?     @map("rewards_by_player")
 
-  event         WorldEvent        @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  mobTemplate   MobTemplate       @relation(fields: [mobTemplateId], references: [id])
-  participants  BossParticipant[]
+  event        WorldEvent        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  mobTemplate  MobTemplate       @relation(fields: [mobTemplateId], references: [id])
+  participants BossParticipant[]
 
   @@index([status, nextRoundAt])
   @@map("boss_encounters")
 }
 
 model BossParticipant {
-  id              String @id @default(uuid())
-  encounterId     String @map("encounter_id")
-  playerId        String @map("player_id")
-  roundNumber     Int    @map("round_number")
-  turnsCommitted  Int    @map("turns_committed")
-  totalDamage     Int    @default(0) @map("total_damage")
-  totalHealing    Int    @default(0) @map("total_healing")
-  attacks         Int    @default(0)
-  hits            Int    @default(0)
-  crits           Int    @default(0)
-  autoSignUp      Boolean @default(false) @map("auto_sign_up")
-  currentHp       Int    @map("current_hp")
-  currentStamina  Int    @default(100) @map("current_stamina")
-  currentMana     Int    @default(50)  @map("current_mana")
-  threat          Int    @default(0)
-  damageAbsorbed  Int    @default(0) @map("damage_absorbed")
-  templateRound   Int    @default(1) @map("template_round")
-  status          String @default("alive") @db.VarChar(16)
+  id             String  @id @default(uuid())
+  encounterId    String  @map("encounter_id")
+  playerId       String  @map("player_id")
+  roundNumber    Int     @map("round_number")
+  turnsCommitted Int     @map("turns_committed")
+  totalDamage    Int     @default(0) @map("total_damage")
+  totalHealing   Int     @default(0) @map("total_healing")
+  attacks        Int     @default(0)
+  hits           Int     @default(0)
+  crits          Int     @default(0)
+  autoSignUp     Boolean @default(false) @map("auto_sign_up")
+  currentHp      Int     @map("current_hp")
+  currentStamina Int     @default(100) @map("current_stamina")
+  currentMana    Int     @default(50) @map("current_mana")
+  threat         Int     @default(0)
+  damageAbsorbed Int     @default(0) @map("damage_absorbed")
+  templateRound  Int     @default(1) @map("template_round")
+  status         String  @default("alive") @db.VarChar(16)
 
   encounter BossEncounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
   player    Player        @relation(fields: [playerId], references: [id], onDelete: Cascade)
@@ -956,7 +979,7 @@ model GuildProject {
   startedAt         DateTime  @default(now()) @map("started_at")
   completedAt       DateTime? @map("completed_at")
 
-  guild         Guild                     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guild         Guild                      @relation(fields: [guildId], references: [id], onDelete: Cascade)
   contributions GuildProjectContribution[]
 
   @@unique([guildId, projectKey])
@@ -1029,23 +1052,23 @@ model GuildJoinRequest {
 // =============================================================================
 
 model GuildExpedition {
-  id                String    @id @default(uuid())
-  guildId           String    @map("guild_id")
-  tier              Int
-  themeId         String?   @map("theme_id") @db.VarChar(64)
-  status            String    @default("recruiting") @db.VarChar(16)
-  currentRoom       Int       @default(0) @map("current_room")
-  totalRooms        Int       @map("total_rooms")
-  roomDefinitions   Json      @map("room_definitions")
-  roomStartSnapshot Json?     @map("room_start_snapshot")
-  roundNumber       Int       @default(0) @map("round_number")
-  roundSummaries    Json?     @map("round_summaries")
-  nextRoundAt       DateTime? @map("next_round_at")
-  startedAt         DateTime  @default(now()) @map("started_at")
-  completedAt       DateTime? @map("completed_at")
-  launchedBy        String    @map("launched_by")
-  wipeCount              Int      @default(0) @map("wipe_count")
-  expeditionAttemptLogs  Json?    @map("expedition_attempt_logs")
+  id                    String    @id @default(uuid())
+  guildId               String    @map("guild_id")
+  tier                  Int
+  themeId               String?   @map("theme_id") @db.VarChar(64)
+  status                String    @default("recruiting") @db.VarChar(16)
+  currentRoom           Int       @default(0) @map("current_room")
+  totalRooms            Int       @map("total_rooms")
+  roomDefinitions       Json      @map("room_definitions")
+  roomStartSnapshot     Json?     @map("room_start_snapshot")
+  roundNumber           Int       @default(0) @map("round_number")
+  roundSummaries        Json?     @map("round_summaries")
+  nextRoundAt           DateTime? @map("next_round_at")
+  startedAt             DateTime  @default(now()) @map("started_at")
+  completedAt           DateTime? @map("completed_at")
+  launchedBy            String    @map("launched_by")
+  wipeCount             Int       @default(0) @map("wipe_count")
+  expeditionAttemptLogs Json?     @map("expedition_attempt_logs")
 
   guild    Guild                   @relation(fields: [guildId], references: [id], onDelete: Cascade)
   launcher Player                  @relation("ExpeditionLauncher", fields: [launchedBy], references: [id])
@@ -1058,27 +1081,27 @@ model GuildExpedition {
 }
 
 model GuildExpeditionMember {
-  id             String   @id @default(uuid())
-  expeditionId   String   @map("expedition_id")
-  playerId       String   @map("player_id")
-  currentHp      Int      @map("current_hp")
-  currentStamina Int      @map("current_stamina")
-  currentMana    Int      @map("current_mana")
-  maxHp          Int      @map("max_hp")
-  maxStamina     Int      @map("max_stamina")
-  maxMana        Int      @map("max_mana")
-  templateRound  Int      @default(1) @map("template_round")
-  activeEffects  Json     @default("[]") @map("active_effects")
-  threatValue    Float    @default(0) @map("threat_value")
-  isKnockedOut   Boolean  @default(false) @map("is_knocked_out")
-  totalDamage    BigInt   @default(0) @map("total_damage")
-  totalHealing   BigInt   @default(0) @map("total_healing")
-  roomDamage     BigInt   @default(0) @map("room_damage")
-  roomHealing    BigInt   @default(0) @map("room_healing")
+  id                 String   @id @default(uuid())
+  expeditionId       String   @map("expedition_id")
+  playerId           String   @map("player_id")
+  currentHp          Int      @map("current_hp")
+  currentStamina     Int      @map("current_stamina")
+  currentMana        Int      @map("current_mana")
+  maxHp              Int      @map("max_hp")
+  maxStamina         Int      @map("max_stamina")
+  maxMana            Int      @map("max_mana")
+  templateRound      Int      @default(1) @map("template_round")
+  activeEffects      Json     @default("[]") @map("active_effects")
+  threatValue        Float    @default(0) @map("threat_value")
+  isKnockedOut       Boolean  @default(false) @map("is_knocked_out")
+  totalDamage        BigInt   @default(0) @map("total_damage")
+  totalHealing       BigInt   @default(0) @map("total_healing")
+  roomDamage         BigInt   @default(0) @map("room_damage")
+  roomHealing        BigInt   @default(0) @map("room_healing")
   targetMobId        String?  @map("target_mob_id")
   healTargetPlayerId String?  @map("heal_target_player_id")
   tokensEarned       Int      @default(0) @map("tokens_earned")
-  signedUpAt     DateTime @default(now()) @map("signed_up_at")
+  signedUpAt         DateTime @default(now()) @map("signed_up_at")
 
   expedition GuildExpedition @relation(fields: [expeditionId], references: [id], onDelete: Cascade)
   player     Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
@@ -1205,7 +1228,7 @@ model CombatTemplate {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  player Player               @relation(fields: [playerId], references: [id], onDelete: Cascade)
   slots  CombatTemplateSlot[]
 
   @@index([playerId, isActive])
@@ -1268,11 +1291,11 @@ model PvpScoutLog {
 // =============================================================================
 
 model RouletteRound {
-  id         String    @id @default(uuid())
-  spinNumber Int       @default(autoincrement()) @map("spin_number")
+  id         String        @id @default(uuid())
+  spinNumber Int           @default(autoincrement()) @map("spin_number")
   result     Int?
-  startedAt  DateTime  @default(now()) @map("started_at")
-  resolvedAt DateTime? @map("resolved_at")
+  startedAt  DateTime      @default(now()) @map("started_at")
+  resolvedAt DateTime?     @map("resolved_at")
   bets       RouletteBet[]
 
   @@index([resolvedAt])
@@ -1283,8 +1306,8 @@ model RouletteBet {
   id       String @id @default(uuid())
   roundId  String @map("round_id")
   playerId String @map("player_id")
-  betType  String @db.VarChar(16) @map("bet_type")
-  betValue String @db.VarChar(32) @map("bet_value")
+  betType  String @map("bet_type") @db.VarChar(16)
+  betValue String @map("bet_value") @db.VarChar(32)
   amount   Int
   payout   Int?
 

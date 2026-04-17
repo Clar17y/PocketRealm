@@ -46,6 +46,7 @@ export const prisma = {
   chatMessage: mockModel(),
   playerStats: mockModel(),
   playerAchievement: mockModel(),
+  premiumPurchase: mockModel(),
   mobFamily: mockModel(),
   activityLog: mockModel(),
   pvpRating: mockModel(),
