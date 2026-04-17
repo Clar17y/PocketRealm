@@ -18,10 +18,12 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getBuffValue, consumeBuffStandalone } from '../services/buffService';
+import { getHasActivePremiumEntitlement } from '../services/premiumEntitlement';
 import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
 
 export const gatheringRouter = Router();
+const CHAMPION_BONUS_MULTIPLIER = 1.1;
 
 gatheringRouter.use(authenticate);
 
@@ -315,11 +317,13 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
   const guildMods = await getPlayerGuildModifiers(playerId);
   const shopGatheringYield = await getBuffValue(playerId, 'gathering_yield');
+  const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
+  const championMultiplier = hasChampion ? CHAMPION_BONUS_MULTIPLIER : 1;
 
   // Apply level + guild/shop multipliers to batch total, not per-action
   // (fixes dead zone where Math.floor discards fractional multipliers every action)
   const combinedYieldBonus = guildMods.gatheringYield + shopGatheringYield;
-  const totalMultiplier = yieldMultiplier * (1 + combinedYieldBonus);
+  const totalMultiplier = yieldMultiplier * (1 + combinedYieldBonus) * championMultiplier;
   // Unrounded effective yield for capacity planning
   const effectiveYieldPerAction = baseYield * totalMultiplier;
   // Display value for yieldBreakdown (rounded for display only)
@@ -430,7 +434,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     const luckStat = equipStats.luck;
 
     const critResult = rollGemCritBatch(
-      { skillLevel: level, nodeLevel: template.levelRequired, luckStat },
+      { skillLevel: level, nodeLevel: template.levelRequired, luckStat, championMultiplier },
       actions,
     );
 

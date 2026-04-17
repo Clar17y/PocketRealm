@@ -222,6 +222,25 @@ describe('calculateCraftingCrit', () => {
     expect(result.bonusValue).toBeNull();
   });
 
+  it('applies champion multiplier to crit chance', () => {
+    const result = calculateCraftingCrit({
+      skillLevel: 10,
+      requiredLevel: 10,
+      luckStat: 0,
+      itemType: 'weapon',
+      baseStats: { attack: 50 },
+      slot: 'main_hand',
+    }, {
+      critRoll: 0.08,
+      statRoll: 0,
+      bonusPercentRoll: 0.5,
+    }, { championMultiplier: 2 });
+
+    expect(result.critChance).toBeCloseTo(0.10);
+    expect(result.isCrit).toBe(true);
+    expect(result.rarity).toBe('uncommon');
+  });
+
   it('returns deterministic crit result when rolls are provided', () => {
     const result = calculateCraftingCrit({
       skillLevel: 25,

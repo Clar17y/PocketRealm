@@ -235,7 +235,7 @@ vi.mock('@pocketrealm/game-engine', () => ({
   validateExplorationTurns: vi.fn(() => ({ valid: true })),
 }));
 
-import { TUTORIAL_STEP_EXPLORE, TUTORIAL_STEP_WELCOME } from '@pocketrealm/shared';
+import { EXPLORATION_CONSTANTS, TUTORIAL_STEP_EXPLORE, TUTORIAL_STEP_WELCOME } from '@pocketrealm/shared';
 import { mockPrisma } from '../../__test__/setup';
 import { spendPlayerTurnsTx } from '../../services/turnBankService';
 import { applyMobPrefix, simulateExploration, runTemplateCombat } from '@pocketrealm/game-engine';
@@ -370,7 +370,30 @@ describe('exploration tutorial path', () => {
     // Should spend the requested turns, not 100 (called via transaction)
     expect(mockSpendPlayerTurnsTx).toHaveBeenCalledWith(expect.anything(), 'p1', 500);
     // Should call simulateExploration (exitChance is null when no undiscovered neighbors, spawnRateMultiplier is 1 with no zone families)
-    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, 1);
+    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, 1, null);
+  });
+
+  it('passes Champion-adjusted hidden cache chance into simulateExploration for premium players', async () => {
+    setupZoneAndMobs(TUTORIAL_STEP_WELCOME);
+    mockPrisma.player.findUnique
+      .mockResolvedValueOnce({ tutorialStep: TUTORIAL_STEP_WELCOME })
+      .mockResolvedValueOnce({
+        isPremium: true,
+        premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+      });
+    mockSimulateExploration.mockReturnValue([]);
+
+    const req = baseReq({ body: { zoneId: ZONE_ID, turns: 500 } });
+    const res = mockRes();
+    const handler = findHandler('post', '/start');
+    await handler(req, res, vi.fn());
+
+    expect(mockSimulateExploration).toHaveBeenCalledWith(
+      500,
+      null,
+      1,
+      EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * 1.1,
+    );
   });
 
   it('combat victory during tutorial grants XP and loot normally', async () => {

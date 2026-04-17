@@ -7,6 +7,7 @@ import {
   validateExplorationTurns,
 } from '@pocketrealm/game-engine';
 import {
+  EXPLORATION_CONSTANTS,
   getUnlockedTiers,
   getHighestUnlockedTier,
   type PotionConsumed,
@@ -33,6 +34,7 @@ import { getCombatBuffsWithUses } from '../../services/buffService';
 import { getMainHandAttackSkill } from '../../services/combatStatsService';
 import { checkActivityLockout } from '../../services/expeditionLockoutService';
 import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers';
+import { getHasActivePremiumEntitlement } from '../../services/premiumEntitlement';
 import {
   getCachedMobTemplatesByZone,
   getCachedResourceNodesByZone,
@@ -48,6 +50,7 @@ import {
 
 
 export const startRouter = Router();
+const CHAMPION_BONUS_MULTIPLIER = 1.1;
 
 function familyHasEligibleMembersForTier(
   family: ZoneFamilyRow,
@@ -202,9 +205,14 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
       spawnRateMultiplier *= EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER;
     }
 
+    const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
+    const hiddenCacheChance = hasChampion
+      ? EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * CHAMPION_BONUS_MULTIPLIER
+      : null;
+
     const outcomes = isTutorialExplore
       ? [{ turnOccurred: 50, type: 'ambush' as const }]
-      : simulateExploration(effectiveTurns, effectiveExitChance, spawnRateMultiplier);
+      : simulateExploration(effectiveTurns, effectiveExitChance, spawnRateMultiplier, hiddenCacheChance);
 
     // --- Process all outcome events ---
     const outcomeResult = await processExplorationOutcomes(

@@ -80,6 +80,18 @@ describe('estimateExploration', () => {
     const est = estimateExploration(100, 0.01);
     expect(est.zoneExitChance).toBeCloseTo(cumulativeProbability(0.01, 100));
   });
+
+  it('uses champion-adjusted hidden cache chance when provided', () => {
+    const est = estimateExploration(
+      100,
+      null,
+      1,
+      EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * 2,
+    );
+    expect(est.hiddenCacheChance).toBeCloseTo(
+      cumulativeProbability(EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * 2, 100),
+    );
+  });
 });
 
 describe('simulateExploration', () => {
@@ -106,6 +118,17 @@ describe('simulateExploration', () => {
     const outcomes = simulateExploration(5, 0.5);
     const zoneExits = outcomes.filter(o => o.type === 'zone_exit');
     expect(zoneExits.length).toBe(1);
+  });
+
+  it('uses champion-adjusted hidden cache chance when provided', () => {
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.9)
+      .mockReturnValueOnce(0.9)
+      .mockReturnValueOnce(0.9)
+      .mockReturnValueOnce(0.4)
+      .mockReturnValue(0.9);
+    const outcomes = simulateExploration(1, null, 1, 0.5);
+    expect(outcomes.some((o) => o.type === 'hidden_cache')).toBe(true);
   });
 
   it('results are sorted by turnOccurred', () => {

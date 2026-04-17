@@ -6,6 +6,9 @@ import { rollAndGrantLoot, enrichLootWithNames } from './lootService';
 import { addStackableItem } from './inventoryService';
 import { grantSkillXp } from './xpService';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';
+import { getHasActivePremiumEntitlement } from './premiumEntitlement';
+
+const CHAMPION_BONUS_MULTIPLIER = 1.1;
 
 export interface BossContributor {
   playerId: string;
@@ -107,13 +110,16 @@ export async function distributeBossLoot(
     const playerScore = scores.find(s => s.playerId === contributor.playerId)?.score ?? 0;
     const ratio = totalContribution > 0 ? playerScore / totalContribution : 1 / contributors.length;
     const dropMultiplier = Math.max(WORLD_EVENT_CONSTANTS.BOSS_CONTRIBUTION_FLOOR, Math.min(2, ratio * contributors.length));
+    const hasChampion = await getHasActivePremiumEntitlement(prisma, contributor.playerId);
+    const championMultiplier = hasChampion ? CHAMPION_BONUS_MULTIPLIER : 1;
+    const effectiveDropMultiplier = dropMultiplier * championMultiplier;
 
     // 1. Item loot with rarity bonus
     const loot = await rollAndGrantLoot(
       contributor.playerId,
       mobTemplateId,
       mobLevel + rarityBonus,
-      dropMultiplier,
+      effectiveDropMultiplier,
     );
     const enrichedLoot = await enrichLootWithNames(loot);
     const lootReward: BossPlayerReward['loot'] = enrichedLoot.map((drop) => ({
@@ -133,7 +139,7 @@ export async function distributeBossLoot(
     }
 
     // 2. XP scaled by contribution
-    const scaledXp = Math.round(baseXp * dropMultiplier);
+    const scaledXp = Math.round(baseXp * effectiveDropMultiplier);
     const rawSkill = contributor.attackSkill ?? 'magic';
     const skillType: SkillType = ALL_SKILLS.includes(rawSkill as SkillType) ? (rawSkill as SkillType) : 'magic';
     const xpResult = await grantSkillXp(contributor.playerId, skillType, scaledXp);
