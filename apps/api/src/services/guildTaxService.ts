@@ -1,5 +1,5 @@
 import { Prisma, prisma } from '@pocketrealm/database';
-import type { TaxInfo } from '@pocketrealm/shared';
+import { PREMIUM_CONSTANTS, TURN_CONSTANTS, type TaxInfo } from '@pocketrealm/shared';
 import { calculateCurrentTurns, calculateTimeToCapMs } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { calculateTreasuryCap } from './guildService';
@@ -63,14 +63,22 @@ export async function spendWithTaxTx(
   baseCost: number,
 ): Promise<{ turnSpend: SpendTurnsResult; taxResult: TaxResult }> {
   if (baseCost <= 0) {
-    const bank = await tx.turnBank.findUnique({ where: { playerId } });
+    const [bank, player] = await Promise.all([
+      tx.turnBank.findUnique({ where: { playerId } }),
+      tx.player.findUnique({
+        where: { id: playerId },
+        select: { isPremium: true },
+      }),
+    ]);
     if (!bank) throw new AppError(404, 'Turn bank not found', 'NOT_FOUND');
-    const current = calculateCurrentTurns(bank.currentTurns, bank.lastRegenAt, new Date());
+    const regenRate = player?.isPremium ? PREMIUM_CONSTANTS.TURN_REGEN_RATE : TURN_CONSTANTS.REGEN_RATE;
+    const bankCap = player?.isPremium ? PREMIUM_CONSTANTS.TURN_BANK_CAP : TURN_CONSTANTS.BANK_CAP;
+    const current = calculateCurrentTurns(bank.currentTurns, bank.lastRegenAt, new Date(), regenRate, bankCap);
     return {
       turnSpend: {
         previousTurns: current, spent: 0, currentTurns: current,
         lastRegenAt: bank.lastRegenAt.toISOString(),
-        timeToCapMs: calculateTimeToCapMs(current),
+        timeToCapMs: calculateTimeToCapMs(current, regenRate, bankCap),
       },
       taxResult: NO_TAX(0),
     };

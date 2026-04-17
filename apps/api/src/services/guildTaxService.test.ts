@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PREMIUM_CONSTANTS, TURN_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('./guildService', () => ({
   calculateTreasuryCap: vi.fn().mockReturnValue(110_000),
@@ -277,13 +278,51 @@ describe('spendWithTaxTx', () => {
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       playerId: 'p1', currentTurns: 2000, lastRegenAt,
     });
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     vi.mocked(calculateTimeToCapMs).mockReturnValue(3600000);
 
     const result = await spendWithTaxTx(prisma, 'p1', 0);
 
-    expect(calculateCurrentTurns).toHaveBeenCalledWith(2000, lastRegenAt, expect.any(Date));
-    expect(calculateTimeToCapMs).toHaveBeenCalledWith(5000); // mocked calculateCurrentTurns returns 5000
+    expect(calculateCurrentTurns).toHaveBeenCalledWith(
+      2000,
+      lastRegenAt,
+      expect.any(Date),
+      TURN_CONSTANTS.REGEN_RATE,
+      TURN_CONSTANTS.BANK_CAP,
+    );
+    expect(calculateTimeToCapMs).toHaveBeenCalledWith(
+      5000,
+      TURN_CONSTANTS.REGEN_RATE,
+      TURN_CONSTANTS.BANK_CAP,
+    );
     expect(result.turnSpend.timeToCapMs).toBe(3600000);
+  });
+
+  it('uses Champion turn overrides for premium players when baseCost is 0', async () => {
+    const lastRegenAt = new Date('2026-01-01T00:00:00.000Z');
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      playerId: 'p1', currentTurns: 2000, lastRegenAt,
+    });
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: true });
+
+    await spendWithTaxTx(prisma, 'p1', 0);
+
+    expect(mockPrisma.player.findUnique).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      select: { isPremium: true },
+    });
+    expect(calculateCurrentTurns).toHaveBeenCalledWith(
+      2000,
+      lastRegenAt,
+      expect.any(Date),
+      PREMIUM_CONSTANTS.TURN_REGEN_RATE,
+      PREMIUM_CONSTANTS.TURN_BANK_CAP,
+    );
+    expect(calculateTimeToCapMs).toHaveBeenCalledWith(
+      5000,
+      PREMIUM_CONSTANTS.TURN_REGEN_RATE,
+      PREMIUM_CONSTANTS.TURN_BANK_CAP,
+    );
   });
 
   it('spends inflated cost when player has guild tax', async () => {
