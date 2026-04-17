@@ -51,8 +51,8 @@ describe('premium router', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
-      sessionId: 'cs_test_123',
-      checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_123',
+      id: 'cs_test_123',
+      url: 'https://checkout.stripe.com/c/pay/cs_test_123',
     });
     expect(createSupportPocketrealmCheckoutSession).toHaveBeenCalledWith({
       playerId: 'player-1',

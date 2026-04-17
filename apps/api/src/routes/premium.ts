@@ -13,10 +13,7 @@ premiumRouter.post('/checkout', asyncHandler(async (req, res) => {
     playerId: req.player!.playerId,
   });
 
-  res.json({
-    sessionId: session.id,
-    checkoutUrl: session.url,
-  });
+  res.json(session);
 }));
 
 premiumRouter.get('/status', asyncHandler(async (req, res) => {
