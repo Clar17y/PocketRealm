@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.52',
+    date: '2026-04-17',
+    title: 'Account Settings & Security',
+    summary:
+      'Settings is now split into separate Account and Game tabs, so account management no longer sits mixed in with gameplay preferences. You can now change your email address and password from inside the game, check whether your email is verified, and resend the verification email without leaving the settings screen. The email update flow also avoids a confusing error if you submit your current address unchanged.',
+  },
+  {
     version: '0.51',
     date: '2026-04-14',
     title: 'Exploration Family Tracking',
