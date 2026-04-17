@@ -80,6 +80,7 @@ import { addStackableItem } from '../services/inventoryService';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
+import { createActivityLog } from '../services/activityLogService';
 import { grantPremiumDays, listPremiumPurchases } from '../services/premiumService';
 import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { adminRouter } from './admin';
@@ -106,7 +107,7 @@ function mockRes() {
 describe('admin routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.activityLog.create.mockResolvedValue({ id: 'log-1' });
+    vi.mocked(createActivityLog).mockResolvedValue({ id: 'log-1' } as never);
   });
 
   describe('POST /turns/grant', () => {
@@ -405,18 +406,17 @@ describe('admin routes', () => {
         },
       }, mockPrisma);
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-      expect(mockPrisma.activityLog.create).toHaveBeenCalledWith({
-        data: {
-          playerId: 'admin-1',
-          activityType: 'admin_action',
-          turnsSpent: 0,
-          result: {
-            action: 'grant_premium',
-            targetPlayerId: 'player-target',
-            days: 14,
-            purchaseId: 'purchase-2',
-            reason: 'Support recovery',
-          },
+      expect(createActivityLog).toHaveBeenCalledWith({
+        tx: mockPrisma,
+        playerId: 'admin-1',
+        activityType: 'admin_action',
+        turnsSpent: 0,
+        result: {
+          action: 'grant_premium',
+          targetPlayerId: 'player-target',
+          days: 14,
+          purchaseId: 'purchase-2',
+          reason: 'Support recovery',
         },
       });
       expect(res.json).toHaveBeenCalledWith({
@@ -434,7 +434,7 @@ describe('admin routes', () => {
         id: 'purchase-3',
         playerId: 'player-target',
       } as never);
-      mockPrisma.activityLog.create.mockRejectedValueOnce(new Error('audit write failed'));
+      vi.mocked(createActivityLog).mockRejectedValueOnce(new Error('audit write failed'));
 
       const req = {
         player: { playerId: 'admin-1' },

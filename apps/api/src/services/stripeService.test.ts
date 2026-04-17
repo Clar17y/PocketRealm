@@ -68,8 +68,8 @@ describe('stripeService', () => {
       });
       expect(createSession).toHaveBeenCalledWith({
         mode: 'payment',
-        success_url: 'https://pocketrealm.gg/support/success?session_id={CHECKOUT_SESSION_ID}',
-        cancel_url: 'https://pocketrealm.gg/support',
+        success_url: 'https://pocketrealm.gg/game?screen=settings&support=success&session_id={CHECKOUT_SESSION_ID}',
+        cancel_url: 'https://pocketrealm.gg/game?screen=settings&support=cancelled',
         customer_email: 'player@example.com',
         submit_type: 'donate',
         metadata: {

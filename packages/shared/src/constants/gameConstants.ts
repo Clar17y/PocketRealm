@@ -643,10 +643,6 @@ export const PREMIUM_CONSTANTS = {
   SUPPORT_PRODUCT_TYPE: 'support_pocketrealm',
 } as const;
 
-export const COMBAT_TEMPLATE_CONSTANTS = {
-  MAX_TEMPLATES: 10,
-} as const;
-
 export const POTION_CONSTANTS = {
   /** HP restored by Minor Health Potion */
   MINOR_HEALTH_HEAL: 50,

@@ -218,6 +218,7 @@ model PremiumPurchase {
 model TurnBank {
   playerId     String   @id @map("player_id")
   currentTurns Int      @default(86400) @map("current_turns")
+  regenProgress Int     @default(0) @map("regen_progress")
   lastRegenAt  DateTime @default(now()) @map("last_regen_at")
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)

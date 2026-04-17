@@ -1,6 +1,6 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import { PREMIUM_CONSTANTS, TURN_CONSTANTS, type TaxInfo } from '@pocketrealm/shared';
-import { calculateCurrentTurns, calculateTimeToCapMs } from '@pocketrealm/game-engine';
+import { calculateCurrentTurns, calculateTimeToCapMs, calculateTurnProgress } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import { calculateTreasuryCap } from './guildService';
 import { getHasActivePremiumEntitlement } from './premiumEntitlement';
@@ -64,6 +64,7 @@ export async function spendWithTaxTx(
   baseCost: number,
 ): Promise<{ turnSpend: SpendTurnsResult; taxResult: TaxResult }> {
   if (baseCost <= 0) {
+    const now = new Date();
     const [bank, hasActivePremiumEntitlement] = await Promise.all([
       tx.turnBank.findUnique({ where: { playerId } }),
       getHasActivePremiumEntitlement(tx, playerId),
@@ -71,12 +72,30 @@ export async function spendWithTaxTx(
     if (!bank) throw new AppError(404, 'Turn bank not found', 'NOT_FOUND');
     const regenRate = hasActivePremiumEntitlement ? PREMIUM_CONSTANTS.TURN_REGEN_RATE : TURN_CONSTANTS.REGEN_RATE;
     const bankCap = hasActivePremiumEntitlement ? PREMIUM_CONSTANTS.TURN_BANK_CAP : TURN_CONSTANTS.BANK_CAP;
-    const current = calculateCurrentTurns(bank.currentTurns, bank.lastRegenAt, new Date(), regenRate, bankCap);
+    const current = calculateCurrentTurns(
+      bank.currentTurns,
+      bank.lastRegenAt,
+      now,
+      regenRate,
+      bankCap,
+      bank.regenProgress,
+    );
+    const regenProgress = calculateTurnProgress(
+      bank.lastRegenAt,
+      now,
+      regenRate,
+      bank.regenProgress,
+    );
     return {
       turnSpend: {
         previousTurns: current, spent: 0, currentTurns: current,
         lastRegenAt: bank.lastRegenAt.toISOString(),
-        timeToCapMs: calculateTimeToCapMs(current, regenRate, bankCap),
+        timeToCapMs: calculateTimeToCapMs(
+          current,
+          regenRate,
+          bankCap,
+          current >= bankCap ? 0 : regenProgress,
+        ),
       },
       taxResult: NO_TAX(0),
     };

@@ -3,8 +3,8 @@ import { prisma } from '@pocketrealm/database';
 import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
-const SUCCESS_PATH = '/support/success?session_id={CHECKOUT_SESSION_ID}';
-const CANCEL_PATH = '/support';
+const SUCCESS_PATH = '/game?screen=settings&support=success&session_id={CHECKOUT_SESSION_ID}';
+const CANCEL_PATH = '/game?screen=settings&support=cancelled';
 
 let stripeClient: Stripe | null = null;
 

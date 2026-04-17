@@ -50,13 +50,12 @@ async function adminAuditTx(
   action: string,
   details: Record<string, unknown>,
 ) {
-  await tx.activityLog.create({
-    data: {
-      playerId: adminId,
-      activityType: 'admin_action',
-      turnsSpent: 0,
-      result: { action, ...details } as Prisma.InputJsonValue,
-    },
+  await createActivityLog({
+    tx,
+    playerId: adminId,
+    activityType: 'admin_action',
+    turnsSpent: 0,
+    result: { action, ...details } as Prisma.InputJsonValue,
   });
 }
 

@@ -3,6 +3,7 @@ import { PREMIUM_CONSTANTS, TURN_CONSTANTS } from '@pocketrealm/shared';
 import {
   calculateAccruedTurns,
   calculateCurrentTurns,
+  calculateTurnProgress,
   calculateTimeToCapMs,
   spendTurns,
   isValidTurnAmount,
@@ -34,7 +35,7 @@ describe('calculateAccruedTurns', () => {
     const later = new Date(base.getTime() + 10_000); // 10 seconds
 
     expect(calculateAccruedTurns(base, later, PREMIUM_CONSTANTS.TURN_REGEN_RATE))
-      .toBe(10 * PREMIUM_CONSTANTS.TURN_REGEN_RATE);
+      .toBe(11);
   });
 });
 
@@ -63,6 +64,42 @@ describe('calculateCurrentTurns', () => {
     expect(calculateCurrentTurns(0, base, later, TURN_CONSTANTS.REGEN_RATE, PREMIUM_CONSTANTS.TURN_BANK_CAP))
       .toBe(PREMIUM_CONSTANTS.TURN_BANK_CAP);
   });
+
+  it('keeps premium balances integer-compatible', () => {
+    const later = new Date(base.getTime() + 1_000);
+
+    expect(calculateCurrentTurns(0, base, later, PREMIUM_CONSTANTS.TURN_REGEN_RATE)).toBe(1);
+  });
+});
+
+describe('calculateTurnProgress', () => {
+  const base = new Date('2025-01-01T00:00:00Z');
+
+  it('tracks premium fractional progress separately from whole turns', () => {
+    const later = new Date(base.getTime() + 1_000);
+
+    expect(calculateTurnProgress(base, later, PREMIUM_CONSTANTS.TURN_REGEN_RATE)).toBe(10);
+  });
+
+  it('supports carrying premium progress between updates', () => {
+    const first = new Date(base.getTime() + 1_000);
+    const second = new Date(base.getTime() + 2_000);
+    const carriedProgress = calculateTurnProgress(base, first, PREMIUM_CONSTANTS.TURN_REGEN_RATE);
+
+    expect(
+      calculateCurrentTurns(
+        1,
+        first,
+        second,
+        PREMIUM_CONSTANTS.TURN_REGEN_RATE,
+        TURN_CONSTANTS.BANK_CAP,
+        carriedProgress,
+      ),
+    ).toBe(2);
+    expect(
+      calculateTurnProgress(first, second, PREMIUM_CONSTANTS.TURN_REGEN_RATE, carriedProgress),
+    ).toBe(20);
+  });
 });
 
 describe('calculateTimeToCapMs', () => {
@@ -88,7 +125,7 @@ describe('calculateTimeToCapMs', () => {
 
   it('uses override cap and regen rate when provided', () => {
     const current = PREMIUM_CONSTANTS.TURN_BANK_CAP - 110;
-    const expected = (110 / PREMIUM_CONSTANTS.TURN_REGEN_RATE) * 1000;
+    const expected = 100_000;
 
     expect(calculateTimeToCapMs(
       current,

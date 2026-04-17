@@ -1,5 +1,5 @@
 import { Prisma, prisma } from '@pocketrealm/database';
-import { calculateCurrentTurns, calculateTimeToCapMs, spendTurns } from '@pocketrealm/game-engine';
+import { calculateCurrentTurns, calculateTimeToCapMs, calculateTurnProgress, spendTurns } from '@pocketrealm/game-engine';
 import { PREMIUM_CONSTANTS, TURN_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 import { getHasActivePremiumEntitlement } from './premiumEntitlement';
@@ -26,11 +26,19 @@ export async function getTurnState(playerId: string, now: Date = new Date()): Pr
     now,
     turnConfig.regenRate,
     turnConfig.bankCap,
+    turnBank.regenProgress,
+  );
+  const regenProgress = calculateTurnProgress(
+    turnBank.lastRegenAt,
+    now,
+    turnConfig.regenRate,
+    turnBank.regenProgress,
   );
   const timeToCapMs = calculateTimeToCapMs(
     currentTurns,
     turnConfig.regenRate,
     turnConfig.bankCap,
+    currentTurns >= turnConfig.bankCap ? 0 : regenProgress,
   );
 
   return {
@@ -106,6 +114,13 @@ async function spendPlayerTurnsWithClient(
       now,
       turnConfig.regenRate,
       turnConfig.bankCap,
+      turnBank.regenProgress,
+    );
+    const regenProgress = calculateTurnProgress(
+      turnBank.lastRegenAt,
+      now,
+      turnConfig.regenRate,
+      turnBank.regenProgress,
     );
     const newBalance = spendTurns(previousTurns, amount);
 
@@ -117,10 +132,12 @@ async function spendPlayerTurnsWithClient(
       where: {
         playerId,
         currentTurns: turnBank.currentTurns,
+        regenProgress: turnBank.regenProgress,
         lastRegenAt: turnBank.lastRegenAt,
       },
       data: {
         currentTurns: newBalance,
+        regenProgress,
         lastRegenAt: now,
       },
     });
@@ -133,6 +150,7 @@ async function spendPlayerTurnsWithClient(
       newBalance,
       turnConfig.regenRate,
       turnConfig.bankCap,
+      regenProgress,
     );
 
     return {
@@ -197,17 +215,27 @@ async function refundPlayerTurnsWithClient(
       now,
       turnConfig.regenRate,
       turnConfig.bankCap,
+      turnBank.regenProgress,
+    );
+    const regenProgress = calculateTurnProgress(
+      turnBank.lastRegenAt,
+      now,
+      turnConfig.regenRate,
+      turnBank.regenProgress,
     );
     const newBalance = Math.min(turnConfig.bankCap, previousTurns + amount);
+    const nextRegenProgress = newBalance >= turnConfig.bankCap ? 0 : regenProgress;
 
     const updated = await client.turnBank.updateMany({
       where: {
         playerId,
         currentTurns: turnBank.currentTurns,
+        regenProgress: turnBank.regenProgress,
         lastRegenAt: turnBank.lastRegenAt,
       },
       data: {
         currentTurns: newBalance,
+        regenProgress: nextRegenProgress,
         lastRegenAt: now,
       },
     });
@@ -220,6 +248,7 @@ async function refundPlayerTurnsWithClient(
       newBalance,
       turnConfig.regenRate,
       turnConfig.bankCap,
+      nextRegenProgress,
     );
 
     return {

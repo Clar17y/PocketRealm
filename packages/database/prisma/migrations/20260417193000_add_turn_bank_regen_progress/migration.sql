@@ -1,0 +1,2 @@
+ALTER TABLE "turn_banks"
+ADD COLUMN "regen_progress" INTEGER NOT NULL DEFAULT 0;

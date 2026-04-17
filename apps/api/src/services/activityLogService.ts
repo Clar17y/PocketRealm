@@ -24,8 +24,11 @@ export async function createActivityLog(params: {
   activityType: ActivityType;
   turnsSpent: number;
   result: Record<string, unknown> | Prisma.InputJsonValue;
+  tx?: Prisma.TransactionClient;
 }) {
-  return prisma.activityLog.create({
+  const client = params.tx ?? prisma;
+
+  return client.activityLog.create({
     data: {
       playerId: params.playerId,
       activityType: params.activityType,

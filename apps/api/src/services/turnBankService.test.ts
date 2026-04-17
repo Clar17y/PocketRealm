@@ -17,6 +17,7 @@ describe('getTurnState', () => {
     mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 1000,
+      regenProgress: 0,
       lastRegenAt: new Date(now.getTime() - 5000), // 5s ago
     });
 
@@ -37,6 +38,7 @@ describe('getTurnState', () => {
     mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: TURN_CONSTANTS.BANK_CAP,
+      regenProgress: 0,
       lastRegenAt: new Date(now.getTime() - 100_000),
     });
 
@@ -52,6 +54,7 @@ describe('getTurnState', () => {
     });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: PREMIUM_CONSTANTS.TURN_BANK_CAP - 2,
+      regenProgress: 0,
       lastRegenAt: new Date(now.getTime() - 2_000), // +2.2 turns
     });
 
@@ -67,6 +70,7 @@ describe('getTurnState', () => {
     });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: TURN_CONSTANTS.BANK_CAP - 1,
+      regenProgress: 0,
       lastRegenAt: new Date(now.getTime() - 2_000),
     });
 
@@ -103,6 +107,7 @@ describe('spendPlayerTurns', () => {
     mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 5,
+      regenProgress: 0,
       lastRegenAt: now,
     });
 
@@ -113,6 +118,7 @@ describe('spendPlayerTurns', () => {
     mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 500,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
@@ -127,6 +133,7 @@ describe('spendPlayerTurns', () => {
     mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 500,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany
@@ -142,6 +149,7 @@ describe('spendPlayerTurns', () => {
     mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 500,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 0 });
@@ -164,6 +172,7 @@ describe('refundPlayerTurns', () => {
     mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: TURN_CONSTANTS.BANK_CAP - 50,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
@@ -176,6 +185,7 @@ describe('refundPlayerTurns', () => {
     mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 100,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
@@ -192,6 +202,7 @@ describe('refundPlayerTurns', () => {
     });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: PREMIUM_CONSTANTS.TURN_BANK_CAP - 20,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
@@ -207,11 +218,34 @@ describe('refundPlayerTurns', () => {
     });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: TURN_CONSTANTS.BANK_CAP - 20,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await refundPlayerTurns('p1', 50, now);
     expect(result.currentTurns).toBe(TURN_CONSTANTS.BANK_CAP);
+  });
+
+  it('preserves premium fractional progress when spending turns', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date(now.getTime() + 60_000),
+    });
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      currentTurns: 100,
+      regenProgress: 0,
+      lastRegenAt: new Date(now.getTime() - 1_000),
+    });
+    mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
+
+    await spendPlayerTurns('p1', 1, now);
+
+    expect(mockPrisma.turnBank.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        currentTurns: 100,
+        regenProgress: 10,
+      }),
+    }));
   });
 });
