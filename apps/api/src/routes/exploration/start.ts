@@ -8,6 +8,7 @@ import {
 } from '@pocketrealm/game-engine';
 import {
   EXPLORATION_CONSTANTS,
+  PREMIUM_CONSTANTS,
   getUnlockedTiers,
   getHighestUnlockedTier,
   type PotionConsumed,
@@ -50,7 +51,6 @@ import {
 
 
 export const startRouter = Router();
-const CHAMPION_BONUS_MULTIPLIER = 1.1;
 
 function familyHasEligibleMembersForTier(
   family: ZoneFamilyRow,
@@ -207,7 +207,7 @@ startRouter.post('/start', asyncHandler(async (req, res) => {
 
     const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
     const hiddenCacheChance = hasChampion
-      ? EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * CHAMPION_BONUS_MULTIPLIER
+      ? EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * PREMIUM_CONSTANTS.BONUS_MULTIPLIER
       : null;
 
     const outcomes = isTutorialExplore

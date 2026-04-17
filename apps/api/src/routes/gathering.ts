@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma, prisma } from '@pocketrealm/database';
-import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONSTANTS, levelToGemTier, type SkillType } from '@pocketrealm/shared';
+import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONSTANTS, PREMIUM_CONSTANTS, levelToGemTier, type SkillType } from '@pocketrealm/shared';
 import { createActivityLog, type ActivityType } from '../services/activityLogService';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -23,7 +23,6 @@ import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
 
 export const gatheringRouter = Router();
-const CHAMPION_BONUS_MULTIPLIER = 1.1;
 
 gatheringRouter.use(authenticate);
 
@@ -318,7 +317,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const guildMods = await getPlayerGuildModifiers(playerId);
   const shopGatheringYield = await getBuffValue(playerId, 'gathering_yield');
   const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
-  const championMultiplier = hasChampion ? CHAMPION_BONUS_MULTIPLIER : 1;
+  const championMultiplier = hasChampion ? PREMIUM_CONSTANTS.BONUS_MULTIPLIER : 1;
 
   // Apply level + guild/shop multipliers to batch total, not per-action
   // (fixes dead zone where Math.floor discards fractional multipliers every action)

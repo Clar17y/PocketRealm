@@ -1,12 +1,10 @@
 import { Prisma } from '@pocketrealm/database';
-import { HIDDEN_CACHE_CONSTANTS, GEM_CONSTANTS, levelToGemTier } from '@pocketrealm/shared';
+import { HIDDEN_CACHE_CONSTANTS, GEM_CONSTANTS, PREMIUM_CONSTANTS, levelToGemTier } from '@pocketrealm/shared';
 import { randomIntInclusive } from '../utils/random';
 import { addStackableItemTx } from './inventoryService';
 import { getHasActivePremiumEntitlement } from './premiumEntitlement';
 import type { PendingLootItem } from './pendingLootService';
 import type { GrantedItemIds } from './stateUpdateHelpers';
-
-const CHAMPION_BONUS_MULTIPLIER = 1.1;
 
 interface CacheMaterialDrop {
   itemTemplateId: string;
@@ -107,7 +105,7 @@ export async function grantCacheLootTx(
 ): Promise<CacheLootResult> {
   const { MATERIAL_ROLLS_MIN, MATERIAL_ROLLS_MAX, SOULBOUND_DROP_CHANCE } = HIDDEN_CACHE_CONSTANTS;
   const hasChampion = await getHasActivePremiumEntitlement(tx, params.playerId);
-  const championMultiplier = hasChampion ? CHAMPION_BONUS_MULTIPLIER : 1;
+  const championMultiplier = hasChampion ? PREMIUM_CONSTANTS.BONUS_MULTIPLIER : 1;
 
   // --- Refined gem materials from zone gathering nodes ---
   const resourceNodes = await tx.resourceNode.findMany({

@@ -1,5 +1,5 @@
 import { prisma } from '@pocketrealm/database';
-import { WORLD_EVENT_CONSTANTS, ALL_SKILLS, type BossPlayerReward, type SkillType } from '@pocketrealm/shared';
+import { PREMIUM_CONSTANTS, WORLD_EVENT_CONSTANTS, ALL_SKILLS, type BossPlayerReward, type SkillType } from '@pocketrealm/shared';
 import { calculateContributionScore } from '@pocketrealm/game-engine';
 import { randomIntInclusive } from '../utils/random';
 import { rollAndGrantLoot, enrichLootWithNames } from './lootService';
@@ -7,8 +7,6 @@ import { addStackableItem } from './inventoryService';
 import { grantSkillXp } from './xpService';
 import { checkAchievements, emitAchievementNotifications } from './achievementService';
 import { getHasActivePremiumEntitlement } from './premiumEntitlement';
-
-const CHAMPION_BONUS_MULTIPLIER = 1.1;
 
 export interface BossContributor {
   playerId: string;
@@ -111,7 +109,7 @@ export async function distributeBossLoot(
     const ratio = totalContribution > 0 ? playerScore / totalContribution : 1 / contributors.length;
     const dropMultiplier = Math.max(WORLD_EVENT_CONSTANTS.BOSS_CONTRIBUTION_FLOOR, Math.min(2, ratio * contributors.length));
     const hasChampion = await getHasActivePremiumEntitlement(prisma, contributor.playerId);
-    const championMultiplier = hasChampion ? CHAMPION_BONUS_MULTIPLIER : 1;
+    const championMultiplier = hasChampion ? PREMIUM_CONSTANTS.BONUS_MULTIPLIER : 1;
     const effectiveDropMultiplier = dropMultiplier * championMultiplier;
 
     // 1. Item loot with rarity bonus

@@ -6,11 +6,10 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns } from '../../services/guildTaxService';
 import { getActiveZoneModifiers } from '../../services/worldEventService';
 import { getHasActivePremiumEntitlement } from '../../services/premiumEntitlement';
-import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
+import { EXPLORATION_CONSTANTS, PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 import { estimateQuerySchema } from './helpers';
 
 export const estimateRouter = Router();
-const CHAMPION_BONUS_MULTIPLIER = 1.1;
 
 /**
  * GET /api/v1/exploration/estimate?turns=123
@@ -45,7 +44,7 @@ estimateRouter.get('/estimate', asyncHandler(async (req, res) => {
     const effectiveTurns = calculateEffectiveTurns(query.turns, taxRate);
     const hasChampion = await getHasActivePremiumEntitlement(prisma, req.player!.playerId);
     const hiddenCacheChance = hasChampion
-      ? EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * CHAMPION_BONUS_MULTIPLIER
+      ? EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE * PREMIUM_CONSTANTS.BONUS_MULTIPLIER
       : null;
 
     res.json({

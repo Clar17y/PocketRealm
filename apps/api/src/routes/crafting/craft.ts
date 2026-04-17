@@ -6,6 +6,7 @@ import type { EventModifierBadge } from '../../services/worldEventService';
 import {
   CRAFTING_CONSTANTS,
   GUILD_CONSTANTS,
+  PREMIUM_CONSTANTS,
   type EquipmentSlot,
   type ItemRarity,
   type ItemStats,
@@ -43,7 +44,6 @@ import { createEndpointLimiter } from '../../middleware/rateLimiter';
 
 export const craftRouter = Router();
 craftRouter.use(createEndpointLimiter('crafting', 60_000, 20));
-const CHAMPION_BONUS_MULTIPLIER = 1.1;
 
 /**
  * POST /api/v1/crafting/craft
@@ -148,7 +148,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
       const equipStats = await getEquipmentStats(playerId);
       const guildMods = await getPlayerGuildModifiers(playerId);
       const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
-      const championMultiplier = hasChampion ? CHAMPION_BONUS_MULTIPLIER : 1;
+      const championMultiplier = hasChampion ? PREMIUM_CONSTANTS.BONUS_MULTIPLIER : 1;
       const combinedCritBonus = guildMods.craftingCrit + shopCraftingCrit;
       const effectiveLuck = combinedCritBonus > 0
         ? equipStats.luck + Math.floor(combinedCritBonus / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
