@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getPlayer, refreshToken as refreshTokenApi } from '@/lib/api';
+import { clearStoredTokens, getPlayer, refreshToken as refreshTokenApi } from '@/lib/api';
 
 interface Player {
   id: string;
@@ -24,6 +24,34 @@ export function useAuth() {
     isAuthenticated: false,
   });
 
+  const setAuthenticatedState = useCallback((player: Player) => {
+    setState({
+      player,
+      isLoading: false,
+      isAuthenticated: true,
+    });
+  }, []);
+
+  const failRefresh = useCallback((): never => {
+    clearStoredTokens();
+    setState({ player: null, isLoading: false, isAuthenticated: false });
+    throw new Error('Failed to refresh account.');
+  }, []);
+
+  const refreshPlayer = useCallback(async () => {
+    const { data, error } = await getPlayer();
+    if (data) {
+      setAuthenticatedState(data.player);
+      return data.player;
+    }
+
+    if (error?.code === 'INVALID_TOKEN' || error?.code === 'MISSING_TOKEN') {
+      failRefresh();
+    }
+
+    throw new Error('Failed to refresh account.');
+  }, [failRefresh, setAuthenticatedState]);
+
   const checkAuth = useCallback(async () => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
@@ -35,57 +63,44 @@ export function useAuth() {
           localStorage.setItem('refreshToken', refreshResult.data.refreshToken);
           const retryResult = await getPlayer();
           if (retryResult.data) {
-            setState({
-              player: retryResult.data.player,
-              isLoading: false,
-              isAuthenticated: true,
-            });
+            setAuthenticatedState(retryResult.data.player);
             return;
           }
         }
       }
 
-      setState({ player: null, isLoading: false, isAuthenticated: false });
-      return;
+      failRefresh();
     }
 
     const { data, error } = await getPlayer();
-    if (error || !data) {
-      // Try refresh
-      const refreshTok = localStorage.getItem('refreshToken');
-      if (refreshTok) {
-        const refreshResult = await refreshTokenApi(refreshTok);
-        if (refreshResult.data) {
-          localStorage.setItem('accessToken', refreshResult.data.accessToken);
-          localStorage.setItem('refreshToken', refreshResult.data.refreshToken);
-          // Retry
-          const retryResult = await getPlayer();
-          if (retryResult.data) {
-            setState({
-              player: retryResult.data.player,
-              isLoading: false,
-              isAuthenticated: true,
-            });
-            return;
-          }
-        }
-      }
-      // Failed
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      setState({ player: null, isLoading: false, isAuthenticated: false });
+    if (data && !error) {
+      setAuthenticatedState(data.player);
       return;
     }
 
-    setState({
-      player: data.player,
-      isLoading: false,
-      isAuthenticated: true,
-    });
-  }, []);
+    // Try refresh
+    const refreshTok = localStorage.getItem('refreshToken');
+    if (refreshTok) {
+      const refreshResult = await refreshTokenApi(refreshTok);
+      if (refreshResult.data) {
+        localStorage.setItem('accessToken', refreshResult.data.accessToken);
+        localStorage.setItem('refreshToken', refreshResult.data.refreshToken);
+        const retryResult = await getPlayer();
+        if (retryResult.data) {
+          setAuthenticatedState(retryResult.data.player);
+          return;
+        }
+      }
+    }
+
+    // Failed
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    failRefresh();
+  }, [failRefresh, setAuthenticatedState]);
 
   useEffect(() => {
-    checkAuth();
+    void checkAuth().catch(() => undefined);
   }, [checkAuth]);
 
   const setTokens = useCallback((accessToken: string, refreshToken: string, player: Player) => {
@@ -105,5 +120,6 @@ export function useAuth() {
     setTokens,
     logout,
     checkAuth,
+    refreshPlayer,
   };
 }

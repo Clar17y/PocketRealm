@@ -51,7 +51,7 @@ type GC = ReturnType<typeof useGameController>;
 
 interface GameScreenRendererProps {
   gc: GC;
-  player: { id?: string; username?: string; role?: string } | null;
+  player: { id?: string; username?: string; role?: string; email?: string; emailVerified?: boolean } | null;
   casinoSocket: ReturnType<typeof useCasinoSocket>;
   achievementCategory: string | null;
   setAchievementCategory: (cat: string | null) => void;
@@ -63,6 +63,8 @@ interface GameScreenRendererProps {
   pushState: ReturnType<typeof usePushNotifications>['state'];
   pushToggle: ReturnType<typeof usePushNotifications>['toggle'];
   onLogout: () => void;
+  onAccountRefresh: () => Promise<void>;
+  onForceRelogin: () => void;
 }
 
 export function GameScreenRenderer({
@@ -74,6 +76,8 @@ export function GameScreenRenderer({
   deepLinkTab,
   pushState, pushToggle,
   onLogout,
+  onAccountRefresh,
+  onForceRelogin,
 }: GameScreenRendererProps) {
   const {
     activeScreen, setActiveScreen,
@@ -676,6 +680,8 @@ export function GameScreenRenderer({
       return (
         <Settings
           username={player?.username}
+          email={player?.email ?? ''}
+          emailVerified={player?.emailVerified ?? false}
           combatLogSpeedMs={combatLogSpeedMs} onCombatLogSpeedChange={setCombatLogSpeedMs}
           onCombatLogSpeedCommit={handleSetCombatLogSpeed}
           autoSkipKnownCombat={autoSkipKnownCombat} onAutoSkipKnownCombatChange={handleSetAutoSkipKnownCombat}
@@ -694,6 +700,8 @@ export function GameScreenRenderer({
           showBestiaryLore={showBestiaryLore} onShowBestiaryLoreChange={handleSetShowBestiaryLore}
           pushState={pushState} onPushToggle={pushToggle}
           notificationPrefs={notificationPrefs} onNotificationPrefChange={handleSetNotificationPref}
+          onAccountRefresh={onAccountRefresh}
+          onForceRelogin={onForceRelogin}
           onLogout={onLogout}
         />
       );
