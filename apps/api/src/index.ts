@@ -43,6 +43,8 @@ import { shopRouter } from './routes/shop';
 import { friendsRouter } from './routes/friends';
 import { notificationsRouter } from './routes/notifications';
 import { healthRouter } from './routes/health';
+import { premiumRouter } from './routes/premium';
+import { premiumWebhookRouter } from './routes/premiumWebhook';
 import { markShuttingDown } from './services/healthChecks';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
@@ -101,6 +103,7 @@ app.use(cors({
   },
   credentials: true,
 }));
+app.use('/api/v1/premium/webhook', premiumWebhookRouter);
 app.use(express.json({ limit: '100kb' }));
 
 // Request ID: use client-provided header only if it is a valid UUID,
@@ -162,6 +165,7 @@ app.use('/api/v1/expedition', expeditionRouter);
 app.use('/api/v1/shop', shopRouter);
 app.use('/api/v1/friends', friendsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
+app.use('/api/v1/premium', premiumRouter);
 
 // Sentry's Express error handler — captures errors before our own
 // errorHandler formats the response. `beforeSend` in instrument.ts
