@@ -195,7 +195,7 @@ export default function Home() {
             <div className="text-center">
               <a href="/register" className={linkGold}>Support Pocketrealm</a>
               <p className="text-xs font-crimson text-[var(--rpg-text-secondary)] mt-3">
-                No combat advantages. No pay-to-win. Just efficiency.
+                Helps cover the server bill and gently pressures me into shipping more content.
               </p>
             </div>
           </div>
