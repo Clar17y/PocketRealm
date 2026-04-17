@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import { randomUUID } from 'crypto';
 import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('../services/stripeService', () => ({
@@ -18,7 +19,14 @@ import { premiumWebhookRouter } from './premiumWebhook';
 
 function buildApp() {
   const app = express();
+  app.use((req, res, next) => {
+    req.requestId = randomUUID();
+    res.setHeader('x-request-id', req.requestId);
+    next();
+  });
+  app.use('/api/v1/', (_req, _res, next) => next());
   app.use('/api/v1/premium/webhook', premiumWebhookRouter);
+  app.use(express.json());
   app.use(errorHandler);
   return app;
 }
@@ -55,6 +63,7 @@ describe('premium webhook router', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ received: true });
+    expect(res.headers['x-request-id']).toEqual(expect.any(String));
     expect(parseStripeWebhookEvent).toHaveBeenCalledWith(expect.any(Buffer), 't=1,v1=sig');
     expect(grantPremiumDays).toHaveBeenCalledWith({
       playerId: 'player-1',
