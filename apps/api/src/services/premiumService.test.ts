@@ -189,6 +189,7 @@ describe('grantPremiumDays', () => {
     } as never);
     vi.mocked(prisma.premiumPurchase.findUnique)
       .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(existingPurchase as never);
     vi.mocked(prisma.premiumPurchase.create).mockRejectedValueOnce(p2002);
 
@@ -207,7 +208,50 @@ describe('grantPremiumDays', () => {
     expect(result).toEqual(existingPurchase);
     expect(prisma.premiumPurchase.create).toHaveBeenCalledTimes(1);
     expect(prisma.player.update).not.toHaveBeenCalled();
-    expect(prisma.premiumPurchase.findUnique).toHaveBeenCalledTimes(2);
+    expect(prisma.premiumPurchase.findUnique).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns the existing Stripe purchase when the session id is already recorded', async () => {
+    const existingPurchase = {
+      id: 'purchase-2',
+      playerId: PLAYER_ID,
+      provider: 'stripe',
+      providerSessionId: SESSION_ID,
+      providerPaymentIntentId: null,
+      productType: PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE,
+      status: 'completed',
+      amount: GRANT_AMOUNT,
+      currency: GRANT_CURRENCY,
+      championDaysGranted: GRANT_DAYS,
+      grantedFrom: NOW,
+      grantedUntil: ACTIVE_EXPIRY,
+      metadata: { source: 'checkout' },
+      createdAt: NOW,
+    };
+
+    vi.mocked(prisma.player.findUnique).mockResolvedValue({
+      premiumExpiresAt: null,
+    } as never);
+    vi.mocked(prisma.premiumPurchase.findUnique).mockResolvedValue(existingPurchase as never);
+
+    const result = await grantPremiumDays({
+      playerId: PLAYER_ID,
+      provider: 'stripe',
+      providerSessionId: SESSION_ID,
+      amount: GRANT_AMOUNT,
+      currency: GRANT_CURRENCY,
+      days: GRANT_DAYS,
+      metadata: { source: 'checkout' },
+      now: NOW,
+    });
+
+    expect(result).toEqual(existingPurchase);
+    expect(prisma.premiumPurchase.create).not.toHaveBeenCalled();
+    expect(prisma.player.update).not.toHaveBeenCalled();
+    expect(prisma.premiumPurchase.findUnique).toHaveBeenCalledTimes(1);
+    expect(prisma.premiumPurchase.findUnique).toHaveBeenCalledWith({
+      where: { providerSessionId: SESSION_ID },
+    });
   });
 
   it('throws not found when the player is missing even if the Stripe payment was recorded', async () => {

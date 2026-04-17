@@ -68,6 +68,34 @@ export async function getPremiumStatus(playerId: string) {
   return player;
 }
 
+async function findExistingStripePurchase(tx: Prisma.TransactionClient, input: GrantPremiumDaysInput) {
+  if (input.provider !== 'stripe') {
+    return null;
+  }
+
+  if (input.providerPaymentIntentId) {
+    const byPaymentIntent = await tx.premiumPurchase.findUnique({
+      where: { providerPaymentIntentId: input.providerPaymentIntentId },
+    });
+
+    if (byPaymentIntent) {
+      return byPaymentIntent;
+    }
+  }
+
+  if (input.providerSessionId) {
+    const bySession = await tx.premiumPurchase.findUnique({
+      where: { providerSessionId: input.providerSessionId },
+    });
+
+    if (bySession) {
+      return bySession;
+    }
+  }
+
+  return null;
+}
+
 export async function grantPremiumDays(input: GrantPremiumDaysInput) {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`SELECT id FROM "players" WHERE id = ${input.playerId} FOR UPDATE`;
@@ -83,14 +111,9 @@ export async function grantPremiumDays(input: GrantPremiumDaysInput) {
       throw new AppError(404, 'Player not found', 'NOT_FOUND');
     }
 
-    if (input.provider === 'stripe' && input.providerPaymentIntentId) {
-      const existing = await tx.premiumPurchase.findUnique({
-        where: { providerPaymentIntentId: input.providerPaymentIntentId },
-      });
-
-      if (existing) {
-        return existing;
-      }
+    const existing = await findExistingStripePurchase(tx, input);
+    if (existing) {
+      return existing;
     }
 
     const grantedAt = input.now ?? new Date();
@@ -121,17 +144,14 @@ export async function grantPremiumDays(input: GrantPremiumDaysInput) {
     } catch (err: unknown) {
       if (
         input.provider === 'stripe' &&
-        input.providerPaymentIntentId &&
         err && typeof err === 'object' &&
         'code' in err &&
         err.code === 'P2002'
       ) {
-        const existing = await tx.premiumPurchase.findUnique({
-          where: { providerPaymentIntentId: input.providerPaymentIntentId },
-        });
+        const recovered = await findExistingStripePurchase(tx, input);
 
-        if (existing) {
-          return existing;
+        if (recovered) {
+          return recovered;
         }
       }
 
