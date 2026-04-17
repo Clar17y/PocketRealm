@@ -10,6 +10,8 @@ import { logger } from '../logger';
 /** Verify email and grant Champion trial if eligible. Returns whether trial was granted. */
 export async function verifyPlayerEmail(tokenRecord: { id: string; playerId: string }): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "players" WHERE id = ${tokenRecord.playerId} FOR UPDATE`;
+
     const player = await tx.player.findUnique({
       where: { id: tokenRecord.playerId },
       select: { premiumTrialClaimed: true },

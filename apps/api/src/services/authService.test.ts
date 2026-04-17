@@ -28,6 +28,7 @@ describe('verifyPlayerEmail', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
+    vi.mocked(prisma.$queryRaw).mockResolvedValue(undefined);
     vi.mocked(prisma.emailVerificationToken.delete).mockResolvedValue({ id: 'token-1' } as never);
     vi.mocked(prisma.player.update).mockResolvedValue({ id: 'player-1' } as never);
   });
@@ -63,6 +64,10 @@ describe('verifyPlayerEmail', () => {
       },
       now: NOW,
     }, prisma);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(prisma.$queryRaw).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(prisma.player.findUnique).mock.invocationCallOrder[0],
+    );
     expect(prisma.emailVerificationToken.delete).toHaveBeenCalledWith({
       where: { id: 'token-1' },
     });

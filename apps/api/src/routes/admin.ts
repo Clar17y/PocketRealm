@@ -44,6 +44,22 @@ async function adminAudit(adminId: string, action: string, details: Record<strin
   await createActivityLog({ playerId: adminId, activityType: 'admin_action', turnsSpent: 0, result: { action, ...details } });
 }
 
+async function adminAuditTx(
+  tx: Prisma.TransactionClient,
+  adminId: string,
+  action: string,
+  details: Record<string, unknown>,
+) {
+  await tx.activityLog.create({
+    data: {
+      playerId: adminId,
+      activityType: 'admin_action',
+      turnsSpent: 0,
+      result: { action, ...details } as Prisma.InputJsonValue,
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Player
 // ---------------------------------------------------------------------------
@@ -75,24 +91,28 @@ const premiumGrantSchema = z.object({
 
 router.post('/premium/grant', asyncHandler(async (req, res) => {
   const { playerId, days, reason } = premiumGrantSchema.parse(req.body);
-  const purchase = await grantPremiumDays({
-    playerId,
-    provider: 'admin',
-    productType: 'admin_grant',
-    amount: 0,
-    currency: 'usd',
-    days,
-    metadata: {
-      grantedByAdminId: req.player!.playerId,
-      ...(reason ? { reason } : {}),
-    },
-  });
+  const purchase = await prisma.$transaction(async (tx) => {
+    const createdPurchase = await grantPremiumDays({
+      playerId,
+      provider: 'admin',
+      productType: 'admin_grant',
+      amount: 0,
+      currency: 'usd',
+      days,
+      metadata: {
+        grantedByAdminId: req.player!.playerId,
+        ...(reason ? { reason } : {}),
+      },
+    }, tx);
 
-  await adminAudit(req.player!.playerId, 'grant_premium', {
-    targetPlayerId: playerId,
-    days,
-    purchaseId: purchase.id,
-    ...(reason ? { reason } : {}),
+    await adminAuditTx(tx, req.player!.playerId, 'grant_premium', {
+      targetPlayerId: playerId,
+      days,
+      purchaseId: createdPurchase.id,
+      ...(reason ? { reason } : {}),
+    });
+
+    return createdPurchase;
   });
 
   res.json({ success: true, purchase });

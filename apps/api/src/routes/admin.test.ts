@@ -106,6 +106,7 @@ function mockRes() {
 describe('admin routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.activityLog.create.mockResolvedValue({ id: 'log-1' });
   });
 
   describe('POST /turns/grant', () => {
@@ -402,6 +403,21 @@ describe('admin routes', () => {
           grantedByAdminId: 'admin-1',
           reason: 'Support recovery',
         },
+      }, mockPrisma);
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.activityLog.create).toHaveBeenCalledWith({
+        data: {
+          playerId: 'admin-1',
+          activityType: 'admin_action',
+          turnsSpent: 0,
+          result: {
+            action: 'grant_premium',
+            targetPlayerId: 'player-target',
+            days: 14,
+            purchaseId: 'purchase-2',
+            reason: 'Support recovery',
+          },
+        },
       });
       expect(res.json).toHaveBeenCalledWith({
         success: true,
@@ -411,6 +427,41 @@ describe('admin routes', () => {
           championDaysGranted: 14,
         },
       });
+    });
+
+    it('surfaces an audit failure without writing a success response', async () => {
+      vi.mocked(grantPremiumDays).mockResolvedValue({
+        id: 'purchase-3',
+        playerId: 'player-target',
+      } as never);
+      mockPrisma.activityLog.create.mockRejectedValueOnce(new Error('audit write failed'));
+
+      const req = {
+        player: { playerId: 'admin-1' },
+        body: {
+          playerId: 'player-target',
+          days: 7,
+        },
+      } as any;
+      const res = mockRes();
+      const next = vi.fn();
+      const handler = findHandler('post', '/premium/grant');
+      await handler(req, res, next);
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(grantPremiumDays).toHaveBeenCalledWith({
+        playerId: 'player-target',
+        provider: 'admin',
+        productType: 'admin_grant',
+        amount: 0,
+        currency: 'usd',
+        days: 7,
+        metadata: {
+          grantedByAdminId: 'admin-1',
+        },
+      }, mockPrisma);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(res.json).not.toHaveBeenCalled();
     });
   });
 
