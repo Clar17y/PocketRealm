@@ -150,9 +150,51 @@ describe('grantPremiumDays', () => {
     });
 
     expect(result).toEqual(existingPurchase);
-    expect(prisma.player.findUnique).not.toHaveBeenCalled();
+    expect(prisma.player.findUnique).toHaveBeenCalledWith({
+      where: { id: PLAYER_ID },
+      select: {
+        premiumExpiresAt: true,
+      },
+    });
     expect(prisma.premiumPurchase.create).not.toHaveBeenCalled();
     expect(prisma.player.update).not.toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws not found when the player is missing even if the Stripe payment was recorded', async () => {
+    vi.mocked(prisma.player.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.premiumPurchase.findUnique).mockResolvedValue({
+      id: 'purchase-1',
+      playerId: PLAYER_ID,
+      provider: 'stripe',
+      providerSessionId: SESSION_ID,
+      providerPaymentIntentId: PAYMENT_INTENT_ID,
+      productType: PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE,
+      status: 'completed',
+      amount: GRANT_AMOUNT,
+      currency: GRANT_CURRENCY,
+      championDaysGranted: GRANT_DAYS,
+      grantedFrom: NOW,
+      grantedUntil: ACTIVE_EXPIRY,
+      metadata: { source: 'checkout' },
+      createdAt: NOW,
+    } as never);
+
+    await expect(grantPremiumDays({
+      playerId: PLAYER_ID,
+      provider: 'stripe',
+      providerSessionId: SESSION_ID,
+      providerPaymentIntentId: PAYMENT_INTENT_ID,
+      amount: GRANT_AMOUNT,
+      currency: GRANT_CURRENCY,
+      days: GRANT_DAYS,
+      metadata: { source: 'checkout' },
+      now: NOW,
+    })).rejects.toMatchObject({
+      message: 'Player not found',
+      code: 'NOT_FOUND',
+    });
+
+    expect(prisma.premiumPurchase.findUnique).not.toHaveBeenCalled();
   });
 });

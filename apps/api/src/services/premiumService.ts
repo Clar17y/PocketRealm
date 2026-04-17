@@ -70,16 +70,6 @@ export async function getPremiumStatus(playerId: string) {
 
 export async function grantPremiumDays(input: GrantPremiumDaysInput) {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    if (input.provider === 'stripe' && input.providerPaymentIntentId) {
-      const existing = await tx.premiumPurchase.findUnique({
-        where: { providerPaymentIntentId: input.providerPaymentIntentId },
-      });
-
-      if (existing) {
-        return existing;
-      }
-    }
-
     const player = await tx.player.findUnique({
       where: { id: input.playerId },
       select: {
@@ -89,6 +79,16 @@ export async function grantPremiumDays(input: GrantPremiumDaysInput) {
 
     if (!player) {
       throw new AppError(404, 'Player not found', 'NOT_FOUND');
+    }
+
+    if (input.provider === 'stripe' && input.providerPaymentIntentId) {
+      const existing = await tx.premiumPurchase.findUnique({
+        where: { providerPaymentIntentId: input.providerPaymentIntentId },
+      });
+
+      if (existing) {
+        return existing;
+      }
     }
 
     const grantedAt = input.now ?? new Date();
