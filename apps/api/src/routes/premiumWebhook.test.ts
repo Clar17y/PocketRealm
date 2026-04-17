@@ -35,6 +35,7 @@ describe('premium webhook router', () => {
       data: {
         object: {
           id: 'cs_test_123',
+          payment_status: 'paid',
           payment_intent: 'pi_123',
           metadata: {
             playerId: 'player-1',
@@ -86,6 +87,33 @@ describe('premium webhook router', () => {
       .set('Stripe-Signature', 't=1,v1=sig')
       .set('Content-Type', 'application/json')
       .send('{"id":"evt_456"}');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ received: true });
+    expect(grantPremiumDays).not.toHaveBeenCalled();
+  });
+
+  it('does not grant premium days until the checkout session is paid', async () => {
+    vi.mocked(parseStripeWebhookEvent).mockReturnValue({
+      id: 'evt_789',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_unpaid',
+          payment_status: 'unpaid',
+          payment_intent: 'pi_unpaid',
+          metadata: {
+            playerId: 'player-1',
+          },
+        },
+      },
+    } as never);
+
+    const res = await request(buildApp())
+      .post('/api/v1/premium/webhook/stripe')
+      .set('Stripe-Signature', 't=1,v1=sig')
+      .set('Content-Type', 'application/json')
+      .send('{"id":"evt_789"}');
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ received: true });

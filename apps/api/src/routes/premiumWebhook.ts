@@ -46,7 +46,10 @@ premiumWebhookRouter.post(
     const payload = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body ?? '');
     const event = parseStripeWebhookEvent(payload, signature);
 
-    if (event.type === 'checkout.session.completed') {
+    if (
+      event.type === 'checkout.session.completed'
+      && event.data.object.payment_status === 'paid'
+    ) {
       const session = event.data.object;
       const playerId = getCheckoutSessionPlayerId(session.metadata);
 

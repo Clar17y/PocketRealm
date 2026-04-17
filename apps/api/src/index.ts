@@ -103,7 +103,6 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use('/api/v1/premium/webhook', premiumWebhookRouter);
 app.use(express.json({ limit: '100kb' }));
 
 // Request ID: use client-provided header only if it is a valid UUID,
@@ -165,6 +164,7 @@ app.use('/api/v1/expedition', expeditionRouter);
 app.use('/api/v1/shop', shopRouter);
 app.use('/api/v1/friends', friendsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
+app.use('/api/v1/premium/webhook', premiumWebhookRouter);
 app.use('/api/v1/premium', premiumRouter);
 
 // Sentry's Express error handler — captures errors before our own
