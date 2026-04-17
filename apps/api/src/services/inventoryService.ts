@@ -213,19 +213,25 @@ export async function getUsedSlots(playerId: string): Promise<number> {
 
 /** Compute inventory capacity from equipped backpack + belt bonus. */
 export async function getPlayerCapacity(playerId: string): Promise<number> {
-  const equipped = await prisma.playerEquipment.findMany({
-    where: { playerId, slot: { in: ['backpack', 'belt'] }, itemId: { not: null } },
-    select: {
-      slot: true,
-      item: {
-        select: {
-          rarity: true,
-          bonusStats: true,
-          template: { select: { tier: true } },
+  const [player, equipped] = await Promise.all([
+    prisma.player.findUnique({
+      where: { id: playerId },
+      select: { isPremium: true },
+    }),
+    prisma.playerEquipment.findMany({
+      where: { playerId, slot: { in: ['backpack', 'belt'] }, itemId: { not: null } },
+      select: {
+        slot: true,
+        item: {
+          select: {
+            rarity: true,
+            bonusStats: true,
+            template: { select: { tier: true } },
+          },
         },
       },
-    },
-  });
+    }),
+  ]);
 
   let backpackTier = 0;
   let backpackRarity: ItemRarity = 'common';
@@ -242,6 +248,11 @@ export async function getPlayerCapacity(playerId: string): Promise<number> {
     }
   }
 
-  return getInventoryCapacity({ backpackTier, backpackRarity, beltSlotBonus, isChampion: false });
+  return getInventoryCapacity({
+    backpackTier,
+    backpackRarity,
+    beltSlotBonus,
+    isChampion: player?.isPremium ?? false,
+  });
 }
 

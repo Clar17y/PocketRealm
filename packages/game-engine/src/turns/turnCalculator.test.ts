@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TURN_CONSTANTS } from '@pocketrealm/shared';
+import { PREMIUM_CONSTANTS, TURN_CONSTANTS } from '@pocketrealm/shared';
 import {
   calculateAccruedTurns,
   calculateCurrentTurns,
@@ -29,6 +29,13 @@ describe('calculateAccruedTurns', () => {
     const later = new Date(base.getTime() + 3_600_000); // 1 hour
     expect(calculateAccruedTurns(base, later)).toBe(3600 * TURN_CONSTANTS.REGEN_RATE);
   });
+
+  it('uses an override regen rate when provided', () => {
+    const later = new Date(base.getTime() + 10_000); // 10 seconds
+
+    expect(calculateAccruedTurns(base, later, PREMIUM_CONSTANTS.TURN_REGEN_RATE))
+      .toBe(10 * PREMIUM_CONSTANTS.TURN_REGEN_RATE);
+  });
 });
 
 describe('calculateCurrentTurns', () => {
@@ -48,6 +55,13 @@ describe('calculateCurrentTurns', () => {
   it('returns stored turns if already at cap', () => {
     expect(calculateCurrentTurns(TURN_CONSTANTS.BANK_CAP, base, base))
       .toBe(TURN_CONSTANTS.BANK_CAP);
+  });
+
+  it('uses an override bank cap when provided', () => {
+    const later = new Date(base.getTime() + 200_000_000);
+
+    expect(calculateCurrentTurns(0, base, later, TURN_CONSTANTS.REGEN_RATE, PREMIUM_CONSTANTS.TURN_BANK_CAP))
+      .toBe(PREMIUM_CONSTANTS.TURN_BANK_CAP);
   });
 });
 
@@ -70,6 +84,17 @@ describe('calculateTimeToCapMs', () => {
     const current = TURN_CONSTANTS.BANK_CAP - 100;
     const expected = (100 / TURN_CONSTANTS.REGEN_RATE) * 1000;
     expect(calculateTimeToCapMs(current)).toBe(expected);
+  });
+
+  it('uses override cap and regen rate when provided', () => {
+    const current = PREMIUM_CONSTANTS.TURN_BANK_CAP - 110;
+    const expected = (110 / PREMIUM_CONSTANTS.TURN_REGEN_RATE) * 1000;
+
+    expect(calculateTimeToCapMs(
+      current,
+      PREMIUM_CONSTANTS.TURN_REGEN_RATE,
+      PREMIUM_CONSTANTS.TURN_BANK_CAP,
+    )).toBe(expected);
   });
 });
 

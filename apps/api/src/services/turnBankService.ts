@@ -1,6 +1,6 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import { calculateCurrentTurns, calculateTimeToCapMs, spendTurns } from '@pocketrealm/game-engine';
-import { TURN_CONSTANTS } from '@pocketrealm/shared';
+import { PREMIUM_CONSTANTS, TURN_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
 
 export interface TurnState {
@@ -10,14 +10,27 @@ export interface TurnState {
 }
 
 export async function getTurnState(playerId: string, now: Date = new Date()): Promise<TurnState> {
-  const turnBank = await prisma.turnBank.findUnique({ where: { playerId } });
+  const [turnBank, turnConfig] = await Promise.all([
+    prisma.turnBank.findUnique({ where: { playerId } }),
+    getTurnConfig(prisma, playerId),
+  ]);
 
   if (!turnBank) {
     throw new AppError(404, 'Turn bank not found', 'NOT_FOUND');
   }
 
-  const currentTurns = calculateCurrentTurns(turnBank.currentTurns, turnBank.lastRegenAt, now);
-  const timeToCapMs = calculateTimeToCapMs(currentTurns);
+  const currentTurns = calculateCurrentTurns(
+    turnBank.currentTurns,
+    turnBank.lastRegenAt,
+    now,
+    turnConfig.regenRate,
+    turnConfig.bankCap,
+  );
+  const timeToCapMs = calculateTimeToCapMs(
+    currentTurns,
+    turnConfig.regenRate,
+    turnConfig.bankCap,
+  );
 
   return {
     currentTurns,
@@ -35,9 +48,39 @@ export interface SpendTurnsResult {
 }
 
 interface TurnBankClient {
+  player: {
+    findUnique: Prisma.TransactionClient['player']['findUnique'];
+  };
   turnBank: {
     findUnique: Prisma.TransactionClient['turnBank']['findUnique'];
     updateMany: Prisma.TransactionClient['turnBank']['updateMany'];
+  };
+}
+
+interface TurnConfig {
+  regenRate: number;
+  bankCap: number;
+}
+
+async function getTurnConfig(
+  client: Pick<TurnBankClient, 'player'>,
+  playerId: string,
+): Promise<TurnConfig> {
+  const player = await client.player.findUnique({
+    where: { id: playerId },
+    select: { isPremium: true },
+  });
+
+  if (player?.isPremium) {
+    return {
+      regenRate: PREMIUM_CONSTANTS.TURN_REGEN_RATE,
+      bankCap: PREMIUM_CONSTANTS.TURN_BANK_CAP,
+    };
+  }
+
+  return {
+    regenRate: TURN_CONSTANTS.REGEN_RATE,
+    bankCap: TURN_CONSTANTS.BANK_CAP,
   };
 }
 
@@ -51,6 +94,7 @@ async function spendPlayerTurnsWithClient(
     throw new AppError(400, 'Turn spend amount must be a positive integer', 'INVALID_TURNS');
   }
 
+  const turnConfig = await getTurnConfig(client, playerId);
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const turnBank = await client.turnBank.findUnique({ where: { playerId } });
@@ -59,7 +103,13 @@ async function spendPlayerTurnsWithClient(
       throw new AppError(404, 'Turn bank not found', 'NOT_FOUND');
     }
 
-    const previousTurns = calculateCurrentTurns(turnBank.currentTurns, turnBank.lastRegenAt, now);
+    const previousTurns = calculateCurrentTurns(
+      turnBank.currentTurns,
+      turnBank.lastRegenAt,
+      now,
+      turnConfig.regenRate,
+      turnConfig.bankCap,
+    );
     const newBalance = spendTurns(previousTurns, amount);
 
     if (newBalance === null) {
@@ -82,7 +132,11 @@ async function spendPlayerTurnsWithClient(
       continue;
     }
 
-    const timeToCapMs = calculateTimeToCapMs(newBalance);
+    const timeToCapMs = calculateTimeToCapMs(
+      newBalance,
+      turnConfig.regenRate,
+      turnConfig.bankCap,
+    );
 
     return {
       previousTurns,
@@ -131,6 +185,7 @@ async function refundPlayerTurnsWithClient(
     throw new AppError(400, 'Turn refund amount must be a positive integer', 'INVALID_TURNS');
   }
 
+  const turnConfig = await getTurnConfig(client, playerId);
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const turnBank = await client.turnBank.findUnique({ where: { playerId } });
@@ -139,8 +194,14 @@ async function refundPlayerTurnsWithClient(
       throw new AppError(404, 'Turn bank not found', 'NOT_FOUND');
     }
 
-    const previousTurns = calculateCurrentTurns(turnBank.currentTurns, turnBank.lastRegenAt, now);
-    const newBalance = Math.min(TURN_CONSTANTS.BANK_CAP, previousTurns + amount);
+    const previousTurns = calculateCurrentTurns(
+      turnBank.currentTurns,
+      turnBank.lastRegenAt,
+      now,
+      turnConfig.regenRate,
+      turnConfig.bankCap,
+    );
+    const newBalance = Math.min(turnConfig.bankCap, previousTurns + amount);
 
     const updated = await client.turnBank.updateMany({
       where: {
@@ -158,7 +219,11 @@ async function refundPlayerTurnsWithClient(
       continue;
     }
 
-    const timeToCapMs = calculateTimeToCapMs(newBalance);
+    const timeToCapMs = calculateTimeToCapMs(
+      newBalance,
+      turnConfig.regenRate,
+      turnConfig.bankCap,
+    );
 
     return {
       previousTurns,

@@ -6,11 +6,12 @@ import { TURN_CONSTANTS } from '@pocketrealm/shared';
  */
 export function calculateAccruedTurns(
   lastRegenAt: Date,
-  now: Date = new Date()
+  now: Date = new Date(),
+  regenRate: number = TURN_CONSTANTS.REGEN_RATE,
 ): number {
   const elapsedMs = now.getTime() - lastRegenAt.getTime();
   const elapsedSeconds = Math.floor(elapsedMs / 1000);
-  return elapsedSeconds * TURN_CONSTANTS.REGEN_RATE;
+  return elapsedSeconds * regenRate;
 }
 
 /**
@@ -19,11 +20,13 @@ export function calculateAccruedTurns(
 export function calculateCurrentTurns(
   storedTurns: number,
   lastRegenAt: Date,
-  now: Date = new Date()
+  now: Date = new Date(),
+  regenRate: number = TURN_CONSTANTS.REGEN_RATE,
+  bankCap: number = TURN_CONSTANTS.BANK_CAP,
 ): number {
-  const accrued = calculateAccruedTurns(lastRegenAt, now);
+  const accrued = calculateAccruedTurns(lastRegenAt, now, regenRate);
   const total = storedTurns + accrued;
-  return Math.min(total, TURN_CONSTANTS.BANK_CAP);
+  return Math.min(total, bankCap);
 }
 
 /**
@@ -31,13 +34,15 @@ export function calculateCurrentTurns(
  * Returns null if already at cap.
  */
 export function calculateTimeToCapMs(
-  currentTurns: number
+  currentTurns: number,
+  regenRate: number = TURN_CONSTANTS.REGEN_RATE,
+  bankCap: number = TURN_CONSTANTS.BANK_CAP,
 ): number | null {
-  if (currentTurns >= TURN_CONSTANTS.BANK_CAP) {
+  if (currentTurns >= bankCap) {
     return null;
   }
-  const turnsNeeded = TURN_CONSTANTS.BANK_CAP - currentTurns;
-  const secondsNeeded = turnsNeeded / TURN_CONSTANTS.REGEN_RATE;
+  const turnsNeeded = bankCap - currentTurns;
+  const secondsNeeded = turnsNeeded / regenRate;
   return secondsNeeded * 1000;
 }
 
