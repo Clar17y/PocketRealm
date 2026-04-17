@@ -70,6 +70,8 @@ export async function getPremiumStatus(playerId: string) {
 
 export async function grantPremiumDays(input: GrantPremiumDaysInput) {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.$queryRaw`SELECT id FROM "players" WHERE id = ${input.playerId} FOR UPDATE`;
+
     const player = await tx.player.findUnique({
       where: { id: input.playerId },
       select: {
@@ -98,22 +100,43 @@ export async function grantPremiumDays(input: GrantPremiumDaysInput) {
       grantedAt,
     );
 
-    const purchase = await tx.premiumPurchase.create({
-      data: {
-        playerId: input.playerId,
-        provider: input.provider,
-        providerSessionId: input.providerSessionId ?? null,
-        providerPaymentIntentId: input.providerPaymentIntentId ?? null,
-        productType: PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE,
-        status: 'completed',
-        amount: input.amount,
-        currency: input.currency,
-        championDaysGranted: input.days,
-        grantedFrom,
-        grantedUntil,
-        metadata: input.metadata ?? null,
-      },
-    });
+    let purchase;
+    try {
+      purchase = await tx.premiumPurchase.create({
+        data: {
+          playerId: input.playerId,
+          provider: input.provider,
+          providerSessionId: input.providerSessionId ?? null,
+          providerPaymentIntentId: input.providerPaymentIntentId ?? null,
+          productType: PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE,
+          status: 'completed',
+          amount: input.amount,
+          currency: input.currency,
+          championDaysGranted: input.days,
+          grantedFrom,
+          grantedUntil,
+          metadata: input.metadata ?? undefined,
+        },
+      });
+    } catch (err: unknown) {
+      if (
+        input.provider === 'stripe' &&
+        input.providerPaymentIntentId &&
+        err && typeof err === 'object' &&
+        'code' in err &&
+        err.code === 'P2002'
+      ) {
+        const existing = await tx.premiumPurchase.findUnique({
+          where: { providerPaymentIntentId: input.providerPaymentIntentId },
+        });
+
+        if (existing) {
+          return existing;
+        }
+      }
+
+      throw err;
+    }
 
     await tx.player.update({
       where: { id: input.playerId },
