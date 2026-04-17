@@ -54,6 +54,7 @@ import { APP_VERSION } from './version';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
 import { startMetricsLogger } from './services/metricsLogger';
+import { reconcileExpiredPremium } from './services/premiumReconciliation';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
 
 const app = express();
@@ -179,6 +180,17 @@ const server = http.createServer(app);
 createSocketServer(server, isAllowedCorsOrigin);
 
 let stopMetricsLogger: (() => void) | null = null;
+let premiumReconciliationTimer: ReturnType<typeof setInterval> | null = null;
+
+const PREMIUM_RECONCILIATION_INTERVAL_MS = 60 * 60 * 1000;
+
+async function runPremiumReconciliation(): Promise<void> {
+  try {
+    await reconcileExpiredPremium();
+  } catch (err) {
+    logger.error({ err }, 'Premium reconciliation failed');
+  }
+}
 
 function startServer(): void {
   server.listen(PORT, () => {
@@ -186,6 +198,10 @@ function startServer(): void {
     void roundTimerRegistry.rehydrate(getIo).catch((err) => {
       logger.error({ err }, 'Round timer registry rehydrate failed');
     });
+    void runPremiumReconciliation();
+    premiumReconciliationTimer = setInterval(() => {
+      void runPremiumReconciliation();
+    }, PREMIUM_RECONCILIATION_INTERVAL_MS);
     stopMetricsLogger = startMetricsLogger(getIo);
   });
 }
@@ -198,6 +214,7 @@ process.on('SIGTERM', () => {
   // drains traffic during the graceful-shutdown window.
   markShuttingDown();
   stopMetricsLogger?.();
+  if (premiumReconciliationTimer) clearInterval(premiumReconciliationTimer);
   const io = getIo();
   if (io) io.close();
   server.close(() => {

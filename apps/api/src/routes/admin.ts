@@ -15,6 +15,7 @@ import { normalizePlayerAttributes } from '../services/attributesService';
 import { teleportPlayer } from '../services/zoneService';
 import { createActivityLog } from '../services/activityLogService';
 import { roundTimerRegistry } from '../services/roundTimerRegistry';
+import { grantPremiumDays, listPremiumPurchases } from '../services/premiumService';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import {
@@ -54,6 +55,47 @@ router.post('/turns/grant', asyncHandler(async (req, res) => {
   const result = await refundPlayerTurns(req.player!.playerId, amount);
   await adminAudit(req.player!.playerId, 'grant_turns', { amount });
   res.json({ success: true, ...result });
+}));
+
+const premiumPurchasesParamsSchema = z.object({
+  playerId: z.string().min(1),
+});
+
+router.get('/premium/purchases/:playerId', asyncHandler(async (req, res) => {
+  const { playerId } = premiumPurchasesParamsSchema.parse(req.params);
+  const purchases = await listPremiumPurchases(playerId);
+  res.json({ purchases });
+}));
+
+const premiumGrantSchema = z.object({
+  playerId: z.string().min(1),
+  days: z.number().int().min(1).max(3650),
+  reason: z.string().trim().min(1).max(500).optional(),
+});
+
+router.post('/premium/grant', asyncHandler(async (req, res) => {
+  const { playerId, days, reason } = premiumGrantSchema.parse(req.body);
+  const purchase = await grantPremiumDays({
+    playerId,
+    provider: 'admin',
+    productType: 'admin_grant',
+    amount: 0,
+    currency: 'usd',
+    days,
+    metadata: {
+      grantedByAdminId: req.player!.playerId,
+      ...(reason ? { reason } : {}),
+    },
+  });
+
+  await adminAudit(req.player!.playerId, 'grant_premium', {
+    targetPlayerId: playerId,
+    days,
+    purchaseId: purchase.id,
+    ...(reason ? { reason } : {}),
+  });
+
+  res.json({ success: true, purchase });
 }));
 
 const setLevelSchema = z.object({ level: z.number().int().min(1).max(CHARACTER_CONSTANTS.MAX_LEVEL) });

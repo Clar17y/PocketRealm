@@ -22,6 +22,10 @@ vi.mock('../services/activityLogService', () => ({
 vi.mock('../services/pushNotificationService', () => ({
   sendPush: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../services/premiumService', () => ({
+  grantPremiumDays: vi.fn(),
+  listPremiumPurchases: vi.fn(),
+}));
 vi.mock('../services/roundTimerRegistry', () => ({
   roundTimerRegistry: {
     schedule: vi.fn(),
@@ -76,6 +80,7 @@ import { addStackableItem } from '../services/inventoryService';
 import { spawnWorldEvent, getEventById } from '../services/worldEventService';
 import { createBossEncounter } from '../services/bossEncounterService';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
+import { grantPremiumDays, listPremiumPurchases } from '../services/premiumService';
 import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { adminRouter } from './admin';
 
@@ -341,6 +346,70 @@ describe('admin routes', () => {
         pendingGuildExpeditions: 1,
         pendingEnumeratedFromDb: 2,
         hasDrift: true,
+      });
+    });
+  });
+
+  describe('GET /premium/purchases/:playerId', () => {
+    it('returns premium purchases for the requested player', async () => {
+      vi.mocked(listPremiumPurchases).mockResolvedValue([
+        { id: 'purchase-1', playerId: 'player-target' },
+      ] as never);
+
+      const req = {
+        player: { playerId: 'admin-1' },
+        params: { playerId: 'player-target' },
+      } as any;
+      const res = mockRes();
+      const handler = findHandler('get', '/premium/purchases/:playerId');
+      await handler(req, res, vi.fn());
+
+      expect(listPremiumPurchases).toHaveBeenCalledWith('player-target');
+      expect(res.json).toHaveBeenCalledWith({
+        purchases: [{ id: 'purchase-1', playerId: 'player-target' }],
+      });
+    });
+  });
+
+  describe('POST /premium/grant', () => {
+    it('grants premium days through the shared premium service', async () => {
+      vi.mocked(grantPremiumDays).mockResolvedValue({
+        id: 'purchase-2',
+        playerId: 'player-target',
+        championDaysGranted: 14,
+      } as never);
+
+      const req = {
+        player: { playerId: 'admin-1' },
+        body: {
+          playerId: 'player-target',
+          days: 14,
+          reason: 'Support recovery',
+        },
+      } as any;
+      const res = mockRes();
+      const handler = findHandler('post', '/premium/grant');
+      await handler(req, res, vi.fn());
+
+      expect(grantPremiumDays).toHaveBeenCalledWith({
+        playerId: 'player-target',
+        provider: 'admin',
+        productType: 'admin_grant',
+        amount: 0,
+        currency: 'usd',
+        days: 14,
+        metadata: {
+          grantedByAdminId: 'admin-1',
+          reason: 'Support recovery',
+        },
+      });
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        purchase: {
+          id: 'purchase-2',
+          playerId: 'player-target',
+          championDaysGranted: 14,
+        },
       });
     });
   });

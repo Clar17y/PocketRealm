@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { AUTH_CONSTANTS } from '@pocketrealm/shared';
 import { createEmailVerificationToken } from './authTokenService';
 import { sendVerificationEmail } from './emailService';
+import { grantPremiumDays } from './premiumService';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../logger';
 
@@ -15,19 +16,34 @@ export async function verifyPlayerEmail(tokenRecord: { id: string; playerId: str
     });
 
     const shouldGrantTrial = player && !player.premiumTrialClaimed;
-    const expiresAt = new Date(Date.now() + AUTH_CONSTANTS.CHAMPION_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    const playerUpdateData = shouldGrantTrial
+      ? {
+        emailVerified: true,
+        premiumTrialClaimed: true,
+      }
+      : {
+        emailVerified: true,
+      };
 
     await tx.player.update({
       where: { id: tokenRecord.playerId },
-      data: {
-        emailVerified: true,
-        ...(shouldGrantTrial ? {
-          premiumTrialClaimed: true,
-          isPremium: true,
-          premiumExpiresAt: expiresAt,
-        } : {}),
-      },
+      data: playerUpdateData,
     });
+
+    if (shouldGrantTrial) {
+      await grantPremiumDays({
+        playerId: tokenRecord.playerId,
+        provider: 'email_verification',
+        productType: 'email_verification_trial',
+        days: AUTH_CONSTANTS.CHAMPION_TRIAL_DAYS,
+        amount: 0,
+        currency: 'usd',
+        metadata: {
+          source: 'email_verification',
+        },
+        now: new Date(),
+      }, tx);
+    }
 
     await tx.emailVerificationToken.delete({
       where: { id: tokenRecord.id },

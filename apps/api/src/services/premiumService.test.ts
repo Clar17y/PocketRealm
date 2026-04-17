@@ -43,6 +43,50 @@ describe('calculatePremiumGrantWindow', () => {
 });
 
 describe('grantPremiumDays', () => {
+  it('uses a provided transaction client instead of opening a nested transaction', async () => {
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue(undefined),
+      player: {
+        findUnique: vi.fn().mockResolvedValue({ premiumExpiresAt: null }),
+        update: vi.fn().mockResolvedValue({
+          id: PLAYER_ID,
+          isPremium: true,
+        }),
+      },
+      premiumPurchase: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({
+          id: 'purchase-tx',
+          playerId: PLAYER_ID,
+        }),
+      },
+    } as any;
+
+    const result = await grantPremiumDays({
+      playerId: PLAYER_ID,
+      provider: 'admin',
+      productType: 'admin_grant',
+      amount: 0,
+      currency: 'usd',
+      days: GRANT_DAYS,
+      now: NOW,
+    }, tx);
+
+    expect(result).toEqual({
+      id: 'purchase-tx',
+      playerId: PLAYER_ID,
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(tx.player.findUnique).toHaveBeenCalledTimes(1);
+    expect(tx.premiumPurchase.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        provider: 'admin',
+        productType: 'admin_grant',
+      }),
+    });
+  });
+
   it('creates a completed purchase and extends Champion time correctly', async () => {
     const expectedWindow = calculatePremiumGrantWindow(null, GRANT_DAYS, NOW);
     const createdPurchase = {

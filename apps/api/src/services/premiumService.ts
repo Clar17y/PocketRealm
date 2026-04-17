@@ -12,6 +12,7 @@ export interface PremiumGrantWindow {
 export interface GrantPremiumDaysInput {
   playerId: string;
   provider: string;
+  productType?: string;
   days: number;
   amount: number;
   currency: string;
@@ -20,6 +21,8 @@ export interface GrantPremiumDaysInput {
   metadata?: Prisma.InputJsonValue | null;
   now?: Date;
 }
+
+type PremiumGrantClient = Prisma.TransactionClient;
 
 function assertPositiveInteger(value: number, label: string): void {
   if (!Number.isInteger(value) || value <= 0) {
@@ -96,10 +99,10 @@ async function findExistingStripePurchase(tx: Prisma.TransactionClient, input: G
   return null;
 }
 
-function ensureStripePurchaseBelongsToPlayer(
-  purchase: { playerId: string },
+function ensureStripePurchaseBelongsToPlayer<T extends { playerId: string }>(
+  purchase: T,
   playerId: string,
-) {
+): T {
   if (purchase.playerId !== playerId) {
     throw new AppError(409, 'Stripe purchase belongs to another player', 'PURCHASE_PLAYER_MISMATCH');
   }
@@ -107,76 +110,82 @@ function ensureStripePurchaseBelongsToPlayer(
   return purchase;
 }
 
-export async function grantPremiumDays(input: GrantPremiumDaysInput) {
-  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    await tx.$queryRaw`SELECT id FROM "players" WHERE id = ${input.playerId} FOR UPDATE`;
+async function grantPremiumDaysTx(tx: PremiumGrantClient, input: GrantPremiumDaysInput) {
+  await tx.$queryRaw`SELECT id FROM "players" WHERE id = ${input.playerId} FOR UPDATE`;
 
-    const player = await tx.player.findUnique({
-      where: { id: input.playerId },
-      select: {
-        premiumExpiresAt: true,
-      },
-    });
-
-    if (!player) {
-      throw new AppError(404, 'Player not found', 'NOT_FOUND');
-    }
-
-    const existing = await findExistingStripePurchase(tx, input);
-    if (existing) {
-      return ensureStripePurchaseBelongsToPlayer(existing, input.playerId);
-    }
-
-    const grantedAt = input.now ?? new Date();
-    const { grantedFrom, grantedUntil } = calculatePremiumGrantWindow(
-      player.premiumExpiresAt,
-      input.days,
-      grantedAt,
-    );
-
-    let purchase;
-    try {
-      purchase = await tx.premiumPurchase.create({
-        data: {
-          playerId: input.playerId,
-          provider: input.provider,
-          providerSessionId: input.providerSessionId ?? null,
-          providerPaymentIntentId: input.providerPaymentIntentId ?? null,
-          productType: PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE,
-          status: 'completed',
-          amount: input.amount,
-          currency: input.currency,
-          championDaysGranted: input.days,
-          grantedFrom,
-          grantedUntil,
-          metadata: input.metadata ?? undefined,
-        },
-      });
-    } catch (err: unknown) {
-      if (
-        input.provider === 'stripe' &&
-        err && typeof err === 'object' &&
-        'code' in err &&
-        err.code === 'P2002'
-      ) {
-        const recovered = await findExistingStripePurchase(tx, input);
-
-        if (recovered) {
-          return ensureStripePurchaseBelongsToPlayer(recovered, input.playerId);
-        }
-      }
-
-      throw err;
-    }
-
-    await tx.player.update({
-      where: { id: input.playerId },
-      data: {
-        isPremium: true,
-        premiumExpiresAt: grantedUntil,
-      },
-    });
-
-    return purchase;
+  const player = await tx.player.findUnique({
+    where: { id: input.playerId },
+    select: {
+      premiumExpiresAt: true,
+    },
   });
+
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
+  const existing = await findExistingStripePurchase(tx, input);
+  if (existing) {
+    return ensureStripePurchaseBelongsToPlayer(existing, input.playerId);
+  }
+
+  const grantedAt = input.now ?? new Date();
+  const { grantedFrom, grantedUntil } = calculatePremiumGrantWindow(
+    player.premiumExpiresAt,
+    input.days,
+    grantedAt,
+  );
+
+  let purchase;
+  try {
+    purchase = await tx.premiumPurchase.create({
+      data: {
+        playerId: input.playerId,
+        provider: input.provider,
+        providerSessionId: input.providerSessionId ?? null,
+        providerPaymentIntentId: input.providerPaymentIntentId ?? null,
+        productType: input.productType ?? PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE,
+        status: 'completed',
+        amount: input.amount,
+        currency: input.currency,
+        championDaysGranted: input.days,
+        grantedFrom,
+        grantedUntil,
+        metadata: input.metadata ?? undefined,
+      },
+    });
+  } catch (err: unknown) {
+    if (
+      input.provider === 'stripe' &&
+      err && typeof err === 'object' &&
+      'code' in err &&
+      err.code === 'P2002'
+    ) {
+      const recovered = await findExistingStripePurchase(tx, input);
+
+      if (recovered) {
+        return ensureStripePurchaseBelongsToPlayer(recovered, input.playerId);
+      }
+    }
+
+    throw err;
+  }
+
+  await tx.player.update({
+    where: { id: input.playerId },
+    data: {
+      isPremium: true,
+      premiumExpiresAt: grantedUntil,
+    },
+  });
+
+  return purchase;
+}
+
+export async function grantPremiumDays(input: GrantPremiumDaysInput, tx?: PremiumGrantClient) {
+  if (tx) {
+    return grantPremiumDaysTx(tx, input);
+  }
+
+  return prisma.$transaction((transactionClient) => grantPremiumDaysTx(transactionClient, input));
 }
