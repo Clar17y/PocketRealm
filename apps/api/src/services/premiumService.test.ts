@@ -254,6 +254,92 @@ describe('grantPremiumDays', () => {
     });
   });
 
+  it('rejects a Stripe session id that belongs to another player', async () => {
+    vi.mocked(prisma.player.findUnique).mockResolvedValue({
+      premiumExpiresAt: null,
+    } as never);
+    vi.mocked(prisma.premiumPurchase.findUnique).mockResolvedValue({
+      id: 'purchase-3',
+      playerId: 'player-2',
+      provider: 'stripe',
+      providerSessionId: SESSION_ID,
+      providerPaymentIntentId: null,
+      productType: PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE,
+      status: 'completed',
+      amount: GRANT_AMOUNT,
+      currency: GRANT_CURRENCY,
+      championDaysGranted: GRANT_DAYS,
+      grantedFrom: NOW,
+      grantedUntil: ACTIVE_EXPIRY,
+      metadata: { source: 'checkout' },
+      createdAt: NOW,
+    } as never);
+
+    await expect(grantPremiumDays({
+      playerId: PLAYER_ID,
+      provider: 'stripe',
+      providerSessionId: SESSION_ID,
+      amount: GRANT_AMOUNT,
+      currency: GRANT_CURRENCY,
+      days: GRANT_DAYS,
+      metadata: { source: 'checkout' },
+      now: NOW,
+    })).rejects.toMatchObject({
+      message: 'Stripe purchase belongs to another player',
+      code: 'PURCHASE_PLAYER_MISMATCH',
+    });
+
+    expect(prisma.premiumPurchase.create).not.toHaveBeenCalled();
+    expect(prisma.player.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Stripe payment-intent recovery that belongs to another player', async () => {
+    const p2002 = Object.assign(new Error('Unique constraint'), { code: 'P2002' });
+
+    vi.mocked(prisma.player.findUnique).mockResolvedValue({
+      premiumExpiresAt: null,
+    } as never);
+    vi.mocked(prisma.premiumPurchase.findUnique)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'purchase-4',
+        playerId: 'player-2',
+        provider: 'stripe',
+        providerSessionId: SESSION_ID,
+        providerPaymentIntentId: PAYMENT_INTENT_ID,
+        productType: PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE,
+        status: 'completed',
+        amount: GRANT_AMOUNT,
+        currency: GRANT_CURRENCY,
+        championDaysGranted: GRANT_DAYS,
+        grantedFrom: NOW,
+        grantedUntil: ACTIVE_EXPIRY,
+        metadata: { source: 'checkout' },
+        createdAt: NOW,
+      } as never);
+    vi.mocked(prisma.premiumPurchase.create).mockRejectedValueOnce(p2002);
+
+    await expect(grantPremiumDays({
+      playerId: PLAYER_ID,
+      provider: 'stripe',
+      providerSessionId: SESSION_ID,
+      providerPaymentIntentId: PAYMENT_INTENT_ID,
+      amount: GRANT_AMOUNT,
+      currency: GRANT_CURRENCY,
+      days: GRANT_DAYS,
+      metadata: { source: 'checkout' },
+      now: NOW,
+    })).rejects.toMatchObject({
+      message: 'Stripe purchase belongs to another player',
+      code: 'PURCHASE_PLAYER_MISMATCH',
+    });
+
+    expect(prisma.premiumPurchase.create).toHaveBeenCalledTimes(1);
+    expect(prisma.player.update).not.toHaveBeenCalled();
+    expect(prisma.premiumPurchase.findUnique).toHaveBeenCalledTimes(3);
+  });
+
   it('throws not found when the player is missing even if the Stripe payment was recorded', async () => {
     vi.mocked(prisma.player.findUnique).mockResolvedValue(null);
 

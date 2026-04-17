@@ -96,6 +96,17 @@ async function findExistingStripePurchase(tx: Prisma.TransactionClient, input: G
   return null;
 }
 
+function ensureStripePurchaseBelongsToPlayer(
+  purchase: { playerId: string },
+  playerId: string,
+) {
+  if (purchase.playerId !== playerId) {
+    throw new AppError(409, 'Stripe purchase belongs to another player', 'PURCHASE_PLAYER_MISMATCH');
+  }
+
+  return purchase;
+}
+
 export async function grantPremiumDays(input: GrantPremiumDaysInput) {
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`SELECT id FROM "players" WHERE id = ${input.playerId} FOR UPDATE`;
@@ -113,7 +124,7 @@ export async function grantPremiumDays(input: GrantPremiumDaysInput) {
 
     const existing = await findExistingStripePurchase(tx, input);
     if (existing) {
-      return existing;
+      return ensureStripePurchaseBelongsToPlayer(existing, input.playerId);
     }
 
     const grantedAt = input.now ?? new Date();
@@ -151,7 +162,7 @@ export async function grantPremiumDays(input: GrantPremiumDaysInput) {
         const recovered = await findExistingStripePurchase(tx, input);
 
         if (recovered) {
-          return recovered;
+          return ensureStripePurchaseBelongsToPlayer(recovered, input.playerId);
         }
       }
 
