@@ -641,6 +641,8 @@ export const PREMIUM_CONSTANTS = {
   TEMPLATE_LIMIT_FREE: 5,
   TEMPLATE_LIMIT_CHAMPION: 20,
   SUPPORT_PRODUCT_TYPE: 'support_pocketrealm',
+  SUPPORT_TITLE_ACHIEVEMENT_ID: 'support_pocketrealm_title',
+  SUPPORT_TITLE: 'Champion',
 } as const;
 
 export const POTION_CONSTANTS = {

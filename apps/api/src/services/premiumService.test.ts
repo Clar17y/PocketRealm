@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@pocketrealm/database', () => import('../__mocks__/database.js'));
+vi.mock('./stripeService', () => ({
+  retrieveStripeCheckoutSession: vi.fn(),
+}));
 
 import { prisma } from '@pocketrealm/database';
 import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 import {
   calculatePremiumGrantWindow,
+  confirmSupportPocketrealmCheckoutSession,
   grantPremiumDays,
 } from './premiumService';
+import { retrieveStripeCheckoutSession } from './stripeService';
 
 const PLAYER_ID = 'player-1';
 const PAYMENT_INTENT_ID = 'pi_123';
@@ -52,6 +57,9 @@ describe('grantPremiumDays', () => {
           id: PLAYER_ID,
           isPremium: true,
         }),
+      },
+      playerAchievement: {
+        upsert: vi.fn().mockResolvedValue({}),
       },
       premiumPurchase: {
         findUnique: vi.fn().mockResolvedValue(null),
@@ -162,6 +170,19 @@ describe('grantPremiumDays', () => {
         isPremium: true,
         premiumExpiresAt: expectedWindow.grantedUntil,
       },
+    });
+    expect(prisma.playerAchievement.upsert).toHaveBeenCalledWith({
+      where: {
+        playerId_achievementId: {
+          playerId: PLAYER_ID,
+          achievementId: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
+        },
+      },
+      create: {
+        playerId: PLAYER_ID,
+        achievementId: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
+      },
+      update: {},
     });
   });
 
@@ -403,5 +424,61 @@ describe('grantPremiumDays', () => {
     });
 
     expect(prisma.premiumPurchase.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('confirmSupportPocketrealmCheckoutSession', () => {
+  it('grants premium from a paid support checkout session and returns updated status', async () => {
+    const expectedWindow = calculatePremiumGrantWindow(null, GRANT_DAYS, NOW);
+
+    vi.mocked(retrieveStripeCheckoutSession).mockResolvedValue({
+      id: SESSION_ID,
+      payment_status: 'paid',
+      amount_total: PREMIUM_CONSTANTS.PRICE_GBP_PENCE,
+      currency: 'gbp',
+      payment_intent: PAYMENT_INTENT_ID,
+      metadata: {
+        playerId: PLAYER_ID,
+        productType: PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE,
+      },
+    } as never);
+    vi.mocked(prisma.player.findUnique)
+      .mockResolvedValueOnce({ premiumExpiresAt: null } as never)
+      .mockResolvedValueOnce({
+        id: PLAYER_ID,
+        isPremium: true,
+        premiumExpiresAt: expectedWindow.grantedUntil,
+      } as never);
+    vi.mocked(prisma.premiumPurchase.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.player.update).mockResolvedValue({
+      id: PLAYER_ID,
+      isPremium: true,
+      premiumExpiresAt: expectedWindow.grantedUntil,
+    } as never);
+    vi.mocked(prisma.premiumPurchase.create).mockResolvedValue({
+      id: 'purchase-1',
+      playerId: PLAYER_ID,
+    } as never);
+
+    const result = await confirmSupportPocketrealmCheckoutSession({
+      playerId: PLAYER_ID,
+      sessionId: SESSION_ID,
+      now: NOW,
+    });
+
+    expect(retrieveStripeCheckoutSession).toHaveBeenCalledWith(SESSION_ID);
+    expect(prisma.premiumPurchase.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        playerId: PLAYER_ID,
+        provider: 'stripe',
+        providerSessionId: SESSION_ID,
+        providerPaymentIntentId: PAYMENT_INTENT_ID,
+      }),
+    });
+    expect(result).toEqual({
+      id: PLAYER_ID,
+      isPremium: true,
+      premiumExpiresAt: expectedWindow.grantedUntil,
+    });
   });
 });

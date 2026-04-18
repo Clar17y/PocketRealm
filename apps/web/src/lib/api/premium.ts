@@ -7,6 +7,18 @@ export async function createPremiumCheckout() {
   });
 }
 
+export async function confirmPremiumCheckout(sessionId: string) {
+  return fetchApi<{
+    premium: {
+      isPremium: boolean;
+      premiumExpiresAt: string | null;
+    };
+  }>('/api/v1/premium/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId }),
+  });
+}
+
 export async function getPremiumStatus() {
   return fetchApi<{
     premium: {

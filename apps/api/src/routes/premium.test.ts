@@ -5,6 +5,7 @@ import request from 'supertest';
 vi.mock('../services/premiumService', () => ({
   getPremiumStatus: vi.fn(),
   listPremiumPurchases: vi.fn(),
+  confirmSupportPocketrealmCheckoutSession: vi.fn(),
 }));
 
 vi.mock('../services/stripeService', () => ({
@@ -14,6 +15,7 @@ vi.mock('../services/stripeService', () => ({
 import { errorHandler } from '../middleware/errorHandler';
 import { generateAccessToken } from '../middleware/auth';
 import {
+  confirmSupportPocketrealmCheckoutSession,
   getPremiumStatus,
   listPremiumPurchases,
 } from '../services/premiumService';
@@ -119,5 +121,36 @@ describe('premium router', () => {
       ],
     });
     expect(listPremiumPurchases).toHaveBeenCalledWith('player-1');
+  });
+
+  it('confirms a Stripe checkout session for the authenticated player', async () => {
+    vi.mocked(confirmSupportPocketrealmCheckoutSession).mockResolvedValue({
+      id: 'player-1',
+      isPremium: true,
+      premiumExpiresAt: new Date('2026-05-17T12:00:00.000Z'),
+    } as never);
+    const token = generateAccessToken({
+      playerId: 'player-1',
+      username: 'hero',
+      role: 'player',
+    });
+
+    const res = await request(buildApp())
+      .post('/api/v1/premium/confirm')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ sessionId: 'cs_test_123' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      premium: {
+        id: 'player-1',
+        isPremium: true,
+        premiumExpiresAt: '2026-05-17T12:00:00.000Z',
+      },
+    });
+    expect(confirmSupportPocketrealmCheckoutSession).toHaveBeenCalledWith({
+      playerId: 'player-1',
+      sessionId: 'cs_test_123',
+    });
   });
 });

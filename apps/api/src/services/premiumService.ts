@@ -1,6 +1,8 @@
+import type Stripe from 'stripe';
 import { Prisma, prisma } from '@pocketrealm/database';
 import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { retrieveStripeCheckoutSession } from './stripeService';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -69,6 +71,38 @@ export async function getPremiumStatus(playerId: string) {
   }
 
   return player;
+}
+
+function getCheckoutSessionPlayerId(metadata: Record<string, string> | null | undefined): string {
+  const playerId = metadata?.playerId;
+
+  if (!playerId) {
+    throw new AppError(400, 'Stripe checkout session missing playerId metadata', 'STRIPE_PLAYER_ID_MISSING');
+  }
+
+  return playerId;
+}
+
+function getPaymentIntentId(paymentIntent: string | Stripe.PaymentIntent | null): string | null {
+  if (typeof paymentIntent === 'string') {
+    return paymentIntent;
+  }
+
+  if (paymentIntent && typeof paymentIntent === 'object' && 'id' in paymentIntent) {
+    const paymentIntentId = paymentIntent.id;
+    return typeof paymentIntentId === 'string' ? paymentIntentId : null;
+  }
+
+  return null;
+}
+
+function isSupportPocketrealmSession(session: Stripe.Checkout.Session): boolean {
+  return (
+    session.payment_status === 'paid'
+    && session.metadata?.productType === PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE
+    && session.amount_total === PREMIUM_CONSTANTS.PRICE_GBP_PENCE
+    && session.currency?.toLowerCase() === 'gbp'
+  );
 }
 
 async function findExistingStripePurchase(tx: Prisma.TransactionClient, input: GrantPremiumDaysInput) {
@@ -179,6 +213,20 @@ async function grantPremiumDaysTx(tx: PremiumGrantClient, input: GrantPremiumDay
     },
   });
 
+  await tx.playerAchievement.upsert({
+    where: {
+      playerId_achievementId: {
+        playerId: input.playerId,
+        achievementId: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
+      },
+    },
+    create: {
+      playerId: input.playerId,
+      achievementId: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
+    },
+    update: {},
+  });
+
   return purchase;
 }
 
@@ -188,4 +236,38 @@ export async function grantPremiumDays(input: GrantPremiumDaysInput, tx?: Premiu
   }
 
   return prisma.$transaction((transactionClient) => grantPremiumDaysTx(transactionClient, input));
+}
+
+export async function confirmSupportPocketrealmCheckoutSession(input: {
+  playerId: string;
+  sessionId: string;
+  now?: Date;
+}) {
+  const session = await retrieveStripeCheckoutSession(input.sessionId);
+  const sessionPlayerId = getCheckoutSessionPlayerId(session.metadata);
+
+  if (sessionPlayerId !== input.playerId) {
+    throw new AppError(409, 'Stripe purchase belongs to another player', 'PURCHASE_PLAYER_MISMATCH');
+  }
+
+  if (!isSupportPocketrealmSession(session)) {
+    throw new AppError(409, 'Stripe checkout session is not a paid Support Pocketrealm purchase', 'STRIPE_SESSION_NOT_FULFILLABLE');
+  }
+
+  await grantPremiumDays({
+    playerId: input.playerId,
+    provider: 'stripe',
+    providerSessionId: session.id,
+    providerPaymentIntentId: getPaymentIntentId(session.payment_intent),
+    amount: PREMIUM_CONSTANTS.PRICE_GBP_PENCE,
+    currency: 'gbp',
+    days: PREMIUM_CONSTANTS.SUPPORT_DURATION_DAYS,
+    metadata: {
+      sessionId: session.id,
+      source: 'stripe_checkout_confirm',
+    },
+    now: input.now,
+  });
+
+  return getPremiumStatus(input.playerId);
 }

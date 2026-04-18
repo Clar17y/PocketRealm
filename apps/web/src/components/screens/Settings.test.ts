@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   createPremiumCheckoutMock,
+  confirmPremiumCheckoutMock,
   getPremiumStatusMock,
   getPremiumPurchasesMock,
 } = vi.hoisted(() => ({
   createPremiumCheckoutMock: vi.fn(),
+  confirmPremiumCheckoutMock: vi.fn(),
   getPremiumStatusMock: vi.fn(),
   getPremiumPurchasesMock: vi.fn(),
 }));
@@ -24,6 +26,7 @@ vi.mock('@/lib/api', async () => {
     changeEmail: vi.fn(),
     changePassword: vi.fn(),
     createPremiumCheckout: createPremiumCheckoutMock,
+    confirmPremiumCheckout: confirmPremiumCheckoutMock,
     getPremiumStatus: getPremiumStatusMock,
     getPremiumPurchases: getPremiumPurchasesMock,
   };
@@ -38,6 +41,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  window.history.replaceState({}, '', '/game?screen=settings');
   getPremiumStatusMock.mockResolvedValue({
     data: { premium: { isPremium: false, premiumExpiresAt: null } },
   });
@@ -114,6 +118,11 @@ describe('Settings', () => {
     expect(await screen.findByRole('heading', { name: 'Support Pocketrealm' })).toBeTruthy();
     expect(screen.getByText(/One-time purchase\. Grants 30 days of Champion\./i)).toBeTruthy();
     expect(screen.getByText('Free account')).toBeTruthy();
+    expect(screen.getByText(/Champion perks/i)).toBeTruthy();
+    expect(screen.getByText(/\+10% turn regen and turn bank cap/i)).toBeTruthy();
+    expect(screen.getByText(/\+8 backpack slots/i)).toBeTruthy();
+    expect(screen.getByText(/20 combat templates/i)).toBeTruthy();
+    expect(screen.getByText(/Unlock the Champion title/i)).toBeTruthy();
   });
 
   it('renders recent Support Pocketrealm purchase history', async () => {
@@ -137,6 +146,43 @@ describe('Settings', () => {
 
     expect(await screen.findByText(/Champion until/i)).toBeTruthy();
     expect(screen.getByText((content) => content.includes('30') && content.includes('days (until'))).toBeTruthy();
+  });
+
+  it('confirms a returned Stripe checkout session and refreshes premium state', async () => {
+    const premiumExpiresAt = '2026-05-17T12:00:00.000Z';
+
+    window.history.replaceState(
+      {},
+      '',
+      '/game?screen=settings&support=success&session_id=cs_test_123',
+    );
+
+    confirmPremiumCheckoutMock.mockResolvedValue({
+      data: { premium: { isPremium: true, premiumExpiresAt } },
+    });
+    getPremiumStatusMock.mockResolvedValue({
+      data: { premium: { isPremium: true, premiumExpiresAt } },
+    });
+    getPremiumPurchasesMock.mockResolvedValue({
+      data: {
+        purchases: [
+          {
+            id: 'purchase-1',
+            championDaysGranted: 30,
+            grantedUntil: premiumExpiresAt,
+            createdAt: '2026-04-17T12:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    renderSettings();
+
+    await waitFor(() => expect(confirmPremiumCheckoutMock).toHaveBeenCalledWith('cs_test_123'));
+    await waitFor(() => expect(screen.getByText(/Thanks for supporting Pocketrealm/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Champion until/i)).toBeTruthy());
+    expect(screen.getByText(/Champion title is now available in Achievements/i)).toBeTruthy();
+    await waitFor(() => expect(window.location.search).not.toContain('session_id='));
   });
 
   it('defaults to the Account tab and can switch to Game', () => {

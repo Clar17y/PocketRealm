@@ -3,15 +3,36 @@ import { CACHE_TTL_CONSTANTS } from '@pocketrealm/shared';
 import { redis } from '../redis';
 
 const TTL = CACHE_TTL_CONSTANTS.STATIC_DATA_TTL;
-const INDEX_KEY = 'static:__index';
+
+function getStaticCacheNamespace(): string {
+  const databaseUrl = process.env.DATABASE_URL ?? process.env.DIRECT_DATABASE_URL ?? '';
+  const fallback = 'default';
+
+  if (!databaseUrl) return fallback;
+
+  try {
+    const dbName = new URL(databaseUrl).pathname.split('/').filter(Boolean).pop();
+    if (!dbName) return fallback;
+    return dbName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  } catch {
+    return fallback;
+  }
+}
+
+function getStaticCacheKey(key: string): string {
+  return `static:${getStaticCacheNamespace()}:${key}`;
+}
 
 /**
  * Cache-through helper for static data. Like cachedQuery but also tracks
  * keys in a Redis Set so invalidateStaticCache can delete them without KEYS.
  */
 async function staticCachedQuery<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const namespacedKey = getStaticCacheKey(key);
+  const indexKey = getStaticCacheKey('__index');
+
   try {
-    const cached = await redis.get(key);
+    const cached = await redis.get(namespacedKey);
     if (cached !== null) return JSON.parse(cached) as T;
   } catch {
     // Redis unavailable — fall through
@@ -21,8 +42,8 @@ async function staticCachedQuery<T>(key: string, fetcher: () => Promise<T>): Pro
 
   try {
     await Promise.all([
-      redis.set(key, JSON.stringify(result), 'EX', TTL),
-      redis.sadd(INDEX_KEY, key),
+      redis.set(namespacedKey, JSON.stringify(result), 'EX', TTL),
+      redis.sadd(indexKey, namespacedKey),
     ]);
   } catch {
     // Best-effort
@@ -36,7 +57,7 @@ async function staticCachedQuery<T>(key: string, fetcher: () => Promise<T>): Pro
 // ---------------------------------------------------------------------------
 
 export function getCachedZones() {
-  return staticCachedQuery('static:zones:all', () =>
+  return staticCachedQuery('zones:all', () =>
     prisma.zone.findMany({
       orderBy: [{ isStarter: 'desc' }, { difficulty: 'asc' }, { name: 'asc' }],
     }),
@@ -44,7 +65,7 @@ export function getCachedZones() {
 }
 
 export function getCachedZoneConnections() {
-  return staticCachedQuery('static:connections:all', () =>
+  return staticCachedQuery('connections:all', () =>
     prisma.zoneConnection.findMany({
       select: { fromId: true, toId: true, explorationThreshold: true },
     }),
@@ -56,19 +77,19 @@ export function getCachedZoneConnections() {
 // ---------------------------------------------------------------------------
 
 export function getCachedMobTemplatesByZone(zoneId: string) {
-  return staticCachedQuery(`static:mobs:zone:${zoneId}`, () =>
+  return staticCachedQuery(`mobs:zone:${zoneId}`, () =>
     prisma.mobTemplate.findMany({ where: { zoneId } }),
   );
 }
 
 export function getCachedBossMobTemplates() {
-  return staticCachedQuery('static:mobs:boss', () =>
+  return staticCachedQuery('mobs:boss', () =>
     prisma.mobTemplate.findMany({ where: { isBoss: true } }),
   );
 }
 
 export function getCachedExpeditionMobTemplates() {
-  return staticCachedQuery('static:mobs:expedition', () =>
+  return staticCachedQuery('mobs:expedition', () =>
     prisma.mobTemplate.findMany({ where: { isExpeditionMob: true } }),
   );
 }
@@ -78,7 +99,7 @@ export function getCachedExpeditionMobTemplates() {
 // ---------------------------------------------------------------------------
 
 export function getCachedResourceNodesByZone(zoneId: string) {
-  return staticCachedQuery(`static:resources:zone:${zoneId}`, () =>
+  return staticCachedQuery(`resources:zone:${zoneId}`, () =>
     prisma.resourceNode.findMany({ where: { zoneId } }),
   );
 }
@@ -88,7 +109,7 @@ export function getCachedResourceNodesByZone(zoneId: string) {
 // ---------------------------------------------------------------------------
 
 export function getCachedZoneMobFamilies(zoneId: string) {
-  return staticCachedQuery(`static:zonefamilies:${zoneId}`, () =>
+  return staticCachedQuery(`zonefamilies:${zoneId}`, () =>
     prisma.zoneMobFamily.findMany({
       where: { zoneId },
       include: {
@@ -113,7 +134,7 @@ export function getCachedZoneMobFamilies(zoneId: string) {
 // ---------------------------------------------------------------------------
 
 export function getCachedCraftingRecipes() {
-  return staticCachedQuery('static:recipes:all', () =>
+  return staticCachedQuery('recipes:all', () =>
     prisma.craftingRecipe.findMany({
       include: { resultTemplate: true, mobFamily: { select: { name: true, siteNounLarge: true } } },
       orderBy: [{ requiredLevel: 'asc' }],
@@ -126,10 +147,12 @@ export function getCachedCraftingRecipes() {
 // ---------------------------------------------------------------------------
 
 export async function invalidateStaticCache(): Promise<void> {
+  const indexKey = getStaticCacheKey('__index');
+
   try {
-    const keys = await redis.smembers(INDEX_KEY);
+    const keys = await redis.smembers(indexKey);
     if (keys.length === 0) return;
-    await redis.del(...keys, INDEX_KEY);
+    await redis.del(...keys, indexKey);
   } catch {
     // Best-effort
   }

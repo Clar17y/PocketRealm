@@ -4,12 +4,14 @@ vi.mock('@pocketrealm/database', () => import('../__mocks__/database.js'));
 
 const createSession = vi.fn();
 const constructEvent = vi.fn();
+const retrieveSession = vi.fn();
 
 vi.mock('stripe', () => {
   class Stripe {
     checkout = {
       sessions: {
         create: createSession,
+        retrieve: retrieveSession,
       },
     };
 
@@ -26,6 +28,7 @@ import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 import {
   createSupportPocketrealmCheckoutSession,
   parseStripeWebhookEvent,
+  retrieveStripeCheckoutSession,
 } from './stripeService';
 
 describe('stripeService', () => {
@@ -126,6 +129,23 @@ describe('stripeService', () => {
 
       expect(parseStripeWebhookEvent(payload, 't=1,v1=sig')).toEqual(event);
       expect(constructEvent).toHaveBeenCalledWith(payload, 't=1,v1=sig', 'whsec_123');
+    });
+  });
+
+  describe('retrieveStripeCheckoutSession', () => {
+    it('retrieves a checkout session by id', async () => {
+      retrieveSession.mockResolvedValue({
+        id: 'cs_test_123',
+        payment_status: 'paid',
+      });
+
+      const session = await retrieveStripeCheckoutSession('cs_test_123');
+
+      expect(session).toEqual({
+        id: 'cs_test_123',
+        payment_status: 'paid',
+      });
+      expect(retrieveSession).toHaveBeenCalledWith('cs_test_123');
     });
   });
 });

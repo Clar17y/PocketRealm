@@ -90,6 +90,10 @@ export async function createSupportPocketrealmCheckoutSession(input: { playerId:
   };
 }
 
+export async function retrieveStripeCheckoutSession(sessionId: string) {
+  return getStripeClient().checkout.sessions.retrieve(sessionId);
+}
+
 export function parseStripeWebhookEvent(payload: Buffer, signature: string): Stripe.Event {
   return getStripeClient().webhooks.constructEvent(
     payload,

@@ -184,7 +184,17 @@ export async function mine(playerNodeId: string, turns: number) {
       remainingCapacity: number;
       nodeDepleted: boolean;
     };
-    results: { actions: number; baseYield: number; yieldMultiplier: number; totalYield: number; itemTemplateId: string; itemId: string };
+    results: {
+      actions: number;
+      baseYield: number;
+      yieldMultiplier: number;
+      totalMultiplier?: number;
+      championMultiplier?: number;
+      totalYield: number;
+      capacityLimited?: boolean;
+      itemTemplateId: string;
+      itemId: string;
+    };
     xp: {
       skillType: string;
       xpAfterEfficiency: number;
@@ -206,7 +216,12 @@ export async function mine(playerNodeId: string, turns: number) {
     yieldBreakdown?: {
       baseYieldPerAction: number;
       totalYieldPerAction: number;
+      totalMultiplier?: number;
+      championMultiplier?: number;
+      bonusMultiplier?: number;
       rawTotalYield?: number;
+      unclampedRawYield?: number;
+      capacityLimited?: boolean;
       eventModifier: number;
       turnCostPerAction?: number;
       eventTitle: string | null;
