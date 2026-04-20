@@ -57,6 +57,7 @@ describe('useAuth', () => {
         emailVerified: false,
         isPremium: false,
         premiumExpiresAt: null,
+        seasonId: null,
       });
     });
 

@@ -31,17 +31,20 @@ export interface SeasonArchiveSummary {
   };
 }
 
+export interface AuthPlayerSummary {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  emailVerified: boolean;
+  seasonId: string | null;
+  isPremium: boolean;
+  premiumExpiresAt: string | null;
+}
+
 export async function register(username: string, email: string, password: string) {
   return fetchApi<{
-    player: {
-      id: string;
-      username: string;
-      email: string;
-      role: string;
-      emailVerified: boolean;
-      isPremium: boolean;
-      premiumExpiresAt: string | null;
-    };
+    player: AuthPlayerSummary;
     accessToken: string;
     refreshToken: string;
   }>('/api/v1/auth/register', {
@@ -52,15 +55,7 @@ export async function register(username: string, email: string, password: string
 
 export async function login(email: string, password: string) {
   return fetchApi<{
-    player: {
-      id: string;
-      username: string;
-      email: string;
-      role: string;
-      emailVerified: boolean;
-      isPremium: boolean;
-      premiumExpiresAt: string | null;
-    };
+    player: AuthPlayerSummary;
     accessToken: string;
     refreshToken: string;
   }>('/api/v1/auth/login', {

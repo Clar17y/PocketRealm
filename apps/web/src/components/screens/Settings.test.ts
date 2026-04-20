@@ -64,6 +64,7 @@ function renderSettings(overrides: Partial<React.ComponentProps<typeof Settings>
     emailVerified: false,
     isPremium: false,
     premiumExpiresAt: null,
+    seasonArchives: [],
     onAccountRefresh: vi.fn().mockResolvedValue(undefined),
     onForceRelogin: vi.fn(),
     combatLogSpeedMs: 800,
@@ -287,5 +288,38 @@ describe('Settings', () => {
     const passwordCard = screen.getByRole('heading', { name: 'Change password' }).parentElement!;
     expect(within(passwordCard).getByText('New password confirmation does not match.')).toBeTruthy();
     expect(changePassword).not.toHaveBeenCalled();
+  });
+
+  it('renders season archive summaries on the account tab', () => {
+    renderSettings({
+      seasonArchives: [
+        {
+          id: 'archive-1',
+          username: 'Rook_S1',
+          characterLevel: 21,
+          characterXp: 12345,
+          attributes: {},
+          skills: [],
+          stats: {},
+          combatTemplates: [],
+          leaderboardRanks: { pvp_rating: 3 },
+          rewardsEarned: [{ type: 'title', rank: 3 }],
+          mergeLog: {},
+          createdAt: '2026-03-20T00:00:00.000Z',
+          season: {
+            id: 'season-1',
+            name: 'Season 1',
+            startsAt: '2026-03-01T00:00:00.000Z',
+            endsAt: '2026-03-19T00:00:00.000Z',
+          },
+        },
+      ],
+    });
+
+    expect(screen.getByText('Season Archives')).toBeTruthy();
+    expect(screen.getByText('Season 1')).toBeTruthy();
+    expect(screen.getByText('Rook_S1 · Level 21')).toBeTruthy();
+    expect(screen.getByText('1 rewards')).toBeTruthy();
+    expect(screen.getByText('1 tracked ranks')).toBeTruthy();
   });
 });

@@ -112,4 +112,46 @@ describe('AppShell', () => {
     expect(onMailClick).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('menu')).toBeNull();
   });
+
+  it('shows a character picker when multiple characters exist and switches realms from the header', () => {
+    const onSwitchPlayer = vi.fn();
+
+    render(
+      React.createElement(
+        AppShell,
+        {
+          username: 'Rook',
+          realmLabel: 'Permanent Realm',
+          activePlayerId: 'permanent-player',
+          characters: [
+            {
+              id: 'permanent-player',
+              username: 'Rook',
+              characterLevel: 42,
+              seasonId: null,
+              seasonName: null,
+              seasonStatus: null,
+              seasonEndsAt: null,
+            },
+            {
+              id: 'season-player',
+              username: 'Rook_S1',
+              characterLevel: 18,
+              seasonId: 'season-1',
+              seasonName: 'Season 1',
+              seasonStatus: 'active',
+              seasonEndsAt: '2099-01-01T00:00:00.000Z',
+            },
+          ],
+          onSwitchPlayer,
+        },
+        React.createElement('div', null, 'Child'),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch character' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Rook_S1/i }));
+
+    expect(onSwitchPlayer).toHaveBeenCalledWith('season-player');
+  });
 });

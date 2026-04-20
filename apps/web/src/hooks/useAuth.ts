@@ -11,6 +11,7 @@ interface Player {
   emailVerified: boolean;
   isPremium: boolean;
   premiumExpiresAt: string | null;
+  seasonId: string | null;
 }
 
 interface AuthState {
@@ -111,6 +112,11 @@ export function useAuth() {
     setState({ player, isLoading: false, isAuthenticated: true });
   }, []);
 
+  const storeTokens = useCallback((accessToken: string, refreshToken: string) => {
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
@@ -120,6 +126,7 @@ export function useAuth() {
   return {
     ...state,
     setTokens,
+    storeTokens,
     logout,
     checkAuth,
     refreshPlayer,

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { PixelCard } from '@/components/PixelCard';
 import { Slider } from '@/components/ui/Slider';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { changeEmail, changePassword, resendVerification } from '@/lib/api';
+import { changeEmail, changePassword, resendVerification, type SeasonArchiveSummary } from '@/lib/api';
 import type { ConfirmRarity } from '@/lib/rarity';
 import { EXPLORATION_CONSTANTS } from '@pocketrealm/shared';
 import { RaritySelector } from '../common/RaritySelector';
@@ -37,6 +37,7 @@ interface SettingsProps {
   emailVerified: boolean;
   isPremium: boolean;
   premiumExpiresAt: string | null;
+  seasonArchives: SeasonArchiveSummary[];
   onAccountRefresh: () => Promise<void>;
   onForceRelogin: () => void;
 
@@ -110,12 +111,23 @@ const primaryButtonClassName =
 const secondaryButtonClassName =
   'rounded border border-[var(--rpg-border)] bg-[var(--rpg-surface)] px-4 py-2 text-xs font-bold text-[var(--rpg-text-primary)] transition-colors hover:bg-[var(--rpg-border)] disabled:cursor-not-allowed disabled:opacity-60';
 
+function countEntries(value: unknown): number {
+  if (Array.isArray(value)) {
+    return value.length;
+  }
+  if (value && typeof value === 'object') {
+    return Object.keys(value).length;
+  }
+  return 0;
+}
+
 export function Settings({
   username,
   email,
   emailVerified,
   isPremium,
   premiumExpiresAt,
+  seasonArchives,
   onAccountRefresh,
   onForceRelogin,
   combatLogSpeedMs,
@@ -400,6 +412,52 @@ export function Settings({
             initialIsPremium={isPremium}
             initialPremiumExpiresAt={premiumExpiresAt}
           />
+
+          <PixelCard>
+            <h3 className="mb-3 text-sm font-bold text-[var(--rpg-text-primary)]">Season Archives</h3>
+            {seasonArchives.length === 0 ? (
+              <p className="text-sm text-[var(--rpg-text-secondary)]">No past seasons yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {seasonArchives.map((archive) => {
+                  const rewardCount = countEntries(archive.rewardsEarned);
+                  const rankCount = countEntries(archive.leaderboardRanks);
+
+                  return (
+                    <div
+                      key={archive.id}
+                      className="rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-3 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-[var(--rpg-text-primary)]">
+                            {archive.season.name}
+                          </p>
+                          <p className="text-xs text-[var(--rpg-text-secondary)]">
+                            {archive.username} · Level {archive.characterLevel}
+                          </p>
+                        </div>
+                        <span className="text-[10px] font-pixel uppercase tracking-wide text-[var(--rpg-gold)]">
+                          Archived
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--rpg-text-secondary)]">
+                        <span className="rounded border border-[var(--rpg-border)] px-2 py-1">
+                          {rewardCount} rewards
+                        </span>
+                        <span className="rounded border border-[var(--rpg-border)] px-2 py-1">
+                          {rankCount} tracked ranks
+                        </span>
+                        <span className="rounded border border-[var(--rpg-border)] px-2 py-1">
+                          {archive.characterXp.toLocaleString()} XP
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </PixelCard>
 
           {onLogout && (
             <button
