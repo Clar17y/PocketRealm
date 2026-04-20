@@ -42,6 +42,7 @@ import { checkActivityLockout } from '../services/expeditionLockoutService';
 import { getCachedZones, getCachedZoneConnections, getCachedMobTemplatesByZone } from '../services/staticDataCacheService';
 import { buildTrackableMobFamiliesByZone } from '../services/explorationTrackingService';
 import { invalidateZoneIdCache } from '../services/zoneService';
+import { requireActiveSeason } from '../middleware/seasonGuard';
 
 
 
@@ -169,6 +170,8 @@ zonesRouter.get('/', asyncHandler(async (req, res) => {
 const travelSchema = z.object({
   zoneId: z.string().uuid(),
 });
+
+zonesRouter.use(requireActiveSeason);
 
 interface TravelEvent {
   turn: number;

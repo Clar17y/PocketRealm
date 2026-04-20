@@ -16,6 +16,7 @@ import { teleportPlayer } from '../services/zoneService';
 import { createActivityLog } from '../services/activityLogService';
 import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { grantPremiumDays, listPremiumPurchases } from '../services/premiumService';
+import { refreshSeasonCache } from '../services/seasonCacheService';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import {
@@ -39,6 +40,14 @@ import {
 const router = Router();
 router.use(authenticate, requireAdmin);
 
+const createSeasonSchema = z.object({
+  name: z.string().min(1).max(64),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  constantOverrides: z.record(z.string(), z.record(z.string(), z.number())).optional(),
+  features: z.array(z.string()).optional(),
+});
+
 /** Log an admin action for audit trail */
 async function adminAudit(adminId: string, action: string, details: Record<string, unknown>) {
   await createActivityLog({ playerId: adminId, activityType: 'admin_action', turnsSpent: 0, result: { action, ...details } });
@@ -58,6 +67,96 @@ async function adminAuditTx(
     result: { action, ...details } as Prisma.InputJsonValue,
   });
 }
+
+router.get('/seasons', asyncHandler(async (_req, res) => {
+  const seasons = await prisma.season.findMany({
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ seasons });
+}));
+
+router.post('/seasons', asyncHandler(async (req, res) => {
+  const data = createSeasonSchema.parse(req.body);
+
+  const season = await prisma.season.create({
+    data: {
+      name: data.name,
+      status: 'upcoming',
+      startsAt: new Date(data.startsAt),
+      endsAt: new Date(data.endsAt),
+      constantOverrides: (data.constantOverrides ?? null) as unknown as Prisma.InputJsonValue,
+      features: data.features ?? [],
+    },
+  });
+
+  await adminAudit(req.player!.playerId, 'create_season', {
+    seasonId: season.id,
+    name: season.name,
+  });
+  res.status(201).json({ season });
+}));
+
+router.post('/seasons/:id/activate', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const activeSeason = await prisma.season.findFirst({
+    where: { status: 'active' },
+    select: { id: true },
+  });
+  if (activeSeason && activeSeason.id !== id) {
+    throw new AppError(409, 'Another season is already active', 'ACTIVE_SEASON_EXISTS');
+  }
+
+  const season = await prisma.season.update({
+    where: { id },
+    data: { status: 'active' },
+  });
+
+  await refreshSeasonCache();
+  await adminAudit(req.player!.playerId, 'activate_season', {
+    seasonId: season.id,
+    name: season.name,
+  });
+  res.json({ season });
+}));
+
+router.post('/seasons/:id/end', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const season = await prisma.season.findUniqueOrThrow({
+    where: { id },
+  });
+  if (season.status !== 'active') {
+    throw new AppError(400, 'Season is not active', 'SEASON_NOT_ACTIVE');
+  }
+
+  await prisma.season.update({
+    where: { id },
+    data: { status: 'ended' },
+  });
+
+  await refreshSeasonCache();
+
+  const seasonalZoneIds = await prisma.zone.findMany({
+    where: { seasonId: id },
+    select: { id: true },
+  });
+  if (seasonalZoneIds.length > 0) {
+    await prisma.worldEvent.updateMany({
+      where: {
+        status: 'active',
+        zoneId: { in: seasonalZoneIds.map((zone) => zone.id) },
+      },
+      data: { status: 'cancelled' },
+    });
+  }
+
+  await adminAudit(req.player!.playerId, 'end_season', {
+    seasonId: id,
+    name: season.name,
+  });
+  res.json({ message: 'Season ended. Run merge when ready.' });
+}));
 
 // ---------------------------------------------------------------------------
 // Player

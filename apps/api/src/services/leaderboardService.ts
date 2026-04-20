@@ -10,6 +10,22 @@ const LAST_REFRESH_KEY = 'leaderboard:last_refresh';
 const LOCK_KEY = 'leaderboard:refresh_lock';
 const RELEASE_LOCK_LUA = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
 
+function leaderboardRealmId(seasonId?: string | null): string {
+  return seasonId ?? 'permanent';
+}
+
+function leaderboardKey(category: string, seasonId?: string | null): string {
+  return `leaderboard:${leaderboardRealmId(seasonId)}:${category}`;
+}
+
+function leaderboardMetaKey(category: string, seasonId?: string | null): string {
+  return `leaderboard:meta:${leaderboardRealmId(seasonId)}:${category}`;
+}
+
+function playerSeasonWhere(seasonId?: string | null): { seasonId: string | null } {
+  return { seasonId: seasonId ?? null };
+}
+
 // ── Paginated fetch helper ───────────────────────────────────────────────────
 
 // Shared player sub-shape selected in leaderboard queries
@@ -75,8 +91,8 @@ function getRole(player: { account?: { role?: string | null }; role?: string | n
  * unbounded single-query memory pressure at scale.
  */
 async function paginatedFindMany<T extends { id: string }>(
-  findMany: (args: { take: number; skip?: number; cursor?: { id: string }; select?: unknown; orderBy?: unknown }) => Promise<T[]>,
-  baseArgs: { select?: unknown },
+  findMany: (args: { take: number; skip?: number; cursor?: { id: string }; select?: unknown; where?: unknown; orderBy?: unknown }) => Promise<T[]>,
+  baseArgs: { select?: unknown; where?: unknown },
 ): Promise<T[]> {
   const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
   const allRows: T[] = [];
@@ -204,6 +220,7 @@ export async function getLeaderboard(
   category: string,
   playerId?: string,
   aroundMe = false,
+  seasonId?: string | null,
 ): Promise<LeaderboardResponse> {
   if (!VALID_SLUGS.has(category)) {
     throw new AppError(400, `Invalid leaderboard category: ${category}`, 'INVALID_CATEGORY');
@@ -211,8 +228,8 @@ export async function getLeaderboard(
 
   await ensureLeaderboardsFresh();
 
-  const key = `leaderboard:${category}`;
-  const metaKey = `leaderboard:meta:${category}`;
+  const key = leaderboardKey(category, seasonId);
+  const metaKey = leaderboardMetaKey(category, seasonId);
   const { PAGE_SIZE } = LEADERBOARD_CONSTANTS;
 
   const totalPlayers = await redis.zcard(key);
@@ -322,9 +339,10 @@ export async function ensureLeaderboardsFresh(): Promise<void> {
 async function writeToZset(
   category: string,
   rows: { playerId: string; score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number; titleStyle?: TitleStyleVariant }[],
+  seasonId?: string | null,
 ) {
-  const key = `leaderboard:${category}`;
-  const metaKey = `leaderboard:meta:${category}`;
+  const key = leaderboardKey(category, seasonId);
+  const metaKey = leaderboardMetaKey(category, seasonId);
 
   // Clear old data
   await redis.del(key, metaKey);
@@ -354,10 +372,13 @@ async function writeToZset(
   }
 }
 
-async function refreshPvp() {
+async function refreshPvp(seasonId?: string | null) {
   const ratings = await paginatedFindMany<PvpRatingRow>(
     (args) => prisma.pvpRating.findMany(args as Parameters<typeof prisma.pvpRating.findMany>[0]) as unknown as Promise<PvpRatingRow[]>,
     {
+      where: {
+        player: playerSeasonWhere(seasonId),
+      },
       select: {
         id: true,
         playerId: true,
@@ -397,14 +418,19 @@ async function refreshPvp() {
         isAdmin: getRole(r.player) === 'admin',
         ...resolveAchievementTitleDisplay(r.player.activeTitle),
       })),
+      seasonId,
     );
   }
 }
 
-async function refreshProgression() {
+async function refreshProgression(seasonId?: string | null) {
   const players = await paginatedFindMany<PlayerRow>(
     (args) => prisma.player.findMany(args as Parameters<typeof prisma.player.findMany>[0]) as unknown as Promise<PlayerRow[]>,
     {
+      where: {
+        isBot: false,
+        ...playerSeasonWhere(seasonId),
+      },
       select: {
         id: true,
         username: true,
@@ -428,6 +454,7 @@ async function refreshProgression() {
       isAdmin: getRole(p) === 'admin',
       ...resolveAchievementTitleDisplay(p.activeTitle),
     })),
+    seasonId,
   );
 
   await writeToZset(
@@ -441,13 +468,20 @@ async function refreshProgression() {
       isAdmin: getRole(p) === 'admin',
       ...resolveAchievementTitleDisplay(p.activeTitle),
     })),
+    seasonId,
   );
 }
 
-async function refreshSkills() {
+async function refreshSkills(seasonId?: string | null) {
   const skills = await paginatedFindMany<PlayerSkillRow>(
     (args) => prisma.playerSkill.findMany(args as Parameters<typeof prisma.playerSkill.findMany>[0]) as unknown as Promise<PlayerSkillRow[]>,
     {
+      where: {
+        player: {
+          isBot: false,
+          ...playerSeasonWhere(seasonId),
+        },
+      },
       select: {
         id: true,
         playerId: true,
@@ -480,6 +514,7 @@ async function refreshSkills() {
         isAdmin: getRole(s.player) === 'admin',
         ...resolveAchievementTitleDisplay(s.player.activeTitle),
       })),
+      seasonId,
     );
   }
 
@@ -504,10 +539,11 @@ async function refreshSkills() {
   await writeToZset(
     'total_skill_level',
     Array.from(totals.entries()).map(([playerId, data]) => ({ playerId, ...data })),
+    seasonId,
   );
 }
 
-async function refreshCombat() {
+async function refreshCombat(seasonId?: string | null) {
   // Total kills from bestiary — uses offset-based pagination because
   // PlayerBestiary has a composite PK (playerId + mobTemplateId),
   // incompatible with cursor pagination.
@@ -517,6 +553,12 @@ async function refreshCombat() {
   let batch;
   do {
     batch = await prisma.playerBestiary.findMany({
+      where: {
+        player: {
+          isBot: false,
+          ...playerSeasonWhere(seasonId),
+        },
+      },
       select: {
         playerId: true,
         kills: true,
@@ -554,6 +596,7 @@ async function refreshCombat() {
   await writeToZset(
     'total_kills',
     Array.from(killTotals.entries()).map(([playerId, data]) => ({ playerId, ...data })),
+    seasonId,
   );
 
   // Boss damage
@@ -561,6 +604,12 @@ async function refreshCombat() {
     const bossRaw = await paginatedFindMany<BossParticipantRow>(
       (args) => prisma.bossParticipant.findMany(args as Parameters<typeof prisma.bossParticipant.findMany>[0]) as unknown as Promise<BossParticipantRow[]>,
       {
+        where: {
+          player: {
+            isBot: false,
+            ...playerSeasonWhere(seasonId),
+          },
+        },
         select: {
           id: true,
           playerId: true,
@@ -598,6 +647,7 @@ async function refreshCombat() {
     await writeToZset(
       'boss_damage',
       Array.from(dmgTotals.entries()).map(([playerId, data]) => ({ playerId, ...data })),
+      seasonId,
     );
   } catch (err) {
     // Skip if table doesn't exist (migration not yet applied); re-throw other errors
@@ -607,10 +657,11 @@ async function refreshCombat() {
   }
 }
 
-async function refreshGuilds() {
+async function refreshGuilds(seasonId?: string | null) {
   const guilds = await paginatedFindMany<GuildRow>(
     (args) => prisma.guild.findMany(args as Parameters<typeof prisma.guild.findMany>[0]) as unknown as Promise<GuildRow[]>,
     {
+      where: playerSeasonWhere(seasonId),
       select: { id: true, name: true, tag: true, level: true, renown: true, _count: { select: { members: true } } },
     },
   );
@@ -625,6 +676,7 @@ async function refreshGuilds() {
       isBot: false,
       isAdmin: false,
     })),
+    seasonId,
   );
 
   await writeToZset(
@@ -637,6 +689,7 @@ async function refreshGuilds() {
       isBot: false,
       isAdmin: false,
     })),
+    seasonId,
   );
 
   await writeToZset(
@@ -649,10 +702,11 @@ async function refreshGuilds() {
       isBot: false,
       isAdmin: false,
     })),
+    seasonId,
   );
 }
 
-async function refreshCasino(): Promise<void> {
+async function refreshCasino(seasonId?: string | null): Promise<void> {
   const rows = await prisma.$queryRaw<{ playerId: string; totalWagered: number; totalPayout: number }[]>`
     SELECT
       rb.player_id AS "playerId",
@@ -667,7 +721,11 @@ async function refreshCasino(): Promise<void> {
 
   const playerIds = rows.map((r) => r.playerId);
   const players = await prisma.player.findMany({
-    where: { id: { in: playerIds } },
+    where: {
+      id: { in: playerIds },
+      isBot: false,
+      ...playerSeasonWhere(seasonId),
+    },
     select: {
       id: true,
       username: true,
@@ -680,33 +738,46 @@ async function refreshCasino(): Promise<void> {
   const playerMap = new Map(players.map((p) => [p.id, p]));
 
   const buildRows = (scoreFn: (r: (typeof rows)[0]) => number) =>
-    rows.map((r) => {
+    rows.flatMap((r) => {
       const p = playerMap.get(r.playerId);
+      if (!p) {
+        return [];
+      }
+
       return {
         playerId: r.playerId,
         score: scoreFn(r),
-        username: p?.username ?? 'Unknown',
-        characterLevel: p?.characterLevel ?? 1,
-        isBot: p?.isBot ?? false,
-        isAdmin: p ? getRole(p) === 'admin' : false,
-        ...resolveAchievementTitleDisplay(p?.activeTitle),
+        username: p.username,
+        characterLevel: p.characterLevel,
+        isBot: p.isBot,
+        isAdmin: getRole(p) === 'admin',
+        ...resolveAchievementTitleDisplay(p.activeTitle),
       };
     });
 
-  await writeToZset('casino_profit', buildRows((r) => r.totalPayout - r.totalWagered));
-  await writeToZset('casino_wagered', buildRows((r) => r.totalWagered));
+  await writeToZset('casino_profit', buildRows((r) => r.totalPayout - r.totalWagered), seasonId);
+  await writeToZset('casino_wagered', buildRows((r) => r.totalWagered), seasonId);
 }
 
 export async function refreshAllLeaderboards(): Promise<void> {
   const start = Date.now();
   let failures = 0;
 
-  try { await refreshPvp(); } catch (err) { failures++; logger.error({ err, board: 'pvp' }, 'Leaderboard refresh error'); }
-  try { await refreshProgression(); } catch (err) { failures++; logger.error({ err, board: 'progression' }, 'Leaderboard refresh error'); }
-  try { await refreshSkills(); } catch (err) { failures++; logger.error({ err, board: 'skills' }, 'Leaderboard refresh error'); }
-  try { await refreshCombat(); } catch (err) { failures++; logger.error({ err, board: 'combat' }, 'Leaderboard refresh error'); }
-  try { await refreshGuilds(); } catch (err) { failures++; logger.error({ err, board: 'guilds' }, 'Leaderboard refresh error'); }
-  try { await refreshCasino(); } catch (err) { failures++; logger.error({ err, board: 'casino' }, 'Leaderboard refresh error'); }
+  const activeSeasons = await prisma.season.findMany({
+    where: { status: 'active' },
+    select: { id: true },
+  });
+
+  const realms: Array<string | null> = [null, ...activeSeasons.map((season) => season.id)];
+
+  for (const seasonId of realms) {
+    try { await refreshPvp(seasonId); } catch (err) { failures++; logger.error({ err, board: 'pvp', seasonId }, 'Leaderboard refresh error'); }
+    try { await refreshProgression(seasonId); } catch (err) { failures++; logger.error({ err, board: 'progression', seasonId }, 'Leaderboard refresh error'); }
+    try { await refreshSkills(seasonId); } catch (err) { failures++; logger.error({ err, board: 'skills', seasonId }, 'Leaderboard refresh error'); }
+    try { await refreshCombat(seasonId); } catch (err) { failures++; logger.error({ err, board: 'combat', seasonId }, 'Leaderboard refresh error'); }
+    try { await refreshGuilds(seasonId); } catch (err) { failures++; logger.error({ err, board: 'guilds', seasonId }, 'Leaderboard refresh error'); }
+    try { await refreshCasino(seasonId); } catch (err) { failures++; logger.error({ err, board: 'casino', seasonId }, 'Leaderboard refresh error'); }
+  }
 
   if (failures === 0) {
     await redis.set(LAST_REFRESH_KEY, new Date().toISOString());

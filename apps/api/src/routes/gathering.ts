@@ -22,6 +22,7 @@ import { getHasActivePremiumEntitlement } from '../services/premiumEntitlement';
 import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
 import { buildGatheringResultDetails } from './gatheringResult';
+import { requireActiveSeason } from '../middleware/seasonGuard';
 
 export const gatheringRouter = Router();
 
@@ -236,6 +237,8 @@ async function getResourceTemplateId(resourceType: string): Promise<string> {
   }
   return match.id;
 }
+
+gatheringRouter.use(requireActiveSeason);
 
 /**
  * POST /api/v1/gathering/mine

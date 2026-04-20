@@ -9,6 +9,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { createActivityLog } from '../services/activityLogService';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
+import { requireActiveSeason } from '../middleware/seasonGuard';
 
 export const hpRouter = Router();
 
@@ -32,7 +33,7 @@ const restSchema = z.object({
  * POST /api/v1/hp/rest
  * Spend turns to restore HP
  */
-hpRouter.post('/rest', asyncHandler(async (req, res) => {
+hpRouter.post('/rest', requireActiveSeason, asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = restSchema.parse(req.body);
 
@@ -67,7 +68,7 @@ hpRouter.post('/rest', asyncHandler(async (req, res) => {
  * POST /api/v1/hp/recover
  * Spend recovery turns to exit knockout state
  */
-hpRouter.post('/recover', asyncHandler(async (req, res) => {
+hpRouter.post('/recover', requireActiveSeason, asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
 
   const result = await recover(playerId);

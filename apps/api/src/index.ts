@@ -56,6 +56,7 @@ import { redis } from './redis';
 import { startMetricsLogger } from './services/metricsLogger';
 import { reconcileExpiredPremium } from './services/premiumReconciliation';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
+import { refreshSeasonCache } from './services/seasonCacheService';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -195,6 +196,9 @@ async function runPremiumReconciliation(): Promise<void> {
 function startServer(): void {
   server.listen(PORT, () => {
     logger.info({ port: PORT, version: APP_VERSION }, 'PocketRealm API running');
+    void refreshSeasonCache().catch((err) => {
+      logger.error({ err }, 'Season cache init failed');
+    });
     void roundTimerRegistry.rehydrate(getIo).catch((err) => {
       logger.error({ err }, 'Round timer registry rehydrate failed');
     });

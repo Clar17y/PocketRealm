@@ -18,6 +18,7 @@ import {
   parseEncounterMobSlot,
 } from '../../services/encounterSiteCombatService';
 import { buildStateUpdates, mergeLootIntoStateUpdates } from '../../services/stateUpdateHelpers.js';
+import { requireActiveSeason } from '../../middleware/seasonGuard';
 
 const abandonSchema = z.object({
   zoneId: z.string().uuid().optional(),
@@ -243,6 +244,8 @@ export function registerSiteRoutes(router: Router): void {
         },
       });
   }));
+
+  router.use(requireActiveSeason);
 
   /**
    * POST /api/v1/combat/sites/abandon

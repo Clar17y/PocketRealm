@@ -14,6 +14,7 @@ import { getIo } from '../socket';
 import { paginationSchema, buildPagination, assertNotRecovering } from '../utils/routeHelpers.js';
 import { asyncHandler } from '../utils/asyncHandler';
 import { trackProgress } from '../services/progressService';
+import { requireActiveSeason } from '../middleware/seasonGuard';
 
 export const bossRouter = Router();
 
@@ -142,7 +143,7 @@ const signupSchema = z.object({
  * POST /api/v1/boss/:id/signup
  * Kept with try/catch because the catch block does custom error mapping.
  */
-bossRouter.post('/:id/signup', async (req, res, next) => {
+bossRouter.post('/:id/signup', requireActiveSeason, async (req, res, next) => {
   try {
     await checkAndResolveDueBossRounds(getIo());
     const playerId = req.player!.playerId;
