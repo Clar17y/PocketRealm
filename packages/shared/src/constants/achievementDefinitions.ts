@@ -898,6 +898,7 @@ const SHOP_ACHIEVEMENTS: AchievementDef[] = [
     title: 'Support Pocketrealm',
     description: 'Support Pocketrealm and unlock the Champion title.',
     titleReward: PREMIUM_CONSTANTS.SUPPORT_TITLE,
+    titleStyle: 'rainbow',
     threshold: 0,
     tier: 5,
   },

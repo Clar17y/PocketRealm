@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, type FormEvent } from 'react';
 import { MessageCircle, Send, X } from 'lucide-react';
 import { CHAT_CONSTANTS } from '@pocketrealm/shared';
-import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
+import { PlayerTitle } from '@/components/common/PlayerTitle';
 import type { ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@pocketrealm/shared';
 import type { ChatChannel } from '@/hooks/useChat';
 
@@ -222,12 +222,13 @@ export function ChatPanel({
                   {msg.username}
                 </span>
                 {msg.title && (
-                  <span
+                  <PlayerTitle
+                    title={msg.title}
+                    titleTier={msg.titleTier}
+                    titleStyle={msg.titleStyle}
                     className="text-[10px] ml-0.5"
-                    style={{ color: RARITY_COLORS[rarityFromTier(msg.titleTier ?? 1)] }}
-                  >
-                    &lt;{msg.title}&gt;
-                  </span>
+                    bracketed
+                  />
                 )}
                 <span className="text-[var(--rpg-text-secondary)]">: </span>
                 <span className="text-[var(--rpg-text-primary)]">{msg.message}</span>

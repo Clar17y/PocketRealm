@@ -25,7 +25,7 @@ import { mockPrisma } from '../__test__/setup';
 import { redis } from '../redis';
 import { ensureLeaderboardsFresh, getCategories, getLeaderboard, refreshAllLeaderboards } from './leaderboardService';
 import { AppError } from '../middleware/errorHandler';
-import { LEADERBOARD_CONSTANTS } from '@pocketrealm/shared';
+import { LEADERBOARD_CONSTANTS, PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 const mockRedis = redis as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 // Helper: set up all prisma mocks to return empty so refresh doesn't throw
@@ -645,6 +645,36 @@ describe('leaderboardService', () => {
         const meta = JSON.parse(pvpRatingMeta![2] as string);
         expect(meta.title).toBe('The Warrior');
         expect(meta.titleTier).toBe(2);
+        expect(meta.titleStyle).toBeUndefined();
+      });
+
+      it('persists titleStyle when a styled title is active', async () => {
+        mockPrisma.pvpRating.findMany.mockResolvedValue([
+          {
+            id: 'pvp-supporter', playerId: 'supporter-p', rating: 1000, wins: 1, bestRating: 1000, winStreak: 0,
+            player: {
+              username: 'Supporter',
+              characterLevel: 5,
+              isBot: false,
+              role: 'player',
+              activeTitle: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
+            },
+          },
+        ]);
+        mockPrisma.player.findMany.mockResolvedValue([]);
+        mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+        mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
+        mockPrisma.bossParticipant.findMany.mockResolvedValue([]);
+        mockPrisma.guild.findMany.mockResolvedValue([]);
+        mockPrisma.$queryRaw.mockResolvedValue([]);
+
+        await refreshAllLeaderboards();
+
+        const hsetCalls = mockRedis.hset.mock.calls;
+        const pvpRatingMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:pvp_rating');
+        const meta = JSON.parse(pvpRatingMeta![2] as string);
+        expect(meta.title).toBe(PREMIUM_CONSTANTS.SUPPORT_TITLE);
+        expect(meta.titleStyle).toBe('rainbow');
       });
 
       it('returns empty title for null activeTitle', async () => {

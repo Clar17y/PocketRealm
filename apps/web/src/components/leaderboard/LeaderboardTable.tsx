@@ -2,7 +2,7 @@
 
 import type { LeaderboardEntry } from '@/lib/api';
 import { Bot, Medal, Shield } from 'lucide-react';
-import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
+import { PlayerTitle } from '@/components/common/PlayerTitle';
 
 interface LeaderboardTableProps {
   entries: LeaderboardEntry[];
@@ -95,9 +95,13 @@ export function LeaderboardTable({
                       {entry.username}
                     </span>
                     {entry.title && (
-                      <span className="text-[10px] shrink-0" style={{ color: RARITY_COLORS[rarityFromTier(entry.titleTier ?? 1)] }}>
-                        &lt;{entry.title}&gt;
-                      </span>
+                      <PlayerTitle
+                        title={entry.title}
+                        titleTier={entry.titleTier}
+                        titleStyle={entry.titleStyle}
+                        className="text-[10px] shrink-0"
+                        bracketed
+                      />
                     )}
                     {entry.isBot && <Bot className="w-3.5 h-3.5 text-[var(--rpg-text-secondary)] shrink-0" />}
                     {entry.isAdmin === true && <Shield className="w-3.5 h-3.5 text-[var(--rpg-gold)] shrink-0" />}
@@ -134,9 +138,13 @@ export function LeaderboardTable({
               <div className="min-w-0">
                 <span className="text-[var(--rpg-gold)] font-semibold truncate">{myRank.username}</span>
                 {myRank.title && (
-                  <span className="text-[10px] ml-1" style={{ color: RARITY_COLORS[rarityFromTier(myRank.titleTier ?? 1)] }}>
-                    &lt;{myRank.title}&gt;
-                  </span>
+                  <PlayerTitle
+                    title={myRank.title}
+                    titleTier={myRank.titleTier}
+                    titleStyle={myRank.titleStyle}
+                    className="text-[10px] ml-1"
+                    bracketed
+                  />
                 )}
                 <span className="text-xs text-[var(--rpg-text-secondary)] ml-1">Lv.<span className="font-pixel text-[8px]">{myRank.characterLevel}</span></span>
               </div>

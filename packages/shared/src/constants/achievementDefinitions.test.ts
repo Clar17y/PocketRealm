@@ -102,6 +102,7 @@ describe('achievementDefinitions', () => {
         id: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
         category: 'shop',
         titleReward: PREMIUM_CONSTANTS.SUPPORT_TITLE,
+        titleStyle: 'rainbow',
       });
     });
   });

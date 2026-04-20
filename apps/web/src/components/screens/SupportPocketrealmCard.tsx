@@ -53,7 +53,7 @@ export function SupportPocketrealmCard({
   const [purchases, setPurchases] = useState<PremiumPurchaseSummary[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   useEffect(() => {
     setIsPremium(initialIsPremium);
@@ -80,7 +80,7 @@ export function SupportPocketrealmCard({
         } else {
           setIsPremium(confirmRes.data.premium.isPremium);
           setPremiumExpiresAt(confirmRes.data.premium.premiumExpiresAt);
-          setNotice('Thanks for supporting Pocketrealm. Champion is active, and the Champion title is now available in Achievements.');
+          setShowSuccessDialog(true);
         }
 
         searchParams.delete('support');
@@ -119,7 +119,7 @@ export function SupportPocketrealmCard({
   const handleSupport = async () => {
     setBusy(true);
     setError(null);
-    setNotice(null);
+    setShowSuccessDialog(false);
 
     const res = await createPremiumCheckout();
 
@@ -136,12 +136,46 @@ export function SupportPocketrealmCard({
 
   return (
     <PixelCard>
-      {notice && (
-        <div className="mb-4 rounded border border-[var(--rpg-gold)]/60 bg-[var(--rpg-gold)]/10 px-3 py-3">
-          <p className="text-sm font-bold text-[var(--rpg-text-primary)]">Thanks for supporting Pocketrealm.</p>
-          <p className="mt-1 text-xs text-[var(--rpg-text-secondary)]">
-            Champion title is now available in Achievements, along with your active Champion perks.
-          </p>
+      {showSuccessDialog && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/65 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Support Pocketrealm success"
+        >
+          <div className="w-full max-w-md rounded-lg border border-[var(--rpg-gold)]/60 bg-[var(--rpg-surface)] p-5 shadow-2xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--rpg-gold)]/15 text-2xl animate-pulse">
+                ✨
+              </div>
+              <div>
+                <p className="text-lg font-bold text-[var(--rpg-text-primary)]">Thanks for supporting Pocketrealm</p>
+                <p className="text-sm text-[var(--rpg-text-secondary)]">
+                  Champion is active and your support helps keep the game online.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)]/70 px-3 py-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-[var(--rpg-text-secondary)]">
+                Unlocked now
+              </p>
+              <p className="mt-2 text-sm font-bold text-[var(--rpg-text-primary)]">
+                Champion title is now available in Achievements
+              </p>
+              <p className="mt-1 text-xs text-[var(--rpg-text-secondary)]">
+                Your {PREMIUM_CONSTANTS.SUPPORT_DURATION_DAYS} days of Champion time have been applied and will stack with future support purchases.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowSuccessDialog(false)}
+              className="mt-4 w-full rounded bg-[var(--rpg-gold)] px-4 py-2 text-sm font-bold text-black transition-colors hover:brightness-95"
+            >
+              Continue
+            </button>
+          </div>
         </div>
       )}
 
@@ -153,9 +187,14 @@ export function SupportPocketrealmCard({
       <p className="text-xs text-[var(--rpg-text-secondary)] mb-2">
         One-time purchase. Grants {PREMIUM_CONSTANTS.SUPPORT_DURATION_DAYS} days of Champion. Stacks if purchased again.
       </p>
-      <p className="mb-4 text-sm font-bold text-[var(--rpg-text-primary)]">
-        {formatStatus(isPremium, premiumExpiresAt)}
-      </p>
+      <div className="mb-4 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)]/60 px-3 py-3">
+        <p className="text-xs font-bold uppercase tracking-wide text-[var(--rpg-text-secondary)]">
+          Status
+        </p>
+        <p className="mt-2 text-base font-bold text-[var(--rpg-text-primary)]">
+          {formatStatus(isPremium, premiumExpiresAt)}
+        </p>
+      </div>
 
       <div className="mb-4 rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)]/60 px-3 py-3">
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--rpg-text-secondary)]">

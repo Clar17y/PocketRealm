@@ -24,8 +24,8 @@ import {
 import { CombatPlayback } from '@/components/combat/CombatPlayback';
 import { PlaybackSurface } from '@/components/playback/PlaybackSurface';
 import { CombatLogEntry } from '@/components/combat/CombatLogEntry';
+import { PlayerTitle } from '@/components/common/PlayerTitle';
 import { PVP_CONSTANTS, type StateUpdates } from '@pocketrealm/shared';
-import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
 import { Swords, Eye, Trophy, Bell, ChevronLeft, ChevronRight, Medal, Shield } from 'lucide-react';
 import { LeaderboardTable } from '@/components/leaderboard/LeaderboardTable';
 import { getLeaderboard, type LeaderboardResponse } from '@/lib/api';
@@ -401,9 +401,13 @@ export function ArenaScreen({ characterLevel, busyAction, currentTurns, playerId
                     {opponent.username}
                   </span>
                   {opponent.title && (
-                    <span className="text-[10px] shrink-0" style={{ color: RARITY_COLORS[rarityFromTier(opponent.titleTier ?? 1)] }}>
-                      &lt;{opponent.title}&gt;
-                    </span>
+                    <PlayerTitle
+                      title={opponent.title}
+                      titleTier={opponent.titleTier}
+                      titleStyle={opponent.titleStyle}
+                      className="text-[10px] shrink-0"
+                      bracketed
+                    />
                   )}
                   {opponent.isAdmin && <Shield className="w-3.5 h-3.5 text-[var(--rpg-gold)] shrink-0" />}
                 </div>

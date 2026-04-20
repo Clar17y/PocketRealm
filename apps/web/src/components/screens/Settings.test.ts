@@ -179,9 +179,11 @@ describe('Settings', () => {
     renderSettings();
 
     await waitFor(() => expect(confirmPremiumCheckoutMock).toHaveBeenCalledWith('cs_test_123'));
-    await waitFor(() => expect(screen.getByText(/Thanks for supporting Pocketrealm/i)).toBeTruthy());
+    const successDialog = await screen.findByRole('dialog', { name: /support pocketrealm success/i });
+    expect(within(successDialog).getByText(/Thanks for supporting Pocketrealm/i)).toBeTruthy();
+    expect(within(successDialog).getByText(/Champion title is now available in Achievements/i)).toBeTruthy();
+    expect(within(successDialog).getByRole('button', { name: /continue/i })).toBeTruthy();
     await waitFor(() => expect(screen.getByText(/Champion until/i)).toBeTruthy());
-    expect(screen.getByText(/Champion title is now available in Achievements/i)).toBeTruthy();
     await waitFor(() => expect(window.location.search).not.toContain('session_id='));
   });
 

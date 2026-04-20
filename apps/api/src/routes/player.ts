@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@pocketrealm/database';
-import { ATTRIBUTE_TYPES, type AttributeType, ACHIEVEMENTS_BY_ID, EXPLORATION_CONSTANTS, TUTORIAL_COMPLETED, TUTORIAL_SKIPPED, STARTER_LOADOUT } from '@pocketrealm/shared';
+import { ATTRIBUTE_TYPES, type AttributeType, EXPLORATION_CONSTANTS, TUTORIAL_COMPLETED, TUTORIAL_SKIPPED, STARTER_LOADOUT, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
 import { shouldResetWindowCap } from '@pocketrealm/game-engine';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -74,14 +74,15 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
     throw new AppError(404, 'Player not found', 'NOT_FOUND');
   }
 
-  const titleDef = player.activeTitle ? ACHIEVEMENTS_BY_ID.get(player.activeTitle) : null;
+  const titleDisplay = resolveAchievementTitleDisplay(player.activeTitle);
 
   res.json({
     player: {
       ...player,
       characterXp: Number(player.characterXp),
       attributes: normalizePlayerAttributes(player.attributes),
-      activeTitle: titleDef?.titleReward ?? null,
+      activeTitle: titleDisplay.title ?? null,
+      activeTitleStyle: titleDisplay.titleStyle ?? null,
     },
   });
 }));

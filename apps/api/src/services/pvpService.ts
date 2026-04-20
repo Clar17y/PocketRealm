@@ -5,8 +5,9 @@ import {
   calculateFleeChance,
 } from '@pocketrealm/game-engine';
 import {
-  PVP_CONSTANTS, ACHIEVEMENTS_BY_ID, BASE_ACTION_DEFINITIONS,
+  PVP_CONSTANTS, BASE_ACTION_DEFINITIONS,
   TALENT_TREE_DEFINITIONS, FLEE_CONSTANTS, QUERY_LIMITS,
+  resolveAchievementTitleDisplay,
   type ActionDefinition, type FleeOutcome,
 } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
@@ -90,18 +91,14 @@ export async function getLadder(playerId: string) {
 
   const allEligible = candidates
     .filter((c) => !cooldownIds.has(c.playerId))
-    .map((c) => {
-      const titleDef = c.player.activeTitle ? ACHIEVEMENTS_BY_ID.get(c.player.activeTitle) : null;
-      return {
-        playerId: c.playerId,
-        username: c.player.username,
-        rating: c.rating,
-        characterLevel: c.player.characterLevel,
-        isAdmin: c.player.role === 'admin',
-        title: titleDef?.titleReward,
-        titleTier: titleDef?.tier,
-      };
-    });
+    .map((c) => ({
+      playerId: c.playerId,
+      username: c.player.username,
+      rating: c.rating,
+      characterLevel: c.player.characterLevel,
+      isAdmin: c.player.role === 'admin',
+      ...resolveAchievementTitleDisplay(c.player.activeTitle),
+    }));
 
   // Progressively widen from the initial bracket until enough opponents found
   let currentLower = lowerBound;
