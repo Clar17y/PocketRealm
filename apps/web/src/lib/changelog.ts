@@ -7,6 +7,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.53',
+    date: '2026-04-20',
+    title: 'Support Pocketrealm & Champion Perks',
+    summary:
+      'Support Pocketrealm is now live as a one-time purchase that grants 30 days of Champion time and stacks if you buy it again. Champion perks now properly apply across turn regeneration, backpack space, combat templates, crafting, gathering, hidden caches, and boss rewards. The settings screen now shows support purchase history, a clearer active Champion status, and a proper success confirmation after checkout. Champion titles also support reusable special styles, with the Support Pocketrealm Champion title now showing its rainbow effect anywhere player titles appear, including achievements, chat, arena, and leaderboards.',
+  },
+  {
     version: '0.52',
     date: '2026-04-17',
     title: 'Account Settings & Security',
