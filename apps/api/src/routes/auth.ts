@@ -65,6 +65,23 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(10).max(100),
 });
 
+const switchPlayerSchema = z.object({
+  playerId: z.string().uuid().or(z.string().min(1)),
+});
+
+const joinSeasonSchema = z.object({
+  username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_]+$/),
+});
+
+interface CharacterSummary {
+  id: string;
+  username: string;
+  characterLevel: number;
+  seasonId: string | null;
+  seasonName: string | null;
+  seasonStatus: string | null;
+  seasonEndsAt: Date | null;
+}
 
 authRouter.post('/register', asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
@@ -420,6 +437,297 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
 
   void checkAndSpawnEvents(getIo()).catch((err) => {
     logger.warn({ err, playerId: freshPayload.playerId }, 'Post-refresh world event catch-up failed');
+  });
+}));
+
+authRouter.get('/characters', authenticate, asyncHandler(async (req, res) => {
+  const players = await prisma.player.findMany({
+    where: {
+      accountId: req.player!.accountId,
+      isBot: false,
+    },
+    select: {
+      id: true,
+      username: true,
+      characterLevel: true,
+      seasonId: true,
+      season: {
+        select: {
+          name: true,
+          status: true,
+          endsAt: true,
+        },
+      },
+    },
+    orderBy: [
+      { seasonId: 'asc' },
+      { createdAt: 'asc' },
+    ],
+  });
+
+  const characters: CharacterSummary[] = players.map((player) => ({
+    id: player.id,
+    username: player.username,
+    characterLevel: player.characterLevel,
+    seasonId: player.seasonId,
+    seasonName: player.season?.name ?? null,
+    seasonStatus: player.season?.status ?? null,
+    seasonEndsAt: player.season?.endsAt ?? null,
+  }));
+
+  res.json({
+    characters,
+    activePlayerId: req.player!.playerId,
+  });
+}));
+
+authRouter.post('/switch-player', authenticate, asyncHandler(async (req, res) => {
+  const { playerId } = switchPlayerSchema.parse(req.body);
+
+  const player = await prisma.player.findFirst({
+    where: {
+      id: playerId,
+      accountId: req.player!.accountId,
+      isBot: false,
+    },
+    select: {
+      id: true,
+      username: true,
+      seasonId: true,
+      season: {
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+    },
+  });
+
+  if (!player) {
+    throw new AppError(404, 'Character not found', 'NOT_FOUND');
+  }
+
+  if (player.season && player.season.status !== 'active') {
+    throw new AppError(400, 'This seasonal character is no longer playable', 'SEASON_CHARACTER_UNPLAYABLE');
+  }
+
+  await prisma.account.update({
+    where: { id: req.player!.accountId },
+    data: { activePlayerId: player.id },
+  });
+
+  const account = await prisma.account.findUnique({
+    where: { id: req.player!.accountId },
+    select: {
+      id: true,
+      role: true,
+    },
+  });
+
+  if (!account) {
+    throw new AppError(404, 'Account not found', 'NOT_FOUND');
+  }
+
+  const payload = {
+    accountId: req.player!.accountId,
+    playerId: player.id,
+    username: player.username,
+    seasonId: player.seasonId,
+    role: account.role,
+  };
+  const accessToken = generateAccessToken(payload);
+  const refreshToken = generateRefreshToken(payload);
+
+  await prisma.refreshToken.create({
+    data: {
+      accountId: req.player!.accountId,
+      token: refreshToken,
+      expiresAt: refreshTokenExpiresAt(Date.now()),
+    },
+  });
+
+  res.json({
+    player: {
+      id: player.id,
+      username: player.username,
+    },
+    accessToken,
+    refreshToken,
+  });
+}));
+
+authRouter.post('/join-season', authenticate, asyncHandler(async (req, res) => {
+  const { username } = joinSeasonSchema.parse(req.body);
+  const now = new Date();
+
+  const activeSeason = await prisma.season.findFirst({
+    where: { status: 'active' },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  if (!activeSeason) {
+    throw new AppError(400, 'No active season', 'NO_ACTIVE_SEASON');
+  }
+
+  const existingCharacter = await prisma.player.findFirst({
+    where: {
+      accountId: req.player!.accountId,
+      seasonId: activeSeason.id,
+    },
+    select: { id: true },
+  });
+
+  if (existingCharacter) {
+    throw new AppError(409, 'Already have a character for this season', 'SEASON_CHARACTER_EXISTS');
+  }
+
+  const usernameTaken = await prisma.player.findUnique({
+    where: { username },
+    select: { id: true },
+  });
+
+  if (usernameTaken) {
+    throw new AppError(409, 'Username already taken', 'USERNAME_TAKEN');
+  }
+
+  const starterTown = await prisma.zone.findFirst({
+    where: {
+      isStarter: true,
+      seasonId: activeSeason.id,
+    },
+    select: {
+      id: true,
+    },
+  }) ?? await prisma.zone.findFirst({
+    where: {
+      isStarter: true,
+      seasonId: null,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!starterTown) {
+    throw new AppError(500, 'No starter zone configured', 'NO_STARTER_ZONE');
+  }
+
+  const firstWildConnection = await prisma.zoneConnection.findFirst({
+    where: { fromId: starterTown.id, toZone: { zoneType: 'wild' } },
+    include: { toZone: true },
+  });
+  const startingZone = firstWildConnection?.toZone ?? starterTown;
+
+  const starterOffHandTemplate = await prisma.itemTemplate.findUnique({
+    where: { id: STARTER_LOADOUT.tutorialOffHandTemplateId },
+    select: { id: true, maxDurability: true },
+  });
+  if (!starterOffHandTemplate) {
+    throw new AppError(500, 'Starter off-hand template is missing', 'MISSING_STARTER_ITEM');
+  }
+
+  const player = await prisma.$transaction(async (tx) => {
+    const createdPlayer = await tx.player.create({
+      data: {
+        username,
+        accountId: req.player!.accountId,
+        seasonId: activeSeason.id,
+        lastActiveAt: now,
+        currentZoneId: startingZone.id,
+        lastTravelledFromZoneId: starterTown.id,
+        homeTownId: starterTown.id,
+        attributePoints: CHARACTER_CONSTANTS.STARTING_ATTRIBUTE_POINTS,
+        turnBank: {
+          create: {
+            currentTurns: TURN_CONSTANTS.STARTING_TURNS,
+          },
+        },
+        skills: {
+          create: ALL_SKILLS.map((skill: string) => ({
+            skillType: skill,
+            level: 1,
+            xp: BigInt(0),
+          })),
+        },
+      },
+      select: {
+        id: true,
+        username: true,
+        seasonId: true,
+      },
+    });
+
+    await ensureEquipmentSlots(createdPlayer.id, tx);
+
+    const starterOffHand = await tx.item.create({
+      data: {
+        ownerId: createdPlayer.id,
+        templateId: starterOffHandTemplate.id,
+        rarity: 'common',
+        quantity: 1,
+        maxDurability: starterOffHandTemplate.maxDurability,
+        currentDurability: starterOffHandTemplate.maxDurability,
+      },
+      select: { id: true },
+    });
+    await tx.playerEquipment.upsert({
+      where: { playerId_slot: { playerId: createdPlayer.id, slot: 'off_hand' } },
+      create: { playerId: createdPlayer.id, slot: 'off_hand', itemId: starterOffHand.id },
+      update: { itemId: starterOffHand.id },
+    });
+
+    await ensureStarterDiscoveries(createdPlayer.id, tx);
+    await ensureStarterEncounterAndNodes(createdPlayer.id, tx);
+
+    return createdPlayer;
+  });
+
+  await prisma.account.update({
+    where: { id: req.player!.accountId },
+    data: { activePlayerId: player.id },
+  });
+
+  const account = await prisma.account.findUnique({
+    where: { id: req.player!.accountId },
+    select: {
+      id: true,
+      role: true,
+    },
+  });
+
+  if (!account) {
+    throw new AppError(404, 'Account not found', 'NOT_FOUND');
+  }
+
+  const payload = {
+    accountId: req.player!.accountId,
+    playerId: player.id,
+    username: player.username,
+    seasonId: player.seasonId,
+    role: account.role,
+  };
+  const accessToken = generateAccessToken(payload);
+  const refreshToken = generateRefreshToken(payload);
+
+  await prisma.refreshToken.create({
+    data: {
+      accountId: req.player!.accountId,
+      token: refreshToken,
+      expiresAt: refreshTokenExpiresAt(Date.now()),
+    },
+  });
+
+  res.status(201).json({
+    player: {
+      id: player.id,
+      username: player.username,
+    },
+    seasonId: activeSeason.id,
+    accessToken,
+    refreshToken,
   });
 }));
 
