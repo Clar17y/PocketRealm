@@ -43,6 +43,8 @@ import { shopRouter } from './routes/shop';
 import { friendsRouter } from './routes/friends';
 import { notificationsRouter } from './routes/notifications';
 import { healthRouter } from './routes/health';
+import { premiumRouter } from './routes/premium';
+import { premiumWebhookRouter } from './routes/premiumWebhook';
 import { markShuttingDown } from './services/healthChecks';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
@@ -52,6 +54,7 @@ import { APP_VERSION } from './version';
 import { createSocketServer, getIo } from './socket';
 import { redis } from './redis';
 import { startMetricsLogger } from './services/metricsLogger';
+import { reconcileExpiredPremium } from './services/premiumReconciliation';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
 
 const app = express();
@@ -101,7 +104,6 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json({ limit: '100kb' }));
 
 // Request ID: use client-provided header only if it is a valid UUID,
 // otherwise generate a fresh one to prevent log injection attacks.
@@ -125,11 +127,13 @@ app.set('trust proxy', 1);
 // Global rate limiter: 120 requests per minute per IP
 // Skip CORS preflight (OPTIONS) — they carry no payload and shouldn't count against the limit.
 app.use('/api/v1/', createEndpointLimiter('global', RATE_LIMIT_CONSTANTS.DEFAULT_WINDOW_MS, RATE_LIMIT_CONSTANTS.GLOBAL_MAX, {
-  skip: (req) => req.method === 'OPTIONS',
+  skip: (req) => req.method === 'OPTIONS' || req.path === '/premium/webhook/stripe',
 }));
 
 // Health / readiness / liveness checks (see docs/reference/deployment.md)
 app.use(healthRouter);
+app.use('/api/v1/premium/webhook', premiumWebhookRouter);
+app.use(express.json({ limit: '100kb' }));
 
 // API routes
 app.use('/api/v1/auth', authRouter);
@@ -162,6 +166,7 @@ app.use('/api/v1/expedition', expeditionRouter);
 app.use('/api/v1/shop', shopRouter);
 app.use('/api/v1/friends', friendsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
+app.use('/api/v1/premium', premiumRouter);
 
 // Sentry's Express error handler — captures errors before our own
 // errorHandler formats the response. `beforeSend` in instrument.ts
@@ -175,6 +180,17 @@ const server = http.createServer(app);
 createSocketServer(server, isAllowedCorsOrigin);
 
 let stopMetricsLogger: (() => void) | null = null;
+let premiumReconciliationTimer: ReturnType<typeof setInterval> | null = null;
+
+const PREMIUM_RECONCILIATION_INTERVAL_MS = 60 * 60 * 1000;
+
+async function runPremiumReconciliation(): Promise<void> {
+  try {
+    await reconcileExpiredPremium();
+  } catch (err) {
+    logger.error({ err }, 'Premium reconciliation failed');
+  }
+}
 
 function startServer(): void {
   server.listen(PORT, () => {
@@ -182,6 +198,10 @@ function startServer(): void {
     void roundTimerRegistry.rehydrate(getIo).catch((err) => {
       logger.error({ err }, 'Round timer registry rehydrate failed');
     });
+    void runPremiumReconciliation();
+    premiumReconciliationTimer = setInterval(() => {
+      void runPremiumReconciliation();
+    }, PREMIUM_RECONCILIATION_INTERVAL_MS);
     stopMetricsLogger = startMetricsLogger(getIo);
   });
 }
@@ -194,6 +214,7 @@ process.on('SIGTERM', () => {
   // drains traffic during the graceful-shutdown window.
   markShuttingDown();
   stopMetricsLogger?.();
+  if (premiumReconciliationTimer) clearInterval(premiumReconciliationTimer);
   const io = getIo();
   if (io) io.close();
   server.close(() => {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TURN_CONSTANTS } from '@pocketrealm/shared';
+import { PREMIUM_CONSTANTS, TURN_CONSTANTS } from '@pocketrealm/shared';
 import { mockPrisma } from '../__test__/setup';
 import {
   getTurnState,
@@ -14,8 +14,10 @@ beforeEach(() => {
 
 describe('getTurnState', () => {
   it('returns current turns and time to cap', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 1000,
+      regenProgress: 0,
       lastRegenAt: new Date(now.getTime() - 5000), // 5s ago
     });
 
@@ -26,15 +28,50 @@ describe('getTurnState', () => {
   });
 
   it('throws 404 when turn bank not found', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue(null);
 
     await expect(getTurnState('missing', now)).rejects.toThrow('Turn bank not found');
   });
 
   it('caps turns at BANK_CAP', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: TURN_CONSTANTS.BANK_CAP,
+      regenProgress: 0,
       lastRegenAt: new Date(now.getTime() - 100_000),
+    });
+
+    const result = await getTurnState('p1', now);
+    expect(result.currentTurns).toBe(TURN_CONSTANTS.BANK_CAP);
+    expect(result.timeToCapMs).toBeNull();
+  });
+
+  it('uses Champion regen rate and bank cap for premium players', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date(now.getTime() + 60_000),
+    });
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      currentTurns: PREMIUM_CONSTANTS.TURN_BANK_CAP - 2,
+      regenProgress: 0,
+      lastRegenAt: new Date(now.getTime() - 2_000), // +2.2 turns
+    });
+
+    const result = await getTurnState('p1', now);
+    expect(result.currentTurns).toBe(PREMIUM_CONSTANTS.TURN_BANK_CAP);
+    expect(result.timeToCapMs).toBeNull();
+  });
+
+  it('falls back to free turn settings when premium entitlement is expired', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date(now.getTime() - 60_000),
+    });
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      currentTurns: TURN_CONSTANTS.BANK_CAP - 1,
+      regenProgress: 0,
+      lastRegenAt: new Date(now.getTime() - 2_000),
     });
 
     const result = await getTurnState('p1', now);
@@ -60,14 +97,17 @@ describe('spendPlayerTurns', () => {
   });
 
   it('throws 404 when turn bank not found', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue(null);
 
     await expect(spendPlayerTurns('missing', 10, now)).rejects.toThrow('Turn bank not found');
   });
 
   it('throws when insufficient turns', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 5,
+      regenProgress: 0,
       lastRegenAt: now,
     });
 
@@ -75,8 +115,10 @@ describe('spendPlayerTurns', () => {
   });
 
   it('succeeds on first attempt with optimistic lock', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 500,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
@@ -88,8 +130,10 @@ describe('spendPlayerTurns', () => {
   });
 
   it('retries on optimistic lock failure', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 500,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany
@@ -102,8 +146,10 @@ describe('spendPlayerTurns', () => {
   });
 
   it('throws after 3 failed attempts', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 500,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 0 });
@@ -123,8 +169,10 @@ describe('refundPlayerTurns', () => {
   });
 
   it('refunds turns clamped at BANK_CAP', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: TURN_CONSTANTS.BANK_CAP - 50,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
@@ -134,8 +182,10 @@ describe('refundPlayerTurns', () => {
   });
 
   it('succeeds on first attempt', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.turnBank.findUnique.mockResolvedValue({
       currentTurns: 100,
+      regenProgress: 0,
       lastRegenAt: now,
     });
     mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
@@ -143,5 +193,59 @@ describe('refundPlayerTurns', () => {
     const result = await refundPlayerTurns('p1', 50, now);
     expect(result.currentTurns).toBe(150);
     expect(result.refunded).toBe(50);
+  });
+
+  it('refunds premium players up to the Champion bank cap', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date(now.getTime() + 60_000),
+    });
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      currentTurns: PREMIUM_CONSTANTS.TURN_BANK_CAP - 20,
+      regenProgress: 0,
+      lastRegenAt: now,
+    });
+    mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await refundPlayerTurns('p1', 50, now);
+    expect(result.currentTurns).toBe(PREMIUM_CONSTANTS.TURN_BANK_CAP);
+  });
+
+  it('refunds expired premium players using the free bank cap', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date(now.getTime() - 60_000),
+    });
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      currentTurns: TURN_CONSTANTS.BANK_CAP - 20,
+      regenProgress: 0,
+      lastRegenAt: now,
+    });
+    mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await refundPlayerTurns('p1', 50, now);
+    expect(result.currentTurns).toBe(TURN_CONSTANTS.BANK_CAP);
+  });
+
+  it('preserves premium fractional progress when spending turns', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date(now.getTime() + 60_000),
+    });
+    mockPrisma.turnBank.findUnique.mockResolvedValue({
+      currentTurns: 100,
+      regenProgress: 0,
+      lastRegenAt: new Date(now.getTime() - 1_000),
+    });
+    mockPrisma.turnBank.updateMany.mockResolvedValue({ count: 1 });
+
+    await spendPlayerTurns('p1', 1, now);
+
+    expect(mockPrisma.turnBank.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        currentTurns: 100,
+        regenProgress: 10,
+      }),
+    }));
   });
 });

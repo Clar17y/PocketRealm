@@ -15,6 +15,7 @@ import { normalizePlayerAttributes } from '../services/attributesService';
 import { teleportPlayer } from '../services/zoneService';
 import { createActivityLog } from '../services/activityLogService';
 import { roundTimerRegistry } from '../services/roundTimerRegistry';
+import { grantPremiumDays, listPremiumPurchases } from '../services/premiumService';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import {
@@ -43,6 +44,21 @@ async function adminAudit(adminId: string, action: string, details: Record<strin
   await createActivityLog({ playerId: adminId, activityType: 'admin_action', turnsSpent: 0, result: { action, ...details } });
 }
 
+async function adminAuditTx(
+  tx: Prisma.TransactionClient,
+  adminId: string,
+  action: string,
+  details: Record<string, unknown>,
+) {
+  await createActivityLog({
+    tx,
+    playerId: adminId,
+    activityType: 'admin_action',
+    turnsSpent: 0,
+    result: { action, ...details } as Prisma.InputJsonValue,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Player
 // ---------------------------------------------------------------------------
@@ -54,6 +70,51 @@ router.post('/turns/grant', asyncHandler(async (req, res) => {
   const result = await refundPlayerTurns(req.player!.playerId, amount);
   await adminAudit(req.player!.playerId, 'grant_turns', { amount });
   res.json({ success: true, ...result });
+}));
+
+const premiumPurchasesParamsSchema = z.object({
+  playerId: z.string().min(1),
+});
+
+router.get('/premium/purchases/:playerId', asyncHandler(async (req, res) => {
+  const { playerId } = premiumPurchasesParamsSchema.parse(req.params);
+  const purchases = await listPremiumPurchases(playerId);
+  res.json({ purchases });
+}));
+
+const premiumGrantSchema = z.object({
+  playerId: z.string().min(1),
+  days: z.number().int().min(1).max(3650),
+  reason: z.string().trim().min(1).max(500).optional(),
+});
+
+router.post('/premium/grant', asyncHandler(async (req, res) => {
+  const { playerId, days, reason } = premiumGrantSchema.parse(req.body);
+  const purchase = await prisma.$transaction(async (tx) => {
+    const createdPurchase = await grantPremiumDays({
+      playerId,
+      provider: 'admin',
+      productType: 'admin_grant',
+      amount: 0,
+      currency: 'usd',
+      days,
+      metadata: {
+        grantedByAdminId: req.player!.playerId,
+        ...(reason ? { reason } : {}),
+      },
+    }, tx);
+
+    await adminAuditTx(tx, req.player!.playerId, 'grant_premium', {
+      targetPlayerId: playerId,
+      days,
+      purchaseId: createdPurchase.id,
+      ...(reason ? { reason } : {}),
+    });
+
+    return createdPurchase;
+  });
+
+  res.json({ success: true, purchase });
 }));
 
 const setLevelSchema = z.object({ level: z.number().int().min(1).max(CHARACTER_CONSTANTS.MAX_LEVEL) });

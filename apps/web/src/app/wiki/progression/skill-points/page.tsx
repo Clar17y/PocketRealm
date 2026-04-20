@@ -3,6 +3,7 @@ import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 import {
+  PREMIUM_CONSTANTS,
   SKILL_POINT_CONSTANTS,
   TALENT_TREE_DEFINITIONS,
 } from '@pocketrealm/shared';
@@ -128,10 +129,10 @@ export default function SkillPointsPage() {
       <h2>Combat Templates</h2>
       <p>
         Unlocked talent actions become available in your combat templates. You
-        can save up to{' '}
-        <Const>{SKILL_POINT_CONSTANTS.MAX_TEMPLATES}</Const> combat templates
-        with different action configurations. The default action for empty
-        template slots is{' '}
+        can save <Const>{PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE}</Const> combat
+        templates on a free account or{' '}
+        <Const>{PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION}</Const> as a Champion
+        supporter. The default action for empty template slots is{' '}
         <code>{SKILL_POINT_CONSTANTS.DEFAULT_ACTION_ID}</code>.
       </p>
 
@@ -149,9 +150,14 @@ export default function SkillPointsPage() {
             description: 'Turns spent to respec all skill points',
           },
           {
-            name: 'MAX_TEMPLATES',
-            value: SKILL_POINT_CONSTANTS.MAX_TEMPLATES,
-            description: 'Maximum saved combat templates',
+            name: 'TEMPLATE_LIMIT_FREE',
+            value: PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE,
+            description: 'Maximum saved combat templates for free accounts',
+          },
+          {
+            name: 'TEMPLATE_LIMIT_CHAMPION',
+            value: PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION,
+            description: 'Maximum saved combat templates for Champion supporters',
           },
         ]}
       />

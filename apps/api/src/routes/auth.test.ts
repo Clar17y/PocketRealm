@@ -91,7 +91,12 @@ function setupSuccessfulRegisterState() {
         create: vi.fn().mockImplementation(() => {
           txCalls.push('player.create');
           return Promise.resolve({
-            id: 'player-1', username: 'Rook', email: 'rook@example.com', role: 'player',
+            id: 'player-1',
+            username: 'Rook',
+            email: 'rook@example.com',
+            role: 'player',
+            isPremium: false,
+            premiumExpiresAt: null,
           });
         }),
       };
@@ -218,6 +223,8 @@ describe('POST /login', () => {
       passwordHash: 'stored-hash',
       isBot: false,
       emailVerified: true,
+      isPremium: false,
+      premiumExpiresAt: null,
     });
     mockPrisma.player.update.mockResolvedValue({});
     (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
@@ -260,6 +267,8 @@ describe('POST /login', () => {
       passwordHash: 'stored-hash',
       isBot: false,
       emailVerified: true,
+      isPremium: false,
+      premiumExpiresAt: null,
     });
     mockPrisma.player.update.mockResolvedValue({});
     (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
@@ -290,6 +299,8 @@ describe('POST /login', () => {
       passwordHash: 'stored-hash',
       isBot: false,
       emailVerified: true,
+      isPremium: false,
+      premiumExpiresAt: null,
     });
     (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 

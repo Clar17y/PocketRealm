@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { prisma, Prisma } from '@pocketrealm/database';
-import { LEADERBOARD_CONSTANTS, ACHIEVEMENTS_BY_ID } from '@pocketrealm/shared';
+import { LEADERBOARD_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
+import type { TitleStyleVariant } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../logger';
@@ -180,6 +181,7 @@ interface LeaderboardEntry {
   isAdmin: boolean;
   title?: string;
   titleTier?: number;
+  titleStyle?: TitleStyleVariant;
 }
 
 interface LeaderboardResponse {
@@ -248,6 +250,7 @@ export async function getLeaderboard(
       isAdmin: !!meta.isAdmin,
       title: meta.title,
       titleTier: meta.titleTier,
+      titleStyle: meta.titleStyle,
     };
   });
 
@@ -267,6 +270,7 @@ export async function getLeaderboard(
       isAdmin: !!meta.isAdmin,
       title: meta.title,
       titleTier: meta.titleTier,
+      titleStyle: meta.titleStyle,
     };
   }
 
@@ -307,16 +311,9 @@ export async function ensureLeaderboardsFresh(): Promise<void> {
 
 // ── Refresh logic ───────────────────────────────────────────────────────────
 
-function resolveTitle(activeTitle: string | null | undefined): { title?: string; titleTier?: number } {
-  if (!activeTitle) return {};
-  const def = ACHIEVEMENTS_BY_ID.get(activeTitle);
-  if (!def?.titleReward) return {};
-  return { title: def.titleReward, titleTier: def.tier };
-}
-
 async function writeToZset(
   category: string,
-  rows: { playerId: string; score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }[],
+  rows: { playerId: string; score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number; titleStyle?: TitleStyleVariant }[],
 ) {
   const key = `leaderboard:${category}`;
   const metaKey = `leaderboard:meta:${category}`;
@@ -339,6 +336,7 @@ async function writeToZset(
       isAdmin: row.isAdmin,
       title: row.title,
       titleTier: row.titleTier,
+      titleStyle: row.titleStyle,
     }));
   }
 
@@ -381,7 +379,7 @@ async function refreshPvp() {
         characterLevel: r.player.characterLevel,
         isBot: r.player.isBot,
         isAdmin: r.player.role === 'admin',
-        ...resolveTitle(r.player.activeTitle),
+        ...resolveAchievementTitleDisplay(r.player.activeTitle),
       })),
     );
   }
@@ -404,7 +402,7 @@ async function refreshProgression() {
       characterLevel: p.characterLevel,
       isBot: p.isBot,
       isAdmin: p.role === 'admin',
-      ...resolveTitle(p.activeTitle),
+      ...resolveAchievementTitleDisplay(p.activeTitle),
     })),
   );
 
@@ -417,7 +415,7 @@ async function refreshProgression() {
       characterLevel: p.characterLevel,
       isBot: p.isBot,
       isAdmin: p.role === 'admin',
-      ...resolveTitle(p.activeTitle),
+      ...resolveAchievementTitleDisplay(p.activeTitle),
     })),
   );
 }
@@ -448,13 +446,13 @@ async function refreshSkills() {
         characterLevel: s.player.characterLevel,
         isBot: s.player.isBot,
         isAdmin: s.player.role === 'admin',
-        ...resolveTitle(s.player.activeTitle),
+        ...resolveAchievementTitleDisplay(s.player.activeTitle),
       })),
     );
   }
 
   // Total skill level — aggregate per player
-  const totals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }>();
+  const totals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number; titleStyle?: TitleStyleVariant }>();
   for (const s of skills) {
     const existing = totals.get(s.playerId);
     if (existing) {
@@ -466,7 +464,7 @@ async function refreshSkills() {
         characterLevel: s.player.characterLevel,
         isBot: s.player.isBot,
         isAdmin: s.player.role === 'admin',
-        ...resolveTitle(s.player.activeTitle),
+        ...resolveAchievementTitleDisplay(s.player.activeTitle),
       });
     }
   }
@@ -482,7 +480,7 @@ async function refreshCombat() {
   // PlayerBestiary has a composite PK (playerId + mobTemplateId),
   // incompatible with cursor pagination.
   const batchSize = LEADERBOARD_CONSTANTS.BATCH_SIZE;
-  const killTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }>();
+  const killTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number; titleStyle?: TitleStyleVariant }>();
   let offset = 0;
   let batch;
   do {
@@ -502,7 +500,7 @@ async function refreshCombat() {
           characterLevel: b.player.characterLevel,
           isBot: b.player.isBot,
           isAdmin: b.player.role === 'admin',
-          ...resolveTitle(b.player.activeTitle),
+          ...resolveAchievementTitleDisplay(b.player.activeTitle),
         });
       }
     }
@@ -523,7 +521,7 @@ async function refreshCombat() {
       },
     );
 
-    const dmgTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number }>();
+    const dmgTotals = new Map<string, { score: number; username: string; characterLevel: number; isBot: boolean; isAdmin: boolean; title?: string; titleTier?: number; titleStyle?: TitleStyleVariant }>();
     for (const b of bossRaw) {
       const existing = dmgTotals.get(b.playerId);
       if (existing) {
@@ -535,7 +533,7 @@ async function refreshCombat() {
           characterLevel: b.player.characterLevel,
           isBot: b.player.isBot,
           isAdmin: b.player.role === 'admin',
-          ...resolveTitle(b.player.activeTitle),
+          ...resolveAchievementTitleDisplay(b.player.activeTitle),
         });
       }
     }
@@ -627,7 +625,7 @@ async function refreshCasino(): Promise<void> {
         characterLevel: p?.characterLevel ?? 1,
         isBot: p?.isBot ?? false,
         isAdmin: p?.role === 'admin',
-        ...resolveTitle(p?.activeTitle),
+        ...resolveAchievementTitleDisplay(p?.activeTitle),
       };
     });
 

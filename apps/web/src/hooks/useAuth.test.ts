@@ -55,6 +55,8 @@ describe('useAuth', () => {
         email: 'rook@example.com',
         role: 'player',
         emailVerified: false,
+        isPremium: false,
+        premiumExpiresAt: null,
       });
     });
 

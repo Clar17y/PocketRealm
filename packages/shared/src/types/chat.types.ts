@@ -1,3 +1,5 @@
+import type { TitleStyleVariant } from './achievement.types';
+
 export type ChatChannelType = 'world' | 'zone' | 'guild' | 'casino';
 
 export interface ChatSendPayload {
@@ -17,6 +19,7 @@ export interface ChatMessageEvent {
   username: string;
   title?: string;
   titleTier?: number;
+  titleStyle?: TitleStyleVariant;
   message: string;
   createdAt: string;
   role?: ChatRole;

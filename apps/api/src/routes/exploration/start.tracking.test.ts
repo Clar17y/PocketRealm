@@ -532,7 +532,7 @@ describe('POST /exploration/start tracking contract', () => {
     const handler = findHandler('post', '/start');
     await handler(req, res, next);
 
-    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER);
+    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER, null);
     expect(mockProcessExplorationOutcomes).toHaveBeenCalledWith(
       expect.objectContaining({ trackingFamilyId }),
       expect.any(Array),
@@ -754,7 +754,7 @@ describe('POST /exploration/start tracking contract', () => {
     await handler(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
-    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, 1);
+    expect(mockSimulateExploration).toHaveBeenCalledWith(500, null, 1, null);
     expect(mockProcessExplorationOutcomes).toHaveBeenCalledWith(
       expect.objectContaining({
         trackingFamilyId: null,

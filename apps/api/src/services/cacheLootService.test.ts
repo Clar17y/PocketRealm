@@ -86,21 +86,25 @@ describe('grantCacheLootTx', () => {
     mockTxAny.resourceNode = { findMany: vi.fn() };
     mockTxAny.itemTemplate = { findMany: vi.fn() };
     mockTxAny.craftingRecipe = { findMany: vi.fn() };
+    mockTxAny.player = {
+      findUnique: vi.fn().mockResolvedValue({ isPremium: false, premiumExpiresAt: null }),
+    };
     (mockTx.item.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
   });
 
   // Helper: set up mocks for a zone with mining nodes that produce Cut Sapphire
-  function setupMiningZone() {
-    mockTxAny.resourceNode.findMany.mockResolvedValue([
+  function setupMiningZone(txAny = mockTxAny) {
+    txAny.craftingRecipe.findMany.mockReset();
+    txAny.resourceNode.findMany.mockResolvedValue([
       { skillRequired: 'mining', levelRequired: 5 },
     ]);
-    mockTxAny.itemTemplate.findMany.mockResolvedValue([
+    txAny.itemTemplate.findMany.mockResolvedValue([
       { id: 'raw-sapphire-id', name: 'Rough Sapphire' },
     ]);
     // craftingRecipe.findMany is called twice:
     // 1st: refining recipes (skillType: 'refining')
     // 2nd: soulbound recipes (soulbound: true, mobFamilyId: ...)
-    mockTxAny.craftingRecipe.findMany
+    txAny.craftingRecipe.findMany
       .mockResolvedValueOnce([{
         resultTemplateId: 'cut-sapphire-id',
         resultTemplate: { name: 'Cut Sapphire' },
@@ -288,5 +292,29 @@ describe('grantCacheLootTx', () => {
     const totalQuantity = result.materials.reduce((sum, m) => sum + m.quantity, 0);
     expect(totalQuantity).toBeGreaterThanOrEqual(HIDDEN_CACHE_CONSTANTS.MATERIAL_ROLLS_MIN);
     expect(totalQuantity).toBeLessThanOrEqual(HIDDEN_CACHE_CONSTANTS.MATERIAL_ROLLS_MAX);
+  });
+
+  it('uses Champion multiplier to increase material rolls', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    setupMiningZone();
+
+    const base = await grantCacheLootTx(mockTx, params);
+    const boostedTx = {
+      item: { create: vi.fn().mockResolvedValue({}) },
+    } as unknown as Prisma.TransactionClient;
+    const boostedTxAny = boostedTx as unknown as Record<string, any>;
+    boostedTxAny.resourceNode = { findMany: vi.fn() };
+    boostedTxAny.itemTemplate = { findMany: vi.fn() };
+    boostedTxAny.craftingRecipe = { findMany: vi.fn() };
+    boostedTxAny.player = {
+      findUnique: vi.fn().mockResolvedValue({ isPremium: true, premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z') }),
+    };
+    setupMiningZone(boostedTxAny);
+    const boosted = await grantCacheLootTx(boostedTx, params);
+
+    const baseQuantity = base.materials.reduce((sum, drop) => sum + drop.quantity, 0);
+    const boostedQuantity = boosted.materials.reduce((sum, drop) => sum + drop.quantity, 0);
+
+    expect(boostedQuantity).toBeGreaterThan(baseQuantity);
   });
 });

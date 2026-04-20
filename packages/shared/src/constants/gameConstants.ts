@@ -628,10 +628,21 @@ export const SKILL_POINT_CONSTANTS = {
   POINTS_PER_LEVEL: 1,
   /** Turn cost to respec all skill points */
   RESPEC_TURN_COST: 50_000,
-  /** Max saved combat templates */
-  MAX_TEMPLATES: 10,
   /** Default template action (light attack ID) */
   DEFAULT_ACTION_ID: 'light_attack',
+} as const;
+
+export const PREMIUM_CONSTANTS = {
+  BONUS_MULTIPLIER: 1.1,
+  SUPPORT_DURATION_DAYS: 30,
+  PRICE_GBP_PENCE: 499,
+  TURN_REGEN_RATE: 1.1,
+  TURN_BANK_CAP: 95_040,
+  TEMPLATE_LIMIT_FREE: 5,
+  TEMPLATE_LIMIT_CHAMPION: 20,
+  SUPPORT_PRODUCT_TYPE: 'support_pocketrealm',
+  SUPPORT_TITLE_ACHIEVEMENT_ID: 'support_pocketrealm_title',
+  SUPPORT_TITLE: 'Champion',
 } as const;
 
 export const POTION_CONSTANTS = {

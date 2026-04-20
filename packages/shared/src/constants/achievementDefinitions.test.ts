@@ -6,6 +6,7 @@ import {
   ACHIEVEMENTS_BY_FAMILY_KEY,
   FAMILY_REWARD_ITEMS,
 } from './achievementDefinitions';
+import { PREMIUM_CONSTANTS } from './gameConstants';
 
 describe('achievementDefinitions', () => {
   describe('ALL_ACHIEVEMENTS structural integrity', () => {
@@ -94,6 +95,15 @@ describe('achievementDefinitions', () => {
       for (const a of ALL_ACHIEVEMENTS) {
         expect(ACHIEVEMENTS_BY_ID.get(a.id)).toBe(a);
       }
+    });
+
+    it('includes the Support Pocketrealm Champion title achievement', () => {
+      expect(ACHIEVEMENTS_BY_ID.get(PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID)).toMatchObject({
+        id: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
+        category: 'shop',
+        titleReward: PREMIUM_CONSTANTS.SUPPORT_TITLE,
+        titleStyle: 'rainbow',
+      });
     });
   });
 

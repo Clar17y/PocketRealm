@@ -9,6 +9,8 @@ interface Player {
   email: string;
   role: string;
   emailVerified: boolean;
+  isPremium: boolean;
+  premiumExpiresAt: string | null;
 }
 
 interface AuthState {

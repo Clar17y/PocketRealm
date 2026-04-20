@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('../redis', () => ({
   redis: { set: vi.fn() },
@@ -104,6 +105,21 @@ describe('chatService', () => {
       expect(result[1].message).toBe('Second');
       expect(result[0].title).toBeUndefined();
       expect(result[1].title).toBe('The Warrior');
+      expect(result[1].titleStyle).toBeUndefined();
+    });
+
+    it('returns titleStyle for styled titles', async () => {
+      mockPrisma.chatMessage.findMany.mockResolvedValue([
+        { id: '1', channelType: 'world', channelId: 'world', playerId: 'p1', username: 'A', message: 'Styled', messageType: 'player', createdAt: new Date('2025-01-01') },
+      ]);
+      mockPrisma.player.findMany.mockResolvedValue([
+        { id: 'p1', activeTitle: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID },
+      ]);
+
+      const result = await getChannelHistory('world', 'world');
+
+      expect(result[0].title).toBe(PREMIUM_CONSTANTS.SUPPORT_TITLE);
+      expect(result[0].titleStyle).toBe('rainbow');
     });
 
     it('queries with correct limit and ordering', async () => {

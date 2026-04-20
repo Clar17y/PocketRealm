@@ -45,9 +45,13 @@ export function estimateExploration(
   turns: number,
   zoneExitChance: number | null = null,
   spawnRateMultiplier: number = 1,
+  hiddenCacheChanceOverride: number | null = null,
 ): ExplorationEstimate {
   const ambushRate = EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * spawnRateMultiplier;
   const siteRate = EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN * spawnRateMultiplier;
+  const hiddenCacheChance = hiddenCacheChanceOverride != null
+    ? hiddenCacheChanceOverride
+    : EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE;
   return {
     turns,
     ambushChance: cumulativeProbability(ambushRate, turns),
@@ -57,7 +61,7 @@ export function estimateExploration(
       turns
     ),
     hiddenCacheChance: cumulativeProbability(
-      EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE,
+      hiddenCacheChance,
       turns
     ),
     zoneExitChance: zoneExitChance != null && zoneExitChance > 0
@@ -76,12 +80,16 @@ export function simulateExploration(
   turns: number,
   zoneExitChance: number | null = null,
   spawnRateMultiplier: number = 1,
+  hiddenCacheChanceOverride: number | null = null,
 ): ExplorationOutcome[] {
   const outcomes: ExplorationOutcome[] = [];
   let canDiscoverZoneExit = zoneExitChance != null && zoneExitChance > 0;
   let canDiscoverEvent = true;
   const ambushChance = EXPLORATION_CONSTANTS.AMBUSH_CHANCE_PER_TURN * spawnRateMultiplier;
   const siteChance = EXPLORATION_CONSTANTS.ENCOUNTER_SITE_CHANCE_PER_TURN * spawnRateMultiplier;
+  const hiddenCacheChance = hiddenCacheChanceOverride != null
+    ? hiddenCacheChanceOverride
+    : EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE;
 
   for (let t = 1; t <= turns; t++) {
     if (Math.random() < ambushChance) {
@@ -96,7 +104,7 @@ export function simulateExploration(
       outcomes.push({ type: 'resource_node', turnOccurred: t });
     }
 
-    if (Math.random() < EXPLORATION_CONSTANTS.HIDDEN_CACHE_CHANCE) {
+    if (Math.random() < hiddenCacheChance) {
       outcomes.push({ type: 'hidden_cache', turnOccurred: t });
     }
 

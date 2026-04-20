@@ -1,0 +1,273 @@
+import type Stripe from 'stripe';
+import { Prisma, prisma } from '@pocketrealm/database';
+import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
+import { AppError } from '../middleware/errorHandler';
+import { retrieveStripeCheckoutSession } from './stripeService';
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+export interface PremiumGrantWindow {
+  grantedFrom: Date;
+  grantedUntil: Date;
+}
+
+export interface GrantPremiumDaysInput {
+  playerId: string;
+  provider: string;
+  productType?: string;
+  days: number;
+  amount: number;
+  currency: string;
+  providerSessionId?: string | null;
+  providerPaymentIntentId?: string | null;
+  metadata?: Prisma.InputJsonValue | null;
+  now?: Date;
+}
+
+type PremiumGrantClient = Prisma.TransactionClient;
+
+function assertPositiveInteger(value: number, label: string): void {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new AppError(400, `${label} must be a positive integer`, 'INVALID_DAYS');
+  }
+}
+
+export function calculatePremiumGrantWindow(
+  currentExpiry: Date | null | undefined,
+  days: number,
+  now: Date = new Date(),
+): PremiumGrantWindow {
+  assertPositiveInteger(days, 'Champion days');
+
+  const grantStart = currentExpiry && currentExpiry.getTime() > now.getTime()
+    ? currentExpiry
+    : now;
+
+  return {
+    grantedFrom: new Date(grantStart),
+    grantedUntil: new Date(grantStart.getTime() + days * MS_PER_DAY),
+  };
+}
+
+export async function listPremiumPurchases(playerId: string) {
+  return prisma.premiumPurchase.findMany({
+    where: { playerId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+export async function getPremiumStatus(playerId: string) {
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: {
+      id: true,
+      isPremium: true,
+      premiumExpiresAt: true,
+    },
+  });
+
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
+  return player;
+}
+
+function getCheckoutSessionPlayerId(metadata: Record<string, string> | null | undefined): string {
+  const playerId = metadata?.playerId;
+
+  if (!playerId) {
+    throw new AppError(400, 'Stripe checkout session missing playerId metadata', 'STRIPE_PLAYER_ID_MISSING');
+  }
+
+  return playerId;
+}
+
+function getPaymentIntentId(paymentIntent: string | Stripe.PaymentIntent | null): string | null {
+  if (typeof paymentIntent === 'string') {
+    return paymentIntent;
+  }
+
+  if (paymentIntent && typeof paymentIntent === 'object' && 'id' in paymentIntent) {
+    const paymentIntentId = paymentIntent.id;
+    return typeof paymentIntentId === 'string' ? paymentIntentId : null;
+  }
+
+  return null;
+}
+
+function isSupportPocketrealmSession(session: Stripe.Checkout.Session): boolean {
+  return (
+    session.payment_status === 'paid'
+    && session.metadata?.productType === PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE
+    && session.amount_total === PREMIUM_CONSTANTS.PRICE_GBP_PENCE
+    && session.currency?.toLowerCase() === 'gbp'
+  );
+}
+
+async function findExistingStripePurchase(tx: Prisma.TransactionClient, input: GrantPremiumDaysInput) {
+  if (input.provider !== 'stripe') {
+    return null;
+  }
+
+  if (input.providerPaymentIntentId) {
+    const byPaymentIntent = await tx.premiumPurchase.findUnique({
+      where: { providerPaymentIntentId: input.providerPaymentIntentId },
+    });
+
+    if (byPaymentIntent) {
+      return byPaymentIntent;
+    }
+  }
+
+  if (input.providerSessionId) {
+    const bySession = await tx.premiumPurchase.findUnique({
+      where: { providerSessionId: input.providerSessionId },
+    });
+
+    if (bySession) {
+      return bySession;
+    }
+  }
+
+  return null;
+}
+
+function ensureStripePurchaseBelongsToPlayer<T extends { playerId: string }>(
+  purchase: T,
+  playerId: string,
+): T {
+  if (purchase.playerId !== playerId) {
+    throw new AppError(409, 'Stripe purchase belongs to another player', 'PURCHASE_PLAYER_MISMATCH');
+  }
+
+  return purchase;
+}
+
+async function grantPremiumDaysTx(tx: PremiumGrantClient, input: GrantPremiumDaysInput) {
+  await tx.$queryRaw`SELECT id FROM "players" WHERE id = ${input.playerId} FOR UPDATE`;
+
+  const player = await tx.player.findUnique({
+    where: { id: input.playerId },
+    select: {
+      premiumExpiresAt: true,
+    },
+  });
+
+  if (!player) {
+    throw new AppError(404, 'Player not found', 'NOT_FOUND');
+  }
+
+  const existing = await findExistingStripePurchase(tx, input);
+  if (existing) {
+    return ensureStripePurchaseBelongsToPlayer(existing, input.playerId);
+  }
+
+  const grantedAt = input.now ?? new Date();
+  const { grantedFrom, grantedUntil } = calculatePremiumGrantWindow(
+    player.premiumExpiresAt,
+    input.days,
+    grantedAt,
+  );
+
+  let purchase;
+  try {
+    purchase = await tx.premiumPurchase.create({
+      data: {
+        playerId: input.playerId,
+        provider: input.provider,
+        providerSessionId: input.providerSessionId ?? null,
+        providerPaymentIntentId: input.providerPaymentIntentId ?? null,
+        productType: input.productType ?? PREMIUM_CONSTANTS.SUPPORT_PRODUCT_TYPE,
+        status: 'completed',
+        amount: input.amount,
+        currency: input.currency,
+        championDaysGranted: input.days,
+        grantedFrom,
+        grantedUntil,
+        metadata: input.metadata ?? undefined,
+      },
+    });
+  } catch (err: unknown) {
+    if (
+      input.provider === 'stripe' &&
+      err && typeof err === 'object' &&
+      'code' in err &&
+      err.code === 'P2002'
+    ) {
+      const recovered = await findExistingStripePurchase(tx, input);
+
+      if (recovered) {
+        return ensureStripePurchaseBelongsToPlayer(recovered, input.playerId);
+      }
+    }
+
+    throw err;
+  }
+
+  await tx.player.update({
+    where: { id: input.playerId },
+    data: {
+      isPremium: true,
+      premiumExpiresAt: grantedUntil,
+    },
+  });
+
+  await tx.playerAchievement.upsert({
+    where: {
+      playerId_achievementId: {
+        playerId: input.playerId,
+        achievementId: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
+      },
+    },
+    create: {
+      playerId: input.playerId,
+      achievementId: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
+    },
+    update: {},
+  });
+
+  return purchase;
+}
+
+export async function grantPremiumDays(input: GrantPremiumDaysInput, tx?: PremiumGrantClient) {
+  if (tx) {
+    return grantPremiumDaysTx(tx, input);
+  }
+
+  return prisma.$transaction((transactionClient) => grantPremiumDaysTx(transactionClient, input));
+}
+
+export async function confirmSupportPocketrealmCheckoutSession(input: {
+  playerId: string;
+  sessionId: string;
+  now?: Date;
+}) {
+  const session = await retrieveStripeCheckoutSession(input.sessionId);
+  const sessionPlayerId = getCheckoutSessionPlayerId(session.metadata);
+
+  if (sessionPlayerId !== input.playerId) {
+    throw new AppError(409, 'Stripe purchase belongs to another player', 'PURCHASE_PLAYER_MISMATCH');
+  }
+
+  if (!isSupportPocketrealmSession(session)) {
+    throw new AppError(409, 'Stripe checkout session is not a paid Support Pocketrealm purchase', 'STRIPE_SESSION_NOT_FULFILLABLE');
+  }
+
+  await grantPremiumDays({
+    playerId: input.playerId,
+    provider: 'stripe',
+    providerSessionId: session.id,
+    providerPaymentIntentId: getPaymentIntentId(session.payment_intent),
+    amount: PREMIUM_CONSTANTS.PRICE_GBP_PENCE,
+    currency: 'gbp',
+    days: PREMIUM_CONSTANTS.SUPPORT_DURATION_DAYS,
+    metadata: {
+      sessionId: session.id,
+      source: 'stripe_checkout_confirm',
+    },
+    now: input.now,
+  });
+
+  return getPremiumStatus(input.playerId);
+}

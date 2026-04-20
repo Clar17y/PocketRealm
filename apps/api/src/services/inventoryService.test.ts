@@ -183,12 +183,14 @@ describe('getUsedSlots', () => {
 
 describe('getPlayerCapacity', () => {
   it('returns base capacity with no equipment', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
     // BASE_CAPACITY = 24
     expect(await getPlayerCapacity('p1')).toBe(24);
   });
 
   it('includes backpack tier bonus', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.playerEquipment.findMany.mockResolvedValue([
       { slot: 'backpack', item: { rarity: 'common', template: { tier: 2 }, bonusStats: null } },
     ]);
@@ -197,6 +199,7 @@ describe('getPlayerCapacity', () => {
   });
 
   it('includes backpack rarity bonus', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.playerEquipment.findMany.mockResolvedValue([
       { slot: 'backpack', item: { rarity: 'rare', template: { tier: 1 }, bonusStats: null } },
     ]);
@@ -205,6 +208,7 @@ describe('getPlayerCapacity', () => {
   });
 
   it('includes belt slot bonus', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.playerEquipment.findMany.mockResolvedValue([
       { slot: 'belt', item: { rarity: 'common', template: { tier: 1 }, bonusStats: { inventorySlots: 4 } } },
     ]);
@@ -213,11 +217,32 @@ describe('getPlayerCapacity', () => {
   });
 
   it('combines backpack and belt bonuses', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.playerEquipment.findMany.mockResolvedValue([
       { slot: 'backpack', item: { rarity: 'common', template: { tier: 1 }, bonusStats: null } },
       { slot: 'belt', item: { rarity: 'common', template: { tier: 1 }, bonusStats: { inventorySlots: 6 } } },
     ]);
     // 24 base + 1*8 tier + 6 belt = 38
     expect(await getPlayerCapacity('p1')).toBe(38);
+  });
+
+  it('includes Champion bonus slots for premium players', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+    });
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
+
+    expect(await getPlayerCapacity('p1')).toBe(32);
+  });
+
+  it('does not include Champion bonus slots when premium entitlement is expired', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date('2025-12-31T23:59:59.000Z'),
+    });
+    mockPrisma.playerEquipment.findMany.mockResolvedValue([]);
+
+    expect(await getPlayerCapacity('p1')).toBe(24);
   });
 });

@@ -18,6 +18,7 @@ export interface CalculateCraftingCritInput {
   itemType: ItemType;
   baseStats: ItemStats | null | undefined;
   slot?: EquipmentSlot | null;
+  championMultiplier?: number;
 }
 
 export interface CraftingCritRolls {
@@ -174,11 +175,28 @@ export function rollBonusStat(
 
 export function calculateCraftingCrit(
   input: CalculateCraftingCritInput,
-  rolls?: CraftingCritRolls
+  rolls?: CraftingCritRolls,
+  options?: { championMultiplier?: number }
 ): CraftingCritResult {
-  const critChance = calculateCritChance(input.skillLevel, input.requiredLevel, input.luckStat);
-  const rareCraftChance = calculateRareCraftChance(input.skillLevel, input.requiredLevel, input.luckStat);
-  const epicCraftChance = calculateEpicCraftChance(input.skillLevel, input.requiredLevel, input.luckStat);
+  const championMultiplierValue = options?.championMultiplier ?? input.championMultiplier ?? 1;
+  const championMultiplier = Number.isFinite(championMultiplierValue)
+    ? Math.max(1, championMultiplierValue)
+    : 1;
+  const critChance = clamp(
+    calculateCritChance(input.skillLevel, input.requiredLevel, input.luckStat) * championMultiplier,
+    CRAFTING_CONSTANTS.MIN_CRIT_CHANCE,
+    CRAFTING_CONSTANTS.MAX_CRIT_CHANCE,
+  );
+  const rareCraftChance = clamp(
+    calculateRareCraftChance(input.skillLevel, input.requiredLevel, input.luckStat) * championMultiplier,
+    0,
+    CRAFTING_CONSTANTS.RARE_CRAFT_MAX_CHANCE,
+  );
+  const epicCraftChance = clamp(
+    calculateEpicCraftChance(input.skillLevel, input.requiredLevel, input.luckStat) * championMultiplier,
+    0,
+    CRAFTING_CONSTANTS.EPIC_CRAFT_MAX_CHANCE,
+  );
   const eligibleStats = getEligibleBonusStats(input.itemType, input.baseStats, input.slot);
 
   const noChances = { critChance, rareCraftChance, epicCraftChance };

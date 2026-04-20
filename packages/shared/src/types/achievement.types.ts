@@ -11,6 +11,14 @@ export type AchievementCategory =
   | 'casino'
   | 'shop';
 
+export type TitleStyleVariant = 'rainbow';
+
+export interface TitleDisplay {
+  title?: string;
+  titleTier?: number;
+  titleStyle?: TitleStyleVariant;
+}
+
 export interface AchievementReward {
   type: 'xp' | 'turns' | 'attribute_points' | 'item';
   amount: number;
@@ -24,6 +32,7 @@ export interface AchievementDef {
   description: string;
   flavorText?: string;
   titleReward?: string;
+  titleStyle?: TitleStyleVariant;
   rewards?: AchievementReward[];
   secret?: boolean;
   tier?: number;
@@ -39,6 +48,7 @@ export interface PlayerAchievementProgress {
   description: string;
   flavorText?: string;
   titleReward?: string;
+  titleStyle?: TitleStyleVariant;
   threshold: number;
   secret?: boolean;
   tier?: number;

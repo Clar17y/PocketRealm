@@ -1,8 +1,9 @@
 import { prisma, Prisma } from '@pocketrealm/database';
 import type { CombatTemplate, CombatTemplateSlot } from '@pocketrealm/database';
 import type { CombatTemplateSlotData, CombatTemplateData, SlotCondition } from '@pocketrealm/shared';
-import { ALWAYS_AVAILABLE_ACTION_IDS, SKILL_POINT_CONSTANTS, BASE_ACTION_DEFINITIONS } from '@pocketrealm/shared';
+import { ALWAYS_AVAILABLE_ACTION_IDS, BASE_ACTION_DEFINITIONS, PREMIUM_CONSTANTS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 import { AppError } from '../middleware/errorHandler';
+import { getHasActivePremiumEntitlement } from './premiumEntitlement';
 
 interface CreateSlotInput {
   sortOrder?: number;
@@ -58,9 +59,16 @@ export async function createTemplate(
   slots: CreateSlotInput[],
   unlockedActions: string[] = [],
 ): Promise<CombatTemplateData> {
-  const count = await prisma.combatTemplate.count({ where: { playerId } });
-  if (count >= SKILL_POINT_CONSTANTS.MAX_TEMPLATES) {
-    throw new AppError(400, `Maximum ${SKILL_POINT_CONSTANTS.MAX_TEMPLATES} templates allowed`, 'TEMPLATE_LIMIT');
+  const [count, hasActivePremiumEntitlement] = await Promise.all([
+    prisma.combatTemplate.count({ where: { playerId } }),
+    getHasActivePremiumEntitlement(prisma, playerId),
+  ]);
+  const templateLimit = hasActivePremiumEntitlement
+    ? PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION
+    : PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE;
+
+  if (count >= templateLimit) {
+    throw new AppError(400, `Maximum ${templateLimit} templates allowed`, 'TEMPLATE_LIMIT');
   }
 
   validateTemplateSlots(slots, unlockedActions);

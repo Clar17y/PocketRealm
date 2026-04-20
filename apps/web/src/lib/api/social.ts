@@ -1,5 +1,5 @@
 import { fetchApi } from './core';
-import type { StateUpdates } from '@pocketrealm/shared';
+import type { StateUpdates, TitleStyleVariant } from '@pocketrealm/shared';
 import type { CombatLogEntryResponse, CombatOutcomeResponse } from './combat';
 
 // PvP Arena
@@ -21,6 +21,7 @@ export interface PvpLadderEntry {
   isAdmin?: boolean;
   title?: string;
   titleTier?: number;
+  titleStyle?: TitleStyleVariant;
 }
 
 export interface PvpLadderResponse {
@@ -180,6 +181,9 @@ export async function getChatHistory(channelType: string, channelId: string) {
       channelId: string;
       playerId: string;
       username: string;
+      title?: string;
+      titleTier?: number;
+      titleStyle?: TitleStyleVariant;
       message: string;
       messageType?: string;
       createdAt: string;
@@ -345,6 +349,7 @@ export interface PlayerAchievementProgress {
   description: string;
   flavorText?: string;
   titleReward?: string;
+  titleStyle?: TitleStyleVariant;
   threshold: number;
   secret?: boolean;
   tier?: number;
@@ -400,6 +405,7 @@ export interface LeaderboardEntry {
   isAdmin?: boolean;
   title?: string;
   titleTier?: number;
+  titleStyle?: TitleStyleVariant;
 }
 
 export interface LeaderboardResponse {

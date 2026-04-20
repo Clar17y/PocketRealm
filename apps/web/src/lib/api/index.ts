@@ -139,6 +139,7 @@ export type {
 } from './social';
 
 export { getNotificationStatus, subscribePush, unsubscribePush } from './notifications';
+export { createPremiumCheckout, confirmPremiumCheckout, getPremiumStatus, getPremiumPurchases } from './premium';
 
 export { getResources } from './resources';
 export type { CombatResourceResponse } from './resources';

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma, prisma } from '@pocketrealm/database';
-import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONSTANTS, levelToGemTier, type SkillType } from '@pocketrealm/shared';
+import { EXPLORATION_CONSTANTS, GATHERING_CONSTANTS, GATHERING_SKILLS, GEM_CONSTANTS, PREMIUM_CONSTANTS, levelToGemTier, type SkillType } from '@pocketrealm/shared';
 import { createActivityLog, type ActivityType } from '../services/activityLogService';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -18,8 +18,10 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { applyGuildTaxTx, getPlayerTaxRateTx, calculateInflatedCost, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../services/guildUpgradeService';
 import { getBuffValue, consumeBuffStandalone } from '../services/buffService';
+import { getHasActivePremiumEntitlement } from '../services/premiumEntitlement';
 import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
+import { buildGatheringResultDetails } from './gatheringResult';
 
 export const gatheringRouter = Router();
 
@@ -315,11 +317,13 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const activeEventEffects = computeEventSummaries(cachedZoneEvents, cachedWorldEvents);
   const guildMods = await getPlayerGuildModifiers(playerId);
   const shopGatheringYield = await getBuffValue(playerId, 'gathering_yield');
+  const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
+  const championMultiplier = hasChampion ? PREMIUM_CONSTANTS.BONUS_MULTIPLIER : 1;
 
   // Apply level + guild/shop multipliers to batch total, not per-action
   // (fixes dead zone where Math.floor discards fractional multipliers every action)
   const combinedYieldBonus = guildMods.gatheringYield + shopGatheringYield;
-  const totalMultiplier = yieldMultiplier * (1 + combinedYieldBonus);
+  const totalMultiplier = yieldMultiplier * (1 + combinedYieldBonus) * championMultiplier;
   // Unrounded effective yield for capacity planning
   const effectiveYieldPerAction = baseYield * totalMultiplier;
   // Display value for yieldBreakdown (rounded for display only)
@@ -330,7 +334,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
   const eventMultiplier = zoneModifiers.resourceYieldMultiplier;
   const turnCostPerAction = computeEventTurnCost(eventMultiplier);
 
-  const { turnSpend, taxResult, actions, totalYield, rawTotalYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
+  const { turnSpend, taxResult, actions, totalYield, rawTotalYield, unclampedRawYield, newCapacity, nodeDepleted, stack } = await prisma.$transaction(async (tx) => {
     // Validate player is actually in the node's zone inside the transaction to prevent TOCTOU race
     const playerForZone = await tx.player.findUnique({
       where: { id: playerId },
@@ -356,7 +360,8 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     const actualTurns = calculateInflatedCost(baseTurns, taxRate);
 
     // Batch-level floor: apply multipliers to total, not per-action (fixes fractional dead zone)
-    const innerRawYield = Math.min(Math.max(1, Math.floor(innerActions * effectiveYieldPerAction)), effectiveCapacity);
+    const innerUnclampedRawYield = Math.max(1, Math.floor(innerActions * effectiveYieldPerAction));
+    const innerRawYield = Math.min(innerUnclampedRawYield, effectiveCapacity);
     const innerTotalYield = eventMultiplier > 1
       ? Math.max(1, Math.floor(innerRawYield * eventMultiplier))
       : innerRawYield;
@@ -403,10 +408,22 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       actions: innerActions,
       totalYield: innerTotalYield,
       rawTotalYield: innerRawYield,
+      unclampedRawYield: innerUnclampedRawYield,
       newCapacity: innerNewCapacity,
       nodeDepleted: innerNodeDepleted,
       stack: minedStack,
     };
+  });
+
+  const resultDetails = buildGatheringResultDetails({
+    levelMultiplier: yieldMultiplier,
+    guildAndBuffBonus: combinedYieldBonus,
+    championMultiplier,
+    eventMultiplier,
+    unclampedRawYield,
+    rawTotalYield,
+    totalYield,
+    effectiveCapacity,
   });
 
   // Consume shop gathering yield buff (one use per gather action)
@@ -430,7 +447,7 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
     const luckStat = equipStats.luck;
 
     const critResult = rollGemCritBatch(
-      { skillLevel: level, nodeLevel: template.levelRequired, luckStat },
+      { skillLevel: level, nodeLevel: template.levelRequired, luckStat, championMultiplier },
       actions,
     );
 
@@ -534,7 +551,10 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       actions,
       baseYield,
       yieldMultiplier,
+      totalMultiplier: resultDetails.totalMultiplier,
+      championMultiplier: resultDetails.championMultiplier,
       totalYield,
+      capacityLimited: resultDetails.capacityLimited,
       itemTemplateId: resourceTemplateId,
       itemId: stack.itemId,
     },
@@ -551,12 +571,29 @@ gatheringRouter.post('/mine', asyncHandler(async (req, res) => {
       ? {
           baseYieldPerAction,
           totalYieldPerAction: baseYieldPerAction, // deprecated; kept for client compat
+          totalMultiplier: resultDetails.totalMultiplier,
+          championMultiplier: resultDetails.championMultiplier,
+          bonusMultiplier: resultDetails.bonusMultiplier,
           rawTotalYield,
+          unclampedRawYield,
+          capacityLimited: resultDetails.capacityLimited,
           eventModifier: zoneModifiers.resourceYieldMultiplier,
           turnCostPerAction,
           eventTitle: activeEventEffects.find((e: { effectType: string }) => e.effectType === 'yield_up' || e.effectType === 'yield_down')?.title ?? null,
         }
-      : undefined,
+      : {
+          baseYieldPerAction,
+          totalYieldPerAction: baseYieldPerAction,
+          totalMultiplier: resultDetails.totalMultiplier,
+          championMultiplier: resultDetails.championMultiplier,
+          bonusMultiplier: resultDetails.bonusMultiplier,
+          rawTotalYield,
+          unclampedRawYield,
+          capacityLimited: resultDetails.capacityLimited,
+          eventModifier: zoneModifiers.resourceYieldMultiplier,
+          turnCostPerAction,
+          eventTitle: null,
+        },
     tax: taxInfoFromResult(taxResult),
     ...(questProgress.length > 0 ? { questProgress } : {}),
     stateUpdates,

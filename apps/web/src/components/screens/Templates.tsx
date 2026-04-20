@@ -14,7 +14,7 @@ import type { Screen } from '@/app/game/gameController.types';
 import { handleKeyActivate } from '@/lib/utils';
 import { useConfirmAction } from '@/hooks/useConfirmAction';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
-import { BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, getAllTalentNodes } from '@pocketrealm/shared';
+import { BASE_ACTION_DEFINITIONS, BUFF_EFFECTS, DEBUFF_EFFECTS, PREMIUM_CONSTANTS, getAllTalentNodes } from '@pocketrealm/shared';
 import type { CombatTemplateData, CombatTemplateSlotData, SlotCondition, ConditionType, ConditionResourceType, ResourceState } from '@pocketrealm/shared';
 import { TemplateTutorial } from '@/components/common/TemplateTutorial';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
@@ -738,6 +738,9 @@ export function Templates({
           <Plus size={14} className="mr-1 inline" /> New Template
         </PixelButton>
       </div>
+      <p className="mb-3 text-xs text-[var(--rpg-text-secondary)]">
+        Free adventurers can save {PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE} templates. Champion supporters can save {PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION}.
+      </p>
 
       {listAction.error && <ErrorBanner message={listAction.error} />}
 

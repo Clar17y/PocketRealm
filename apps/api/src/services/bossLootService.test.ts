@@ -242,4 +242,22 @@ describe('distributeBossLoot', () => {
     expect(rollAndGrantLoot).toHaveBeenCalledWith('p1', 'mob-1', 10 + rarityBonus, 1.0);
     expect(rollAndGrantLoot).toHaveBeenCalledWith('p2', 'mob-1', 10 + rarityBonus, 1.0);
   });
+
+  it('uses Champion multiplier to scale boss loot and XP rewards', async () => {
+    const contributors = [
+      { playerId: 'p1', totalDamage: 200, totalHealing: 0, damageAbsorbed: 0, roundsSurvived: 1 },
+    ];
+
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+    });
+
+    await distributeBossLoot('mob-1', 10, contributors, 1);
+
+    const rarityBonus = WORLD_EVENT_CONSTANTS.BOSS_RARITY_BONUS;
+    const baseXp = WORLD_EVENT_CONSTANTS.BOSS_BASE_XP_REWARD_BY_TIER[0]!;
+    expect(rollAndGrantLoot).toHaveBeenCalledWith('p1', 'mob-1', 10 + rarityBonus, 1.1);
+    expect(grantSkillXp).toHaveBeenCalledWith('p1', 'magic', Math.round(baseXp * 1.1));
+  });
 });

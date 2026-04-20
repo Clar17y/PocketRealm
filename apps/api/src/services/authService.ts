@@ -3,31 +3,49 @@ import bcrypt from 'bcrypt';
 import { AUTH_CONSTANTS } from '@pocketrealm/shared';
 import { createEmailVerificationToken } from './authTokenService';
 import { sendVerificationEmail } from './emailService';
+import { grantPremiumDays } from './premiumService';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../logger';
 
 /** Verify email and grant Champion trial if eligible. Returns whether trial was granted. */
 export async function verifyPlayerEmail(tokenRecord: { id: string; playerId: string }): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "players" WHERE id = ${tokenRecord.playerId} FOR UPDATE`;
+
     const player = await tx.player.findUnique({
       where: { id: tokenRecord.playerId },
       select: { premiumTrialClaimed: true },
     });
 
     const shouldGrantTrial = player && !player.premiumTrialClaimed;
-    const expiresAt = new Date(Date.now() + AUTH_CONSTANTS.CHAMPION_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    const playerUpdateData = shouldGrantTrial
+      ? {
+        emailVerified: true,
+        premiumTrialClaimed: true,
+      }
+      : {
+        emailVerified: true,
+      };
 
     await tx.player.update({
       where: { id: tokenRecord.playerId },
-      data: {
-        emailVerified: true,
-        ...(shouldGrantTrial ? {
-          premiumTrialClaimed: true,
-          isPremium: true,
-          premiumExpiresAt: expiresAt,
-        } : {}),
-      },
+      data: playerUpdateData,
     });
+
+    if (shouldGrantTrial) {
+      await grantPremiumDays({
+        playerId: tokenRecord.playerId,
+        provider: 'email_verification',
+        productType: 'email_verification_trial',
+        days: AUTH_CONSTANTS.CHAMPION_TRIAL_DAYS,
+        amount: 0,
+        currency: 'usd',
+        metadata: {
+          source: 'email_verification',
+        },
+        now: new Date(),
+      }, tx);
+    }
 
     await tx.emailVerificationToken.delete({
       where: { id: tokenRecord.id },

@@ -1,5 +1,5 @@
 import { prisma } from '@pocketrealm/database';
-import { ACHIEVEMENTS_BY_ID, CHAT_CONSTANTS } from '@pocketrealm/shared';
+import { CHAT_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
 import type { ChatChannelType, ChatMessageEvent, ChatMessageType } from '@pocketrealm/shared';
 import { redis } from '../redis';
 
@@ -54,11 +54,10 @@ export async function getChannelHistory(
     where: { id: { in: playerIds } },
     select: { id: true, activeTitle: true },
   });
-  const titleMap = new Map<string, { title: string; tier?: number }>();
+  const titleMap = new Map<string, ReturnType<typeof resolveAchievementTitleDisplay>>();
   for (const p of players) {
     if (p.activeTitle) {
-      const def = ACHIEVEMENTS_BY_ID.get(p.activeTitle);
-      if (def?.titleReward) titleMap.set(p.id, { title: def.titleReward, tier: def.tier });
+      titleMap.set(p.id, resolveAchievementTitleDisplay(p.activeTitle));
     }
   }
 
@@ -71,8 +70,7 @@ export async function getChannelHistory(
       channelId: r.channelId,
       playerId: r.playerId,
       username: r.username,
-      title: info?.title,
-      titleTier: info?.tier,
+      ...info,
       message: r.message,
       messageType: (r.messageType ?? 'player') as ChatMessageType,
       createdAt: r.createdAt.toISOString(),

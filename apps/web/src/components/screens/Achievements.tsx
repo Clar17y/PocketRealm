@@ -5,8 +5,8 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { StatBar } from '@/components/StatBar';
 import { groupAchievementChains } from '@pocketrealm/shared';
-import { rarityFromTier, RARITY_COLORS } from '@/lib/rarity';
 import { FeatureTutorial } from '@/components/common/FeatureTutorial';
+import { PlayerTitle } from '@/components/common/PlayerTitle';
 import { ScreenContainer } from '../common/ScreenContainer';
 import type { PlayerAchievementProgress as SharedProgress } from '@pocketrealm/shared';
 import type { PlayerAchievementProgress, AchievementRewardResponse } from '@/lib/api';
@@ -152,7 +152,6 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
               None
             </button>
             {unlockedTitles.map((a) => {
-              const color = RARITY_COLORS[rarityFromTier(a.tier ?? 1)];
               return (
                 <button
                   key={a.id}
@@ -162,9 +161,8 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
                       ? 'bg-[var(--rpg-gold)] text-[var(--rpg-background)]'
                       : 'bg-[var(--rpg-surface)] hover:bg-[var(--rpg-border)]'
                   }`}
-                  style={activeTitle !== a.id ? { color } : undefined}
                 >
-                  {a.titleReward}
+                  <PlayerTitle title={a.titleReward!} titleTier={a.tier} titleStyle={a.titleStyle} />
                 </button>
               );
             })}
@@ -214,12 +212,12 @@ export function Achievements({ achievements, unclaimedCount, activeTitle, onClai
                       </span>
                       <TierStars current={entry.completedTiers} total={entry.totalTiers} />
                       {achievement.titleReward && achievement.unlocked && (
-                        <span
+                        <PlayerTitle
+                          title={achievement.titleReward}
+                          titleTier={achievement.tier}
+                          titleStyle={achievement.titleStyle}
                           className="text-xs italic"
-                          style={{ color: RARITY_COLORS[rarityFromTier(achievement.tier ?? 1)] }}
-                        >
-                          &quot;{achievement.titleReward}&quot;
-                        </span>
+                        />
                       )}
                     </div>
                     <p className="text-sm text-[var(--rpg-text-secondary)]">

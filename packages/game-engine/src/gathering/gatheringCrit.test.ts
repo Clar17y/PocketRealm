@@ -6,6 +6,10 @@ describe('calculateGemCritChance', () => {
     expect(calculateGemCritChance(5, 5, 0)).toBeCloseTo(0.03);
   });
 
+  it('applies champion multiplier to crit chance', () => {
+    expect(calculateGemCritChance(5, 5, 0, 2)).toBeCloseTo(0.06);
+  });
+
   it('scales with levels above requirement', () => {
     // 0.03 + 10 * 0.005 = 0.08
     expect(calculateGemCritChance(15, 5, 0)).toBeCloseTo(0.08);
@@ -47,6 +51,12 @@ describe('rollGemCrit', () => {
     const result = rollGemCrit({ skillLevel: 5, nodeLevel: 5, luckStat: 0 });
     expect(typeof result.isCrit).toBe('boolean');
     expect(result.critChance).toBeCloseTo(0.03);
+  });
+
+  it('applies champion multiplier when provided', () => {
+    const result = rollGemCrit({ skillLevel: 5, nodeLevel: 5, luckStat: 0 }, 0.04, 2);
+    expect(result.critChance).toBeCloseTo(0.06);
+    expect(result.isCrit).toBe(true);
   });
 });
 

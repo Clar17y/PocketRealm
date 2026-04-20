@@ -204,6 +204,8 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
       email: player.email,
       role: player.role,
       emailVerified: false,
+      isPremium: player.isPremium,
+      premiumExpiresAt: player.premiumExpiresAt,
     },
     accessToken,
     refreshToken,
@@ -221,7 +223,17 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
 
   const player = await prisma.player.findUnique({
     where: { email: body.email },
-    select: { id: true, username: true, email: true, role: true, passwordHash: true, isBot: true, emailVerified: true },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      role: true,
+      passwordHash: true,
+      isBot: true,
+      emailVerified: true,
+      isPremium: true,
+      premiumExpiresAt: true,
+    },
   });
 
   if (!player) {
@@ -283,6 +295,8 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
       email: player.email,
       role: player.role,
       emailVerified: player.emailVerified,
+      isPremium: player.isPremium,
+      premiumExpiresAt: player.premiumExpiresAt,
     },
     accessToken,
     refreshToken,

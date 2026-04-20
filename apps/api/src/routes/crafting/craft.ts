@@ -6,6 +6,7 @@ import type { EventModifierBadge } from '../../services/worldEventService';
 import {
   CRAFTING_CONSTANTS,
   GUILD_CONSTANTS,
+  PREMIUM_CONSTANTS,
   type EquipmentSlot,
   type ItemRarity,
   type ItemStats,
@@ -25,6 +26,7 @@ import { addGuildXp, getPlayerGuildId } from '../../services/guildService';
 import { spendWithTaxTx, taxInfoFromResult } from '../../services/guildTaxService';
 import { getPlayerGuildModifiers } from '../../services/guildUpgradeService';
 import { getBuffValue, consumeBuffStandalone } from '../../services/buffService';
+import { getHasActivePremiumEntitlement } from '../../services/premiumEntitlement';
 import { trackProgress } from '../../services/progressService';
 import { serializeXpGrant, assertCanAct, trackAchievements } from '../../utils/routeHelpers.js';
 import {
@@ -145,6 +147,8 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
         : 'resource';
       const equipStats = await getEquipmentStats(playerId);
       const guildMods = await getPlayerGuildModifiers(playerId);
+      const hasChampion = await getHasActivePremiumEntitlement(prisma, playerId);
+      const championMultiplier = hasChampion ? PREMIUM_CONSTANTS.BONUS_MULTIPLIER : 1;
       const combinedCritBonus = guildMods.craftingCrit + shopCraftingCrit;
       const effectiveLuck = combinedCritBonus > 0
         ? equipStats.luck + Math.floor(combinedCritBonus / CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT)
@@ -161,6 +165,7 @@ craftRouter.post('/', asyncHandler(async (req, res) => {
           itemType,
           baseStats: templateBaseStats,
           slot: templateSlot,
+          championMultiplier,
         });
         const rarity: ItemRarity = critResult.rarity;
         const rolledBonusStats = rollBonusStatsForRarity({

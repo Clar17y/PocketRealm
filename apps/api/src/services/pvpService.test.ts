@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 
 vi.mock('./eloService', () => ({
   calculateEloChange: vi.fn().mockReturnValue({ deltaA: 16, deltaB: -16 }),
@@ -273,6 +274,31 @@ describe('pvpService', () => {
 
       expect(result.opponents[0].title).toBeUndefined();
       expect(result.opponents[0].titleTier).toBeUndefined();
+      expect(result.opponents[0].titleStyle).toBeUndefined();
+    });
+
+    it('includes titleStyle for styled active titles', async () => {
+      mockPrisma.pvpRating.upsert.mockResolvedValue({
+        playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
+      });
+      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
+      mockPrisma.pvpRating.findMany.mockResolvedValue([
+        {
+          playerId: 'p2', rating: 1000,
+          player: {
+            username: 'Supporter',
+            characterLevel: 10,
+            role: 'player',
+            activeTitle: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
+          },
+        },
+      ]);
+
+      const result = await getLadder('p1');
+
+      expect(result.opponents[0].title).toBe(PREMIUM_CONSTANTS.SUPPORT_TITLE);
+      expect(result.opponents[0].titleStyle).toBe('rainbow');
     });
 
     it('returns isAdmin flag on opponents', async () => {

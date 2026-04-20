@@ -19,7 +19,7 @@ export async function sendVerificationEmail(
     html: `
       <div style="font-family: 'Georgia', serif; max-width: 560px; margin: 0 auto; background: #1a1a2e; color: #e0d4b8; padding: 32px; border-radius: 8px;">
         <h1 style="color: #d4a947; font-size: 24px; margin-bottom: 16px;">Welcome, ${escapeHtml(username)}!</h1>
-        <p style="line-height: 1.6;">Verify your email to unlock <strong>account recovery</strong> and claim <strong style="color: #d4a947;">3 days of Champion</strong> — bonus turns, better loot, and more.</p>
+        <p style="line-height: 1.6;">Verify your email to unlock <strong>account recovery</strong> and claim <strong style="color: #d4a947;">3 days of Champion</strong>.</p>
         <div style="text-align: center; margin: 24px 0;">
           <a href="${verifyUrl}" style="display: inline-block; background: #d4a947; color: #1a1a2e; padding: 12px 32px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">Verify Email</a>
         </div>

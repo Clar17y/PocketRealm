@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
+import { PREMIUM_CONSTANTS, SKILL_POINT_CONSTANTS } from '@pocketrealm/shared';
 
 import { mockPrisma } from '../__test__/setup';
 import {
@@ -49,6 +49,7 @@ function makeRecord(overrides: Record<string, any> = {}) {
 
 describe('createTemplate', () => {
   it('creates a template; first one is auto-active', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.combatTemplate.count.mockResolvedValue(0);
     mockPrisma.combatTemplate.create.mockResolvedValue(makeRecord({ isActive: true }));
 
@@ -80,6 +81,7 @@ describe('createTemplate', () => {
   });
 
   it('creates second template as NOT active', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.combatTemplate.count.mockResolvedValue(1);
     mockPrisma.combatTemplate.create.mockResolvedValue(makeRecord({ isActive: false }));
 
@@ -93,6 +95,7 @@ describe('createTemplate', () => {
   });
 
   it('creates template with conditional slot', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     const slotWithCondition = makeSlot({
       conditionType: 'resource_below',
       resource: 'hp',
@@ -118,15 +121,54 @@ describe('createTemplate', () => {
     expect(result.slots[0].thenActionId).toBe('defend');
   });
 
-  it('rejects when over MAX_TEMPLATES limit', async () => {
-    mockPrisma.combatTemplate.count.mockResolvedValue(SKILL_POINT_CONSTANTS.MAX_TEMPLATES);
+  it('rejects free players when over free template limit', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
+    mockPrisma.combatTemplate.count.mockResolvedValue(PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE);
 
     await expect(
       createTemplate(PLAYER_ID, 'Overflow', [{ actionId: 'light_attack' }]),
-    ).rejects.toThrow(`Maximum ${SKILL_POINT_CONSTANTS.MAX_TEMPLATES} templates allowed`);
+    ).rejects.toThrow(`Maximum ${PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE} templates allowed`);
+  });
+
+  it('allows Champion players up to the Champion template limit', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+    });
+    mockPrisma.combatTemplate.count.mockResolvedValue(PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE);
+    mockPrisma.combatTemplate.create.mockResolvedValue(makeRecord({ isActive: false }));
+
+    await expect(
+      createTemplate(PLAYER_ID, 'Champion Template', [{ actionId: 'light_attack' }]),
+    ).resolves.toMatchObject({ id: TEMPLATE_ID });
+  });
+
+  it('rejects Champion players when over Champion template limit', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+    });
+    mockPrisma.combatTemplate.count.mockResolvedValue(PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION);
+
+    await expect(
+      createTemplate(PLAYER_ID, 'Overflow', [{ actionId: 'light_attack' }]),
+    ).rejects.toThrow(`Maximum ${PREMIUM_CONSTANTS.TEMPLATE_LIMIT_CHAMPION} templates allowed`);
+  });
+
+  it('treats expired premium players as free for template limits', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({
+      isPremium: true,
+      premiumExpiresAt: new Date('2025-12-31T23:59:59.000Z'),
+    });
+    mockPrisma.combatTemplate.count.mockResolvedValue(PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE);
+
+    await expect(
+      createTemplate(PLAYER_ID, 'Overflow', [{ actionId: 'light_attack' }]),
+    ).rejects.toThrow(`Maximum ${PREMIUM_CONSTANTS.TEMPLATE_LIMIT_FREE} templates allowed`);
   });
 
   it('rejects unknown action IDs', async () => {
+    mockPrisma.player.findUnique.mockResolvedValue({ isPremium: false });
     mockPrisma.combatTemplate.count.mockResolvedValue(0);
 
     await expect(

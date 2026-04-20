@@ -37,3 +37,4 @@ export * from './utils/achievementChains';
 export * from './utils/tierUtils';
 export * from './utils/mobUtils';
 export * from './utils/repairUtils';
+export * from './utils/titleDisplay';

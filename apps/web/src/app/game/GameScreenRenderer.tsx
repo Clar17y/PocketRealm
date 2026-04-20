@@ -23,8 +23,9 @@ import { PixelCard } from '@/components/PixelCard';
 import { PixelButton } from '@/components/PixelButton';
 import { rarityFromTier } from '@/lib/rarity';
 import { titleCaseFromSnake } from '@/lib/format';
+import { hasActivePremium } from '@/lib/premium';
 import { buildRecipeDiscountLookup, getDiscountedCost, getRecipeSkillInfo } from '@/lib/recipeDiscount';
-import { CRAFTING_CONSTANTS, TURN_CONSTANTS, type SkillType } from '@pocketrealm/shared';
+import { CRAFTING_CONSTANTS, PREMIUM_CONSTANTS, TURN_CONSTANTS, type SkillType } from '@pocketrealm/shared';
 import { calculateEfficiency, xpForLevel } from '@pocketrealm/game-engine';
 import type { Sword } from 'lucide-react';
 import {
@@ -51,7 +52,15 @@ type GC = ReturnType<typeof useGameController>;
 
 interface GameScreenRendererProps {
   gc: GC;
-  player: { id?: string; username?: string; role?: string; email?: string; emailVerified?: boolean } | null;
+  player: {
+    id?: string;
+    username?: string;
+    role?: string;
+    email?: string;
+    emailVerified?: boolean;
+    isPremium?: boolean;
+    premiumExpiresAt?: string | null;
+  } | null;
   casinoSocket: ReturnType<typeof useCasinoSocket>;
   achievementCategory: string | null;
   setAchievementCategory: (cat: string | null) => void;
@@ -205,6 +214,9 @@ export function GameScreenRenderer({
   const activeCraftingSkillMeta = SKILL_META[activeCraftingSkill];
   const activeGatheringSkillData = skills.find((s) => s.skillType === activeGatheringSkill);
   const activeCraftingSkillData = skills.find((s) => s.skillType === activeCraftingSkill);
+  const hasActivePremiumTurns = hasActivePremium(player);
+  const displayedTurnCap = hasActivePremiumTurns ? PREMIUM_CONSTANTS.TURN_BANK_CAP : TURN_CONSTANTS.BANK_CAP;
+  const displayedTurnRegenRate = hasActivePremiumTurns ? PREMIUM_CONSTANTS.TURN_REGEN_RATE : TURN_CONSTANTS.REGEN_RATE;
 
   switch (activeScreen) {
     case 'home': {
@@ -216,8 +228,8 @@ export function GameScreenRenderer({
         <Dashboard
           playerData={{
             turns,
-            maxTurns: TURN_CONSTANTS.BANK_CAP,
-            turnsRegenRate: TURN_CONSTANTS.REGEN_RATE * 60,
+            maxTurns: displayedTurnCap,
+            turnsRegenRate: displayedTurnRegenRate * 60,
             gold,
             currentXP: characterProgression.characterXp,
             nextLevelXP: nextLevelTotalXp,
@@ -682,6 +694,8 @@ export function GameScreenRenderer({
           username={player?.username}
           email={player?.email ?? ''}
           emailVerified={player?.emailVerified ?? false}
+          isPremium={player?.isPremium ?? false}
+          premiumExpiresAt={player?.premiumExpiresAt ?? null}
           combatLogSpeedMs={combatLogSpeedMs} onCombatLogSpeedChange={setCombatLogSpeedMs}
           onCombatLogSpeedCommit={handleSetCombatLogSpeed}
           autoSkipKnownCombat={autoSkipKnownCombat} onAutoSkipKnownCombatChange={handleSetAutoSkipKnownCombat}

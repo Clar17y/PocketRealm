@@ -1,6 +1,6 @@
 import type { Server, Socket } from 'socket.io';
 import { prisma } from '@pocketrealm/database';
-import { ACHIEVEMENTS_BY_ID, CHAT_CONSTANTS } from '@pocketrealm/shared';
+import { CHAT_CONSTANTS, resolveAchievementTitleDisplay } from '@pocketrealm/shared';
 import type { ChatChannelType, ChatMessageEvent, ChatPresenceEvent, ChatPinnedMessageEvent } from '@pocketrealm/shared';
 import { checkRateLimit, saveMessage } from '../services/chatService';
 import { sanitizeUserText } from '../utils/sanitize';
@@ -115,16 +115,13 @@ export function registerChatHandlers(io: Server, socket: Socket): void {
       prisma.player.findUnique({ where: { id: playerId }, select: { activeTitle: true } }),
     ]);
 
-    const titleDef = player?.activeTitle ? ACHIEVEMENTS_BY_ID.get(player.activeTitle) : null;
-
     const event: ChatMessageEvent = {
       id: saved.id,
       channelType: channelType as ChatChannelType,
       channelId,
       playerId,
       username,
-      title: titleDef?.titleReward,
-      titleTier: titleDef?.tier,
+      ...resolveAchievementTitleDisplay(player?.activeTitle),
       message: trimmed,
       createdAt: saved.createdAt.toISOString(),
       role: role as ChatMessageEvent['role'],

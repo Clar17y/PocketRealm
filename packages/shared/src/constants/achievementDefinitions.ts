@@ -1,3 +1,4 @@
+import { PREMIUM_CONSTANTS } from './gameConstants';
 import type { AchievementDef } from '../types/achievement.types';
 
 // --- Combat achievements ---
@@ -891,6 +892,16 @@ const CASINO_ACHIEVEMENTS: AchievementDef[] = [
 
 // --- Shop achievements (unlocked by quest shop purchase, not stats) ---
 const SHOP_ACHIEVEMENTS: AchievementDef[] = [
+  {
+    id: PREMIUM_CONSTANTS.SUPPORT_TITLE_ACHIEVEMENT_ID,
+    category: 'shop',
+    title: 'Support Pocketrealm',
+    description: 'Support Pocketrealm and unlock the Champion title.',
+    titleReward: PREMIUM_CONSTANTS.SUPPORT_TITLE,
+    titleStyle: 'rainbow',
+    threshold: 0,
+    tier: 5,
+  },
   {
     id: 'shop_title_questmaster',
     category: 'shop',
