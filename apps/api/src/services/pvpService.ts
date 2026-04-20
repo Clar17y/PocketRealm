@@ -27,6 +27,10 @@ import { getAttackStyle, buildPvpCombatant } from './pvpCombatantBuilder';
 
 const REVENGE_WINDOW_DAYS = 7;
 
+function getPlayerRole(player: { account?: { role?: string | null }; role?: string | null }): string {
+  return player.account?.role ?? player.role ?? 'player';
+}
+
 export function computeBracketBounds(rating: number): { lower: number; upper: number } {
   const percentLower = Math.floor(rating * (1 - PVP_CONSTANTS.BRACKET_RANGE));
   const percentUpper = Math.ceil(rating * (1 + PVP_CONSTANTS.BRACKET_RANGE));
@@ -64,7 +68,12 @@ export async function getLadder(playerId: string) {
   const { lower: lowerBound, upper: upperBound } = computeBracketBounds(myRating.rating);
 
   // Admins bypass cooldowns for testing
-  const isAdmin = (await prisma.player.findUnique({ where: { id: playerId }, select: { role: true } }))?.role === 'admin';
+  const isAdmin = getPlayerRole((
+    await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { account: { select: { role: true } } },
+    })
+  ) ?? {}) === 'admin';
 
   const cooldowns = isAdmin ? [] : await prisma.pvpCooldown.findMany({
     where: { attackerId: playerId, expiresAt: { gt: new Date() } },
@@ -84,7 +93,14 @@ export async function getLadder(playerId: string) {
       player: { characterLevel: { gte: PVP_CONSTANTS.MIN_CHARACTER_LEVEL } },
     },
     include: {
-      player: { select: { username: true, characterLevel: true, role: true, activeTitle: true } },
+      player: {
+        select: {
+          username: true,
+          characterLevel: true,
+          activeTitle: true,
+          account: { select: { role: true } },
+        },
+      },
     },
     orderBy: { rating: 'desc' },
   });
@@ -96,7 +112,7 @@ export async function getLadder(playerId: string) {
       username: c.player.username,
       rating: c.rating,
       characterLevel: c.player.characterLevel,
-      isAdmin: c.player.role === 'admin',
+      isAdmin: getPlayerRole(c.player) === 'admin',
       ...resolveAchievementTitleDisplay(c.player.activeTitle),
     }));
 
@@ -319,8 +335,8 @@ export async function challenge(
     select: {
       characterLevel: true,
       attributes: true,
-      role: true,
       currentZone: { select: { id: true, zoneType: true } },
+      account: { select: { role: true } },
     },
   });
   if (!attacker) throw new AppError(404, 'Player not found', 'NOT_FOUND');
@@ -334,7 +350,8 @@ export async function challenge(
   }
 
   // Validation: cooldown (admins bypass for testing)
-  if (attacker.role !== 'admin') {
+  const attackerRole = getPlayerRole(attacker);
+  if (attackerRole !== 'admin') {
     const cooldown = await prisma.pvpCooldown.findUnique({
       where: { attackerId_defenderId: { attackerId, defenderId: targetId } },
     });
@@ -351,7 +368,7 @@ export async function challenge(
       attributes: true,
       username: true,
       isBot: true,
-      role: true,
+      account: { select: { role: true } },
     },
   });
   if (!target) throw new AppError(404, 'Target not found', 'NOT_FOUND');
@@ -405,7 +422,8 @@ export async function challenge(
   let defenderRatingChange = elo.deltaB;
 
   // Zero ELO changes when an admin is involved (friendly match)
-  if (attacker.role === 'admin' || target.role === 'admin') {
+  const targetRole = getPlayerRole(target);
+  if (attackerRole === 'admin' || targetRole === 'admin') {
     attackerRatingChange = 0;
     defenderRatingChange = 0;
   }
@@ -481,7 +499,7 @@ export async function challenge(
     });
 
     // Upsert cooldown (admins bypass for testing)
-    if (attacker.role !== 'admin') {
+    if (attackerRole !== 'admin') {
       const expiresAt = new Date(now.getTime() + PVP_CONSTANTS.COOLDOWN_HOURS * 60 * 60 * 1000);
       await tx.pvpCooldown.upsert({
         where: { attackerId_defenderId: { attackerId, defenderId: targetId } },

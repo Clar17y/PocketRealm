@@ -82,15 +82,17 @@ describe('admin router auth chain', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.player.update.mockResolvedValue({});
-    mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+    mockPrisma.account.findUnique.mockResolvedValue({ role: 'player' });
     mockPrisma.bossEncounter.count.mockResolvedValue(0);
     mockPrisma.guildExpedition.count.mockResolvedValue(0);
   });
 
   it('returns 403 for non-admin access to GET /scheduler-status before reaching the handler', async () => {
     const token = generateAccessToken({
+      accountId: 'account-1',
       playerId: 'player-1',
       username: 'user',
+      seasonId: null,
       role: 'player',
     });
 
@@ -105,8 +107,8 @@ describe('admin router auth chain', () => {
         code: 'FORBIDDEN',
       }),
     });
-    expect(mockPrisma.player.findUnique).toHaveBeenCalledWith({
-      where: { id: 'player-1' },
+    expect(mockPrisma.account.findUnique).toHaveBeenCalledWith({
+      where: { id: 'account-1' },
       select: { role: true },
     });
     expect(roundTimerRegistry.size).not.toHaveBeenCalled();

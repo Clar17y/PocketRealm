@@ -74,7 +74,8 @@ function mockRes() {
 }
 
 function setupSuccessfulRegisterState() {
-  mockPrisma.player.findFirst.mockResolvedValue(null);
+  mockPrisma.account.findUnique.mockResolvedValue(null);
+  mockPrisma.player.findUnique.mockResolvedValue(null);
   mockPrisma.zone.findFirst.mockResolvedValue({ id: 'starter-town' });
   mockPrisma.zoneConnection.findFirst.mockResolvedValue({
     toZone: { id: 'forest-edge' },
@@ -87,16 +88,23 @@ function setupSuccessfulRegisterState() {
   const txCalls: string[] = [];
   const txClient: any = new Proxy({}, {
     get(_target, prop) {
+      if (prop === 'account') return {
+        create: vi.fn().mockImplementation(() => {
+          txCalls.push('account.create');
+          return Promise.resolve({
+            id: 'account-1', email: 'rook@example.com', role: 'player',
+          });
+        }),
+        update: vi.fn().mockImplementation(() => {
+          txCalls.push('account.update');
+          return Promise.resolve({});
+        }),
+      };
       if (prop === 'player') return {
         create: vi.fn().mockImplementation(() => {
           txCalls.push('player.create');
           return Promise.resolve({
-            id: 'player-1',
-            username: 'Rook',
-            email: 'rook@example.com',
-            role: 'player',
-            isPremium: false,
-            premiumExpiresAt: null,
+            id: 'player-1', username: 'Rook', seasonId: null,
           });
         }),
       };
@@ -161,9 +169,11 @@ describe('POST /register', () => {
 
     // Verify key operations happened via tx, not top-level prisma
     expect(txCalls).toContain('player.create');
+    expect(txCalls).toContain('account.create');
     expect(txCalls).toContain('playerEquipment.findMany');
     expect(txCalls).toContain('item.create');
     expect(txCalls).toContain('playerEquipment.upsert');
+    expect(txCalls).toContain('account.update');
 
     // Verify the response
     expect(res.status).toHaveBeenCalledWith(201);
@@ -188,13 +198,13 @@ describe('POST /register', () => {
 
     expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
       where: {
-        playerId: 'player-1',
+        accountId: 'account-1',
         expiresAt: { lt: expect.any(Date) },
       },
     });
     expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
       data: {
-        playerId: 'player-1',
+        accountId: 'account-1',
         token: 'refresh-token',
         expiresAt: new Date('2026-03-10T12:00:00.000Z'),
       },
@@ -215,18 +225,20 @@ describe('POST /login', () => {
   });
 
   it('cleans up expired refresh tokens before storing a new login refresh token', async () => {
-    mockPrisma.player.findUnique.mockResolvedValue({
-      id: 'player-1',
-      username: 'Rook',
+    mockPrisma.account.findUnique.mockResolvedValue({
+      id: 'account-1',
       email: 'rook@example.com',
       role: 'player',
       passwordHash: 'stored-hash',
-      isBot: false,
       emailVerified: true,
-      isPremium: false,
-      premiumExpiresAt: null,
+      activePlayer: {
+        id: 'player-1',
+        username: 'Rook',
+        seasonId: null,
+        isBot: false,
+      },
     });
-    mockPrisma.player.update.mockResolvedValue({});
+    mockPrisma.account.update.mockResolvedValue({});
     (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
 
     const req = {
@@ -243,13 +255,13 @@ describe('POST /login', () => {
 
     expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
       where: {
-        playerId: 'player-1',
+        accountId: 'account-1',
         expiresAt: { lt: expect.any(Date) },
       },
     });
     expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
       data: {
-        playerId: 'player-1',
+        accountId: 'account-1',
         token: 'refresh-token',
         expiresAt: new Date('2026-03-10T12:00:00.000Z'),
       },
@@ -259,18 +271,20 @@ describe('POST /login', () => {
   });
 
   it('triggers world event catch-up after successful login', async () => {
-    mockPrisma.player.findUnique.mockResolvedValue({
-      id: 'player-1',
-      username: 'Rook',
+    mockPrisma.account.findUnique.mockResolvedValue({
+      id: 'account-1',
       email: 'rook@example.com',
       role: 'player',
       passwordHash: 'stored-hash',
-      isBot: false,
       emailVerified: true,
-      isPremium: false,
-      premiumExpiresAt: null,
+      activePlayer: {
+        id: 'player-1',
+        username: 'Rook',
+        seasonId: null,
+        isBot: false,
+      },
     });
-    mockPrisma.player.update.mockResolvedValue({});
+    mockPrisma.account.update.mockResolvedValue({});
     (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
 
     const req = {
@@ -291,16 +305,18 @@ describe('POST /login', () => {
   });
 
   it('does not trigger world event catch-up when login fails', async () => {
-    mockPrisma.player.findUnique.mockResolvedValue({
-      id: 'player-1',
-      username: 'Rook',
+    mockPrisma.account.findUnique.mockResolvedValue({
+      id: 'account-1',
       email: 'rook@example.com',
       role: 'player',
       passwordHash: 'stored-hash',
-      isBot: false,
       emailVerified: true,
-      isPremium: false,
-      premiumExpiresAt: null,
+      activePlayer: {
+        id: 'player-1',
+        username: 'Rook',
+        seasonId: null,
+        isBot: false,
+      },
     });
     (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
@@ -333,20 +349,27 @@ describe('POST /refresh', () => {
 
   it('extends refresh token rotation transaction with expired-token cleanup', async () => {
     (verifyRefreshToken as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      accountId: 'account-1',
       playerId: 'player-1',
       username: 'Rook',
+      seasonId: null,
       role: 'player',
     });
     mockPrisma.refreshToken.findUnique.mockResolvedValue({
       token: 'old-refresh-token',
-      playerId: 'player-1',
+      accountId: 'account-1',
       expiresAt: new Date(Date.now() + 60_000),
     });
-    mockPrisma.player.findUnique.mockResolvedValue({
-      id: 'player-1',
+    mockPrisma.account.findUnique.mockResolvedValue({
+      id: 'account-1',
       role: 'player',
+      activePlayer: {
+        id: 'player-1',
+        username: 'Rook',
+        seasonId: null,
+      },
     });
-    mockPrisma.player.update.mockResolvedValue({});
+    mockPrisma.account.update.mockResolvedValue({});
 
     const req = {
       body: {
@@ -364,13 +387,13 @@ describe('POST /refresh', () => {
     });
     expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
       where: {
-        playerId: 'player-1',
+        accountId: 'account-1',
         expiresAt: { lt: expect.any(Date) },
       },
     });
     expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
       data: {
-        playerId: 'player-1',
+        accountId: 'account-1',
         token: 'refresh-token',
         expiresAt: new Date('2026-03-10T12:00:00.000Z'),
       },
@@ -381,20 +404,27 @@ describe('POST /refresh', () => {
 
   it('triggers world event catch-up after a successful refresh', async () => {
     (verifyRefreshToken as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      accountId: 'account-1',
       playerId: 'player-1',
       username: 'Rook',
+      seasonId: null,
       role: 'player',
     });
     mockPrisma.refreshToken.findUnique.mockResolvedValue({
       token: 'old-refresh-token',
-      playerId: 'player-1',
+      accountId: 'account-1',
       expiresAt: new Date(Date.now() + 60_000),
     });
-    mockPrisma.player.findUnique.mockResolvedValue({
-      id: 'player-1',
+    mockPrisma.account.findUnique.mockResolvedValue({
+      id: 'account-1',
       role: 'player',
+      activePlayer: {
+        id: 'player-1',
+        username: 'Rook',
+        seasonId: null,
+      },
     });
-    mockPrisma.player.update.mockResolvedValue({});
+    mockPrisma.account.update.mockResolvedValue({});
 
     const req = {
       body: {

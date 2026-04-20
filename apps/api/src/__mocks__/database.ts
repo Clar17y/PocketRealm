@@ -29,6 +29,7 @@ function mockModel() {
 }
 
 export const prisma = {
+  account: mockModel(),
   player: mockModel(),
   turnBank: mockModel(),
   playerSkill: mockModel(),

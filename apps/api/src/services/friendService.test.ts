@@ -23,11 +23,32 @@ import { isBlocked } from './blockService';
 const PLAYER_ID = 'player-1';
 const TARGET_ID = 'player-2';
 const FRIENDSHIP_ID = 'friendship-1';
+const PLAYER_ACCOUNT_ID = 'account-1';
+const TARGET_ACCOUNT_ID = 'account-2';
 
 describe('friendService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(isBlocked).mockResolvedValue(false);
+    mockPrisma.player.findUnique.mockImplementation(({ where }: { where: { id: string } }) => {
+      if (where.id === PLAYER_ID) {
+        return Promise.resolve({
+          id: PLAYER_ID,
+          accountId: PLAYER_ACCOUNT_ID,
+          username: 'Me',
+          characterLevel: 5,
+        });
+      }
+      if (where.id === TARGET_ID) {
+        return Promise.resolve({
+          id: TARGET_ID,
+          accountId: TARGET_ACCOUNT_ID,
+          username: 'Alice',
+          characterLevel: 10,
+        });
+      }
+      return Promise.resolve(null);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -35,7 +56,6 @@ describe('friendService', () => {
   // ---------------------------------------------------------------------------
   describe('sendFriendRequest', () => {
     it('creates a pending friendship', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       mockPrisma.friendship.findFirst.mockResolvedValue(null);
       mockPrisma.friendship.count.mockResolvedValue(0);
       mockPrisma.friendship.create.mockResolvedValue({ id: FRIENDSHIP_ID });
@@ -44,7 +64,7 @@ describe('friendService', () => {
 
       expect(result).toEqual({ friendshipId: FRIENDSHIP_ID });
       expect(mockPrisma.friendship.create).toHaveBeenCalledWith({
-        data: { senderId: PLAYER_ID, receiverId: TARGET_ID, status: 'pending' },
+        data: { senderId: PLAYER_ACCOUNT_ID, receiverId: TARGET_ACCOUNT_ID, status: 'pending' },
         select: { id: true },
       });
     });
@@ -68,7 +88,6 @@ describe('friendService', () => {
     });
 
     it('throws BLOCKED when sender has blocked target', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       vi.mocked(isBlocked).mockResolvedValue(true);
 
       await expect(sendFriendRequest(PLAYER_ID, TARGET_ID)).rejects.toThrow(AppError);
@@ -79,7 +98,6 @@ describe('friendService', () => {
     });
 
     it('throws BLOCKED when target has blocked sender', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       // isBlocked(sender, target) = false, isBlocked(target, sender) = true
       // Need 4 values because we call sendFriendRequest twice (two assertions)
       vi.mocked(isBlocked)
@@ -94,7 +112,6 @@ describe('friendService', () => {
     });
 
     it('throws ALREADY_FRIENDS when friendship exists', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       mockPrisma.friendship.findFirst.mockResolvedValue({
         id: FRIENDSHIP_ID,
         status: 'accepted',
@@ -108,7 +125,6 @@ describe('friendService', () => {
     });
 
     it('throws ALREADY_PENDING when request is pending', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       mockPrisma.friendship.findFirst.mockResolvedValue({
         id: FRIENDSHIP_ID,
         status: 'pending',
@@ -122,7 +138,6 @@ describe('friendService', () => {
     });
 
     it('throws MAX_PENDING when too many outgoing requests', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       mockPrisma.friendship.findFirst.mockResolvedValue(null);
       // count always returns 20 — throws on pending check before reaching friend caps
       mockPrisma.friendship.count.mockResolvedValue(20);
@@ -135,7 +150,6 @@ describe('friendService', () => {
     });
 
     it('throws MAX_FRIENDS when sender at cap', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       mockPrisma.friendship.findFirst.mockResolvedValue(null);
       // Two invocations: each calls count(pending=0, senderFriends=50)
       mockPrisma.friendship.count
@@ -150,7 +164,6 @@ describe('friendService', () => {
     });
 
     it('throws TARGET_MAX_FRIENDS when target at cap', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       mockPrisma.friendship.findFirst.mockResolvedValue(null);
       // Two invocations: each calls count(pending=0, senderFriends=0, targetFriends=50)
       mockPrisma.friendship.count
@@ -172,7 +185,7 @@ describe('friendService', () => {
     it('updates friendship to accepted', async () => {
       mockPrisma.friendship.findFirst.mockResolvedValue({
         id: FRIENDSHIP_ID,
-        senderId: TARGET_ID,
+        senderId: TARGET_ACCOUNT_ID,
       });
       mockPrisma.friendship.count.mockResolvedValue(0);
       mockPrisma.friendship.update.mockResolvedValue({});
@@ -198,7 +211,7 @@ describe('friendService', () => {
     it('throws MAX_FRIENDS when receiver at cap', async () => {
       mockPrisma.friendship.findFirst.mockResolvedValue({
         id: FRIENDSHIP_ID,
-        senderId: TARGET_ID,
+        senderId: TARGET_ACCOUNT_ID,
       });
       // Always return 50 — throws on first count check (receiver friends)
       mockPrisma.friendship.count.mockResolvedValue(50);
@@ -213,7 +226,7 @@ describe('friendService', () => {
     it('throws TARGET_MAX_FRIENDS when sender at cap', async () => {
       mockPrisma.friendship.findFirst.mockResolvedValue({
         id: FRIENDSHIP_ID,
-        senderId: TARGET_ID,
+        senderId: TARGET_ACCOUNT_ID,
       });
       // Two invocations: each calls count(receiverFriends=0, senderFriends=50)
       mockPrisma.friendship.count
@@ -242,7 +255,7 @@ describe('friendService', () => {
         where: {
           id: FRIENDSHIP_ID,
           status: 'pending',
-          OR: [{ senderId: PLAYER_ID }, { receiverId: PLAYER_ID }],
+          OR: [{ senderId: PLAYER_ACCOUNT_ID }, { receiverId: PLAYER_ACCOUNT_ID }],
         },
         select: { id: true },
       });
@@ -262,7 +275,7 @@ describe('friendService', () => {
         where: {
           id: FRIENDSHIP_ID,
           status: 'pending',
-          OR: [{ senderId: TARGET_ID }, { receiverId: TARGET_ID }],
+          OR: [{ senderId: TARGET_ACCOUNT_ID }, { receiverId: TARGET_ACCOUNT_ID }],
         },
         select: { id: true },
       });
@@ -317,21 +330,21 @@ describe('friendService', () => {
       mockPrisma.friendship.findMany.mockResolvedValue([
         {
           id: 'f1',
-          senderId: PLAYER_ID,
-          receiverId: 'player-3',
+          senderId: PLAYER_ACCOUNT_ID,
+          receiverId: 'account-3',
           status: 'accepted',
           acceptedAt: now,
-          sender: { id: PLAYER_ID, username: 'Me', characterLevel: 5 },
-          receiver: { id: 'player-3', username: 'Alice', characterLevel: 10 },
+          sender: { activePlayer: { id: PLAYER_ID, username: 'Me', characterLevel: 5 } },
+          receiver: { activePlayer: { id: 'player-3', username: 'Alice', characterLevel: 10 } },
         },
         {
           id: 'f2',
-          senderId: 'player-4',
-          receiverId: PLAYER_ID,
+          senderId: 'account-4',
+          receiverId: PLAYER_ACCOUNT_ID,
           status: 'accepted',
           acceptedAt: now,
-          sender: { id: 'player-4', username: 'Bob', characterLevel: 7 },
-          receiver: { id: PLAYER_ID, username: 'Me', characterLevel: 5 },
+          sender: { activePlayer: { id: 'player-4', username: 'Bob', characterLevel: 7 } },
+          receiver: { activePlayer: { id: PLAYER_ID, username: 'Me', characterLevel: 5 } },
         },
       ]);
 
@@ -374,11 +387,11 @@ describe('friendService', () => {
       mockPrisma.friendship.findMany.mockResolvedValue([
         {
           id: 'f1',
-          senderId: TARGET_ID,
-          receiverId: PLAYER_ID,
+          senderId: TARGET_ACCOUNT_ID,
+          receiverId: PLAYER_ACCOUNT_ID,
           status: 'pending',
           createdAt: now,
-          sender: { id: TARGET_ID, username: 'Alice', characterLevel: 10 },
+          sender: { activePlayer: { id: TARGET_ID, username: 'Alice', characterLevel: 10 } },
         },
       ]);
 
@@ -405,11 +418,11 @@ describe('friendService', () => {
       mockPrisma.friendship.findMany.mockResolvedValue([
         {
           id: 'f1',
-          senderId: PLAYER_ID,
-          receiverId: TARGET_ID,
+          senderId: PLAYER_ACCOUNT_ID,
+          receiverId: TARGET_ACCOUNT_ID,
           status: 'pending',
           createdAt: now,
-          receiver: { id: TARGET_ID, username: 'Bob', characterLevel: 3 },
+          receiver: { activePlayer: { id: TARGET_ID, username: 'Bob', characterLevel: 3 } },
         },
       ]);
 
@@ -434,11 +447,11 @@ describe('friendService', () => {
     it('returns friend profile with equipment slots', async () => {
       mockPrisma.friendship.findFirst.mockResolvedValue({
         id: FRIENDSHIP_ID,
-        senderId: PLAYER_ID,
-        receiverId: TARGET_ID,
+        senderId: PLAYER_ACCOUNT_ID,
+        receiverId: TARGET_ACCOUNT_ID,
         status: 'accepted',
-        sender: { id: PLAYER_ID, username: 'Me', characterLevel: 5 },
-        receiver: { id: TARGET_ID, username: 'Alice', characterLevel: 10 },
+        sender: { activePlayer: { id: PLAYER_ID, username: 'Me', characterLevel: 5 } },
+        receiver: { activePlayer: { id: TARGET_ID, username: 'Alice', characterLevel: 10 } },
       });
 
       mockPrisma.playerEquipment.findMany.mockResolvedValue([

@@ -144,8 +144,19 @@ function setupChallengeMocks(overrides?: {
   const isBot = overrides?.isBot ?? false;
 
   mockPrisma.player.findUnique
-    .mockResolvedValueOnce({ characterLevel: aLevel, attributes: {}, role: aRole, currentZone: { id: 'z1', zoneType: 'town' } })
-    .mockResolvedValueOnce({ characterLevel: tLevel, attributes: {}, username: 'Target', isBot, role: tRole });
+    .mockResolvedValueOnce({
+      characterLevel: aLevel,
+      attributes: {},
+      currentZone: { id: 'z1', zoneType: 'town' },
+      account: { role: aRole },
+    })
+    .mockResolvedValueOnce({
+      characterLevel: tLevel,
+      attributes: {},
+      username: 'Target',
+      isBot,
+      account: { role: tRole },
+    });
   mockPrisma.pvpRating.upsert
     .mockResolvedValueOnce({ playerId: 'p1', rating: aRating, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: aRating })
     .mockResolvedValueOnce({ playerId: 'p2', rating: dRating, wins: 0, losses: 0, draws: 0, winStreak: 0, bestWinStreak: 0, bestRating: dRating });
@@ -197,12 +208,12 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 5, losses: 3, draws: 1, winStreak: 2, bestRating: 1050,
       });
-      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.player.findUnique.mockResolvedValue({ account: { role: 'player' } });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
       mockPrisma.pvpRating.findMany.mockResolvedValue([
         {
           playerId: 'p2', rating: 950,
-          player: { username: 'Rival', characterLevel: 15, role: 'player', activeTitle: null },
+          player: { username: 'Rival', characterLevel: 15, account: { role: 'player' }, activeTitle: null },
         },
       ]);
 
@@ -218,16 +229,16 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
-      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.player.findUnique.mockResolvedValue({ account: { role: 'player' } });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([{ defenderId: 'p2' }]);
       mockPrisma.pvpRating.findMany.mockResolvedValue([
         {
           playerId: 'p2', rating: 950,
-          player: { username: 'CooldownGuy', characterLevel: 12, role: 'player', activeTitle: null },
+          player: { username: 'CooldownGuy', characterLevel: 12, account: { role: 'player' }, activeTitle: null },
         },
         {
           playerId: 'p3', rating: 1020,
-          player: { username: 'Available', characterLevel: 14, role: 'player', activeTitle: null },
+          player: { username: 'Available', characterLevel: 14, account: { role: 'player' }, activeTitle: null },
         },
       ]);
 
@@ -241,11 +252,11 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'admin1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
-      mockPrisma.player.findUnique.mockResolvedValue({ role: 'admin' });
+      mockPrisma.player.findUnique.mockResolvedValue({ account: { role: 'admin' } });
       mockPrisma.pvpRating.findMany.mockResolvedValue([
         {
           playerId: 'p2', rating: 950,
-          player: { username: 'Target', characterLevel: 12, role: 'player', activeTitle: null },
+          player: { username: 'Target', characterLevel: 12, account: { role: 'player' }, activeTitle: null },
         },
       ]);
 
@@ -260,13 +271,13 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
-      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.player.findUnique.mockResolvedValue({ account: { role: 'player' } });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
       mockPrisma.pvpRating.findMany.mockResolvedValue([
         {
           playerId: 'p2', rating: 1000,
           // Player has no active title
-          player: { username: 'NoTitle', characterLevel: 10, role: 'player', activeTitle: null },
+          player: { username: 'NoTitle', characterLevel: 10, account: { role: 'player' }, activeTitle: null },
         },
       ]);
 
@@ -305,12 +316,12 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
-      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.player.findUnique.mockResolvedValue({ account: { role: 'player' } });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
       mockPrisma.pvpRating.findMany.mockResolvedValue([
         {
           playerId: 'admin2', rating: 1000,
-          player: { username: 'AdminGuy', characterLevel: 10, role: 'admin', activeTitle: null },
+          player: { username: 'AdminGuy', characterLevel: 10, account: { role: 'admin' }, activeTitle: null },
         },
       ]);
 
@@ -323,7 +334,7 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
-      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.player.findUnique.mockResolvedValue({ account: { role: 'player' } });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
       mockPrisma.pvpRating.findMany.mockResolvedValue([]);
 
@@ -543,7 +554,7 @@ describe('pvpService', () => {
 
     it('throws if attacker is not in a town', async () => {
       mockPrisma.player.findUnique.mockResolvedValue({
-        characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'wild' },
+        characterLevel: 10, attributes: {}, account: { role: 'player' }, currentZone: { id: 'z1', zoneType: 'wild' },
       });
 
       await expect(challenge('p1', 'Attacker', 'p2')).rejects.toThrow('Must be in a town to challenge');
@@ -559,7 +570,7 @@ describe('pvpService', () => {
       mockPrisma.player.findUnique.mockResolvedValue({
         characterLevel: PVP_CONSTANTS.MIN_CHARACTER_LEVEL - 1,
         attributes: {},
-        role: 'player',
+        account: { role: 'player' },
         currentZone: { id: 'z1', zoneType: 'town' },
       });
 
@@ -570,7 +581,7 @@ describe('pvpService', () => {
 
     it('throws if on cooldown (non-admin)', async () => {
       mockPrisma.player.findUnique.mockResolvedValue({
-        characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' },
+        characterLevel: 10, attributes: {}, account: { role: 'player' }, currentZone: { id: 'z1', zoneType: 'town' },
       });
       mockPrisma.pvpCooldown.findUnique.mockResolvedValue({
         expiresAt: new Date(Date.now() + 3_600_000), // 1 hour in the future
@@ -590,7 +601,7 @@ describe('pvpService', () => {
 
     it('throws if target not found', async () => {
       mockPrisma.player.findUnique
-        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, account: { role: 'player' }, currentZone: { id: 'z1', zoneType: 'town' } })
         .mockResolvedValueOnce(null);
       mockPrisma.pvpCooldown.findUnique.mockResolvedValue(null);
 
@@ -599,8 +610,8 @@ describe('pvpService', () => {
 
     it('throws if target below minimum level', async () => {
       mockPrisma.player.findUnique
-        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' } })
-        .mockResolvedValueOnce({ characterLevel: PVP_CONSTANTS.MIN_CHARACTER_LEVEL - 1, attributes: {}, username: 'LowLevel', isBot: false, role: 'player' });
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, account: { role: 'player' }, currentZone: { id: 'z1', zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: PVP_CONSTANTS.MIN_CHARACTER_LEVEL - 1, attributes: {}, username: 'LowLevel', isBot: false, account: { role: 'player' } });
       mockPrisma.pvpCooldown.findUnique.mockResolvedValue(null);
 
       await expect(challenge('p1', 'Attacker', 'p2')).rejects.toThrow('Target below minimum level');
@@ -608,8 +619,8 @@ describe('pvpService', () => {
 
     it('throws if target is outside rating bracket', async () => {
       mockPrisma.player.findUnique
-        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' } })
-        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, username: 'FarAway', isBot: false, role: 'player' });
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, account: { role: 'player' }, currentZone: { id: 'z1', zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, username: 'FarAway', isBot: false, account: { role: 'player' } });
       mockPrisma.pvpCooldown.findUnique.mockResolvedValue(null);
       // Attacker at 1000, defender at 2000 — outside 25% bracket
       mockPrisma.pvpRating.upsert
@@ -874,8 +885,8 @@ describe('pvpService', () => {
 
     it('expired cooldown does not block challenge', async () => {
       mockPrisma.player.findUnique
-        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, role: 'player', currentZone: { id: 'z1', zoneType: 'town' } })
-        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, username: 'Target', isBot: false, role: 'player' });
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, account: { role: 'player' }, currentZone: { id: 'z1', zoneType: 'town' } })
+        .mockResolvedValueOnce({ characterLevel: 10, attributes: {}, username: 'Target', isBot: false, account: { role: 'player' } });
       mockPrisma.pvpCooldown.findUnique.mockResolvedValue({
         expiresAt: new Date(Date.now() - 1000), // expired
       });
@@ -1316,17 +1327,17 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
-      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.player.findUnique.mockResolvedValue({ account: { role: 'player' } });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
 
       // Return mix of in-bracket and out-of-bracket opponents
       const bounds = computeBracketBounds(1000);
       mockPrisma.pvpRating.findMany.mockResolvedValue([
         // In initial bracket
-        { playerId: 'p2', rating: bounds.lower + 10, player: { username: 'Near', characterLevel: 12, role: 'player', activeTitle: null } },
+        { playerId: 'p2', rating: bounds.lower + 10, player: { username: 'Near', characterLevel: 12, account: { role: 'player' }, activeTitle: null } },
         // Outside initial bracket but within widened range
         ...Array.from({ length: 10 }, (_, i) => ({
-          playerId: `p${i + 3}`, rating: bounds.upper + 50 + i, player: { username: `Far${i}`, characterLevel: 12, role: 'player', activeTitle: null },
+          playerId: `p${i + 3}`, rating: bounds.upper + 50 + i, player: { username: `Far${i}`, characterLevel: 12, account: { role: 'player' }, activeTitle: null },
         })),
       ]);
 
@@ -1342,11 +1353,11 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
-      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.player.findUnique.mockResolvedValue({ account: { role: 'player' } });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
       mockPrisma.pvpRating.findMany.mockResolvedValue(
         Array.from({ length: 12 }, (_, i) => ({
-          playerId: `p${i + 2}`, rating: 950 + i, player: { username: `Player${i}`, characterLevel: 12, role: 'player', activeTitle: null },
+          playerId: `p${i + 2}`, rating: 950 + i, player: { username: `Player${i}`, characterLevel: 12, account: { role: 'player' }, activeTitle: null },
         })),
       );
 
@@ -1360,7 +1371,7 @@ describe('pvpService', () => {
       mockPrisma.pvpRating.upsert.mockResolvedValue({
         playerId: 'p1', rating: 1000, wins: 0, losses: 0, draws: 0, winStreak: 0, bestRating: 1000,
       });
-      mockPrisma.player.findUnique.mockResolvedValue({ role: 'player' });
+      mockPrisma.player.findUnique.mockResolvedValue({ account: { role: 'player' } });
       mockPrisma.pvpCooldown.findMany.mockResolvedValue([]);
       mockPrisma.pvpRating.findMany.mockResolvedValue([]);
 

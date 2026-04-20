@@ -22,6 +22,7 @@ describe('toInventoryItemDTO', () => {
     isSoulbound: false,
     template: {
       id: 'tpl-1',
+      seasonId: null,
       name: 'Iron Sword',
       itemType: 'weapon',
       weightClass: 'medium' as const,

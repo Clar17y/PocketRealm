@@ -51,11 +51,11 @@ describe('createEmailVerificationToken', () => {
     };
   });
 
-  it('deletes existing tokens for the player before creating a new one', async () => {
-    const { rawToken } = await createEmailVerificationToken('player-1');
+  it('deletes existing tokens for the account before creating a new one', async () => {
+    const { rawToken } = await createEmailVerificationToken('account-1');
 
     expect(mockPrisma.emailVerificationToken.deleteMany).toHaveBeenNthCalledWith(1, {
-      where: { playerId: 'player-1' },
+      where: { accountId: 'account-1' },
     });
     expect(mockPrisma.emailVerificationToken.deleteMany).toHaveBeenNthCalledWith(2, {
       where: { expiresAt: { lt: expect.any(Date) } },
@@ -76,10 +76,10 @@ describe('createPasswordResetToken', () => {
   });
 
   it('deletes existing, expired, and used reset tokens before creating a new one', async () => {
-    const { rawToken } = await createPasswordResetToken('player-1');
+    const { rawToken } = await createPasswordResetToken('account-1');
 
     expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenNthCalledWith(1, {
-      where: { playerId: 'player-1' },
+      where: { accountId: 'account-1' },
     });
     expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenNthCalledWith(2, {
       where: {
@@ -107,12 +107,12 @@ describe('verifyEmailToken', () => {
     const future = new Date(Date.now() + 60_000);
     mockPrisma.emailVerificationToken.findUnique.mockResolvedValue({
       id: 'tok-1',
-      playerId: 'player-1',
+      accountId: 'account-1',
       expiresAt: future,
     });
 
     const result = await verifyEmailToken('some-raw-token');
-    expect(result).toEqual({ id: 'tok-1', playerId: 'player-1', expiresAt: future });
+    expect(result).toEqual({ id: 'tok-1', accountId: 'account-1', expiresAt: future });
   });
 
   it('returns null when token not found', async () => {
@@ -125,7 +125,7 @@ describe('verifyEmailToken', () => {
     const past = new Date(Date.now() - 60_000);
     mockPrisma.emailVerificationToken.findUnique.mockResolvedValue({
       id: 'tok-1',
-      playerId: 'player-1',
+      accountId: 'account-1',
       expiresAt: past,
     });
 
@@ -145,7 +145,7 @@ describe('verifyPasswordResetToken', () => {
   it('returns null when token is already used', async () => {
     mockPrisma.passwordResetToken.findUnique.mockResolvedValue({
       id: 'tok-1',
-      playerId: 'player-1',
+      accountId: 'account-1',
       expiresAt: new Date(Date.now() + 60_000),
       usedAt: new Date(),
     });

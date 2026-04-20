@@ -17,8 +17,10 @@ interface LeaderboardPlayerSummary {
   username: string;
   characterLevel: number;
   isBot: boolean;
-  role: string;
   activeTitle: string | null;
+  account: {
+    role: string;
+  };
 }
 
 // Row shapes for each paginated query (must include `id` for cursor pagination)
@@ -37,8 +39,10 @@ interface PlayerRow {
   characterLevel: number;
   characterXp: bigint;
   isBot: boolean;
-  role: string;
   activeTitle: string | null;
+  account: {
+    role: string;
+  };
 }
 interface PlayerSkillRow {
   id: string;
@@ -60,6 +64,10 @@ interface GuildRow {
   level: number;
   renown: number;
   _count: { members: number };
+}
+
+function getRole(player: { account?: { role?: string | null }; role?: string | null }): string | null {
+  return player.account?.role ?? player.role ?? null;
 }
 
 /**
@@ -357,7 +365,15 @@ async function refreshPvp() {
         wins: true,
         bestRating: true,
         winStreak: true,
-        player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } },
+        player: {
+          select: {
+            username: true,
+            characterLevel: true,
+            isBot: true,
+            activeTitle: true,
+            account: { select: { role: true } },
+          },
+        },
       },
     },
   );
@@ -378,7 +394,7 @@ async function refreshPvp() {
         username: r.player.username,
         characterLevel: r.player.characterLevel,
         isBot: r.player.isBot,
-        isAdmin: r.player.role === 'admin',
+        isAdmin: getRole(r.player) === 'admin',
         ...resolveAchievementTitleDisplay(r.player.activeTitle),
       })),
     );
@@ -389,7 +405,15 @@ async function refreshProgression() {
   const players = await paginatedFindMany<PlayerRow>(
     (args) => prisma.player.findMany(args as Parameters<typeof prisma.player.findMany>[0]) as unknown as Promise<PlayerRow[]>,
     {
-      select: { id: true, username: true, characterLevel: true, characterXp: true, isBot: true, role: true, activeTitle: true },
+      select: {
+        id: true,
+        username: true,
+        characterLevel: true,
+        characterXp: true,
+        isBot: true,
+        activeTitle: true,
+        account: { select: { role: true } },
+      },
     },
   );
 
@@ -401,7 +425,7 @@ async function refreshProgression() {
       username: p.username,
       characterLevel: p.characterLevel,
       isBot: p.isBot,
-      isAdmin: p.role === 'admin',
+      isAdmin: getRole(p) === 'admin',
       ...resolveAchievementTitleDisplay(p.activeTitle),
     })),
   );
@@ -414,7 +438,7 @@ async function refreshProgression() {
       username: p.username,
       characterLevel: p.characterLevel,
       isBot: p.isBot,
-      isAdmin: p.role === 'admin',
+      isAdmin: getRole(p) === 'admin',
       ...resolveAchievementTitleDisplay(p.activeTitle),
     })),
   );
@@ -429,7 +453,15 @@ async function refreshSkills() {
         playerId: true,
         skillType: true,
         level: true,
-        player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } },
+        player: {
+          select: {
+            username: true,
+            characterLevel: true,
+            isBot: true,
+            activeTitle: true,
+            account: { select: { role: true } },
+          },
+        },
       },
     },
   );
@@ -445,7 +477,7 @@ async function refreshSkills() {
         username: s.player.username,
         characterLevel: s.player.characterLevel,
         isBot: s.player.isBot,
-        isAdmin: s.player.role === 'admin',
+        isAdmin: getRole(s.player) === 'admin',
         ...resolveAchievementTitleDisplay(s.player.activeTitle),
       })),
     );
@@ -463,7 +495,7 @@ async function refreshSkills() {
         username: s.player.username,
         characterLevel: s.player.characterLevel,
         isBot: s.player.isBot,
-        isAdmin: s.player.role === 'admin',
+        isAdmin: getRole(s.player) === 'admin',
         ...resolveAchievementTitleDisplay(s.player.activeTitle),
       });
     }
@@ -485,7 +517,19 @@ async function refreshCombat() {
   let batch;
   do {
     batch = await prisma.playerBestiary.findMany({
-      select: { playerId: true, kills: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
+      select: {
+        playerId: true,
+        kills: true,
+        player: {
+          select: {
+            username: true,
+            characterLevel: true,
+            isBot: true,
+            activeTitle: true,
+            account: { select: { role: true } },
+          },
+        },
+      },
       take: batchSize,
       skip: offset,
     });
@@ -499,7 +543,7 @@ async function refreshCombat() {
           username: b.player.username,
           characterLevel: b.player.characterLevel,
           isBot: b.player.isBot,
-          isAdmin: b.player.role === 'admin',
+          isAdmin: getRole(b.player) === 'admin',
           ...resolveAchievementTitleDisplay(b.player.activeTitle),
         });
       }
@@ -517,7 +561,20 @@ async function refreshCombat() {
     const bossRaw = await paginatedFindMany<BossParticipantRow>(
       (args) => prisma.bossParticipant.findMany(args as Parameters<typeof prisma.bossParticipant.findMany>[0]) as unknown as Promise<BossParticipantRow[]>,
       {
-        select: { id: true, playerId: true, totalDamage: true, player: { select: { username: true, characterLevel: true, isBot: true, role: true, activeTitle: true } } },
+        select: {
+          id: true,
+          playerId: true,
+          totalDamage: true,
+          player: {
+            select: {
+              username: true,
+              characterLevel: true,
+              isBot: true,
+              activeTitle: true,
+              account: { select: { role: true } },
+            },
+          },
+        },
       },
     );
 
@@ -532,7 +589,7 @@ async function refreshCombat() {
           username: b.player.username,
           characterLevel: b.player.characterLevel,
           isBot: b.player.isBot,
-          isAdmin: b.player.role === 'admin',
+          isAdmin: getRole(b.player) === 'admin',
           ...resolveAchievementTitleDisplay(b.player.activeTitle),
         });
       }
@@ -611,7 +668,14 @@ async function refreshCasino(): Promise<void> {
   const playerIds = rows.map((r) => r.playerId);
   const players = await prisma.player.findMany({
     where: { id: { in: playerIds } },
-    select: { id: true, username: true, characterLevel: true, isBot: true, role: true, activeTitle: true },
+    select: {
+      id: true,
+      username: true,
+      characterLevel: true,
+      isBot: true,
+      activeTitle: true,
+      account: { select: { role: true } },
+    },
   });
   const playerMap = new Map(players.map((p) => [p.id, p]));
 
@@ -624,7 +688,7 @@ async function refreshCasino(): Promise<void> {
         username: p?.username ?? 'Unknown',
         characterLevel: p?.characterLevel ?? 1,
         isBot: p?.isBot ?? false,
-        isAdmin: p?.role === 'admin',
+        isAdmin: p ? getRole(p) === 'admin' : false,
         ...resolveAchievementTitleDisplay(p?.activeTitle),
       };
     });

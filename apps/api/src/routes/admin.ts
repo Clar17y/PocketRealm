@@ -794,16 +794,28 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
 
     // Wrap each bot creation in a transaction so partial records aren't orphaned
     const botId = await prisma.$transaction(async (tx) => {
+      const account = await tx.account.create({
+        data: {
+          email: `${botName}@bot.local`,
+          passwordHash: 'bot-no-login',
+          role: 'player',
+        },
+      });
+
       // Create bot player with attributes matching the tier
       const bot = await tx.player.create({
         data: {
+          accountId: account.id,
           username: botName,
-          email: `${botName}@bot.local`,
-          passwordHash: 'bot-no-login',
           isBot: true,
           characterLevel: botLevel,
           attributes: botAttributes,
         },
+      });
+
+      await tx.account.update({
+        where: { id: account.id },
+        data: { activePlayerId: bot.id },
       });
 
       // Create all supporting records in parallel

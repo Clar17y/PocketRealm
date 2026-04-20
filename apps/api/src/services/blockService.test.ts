@@ -6,10 +6,21 @@ import { AppError } from '../middleware/errorHandler';
 
 const PLAYER_ID = 'player-1';
 const TARGET_ID = 'player-2';
+const PLAYER_ACCOUNT_ID = 'account-1';
+const TARGET_ACCOUNT_ID = 'account-2';
 
 describe('blockService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.player.findUnique.mockImplementation(({ where }: { where: { id: string } }) => {
+      if (where.id === PLAYER_ID) {
+        return Promise.resolve({ id: PLAYER_ID, accountId: PLAYER_ACCOUNT_ID });
+      }
+      if (where.id === TARGET_ID) {
+        return Promise.resolve({ id: TARGET_ID, accountId: TARGET_ACCOUNT_ID });
+      }
+      return Promise.resolve(null);
+    });
   });
 
   describe('isBlocked', () => {
@@ -20,7 +31,7 @@ describe('blockService', () => {
 
       expect(result).toBe(true);
       expect(mockPrisma.playerBlock.findUnique).toHaveBeenCalledWith({
-        where: { blockerId_blockedId: { blockerId: PLAYER_ID, blockedId: TARGET_ID } },
+        where: { blockerId_blockedId: { blockerId: PLAYER_ACCOUNT_ID, blockedId: TARGET_ACCOUNT_ID } },
         select: { id: true },
       });
     });
@@ -54,7 +65,6 @@ describe('blockService', () => {
     });
 
     it('is idempotent when block already exists (upsert)', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       mockPrisma.playerBlock.upsert.mockResolvedValue({});
       mockPrisma.friendship.deleteMany.mockResolvedValue({ count: 0 });
 
@@ -65,7 +75,6 @@ describe('blockService', () => {
     });
 
     it('creates block, removes friendship, and deletes pending requests in transaction', async () => {
-      mockPrisma.player.findUnique.mockResolvedValue({ id: TARGET_ID });
       mockPrisma.playerBlock.upsert.mockResolvedValue({});
       mockPrisma.friendship.deleteMany.mockResolvedValue({ count: 1 });
 
@@ -73,16 +82,16 @@ describe('blockService', () => {
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
       expect(mockPrisma.playerBlock.upsert).toHaveBeenCalledWith({
-        where: { blockerId_blockedId: { blockerId: PLAYER_ID, blockedId: TARGET_ID } },
-        create: { blockerId: PLAYER_ID, blockedId: TARGET_ID },
+        where: { blockerId_blockedId: { blockerId: PLAYER_ACCOUNT_ID, blockedId: TARGET_ACCOUNT_ID } },
+        create: { blockerId: PLAYER_ACCOUNT_ID, blockedId: TARGET_ACCOUNT_ID },
         update: {},
       });
       // Removes all friendships and pending requests in a single call
       expect(mockPrisma.friendship.deleteMany).toHaveBeenCalledWith({
         where: {
           OR: [
-            { senderId: PLAYER_ID, receiverId: TARGET_ID },
-            { senderId: TARGET_ID, receiverId: PLAYER_ID },
+            { senderId: PLAYER_ACCOUNT_ID, receiverId: TARGET_ACCOUNT_ID },
+            { senderId: TARGET_ACCOUNT_ID, receiverId: PLAYER_ACCOUNT_ID },
           ],
         },
       });
@@ -98,7 +107,7 @@ describe('blockService', () => {
       await unblockPlayer(PLAYER_ID, 'block-1');
 
       expect(mockPrisma.playerBlock.findFirst).toHaveBeenCalledWith({
-        where: { id: 'block-1', blockerId: PLAYER_ID },
+        where: { id: 'block-1', blockerId: PLAYER_ACCOUNT_ID },
         select: { id: true },
       });
       expect(mockPrisma.playerBlock.delete).toHaveBeenCalledWith({
@@ -123,17 +132,17 @@ describe('blockService', () => {
       mockPrisma.playerBlock.findMany.mockResolvedValue([
         {
           id: 'block-1',
-          blockerId: PLAYER_ID,
-          blockedId: 'player-3',
+          blockerId: PLAYER_ACCOUNT_ID,
+          blockedId: 'account-3',
           createdAt: now,
-          blocked: { username: 'EvilDragon' },
+          blocked: { activePlayer: { id: 'player-3', username: 'EvilDragon' } },
         },
         {
           id: 'block-2',
-          blockerId: PLAYER_ID,
-          blockedId: 'player-4',
+          blockerId: PLAYER_ACCOUNT_ID,
+          blockedId: 'account-4',
           createdAt: now,
-          blocked: { username: 'Troll99' },
+          blocked: { activePlayer: { id: 'player-4', username: 'Troll99' } },
         },
       ]);
 
@@ -155,8 +164,19 @@ describe('blockService', () => {
       ]);
 
       expect(mockPrisma.playerBlock.findMany).toHaveBeenCalledWith({
-        where: { blockerId: PLAYER_ID },
-        include: { blocked: { select: { username: true } } },
+        where: { blockerId: PLAYER_ACCOUNT_ID },
+        include: {
+          blocked: {
+            select: {
+              activePlayer: {
+                select: {
+                  id: true,
+                  username: true,
+                },
+              },
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
       });
     });

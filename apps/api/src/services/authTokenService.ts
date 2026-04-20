@@ -12,18 +12,18 @@ export function hashToken(rawToken: string): string {
   return createHash('sha256').update(rawToken).digest('hex');
 }
 
-/** Create a verification token for a player. Deletes any existing token first. */
-export async function createEmailVerificationToken(playerId: string): Promise<{ rawToken: string }> {
+/** Create a verification token for an account. Deletes any existing token first. */
+export async function createEmailVerificationToken(accountId: string): Promise<{ rawToken: string }> {
   const rawToken = generateToken();
   const tokenHash = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + AUTH_CONSTANTS.VERIFICATION_TOKEN_TTL_HOURS * 60 * 60 * 1000);
   const now = new Date();
 
   await prisma.$transaction([
-    prisma.emailVerificationToken.deleteMany({ where: { playerId } }),
+    prisma.emailVerificationToken.deleteMany({ where: { accountId } }),
     prisma.emailVerificationToken.deleteMany({ where: { expiresAt: { lt: now } } }),
     prisma.emailVerificationToken.create({
-      data: { playerId, tokenHash, expiresAt },
+      data: { accountId, tokenHash, expiresAt },
     }),
   ]);
 
@@ -44,15 +44,15 @@ export async function verifyEmailToken(rawToken: string) {
   return record;
 }
 
-/** Create a password reset token for a player. Deletes any existing token first. */
-export async function createPasswordResetToken(playerId: string): Promise<{ rawToken: string }> {
+/** Create a password reset token for an account. Deletes any existing token first. */
+export async function createPasswordResetToken(accountId: string): Promise<{ rawToken: string }> {
   const rawToken = generateToken();
   const tokenHash = hashToken(rawToken);
   const expiresAt = new Date(Date.now() + AUTH_CONSTANTS.RESET_TOKEN_TTL_HOURS * 60 * 60 * 1000);
   const now = new Date();
 
   await prisma.$transaction([
-    prisma.passwordResetToken.deleteMany({ where: { playerId } }),
+    prisma.passwordResetToken.deleteMany({ where: { accountId } }),
     prisma.passwordResetToken.deleteMany({
       where: {
         OR: [
@@ -62,7 +62,7 @@ export async function createPasswordResetToken(playerId: string): Promise<{ rawT
       },
     }),
     prisma.passwordResetToken.create({
-      data: { playerId, tokenHash, expiresAt },
+      data: { accountId, tokenHash, expiresAt },
     }),
   ]);
 

@@ -55,8 +55,10 @@ function touchPlayerLastActive(playerId: string): void {
 }
 
 export interface AuthPayload {
+  accountId: string;
   playerId: string;
   username: string;
+  seasonId: string | null;
   role: string;
 }
 
@@ -137,15 +139,23 @@ export function verifyRefreshToken(token: string): AuthPayload {
     throw new AppError(401, 'Invalid or expired token', 'INVALID_TOKEN');
   }
 
+  const accountId = (decoded as { accountId?: unknown }).accountId;
   const playerId = (decoded as { playerId?: unknown }).playerId;
   const username = (decoded as { username?: unknown }).username;
+  const seasonId = (decoded as { seasonId?: unknown }).seasonId;
   const role = (decoded as { role?: unknown }).role;
 
-  if (typeof playerId !== 'string' || typeof username !== 'string') {
+  if (typeof accountId !== 'string' || typeof playerId !== 'string' || typeof username !== 'string') {
     throw new AppError(401, 'Invalid or expired token', 'INVALID_TOKEN');
   }
 
-  return { playerId, username, role: typeof role === 'string' ? role : 'player' };
+  return {
+    accountId,
+    playerId,
+    username,
+    seasonId: typeof seasonId === 'string' ? seasonId : null,
+    role: typeof role === 'string' ? role : 'player',
+  };
 }
 
 export function refreshTokenExpiresAt(nowMs = Date.now()): Date {
