@@ -17,6 +17,8 @@ import { createActivityLog } from '../services/activityLogService';
 import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { grantPremiumDays, listPremiumPurchases } from '../services/premiumService';
 import { refreshSeasonCache } from '../services/seasonCacheService';
+import { runSeasonMerge } from '../services/seasonMergeService';
+import { evaluateSeasonRewards } from '../services/seasonRewardService';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import {
@@ -156,6 +158,35 @@ router.post('/seasons/:id/end', asyncHandler(async (req, res) => {
     name: season.name,
   });
   res.json({ message: 'Season ended. Run merge when ready.' });
+}));
+
+router.post('/seasons/:id/evaluate-rewards', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const season = await prisma.season.findUniqueOrThrow({
+    where: { id },
+    select: { id: true, status: true },
+  });
+  if (season.status !== 'ended') {
+    throw new AppError(400, 'Season must be ended before evaluating rewards', 'SEASON_NOT_ENDED');
+  }
+
+  const result = await evaluateSeasonRewards(id);
+  await adminAudit(req.player!.playerId, 'evaluate_season_rewards', {
+    seasonId: id,
+    hallOfFameEntries: result.entries,
+  });
+  res.json({ message: 'Rewards evaluated', hallOfFameEntries: result.entries });
+}));
+
+router.post('/seasons/:id/merge', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const result = await runSeasonMerge(id);
+  await adminAudit(req.player!.playerId, 'merge_season', {
+    seasonId: id,
+    merged: result.merged,
+    errors: result.errors,
+  });
+  res.json({ message: 'Merge complete', merged: result.merged, errors: result.errors });
 }));
 
 // ---------------------------------------------------------------------------

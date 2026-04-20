@@ -1,7 +1,25 @@
 export { fetchApi, clearStoredTokens, getJwtExpMs } from './core';
 export type { ApiResponse, TaxInfo } from './core';
 
-export { register, login, refreshToken, verifyEmail, resendVerification, forgotPassword, resetPassword, changeEmail, changePassword } from './auth';
+export {
+  register,
+  login,
+  refreshToken,
+  verifyEmail,
+  resendVerification,
+  forgotPassword,
+  resetPassword,
+  changeEmail,
+  changePassword,
+  getCharacters,
+  switchPlayer,
+  joinSeason,
+  getSeasonArchives,
+} from './auth';
+export type { CharacterSummary, SeasonArchiveSummary } from './auth';
+
+export { getActiveSeason, getHallOfFame } from './seasons';
+export type { ActiveSeasonResponse, HallOfFameEntryResponse } from './seasons';
 
 export {
   getPlayer,

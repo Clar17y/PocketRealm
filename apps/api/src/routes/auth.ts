@@ -481,6 +481,53 @@ authRouter.get('/characters', authenticate, asyncHandler(async (req, res) => {
   });
 }));
 
+authRouter.get('/season-archives', authenticate, asyncHandler(async (req, res) => {
+  const archives = await prisma.seasonArchive.findMany({
+    where: { accountId: req.player!.accountId },
+    select: {
+      id: true,
+      username: true,
+      characterLevel: true,
+      characterXp: true,
+      attributes: true,
+      skills: true,
+      stats: true,
+      combatTemplates: true,
+      leaderboardRanks: true,
+      rewardsEarned: true,
+      mergeLog: true,
+      createdAt: true,
+      season: {
+        select: {
+          id: true,
+          name: true,
+          startsAt: true,
+          endsAt: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  res.json({
+    archives: archives.map((archive) => ({
+      id: archive.id,
+      username: archive.username,
+      characterLevel: archive.characterLevel,
+      characterXp: Number(archive.characterXp),
+      attributes: archive.attributes,
+      skills: archive.skills,
+      stats: archive.stats,
+      combatTemplates: archive.combatTemplates,
+      leaderboardRanks: archive.leaderboardRanks,
+      rewardsEarned: archive.rewardsEarned,
+      mergeLog: archive.mergeLog,
+      createdAt: archive.createdAt,
+      season: archive.season,
+    })),
+  });
+}));
+
 authRouter.post('/switch-player', authenticate, asyncHandler(async (req, res) => {
   const { playerId } = switchPlayerSchema.parse(req.body);
 

@@ -164,6 +164,86 @@ describe('GET /characters', () => {
   });
 });
 
+describe('GET /season-archives', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns season archive summaries for the authenticated account', async () => {
+    mockPrisma.seasonArchive.findMany.mockResolvedValue([
+      {
+        id: 'archive-1',
+        username: 'RookS1',
+        characterLevel: 23,
+        characterXp: 2300n,
+        attributes: { vitality: 4 },
+        skills: [{ skillType: 'melee', level: 12, xp: 1400 }],
+        stats: { totalCrafts: 12 },
+        combatTemplates: [{ name: 'Boss' }],
+        leaderboardRanks: { pvp_rating: 3 },
+        rewardsEarned: { pvp_rating: { rank: 3 } },
+        mergeLog: { gold: { amount: 1000 } },
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        season: {
+          id: 'season-1',
+          name: 'Season 1',
+          startsAt: new Date('2026-05-01T00:00:00.000Z'),
+          endsAt: new Date('2026-06-01T00:00:00.000Z'),
+        },
+      },
+    ]);
+
+    const req = {
+      player: {
+        accountId: 'account-1',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('get', '/season-archives');
+    await handler(req, res, next);
+
+    expect(mockPrisma.seasonArchive.findMany).toHaveBeenCalledWith({
+      where: { accountId: 'account-1' },
+      select: {
+        id: true,
+        username: true,
+        characterLevel: true,
+        characterXp: true,
+        attributes: true,
+        skills: true,
+        stats: true,
+        combatTemplates: true,
+        leaderboardRanks: true,
+        rewardsEarned: true,
+        mergeLog: true,
+        createdAt: true,
+        season: {
+          select: {
+            id: true,
+            name: true,
+            startsAt: true,
+            endsAt: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(res.json).toHaveBeenCalledWith({
+      archives: [
+        expect.objectContaining({
+          id: 'archive-1',
+          username: 'RookS1',
+          characterXp: 2300,
+          season: expect.objectContaining({ id: 'season-1', name: 'Season 1' }),
+        }),
+      ],
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /switch-player', () => {
   beforeEach(() => {
     vi.clearAllMocks();

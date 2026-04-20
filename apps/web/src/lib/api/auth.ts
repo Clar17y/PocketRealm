@@ -1,5 +1,36 @@
 import { fetchApi } from './core';
 
+export interface CharacterSummary {
+  id: string;
+  username: string;
+  characterLevel: number;
+  seasonId: string | null;
+  seasonName: string | null;
+  seasonStatus: string | null;
+  seasonEndsAt: string | Date | null;
+}
+
+export interface SeasonArchiveSummary {
+  id: string;
+  username: string;
+  characterLevel: number;
+  characterXp: number;
+  attributes: Record<string, unknown>;
+  skills: unknown[];
+  stats: Record<string, unknown>;
+  combatTemplates: unknown[];
+  leaderboardRanks: Record<string, unknown>;
+  rewardsEarned: Record<string, unknown>;
+  mergeLog: Record<string, unknown>;
+  createdAt: string | Date;
+  season: {
+    id: string;
+    name: string;
+    startsAt: string | Date;
+    endsAt: string | Date;
+  };
+}
+
 export async function register(username: string, email: string, password: string) {
   return fetchApi<{
     player: {
@@ -84,4 +115,35 @@ export async function changePassword(currentPassword: string, newPassword: strin
     method: 'POST',
     body: JSON.stringify({ currentPassword, newPassword }),
   });
+}
+
+export async function getCharacters() {
+  return fetchApi<{ characters: CharacterSummary[]; activePlayerId: string }>('/api/v1/auth/characters');
+}
+
+export async function switchPlayer(playerId: string) {
+  return fetchApi<{
+    player: { id: string; username: string };
+    accessToken: string;
+    refreshToken: string;
+  }>('/api/v1/auth/switch-player', {
+    method: 'POST',
+    body: JSON.stringify({ playerId }),
+  });
+}
+
+export async function joinSeason(username: string) {
+  return fetchApi<{
+    player: { id: string; username: string };
+    seasonId: string;
+    accessToken: string;
+    refreshToken: string;
+  }>('/api/v1/auth/join-season', {
+    method: 'POST',
+    body: JSON.stringify({ username }),
+  });
+}
+
+export async function getSeasonArchives() {
+  return fetchApi<{ archives: SeasonArchiveSummary[] }>('/api/v1/auth/season-archives');
 }

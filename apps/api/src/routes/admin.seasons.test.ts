@@ -66,10 +66,18 @@ vi.mock('../services/stateUpdateHelpers', () => ({
 
 const mocks = vi.hoisted(() => ({
   refreshSeasonCache: vi.fn().mockResolvedValue(undefined),
+  evaluateSeasonRewards: vi.fn(),
+  runSeasonMerge: vi.fn(),
 }));
 
 vi.mock('../services/seasonCacheService', () => ({
   refreshSeasonCache: mocks.refreshSeasonCache,
+}));
+vi.mock('../services/seasonRewardService', () => ({
+  evaluateSeasonRewards: mocks.evaluateSeasonRewards,
+}));
+vi.mock('../services/seasonMergeService', () => ({
+  runSeasonMerge: mocks.runSeasonMerge,
 }));
 
 import { mockPrisma } from '../__test__/setup';
@@ -176,5 +184,43 @@ describe('admin season endpoints', () => {
       data: { status: 'cancelled' },
     });
     expect(mocks.refreshSeasonCache).toHaveBeenCalledTimes(1);
+  });
+
+  it('evaluates rewards only for ended seasons', async () => {
+    mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
+      id: 'season-1',
+      status: 'ended',
+    });
+    mocks.evaluateSeasonRewards.mockResolvedValue({ entries: 7 });
+
+    const res = await request(buildApp())
+      .post('/api/v1/admin/seasons/season-1/evaluate-rewards')
+      .set('Authorization', `Bearer ${adminToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.evaluateSeasonRewards).toHaveBeenCalledWith('season-1');
+    expect(res.body).toEqual({
+      message: 'Rewards evaluated',
+      hallOfFameEntries: 7,
+    });
+  });
+
+  it('runs the merge pipeline from the admin endpoint', async () => {
+    mocks.runSeasonMerge.mockResolvedValue({
+      merged: 3,
+      errors: ['player-4 failed'],
+    });
+
+    const res = await request(buildApp())
+      .post('/api/v1/admin/seasons/season-1/merge')
+      .set('Authorization', `Bearer ${adminToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.runSeasonMerge).toHaveBeenCalledWith('season-1');
+    expect(res.body).toEqual({
+      message: 'Merge complete',
+      merged: 3,
+      errors: ['player-4 failed'],
+    });
   });
 });

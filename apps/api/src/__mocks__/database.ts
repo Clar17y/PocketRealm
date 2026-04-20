@@ -30,6 +30,10 @@ function mockModel() {
 
 export const prisma = {
   account: mockModel(),
+  season: mockModel(),
+  seasonArchive: mockModel(),
+  hallOfFameEntry: mockModel(),
+  seasonRewardTier: mockModel(),
   player: mockModel(),
   turnBank: mockModel(),
   playerSkill: mockModel(),
