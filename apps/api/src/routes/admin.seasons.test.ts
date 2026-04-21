@@ -88,7 +88,6 @@ import { mockPrisma } from '../__test__/setup';
 import { errorHandler } from '../middleware/errorHandler';
 import { generateAccessToken } from '../middleware/auth';
 import { adminRouter } from './admin';
-import { activateSeason } from '../services/seasonLifecycleService';
 
 function buildApp() {
   const app = express();
@@ -266,9 +265,15 @@ describe('admin season endpoints', () => {
   it('rejects activation when the season is not bootstrapped', async () => {
     mockPrisma.season.findFirst.mockResolvedValue(null);
 
-    await expect(activateSeason('season-1')).rejects.toMatchObject({
-      statusCode: 400,
-      code: 'SEASON_NOT_BOOTSTRAPPED',
+    const res = await request(buildApp())
+      .post('/api/v1/admin/seasons/season-1/activate')
+      .set('Authorization', `Bearer ${adminToken()}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({
+      error: {
+        code: 'SEASON_NOT_BOOTSTRAPPED',
+      },
     });
     expect(mockPrisma.season.update).not.toHaveBeenCalled();
     expect(mocks.refreshSeasonCache).not.toHaveBeenCalled();
