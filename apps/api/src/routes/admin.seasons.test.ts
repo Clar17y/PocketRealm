@@ -108,7 +108,10 @@ function adminToken() {
   });
 }
 
-function stubBootstrappedSeason(status: 'upcoming' | 'active' | 'ended' | 'archived' = 'upcoming') {
+function stubBootstrappedSeason(
+  status: 'upcoming' | 'active' | 'ended' | 'archived' = 'upcoming',
+  includeOptionalContent = true,
+) {
   mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
     id: 'season-1',
     name: 'Season 1',
@@ -118,11 +121,11 @@ function stubBootstrappedSeason(status: 'upcoming' | 'active' | 'ended' | 'archi
   mockPrisma.itemTemplate.findFirst.mockResolvedValue({ id: 'item-season-1' });
   mockPrisma.mobTemplate.findFirst.mockResolvedValue({ id: 'mob-season-1' });
   mockPrisma.craftingRecipe.findFirst.mockResolvedValue({ id: 'recipe-season-1' });
-  mockPrisma.mobFamilyMember.findFirst.mockResolvedValue({ mobFamilyId: 'family-season-1' });
-  mockPrisma.zoneMobFamily.findFirst.mockResolvedValue({ zoneId: 'zone-season-1' });
-  mockPrisma.dropTable.findFirst.mockResolvedValue({ id: 'drop-season-1' });
-  mockPrisma.chestDropTable.findFirst.mockResolvedValue({ id: 'chest-season-1' });
-  mockPrisma.resourceNode.findFirst.mockResolvedValue({ id: 'node-season-1' });
+  mockPrisma.mobFamilyMember.findFirst.mockResolvedValue(includeOptionalContent ? { mobFamilyId: 'family-season-1' } : null);
+  mockPrisma.zoneMobFamily.findFirst.mockResolvedValue(includeOptionalContent ? { zoneId: 'zone-season-1' } : null);
+  mockPrisma.dropTable.findFirst.mockResolvedValue(includeOptionalContent ? { id: 'drop-season-1' } : null);
+  mockPrisma.chestDropTable.findFirst.mockResolvedValue(includeOptionalContent ? { id: 'chest-season-1' } : null);
+  mockPrisma.resourceNode.findFirst.mockResolvedValue(includeOptionalContent ? { id: 'node-season-1' } : null);
 }
 
 describe('admin season endpoints', () => {
@@ -203,7 +206,7 @@ describe('admin season endpoints', () => {
     });
   });
 
-  it('returns seasons with computed isBootstrapped', async () => {
+  it('returns seasons with computed isBootstrapped when optional season content is absent', async () => {
     mockPrisma.season.findMany.mockResolvedValue([
       {
         id: 'season-1',
@@ -240,31 +243,6 @@ describe('admin season endpoints', () => {
     mockPrisma.craftingRecipe.findFirst.mockImplementation(async ({ where }: { where?: { seasonId?: string } }) => (
       where?.seasonId === 'season-1'
         ? { id: 'recipe-season-1' }
-        : null
-    ));
-    mockPrisma.mobFamilyMember.findFirst.mockImplementation(async ({ where }: { where?: { mobTemplate?: { seasonId?: string } } }) => (
-      where?.mobTemplate?.seasonId === 'season-1'
-        ? { mobFamilyId: 'family-season-1' }
-        : null
-    ));
-    mockPrisma.zoneMobFamily.findFirst.mockImplementation(async ({ where }: { where?: { zone?: { seasonId?: string } } }) => (
-      where?.zone?.seasonId === 'season-1'
-        ? { zoneId: 'zone-season-1' }
-        : null
-    ));
-    mockPrisma.dropTable.findFirst.mockImplementation(async ({ where }: { where?: { mobTemplate?: { seasonId?: string }, itemTemplate?: { seasonId?: string } } }) => (
-      where?.mobTemplate?.seasonId === 'season-1' && where?.itemTemplate?.seasonId === 'season-1'
-        ? { id: 'drop-season-1' }
-        : null
-    ));
-    mockPrisma.chestDropTable.findFirst.mockImplementation(async ({ where }: { where?: { itemTemplate?: { seasonId?: string } } }) => (
-      where?.itemTemplate?.seasonId === 'season-1'
-        ? { id: 'chest-season-1' }
-        : null
-    ));
-    mockPrisma.resourceNode.findFirst.mockImplementation(async ({ where }: { where?: { zone?: { seasonId?: string } } }) => (
-      where?.zone?.seasonId === 'season-1'
-        ? { id: 'node-season-1' }
         : null
     ));
 
@@ -310,7 +288,7 @@ describe('admin season endpoints', () => {
   });
 
   it('activates a bootstrapped season through the admin endpoint', async () => {
-    stubBootstrappedSeason();
+    stubBootstrappedSeason('upcoming', false);
     mockPrisma.season.findFirst.mockResolvedValue(null);
     mockPrisma.season.update.mockResolvedValue({
       id: 'season-1',
