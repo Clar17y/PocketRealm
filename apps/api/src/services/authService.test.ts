@@ -53,6 +53,33 @@ describe('verifyPlayerEmail', () => {
     });
   });
 
+  it('extends an existing premium window instead of truncating it when granting the trial', async () => {
+    const existingExpiry = new Date('2026-05-01T00:00:00.000Z');
+
+    vi.mocked(prisma.account.findUnique).mockResolvedValue({
+      premiumTrialClaimed: false,
+      premiumExpiresAt: existingExpiry,
+    } as never);
+
+    const result = await verifyPlayerEmail({
+      id: 'token-1',
+      accountId: 'account-1',
+    });
+
+    expect(result).toBe(true);
+    expect(prisma.account.update).toHaveBeenCalledWith({
+      where: { id: 'account-1' },
+      data: {
+        emailVerified: true,
+        premiumTrialClaimed: true,
+        isPremium: true,
+        premiumExpiresAt: new Date(
+          existingExpiry.getTime() + AUTH_CONSTANTS.CHAMPION_TRIAL_DAYS * 24 * 60 * 60 * 1000,
+        ),
+      },
+    });
+  });
+
   it('verifies the email without granting another trial when it was already claimed', async () => {
     vi.mocked(prisma.account.findUnique).mockResolvedValue({
       premiumTrialClaimed: true,

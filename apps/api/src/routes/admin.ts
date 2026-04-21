@@ -16,9 +16,10 @@ import { teleportPlayer } from '../services/zoneService';
 import { createActivityLog } from '../services/activityLogService';
 import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { grantPremiumDays, listPremiumPurchases } from '../services/premiumService';
-import { refreshSeasonCache } from '../services/seasonCacheService';
 import { runSeasonMerge } from '../services/seasonMergeService';
 import { evaluateSeasonRewards } from '../services/seasonRewardService';
+import { activateSeason, endSeason } from '../services/seasonLifecycleService';
+import { SEASON_STATUSES } from '../services/season.constants';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import {
@@ -101,20 +102,7 @@ router.post('/seasons', asyncHandler(async (req, res) => {
 router.post('/seasons/:id/activate', asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const activeSeason = await prisma.season.findFirst({
-    where: { status: 'active' },
-    select: { id: true },
-  });
-  if (activeSeason && activeSeason.id !== id) {
-    throw new AppError(409, 'Another season is already active', 'ACTIVE_SEASON_EXISTS');
-  }
-
-  const season = await prisma.season.update({
-    where: { id },
-    data: { status: 'active' },
-  });
-
-  await refreshSeasonCache();
+  const season = await activateSeason(id);
   await adminAudit(req.player!.playerId, 'activate_season', {
     seasonId: season.id,
     name: season.name,
@@ -125,34 +113,7 @@ router.post('/seasons/:id/activate', asyncHandler(async (req, res) => {
 router.post('/seasons/:id/end', asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const season = await prisma.season.findUniqueOrThrow({
-    where: { id },
-  });
-  if (season.status !== 'active') {
-    throw new AppError(400, 'Season is not active', 'SEASON_NOT_ACTIVE');
-  }
-
-  await prisma.season.update({
-    where: { id },
-    data: { status: 'ended' },
-  });
-
-  await refreshSeasonCache();
-
-  const seasonalZoneIds = await prisma.zone.findMany({
-    where: { seasonId: id },
-    select: { id: true },
-  });
-  if (seasonalZoneIds.length > 0) {
-    await prisma.worldEvent.updateMany({
-      where: {
-        status: 'active',
-        zoneId: { in: seasonalZoneIds.map((zone) => zone.id) },
-      },
-      data: { status: 'cancelled' },
-    });
-  }
-
+  const season = await endSeason(id);
   await adminAudit(req.player!.playerId, 'end_season', {
     seasonId: id,
     name: season.name,
@@ -166,7 +127,7 @@ router.post('/seasons/:id/evaluate-rewards', asyncHandler(async (req, res) => {
     where: { id },
     select: { id: true, status: true },
   });
-  if (season.status !== 'ended') {
+  if (season.status !== SEASON_STATUSES.ENDED) {
     throw new AppError(400, 'Season must be ended before evaluating rewards', 'SEASON_NOT_ENDED');
   }
 

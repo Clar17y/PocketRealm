@@ -11,11 +11,18 @@ export async function verifyPlayerEmail(tokenRecord: { id: string; accountId: st
   return prisma.$transaction(async (tx) => {
     const account = await tx.account.findUnique({
       where: { id: tokenRecord.accountId },
-      select: { premiumTrialClaimed: true },
+      select: {
+        premiumTrialClaimed: true,
+        premiumExpiresAt: true,
+      },
     });
 
     const shouldGrantTrial = account && !account.premiumTrialClaimed;
-    const expiresAt = new Date(Date.now() + AUTH_CONSTANTS.CHAMPION_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    const trialMs = AUTH_CONSTANTS.CHAMPION_TRIAL_DAYS * 24 * 60 * 60 * 1000;
+    const trialBaseMs = account?.premiumExpiresAt instanceof Date && account.premiumExpiresAt.getTime() > Date.now()
+      ? account.premiumExpiresAt.getTime()
+      : Date.now();
+    const expiresAt = new Date(trialBaseMs + trialMs);
 
     await tx.account.update({
       where: { id: tokenRecord.accountId },

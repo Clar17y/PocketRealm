@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   refreshSeasonCache: vi.fn(),
   getCategories: vi.fn(() => ({ groups: [] })),
   characterLevelFromXp: vi.fn((xp: number) => Math.floor(xp / 100)),
+  levelFromXp: vi.fn((xp: number) => Math.floor(xp / 100)),
 }));
 
 vi.mock('../redis', () => ({
@@ -30,6 +31,7 @@ vi.mock('./leaderboardService', () => ({
 
 vi.mock('@pocketrealm/game-engine', () => ({
   characterLevelFromXp: mocks.characterLevelFromXp,
+  levelFromXp: mocks.levelFromXp,
 }));
 
 import { prisma } from '@pocketrealm/database';
@@ -43,14 +45,17 @@ describe('seasonMergeService', () => {
     mockPrisma.$transaction.mockImplementation(async (fn: (tx: any) => Promise<unknown>) => fn(mockPrisma));
   });
 
-  it('merges transferable data and grants seasonal skill xp to the permanent player', async () => {
+  it('merges transferable data and folds seasonal skill xp into the permanent player inside the transaction', async () => {
     mockPrisma.player.findUniqueOrThrow
       .mockResolvedValueOnce({ gold: 25, characterXp: 200n })
       .mockResolvedValueOnce({ characterXp: 500n, characterLevel: 5, attributePoints: 2 });
     mockPrisma.item.findMany.mockResolvedValue([{ id: 'item-1' }]);
     mockPrisma.item.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.item.deleteMany.mockResolvedValue({ count: 2 });
-    mockPrisma.playerSkill.findMany.mockResolvedValue([{ skillType: 'woodcutting', xp: 120n }]);
+    mockPrisma.playerSkill.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ skillType: 'woodcutting', xp: 120n }]);
+    mockPrisma.playerSkill.upsert.mockResolvedValue({});
     mockPrisma.playerAchievement.findMany.mockResolvedValue([]);
     mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
     mockPrisma.playerBestiaryPrefix.findMany.mockResolvedValue([]);
@@ -86,7 +91,24 @@ describe('seasonMergeService', () => {
         attributePoints: { increment: 2 },
       },
     });
-    expect(mocks.grantSkillXp).toHaveBeenCalledWith('perm-1', 'woodcutting', 120);
+    expect(mockPrisma.playerSkill.upsert).toHaveBeenCalledWith({
+      where: {
+        playerId_skillType: {
+          playerId: 'perm-1',
+          skillType: 'woodcutting',
+        },
+      },
+      update: {
+        xp: 120n,
+        level: 1,
+      },
+      create: {
+        playerId: 'perm-1',
+        skillType: 'woodcutting',
+        xp: 120n,
+        level: 1,
+      },
+    });
   });
 
   it('archives merged seasons and refreshes the cache after cleanup', async () => {
@@ -143,5 +165,51 @@ describe('seasonMergeService', () => {
       data: { status: 'archived' },
     });
     expect(mocks.refreshSeasonCache).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the season ended when any player merge fails', async () => {
+    mockPrisma.season.findUniqueOrThrow.mockResolvedValue({ id: 'season-1', status: 'ended' });
+    mockPrisma.player.findMany
+      .mockResolvedValueOnce([
+        { id: 'seasonal-1', accountId: 'account-1' },
+        { id: 'seasonal-2', accountId: 'account-2' },
+      ])
+      .mockResolvedValueOnce([]);
+    mockPrisma.player.findFirst
+      .mockResolvedValueOnce({ id: 'perm-1' })
+      .mockResolvedValueOnce(null);
+    mockPrisma.player.findUniqueOrThrow.mockResolvedValue({
+      id: 'seasonal-1',
+      username: 'Rook',
+      characterLevel: 12,
+      characterXp: 1200n,
+      attributes: { vitality: 3 },
+      skills: [],
+      stats: null,
+    });
+    mockPrisma.combatTemplate.findMany.mockResolvedValue([]);
+    mockPrisma.seasonArchive.upsert.mockResolvedValue({});
+    mockPrisma.item.findMany.mockResolvedValue([]);
+    mockPrisma.item.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.playerSkill.findMany.mockResolvedValue([]);
+    mockPrisma.playerAchievement.findMany.mockResolvedValue([]);
+    mockPrisma.playerBestiary.findMany.mockResolvedValue([]);
+    mockPrisma.playerBestiaryPrefix.findMany.mockResolvedValue([]);
+    mockPrisma.playerRecipe.findMany.mockResolvedValue([]);
+    mockPrisma.playerZoneDiscovery.findMany.mockResolvedValue([]);
+    mockPrisma.seasonArchive.update.mockResolvedValue({});
+    mockPrisma.account.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.player.delete.mockResolvedValue({});
+    mockPrisma.guild.deleteMany.mockResolvedValue({ count: 0 });
+
+    const result = await runSeasonMerge('season-1');
+
+    expect(result).toEqual({
+      merged: 1,
+      errors: ['Failed to merge player seasonal-2: No permanent player for account account-2'],
+    });
+    expect(mockPrisma.season.update).not.toHaveBeenCalled();
+    expect(mockPrisma.guild.deleteMany).not.toHaveBeenCalled();
+    expect(mocks.refreshSeasonCache).not.toHaveBeenCalled();
   });
 });

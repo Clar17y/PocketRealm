@@ -41,6 +41,32 @@ export function useAuth() {
     throw new Error('Failed to refresh account.');
   }, []);
 
+  const isTerminalAuthError = useCallback((code?: string) => (
+    code === 'INVALID_TOKEN' || code === 'MISSING_TOKEN'
+  ), []);
+
+  const finishTransientFailure = useCallback(() => {
+    setState((current) => ({
+      ...current,
+      isLoading: false,
+    }));
+  }, []);
+
+  const loadPlayerAfterRefresh = useCallback(async () => {
+    const retryResult = await getPlayer();
+    if (retryResult.data) {
+      setAuthenticatedState(retryResult.data.player);
+      return retryResult.data.player;
+    }
+
+    if (isTerminalAuthError(retryResult.error?.code)) {
+      failRefresh();
+    }
+
+    finishTransientFailure();
+    throw new Error('Failed to refresh account.');
+  }, [failRefresh, finishTransientFailure, isTerminalAuthError, setAuthenticatedState]);
+
   const refreshPlayer = useCallback(async () => {
     const { data, error } = await getPlayer();
     if (data) {
@@ -48,12 +74,13 @@ export function useAuth() {
       return data.player;
     }
 
-    if (error?.code === 'INVALID_TOKEN' || error?.code === 'MISSING_TOKEN') {
+    if (isTerminalAuthError(error?.code)) {
       failRefresh();
     }
 
+    finishTransientFailure();
     throw new Error('Failed to refresh account.');
-  }, [failRefresh, setAuthenticatedState]);
+  }, [failRefresh, finishTransientFailure, isTerminalAuthError, setAuthenticatedState]);
 
   const checkAuth = useCallback(async () => {
     const token = localStorage.getItem('accessToken');
@@ -64,12 +91,16 @@ export function useAuth() {
         if (refreshResult.data) {
           localStorage.setItem('accessToken', refreshResult.data.accessToken);
           localStorage.setItem('refreshToken', refreshResult.data.refreshToken);
-          const retryResult = await getPlayer();
-          if (retryResult.data) {
-            setAuthenticatedState(retryResult.data.player);
-            return;
-          }
+          await loadPlayerAfterRefresh();
+          return;
         }
+
+        if (isTerminalAuthError(refreshResult.error?.code)) {
+          failRefresh();
+        }
+
+        finishTransientFailure();
+        throw new Error('Failed to refresh account.');
       }
 
       failRefresh();
@@ -88,19 +119,22 @@ export function useAuth() {
       if (refreshResult.data) {
         localStorage.setItem('accessToken', refreshResult.data.accessToken);
         localStorage.setItem('refreshToken', refreshResult.data.refreshToken);
-        const retryResult = await getPlayer();
-        if (retryResult.data) {
-          setAuthenticatedState(retryResult.data.player);
-          return;
-        }
+        await loadPlayerAfterRefresh();
+        return;
+      }
+
+      if (isTerminalAuthError(refreshResult.error?.code)) {
+        failRefresh();
       }
     }
 
-    // Failed
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    failRefresh();
-  }, [failRefresh, setAuthenticatedState]);
+    if (isTerminalAuthError(error?.code)) {
+      failRefresh();
+    }
+
+    finishTransientFailure();
+    throw new Error('Failed to refresh account.');
+  }, [failRefresh, finishTransientFailure, isTerminalAuthError, loadPlayerAfterRefresh, setAuthenticatedState]);
 
   useEffect(() => {
     void checkAuth().catch(() => undefined);

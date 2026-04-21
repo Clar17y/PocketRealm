@@ -5,22 +5,11 @@ import type { TitleStyleVariant } from '@pocketrealm/shared';
 import { redis } from '../redis';
 import { AppError } from '../middleware/errorHandler';
 import { logger } from '../logger';
+import { leaderboardKey, leaderboardMetaKey } from './leaderboardKeys';
 
 const LAST_REFRESH_KEY = 'leaderboard:last_refresh';
 const LOCK_KEY = 'leaderboard:refresh_lock';
 const RELEASE_LOCK_LUA = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
-
-function leaderboardRealmId(seasonId?: string | null): string {
-  return seasonId ?? 'permanent';
-}
-
-function leaderboardKey(category: string, seasonId?: string | null): string {
-  return `leaderboard:${leaderboardRealmId(seasonId)}:${category}`;
-}
-
-function leaderboardMetaKey(category: string, seasonId?: string | null): string {
-  return `leaderboard:meta:${leaderboardRealmId(seasonId)}:${category}`;
-}
 
 function playerSeasonWhere(seasonId?: string | null): { seasonId: string | null } {
   return { seasonId: seasonId ?? null };

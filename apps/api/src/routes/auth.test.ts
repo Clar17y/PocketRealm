@@ -209,7 +209,7 @@ describe('POST /register', () => {
         expiresAt: new Date('2026-03-10T12:00:00.000Z'),
       },
     });
-    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
     expect(next).not.toHaveBeenCalled();
   });
 });
@@ -237,6 +237,7 @@ describe('POST /login', () => {
         seasonId: null,
         isBot: false,
       },
+      players: [],
     });
     mockPrisma.account.update.mockResolvedValue({});
     (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
@@ -266,7 +267,7 @@ describe('POST /login', () => {
         expiresAt: new Date('2026-03-10T12:00:00.000Z'),
       },
     });
-    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -283,6 +284,7 @@ describe('POST /login', () => {
         seasonId: null,
         isBot: false,
       },
+      players: [],
     });
     mockPrisma.account.update.mockResolvedValue({});
     (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
@@ -304,6 +306,53 @@ describe('POST /login', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('repairs missing activePlayerId by falling back to the first account character after password validation', async () => {
+    mockPrisma.account.findUnique.mockResolvedValue({
+      id: 'account-1',
+      email: 'rook@example.com',
+      role: 'player',
+      passwordHash: 'stored-hash',
+      emailVerified: true,
+      activePlayer: null,
+      players: [
+        {
+          id: 'player-fallback',
+          username: 'Rook',
+          seasonId: null,
+          isBot: false,
+        },
+      ],
+      isPremium: false,
+      premiumExpiresAt: null,
+    });
+    mockPrisma.account.update.mockResolvedValue({});
+    (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+    const req = {
+      body: {
+        email: 'rook@example.com',
+        password: 'supersecure',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/login');
+    await handler(req, res, next);
+
+    expect(mockPrisma.account.update).toHaveBeenCalledWith({
+      where: { id: 'account-1' },
+      data: {
+        lastActiveAt: expect.any(Date),
+        activePlayerId: 'player-fallback',
+      },
+    });
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      player: expect.objectContaining({ id: 'player-fallback', username: 'Rook' }),
+    }));
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('does not trigger world event catch-up when login fails', async () => {
     mockPrisma.account.findUnique.mockResolvedValue({
       id: 'account-1',
@@ -317,6 +366,7 @@ describe('POST /login', () => {
         seasonId: null,
         isBot: false,
       },
+      players: [],
     });
     (bcrypt.compare as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
@@ -363,11 +413,11 @@ describe('POST /refresh', () => {
     mockPrisma.account.findUnique.mockResolvedValue({
       id: 'account-1',
       role: 'player',
-      activePlayer: {
-        id: 'player-1',
-        username: 'Rook',
-        seasonId: null,
-      },
+    });
+    mockPrisma.player.findFirst.mockResolvedValue({
+      id: 'player-1',
+      username: 'Rook',
+      seasonId: null,
     });
     mockPrisma.account.update.mockResolvedValue({});
 
@@ -385,7 +435,7 @@ describe('POST /refresh', () => {
     expect(mockPrisma.refreshToken.deleteMany).toHaveBeenNthCalledWith(1, {
       where: { token: 'old-refresh-token' },
     });
-    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenNthCalledWith(2, {
       where: {
         accountId: 'account-1',
         expiresAt: { lt: expect.any(Date) },
@@ -398,7 +448,7 @@ describe('POST /refresh', () => {
         expiresAt: new Date('2026-03-10T12:00:00.000Z'),
       },
     });
-    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -418,11 +468,11 @@ describe('POST /refresh', () => {
     mockPrisma.account.findUnique.mockResolvedValue({
       id: 'account-1',
       role: 'player',
-      activePlayer: {
-        id: 'player-1',
-        username: 'Rook',
-        seasonId: null,
-      },
+    });
+    mockPrisma.player.findFirst.mockResolvedValue({
+      id: 'player-1',
+      username: 'Rook',
+      seasonId: null,
     });
     mockPrisma.account.update.mockResolvedValue({});
 
@@ -439,6 +489,56 @@ describe('POST /refresh', () => {
 
     expect(checkAndSpawnEvents).toHaveBeenCalledTimes(1);
     expect(checkAndSpawnEvents).toHaveBeenCalledWith(null);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('refreshes against the token player instead of the account active player', async () => {
+    (verifyRefreshToken as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      accountId: 'account-1',
+      playerId: 'player-seasonal',
+      username: 'RookSeasonal',
+      seasonId: 'season-1',
+      role: 'player',
+    });
+    mockPrisma.refreshToken.findUnique.mockResolvedValue({
+      token: 'old-refresh-token',
+      accountId: 'account-1',
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    mockPrisma.account.findUnique.mockResolvedValue({
+      id: 'account-1',
+      role: 'player',
+    });
+    mockPrisma.player.findFirst.mockResolvedValue({
+      id: 'player-seasonal',
+      username: 'RookSeasonal',
+      seasonId: 'season-1',
+    });
+    mockPrisma.account.update.mockResolvedValue({});
+
+    const req = {
+      body: {
+        refreshToken: 'old-refresh-token',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/refresh');
+    await handler(req, res, next);
+
+    expect(mockPrisma.player.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'player-seasonal',
+        accountId: 'account-1',
+        isBot: false,
+      },
+      select: {
+        id: true,
+        username: true,
+        seasonId: true,
+      },
+    });
     expect(next).not.toHaveBeenCalled();
   });
 });

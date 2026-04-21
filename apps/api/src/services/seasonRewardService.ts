@@ -1,5 +1,6 @@
 import { Prisma, prisma } from '@pocketrealm/database';
 import { redis } from '../redis';
+import { leaderboardKey, leaderboardMetaKey } from './leaderboardKeys';
 
 interface SeasonRewardDefinition {
   title?: string;
@@ -7,14 +8,6 @@ interface SeasonRewardDefinition {
   exclusiveItemTemplateIds?: string[];
   achievementId?: string;
   achievementIds?: string[];
-}
-
-function seasonLeaderboardKey(seasonId: string, category: string): string {
-  return `leaderboard:${seasonId}:${category}`;
-}
-
-function seasonLeaderboardMetaKey(seasonId: string, category: string): string {
-  return `leaderboard:meta:${seasonId}:${category}`;
 }
 
 function rewardItemTemplateIds(rewards: SeasonRewardDefinition): string[] {
@@ -112,6 +105,18 @@ async function applyRewardsToPermanentPlayer(
       continue;
     }
 
+    const existingRewardItem = await prisma.item.findFirst({
+      where: {
+        ownerId: permanentPlayer.id,
+        templateId: template.id,
+        isSoulbound: true,
+      },
+      select: { id: true },
+    });
+    if (existingRewardItem) {
+      continue;
+    }
+
     await prisma.item.create({
       data: {
         ownerId: permanentPlayer.id,
@@ -136,9 +141,9 @@ export async function evaluateSeasonRewards(seasonId: string): Promise<{ entries
   let totalEntries = 0;
 
   for (const tier of rewardTiers) {
-    const rewards = (tier.rewards as SeasonRewardDefinition | null) ?? {};
-    const members = await redis.zrevrange(
-      seasonLeaderboardKey(seasonId, tier.category),
+      const rewards = (tier.rewards as SeasonRewardDefinition | null) ?? {};
+      const members = await redis.zrevrange(
+      leaderboardKey(tier.category, seasonId),
       tier.minRank - 1,
       tier.maxRank - 1,
       'WITHSCORES',
@@ -153,7 +158,7 @@ export async function evaluateSeasonRewards(seasonId: string): Promise<{ entries
       }
 
       const [metaStr, player] = await Promise.all([
-        redis.hget(seasonLeaderboardMetaKey(seasonId, tier.category), playerId),
+        redis.hget(leaderboardMetaKey(tier.category, seasonId), playerId),
         prisma.player.findUnique({
           where: { id: playerId },
           select: { accountId: true, username: true },

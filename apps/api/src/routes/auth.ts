@@ -6,9 +6,6 @@ import { TURN_CONSTANTS, CHARACTER_CONSTANTS, ALL_SKILLS, STARTER_LOADOUT, RATE_
 import { AppError } from '../middleware/errorHandler';
 import { createEndpointLimiter } from '../middleware/rateLimiter';
 import {
-  generateAccessToken,
-  generateRefreshToken,
-  refreshTokenExpiresAt,
   verifyRefreshToken,
   authenticate,
 } from '../middleware/auth';
@@ -23,6 +20,8 @@ import { verifyPlayerEmail, changePlayerEmail, changePlayerPassword } from '../s
 import { checkAndSpawnEvents } from '../services/eventSchedulerService';
 import { logger } from '../logger';
 import { getIo } from '../socket';
+import { issueAccountSession } from '../services/authSessionService';
+import { SEASON_STATUSES } from '../services/season.constants';
 
 
 // Strict rate limiter for login: 10 attempts per 15 minutes per IP
@@ -202,33 +201,12 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
     };
   });
 
-  // Generate tokens
-  const payload = {
-    accountId: registration.account.id,
-    playerId: registration.player.id,
-    username: registration.player.username,
-    seasonId: registration.player.seasonId,
-    role: registration.account.role,
-  };
-  const accessToken = generateAccessToken(payload);
-  const refreshToken = generateRefreshToken(payload);
-
-  // Store refresh token and opportunistically clear expired sessions.
-  await prisma.$transaction([
-    prisma.refreshToken.deleteMany({
-      where: {
-        accountId: registration.account.id,
-        expiresAt: { lt: now },
-      },
-    }),
-    prisma.refreshToken.create({
-      data: {
-        accountId: registration.account.id,
-        token: refreshToken,
-        expiresAt: refreshTokenExpiresAt(now.getTime()),
-      },
-    }),
-  ]);
+  const { accessToken, refreshToken } = await issueAccountSession(
+    registration.account.id,
+    registration.account.role,
+    registration.player,
+    now,
+  );
 
   logger.info({ playerId: registration.player.id, username: registration.player.username }, 'Player registered');
 
@@ -275,17 +253,23 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
           isBot: true,
         },
       },
+      players: {
+        where: { isBot: false },
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+        select: {
+          id: true,
+          username: true,
+          seasonId: true,
+          isBot: true,
+        },
+      },
     },
   });
 
-  if (!account?.activePlayer) {
+  if (!account) {
     throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
   }
-
-  if (account.activePlayer.isBot) {
-    throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
-  }
-  const activePlayer = account.activePlayer;
 
   const locked = await isLockedOut(account.id);
 
@@ -299,47 +283,34 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
     throw new AppError(423, 'Account temporarily locked, try again later', 'ACCOUNT_LOCKED');
   }
 
+  const activePlayer = account.activePlayer ?? account.players[0] ?? null;
+  if (!activePlayer || activePlayer.isBot) {
+    throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
+  }
+
   await clearLockout(account.id);
 
   // Update last active
   await prisma.account.update({
     where: { id: account.id },
-    data: { lastActiveAt: now },
+    data: {
+      lastActiveAt: now,
+      ...(account.activePlayer?.id === activePlayer.id ? {} : { activePlayerId: activePlayer.id }),
+    },
   });
 
-  // Generate tokens
-  const payload = {
-    accountId: account.id,
-    playerId: activePlayer.id,
-    username: activePlayer.username,
-    seasonId: activePlayer.seasonId,
-    role: account.role,
-  };
-  const accessToken = generateAccessToken(payload);
-  const refreshToken = generateRefreshToken(payload);
-
-  // Store refresh token and opportunistically clear expired sessions.
-  await prisma.$transaction([
-    prisma.refreshToken.deleteMany({
-      where: {
-        accountId: account.id,
-        expiresAt: { lt: now },
-      },
-    }),
-    prisma.refreshToken.create({
-      data: {
-        accountId: account.id,
-        token: refreshToken,
-        expiresAt: refreshTokenExpiresAt(now.getTime()),
-      },
-    }),
-  ]);
+  const { accessToken, refreshToken } = await issueAccountSession(
+    account.id,
+    account.role,
+    activePlayer,
+    now,
+  );
 
   logger.info({ playerId: activePlayer.id, username: activePlayer.username }, 'Player logged in');
 
   res.json({
     player: {
-      id: account.activePlayer.id,
+      id: activePlayer.id,
       username: activePlayer.username,
       email: account.email,
       role: account.role,
@@ -365,7 +336,7 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
   const payload = verifyRefreshToken(refreshToken);
 
   // Require token to exist in DB and not be expired (no activity-window bypass)
-  const [storedToken, account] = await Promise.all([
+  const [storedToken, account, player] = await Promise.all([
     prisma.refreshToken.findUnique({
       where: { token: refreshToken },
     }),
@@ -374,18 +345,23 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
       select: {
         id: true,
         role: true,
-        activePlayer: {
-          select: {
-            id: true,
-            username: true,
-            seasonId: true,
-          },
-        },
+      },
+    }),
+    prisma.player.findFirst({
+      where: {
+        id: payload.playerId,
+        accountId: payload.accountId,
+        isBot: false,
+      },
+      select: {
+        id: true,
+        username: true,
+        seasonId: true,
       },
     }),
   ]);
 
-  if (!account?.activePlayer) {
+  if (!account || !player) {
     throw new AppError(401, 'Invalid or expired refresh token', 'INVALID_TOKEN');
   }
 
@@ -398,37 +374,20 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
     where: { token: refreshToken },
   });
 
-  // Generate new tokens with fresh role from DB
-  const freshPayload = {
-    accountId: account.id,
-    playerId: account.activePlayer.id,
-    username: account.activePlayer.username,
-    seasonId: account.activePlayer.seasonId,
-    role: account.role ?? 'player',
-  };
-  const newAccessToken = generateAccessToken(freshPayload);
-  const newRefreshToken = generateRefreshToken(freshPayload);
-
-  // Store new refresh token and keep activity timestamp fresh.
-  await prisma.$transaction([
-    prisma.refreshToken.deleteMany({
-      where: {
-        accountId: payload.accountId,
-        expiresAt: { lt: now },
-      },
-    }),
-    prisma.refreshToken.create({
-      data: {
-        accountId: payload.accountId,
-        token: newRefreshToken,
-        expiresAt: refreshTokenExpiresAt(now.getTime()),
-      },
-    }),
-    prisma.account.update({
-      where: { id: payload.accountId },
-      data: { lastActiveAt: now },
-    }),
-  ]);
+  const {
+    payload: freshPayload,
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+  } = await issueAccountSession(
+    account.id,
+    account.role,
+    player,
+    now,
+  );
+  await prisma.account.update({
+    where: { id: payload.accountId },
+    data: { lastActiveAt: now },
+  });
 
   res.json({
     accessToken: newAccessToken,
@@ -554,44 +513,26 @@ authRouter.post('/switch-player', authenticate, asyncHandler(async (req, res) =>
     throw new AppError(404, 'Character not found', 'NOT_FOUND');
   }
 
-  if (player.season && player.season.status !== 'active') {
+  if (player.season && player.season.status !== SEASON_STATUSES.ACTIVE) {
     throw new AppError(400, 'This seasonal character is no longer playable', 'SEASON_CHARACTER_UNPLAYABLE');
   }
 
-  await prisma.account.update({
+  const account = await prisma.account.update({
     where: { id: req.player!.accountId },
     data: { activePlayerId: player.id },
-  });
-
-  const account = await prisma.account.findUnique({
-    where: { id: req.player!.accountId },
     select: {
       id: true,
       role: true,
     },
   });
 
-  if (!account) {
-    throw new AppError(404, 'Account not found', 'NOT_FOUND');
-  }
-
-  const payload = {
-    accountId: req.player!.accountId,
-    playerId: player.id,
-    username: player.username,
-    seasonId: player.seasonId,
-    role: account.role,
-  };
-  const accessToken = generateAccessToken(payload);
-  const refreshToken = generateRefreshToken(payload);
-
-  await prisma.refreshToken.create({
-    data: {
-      accountId: req.player!.accountId,
-      token: refreshToken,
-      expiresAt: refreshTokenExpiresAt(Date.now()),
-    },
-  });
+  const { accessToken, refreshToken } = await issueAccountSession(
+    req.player!.accountId,
+    account.role,
+    player,
+    new Date(),
+    { revokeExisting: true },
+  );
 
   res.json({
     player: {
@@ -648,14 +589,6 @@ authRouter.post('/join-season', authenticate, asyncHandler(async (req, res) => {
     select: {
       id: true,
     },
-  }) ?? await prisma.zone.findFirst({
-    where: {
-      isStarter: true,
-      seasonId: null,
-    },
-    select: {
-      id: true,
-    },
   });
 
   if (!starterTown) {
@@ -676,7 +609,7 @@ authRouter.post('/join-season', authenticate, asyncHandler(async (req, res) => {
     throw new AppError(500, 'Starter off-hand template is missing', 'MISSING_STARTER_ITEM');
   }
 
-  const player = await prisma.$transaction(async (tx) => {
+  const seasonJoin = await prisma.$transaction(async (tx) => {
     const createdPlayer = await tx.player.create({
       data: {
         username,
@@ -729,48 +662,33 @@ authRouter.post('/join-season', authenticate, asyncHandler(async (req, res) => {
     await ensureStarterDiscoveries(createdPlayer.id, tx);
     await ensureStarterEncounterAndNodes(createdPlayer.id, tx);
 
-    return createdPlayer;
+    const account = await tx.account.update({
+      where: { id: req.player!.accountId },
+      data: { activePlayerId: createdPlayer.id },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+
+    return {
+      player: createdPlayer,
+      account,
+    };
   });
 
-  await prisma.account.update({
-    where: { id: req.player!.accountId },
-    data: { activePlayerId: player.id },
-  });
-
-  const account = await prisma.account.findUnique({
-    where: { id: req.player!.accountId },
-    select: {
-      id: true,
-      role: true,
-    },
-  });
-
-  if (!account) {
-    throw new AppError(404, 'Account not found', 'NOT_FOUND');
-  }
-
-  const payload = {
-    accountId: req.player!.accountId,
-    playerId: player.id,
-    username: player.username,
-    seasonId: player.seasonId,
-    role: account.role,
-  };
-  const accessToken = generateAccessToken(payload);
-  const refreshToken = generateRefreshToken(payload);
-
-  await prisma.refreshToken.create({
-    data: {
-      accountId: req.player!.accountId,
-      token: refreshToken,
-      expiresAt: refreshTokenExpiresAt(Date.now()),
-    },
-  });
+  const { accessToken, refreshToken } = await issueAccountSession(
+    req.player!.accountId,
+    seasonJoin.account.role,
+    seasonJoin.player,
+    now,
+    { revokeExisting: true },
+  );
 
   res.status(201).json({
     player: {
-      id: player.id,
-      username: player.username,
+      id: seasonJoin.player.id,
+      username: seasonJoin.player.username,
     },
     seasonId: activeSeason.id,
     accessToken,

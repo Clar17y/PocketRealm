@@ -31,7 +31,7 @@ describe('useAuth', () => {
 
     vi.mocked(getPlayer)
       .mockResolvedValueOnce({ data: null, error: { message: 'expired' } })
-      .mockResolvedValueOnce({ data: null, error: { message: 'still expired' } });
+      .mockResolvedValueOnce({ data: null, error: { message: 'still expired', code: 'INVALID_TOKEN' } });
     vi.mocked(refreshTokenApi).mockResolvedValue({
       data: { accessToken: 'new-access', refreshToken: 'new-refresh' },
       error: null,
@@ -84,5 +84,26 @@ describe('useAuth', () => {
 
     await expect(result.current.checkAuth()).rejects.toThrow('Failed to refresh account.');
     expect(localStorage.getItem('refreshToken')).toBeNull();
+  });
+
+  it('keeps freshly refreshed tokens when the follow-up player fetch fails transiently', async () => {
+    const { result } = renderHook(() => useAuth());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    localStorage.setItem('accessToken', 'expired-access');
+    localStorage.setItem('refreshToken', 'refresh-token');
+
+    vi.mocked(getPlayer)
+      .mockResolvedValueOnce({ data: null, error: { message: 'expired' } })
+      .mockResolvedValueOnce({ data: null, error: { message: 'network', code: 'NETWORK_ERROR' } });
+    vi.mocked(refreshTokenApi).mockResolvedValue({
+      data: { accessToken: 'new-access', refreshToken: 'new-refresh' },
+      error: null,
+    });
+
+    await expect(result.current.checkAuth()).rejects.toThrow('Failed to refresh account.');
+    expect(localStorage.getItem('accessToken')).toBe('new-access');
+    expect(localStorage.getItem('refreshToken')).toBe('new-refresh');
   });
 });

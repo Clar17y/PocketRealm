@@ -20,6 +20,25 @@ describe('requireActiveSeason', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
+  it('fails closed when a seasonal token has no cached season state', () => {
+    let thrown: unknown;
+
+    try {
+      requireActiveSeason({
+        player: { seasonId: 'season-1' },
+        season: undefined,
+      } as any, {} as any, vi.fn());
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toMatchObject({
+      message: 'Season state is temporarily unavailable. Please retry in a moment.',
+      statusCode: 503,
+      code: 'SEASON_STATE_UNAVAILABLE',
+    });
+  });
+
   it('throws for ended seasons', () => {
     let thrown: unknown;
 

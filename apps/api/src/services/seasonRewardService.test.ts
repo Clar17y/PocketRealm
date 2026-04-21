@@ -110,4 +110,36 @@ describe('seasonRewardService', () => {
       },
     });
   });
+
+  it('does not grant duplicate exclusive items when rewards are re-evaluated', async () => {
+    mockPrisma.seasonRewardTier.findMany.mockResolvedValue([
+      {
+        category: 'pvp_rating',
+        minRank: 1,
+        maxRank: 1,
+        rewards: {
+          exclusiveItemTemplateId: 'template-1',
+        },
+      },
+    ]);
+    mocks.zrevrange.mockResolvedValue(['season-player-1', '1450']);
+    mocks.hget.mockResolvedValue(null);
+    mockPrisma.player.findUnique.mockResolvedValue({ accountId: 'account-1', username: 'Rook' });
+    mockPrisma.hallOfFameEntry.upsert.mockResolvedValue({});
+    mockPrisma.seasonArchive.findUnique.mockResolvedValue({ rewardsEarned: null });
+    mockPrisma.seasonArchive.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.player.findFirst.mockResolvedValue({ id: 'perm-1' });
+    mockPrisma.itemTemplate.findUnique.mockResolvedValue({ id: 'template-1', maxDurability: 100 });
+    mockPrisma.item.findFirst.mockResolvedValue({
+      id: 'existing-reward',
+      ownerId: 'perm-1',
+      templateId: 'template-1',
+      isSoulbound: true,
+    });
+
+    const result = await evaluateSeasonRewards('season-1');
+
+    expect(result).toEqual({ entries: 1 });
+    expect(mockPrisma.item.create).not.toHaveBeenCalled();
+  });
 });

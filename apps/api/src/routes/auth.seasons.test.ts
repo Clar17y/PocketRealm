@@ -263,7 +263,7 @@ describe('POST /switch-player', () => {
       season: { id: 'season-1', status: 'active' },
     });
     mockPrisma.account.update.mockResolvedValue({});
-    mockPrisma.account.findUnique.mockResolvedValue({
+    mockPrisma.account.update.mockResolvedValue({
       id: 'account-1',
       role: 'player',
     });
@@ -284,6 +284,13 @@ describe('POST /switch-player', () => {
     expect(mockPrisma.account.update).toHaveBeenCalledWith({
       where: { id: 'account-1' },
       data: { activePlayerId: 'player-s1' },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { accountId: 'account-1' },
     });
     expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
       data: {
@@ -361,10 +368,6 @@ describe('POST /join-season', () => {
       id: 'starter-offhand',
       maxDurability: 40,
     });
-    mockPrisma.account.findUnique.mockResolvedValue({
-      id: 'account-1',
-      role: 'player',
-    });
     mockPrisma.account.update.mockResolvedValue({});
 
     const txClient = {
@@ -382,6 +385,12 @@ describe('POST /join-season', () => {
       },
       playerEquipment: {
         upsert: vi.fn().mockResolvedValue({}),
+      },
+      account: {
+        update: vi.fn().mockResolvedValue({
+          id: 'account-1',
+          role: 'player',
+        }),
       },
     };
     mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(txClient));
@@ -434,9 +443,16 @@ describe('POST /join-season', () => {
       create: { playerId: 'player-s1', slot: 'off_hand', itemId: 'starter-item-1' },
       update: { itemId: 'starter-item-1' },
     });
-    expect(mockPrisma.account.update).toHaveBeenCalledWith({
+    expect(txClient.account.update).toHaveBeenCalledWith({
       where: { id: 'account-1' },
       data: { activePlayerId: 'player-s1' },
+      select: {
+        id: true,
+        role: true,
+      },
+    });
+    expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+      where: { accountId: 'account-1' },
     });
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({
@@ -467,5 +483,34 @@ describe('POST /join-season', () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledTimes(1);
     expect(next.mock.calls[0][0].message).toContain('No active season');
+  });
+
+  it('requires a seasonal starter zone instead of falling back to the permanent realm starter', async () => {
+    mockPrisma.season.findFirst.mockResolvedValue({
+      id: 'season-1',
+      name: 'Season 1',
+      status: 'active',
+    });
+    mockPrisma.player.findFirst.mockResolvedValue(null);
+    mockPrisma.player.findUnique.mockResolvedValue(null);
+    mockPrisma.zone.findFirst.mockResolvedValue(null);
+
+    const req = {
+      body: { username: 'SeasonRook' },
+      player: {
+        accountId: 'account-1',
+        playerId: 'player-perm',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/join-season');
+    await handler(req, res, next);
+
+    expect(mockPrisma.zone.findFirst).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(next.mock.calls[0][0].message).toContain('No starter zone configured');
   });
 });

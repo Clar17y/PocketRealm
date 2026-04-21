@@ -1,4 +1,5 @@
 import { prisma } from '@pocketrealm/database';
+import { CACHED_SEASON_STATUSES, SEASON_CACHE_TTL_MS } from './season.constants';
 
 export interface CachedSeason {
   id: string;
@@ -13,11 +14,9 @@ export interface CachedSeason {
 let seasonCache = new Map<string, CachedSeason>();
 let lastRefreshedAtMs = 0;
 
-const CACHE_TTL_MS = 60_000;
-
 export async function refreshSeasonCache(): Promise<void> {
   const seasons = await prisma.season.findMany({
-    where: { status: { in: ['active', 'ended'] } },
+    where: { status: { in: [...CACHED_SEASON_STATUSES] } },
     select: {
       id: true,
       name: true,
@@ -51,7 +50,7 @@ export function getCachedSeason(seasonId: string): CachedSeason | undefined {
 }
 
 export function isSeasonCacheStale(): boolean {
-  return Date.now() - lastRefreshedAtMs > CACHE_TTL_MS;
+  return Date.now() - lastRefreshedAtMs > SEASON_CACHE_TTL_MS;
 }
 
 export function getActiveSeason(): CachedSeason | undefined {
