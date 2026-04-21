@@ -2,6 +2,28 @@ import { Prisma, prisma } from '@pocketrealm/database';
 import { AppError } from '../middleware/errorHandler';
 import { SEASON_STATUSES } from './season.constants';
 
+function isSerializableConflict(error: unknown): boolean {
+  const knownRequestError = (Prisma as typeof Prisma & {
+    PrismaClientKnownRequestError?: new (...args: never[]) => { code?: string };
+  }).PrismaClientKnownRequestError;
+
+  return typeof knownRequestError === 'function'
+    && error instanceof knownRequestError
+    && error.code === 'P2034';
+}
+
+function runSerializableTransaction<T>(
+  operation: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  const isolationLevel = Prisma.TransactionIsolationLevel?.Serializable;
+
+  if (!isolationLevel) {
+    return prisma.$transaction(operation);
+  }
+
+  return prisma.$transaction(operation, { isolationLevel });
+}
+
 type ZoneWithStarter = {
   id: string;
   name: string;
@@ -161,7 +183,8 @@ function remapRecipeMaterials(
 }
 
 export async function bootstrapSeason(seasonId: string): Promise<{ seasonId: string }> {
-  return prisma.$transaction(async (tx) => {
+  try {
+    return await runSerializableTransaction(async (tx) => {
     const season = await tx.season.findUniqueOrThrow({
       where: { id: seasonId },
       select: { id: true, status: true },
@@ -176,6 +199,11 @@ export async function bootstrapSeason(seasonId: string): Promise<{ seasonId: str
       tx.itemTemplate.findFirst({ where: { seasonId }, select: { id: true } }),
       tx.mobTemplate.findFirst({ where: { seasonId }, select: { id: true } }),
       tx.craftingRecipe.findFirst({ where: { seasonId }, select: { id: true } }),
+      tx.mobFamilyMember.findFirst({ where: { mobTemplate: { seasonId } } }),
+      tx.zoneMobFamily.findFirst({ where: { zone: { seasonId } } }),
+      tx.dropTable.findFirst({ where: { itemTemplate: { seasonId } } }),
+      tx.chestDropTable.findFirst({ where: { itemTemplate: { seasonId } } }),
+      tx.resourceNode.findFirst({ where: { zone: { seasonId } } }),
     ]);
 
     if (existingSeasonContent.some(Boolean)) {
@@ -259,6 +287,12 @@ export async function bootstrapSeason(seasonId: string): Promise<{ seasonId: str
         },
       }),
     ]);
+
+    const mobFamilyMembers = await tx.mobFamilyMember.findMany({
+      where: {
+        mobTemplateId: { in: permanentMobTemplateIds },
+      },
+    });
 
     if (zoneConnections.length > 0) {
       await tx.zoneConnection.createMany({
@@ -377,8 +411,32 @@ export async function bootstrapSeason(seasonId: string): Promise<{ seasonId: str
       });
     }
 
+    if (mobFamilyMembers.length > 0) {
+      await tx.mobFamilyMember.createMany({
+        data: mobFamilyMembers.map((mobFamilyMember) => {
+          const mobTemplateId = mobTemplateIdMap.get(mobFamilyMember.mobTemplateId);
+          if (!mobTemplateId) {
+            throw new AppError(500, 'Missing cloned mob template for mob family member', 'BOOTSTRAP_TEMPLATE_MAP_MISSING');
+          }
+
+          return {
+            mobFamilyId: mobFamilyMember.mobFamilyId,
+            mobTemplateId,
+            role: mobFamilyMember.role,
+          };
+        }),
+      });
+    }
+
     return {
       seasonId: season.id,
     };
   });
+  } catch (error) {
+    if (isSerializableConflict(error)) {
+      throw new AppError(409, 'Season already bootstrapped', 'SEASON_ALREADY_BOOTSTRAPPED');
+    }
+
+    throw error;
+  }
 }

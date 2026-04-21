@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@pocketrealm/database', () => import('../__mocks__/database.js'));
 
-import { prisma } from '@pocketrealm/database';
+import { Prisma, prisma } from '@pocketrealm/database';
 import { bootstrapSeason } from './seasonBootstrapService';
 
 const mockPrisma = prisma as any;
@@ -19,7 +19,7 @@ const permanentZones = [
     difficulty: 1,
     travelCost: 0,
     isStarter: true,
-    zoneType: 'starter',
+    zoneType: 'town',
     zoneExitChance: 0.1,
     maxCraftingLevel: 5,
     turnsToExplore: 1,
@@ -36,7 +36,7 @@ const permanentZones = [
     difficulty: 2,
     travelCost: 1,
     isStarter: false,
-    zoneType: 'wilderness',
+    zoneType: 'wild',
     zoneExitChance: 0.2,
     maxCraftingLevel: 10,
     turnsToExplore: 2,
@@ -112,9 +112,19 @@ const permanentMobTemplates = [
   },
 ];
 
+const permanentMobFamilyMembers = [
+  {
+    id: 'member-perm-1',
+    mobFamilyId: 'family-perm-1',
+    mobTemplateId: 'mob-perm-1',
+    role: 'trash',
+  },
+];
+
 describe('bootstrapSeason', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (Prisma as any).TransactionIsolationLevel = { Serializable: 'Serializable' };
     mockPrisma.$transaction.mockImplementation(async (fn: (tx: any) => Promise<unknown>) => fn(mockPrisma));
   });
 
@@ -127,6 +137,7 @@ describe('bootstrapSeason', () => {
     mockPrisma.zone.findMany.mockResolvedValue(permanentZones);
     mockPrisma.itemTemplate.findMany.mockResolvedValue(permanentItemTemplates);
     mockPrisma.mobTemplate.findMany.mockResolvedValue(permanentMobTemplates);
+    mockPrisma.mobFamilyMember.findMany.mockResolvedValue(permanentMobFamilyMembers);
     mockPrisma.zoneConnection.findMany.mockResolvedValue([
       {
         id: 'connection-perm-1',
@@ -190,8 +201,8 @@ describe('bootstrapSeason', () => {
         zoneId: 'zone-perm-1',
         mobFamilyId: 'family-perm-1',
         discoveryWeight: 11,
-        minSize: 1,
-        maxSize: 3,
+        minSize: 'small',
+        maxSize: 'large',
       },
     ]);
 
@@ -206,6 +217,9 @@ describe('bootstrapSeason', () => {
     const result = await bootstrapSeason('season-1');
 
     expect(result).toEqual({ seasonId: 'season-1' });
+    expect(mockPrisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'Serializable',
+    });
     expect(mockPrisma.zone.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         seasonId: 'season-1',
@@ -287,8 +301,17 @@ describe('bootstrapSeason', () => {
           zoneId: 'zone-season-1',
           mobFamilyId: 'family-perm-1',
           discoveryWeight: 11,
-          minSize: 1,
-          maxSize: 3,
+          minSize: 'small',
+          maxSize: 'large',
+        },
+      ],
+    });
+    expect(mockPrisma.mobFamilyMember.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          mobFamilyId: 'family-perm-1',
+          mobTemplateId: 'mob-season-1',
+          role: 'trash',
         },
       ],
     });
