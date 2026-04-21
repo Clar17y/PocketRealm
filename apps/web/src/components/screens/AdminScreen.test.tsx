@@ -68,6 +68,15 @@ function renderAdminScreen() {
   );
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver;
+  });
+
+  return { promise, resolve };
+}
+
 async function openSeasonsTab() {
   renderAdminScreen();
   fireEvent.click(screen.getByRole('button', { name: 'Seasons' }));
@@ -107,6 +116,20 @@ describe('AdminScreen seasons tab', () => {
     expect(screen.getByTestId('season-row-season-2').textContent).toContain('active');
   });
 
+  it('shows a loading state while seasons are being fetched', async () => {
+    const deferred = createDeferred<{ data: { seasons: AdminSeason[] }; error: null }>();
+    adminGetSeasonsMock.mockReturnValueOnce(deferred.promise);
+
+    renderAdminScreen();
+    fireEvent.click(screen.getByRole('button', { name: 'Seasons' }));
+
+    expect(screen.getByText('Loading...')).toBeTruthy();
+
+    deferred.resolve({ data: { seasons }, error: null });
+
+    expect(await screen.findByText('Season One')).toBeTruthy();
+  });
+
   it('creates a season and refreshes the list', async () => {
     await openSeasonsTab();
 
@@ -126,6 +149,12 @@ describe('AdminScreen seasons tab', () => {
   });
 
   it('bootstraps an existing season and refreshes the list', async () => {
+    adminGetSeasonsMock
+      .mockResolvedValueOnce({ data: { seasons }, error: null })
+      .mockResolvedValueOnce({ data: { seasons: seasons.map((season) => (
+        season.id === 'season-1' ? { ...season, isBootstrapped: true } : season
+      )) }, error: null });
+
     await openSeasonsTab();
 
     const row = screen.getByTestId('season-row-season-1');
@@ -133,30 +162,80 @@ describe('AdminScreen seasons tab', () => {
 
     await waitFor(() => expect(adminBootstrapSeasonMock).toHaveBeenCalledWith('season-1'));
     await waitFor(() => expect(adminGetSeasonsMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTestId('season-row-season-1').textContent).toContain('bootstrapped'));
   });
 
-  it('invokes activate, end, evaluate, and merge actions', async () => {
+  it('refreshes the list after activating a season', async () => {
+    adminGetSeasonsMock
+      .mockResolvedValueOnce({ data: { seasons }, error: null })
+      .mockResolvedValueOnce({ data: { seasons: seasons.map((season) => (
+        season.id === 'season-1' ? { ...season, status: 'active' } : season
+      )) }, error: null });
+
     await openSeasonsTab();
 
     const draftRow = screen.getByTestId('season-row-season-1');
-    const activeRow = screen.getByTestId('season-row-season-2');
-
     fireEvent.click(within(draftRow).getByRole('button', { name: 'Activate' }));
+
     await waitFor(() => expect(adminActivateSeasonMock).toHaveBeenCalledWith('season-1'));
+    await waitFor(() => expect(adminGetSeasonsMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTestId('season-row-season-1').textContent).toContain('active'));
+    expect(window.confirm).toHaveBeenCalledWith('Activate season "Season One"?');
+  });
+
+  it('refreshes the list after ending a season', async () => {
+    adminGetSeasonsMock
+      .mockResolvedValueOnce({ data: { seasons }, error: null })
+      .mockResolvedValueOnce({ data: { seasons: seasons.map((season) => (
+        season.id === 'season-2' ? { ...season, status: 'ended' } : season
+      )) }, error: null });
+
+    await openSeasonsTab();
+
+    const activeRow = screen.getByTestId('season-row-season-2');
 
     fireEvent.click(within(activeRow).getByRole('button', { name: 'End Season' }));
     await waitFor(() => expect(adminEndSeasonMock).toHaveBeenCalledWith('season-2'));
+    await waitFor(() => expect(adminGetSeasonsMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTestId('season-row-season-2').textContent).toContain('ended'));
+    expect(window.confirm).toHaveBeenCalledWith('End season "Season Two"?');
+  });
+
+  it('refreshes the list after evaluating season rewards', async () => {
+    const refreshedSeasons = seasons.map((season) => (
+      season.id === 'season-2' ? { ...season, name: 'Season Two Reviewed' } : season
+    ));
+    adminGetSeasonsMock
+      .mockResolvedValueOnce({ data: { seasons }, error: null })
+      .mockResolvedValueOnce({ data: { seasons: refreshedSeasons }, error: null });
+
+    await openSeasonsTab();
+
+    const activeRow = screen.getByTestId('season-row-season-2');
 
     fireEvent.click(within(activeRow).getByRole('button', { name: 'Evaluate Rewards' }));
     await waitFor(() => expect(adminEvaluateSeasonRewardsMock).toHaveBeenCalledWith('season-2'));
+    await waitFor(() => expect(adminGetSeasonsMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByText('Season Two Reviewed')).toBeTruthy());
+    expect(window.confirm).toHaveBeenCalledWith('Evaluate rewards for "Season Two"?');
+  });
+
+  it('refreshes the list after merging a season', async () => {
+    const refreshedSeasons = seasons.map((season) => (
+      season.id === 'season-2' ? { ...season, name: 'Season Two Merged' } : season
+    ));
+    adminGetSeasonsMock
+      .mockResolvedValueOnce({ data: { seasons }, error: null })
+      .mockResolvedValueOnce({ data: { seasons: refreshedSeasons }, error: null });
+
+    await openSeasonsTab();
+
+    const activeRow = screen.getByTestId('season-row-season-2');
 
     fireEvent.click(within(activeRow).getByRole('button', { name: 'Merge Season' }));
     await waitFor(() => expect(adminMergeSeasonMock).toHaveBeenCalledWith('season-2'));
-
-    expect(window.confirm).toHaveBeenCalledWith('Activate season "Season One"?');
-    expect(window.confirm).toHaveBeenCalledWith('End season "Season Two"?');
-    expect(window.confirm).toHaveBeenCalledWith('Evaluate rewards for "Season Two"?');
+    await waitFor(() => expect(adminGetSeasonsMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByText('Season Two Merged')).toBeTruthy());
     expect(window.confirm).toHaveBeenCalledWith('Merge season "Season Two" into the permanent realm?');
-    await waitFor(() => expect(adminGetSeasonsMock).toHaveBeenCalledTimes(5));
   });
 });
