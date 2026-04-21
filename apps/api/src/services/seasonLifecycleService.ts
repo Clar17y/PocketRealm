@@ -27,14 +27,32 @@ function runSerializableTransaction<T>(
 
 type SeasonBootstrappedReadClient = Pick<
   Prisma.TransactionClient,
-  'zone' | 'itemTemplate' | 'mobTemplate' | 'craftingRecipe'
+  | 'zone'
+  | 'itemTemplate'
+  | 'mobTemplate'
+  | 'craftingRecipe'
+  | 'mobFamilyMember'
+  | 'zoneMobFamily'
+  | 'dropTable'
+  | 'chestDropTable'
+  | 'resourceNode'
 >;
 
 export async function isSeasonBootstrapped(
   db: SeasonBootstrappedReadClient,
   seasonId: string,
 ): Promise<boolean> {
-  const [starterZone, itemTemplate, mobTemplate, craftingRecipe] = await Promise.all([
+  const [
+    starterZone,
+    itemTemplate,
+    mobTemplate,
+    craftingRecipe,
+    mobFamilyMember,
+    zoneMobFamily,
+    dropTable,
+    chestDropTable,
+    resourceNode,
+  ] = await Promise.all([
     db.zone.findFirst({
       where: { seasonId, isStarter: true },
       select: { id: true },
@@ -51,18 +69,63 @@ export async function isSeasonBootstrapped(
       where: { seasonId },
       select: { id: true },
     }),
+    db.mobFamilyMember.findFirst({
+      where: {
+        mobTemplate: { seasonId },
+      },
+      select: { mobFamilyId: true },
+    }),
+    db.zoneMobFamily.findFirst({
+      where: {
+        zone: { seasonId },
+      },
+      select: { zoneId: true },
+    }),
+    db.dropTable.findFirst({
+      where: {
+        mobTemplate: { seasonId },
+        itemTemplate: { seasonId },
+      },
+      select: { id: true },
+    }),
+    db.chestDropTable.findFirst({
+      where: {
+        itemTemplate: { seasonId },
+      },
+      select: { id: true },
+    }),
+    db.resourceNode.findFirst({
+      where: {
+        zone: { seasonId },
+      },
+      select: { id: true },
+    }),
   ]);
 
-  return Boolean(starterZone && itemTemplate && mobTemplate && craftingRecipe);
+  return Boolean(
+    starterZone
+    && itemTemplate
+    && mobTemplate
+    && craftingRecipe
+    && mobFamilyMember
+    && zoneMobFamily
+    && dropTable
+    && chestDropTable
+    && resourceNode,
+  );
 }
 
 export async function activateSeason(seasonId: string): Promise<{ id: string; name: string; status: string }> {
   try {
     const season = await runSerializableTransaction(async (tx) => {
-      await tx.season.findUniqueOrThrow({
+      const season = await tx.season.findUniqueOrThrow({
         where: { id: seasonId },
-        select: { id: true },
+        select: { id: true, status: true },
       });
+
+      if (season.status !== SEASON_STATUSES.UPCOMING) {
+        throw new AppError(400, 'Season must be upcoming to activate', 'SEASON_NOT_UPCOMING');
+      }
 
       const bootstrapped = await isSeasonBootstrapped(tx, seasonId);
       if (!bootstrapped) {

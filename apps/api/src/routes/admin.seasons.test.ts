@@ -88,6 +88,7 @@ import { mockPrisma } from '../__test__/setup';
 import { errorHandler } from '../middleware/errorHandler';
 import { generateAccessToken } from '../middleware/auth';
 import { adminRouter } from './admin';
+import { activateSeason } from '../services/seasonLifecycleService';
 
 function buildApp() {
   const app = express();
@@ -107,16 +108,21 @@ function adminToken() {
   });
 }
 
-function stubBootstrappedSeason() {
+function stubBootstrappedSeason(status: 'upcoming' | 'active' | 'ended' | 'archived' = 'upcoming') {
   mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
     id: 'season-1',
     name: 'Season 1',
-    status: 'upcoming',
+    status,
   });
   mockPrisma.zone.findFirst.mockResolvedValue({ id: 'zone-season-1' });
   mockPrisma.itemTemplate.findFirst.mockResolvedValue({ id: 'item-season-1' });
   mockPrisma.mobTemplate.findFirst.mockResolvedValue({ id: 'mob-season-1' });
   mockPrisma.craftingRecipe.findFirst.mockResolvedValue({ id: 'recipe-season-1' });
+  mockPrisma.mobFamilyMember.findFirst.mockResolvedValue({ mobFamilyId: 'family-season-1' });
+  mockPrisma.zoneMobFamily.findFirst.mockResolvedValue({ zoneId: 'zone-season-1' });
+  mockPrisma.dropTable.findFirst.mockResolvedValue({ id: 'drop-season-1' });
+  mockPrisma.chestDropTable.findFirst.mockResolvedValue({ id: 'chest-season-1' });
+  mockPrisma.resourceNode.findFirst.mockResolvedValue({ id: 'node-season-1' });
 }
 
 describe('admin season endpoints', () => {
@@ -160,6 +166,11 @@ describe('admin season endpoints', () => {
     mockPrisma.itemTemplate.findFirst.mockResolvedValue(null);
     mockPrisma.mobTemplate.findFirst.mockResolvedValue(null);
     mockPrisma.craftingRecipe.findFirst.mockResolvedValue(null);
+    mockPrisma.mobFamilyMember.findFirst.mockResolvedValue(null);
+    mockPrisma.zoneMobFamily.findFirst.mockResolvedValue(null);
+    mockPrisma.dropTable.findFirst.mockResolvedValue(null);
+    mockPrisma.chestDropTable.findFirst.mockResolvedValue(null);
+    mockPrisma.resourceNode.findFirst.mockResolvedValue(null);
     mockPrisma.worldEvent.updateMany.mockResolvedValue({ count: 0 });
   });
 
@@ -231,6 +242,31 @@ describe('admin season endpoints', () => {
         ? { id: 'recipe-season-1' }
         : null
     ));
+    mockPrisma.mobFamilyMember.findFirst.mockImplementation(async ({ where }: { where?: { mobTemplate?: { seasonId?: string } } }) => (
+      where?.mobTemplate?.seasonId === 'season-1'
+        ? { mobFamilyId: 'family-season-1' }
+        : null
+    ));
+    mockPrisma.zoneMobFamily.findFirst.mockImplementation(async ({ where }: { where?: { zone?: { seasonId?: string } } }) => (
+      where?.zone?.seasonId === 'season-1'
+        ? { zoneId: 'zone-season-1' }
+        : null
+    ));
+    mockPrisma.dropTable.findFirst.mockImplementation(async ({ where }: { where?: { mobTemplate?: { seasonId?: string }, itemTemplate?: { seasonId?: string } } }) => (
+      where?.mobTemplate?.seasonId === 'season-1' && where?.itemTemplate?.seasonId === 'season-1'
+        ? { id: 'drop-season-1' }
+        : null
+    ));
+    mockPrisma.chestDropTable.findFirst.mockImplementation(async ({ where }: { where?: { itemTemplate?: { seasonId?: string } } }) => (
+      where?.itemTemplate?.seasonId === 'season-1'
+        ? { id: 'chest-season-1' }
+        : null
+    ));
+    mockPrisma.resourceNode.findFirst.mockImplementation(async ({ where }: { where?: { zone?: { seasonId?: string } } }) => (
+      where?.zone?.seasonId === 'season-1'
+        ? { id: 'node-season-1' }
+        : null
+    ));
 
     const res = await request(buildApp())
       .get('/api/v1/admin/seasons')
@@ -241,6 +277,21 @@ describe('admin season endpoints', () => {
       expect.objectContaining({ id: 'season-1', isBootstrapped: true }),
       expect.objectContaining({ id: 'season-2', isBootstrapped: false }),
     ]);
+  });
+
+  it('rejects activation at the service layer when a season is not upcoming', async () => {
+    mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
+      id: 'season-1',
+      name: 'Season 1',
+      status: 'archived',
+    });
+
+    await expect(activateSeason('season-1')).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'SEASON_NOT_UPCOMING',
+    });
+    expect(mockPrisma.season.findFirst).not.toHaveBeenCalled();
+    expect(mocks.refreshSeasonCache).not.toHaveBeenCalled();
   });
 
   it('bootstraps a season through the admin endpoint', async () => {
@@ -295,6 +346,23 @@ describe('admin season endpoints', () => {
       .set('Authorization', `Bearer ${adminToken()}`);
 
     expect(res.status).toBe(409);
+    expect(mockPrisma.season.update).not.toHaveBeenCalled();
+    expect(mocks.refreshSeasonCache).not.toHaveBeenCalled();
+  });
+
+  it('rejects activation through the admin endpoint when a season is not upcoming', async () => {
+    stubBootstrappedSeason('ended');
+
+    const res = await request(buildApp())
+      .post('/api/v1/admin/seasons/season-1/activate')
+      .set('Authorization', `Bearer ${adminToken()}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({
+      error: {
+        code: 'SEASON_NOT_UPCOMING',
+      },
+    });
     expect(mockPrisma.season.update).not.toHaveBeenCalled();
     expect(mocks.refreshSeasonCache).not.toHaveBeenCalled();
   });
