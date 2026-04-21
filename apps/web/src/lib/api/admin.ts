@@ -67,6 +67,26 @@ export interface AdminResourceNode {
   zone: { name: string };
 }
 
+export interface AdminSeason {
+  id: string;
+  name: string;
+  status: string;
+  startsAt: string;
+  endsAt: string;
+  createdAt: string;
+  isBootstrapped: boolean;
+}
+
+type AdminSeasonCreateInput = {
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  constantOverrides?: Record<string, Record<string, number>>;
+  features?: string[];
+};
+
+type AdminSeasonRecord = Omit<AdminSeason, 'isBootstrapped'>;
+
 export async function adminGrantTurns(amount: number) {
   return fetchApi<{ success: boolean; currentTurns: number }>('/api/v1/admin/turns/grant', {
     method: 'POST',
@@ -184,6 +204,47 @@ export async function adminSpawnEncounter(mobFamilyId: string, zoneId: string, s
 export async function adminGetResourceNodes(zoneId?: string) {
   const qs = zoneId ? `?zoneId=${zoneId}` : '';
   return fetchApi<{ nodes: AdminResourceNode[] }>(`/api/v1/admin/resource-nodes${qs}`);
+}
+
+export async function adminGetSeasons() {
+  return fetchApi<{ seasons: AdminSeason[] }>('/api/v1/admin/seasons');
+}
+
+export async function adminCreateSeason(data: AdminSeasonCreateInput) {
+  return fetchApi<{ season: AdminSeasonRecord }>('/api/v1/admin/seasons', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function adminBootstrapSeason(id: string) {
+  return fetchApi<{ message: string; seasonId: string }>(`/api/v1/admin/seasons/${id}/bootstrap`, {
+    method: 'POST',
+  });
+}
+
+export async function adminActivateSeason(id: string) {
+  return fetchApi<{ season: AdminSeasonRecord }>(`/api/v1/admin/seasons/${id}/activate`, {
+    method: 'POST',
+  });
+}
+
+export async function adminEndSeason(id: string) {
+  return fetchApi<{ message: string }>(`/api/v1/admin/seasons/${id}/end`, {
+    method: 'POST',
+  });
+}
+
+export async function adminEvaluateSeasonRewards(id: string) {
+  return fetchApi<{ message: string; hallOfFameEntries: number }>(`/api/v1/admin/seasons/${id}/evaluate-rewards`, {
+    method: 'POST',
+  });
+}
+
+export async function adminMergeSeason(id: string) {
+  return fetchApi<{ message: string; merged: number; errors: string[] }>(`/api/v1/admin/seasons/${id}/merge`, {
+    method: 'POST',
+  });
 }
 
 export async function adminSpawnResourceNode(resourceNodeId: string, capacity?: number) {
