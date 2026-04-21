@@ -16,6 +16,7 @@ import { teleportPlayer } from '../services/zoneService';
 import { createActivityLog } from '../services/activityLogService';
 import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { grantPremiumDays, listPremiumPurchases } from '../services/premiumService';
+import { bootstrapSeason } from '../services/seasonBootstrapService';
 import { runSeasonMerge } from '../services/seasonMergeService';
 import { evaluateSeasonRewards } from '../services/seasonRewardService';
 import { activateSeason, endSeason } from '../services/seasonLifecycleService';
@@ -71,11 +72,40 @@ async function adminAuditTx(
   });
 }
 
+async function isSeasonBootstrapped(seasonId: string): Promise<boolean> {
+  const [starterZone, itemTemplate, mobTemplate, craftingRecipe] = await Promise.all([
+    prisma.zone.findFirst({
+      where: { seasonId, isStarter: true },
+      select: { id: true },
+    }),
+    prisma.itemTemplate.findFirst({
+      where: { seasonId },
+      select: { id: true },
+    }),
+    prisma.mobTemplate.findFirst({
+      where: { seasonId },
+      select: { id: true },
+    }),
+    prisma.craftingRecipe.findFirst({
+      where: { seasonId },
+      select: { id: true },
+    }),
+  ]);
+
+  return Boolean(starterZone && itemTemplate && mobTemplate && craftingRecipe);
+}
+
 router.get('/seasons', asyncHandler(async (_req, res) => {
   const seasons = await prisma.season.findMany({
     orderBy: { createdAt: 'desc' },
   });
-  res.json({ seasons });
+  const seasonsWithBootstrapped = await Promise.all(
+    seasons.map(async (season) => ({
+      ...season,
+      isBootstrapped: await isSeasonBootstrapped(season.id),
+    })),
+  );
+  res.json({ seasons: seasonsWithBootstrapped });
 }));
 
 router.post('/seasons', asyncHandler(async (req, res) => {
@@ -97,6 +127,12 @@ router.post('/seasons', asyncHandler(async (req, res) => {
     name: season.name,
   });
   res.status(201).json({ season });
+}));
+
+router.post('/seasons/:id/bootstrap', asyncHandler(async (req, res) => {
+  const result = await bootstrapSeason(req.params.id);
+  await adminAudit(req.player!.playerId, 'bootstrap_season', result);
+  res.json({ message: 'Season bootstrapped', ...result });
 }));
 
 router.post('/seasons/:id/activate', asyncHandler(async (req, res) => {

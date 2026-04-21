@@ -25,9 +25,44 @@ function runSerializableTransaction<T>(
   return prisma.$transaction(operation, { isolationLevel });
 }
 
+async function assertSeasonBootstrapped(
+  tx: Prisma.TransactionClient,
+  seasonId: string,
+): Promise<void> {
+  const [starterZone, itemTemplate, mobTemplate, craftingRecipe] = await Promise.all([
+    tx.zone.findFirst({
+      where: { seasonId, isStarter: true },
+      select: { id: true },
+    }),
+    tx.itemTemplate.findFirst({
+      where: { seasonId },
+      select: { id: true },
+    }),
+    tx.mobTemplate.findFirst({
+      where: { seasonId },
+      select: { id: true },
+    }),
+    tx.craftingRecipe.findFirst({
+      where: { seasonId },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!starterZone || !itemTemplate || !mobTemplate || !craftingRecipe) {
+    throw new AppError(400, 'Season must be bootstrapped before activation', 'SEASON_NOT_BOOTSTRAPPED');
+  }
+}
+
 export async function activateSeason(seasonId: string): Promise<{ id: string; name: string; status: string }> {
   try {
     const season = await runSerializableTransaction(async (tx) => {
+      await tx.season.findUniqueOrThrow({
+        where: { id: seasonId },
+        select: { id: true },
+      });
+
+      await assertSeasonBootstrapped(tx, seasonId);
+
       const activeSeason = await tx.season.findFirst({
         where: { status: SEASON_STATUSES.ACTIVE },
         select: { id: true },
