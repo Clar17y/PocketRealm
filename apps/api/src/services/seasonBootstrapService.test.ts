@@ -317,6 +317,99 @@ describe('bootstrapSeason', () => {
     });
   });
 
+  it('aborts when a recipe result template cannot be remapped', async () => {
+    mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
+      id: 'season-1',
+      status: 'upcoming',
+    });
+    mockPrisma.zone.findFirst.mockResolvedValue(null);
+    mockPrisma.zone.findMany.mockResolvedValue(permanentZones);
+    mockPrisma.itemTemplate.findMany.mockResolvedValue([
+      permanentItemTemplates[0],
+      permanentItemTemplates[1],
+    ]);
+    mockPrisma.mobTemplate.findMany.mockResolvedValue(permanentMobTemplates);
+    mockPrisma.mobFamilyMember.findMany.mockResolvedValue(permanentMobFamilyMembers);
+    mockPrisma.zoneConnection.findMany.mockResolvedValue([]);
+    mockPrisma.dropTable.findMany.mockResolvedValue([]);
+    mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
+    mockPrisma.resourceNode.findMany.mockResolvedValue([]);
+    mockPrisma.craftingRecipe.findMany.mockResolvedValue([
+      {
+        id: 'recipe-missing-result',
+        seasonId: null,
+        skillType: 'smithing',
+        requiredLevel: 2,
+        resultTemplateId: 'item-perm-3',
+        isAdvanced: false,
+        soulbound: false,
+        mobFamilyId: 'family-perm-1',
+        turnCost: 3,
+        materials: [{ itemTemplateId: 'item-perm-1', quantity: 2 }],
+        xpReward: 25,
+      },
+    ]);
+    mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
+    mockPrisma.zone.create
+      .mockResolvedValueOnce({ id: 'zone-season-1' })
+      .mockResolvedValueOnce({ id: 'zone-season-2' });
+    mockPrisma.itemTemplate.create
+      .mockResolvedValueOnce({ id: 'item-season-1' })
+      .mockResolvedValueOnce({ id: 'item-season-2' });
+    mockPrisma.mobTemplate.create.mockResolvedValueOnce({ id: 'mob-season-1' });
+
+    await expect(bootstrapSeason('season-1')).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'BOOTSTRAP_TEMPLATE_MAP_MISSING',
+    });
+    expect(mockPrisma.craftingRecipe.createMany).not.toHaveBeenCalled();
+  });
+
+  it('aborts when a recipe material cannot be remapped', async () => {
+    mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
+      id: 'season-1',
+      status: 'upcoming',
+    });
+    mockPrisma.zone.findFirst.mockResolvedValue(null);
+    mockPrisma.zone.findMany.mockResolvedValue(permanentZones);
+    mockPrisma.itemTemplate.findMany.mockResolvedValue(permanentItemTemplates);
+    mockPrisma.mobTemplate.findMany.mockResolvedValue(permanentMobTemplates);
+    mockPrisma.mobFamilyMember.findMany.mockResolvedValue(permanentMobFamilyMembers);
+    mockPrisma.zoneConnection.findMany.mockResolvedValue([]);
+    mockPrisma.dropTable.findMany.mockResolvedValue([]);
+    mockPrisma.chestDropTable.findMany.mockResolvedValue([]);
+    mockPrisma.resourceNode.findMany.mockResolvedValue([]);
+    mockPrisma.craftingRecipe.findMany.mockResolvedValue([
+      {
+        id: 'recipe-missing-material',
+        seasonId: null,
+        skillType: 'smithing',
+        requiredLevel: 2,
+        resultTemplateId: 'item-perm-1',
+        isAdvanced: false,
+        soulbound: false,
+        mobFamilyId: 'family-perm-1',
+        turnCost: 3,
+        materials: [{ itemTemplateId: 'item-perm-3', quantity: 2 }],
+        xpReward: 25,
+      },
+    ]);
+    mockPrisma.zoneMobFamily.findMany.mockResolvedValue([]);
+    mockPrisma.zone.create
+      .mockResolvedValueOnce({ id: 'zone-season-1' })
+      .mockResolvedValueOnce({ id: 'zone-season-2' });
+    mockPrisma.itemTemplate.create
+      .mockResolvedValueOnce({ id: 'item-season-1' })
+      .mockResolvedValueOnce({ id: 'item-season-2' });
+    mockPrisma.mobTemplate.create.mockResolvedValueOnce({ id: 'mob-season-1' });
+
+    await expect(bootstrapSeason('season-1')).rejects.toMatchObject({
+      statusCode: 500,
+      code: 'BOOTSTRAP_TEMPLATE_MAP_MISSING',
+    });
+    expect(mockPrisma.craftingRecipe.createMany).not.toHaveBeenCalled();
+  });
+
   it('rejects already bootstrapped seasons', async () => {
     mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
       id: 'season-1',

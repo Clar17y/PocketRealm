@@ -171,11 +171,19 @@ function remapRecipeMaterials(
     const remapped = { ...entry };
 
     if (typeof entry.templateId === 'string') {
-      remapped.templateId = itemTemplateIdMap.get(entry.templateId) ?? entry.templateId;
+      const mappedTemplateId = itemTemplateIdMap.get(entry.templateId);
+      if (!mappedTemplateId) {
+        throw new AppError(500, `Missing cloned template for recipe material ${entry.templateId}`, 'BOOTSTRAP_TEMPLATE_MAP_MISSING');
+      }
+      remapped.templateId = mappedTemplateId;
     }
 
     if (typeof entry.itemTemplateId === 'string') {
-      remapped.itemTemplateId = itemTemplateIdMap.get(entry.itemTemplateId) ?? entry.itemTemplateId;
+      const mappedItemTemplateId = itemTemplateIdMap.get(entry.itemTemplateId);
+      if (!mappedItemTemplateId) {
+        throw new AppError(500, `Missing cloned template for recipe material ${entry.itemTemplateId}`, 'BOOTSTRAP_TEMPLATE_MAP_MISSING');
+      }
+      remapped.itemTemplateId = mappedItemTemplateId;
     }
 
     return remapped;
@@ -381,7 +389,13 @@ export async function bootstrapSeason(seasonId: string): Promise<{ seasonId: str
           seasonId,
           skillType: recipe.skillType,
           requiredLevel: recipe.requiredLevel,
-          resultTemplateId: itemTemplateIdMap.get(recipe.resultTemplateId) ?? recipe.resultTemplateId,
+          resultTemplateId: (() => {
+            const mappedResultTemplateId = itemTemplateIdMap.get(recipe.resultTemplateId);
+            if (!mappedResultTemplateId) {
+              throw new AppError(500, `Missing cloned template for recipe result ${recipe.resultTemplateId}`, 'BOOTSTRAP_TEMPLATE_MAP_MISSING');
+            }
+            return mappedResultTemplateId;
+          })(),
           isAdvanced: recipe.isAdvanced,
           soulbound: recipe.soulbound,
           mobFamilyId: recipe.mobFamilyId,
