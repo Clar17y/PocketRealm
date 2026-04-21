@@ -55,6 +55,24 @@ import { handleKeyActivate } from '@/lib/utils';
 
 type AdminTab = 'player' | 'items' | 'world' | 'zones' | 'resources' | 'guild' | 'seasons' | 'analytics';
 
+const ADMIN_SKILL_TYPES = [
+  'melee',
+  'ranged',
+  'magic',
+  'mining',
+  'foraging',
+  'woodcutting',
+  'refining',
+  'tanning',
+  'weaving',
+  'weaponsmithing',
+  'armorsmithing',
+  'leatherworking',
+  'tailoring',
+  'alchemy',
+  'jewelcrafting',
+] as const;
+
 function StatusMsg({ msg }: { msg: { text: string; ok: boolean } | null }) {
   if (!msg) return null;
   return (
@@ -62,6 +80,10 @@ function StatusMsg({ msg }: { msg: { text: string; ok: boolean } | null }) {
       {msg.text}
     </div>
   );
+}
+
+function toIsoDateTime(value: string) {
+  return new Date(value).toISOString();
 }
 
 function useAdminAction() {
@@ -189,8 +211,7 @@ function PlayerTab({ onStateUpdates, setTurns: setGameTurns }: { onStateUpdates:
       <PixelCard>
         <h3 className="text-sm font-semibold text-[var(--rpg-gold)] mb-3">Set Skill Levels</h3>
         <div className="grid grid-cols-3 gap-1 mb-3">
-          {['melee', 'ranged', 'magic', 'mining', 'foraging', 'woodcutting', 'refining', 'tanning', 'weaving',
-            'weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring', 'alchemy', 'jewelcrafting'].map((s) => (
+          {ADMIN_SKILL_TYPES.map((s) => (
             <label key={s} className="flex items-center gap-1.5 text-xs text-[var(--rpg-text-primary)] cursor-pointer select-none">
               <input type="checkbox" checked={selectedSkills.has(s)}
                 onChange={(e) => setSelectedSkills((prev) => {
@@ -205,11 +226,9 @@ function PlayerTab({ onStateUpdates, setTurns: setGameTurns }: { onStateUpdates:
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <PixelButton size="sm" variant="gold" onClick={() => {
-            const all = ['melee', 'ranged', 'magic', 'mining', 'foraging', 'woodcutting', 'refining', 'tanning', 'weaving',
-              'weaponsmithing', 'armorsmithing', 'leatherworking', 'tailoring', 'alchemy', 'jewelcrafting'];
-            setSelectedSkills((prev) => prev.size === all.length ? new Set() : new Set(all));
+            setSelectedSkills((prev) => prev.size === ADMIN_SKILL_TYPES.length ? new Set() : new Set(ADMIN_SKILL_TYPES));
           }}>
-            {selectedSkills.size === 15 ? 'Deselect All' : 'Select All'}
+            {selectedSkills.size === ADMIN_SKILL_TYPES.length ? 'Deselect All' : 'Select All'}
           </PixelButton>
           <input type="number" value={skillLevel} min={1} max={100}
             onChange={(e) => setSkillLevel(Number(e.target.value))}
@@ -787,10 +806,12 @@ function SeasonsTab() {
               .split(',')
               .map((feature) => feature.trim())
               .filter(Boolean);
+            const isoStartsAt = toIsoDateTime(startsAt);
+            const isoEndsAt = toIsoDateTime(endsAt);
             const created = await refreshAfter(act('Create season', () => adminCreateSeason({
               name: name.trim(),
-              startsAt,
-              endsAt,
+              startsAt: isoStartsAt,
+              endsAt: isoEndsAt,
               ...(featureList.length > 0 ? { features: featureList } : {}),
             })));
             if (created) {

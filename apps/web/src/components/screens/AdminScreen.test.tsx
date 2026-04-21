@@ -133,16 +133,19 @@ describe('AdminScreen seasons tab', () => {
   it('creates a season and refreshes the list', async () => {
     await openSeasonsTab();
 
+    const startsAt = '2026-06-01T00:00';
+    const endsAt = '2026-06-30T00:00';
+
     fireEvent.change(screen.getByLabelText('Season name'), { target: { value: 'Season Three' } });
-    fireEvent.change(screen.getByLabelText('Starts at'), { target: { value: '2026-06-01T00:00' } });
-    fireEvent.change(screen.getByLabelText('Ends at'), { target: { value: '2026-06-30T00:00' } });
+    fireEvent.change(screen.getByLabelText('Starts at'), { target: { value: startsAt } });
+    fireEvent.change(screen.getByLabelText('Ends at'), { target: { value: endsAt } });
     fireEvent.change(screen.getByLabelText('Features'), { target: { value: 'leaderboards, rewards , merges' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create Season' }));
 
     await waitFor(() => expect(adminCreateSeasonMock).toHaveBeenCalledWith({
       name: 'Season Three',
-      startsAt: '2026-06-01T00:00',
-      endsAt: '2026-06-30T00:00',
+      startsAt: new Date(startsAt).toISOString(),
+      endsAt: new Date(endsAt).toISOString(),
       features: ['leaderboards', 'rewards', 'merges'],
     }));
     await waitFor(() => expect(adminGetSeasonsMock).toHaveBeenCalledTimes(2));
