@@ -28,10 +28,14 @@ export async function getHasActivePremiumEntitlement(
   const player = await client.player.findUnique({
     where: { id: playerId },
     select: {
-      isPremium: true,
-      premiumExpiresAt: true,
+      account: {
+        select: {
+          isPremium: true,
+          premiumExpiresAt: true,
+        },
+      },
     },
   });
 
-  return hasActivePremiumEntitlement(player, now);
+  return hasActivePremiumEntitlement(player?.account, now);
 }

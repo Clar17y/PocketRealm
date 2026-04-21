@@ -12,12 +12,12 @@ describe('reconcileExpiredPremium', () => {
 
   it('disables expired premium accounts without deleting purchase history', async () => {
     const now = new Date('2026-04-17T12:00:00.000Z');
-    vi.mocked(prisma.player.updateMany).mockResolvedValue({ count: 3 } as never);
+    vi.mocked(prisma.account.updateMany).mockResolvedValue({ count: 3 } as never);
 
     const result = await reconcileExpiredPremium(now);
 
     expect(result).toEqual({ updatedCount: 3 });
-    expect(prisma.player.updateMany).toHaveBeenCalledWith({
+    expect(prisma.account.updateMany).toHaveBeenCalledWith({
       where: {
         isPremium: true,
         premiumExpiresAt: {

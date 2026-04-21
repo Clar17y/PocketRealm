@@ -33,8 +33,10 @@ describe('turns router', () => {
       lastRegenAt: '2026-04-17T12:00:00.000Z',
     });
     const token = generateAccessToken({
+      accountId: 'account-1',
       playerId: 'player-1',
       username: 'hero',
+      seasonId: null,
       role: 'player',
     });
 
