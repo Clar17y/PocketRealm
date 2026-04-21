@@ -2,7 +2,6 @@
 npm run test           # All tests across all workspaces
 npm run test:engine    # Game engine unit tests
 npm run test:api       # API integration tests
-npm run test:e2e       # Playwright E2E tests
 ```
 
 **Test distribution (~88 test files):**

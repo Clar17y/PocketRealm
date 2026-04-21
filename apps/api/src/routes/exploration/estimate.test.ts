@@ -49,8 +49,10 @@ beforeEach(() => {
     zoneExitChance: 0.01,
   });
   mockPrisma.player.findUnique.mockResolvedValue({
-    isPremium: true,
-    premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+    account: {
+      isPremium: true,
+      premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+    },
   });
 });
 

@@ -249,8 +249,10 @@ describe('distributeBossLoot', () => {
     ];
 
     mockPrisma.player.findUnique.mockResolvedValue({
-      isPremium: true,
-      premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+      account: {
+        isPremium: true,
+        premiumExpiresAt: new Date('2026-06-02T00:00:00.000Z'),
+      },
     });
 
     await distributeBossLoot('mob-1', 10, contributors, 1);

@@ -677,7 +677,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const pvpRatingMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:pvp_rating');
+        const pvpRatingMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:pvp_rating');
         const meta = JSON.parse(pvpRatingMeta![2] as string);
         expect(meta.title).toBe(PREMIUM_CONSTANTS.SUPPORT_TITLE);
         expect(meta.titleStyle).toBe('rainbow');
