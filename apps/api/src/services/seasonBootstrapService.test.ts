@@ -305,6 +305,28 @@ describe('bootstrapSeason', () => {
     expect(mockPrisma.zone.findMany).not.toHaveBeenCalled();
   });
 
+  it('rejects seasons that already have seasonal content even without a starter zone', async () => {
+    mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
+      id: 'season-1',
+      status: 'upcoming',
+    });
+    mockPrisma.zone.findFirst.mockResolvedValue(null);
+    mockPrisma.itemTemplate.findFirst.mockResolvedValue({
+      id: 'item-season-existing',
+      seasonId: 'season-1',
+    });
+    mockPrisma.mobTemplate.findFirst.mockResolvedValue(null);
+    mockPrisma.craftingRecipe.findFirst.mockResolvedValue(null);
+
+    await expect(bootstrapSeason('season-1')).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'SEASON_ALREADY_BOOTSTRAPPED',
+    });
+    expect(mockPrisma.zone.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.itemTemplate.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.mobTemplate.findMany).not.toHaveBeenCalled();
+  });
+
   it('rejects non-upcoming seasons', async () => {
     mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
       id: 'season-1',

@@ -139,11 +139,14 @@ export async function bootstrapSeason(seasonId: string): Promise<{ seasonId: str
       throw new AppError(400, 'Season must be upcoming to bootstrap', 'SEASON_NOT_UPCOMING');
     }
 
-    const existingStarterZone = await tx.zone.findFirst({
-      where: { seasonId, isStarter: true },
-      select: { id: true },
-    });
-    if (existingStarterZone) {
+    const existingSeasonContent = await Promise.all([
+      tx.zone.findFirst({ where: { seasonId }, select: { id: true } }),
+      tx.itemTemplate.findFirst({ where: { seasonId }, select: { id: true } }),
+      tx.mobTemplate.findFirst({ where: { seasonId }, select: { id: true } }),
+      tx.craftingRecipe.findFirst({ where: { seasonId }, select: { id: true } }),
+    ]);
+
+    if (existingSeasonContent.some(Boolean)) {
       throw new AppError(409, 'Season already bootstrapped', 'SEASON_ALREADY_BOOTSTRAPPED');
     }
 
