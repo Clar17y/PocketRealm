@@ -107,6 +107,18 @@ function adminToken() {
   });
 }
 
+function stubBootstrappedSeason() {
+  mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
+    id: 'season-1',
+    name: 'Season 1',
+    status: 'upcoming',
+  });
+  mockPrisma.zone.findFirst.mockResolvedValue({ id: 'zone-season-1' });
+  mockPrisma.itemTemplate.findFirst.mockResolvedValue({ id: 'item-season-1' });
+  mockPrisma.mobTemplate.findFirst.mockResolvedValue({ id: 'mob-season-1' });
+  mockPrisma.craftingRecipe.findFirst.mockResolvedValue({ id: 'recipe-season-1' });
+}
+
 describe('admin season endpoints', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -246,12 +258,37 @@ describe('admin season endpoints', () => {
     });
   });
 
+  it('activates a bootstrapped season through the admin endpoint', async () => {
+    stubBootstrappedSeason();
+    mockPrisma.season.findFirst.mockResolvedValue(null);
+    mockPrisma.season.update.mockResolvedValue({
+      id: 'season-1',
+      name: 'Season 1',
+      status: 'active',
+    });
+
+    const res = await request(buildApp())
+      .post('/api/v1/admin/seasons/season-1/activate')
+      .set('Authorization', `Bearer ${adminToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.season.update).toHaveBeenCalledWith({
+      where: { id: 'season-1' },
+      data: { status: 'active' },
+    });
+    expect(mocks.refreshSeasonCache).toHaveBeenCalledTimes(1);
+    expect(res.body).toEqual({
+      season: {
+        id: 'season-1',
+        name: 'Season 1',
+        status: 'active',
+      },
+    });
+  });
+
   it('rejects activation when another season is already active', async () => {
+    stubBootstrappedSeason();
     mockPrisma.season.findFirst.mockResolvedValue({ id: 'season-active' });
-    mockPrisma.zone.findFirst.mockResolvedValue({ id: 'zone-season-1' });
-    mockPrisma.itemTemplate.findFirst.mockResolvedValue({ id: 'item-season-1' });
-    mockPrisma.mobTemplate.findFirst.mockResolvedValue({ id: 'mob-season-1' });
-    mockPrisma.craftingRecipe.findFirst.mockResolvedValue({ id: 'recipe-season-1' });
 
     const res = await request(buildApp())
       .post('/api/v1/admin/seasons/season-1/activate')
@@ -263,6 +300,11 @@ describe('admin season endpoints', () => {
   });
 
   it('rejects activation when the season is not bootstrapped', async () => {
+    mockPrisma.season.findUniqueOrThrow.mockResolvedValue({
+      id: 'season-1',
+      name: 'Season 1',
+      status: 'upcoming',
+    });
     mockPrisma.season.findFirst.mockResolvedValue(null);
 
     const res = await request(buildApp())
