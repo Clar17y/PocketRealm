@@ -128,6 +128,38 @@ function toJsonInput(value: Prisma.JsonValue | null): Prisma.InputJsonValue | ty
   return value as Prisma.InputJsonValue;
 }
 
+function remapRecipeMaterials(
+  materials: Prisma.JsonValue | null,
+  itemTemplateIdMap: Map<string, string>,
+): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  if (materials === null) {
+    return Prisma.JsonNull;
+  }
+
+  if (!Array.isArray(materials)) {
+    return materials as Prisma.InputJsonValue;
+  }
+
+  return materials.map((material) => {
+    if (!material || typeof material !== 'object' || Array.isArray(material)) {
+      return material;
+    }
+
+    const entry = material as Record<string, unknown>;
+    const remapped = { ...entry };
+
+    if (typeof entry.templateId === 'string') {
+      remapped.templateId = itemTemplateIdMap.get(entry.templateId) ?? entry.templateId;
+    }
+
+    if (typeof entry.itemTemplateId === 'string') {
+      remapped.itemTemplateId = itemTemplateIdMap.get(entry.itemTemplateId) ?? entry.itemTemplateId;
+    }
+
+    return remapped;
+  }) as Prisma.InputJsonValue;
+}
+
 export async function bootstrapSeason(seasonId: string): Promise<{ seasonId: string }> {
   return prisma.$transaction(async (tx) => {
     const season = await tx.season.findUniqueOrThrow({
@@ -320,7 +352,7 @@ export async function bootstrapSeason(seasonId: string): Promise<{ seasonId: str
           soulbound: recipe.soulbound,
           mobFamilyId: recipe.mobFamilyId,
           turnCost: recipe.turnCost,
-          materials: toJsonInput(recipe.materials) ?? Prisma.JsonNull,
+          materials: remapRecipeMaterials(recipe.materials, itemTemplateIdMap),
           xpReward: recipe.xpReward,
         })),
       });

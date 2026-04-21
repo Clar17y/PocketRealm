@@ -267,11 +267,18 @@ describe('bootstrapSeason', () => {
     });
     expect(mockPrisma.craftingRecipe.createMany).toHaveBeenCalledWith({
       data: [
-        expect.objectContaining({
+        {
           seasonId: 'season-1',
+          skillType: 'smithing',
+          requiredLevel: 2,
           resultTemplateId: 'item-season-1',
+          isAdvanced: false,
+          soulbound: false,
           mobFamilyId: 'family-perm-1',
-        }),
+          turnCost: 3,
+          materials: [{ itemTemplateId: 'item-season-2', quantity: 2 }],
+          xpReward: 25,
+        },
       ],
     });
     expect(mockPrisma.zoneMobFamily.createMany).toHaveBeenCalledWith({
