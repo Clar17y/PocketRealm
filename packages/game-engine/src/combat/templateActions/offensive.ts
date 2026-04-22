@@ -62,6 +62,9 @@ export function executeOffensiveAction(
     baseDamageMax = actionStats.damageMax;
     baseAccuracy = actionStats.accuracy;
 
+    // Re-apply buff/debuff modifiers from active effects (these were lost when
+    // per-action stats replaced the pre-computed effective stats).
+    // Also collect attackPercent in the same pass for application below.
     let attackPercentModifier = 0;
     for (const effect of state.activeEffects) {
       if (effect.target !== actorKey) {

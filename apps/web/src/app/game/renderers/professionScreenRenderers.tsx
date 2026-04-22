@@ -11,24 +11,8 @@ import { titleCaseFromSnake } from '@/lib/format';
 import { buildRecipeDiscountLookup, getRecipeSkillInfo } from '@/lib/recipeDiscount';
 import { rarityFromTier } from '@/lib/rarity';
 import { CRAFTING_SKILL_TABS, GATHERING_SKILL_TABS, SKILL_META } from '../pageConstants';
+import { useEquipmentStats } from '../hooks/useEquipmentStats';
 import type { GameControllerState } from './gameScreenRenderer.types';
-
-function useEquipmentLuck(gc: GameControllerState) {
-  return useMemo(() => {
-    let equipmentLuck = 0;
-    for (const entry of gc.equipment) {
-      const base = entry.item?.template?.baseStats as Record<string, unknown> | undefined;
-      const bonus = entry.item?.bonusStats ?? undefined;
-      if (base && typeof base.luck === 'number') {
-        equipmentLuck += base.luck;
-      }
-      if (bonus && typeof bonus.luck === 'number') {
-        equipmentLuck += bonus.luck;
-      }
-    }
-    return equipmentLuck;
-  }, [gc.equipment]);
-}
 
 export function CraftingScreenRenderer({ gc }: { gc: GameControllerState }) {
   const activeCraftingSkillMeta = SKILL_META[gc.activeCraftingSkill];
@@ -107,7 +91,7 @@ export function CraftingScreenRenderer({ gc }: { gc: GameControllerState }) {
 }
 
 export function ForgeScreenRenderer({ gc }: { gc: GameControllerState }) {
-  const equipmentLuck = useEquipmentLuck(gc);
+  const equipmentLuck = useEquipmentStats(gc.equipment).luck;
   const discountLookup = useMemo(
     () => buildRecipeDiscountLookup(gc.craftingRecipes, gc.skills),
     [gc.craftingRecipes, gc.skills]

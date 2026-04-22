@@ -150,6 +150,8 @@ export async function challenge(
       }
     }
 
+    // Update attacker rating. On draws, `winStreak: undefined` is a Prisma no-op,
+    // which deliberately preserves the current streak across draws.
     const newAttackerRating = Math.max(0, attackerRating.rating + attackerRatingChange);
     const newAttackerStreak = isDraw ? attackerRating.winStreak : attackerWon ? attackerRating.winStreak + 1 : 0;
     await tx.pvpRating.update({
@@ -166,6 +168,7 @@ export async function challenge(
       },
     });
 
+    // Update defender rating. Same draw-preserves-streak invariant as the attacker update.
     const newDefenderRating = Math.max(0, defenderRating.rating + defenderRatingChange);
     const newDefenderStreak = isDraw ? defenderRating.winStreak : attackerWon ? 0 : defenderRating.winStreak + 1;
     await tx.pvpRating.update({
@@ -220,6 +223,8 @@ export async function challenge(
     target.isBot ? [] : degradeEquippedDurability(targetId, combatResult.log, 'combatantB'),
   ]);
 
+  // PvP loss: guaranteed escape, no knockout, no gold loss (deliberate divergence from PvE).
+  // Higher evasion → higher fleeChance → lower escapeThreshold → more likely clean escape.
   const attackerKnockedOut = false;
   let fleeOutcome: FleeOutcome | null = null;
   if (combatResult.combatantAHpRemaining <= 0) {

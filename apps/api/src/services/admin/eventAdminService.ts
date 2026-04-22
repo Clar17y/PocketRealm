@@ -53,11 +53,11 @@ export async function spawnAdminWorldEvent(
       include: { mobFamily: { select: { id: true, name: true } } },
     });
     const familyName = input.target ?? template.fixedTarget;
-    let picked = families[0];
+    let picked: (typeof families)[number] | undefined;
 
     if (familyName) {
       const lowerFamilyName = familyName.toLowerCase();
-      picked = families.find((family) => family.mobFamily.name.toLowerCase() === lowerFamilyName) ?? families[0];
+      picked = families.find((family) => family.mobFamily.name.toLowerCase() === lowerFamilyName);
     } else if (families.length > 0) {
       picked = families[Math.floor(Math.random() * families.length)];
     }
@@ -184,6 +184,7 @@ export async function spawnAdminBoss(
     };
   }
 
+  // Bosses don't time-expire — lifecycle is managed by the encounter system.
   await prisma.worldEvent.update({
     where: { id: event.id },
     data: { expiresAt: null },

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { WORLD_EVENT_TEMPLATES } from '@pocketrealm/shared';
 
 vi.mock('../worldEventService', () => ({
   getEventById: vi.fn(),
@@ -19,9 +20,9 @@ vi.mock('../roundTimerRegistry', () => ({
 }));
 
 import { mockPrisma } from '../../__test__/setup';
-import { getEventById } from '../worldEventService';
+import { getEventById, spawnWorldEvent } from '../worldEventService';
 import { roundTimerRegistry } from '../roundTimerRegistry';
-import { cancelAdminEvent } from './eventAdminService';
+import { cancelAdminEvent, spawnAdminWorldEvent } from './eventAdminService';
 
 describe('eventAdminService', () => {
   beforeEach(() => {
@@ -69,5 +70,35 @@ describe('eventAdminService', () => {
     vi.mocked(getEventById).mockResolvedValue(null);
 
     await expect(cancelAdminEvent('missing')).resolves.toBeNull();
+  });
+
+  it('does not silently retarget a family-scoped event when the requested family is missing', async () => {
+    const familyTemplateIndex = WORLD_EVENT_TEMPLATES.findIndex(
+      (template) => template.targeting === 'family' && !template.fixedTarget,
+    );
+
+    expect(familyTemplateIndex).toBeGreaterThanOrEqual(0);
+
+    mockPrisma.zoneMobFamily.findMany.mockResolvedValue([
+      {
+        mobFamily: { id: 'family-rats', name: 'Rats' },
+      },
+    ]);
+    vi.mocked(spawnWorldEvent).mockResolvedValue({
+      id: 'event-1',
+    } as never);
+
+    await spawnAdminWorldEvent('admin-1', {
+      templateIndex: familyTemplateIndex,
+      zoneId: 'zone-1',
+      durationHours: 2,
+      target: 'Wolves',
+    });
+
+    expect(spawnWorldEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetFamily: undefined,
+      }),
+    );
   });
 });

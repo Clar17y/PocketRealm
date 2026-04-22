@@ -44,6 +44,9 @@ import {
   type DueBossEncounterRef,
 } from './shared';
 
+// Distributed lock to prevent concurrent resolution corrupting boss HP.
+// A unique token is stored so the finally block can only release the lock
+// it owns, guarding against TTL expiry while resolution is still running.
 async function withBossRoundLock<T>(
   encounterId: string,
   resolve: () => Promise<T>,
@@ -299,6 +302,7 @@ async function resolveBossRoundInner(
     }
   }
 
+  // Optimistic lock: only update if roundNumber hasn't changed since we read the encounter.
   const updated = await prisma.bossEncounter.updateMany({
     where: { id: encounterId, roundNumber: encounter.roundNumber, status: 'in_progress' },
     data: {
