@@ -113,20 +113,18 @@ describe('AppShell', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('shows a character picker when multiple characters exist and switches realms from the header', () => {
-    const onSwitchPlayer = vi.fn();
-
+  it('keeps the header stable without the legacy realm switch control', () => {
     render(
       React.createElement(
         AppShell,
         {
-          username: 'Rook',
+          username: 'RookTheUnyieldingOfTheNorthAndSouth',
           realmLabel: 'Permanent Realm',
           activePlayerId: 'permanent-player',
           characters: [
             {
               id: 'permanent-player',
-              username: 'Rook',
+              username: 'RookTheUnyieldingOfTheNorthAndSouth',
               characterLevel: 42,
               seasonId: null,
               seasonName: null,
@@ -143,15 +141,14 @@ describe('AppShell', () => {
               seasonEndsAt: '2099-01-01T00:00:00.000Z',
             },
           ],
-          onSwitchPlayer,
+          switchingPlayerId: 'season-player',
+          onSwitchPlayer: vi.fn(),
         },
         React.createElement('div', null, 'Child'),
       ),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Switch character' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Rook_S1/i }));
-
-    expect(onSwitchPlayer).toHaveBeenCalledWith('season-player');
+    expect(screen.queryByRole('button', { name: 'Switch character' })).toBeNull();
+    expect(screen.queryByText('Permanent Realm')).toBeNull();
   });
 });

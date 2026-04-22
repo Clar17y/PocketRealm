@@ -4,8 +4,6 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
-import { formatTimeRemaining } from '@/lib/format';
-import type { CharacterSummary } from '@/lib/api';
 import { ZoneBackground } from '@/components/ZoneBackground';
 
 interface AppShellProps {
@@ -19,17 +17,6 @@ interface AppShellProps {
   onWhatsNew?: () => void;
   hasUnseenChangelog?: boolean;
   backgroundSrc?: string;
-  realmLabel?: string;
-  realmEndsAt?: string | Date | null;
-  activePlayerId?: string | null;
-  characters?: CharacterSummary[];
-  switchingPlayerId?: string | null;
-  onSwitchPlayer?: (playerId: string) => void;
-}
-
-function realmTimeRemaining(expiresAt: string | Date | null | undefined): string {
-  if (!expiresAt) return 'Permanent';
-  return formatTimeRemaining(typeof expiresAt === 'string' ? expiresAt : expiresAt.toISOString());
 }
 
 export function AppShell({
@@ -43,21 +30,9 @@ export function AppShell({
   onWhatsNew,
   hasUnseenChangelog,
   backgroundSrc,
-  realmLabel,
-  realmEndsAt,
-  activePlayerId,
-  characters = [],
-  switchingPlayerId,
-  onSwitchPlayer,
 }: AppShellProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [characterDropdownOpen, setCharacterDropdownOpen] = useState(false);
   const hasMenu = Boolean(onLogout || onWhatsNew);
-  const hasCharacterPicker = characters.length > 1 && onSwitchPlayer;
-  const closeMenus = () => {
-    setDropdownOpen(false);
-    setCharacterDropdownOpen(false);
-  };
 
   return (
     <div className="min-h-dvh w-full bg-[var(--rpg-background)]/95 flex flex-col safe-area-top">
@@ -83,7 +58,7 @@ export function AppShell({
               <button
                 type="button"
                 onClick={() => {
-                  closeMenus();
+                  setDropdownOpen(false);
                   onMailClick();
                 }}
                 className="relative text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)] transition-colors"
@@ -104,7 +79,7 @@ export function AppShell({
               <button
                 type="button"
                 onClick={() => {
-                  closeMenus();
+                  setDropdownOpen(false);
                   onSettings();
                 }}
                 className="text-[var(--rpg-text-secondary)] hover:text-[var(--rpg-gold)] transition-colors"
@@ -116,96 +91,6 @@ export function AppShell({
                 </svg>
               </button>
             )}
-            {realmLabel && (
-              <div className="hidden sm:flex flex-col items-end">
-                <span className="rounded-full border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-2 py-0.5 text-[10px] font-pixel uppercase tracking-wide text-[var(--rpg-gold)]">
-                  {realmLabel}
-                </span>
-                {realmEndsAt && (
-                  <span className="mt-0.5 text-[10px] text-[var(--rpg-text-secondary)]">
-                    {realmTimeRemaining(realmEndsAt)} left
-                  </span>
-                )}
-              </div>
-            )}
-            {hasCharacterPicker && (
-              <div
-                className="relative"
-                onBlur={(e) => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setCharacterDropdownOpen(false);
-                }}
-              >
-                <button
-                  type="button"
-                  aria-label="Switch character"
-                  aria-expanded={characterDropdownOpen}
-                  aria-haspopup="menu"
-                  onClick={() => {
-                    setDropdownOpen(false);
-                    setCharacterDropdownOpen((open) => !open);
-                  }}
-                  className="rounded border border-[var(--rpg-border)] bg-[var(--rpg-background)] px-2 py-1 text-left text-[10px] text-[var(--rpg-text-primary)] transition-colors hover:border-[var(--rpg-gold)]"
-                >
-                  <span className="block font-pixel uppercase tracking-wide text-[var(--rpg-gold)]">
-                    {realmLabel ?? 'Realm'}
-                  </span>
-                  <span className="block text-[10px] text-[var(--rpg-text-secondary)]">
-                    Switch
-                  </span>
-                </button>
-
-                {characterDropdownOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-30"
-                      onClick={() => setCharacterDropdownOpen(false)}
-                    />
-                    <div
-                      role="menu"
-                      className="absolute right-0 top-full mt-1 z-50 w-64 overflow-hidden rounded-lg border border-[var(--rpg-border)] bg-[var(--rpg-surface)] shadow-lg"
-                    >
-                      {characters.map((character) => {
-                        const isActive = character.id === activePlayerId;
-                        const isBusy = switchingPlayerId === character.id;
-                        const realmName = character.seasonName ?? 'Permanent Realm';
-
-                        return (
-                          <button
-                            key={character.id}
-                            type="button"
-                            role="menuitem"
-                            disabled={isActive || Boolean(switchingPlayerId)}
-                            onClick={() => {
-                              setCharacterDropdownOpen(false);
-                              onSwitchPlayer(character.id);
-                            }}
-                            className={`w-full border-b border-[var(--rpg-border)] px-3 py-2 text-left transition-colors last:border-b-0 ${
-                              isActive
-                                ? 'bg-[var(--rpg-gold)]/10'
-                                : 'hover:bg-[var(--rpg-background)]'
-                            } disabled:cursor-not-allowed disabled:opacity-70`}
-                          >
-                            <span className="flex items-center justify-between gap-3">
-                              <span>
-                                <span className="block text-sm font-bold text-[var(--rpg-text-primary)]">
-                                  {character.username}
-                                </span>
-                                <span className="block text-xs text-[var(--rpg-text-secondary)]">
-                                  {realmName} · Lv. {character.characterLevel}
-                                </span>
-                              </span>
-                              <span className="text-[10px] font-pixel uppercase tracking-wide text-[var(--rpg-gold)]">
-                                {isBusy ? 'Switching' : isActive ? 'Active' : 'Play'}
-                              </span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
             {username && (
               <div
                 className="relative"
@@ -216,7 +101,6 @@ export function AppShell({
                 {hasMenu ? (
                   <button
                     onClick={() => {
-                      setCharacterDropdownOpen(false);
                       setDropdownOpen((open) => !open);
                     }}
                     onKeyDown={(e) => { if (e.key === 'Escape') setDropdownOpen(false); }}
