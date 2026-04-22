@@ -17,7 +17,7 @@ const sectionDescriptions: Record<string, string> = {
   progression:
     'XP formulas, leveling curves, efficiency decay, and skill point allocation.',
   resources:
-    'Health, stamina, and mana pools: max values, regen rates, rest, and flee mechanics.',
+    'Turn bank, health, stamina, mana, regen rates, rest, and flee mechanics.',
   items: 'Item rarity, drop tables, forge upgrades, durability, sell prices, and inventory.',
   crafting:
     'Crafting crit system, gathering yields, gem drops, and salvage rates.',
