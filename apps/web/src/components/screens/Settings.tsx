@@ -305,6 +305,7 @@ export function Settings({
         aria-label={rowLabel}
         onClick={() => {
           if (!isActiveCharacter) {
+            setIsRealmSwitcherOpen(false);
             onSwitchPlayer?.(character.id);
           }
         }}

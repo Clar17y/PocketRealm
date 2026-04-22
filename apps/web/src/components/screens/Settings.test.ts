@@ -420,6 +420,8 @@ describe('Settings', () => {
     fireEvent.click(screen.getByRole('button', { name: /rook · permanent realm · level 18/i }));
 
     expect(onSwitchPlayer).toHaveBeenCalledWith('permanent-player');
+    expect(screen.queryByRole('button', { name: /rook · permanent realm · level 18/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /current realm: season 7/i }).getAttribute('aria-expanded')).toBe('false');
   });
 
   it('switching in progress disables target buttons', () => {
