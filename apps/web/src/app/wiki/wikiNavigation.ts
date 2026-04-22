@@ -59,6 +59,7 @@ export const wikiNavigation: WikiNavSection[] = [
     slug: 'resources',
     icon: '/assets/ui/ui_hp-pixelated-128.webp',
     items: [
+      { label: 'Turns & Regeneration', href: '/wiki/resources/turns' },
       { label: 'Health', href: '/wiki/resources/health' },
       { label: 'Stamina', href: '/wiki/resources/stamina' },
       { label: 'Mana', href: '/wiki/resources/mana' },

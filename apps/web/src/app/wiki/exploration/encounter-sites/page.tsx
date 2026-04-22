@@ -4,6 +4,7 @@ import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
 import {
   EXPLORATION_CONSTANTS,
+  EXPLORATION_TRACKING_CONSTANTS,
   ENCOUNTER_SITE_CONSTANTS,
   CHEST_CONSTANTS,
   COMBAT_CONSTANTS,
@@ -73,6 +74,17 @@ export default function EncounterSitesPage() {
         Mobs are distributed across rooms when the site is generated. You must
         clear rooms sequentially. The next room becomes available only after
         the current one is fully defeated.
+      </p>
+      <p>
+        If mob family tracking is enabled, encounter-site family discovery is
+        biased toward the tracked family using a{' '}
+        <strong>{EXPLORATION_TRACKING_CONSTANTS.TRACKED_FAMILY_WEIGHT_MULTIPLIER}x</strong>{' '}
+        weight boost, while non-tracked families are suppressed to{' '}
+        <strong>{EXPLORATION_TRACKING_CONSTANTS.NON_TRACKED_WEIGHT_MULTIPLIER}x</strong>.
+        Tracking also reduces overall ambush and site result rate to{' '}
+        <strong>{EXPLORATION_TRACKING_CONSTANTS.RESULT_RATE_MULTIPLIER}x</strong>{' '}
+        normal. If the tracked family cannot build a valid site at the current
+        tier, site generation falls back to the normal non-tracked family pool.
       </p>
 
       <h2>Mob Decay</h2>

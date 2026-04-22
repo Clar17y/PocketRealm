@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { TIER_BLEED_CONSTANTS, ZONE_EXPLORATION_CONSTANTS, TIER_NAME_CONSTANTS } from '@pocketrealm/shared';
+import { EXPLORATION_TRACKING_CONSTANTS, TIER_BLEED_CONSTANTS, ZONE_EXPLORATION_CONSTANTS, TIER_NAME_CONSTANTS } from '@pocketrealm/shared';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
@@ -9,7 +9,7 @@ const { Var, Out, Const, Op, Comment } = FormulaBlock;
 export const metadata: Metadata = {
   title: 'Mob Tier Filtering',
   description:
-    'Zone mob tier unlocking by exploration percentage, newest tier weight multiplier, and tier bleedthrough probabilities.',
+    'Zone mob tier unlocking by exploration percentage, tracking rules, newest tier weight multiplier, and tier bleedthrough probabilities.',
 };
 
 const defaultTiers = ZONE_EXPLORATION_CONSTANTS.DEFAULT_TIERS;
@@ -48,6 +48,36 @@ export default function MobTiersPage() {
           ))}
         </tbody>
       </table>
+
+      <h2>Tracking Mode</h2>
+      <p>
+        Mob family tracking unlocks once you have at least one kill from a
+        family in the current zone. Families whose minimum tier is above your
+        highest unlocked tier cannot be tracked yet.
+      </p>
+      <FormulaBlock>
+        <Out>selectedTier while tracking</Out> <Op>=</Op>{' '}
+        <Var>highestUnlockedTier</Var>
+      </FormulaBlock>
+      <p>
+        Tracking ignores the manual tier picker and always uses the highest
+        tier you have unlocked in that zone.
+      </p>
+      <FormulaBlock>
+        <Out>trackedFamilyWeight</Out> <Op>=</Op>{' '}
+        <Var>baseFamilyWeight</Var> <Op>&times;</Op>{' '}
+        <Const>{EXPLORATION_TRACKING_CONSTANTS.TRACKED_FAMILY_WEIGHT_MULTIPLIER}</Const>
+      </FormulaBlock>
+      <FormulaBlock>
+        <Out>nonTrackedFamilyWeight</Out> <Op>=</Op>{' '}
+        <Var>baseFamilyWeight</Var> <Op>&times;</Op>{' '}
+        <Const>{EXPLORATION_TRACKING_CONSTANTS.NON_TRACKED_WEIGHT_MULTIPLIER}</Const>
+      </FormulaBlock>
+      <p>
+        If the tracked family has no eligible members at your highest unlocked
+        tier, the server drops tracking for that run and falls back to normal
+        family weighting.
+      </p>
 
       <h2>Newest Tier Weight Multiplier</h2>
       <p>
@@ -99,6 +129,27 @@ export default function MobTiersPage() {
         selected tier is used instead. If it targets above the zone maximum,
         the highest available tier is used.
       </p>
+
+      <h2>Selection Constants</h2>
+      <ConstantsTable
+        rows={[
+          {
+            name: 'NEWEST_TIER_WEIGHT_MULTIPLIER',
+            value: `${ZONE_EXPLORATION_CONSTANTS.NEWEST_TIER_WEIGHT_MULTIPLIER}x`,
+            description: 'Weight bonus for the highest unlocked exploration tier',
+          },
+          {
+            name: 'TRACKED_FAMILY_WEIGHT_MULTIPLIER',
+            value: `${EXPLORATION_TRACKING_CONSTANTS.TRACKED_FAMILY_WEIGHT_MULTIPLIER}x`,
+            description: 'Weight bonus applied to the tracked family',
+          },
+          {
+            name: 'NON_TRACKED_WEIGHT_MULTIPLIER',
+            value: `${EXPLORATION_TRACKING_CONSTANTS.NON_TRACKED_WEIGHT_MULTIPLIER}x`,
+            description: 'Weight multiplier applied to non-tracked families during tracking',
+          },
+        ]}
+      />
     </WikiSection>
   );
 }

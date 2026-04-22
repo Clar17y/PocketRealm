@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { CRAFTING_CONSTANTS } from '@pocketrealm/shared';
+import { CRAFTING_CONSTANTS, PREMIUM_CONSTANTS } from '@pocketrealm/shared';
 import { WikiSection } from '@/components/wiki/WikiSection';
 import { FormulaBlock } from '@/components/wiki/FormulaBlock';
 import { ConstantsTable } from '@/components/wiki/ConstantsTable';
@@ -9,14 +9,14 @@ const { Var, Out, Const, Op, Comment } = FormulaBlock;
 export const metadata: Metadata = {
   title: 'Crafting Crits',
   description:
-    'Crafting critical hit chance, rare and epic craft probabilities, crit rarity tiers, and bonus stat ranges.',
+    'Crafting critical hit chance, Champion modifiers, rare and epic craft probabilities, crit rarity tiers, and bonus stat ranges.',
 };
 
 export default function CraftingCritsPage() {
   return (
     <WikiSection
       title="Crafting Crits"
-      summary="Crafting an item has a chance to produce a higher-rarity result. The crit chance scales with skill level above recipe requirement and equipped luck."
+      summary="Crafting an item has a chance to produce a higher-rarity result. The crit chance scales with skill level above recipe requirement, equipped luck, and Champion bonuses."
       related={[
         { label: 'Rarity System', href: '/wiki/items/rarity' },
         { label: 'Gathering & Gems', href: '/wiki/crafting/gathering' },
@@ -46,8 +46,27 @@ export default function CraftingCritsPage() {
           { name: 'LUCK_CRIT_BONUS_PER_POINT', value: `+${(CRAFTING_CONSTANTS.LUCK_CRIT_BONUS_PER_POINT * 100).toFixed(1)}%`, description: 'Additional crit chance per point of luck' },
           { name: 'MIN_CRIT_CHANCE', value: `${(CRAFTING_CONSTANTS.MIN_CRIT_CHANCE * 100).toFixed(0)}%`, description: 'Floor crit chance' },
           { name: 'MAX_CRIT_CHANCE', value: `${(CRAFTING_CONSTANTS.MAX_CRIT_CHANCE * 100).toFixed(0)}%`, description: 'Ceiling crit chance' },
+          { name: 'BONUS_MULTIPLIER', value: `${PREMIUM_CONSTANTS.BONUS_MULTIPLIER}x`, description: 'Champion multiplier applied before craft crit caps' },
         ]}
       />
+
+      <h2>Champion Bonus</h2>
+      <p>
+        Champion supporters multiply craft crit, rare craft, and epic craft
+        chances by <strong>{PREMIUM_CONSTANTS.BONUS_MULTIPLIER}x</strong> before
+        each chance is clamped to its normal cap.
+      </p>
+      <FormulaBlock>
+        <Out>championCritChance</Out> <Op>=</Op> min<Op>(</Op>
+        <Var>baseCritChance</Var> <Op>&times;</Op>{' '}
+        <Const>{PREMIUM_CONSTANTS.BONUS_MULTIPLIER}</Const><Op>,</Op>{' '}
+        <Const>{CRAFTING_CONSTANTS.MAX_CRIT_CHANCE}</Const><Op>)</Op>
+      </FormulaBlock>
+      <p>
+        The same multiplier is applied to <code>rareCraftChance</code> and{' '}
+        <code>epicCraftChance</code> before the rare and epic maximums are
+        enforced.
+      </p>
 
       <h2>Rare Craft Chance</h2>
       <p>
