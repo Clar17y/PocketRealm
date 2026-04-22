@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CharacterSummary } from '@/lib/api';
 
 const {
   createPremiumCheckoutMock,
@@ -65,6 +66,22 @@ function renderSettings(overrides: Partial<React.ComponentProps<typeof Settings>
     isPremium: false,
     premiumExpiresAt: null,
     seasonArchives: [],
+    realmLabel: 'Permanent Realm',
+    realmEndsAt: null,
+    activePlayerId: 'permanent-player',
+    characters: [
+      {
+        id: 'permanent-player',
+        username: 'Rook',
+        characterLevel: 18,
+        seasonId: null,
+        seasonName: null,
+        seasonStatus: null,
+        seasonEndsAt: null,
+      },
+    ] as CharacterSummary[],
+    switchingPlayerId: null,
+    onSwitchPlayer: vi.fn(),
     onAccountRefresh: vi.fn().mockResolvedValue(undefined),
     onForceRelogin: vi.fn(),
     combatLogSpeedMs: 800,
@@ -321,5 +338,125 @@ describe('Settings', () => {
     expect(screen.getByText('Rook_S1 · Level 21')).toBeTruthy();
     expect(screen.getByText('1 rewards')).toBeTruthy();
     expect(screen.getByText('1 tracked ranks')).toBeTruthy();
+  });
+
+  it('single-character account shows Current Realm and Permanent Realm but no interactive button', () => {
+    renderSettings({
+      realmLabel: 'Permanent Realm',
+      realmEndsAt: null,
+      activePlayerId: 'permanent-player',
+      characters: [
+        {
+          id: 'permanent-player',
+          username: 'Rook',
+          characterLevel: 18,
+          seasonId: null,
+          seasonName: null,
+          seasonStatus: null,
+          seasonEndsAt: null,
+        },
+      ],
+    });
+
+    expect(screen.getByText('Username')).toBeTruthy();
+    expect(screen.getByText('Rook')).toBeTruthy();
+    expect(screen.getByText('Current Realm')).toBeTruthy();
+    expect(screen.getByText('Permanent Realm')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /current realm/i })).toBeNull();
+  });
+
+  it('seasonal account shows the active season name', () => {
+    renderSettings({
+      realmLabel: 'Season 7',
+      realmEndsAt: '2026-05-01T00:00:00.000Z',
+      activePlayerId: 'season-player',
+      characters: [
+        {
+          id: 'season-player',
+          username: 'Rook_S7',
+          characterLevel: 26,
+          seasonId: 'season-7',
+          seasonName: 'Season 7',
+          seasonStatus: 'active',
+          seasonEndsAt: '2026-05-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(screen.getByText('Current Realm')).toBeTruthy();
+    expect(screen.getByText('Season 7')).toBeTruthy();
+  });
+
+  it('multi-character account can open the Current Realm row and switch to another character', async () => {
+    const onSwitchPlayer = vi.fn();
+    renderSettings({
+      realmLabel: 'Season 7',
+      realmEndsAt: '2026-05-01T00:00:00.000Z',
+      activePlayerId: 'season-player',
+      characters: [
+        {
+          id: 'permanent-player',
+          username: 'Rook',
+          characterLevel: 18,
+          seasonId: null,
+          seasonName: null,
+          seasonStatus: null,
+          seasonEndsAt: null,
+        },
+        {
+          id: 'season-player',
+          username: 'Rook_S7',
+          characterLevel: 26,
+          seasonId: 'season-7',
+          seasonName: 'Season 7',
+          seasonStatus: 'active',
+          seasonEndsAt: '2026-05-01T00:00:00.000Z',
+        },
+      ],
+      onSwitchPlayer,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /current realm: season 7/i }));
+    fireEvent.click(screen.getByRole('button', { name: /rook · permanent realm · level 18/i }));
+
+    expect(onSwitchPlayer).toHaveBeenCalledWith('permanent-player');
+  });
+
+  it('switching in progress disables target buttons', () => {
+    renderSettings({
+      realmLabel: 'Season 7',
+      realmEndsAt: '2026-05-01T00:00:00.000Z',
+      activePlayerId: 'season-player',
+      onSwitchPlayer: vi.fn(),
+      switchingPlayerId: 'season-player',
+      characters: [
+        {
+          id: 'permanent-player',
+          username: 'Rook',
+          characterLevel: 18,
+          seasonId: null,
+          seasonName: null,
+          seasonStatus: null,
+          seasonEndsAt: null,
+        },
+        {
+          id: 'season-player',
+          username: 'Rook_S7',
+          characterLevel: 26,
+          seasonId: 'season-7',
+          seasonName: 'Season 7',
+          seasonStatus: 'active',
+          seasonEndsAt: '2026-05-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /current realm: season 7/i }));
+
+    const activeRow = screen.getByRole('button', { name: /rook_s7 · season 7 · level 26/i });
+    const targetRow = screen.getByRole('button', { name: /rook · permanent realm · level 18/i });
+
+    expect((activeRow as HTMLButtonElement).disabled).toBe(true);
+    expect((targetRow as HTMLButtonElement).disabled).toBe(true);
   });
 });

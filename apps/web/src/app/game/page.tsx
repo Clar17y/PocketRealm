@@ -487,6 +487,12 @@ export default function GamePage() {
           gc={gc}
           player={player}
           seasonArchives={seasonArchives}
+          realmLabel={activeCharacter?.seasonName ?? 'Permanent Realm'}
+          realmEndsAt={activeCharacter?.seasonEndsAt ?? null}
+          activePlayerId={player?.id ?? null}
+          characters={characters}
+          switchingPlayerId={switchingPlayerId}
+          onSwitchPlayer={(playerId) => void handleSwitchPlayer(playerId)}
           casinoSocket={casinoSocket}
           achievementCategory={achievementCategory}
           setAchievementCategory={setAchievementCategory}
