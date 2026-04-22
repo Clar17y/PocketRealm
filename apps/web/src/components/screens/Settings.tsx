@@ -144,6 +144,7 @@ function formatRealmEndsAt(value: string | Date | null): string | null {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    timeZone: 'UTC',
   }).format(date);
 }
 

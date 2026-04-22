@@ -130,6 +130,51 @@ function renderSettings(overrides: Partial<React.ComponentProps<typeof Settings>
 }
 
 describe('Settings', () => {
+  it('renders realm end dates using the canonical UTC calendar day', () => {
+    const dateTimeFormatSpy = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (
+      this: Intl.DateTimeFormat,
+      _locale?: string | string[],
+      options?: Intl.DateTimeFormatOptions,
+    ) {
+      return {
+        format: (value: Date | number) => {
+          const date = value instanceof Date ? value : new Date(value);
+          const useUtc = options?.timeZone === 'UTC';
+          const month = useUtc ? date.getUTCMonth() : date.getMonth();
+          const day = useUtc ? date.getUTCDate() : date.getDate();
+          const year = useUtc ? date.getUTCFullYear() : date.getFullYear();
+          const monthLabel = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month];
+
+          return `${monthLabel} ${day}, ${year}`;
+        },
+      } as Intl.DateTimeFormat;
+    } as typeof Intl.DateTimeFormat);
+
+    try {
+      renderSettings({
+        realmLabel: 'Season 7',
+        realmEndsAt: '2026-05-01T00:00:00.000Z',
+        activePlayerId: 'season-player',
+        characters: [
+          {
+            id: 'season-player',
+            username: 'Rook_S7',
+            characterLevel: 26,
+            seasonId: 'season-7',
+            seasonName: 'Season 7',
+            seasonStatus: 'active',
+            seasonEndsAt: '2026-05-01T00:00:00.000Z',
+          },
+        ],
+      });
+
+      expect(screen.getByText('Ends May 1, 2026')).toBeTruthy();
+      expect(dateTimeFormatSpy).toHaveBeenCalledWith('en-US', expect.objectContaining({ timeZone: 'UTC' }));
+    } finally {
+      dateTimeFormatSpy.mockRestore();
+    }
+  });
+
   it('renders the Support Pocketrealm panel with one-time purchase copy', async () => {
     renderSettings();
 
