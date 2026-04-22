@@ -4,7 +4,6 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { uiIconSrc } from '@/lib/assets';
-import type { CharacterSummary } from '@/lib/api';
 import { ZoneBackground } from '@/components/ZoneBackground';
 
 interface AppShellProps {
@@ -18,12 +17,6 @@ interface AppShellProps {
   onWhatsNew?: () => void;
   hasUnseenChangelog?: boolean;
   backgroundSrc?: string;
-  realmLabel?: string;
-  realmEndsAt?: string | Date | null;
-  activePlayerId?: string | null;
-  characters?: CharacterSummary[];
-  switchingPlayerId?: string | null;
-  onSwitchPlayer?: (playerId: string) => void;
 }
 
 export function AppShell({
