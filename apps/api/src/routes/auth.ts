@@ -82,6 +82,16 @@ interface CharacterSummary {
   seasonEndsAt: Date | null;
 }
 
+async function findPlayerByRealmUsername(username: string, seasonId: string | null) {
+  return prisma.player.findFirst({
+    where: {
+      username,
+      seasonId,
+    },
+    select: { id: true },
+  });
+}
+
 authRouter.post('/register', asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
 
@@ -95,7 +105,7 @@ authRouter.post('/register', asyncHandler(async (req, res) => {
   // Check if user exists
   const [existingAccount, existingPlayer] = await Promise.all([
     prisma.account.findUnique({ where: { email: body.email }, select: { id: true } }),
-    prisma.player.findUnique({ where: { username: body.username }, select: { id: true } }),
+    findPlayerByRealmUsername(body.username, null),
   ]);
 
   if (existingAccount || existingPlayer) {
@@ -572,10 +582,7 @@ authRouter.post('/join-season', authenticate, asyncHandler(async (req, res) => {
     throw new AppError(409, 'Already have a character for this season', 'SEASON_CHARACTER_EXISTS');
   }
 
-  const usernameTaken = await prisma.player.findUnique({
-    where: { username },
-    select: { id: true },
-  });
+  const usernameTaken = await findPlayerByRealmUsername(username, activeSeason.id);
 
   if (usernameTaken) {
     throw new AppError(409, 'Username already taken', 'USERNAME_TAKEN');

@@ -355,8 +355,8 @@ describe('POST /join-season', () => {
       status: 'active',
     });
     mockPrisma.player.findFirst
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
-    mockPrisma.player.findUnique.mockResolvedValue(null);
     mockPrisma.zone.findFirst.mockResolvedValue({
       id: 'starter-town',
       seasonId: 'season-1',
@@ -410,6 +410,10 @@ describe('POST /join-season', () => {
 
     expect(mockPrisma.player.findFirst).toHaveBeenCalledWith({
       where: { accountId: 'account-1', seasonId: 'season-1' },
+      select: { id: true },
+    });
+    expect(mockPrisma.player.findFirst).toHaveBeenNthCalledWith(2, {
+      where: { username: 'SeasonRook', seasonId: 'season-1' },
       select: { id: true },
     });
     expect(txClient.player.create).toHaveBeenCalledWith({
@@ -491,8 +495,9 @@ describe('POST /join-season', () => {
       name: 'Season 1',
       status: 'active',
     });
-    mockPrisma.player.findFirst.mockResolvedValue(null);
-    mockPrisma.player.findUnique.mockResolvedValue(null);
+    mockPrisma.player.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
     mockPrisma.zone.findFirst.mockResolvedValue(null);
 
     const req = {
@@ -512,5 +517,109 @@ describe('POST /join-season', () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledTimes(1);
     expect(next.mock.calls[0][0].message).toContain('No starter zone configured');
+  });
+
+  it('allows reusing a permanent-realm username in a season', async () => {
+    mockPrisma.season.findFirst.mockResolvedValue({
+      id: 'season-1',
+      name: 'Season 1',
+      status: 'active',
+    });
+    mockPrisma.player.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mockPrisma.zone.findFirst.mockResolvedValue({
+      id: 'starter-town',
+      seasonId: 'season-1',
+    });
+    mockPrisma.zoneConnection.findFirst.mockResolvedValue({
+      toZone: { id: 'season-forest' },
+    });
+    mockPrisma.itemTemplate.findUnique.mockResolvedValue({
+      id: 'starter-offhand',
+      maxDurability: 40,
+    });
+
+    const txClient = {
+      player: {
+        create: vi.fn().mockResolvedValue({
+          id: 'player-s1',
+          username: 'Rook',
+          seasonId: 'season-1',
+        }),
+      },
+      item: {
+        create: vi.fn().mockResolvedValue({ id: 'starter-item-1' }),
+      },
+      playerEquipment: {
+        upsert: vi.fn().mockResolvedValue({}),
+      },
+      account: {
+        update: vi.fn().mockResolvedValue({
+          id: 'account-1',
+          role: 'player',
+        }),
+      },
+    };
+    mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(txClient));
+
+    const req = {
+      body: { username: 'Rook' },
+      player: {
+        accountId: 'account-1',
+        playerId: 'player-perm',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/join-season');
+    await handler(req, res, next);
+
+    expect(mockPrisma.player.findFirst).toHaveBeenNthCalledWith(2, {
+      where: { username: 'Rook', seasonId: 'season-1' },
+      select: { id: true },
+    });
+    expect(txClient.player.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        username: 'Rook',
+        seasonId: 'season-1',
+      }),
+      select: {
+        id: true,
+        username: true,
+        seasonId: true,
+      },
+    });
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('rejects usernames already taken within the active season', async () => {
+    mockPrisma.season.findFirst.mockResolvedValue({
+      id: 'season-1',
+      name: 'Season 1',
+      status: 'active',
+    });
+    mockPrisma.player.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'other-season-player' });
+
+    const req = {
+      body: { username: 'SeasonRook' },
+      player: {
+        accountId: 'account-1',
+        playerId: 'player-perm',
+      },
+    } as any;
+    const res = mockRes();
+    const next = vi.fn();
+
+    const handler = findHandler('post', '/join-season');
+    await handler(req, res, next);
+
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(next.mock.calls[0][0].message).toContain('Username already taken');
   });
 });

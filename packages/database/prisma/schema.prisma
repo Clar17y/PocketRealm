@@ -43,7 +43,7 @@ model Account {
 
 model Player {
   id           String    @id @default(uuid())
-  username     String    @unique @db.VarChar(32)
+  username     String    @db.VarChar(32)
   accountId    String    @map("account_id")
   seasonId     String?   @map("season_id")
   isBot        Boolean   @default(false) @map("is_bot")
