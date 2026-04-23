@@ -12,21 +12,43 @@ datasource db {
 // PLAYERS & AUTH
 // =============================================================================
 
+model Account {
+  id                     String                   @id @default(uuid())
+  email                  String                   @unique @db.VarChar(255)
+  passwordHash           String                   @map("password_hash") @db.VarChar(255)
+  role                   String                   @default("player") @db.VarChar(16)
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  lastActiveAt           DateTime?                @map("last_active_at")
+  activePlayerId         String?                  @unique @map("active_player_id")
+  emailVerified          Boolean                  @default(false) @map("email_verified")
+  premiumTrialClaimed    Boolean                  @default(false) @map("premium_trial_claimed")
+  isPremium              Boolean                  @default(false) @map("is_premium")
+  premiumExpiresAt       DateTime?                @map("premium_expires_at")
+  activePlayer           Player?                  @relation("ActivePlayer", fields: [activePlayerId], references: [id])
+  players                Player[]                 @relation("AccountPlayers")
+  refreshTokens          RefreshToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens    PasswordResetToken[]
+  friendshipsSent        Friendship[]             @relation("FriendshipSender")
+  friendshipsReceived    Friendship[]             @relation("FriendshipReceiver")
+  blocksInitiated        PlayerBlock[]            @relation("PlayerBlockBlocker")
+  blocksReceived         PlayerBlock[]            @relation("PlayerBlockBlocked")
+  friendMailsSent        FriendMail[]             @relation("FriendMailSender")
+  friendMailsReceived    FriendMail[]             @relation("FriendMailRecipient")
+  seasonArchives         SeasonArchive[]
+  hallOfFameEntries      HallOfFameEntry[]
+
+  @@map("accounts")
+}
+
 model Player {
   id           String    @id @default(uuid())
-  username     String    @unique @db.VarChar(32)
-  email        String    @unique @db.VarChar(255)
-  passwordHash String    @map("password_hash") @db.VarChar(255)
-  role         String    @default("player") @db.VarChar(16)
+  username     String    @db.VarChar(32)
+  accountId    String    @map("account_id")
+  seasonId     String?   @map("season_id")
   isBot        Boolean   @default(false) @map("is_bot")
   createdAt    DateTime  @default(now()) @map("created_at")
   lastActiveAt DateTime? @map("last_active_at")
-
-  // Auth hardening
-  emailVerified       Boolean   @default(false) @map("email_verified")
-  premiumTrialClaimed Boolean   @default(false) @map("premium_trial_claimed")
-  isPremium           Boolean   @default(false) @map("is_premium")
-  premiumExpiresAt    DateTime? @map("premium_expires_at")
 
   // Character Progression
   characterXp     BigInt @default(0) @map("character_xp")
@@ -81,58 +103,50 @@ model Player {
   lastTravelledFromZoneId String? @map("last_travelled_from_zone_id")
   homeTownId              String? @map("home_town_id")
 
-  currentZone           Zone? @relation("current_zone", fields: [currentZoneId], references: [id])
-  lastTravelledFromZone Zone? @relation("breadcrumb_zone", fields: [lastTravelledFromZoneId], references: [id])
-  homeTown              Zone? @relation("home_town", fields: [homeTownId], references: [id])
+  account                Account @relation("AccountPlayers", fields: [accountId], references: [id], onDelete: Cascade)
+  activeFor              Account? @relation("ActivePlayer")
+  season                 Season? @relation(fields: [seasonId], references: [id])
+  currentZone            Zone?   @relation("current_zone", fields: [currentZoneId], references: [id])
+  lastTravelledFromZone  Zone?   @relation("breadcrumb_zone", fields: [lastTravelledFromZoneId], references: [id])
+  homeTown               Zone?   @relation("home_town", fields: [homeTownId], references: [id])
 
   // Active achievement title
   activeTitle String? @map("active_title")
 
-  turnBank                TurnBank?
-  rouletteBets            RouletteBet[]
-  skills                  PlayerSkill[]
-  equipment               PlayerEquipment[]
-  items                   Item[]
-  bestiary                PlayerBestiary[]
-  bestiaryPrefixes        PlayerBestiaryPrefix[]
-  activityLogs            ActivityLog[]
-  encounterSites          EncounterSite[]
-  knownRecipes            PlayerRecipe[]
-  refreshTokens           RefreshToken[]
-  emailVerificationTokens EmailVerificationToken[]
-  passwordResetTokens     PasswordResetToken[]
-  resourceNodes           PlayerResourceNode[]
-  zoneDiscoveries         PlayerZoneDiscovery[]
-  zoneExplorations        PlayerZoneExploration[]
-  pvpRating               PvpRating?
-  pvpAttacks              PvpMatch[]               @relation("PvpAttacker")
-  pvpDefenses             PvpMatch[]               @relation("PvpDefender")
-  pvpCooldownsAsAttacker  PvpCooldown[]            @relation("pvpCooldownAttacker")
-  pvpCooldownsAsDefender  PvpCooldown[]            @relation("pvpCooldownDefender")
-  bossParticipants        BossParticipant[]
-  persistedMobs           PersistedMob[]
-  stats                   PlayerStats?
-  achievements            PlayerAchievement[]
-  premiumPurchases        PremiumPurchase[]
-  guildMember             GuildMember?
-  guildJoinRequests       GuildJoinRequest[]
-  combatTemplates         CombatTemplate[]
-  skillPointAllocation    SkillPointAllocation?
-  pvpScoutsSent           PvpScoutLog[]            @relation("PvpScouter")
-  pvpScoutsReceived       PvpScoutLog[]            @relation("PvpScoutTarget")
-  bossRotations           PlayerBossRotation[]
-  quests                  PlayerQuest[]
-  questState              PlayerQuestState?
-  shopPurchases           PlayerShopPurchase[]
-  buffs                   PlayerBuff[]
-
-  // Friends & Social
-  friendshipsSent     Friendship[]       @relation("FriendshipSender")
-  friendshipsReceived Friendship[]       @relation("FriendshipReceiver")
-  blocksInitiated     PlayerBlock[]      @relation("PlayerBlockBlocker")
-  blocksReceived      PlayerBlock[]      @relation("PlayerBlockBlocked")
-  friendMailsSent     FriendMail[]       @relation("FriendMailSender")
-  friendMailsReceived FriendMail[]       @relation("FriendMailRecipient")
+  turnBank           TurnBank?
+  rouletteBets       RouletteBet[]
+  skills             PlayerSkill[]
+  equipment          PlayerEquipment[]
+  items              Item[]
+  bestiary           PlayerBestiary[]
+  bestiaryPrefixes   PlayerBestiaryPrefix[]
+  activityLogs       ActivityLog[]
+  encounterSites     EncounterSite[]
+  knownRecipes       PlayerRecipe[]
+  resourceNodes      PlayerResourceNode[]
+  zoneDiscoveries    PlayerZoneDiscovery[]
+  zoneExplorations   PlayerZoneExploration[]
+  pvpRating                PvpRating?
+  pvpAttacks               PvpMatch[]    @relation("PvpAttacker")
+  pvpDefenses              PvpMatch[]    @relation("PvpDefender")
+  pvpCooldownsAsAttacker   PvpCooldown[] @relation("pvpCooldownAttacker")
+  pvpCooldownsAsDefender   PvpCooldown[] @relation("pvpCooldownDefender")
+  bossParticipants   BossParticipant[]
+  persistedMobs      PersistedMob[]
+  stats              PlayerStats?
+  achievements       PlayerAchievement[]
+  premiumPurchases   PremiumPurchase[]
+  guildMember        GuildMember?
+  guildJoinRequests  GuildJoinRequest[]
+  combatTemplates      CombatTemplate[]
+  skillPointAllocation SkillPointAllocation?
+  pvpScoutsSent        PvpScoutLog[] @relation("PvpScouter")
+  pvpScoutsReceived    PvpScoutLog[] @relation("PvpScoutTarget")
+  bossRotations        PlayerBossRotation[]
+  quests               PlayerQuest[]
+  questState           PlayerQuestState?
+  shopPurchases        PlayerShopPurchase[]
+  buffs                PlayerBuff[]
   pushSubscriptions   PushSubscription[]
 
   // Encounter site lockout
@@ -145,47 +159,50 @@ model Player {
   expeditionBestiaryEntries PlayerExpeditionBestiary[]
   expeditionCooldowns       ExpeditionCooldown[]
 
+  @@unique([accountId, seasonId])
+  @@index([accountId])
+  @@index([seasonId])
   @@index([currentZoneId])
   @@map("players")
 }
 
 model RefreshToken {
   id        String   @id @default(uuid())
-  playerId  String   @map("player_id")
+  accountId String   @map("account_id")
   token     String   @unique @db.Text
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
 
-  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  @@index([playerId])
+  @@index([accountId])
   @@map("refresh_tokens")
 }
 
 model EmailVerificationToken {
   id        String   @id @default(uuid())
-  playerId  String   @map("player_id")
+  accountId String   @map("account_id")
   tokenHash String   @unique @map("token_hash") @db.VarChar(64)
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
 
-  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  @@index([playerId])
+  @@index([accountId])
   @@map("email_verification_tokens")
 }
 
 model PasswordResetToken {
   id        String    @id @default(uuid())
-  playerId  String    @map("player_id")
+  accountId String    @map("account_id")
   tokenHash String    @unique @map("token_hash") @db.VarChar(64)
   expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
   createdAt DateTime  @default(now()) @map("created_at")
 
-  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  @@index([playerId])
+  @@index([accountId])
   @@map("password_reset_tokens")
 }
 
@@ -209,6 +226,83 @@ model PremiumPurchase {
 
   @@index([playerId, createdAt])
   @@map("premium_purchases")
+}
+
+model Season {
+  id                String   @id @default(uuid())
+  name              String   @db.VarChar(64)
+  status            String   @default("upcoming") @db.VarChar(16)
+  startsAt          DateTime @map("starts_at")
+  endsAt            DateTime @map("ends_at")
+  constantOverrides Json?    @map("constant_overrides")
+  features          Json?    @default("[]")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  players           Player[]
+  guilds            Guild[]
+  itemTemplates     ItemTemplate[]
+  craftingRecipes   CraftingRecipe[]
+  zones             Zone[]
+  mobTemplates      MobTemplate[]
+  seasonArchives    SeasonArchive[]
+  hallOfFameEntries HallOfFameEntry[]
+  rewardTiers       SeasonRewardTier[]
+
+  @@index([status])
+  @@map("seasons")
+}
+
+model SeasonArchive {
+  id               String   @id @default(uuid())
+  accountId        String   @map("account_id")
+  seasonId         String   @map("season_id")
+  username         String   @db.VarChar(32)
+  characterLevel   Int      @map("character_level")
+  characterXp      BigInt   @map("character_xp")
+  attributes       Json
+  skills           Json
+  stats            Json
+  combatTemplates  Json     @default("[]") @map("combat_templates")
+  leaderboardRanks Json     @default("{}") @map("leaderboard_ranks")
+  rewardsEarned    Json     @default("{}") @map("rewards_earned")
+  mergeLog         Json     @default("{}") @map("merge_log")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  season  Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, seasonId])
+  @@map("season_archives")
+}
+
+model HallOfFameEntry {
+  id        String   @id @default(uuid())
+  seasonId  String   @map("season_id")
+  category  String   @db.VarChar(32)
+  rank      Int
+  accountId String   @map("account_id")
+  username  String   @db.VarChar(32)
+  value     Float
+  createdAt DateTime @default(now()) @map("created_at")
+
+  season  Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, category, rank])
+  @@map("hall_of_fame_entries")
+}
+
+model SeasonRewardTier {
+  id       String @id @default(uuid())
+  seasonId String @map("season_id")
+  category String @db.VarChar(32)
+  minRank  Int    @map("min_rank")
+  maxRank  Int    @map("max_rank")
+  rewards  Json
+
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@map("season_reward_tiers")
 }
 
 // =============================================================================
@@ -266,27 +360,30 @@ model PlayerEquipment {
 // =============================================================================
 
 model ItemTemplate {
-  id               String  @id @default(uuid())
-  name             String  @db.VarChar(64)
-  itemType         String  @map("item_type") @db.VarChar(32)
-  weightClass      String? @map("weight_class") @db.VarChar(16)
-  setId            String? @map("set_id") @db.VarChar(64)
-  slot             String? @db.VarChar(16)
-  tier             Int     @default(1)
-  baseStats        Json    @default("{}") @map("base_stats")
-  requiredSkill    String? @map("required_skill") @db.VarChar(32)
-  requiredLevel    Int     @default(1) @map("required_level")
-  maxDurability    Int     @default(100) @map("max_durability")
+  id             String  @id @default(uuid())
+  name           String  @db.VarChar(64)
+  seasonId       String? @map("season_id")
+  itemType       String  @map("item_type") @db.VarChar(32)
+  weightClass    String? @map("weight_class") @db.VarChar(16)
+  setId          String? @map("set_id") @db.VarChar(64)
+  slot           String? @db.VarChar(16)
+  tier           Int     @default(1)
+  baseStats      Json    @default("{}") @map("base_stats")
+  requiredSkill  String? @map("required_skill") @db.VarChar(32)
+  requiredLevel  Int     @default(1) @map("required_level")
+  maxDurability  Int     @default(100) @map("max_durability")
   stackable        Boolean @default(false)
   consumableEffect Json?   @map("consumable_effect")
   sellPrice        Int?    @map("sell_price")
   flavorText       String? @map("flavor_text") @db.Text
 
+  season          Season? @relation(fields: [seasonId], references: [id])
   items           Item[]
   dropTables      DropTable[]
   chestDropTables ChestDropTable[]
   recipes         CraftingRecipe[]
 
+  @@index([seasonId])
   @@map("item_templates")
 }
 
@@ -317,9 +414,10 @@ model Item {
 // =============================================================================
 
 model Zone {
-  id                 String  @id @default(uuid())
-  name               String  @db.VarChar(64)
-  description        String? @db.Text
+  id          String  @id @default(uuid())
+  name        String  @db.VarChar(64)
+  seasonId    String? @map("season_id")
+  description String? @db.Text
   arrivalText        String? @map("arrival_text") @db.Text
   ambientTexts       Json?   @map("ambient_texts")
   environmentalTexts Json?   @map("environmental_texts")
@@ -332,19 +430,21 @@ model Zone {
   turnsToExplore     Int?    @map("turns_to_explore")
   explorationTiers   Json?   @map("exploration_tiers")
 
-  mobs              MobTemplate[]
-  resourceNodes     ResourceNode[]
-  zoneMobFamilies   ZoneMobFamily[]
-  encounterSites    EncounterSite[]
-  connectionsFrom   ZoneConnection[]        @relation("from_zone")
-  connectionsTo     ZoneConnection[]        @relation("to_zone")
-  discoveries       PlayerZoneDiscovery[]
-  explorations      PlayerZoneExploration[]
-  playersHere       Player[]                @relation("current_zone")
-  playersBreadcrumb Player[]                @relation("breadcrumb_zone")
-  playersHome       Player[]                @relation("home_town")
-  worldEvents       WorldEvent[]
+  season             Season?                @relation(fields: [seasonId], references: [id])
+  mobs               MobTemplate[]
+  resourceNodes      ResourceNode[]
+  zoneMobFamilies    ZoneMobFamily[]
+  encounterSites     EncounterSite[]
+  connectionsFrom    ZoneConnection[]        @relation("from_zone")
+  connectionsTo      ZoneConnection[]        @relation("to_zone")
+  discoveries        PlayerZoneDiscovery[]
+  explorations       PlayerZoneExploration[]
+  playersHere        Player[]                @relation("current_zone")
+  playersBreadcrumb  Player[]                @relation("breadcrumb_zone")
+  playersHome        Player[]                @relation("home_town")
+  worldEvents        WorldEvent[]
 
+  @@index([seasonId])
   @@map("zones")
 }
 
@@ -394,40 +494,43 @@ model PlayerZoneExploration {
 // =============================================================================
 
 model MobTemplate {
-  id               String  @id @default(uuid())
-  name             String  @db.VarChar(64)
-  zoneId           String  @map("zone_id")
-  level            Int     @default(1)
-  hp               Int
-  accuracy         Int
-  defence          Int
-  magicDefence     Int     @default(0) @map("magic_defence")
-  evasion          Int
-  damageMin        Int     @map("damage_min")
-  damageMax        Int     @map("damage_max")
-  xpReward         Int     @map("xp_reward")
-  encounterWeight  Int     @default(100) @map("encounter_weight")
-  explorationTier  Int     @default(1) @map("exploration_tier")
-  spellPattern     Json    @default("[]") @map("spell_pattern")
-  damageType       String  @default("physical") @map("damage_type")
-  isExpeditionMob  Boolean @default(false) @map("is_expedition_mob")
-  isBoss           Boolean @default(false) @map("is_boss")
-  bossAoeDmg       Int?    @map("boss_aoe_dmg")
-  bossBaseHp       Int?    @map("boss_base_hp")
+  id              String  @id @default(uuid())
+  name            String  @db.VarChar(64)
+  zoneId          String  @map("zone_id")
+  seasonId        String? @map("season_id")
+  level           Int     @default(1)
+  hp              Int
+  accuracy        Int
+  defence         Int
+  magicDefence    Int     @default(0) @map("magic_defence")
+  evasion         Int
+  damageMin       Int     @map("damage_min")
+  damageMax       Int     @map("damage_max")
+  xpReward        Int     @map("xp_reward")
+  encounterWeight Int     @default(100) @map("encounter_weight")
+  explorationTier Int     @default(1) @map("exploration_tier")
+  spellPattern    Json    @default("[]") @map("spell_pattern")
+  damageType      String  @default("physical") @map("damage_type")
+  isExpeditionMob Boolean @default(false) @map("is_expedition_mob")
+  isBoss          Boolean @default(false) @map("is_boss")
+  bossAoeDmg      Int?    @map("boss_aoe_dmg")
+  bossBaseHp      Int?    @map("boss_base_hp")
   flavorAppearance String? @map("flavor_appearance") @db.Text
   flavorBehavior   String? @map("flavor_behavior") @db.Text
   flavorLore       String? @map("flavor_lore") @db.Text
 
-  zone             Zone                   @relation(fields: [zoneId], references: [id])
-  dropTables       DropTable[]
-  bestiary         PlayerBestiary[]
-  bestiaryPrefixes PlayerBestiaryPrefix[]
-  familyMembers    MobFamilyMember[]
-  bossEncounters   BossEncounter[]
-  persistedMobs    PersistedMob[]
-  bossRotations    PlayerBossRotation[]
+  zone              Zone               @relation(fields: [zoneId], references: [id])
+  season            Season?            @relation(fields: [seasonId], references: [id])
+  dropTables        DropTable[]
+  bestiary          PlayerBestiary[]
+  bestiaryPrefixes  PlayerBestiaryPrefix[]
+  familyMembers     MobFamilyMember[]
+  bossEncounters    BossEncounter[]
+  persistedMobs     PersistedMob[]
+  bossRotations     PlayerBossRotation[]
 
   @@index([zoneId])
+  @@index([seasonId])
   @@index([isBoss])
   @@index([isExpeditionMob])
   @@map("mob_templates")
@@ -538,6 +641,7 @@ model PlayerResourceNode {
 
 model CraftingRecipe {
   id               String  @id @default(uuid())
+  seasonId         String? @map("season_id")
   skillType        String  @map("skill_type") @db.VarChar(32)
   requiredLevel    Int     @map("required_level")
   resultTemplateId String  @map("result_template_id")
@@ -548,10 +652,12 @@ model CraftingRecipe {
   materials        Json
   xpReward         Int     @map("xp_reward")
 
-  resultTemplate ItemTemplate   @relation(fields: [resultTemplateId], references: [id])
-  mobFamily      MobFamily?     @relation(fields: [mobFamilyId], references: [id], onDelete: SetNull)
+  season         Season?      @relation(fields: [seasonId], references: [id])
+  resultTemplate ItemTemplate @relation(fields: [resultTemplateId], references: [id])
+  mobFamily      MobFamily?   @relation(fields: [mobFamilyId], references: [id], onDelete: SetNull)
   learnedBy      PlayerRecipe[]
 
+  @@index([seasonId])
   @@index([isAdvanced])
   @@index([mobFamilyId])
   @@map("crafting_recipes")
@@ -913,6 +1019,7 @@ model Guild {
   id                  String   @id @default(uuid())
   name                String   @unique @db.VarChar(32)
   tag                 String   @unique @db.VarChar(4)
+  seasonId            String?  @map("season_id")
   description         String?  @db.VarChar(200)
   leaderId            String   @map("leader_id")
   level               Int      @default(1)
@@ -926,6 +1033,7 @@ model Guild {
   treasuryTurns       Int      @default(0) @map("treasury_turns")
   createdAt           DateTime @default(now()) @map("created_at")
 
+  season       Season? @relation(fields: [seasonId], references: [id])
   members      GuildMember[]
   upgrades     GuildUpgrade[]
   projects     GuildProject[]
@@ -934,6 +1042,7 @@ model Guild {
   joinRequests GuildJoinRequest[]
   expeditions  GuildExpedition[]
 
+  @@index([seasonId])
   @@index([level])
   @@map("guilds")
 }
@@ -1137,8 +1246,8 @@ model Friendship {
   createdAt  DateTime  @default(now()) @map("created_at")
   acceptedAt DateTime? @map("accepted_at")
 
-  sender   Player @relation("FriendshipSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver Player @relation("FriendshipReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender   Account @relation("FriendshipSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver Account @relation("FriendshipReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@unique([senderId, receiverId])
   @@index([receiverId, status])
@@ -1152,8 +1261,8 @@ model PlayerBlock {
   blockedId String   @map("blocked_id")
   createdAt DateTime @default(now()) @map("created_at")
 
-  blocker Player @relation("PlayerBlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
-  blocked Player @relation("PlayerBlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocker Account @relation("PlayerBlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked Account @relation("PlayerBlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
@@ -1173,8 +1282,8 @@ model FriendMail {
   isDeletedByRecipient Boolean  @default(false) @map("is_deleted_by_recipient")
   createdAt            DateTime @default(now()) @map("created_at")
 
-  sender    Player @relation("FriendMailSender", fields: [senderId], references: [id], onDelete: Cascade)
-  recipient Player @relation("FriendMailRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender    Account @relation("FriendMailSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient Account @relation("FriendMailRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
 
   @@index([recipientId, isDeletedByRecipient, isRead])
   @@index([senderId, isDeletedBySender])

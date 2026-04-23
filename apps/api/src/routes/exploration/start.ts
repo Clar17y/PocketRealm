@@ -48,9 +48,11 @@ import {
   startSchema,
   type ZoneFamilyRow,
 } from './helpers';
+import { requireActiveSeason } from '../../middleware/seasonGuard';
 
 
 export const startRouter = Router();
+startRouter.use(requireActiveSeason);
 
 function familyHasEligibleMembersForTier(
   family: ZoneFamilyRow,

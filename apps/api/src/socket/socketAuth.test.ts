@@ -12,15 +12,23 @@ function makeSocket(auth: Record<string, unknown> = {}) {
 
 describe('authenticateSocket', () => {
   it('attaches player data on valid token', () => {
-    const token = jwt.sign({ playerId: 'p1', username: 'Alice', role: 'player' }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({
+      accountId: 'account-1',
+      playerId: 'p1',
+      username: 'Alice',
+      seasonId: 'season-1',
+      role: 'player',
+    }, JWT_SECRET, { expiresIn: '1h' });
     const socket = makeSocket({ token });
     const next = vi.fn();
 
     authenticateSocket(socket, next);
 
     expect(next).toHaveBeenCalledWith();
+    expect(socket.data.accountId).toBe('account-1');
     expect(socket.data.playerId).toBe('p1');
     expect(socket.data.username).toBe('Alice');
+    expect(socket.data.seasonId).toBe('season-1');
     expect(socket.data.role).toBe('player');
   });
 
@@ -45,7 +53,13 @@ describe('authenticateSocket', () => {
   });
 
   it('calls next with error on expired token', () => {
-    const token = jwt.sign({ playerId: 'p1', username: 'Alice', role: 'player' }, JWT_SECRET, { expiresIn: '-1s' });
+    const token = jwt.sign({
+      accountId: 'account-1',
+      playerId: 'p1',
+      username: 'Alice',
+      seasonId: null,
+      role: 'player',
+    }, JWT_SECRET, { expiresIn: '-1s' });
     const socket = makeSocket({ token });
     const next = vi.fn();
 

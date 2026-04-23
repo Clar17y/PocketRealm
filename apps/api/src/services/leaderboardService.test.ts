@@ -30,6 +30,9 @@ const mockRedis = redis as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 // Helper: set up all prisma mocks to return empty so refresh doesn't throw
 function stubEmptyRefresh() {
+  mockPrisma.season = {
+    findMany: vi.fn().mockResolvedValue([]),
+  };
   mockPrisma.pvpRating.findMany.mockResolvedValue([]);
   mockPrisma.player.findMany.mockResolvedValue([]);
   mockPrisma.playerSkill.findMany.mockResolvedValue([]);
@@ -42,6 +45,9 @@ function stubEmptyRefresh() {
 describe('leaderboardService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.season = {
+      findMany: vi.fn().mockResolvedValue([]),
+    };
   });
 
   describe('ensureLeaderboardsFresh', () => {
@@ -258,7 +264,7 @@ describe('leaderboardService', () => {
       const expectedStart = playerRank - half;
       const expectedStop = expectedStart + LEADERBOARD_CONSTANTS.PAGE_SIZE - 1;
       expect(mockRedis.zrevrange).toHaveBeenCalledWith(
-        'leaderboard:pvp_rating',
+        'leaderboard:permanent:pvp_rating',
         expectedStart,
         expectedStop,
         'WITHSCORES',
@@ -281,7 +287,7 @@ describe('leaderboardService', () => {
 
       // start should be clamped to 0, not negative
       expect(mockRedis.zrevrange).toHaveBeenCalledWith(
-        'leaderboard:pvp_rating',
+        'leaderboard:permanent:pvp_rating',
         0,
         LEADERBOARD_CONSTANTS.PAGE_SIZE - 1,
         'WITHSCORES',
@@ -297,7 +303,7 @@ describe('leaderboardService', () => {
 
       // Should use default window (0 to PAGE_SIZE-1)
       expect(mockRedis.zrevrange).toHaveBeenCalledWith(
-        'leaderboard:pvp_rating',
+        'leaderboard:permanent:pvp_rating',
         0,
         LEADERBOARD_CONSTANTS.PAGE_SIZE - 1,
         'WITHSCORES',
@@ -316,7 +322,7 @@ describe('leaderboardService', () => {
 
       // Should use default window since myRankIndex is null
       expect(mockRedis.zrevrange).toHaveBeenCalledWith(
-        'leaderboard:pvp_rating',
+        'leaderboard:permanent:pvp_rating',
         0,
         LEADERBOARD_CONSTANTS.PAGE_SIZE - 1,
         'WITHSCORES',
@@ -563,10 +569,10 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
-        expect(zaddKeys).toContain('leaderboard:pvp_rating');
-        expect(zaddKeys).toContain('leaderboard:pvp_wins');
-        expect(zaddKeys).toContain('leaderboard:pvp_best_rating');
-        expect(zaddKeys).toContain('leaderboard:pvp_win_streak');
+        expect(zaddKeys).toContain('leaderboard:permanent:pvp_rating');
+        expect(zaddKeys).toContain('leaderboard:permanent:pvp_wins');
+        expect(zaddKeys).toContain('leaderboard:permanent:pvp_best_rating');
+        expect(zaddKeys).toContain('leaderboard:permanent:pvp_win_streak');
       });
 
       it('maps correct scores for each PvP category', async () => {
@@ -586,10 +592,10 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const zaddCalls = mockRedis.zadd.mock.calls;
-        const ratingCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:pvp_rating');
-        const winsCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:pvp_wins');
-        const bestCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:pvp_best_rating');
-        const streakCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:pvp_win_streak');
+        const ratingCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:pvp_rating');
+        const winsCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:pvp_wins');
+        const bestCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:pvp_best_rating');
+        const streakCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:pvp_win_streak');
 
         // zadd(key, score, member) => score at [1]
         expect(ratingCall![1]).toBe(1500);
@@ -616,7 +622,7 @@ describe('leaderboardService', () => {
 
         // Check hset call contains isAdmin: true in the JSON
         const hsetCalls = mockRedis.hset.mock.calls;
-        const pvpRatingMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:pvp_rating');
+        const pvpRatingMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:pvp_rating');
         expect(pvpRatingMeta).toBeDefined();
         // pvpRatingMeta: [key, playerId, jsonStr]
         const meta = JSON.parse(pvpRatingMeta![2] as string);
@@ -641,7 +647,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const pvpRatingMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:pvp_rating');
+        const pvpRatingMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:pvp_rating');
         const meta = JSON.parse(pvpRatingMeta![2] as string);
         expect(meta.title).toBe('The Warrior');
         expect(meta.titleTier).toBe(2);
@@ -671,7 +677,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const pvpRatingMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:pvp_rating');
+        const pvpRatingMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:pvp_rating');
         const meta = JSON.parse(pvpRatingMeta![2] as string);
         expect(meta.title).toBe(PREMIUM_CONSTANTS.SUPPORT_TITLE);
         expect(meta.titleStyle).toBe('rainbow');
@@ -694,7 +700,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const pvpMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:pvp_rating');
+        const pvpMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:pvp_rating');
         const meta = JSON.parse(pvpMeta![2] as string);
         expect(meta.title).toBeUndefined();
         expect(meta.titleTier).toBeUndefined();
@@ -717,7 +723,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const pvpMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:pvp_rating');
+        const pvpMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:pvp_rating');
         const meta = JSON.parse(pvpMeta![2] as string);
         expect(meta.title).toBeUndefined();
       });
@@ -729,7 +735,7 @@ describe('leaderboardService', () => {
 
         // del is still called (clearing old data), but zadd should not be called for pvp_rating
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
-        expect(zaddKeys).not.toContain('leaderboard:pvp_rating');
+        expect(zaddKeys).not.toContain('leaderboard:permanent:pvp_rating');
       });
     });
 
@@ -750,8 +756,8 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
-        expect(zaddKeys).toContain('leaderboard:character_level');
-        expect(zaddKeys).toContain('leaderboard:character_xp');
+        expect(zaddKeys).toContain('leaderboard:permanent:character_level');
+        expect(zaddKeys).toContain('leaderboard:permanent:character_xp');
       });
 
       it('uses characterLevel as score for character_level', async () => {
@@ -767,7 +773,7 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const levelCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:character_level');
+        const levelCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:character_level');
         expect(levelCall![1]).toBe(42);
       });
 
@@ -784,7 +790,7 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const xpCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:character_xp');
+        const xpCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:character_xp');
         expect(xpCall![1]).toBe(123456);
       });
 
@@ -802,7 +808,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const levelMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:character_level');
+        const levelMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:character_level');
         const meta = JSON.parse(levelMeta![2] as string);
         expect(meta.isAdmin).toBe(true);
       });
@@ -826,8 +832,8 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const zaddCalls = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
-        expect(zaddCalls).toContain('leaderboard:skill_melee');
-        expect(zaddCalls).toContain('leaderboard:total_skill_level');
+        expect(zaddCalls).toContain('leaderboard:permanent:skill_melee');
+        expect(zaddCalls).toContain('leaderboard:permanent:total_skill_level');
       });
 
       it('aggregates total_skill_level across multiple skills for same player', async () => {
@@ -845,7 +851,7 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const totalCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:total_skill_level');
+        const totalCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:total_skill_level');
         expect(totalCall).toBeDefined();
         // 10 + 8 + 12 = 30
         expect(totalCall![1]).toBe(30);
@@ -866,7 +872,7 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const totalCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:total_skill_level');
+        const totalCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:total_skill_level');
         // zadd args: key, score1, member1, score2, member2
         // p1: 10+5=15, p2: 20
         const args = totalCall!.slice(1); // remove key
@@ -891,8 +897,8 @@ describe('leaderboardService', () => {
 
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
         // skill_melee should be written, but skill_ranged should not (empty, only del is called)
-        expect(zaddKeys).toContain('leaderboard:skill_melee');
-        expect(zaddKeys).not.toContain('leaderboard:skill_ranged');
+        expect(zaddKeys).toContain('leaderboard:permanent:skill_melee');
+        expect(zaddKeys).not.toContain('leaderboard:permanent:skill_ranged');
       });
     });
 
@@ -913,7 +919,7 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const totalKillsCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:total_kills');
+        const totalKillsCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:total_kills');
         expect(totalKillsCall).toBeDefined();
         expect(totalKillsCall![1]).toBe(80);
       });
@@ -931,7 +937,7 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const bossDmgCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:boss_damage');
+        const bossDmgCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:boss_damage');
         expect(bossDmgCall).toBeDefined();
         expect(bossDmgCall![1]).toBe(5000);
         expect(bossDmgCall![2]).toBe('p1');
@@ -952,7 +958,7 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const bossDmgCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:boss_damage');
+        const bossDmgCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:boss_damage');
         expect(bossDmgCall).toBeDefined();
         const args = bossDmgCall!.slice(1);
         const p1Idx = args.indexOf('p1');
@@ -1027,9 +1033,9 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
-        expect(zaddKeys).toContain('leaderboard:guild_level');
-        expect(zaddKeys).toContain('leaderboard:guild_renown');
-        expect(zaddKeys).toContain('leaderboard:guild_members');
+        expect(zaddKeys).toContain('leaderboard:permanent:guild_level');
+        expect(zaddKeys).toContain('leaderboard:permanent:guild_renown');
+        expect(zaddKeys).toContain('leaderboard:permanent:guild_members');
       });
 
       it('formats guild username as [TAG] Name', async () => {
@@ -1046,7 +1052,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const guildMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:guild_level');
+        const guildMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:guild_level');
         expect(guildMeta).toBeDefined();
         const meta = JSON.parse(guildMeta![2] as string);
         expect(meta.username).toBe('[KNT] Knights');
@@ -1066,9 +1072,9 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const zaddCalls = mockRedis.zadd.mock.calls;
-        const levelCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:guild_level');
-        const renownCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:guild_renown');
-        const membersCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:guild_members');
+        const levelCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:guild_level');
+        const renownCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:guild_renown');
+        const membersCall = zaddCalls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:guild_members');
 
         expect(levelCall![1]).toBe(7);
         expect(renownCall![1]).toBe(2500);
@@ -1089,7 +1095,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const guildMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:guild_level');
+        const guildMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:guild_level');
         const meta = JSON.parse(guildMeta![2] as string);
         expect(meta.isBot).toBe(false);
         expect(meta.isAdmin).toBe(false);
@@ -1109,7 +1115,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const guildMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:guild_level');
+        const guildMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:guild_level');
         const meta = JSON.parse(guildMeta![2] as string);
         expect(meta.characterLevel).toBe(12);
       });
@@ -1125,8 +1131,8 @@ describe('leaderboardService', () => {
 
         // No zadd for casino categories
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
-        expect(zaddKeys).not.toContain('leaderboard:casino_profit');
-        expect(zaddKeys).not.toContain('leaderboard:casino_wagered');
+        expect(zaddKeys).not.toContain('leaderboard:permanent:casino_profit');
+        expect(zaddKeys).not.toContain('leaderboard:permanent:casino_wagered');
       });
 
       it('writes casino_profit and casino_wagered categories', async () => {
@@ -1145,8 +1151,8 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
-        expect(zaddKeys).toContain('leaderboard:casino_profit');
-        expect(zaddKeys).toContain('leaderboard:casino_wagered');
+        expect(zaddKeys).toContain('leaderboard:permanent:casino_profit');
+        expect(zaddKeys).toContain('leaderboard:permanent:casino_wagered');
       });
 
       it('calculates casino_profit as totalPayout - totalWagered', async () => {
@@ -1164,7 +1170,7 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const profitCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:casino_profit');
+        const profitCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:casino_profit');
         expect(profitCall![1]).toBe(3000); // 8000 - 5000
       });
 
@@ -1183,7 +1189,7 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const profitCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:casino_profit');
+        const profitCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:casino_profit');
         expect(profitCall![1]).toBe(-7000); // 3000 - 10000
       });
 
@@ -1202,11 +1208,11 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const wageredCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:casino_wagered');
+        const wageredCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:casino_wagered');
         expect(wageredCall![1]).toBe(25000);
       });
 
-      it('falls back to Unknown/1/false for missing player data', async () => {
+      it('skips casino rows whose players are missing from the current realm snapshot', async () => {
         mockPrisma.pvpRating.findMany.mockResolvedValue([]);
         // Player not found in second query
         mockPrisma.player.findMany.mockResolvedValue([]);
@@ -1220,14 +1226,15 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const hsetCalls = mockRedis.hset.mock.calls;
-        const casinoMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:casino_profit');
-        expect(casinoMeta).toBeDefined();
-        const meta = JSON.parse(casinoMeta![2] as string);
-        expect(meta.username).toBe('Unknown');
-        expect(meta.characterLevel).toBe(1);
-        expect(meta.isBot).toBe(false);
-        expect(meta.isAdmin).toBe(false);
+        expect(mockRedis.zadd).not.toHaveBeenCalledWith(
+          'leaderboard:permanent:casino_profit',
+          expect.anything(),
+        );
+        expect(mockRedis.hset).not.toHaveBeenCalledWith(
+          'leaderboard:meta:permanent:casino_profit',
+          expect.anything(),
+          expect.anything(),
+        );
       });
 
       it('handles multiple casino players', async () => {
@@ -1247,7 +1254,7 @@ describe('leaderboardService', () => {
 
         await refreshAllLeaderboards();
 
-        const profitCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:casino_profit');
+        const profitCall = mockRedis.zadd.mock.calls.find((c: unknown[]) => c[0] === 'leaderboard:permanent:casino_profit');
         expect(profitCall).toBeDefined();
         const args = profitCall!.slice(1);
         const p1Idx = args.indexOf('p1');
@@ -1272,7 +1279,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const casinoMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:casino_profit');
+        const casinoMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:casino_profit');
         const meta = JSON.parse(casinoMeta![2] as string);
         expect(meta.isAdmin).toBe(true);
       });
@@ -1293,7 +1300,7 @@ describe('leaderboardService', () => {
         await refreshAllLeaderboards();
 
         const hsetCalls = mockRedis.hset.mock.calls;
-        const casinoMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:casino_profit');
+        const casinoMeta = hsetCalls.find((c: unknown[]) => c[0] === 'leaderboard:meta:permanent:casino_profit');
         const meta = JSON.parse(casinoMeta![2] as string);
         expect(meta.title).toBe('The Warrior');
         expect(meta.titleTier).toBe(2);
@@ -1319,7 +1326,7 @@ describe('leaderboardService', () => {
 
         // pvp_rating has no data, so zadd should not be called for it
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
-        expect(zaddKeys).not.toContain('leaderboard:pvp_rating');
+        expect(zaddKeys).not.toContain('leaderboard:permanent:pvp_rating');
       });
     });
 
@@ -1357,7 +1364,7 @@ describe('leaderboardService', () => {
 
         // character_level should still be written even though pvp failed
         const zaddKeys = mockRedis.zadd.mock.calls.map((c: unknown[]) => c[0]);
-        expect(zaddKeys).toContain('leaderboard:character_level');
+        expect(zaddKeys).toContain('leaderboard:permanent:character_level');
         // but no last_refresh
         expect(mockRedis.set).not.toHaveBeenCalledWith(
           'leaderboard:last_refresh',
@@ -1427,3 +1434,4 @@ describe('leaderboardService', () => {
     });
   });
 });
+

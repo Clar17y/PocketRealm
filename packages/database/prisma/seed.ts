@@ -33,15 +33,24 @@ async function cleanTemplateData() {
   const p = prisma as any;
 
   // Clean bot players and their related data first (before items/equipment)
-  const botPlayers = await prisma.player.findMany({ where: { isBot: true }, select: { id: true } });
+  const botPlayers = await prisma.player.findMany({
+    where: { isBot: true },
+    select: { id: true, accountId: true },
+  });
   if (botPlayers.length > 0) {
     const botIds = botPlayers.map((b) => b.id);
+    const botAccountIds = [...new Set(botPlayers.map((b) => b.accountId))];
     await p.pvpMatch.deleteMany({ where: { OR: [{ attackerId: { in: botIds } }, { defenderId: { in: botIds } }] } });
     await p.pvpCooldown.deleteMany({ where: { OR: [{ attackerId: { in: botIds } }, { defenderId: { in: botIds } }] } });
     await p.pvpRating.deleteMany({ where: { playerId: { in: botIds } } });
     await prisma.playerEquipment.deleteMany({ where: { playerId: { in: botIds } } });
     await prisma.item.deleteMany({ where: { ownerId: { in: botIds } } });
+    await prisma.account.updateMany({
+      where: { id: { in: botAccountIds } },
+      data: { activePlayerId: null },
+    });
     await prisma.player.deleteMany({ where: { isBot: true } });
+    await prisma.account.deleteMany({ where: { id: { in: botAccountIds } } });
     console.log(`  ${botPlayers.length} bot players cleaned.`);
   }
 
@@ -270,22 +279,30 @@ async function seedBots() {
   const now = new Date();
 
   for (const bot of bots) {
+    const accountId = randomUUID();
+
     // Create player with nested turnBank and skills
     const player = await prisma.player.create({
       data: {
         id: bot.player.id,
         username: bot.player.username,
-        email: bot.player.email,
-        passwordHash: bot.player.passwordHash,
+        account: {
+          create: {
+            id: accountId,
+            email: bot.player.email,
+            passwordHash: bot.player.passwordHash,
+            lastActiveAt: now,
+          },
+        },
         isBot: true,
         characterLevel: bot.player.characterLevel,
         attributes: bot.player.attributes,
         currentHp: bot.player.currentHp,
-        currentZoneId: starterZone.id,
-        homeTownId: starterZone.id,
+        currentZone: { connect: { id: starterZone.id } },
+        homeTown: { connect: { id: starterZone.id } },
         gold: 500,
         turnBank: {
-          create: { currentTurns: 0, lastRegenAt: now },
+          create: { currentTurns: bot.turnBank.currentTurns, lastRegenAt: now },
         },
         skills: {
           create: bot.skills.map((s) => ({
@@ -295,6 +312,11 @@ async function seedBots() {
           })),
         },
       },
+    });
+
+    await prisma.account.update({
+      where: { id: accountId },
+      data: { activePlayerId: player.id },
     });
 
     // Create items (weapon + armor)

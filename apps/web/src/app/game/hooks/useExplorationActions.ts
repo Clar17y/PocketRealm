@@ -33,13 +33,14 @@ interface UseExplorationActionsParams {
   stateSetters: StateSetters;
   advanceTutorial: (fromStep: number) => void | Promise<void>;
   combatLogPrefetchClear: () => void;
-  refreshPendingEncounters: () => Promise<void>;
+  refreshPendingEncounters: () => Promise<unknown>;
   loadGatheringNodes: () => Promise<void>;
   pendingLootQueueRef: React.MutableRefObject<string[]>;
   activatePendingLoot: (sessionId: string) => Promise<void>;
   updateZoneExploration: (zoneId: string, exploration: { turnsExplored: number; percent: number; turnsToExplore: number | null }) => void;
   updateQuestProgress: (updates?: QuestProgressUpdate[]) => void;
   reloadZones: (options?: { expectedActiveZoneId?: string | null }) => Promise<void>;
+  refreshCraftingRecipes: () => Promise<void>;
 }
 
 export function useExplorationActions({
@@ -60,6 +61,7 @@ export function useExplorationActions({
   updateZoneExploration,
   updateQuestProgress,
   reloadZones,
+  refreshCraftingRecipes,
 }: UseExplorationActionsParams) {
   const [explorationPlaybackData, setExplorationPlaybackData] = useState<ExplorationPlaybackData | null>(null);
 
@@ -111,6 +113,9 @@ export function useExplorationActions({
     await advanceTutorial(TUTORIAL_STEP_EXPLORE);
     applyStateUpdates(savedStateUpdates, stateSetters);
     await reloadZones({ expectedActiveZoneId }).catch(() => undefined);
+    if (savedStateUpdates?.currentZoneId !== undefined) {
+      await refreshCraftingRecipes().catch(() => undefined);
+    }
     if (pendingIds?.length) {
       pendingLootQueueRef.current = pendingIds.slice(1);
       await activatePendingLoot(pendingIds[0]);

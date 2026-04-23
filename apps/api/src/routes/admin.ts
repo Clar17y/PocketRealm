@@ -16,6 +16,11 @@ import { teleportPlayer } from '../services/zoneService';
 import { createActivityLog } from '../services/activityLogService';
 import { roundTimerRegistry } from '../services/roundTimerRegistry';
 import { grantPremiumDays, listPremiumPurchases } from '../services/premiumService';
+import { bootstrapSeason } from '../services/seasonBootstrapService';
+import { runSeasonMerge } from '../services/seasonMergeService';
+import { evaluateSeasonRewards } from '../services/seasonRewardService';
+import { activateSeason, endSeason, isSeasonBootstrapped } from '../services/seasonLifecycleService';
+import { SEASON_STATUSES } from '../services/season.constants';
 import { xpForLevel, characterLevelFromXp, rollMobPrefix, rollBonusStatsForRarity, generateRoomAssignments } from '@pocketrealm/game-engine';
 import { AppError } from '../middleware/errorHandler';
 import {
@@ -39,6 +44,14 @@ import {
 const router = Router();
 router.use(authenticate, requireAdmin);
 
+const createSeasonSchema = z.object({
+  name: z.string().min(1).max(64),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  constantOverrides: z.record(z.string(), z.record(z.string(), z.number())).optional(),
+  features: z.array(z.string()).optional(),
+});
+
 /** Log an admin action for audit trail */
 async function adminAudit(adminId: string, action: string, details: Record<string, unknown>) {
   await createActivityLog({ playerId: adminId, activityType: 'admin_action', turnsSpent: 0, result: { action, ...details } });
@@ -58,6 +71,97 @@ async function adminAuditTx(
     result: { action, ...details } as Prisma.InputJsonValue,
   });
 }
+
+router.get('/seasons', asyncHandler(async (_req, res) => {
+  const seasons = await prisma.season.findMany({
+    orderBy: { createdAt: 'desc' },
+  });
+  const seasonsWithBootstrapped = await Promise.all(
+    seasons.map(async (season) => ({
+      ...season,
+      isBootstrapped: await isSeasonBootstrapped(prisma, season.id),
+    })),
+  );
+  res.json({ seasons: seasonsWithBootstrapped });
+}));
+
+router.post('/seasons', asyncHandler(async (req, res) => {
+  const data = createSeasonSchema.parse(req.body);
+
+  const season = await prisma.season.create({
+    data: {
+      name: data.name,
+      status: 'upcoming',
+      startsAt: new Date(data.startsAt),
+      endsAt: new Date(data.endsAt),
+      constantOverrides: (data.constantOverrides ?? null) as unknown as Prisma.InputJsonValue,
+      features: data.features ?? [],
+    },
+  });
+
+  await adminAudit(req.player!.playerId, 'create_season', {
+    seasonId: season.id,
+    name: season.name,
+  });
+  res.status(201).json({ season });
+}));
+
+router.post('/seasons/:id/bootstrap', asyncHandler(async (req, res) => {
+  const result = await bootstrapSeason(req.params.id);
+  await adminAudit(req.player!.playerId, 'bootstrap_season', result);
+  res.json({ message: 'Season bootstrapped', ...result });
+}));
+
+router.post('/seasons/:id/activate', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const season = await activateSeason(id);
+  await adminAudit(req.player!.playerId, 'activate_season', {
+    seasonId: season.id,
+    name: season.name,
+  });
+  res.json({ season });
+}));
+
+router.post('/seasons/:id/end', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const season = await endSeason(id);
+  await adminAudit(req.player!.playerId, 'end_season', {
+    seasonId: id,
+    name: season.name,
+  });
+  res.json({ message: 'Season ended. Run merge when ready.' });
+}));
+
+router.post('/seasons/:id/evaluate-rewards', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const season = await prisma.season.findUniqueOrThrow({
+    where: { id },
+    select: { id: true, status: true },
+  });
+  if (season.status !== SEASON_STATUSES.ENDED) {
+    throw new AppError(400, 'Season must be ended before evaluating rewards', 'SEASON_NOT_ENDED');
+  }
+
+  const result = await evaluateSeasonRewards(id);
+  await adminAudit(req.player!.playerId, 'evaluate_season_rewards', {
+    seasonId: id,
+    hallOfFameEntries: result.entries,
+  });
+  res.json({ message: 'Rewards evaluated', hallOfFameEntries: result.entries });
+}));
+
+router.post('/seasons/:id/merge', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const result = await runSeasonMerge(id);
+  await adminAudit(req.player!.playerId, 'merge_season', {
+    seasonId: id,
+    merged: result.merged,
+    errors: result.errors,
+  });
+  res.json({ message: 'Merge complete', merged: result.merged, errors: result.errors });
+}));
 
 // ---------------------------------------------------------------------------
 // Player
@@ -794,16 +898,28 @@ router.post('/expedition/fill', asyncHandler(async (req, res) => {
 
     // Wrap each bot creation in a transaction so partial records aren't orphaned
     const botId = await prisma.$transaction(async (tx) => {
+      const account = await tx.account.create({
+        data: {
+          email: `${botName}@bot.local`,
+          passwordHash: 'bot-no-login',
+          role: 'player',
+        },
+      });
+
       // Create bot player with attributes matching the tier
       const bot = await tx.player.create({
         data: {
+          accountId: account.id,
           username: botName,
-          email: `${botName}@bot.local`,
-          passwordHash: 'bot-no-login',
           isBot: true,
           characterLevel: botLevel,
           attributes: botAttributes,
         },
+      });
+
+      await tx.account.update({
+        where: { id: account.id },
+        data: { activePlayerId: bot.id },
       });
 
       // Create all supporting records in parallel

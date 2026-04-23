@@ -47,8 +47,9 @@ describe('stripeService', () => {
   describe('createSupportPocketrealmCheckoutSession', () => {
     it('creates a one-time checkout session using the server-side player email when present', async () => {
       vi.mocked(prisma.player.findUnique).mockResolvedValue({
-        email: 'player@example.com',
-        username: 'hero',
+        account: {
+          email: 'player@example.com',
+        },
       } as never);
       createSession.mockResolvedValue({
         id: 'cs_test_123',
@@ -66,7 +67,11 @@ describe('stripeService', () => {
       expect(prisma.player.findUnique).toHaveBeenCalledWith({
         where: { id: 'player-1' },
         select: {
-          email: true,
+          account: {
+            select: {
+              email: true,
+            },
+          },
         },
       });
       expect(createSession).toHaveBeenCalledWith({
@@ -98,8 +103,9 @@ describe('stripeService', () => {
 
     it('omits customer_email when the player has no email address', async () => {
       vi.mocked(prisma.player.findUnique).mockResolvedValue({
-        email: null,
-        username: 'hero',
+        account: {
+          email: null,
+        },
       } as never);
       createSession.mockResolvedValue({
         id: 'cs_test_456',

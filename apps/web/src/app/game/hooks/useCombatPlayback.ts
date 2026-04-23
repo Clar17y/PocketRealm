@@ -8,7 +8,7 @@ interface UseCombatPlaybackDeps {
   combatLogPrefetch: CombatLogPrefetch;
   setLastCombat: (lc: LastCombat | null) => void;
   setPlaybackActive: (active: boolean) => void;
-  refreshPendingEncounters: () => Promise<void>;
+  refreshPendingEncounters: () => Promise<unknown>;
   reloadZones: (options?: { expectedActiveZoneId?: string | null }) => Promise<void>;
   advanceTutorial: (fromStep: number) => Promise<void>;
   activeZoneIdRef: MutableRefObject<string | null>;

@@ -32,7 +32,7 @@ export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen
   const [pendingClockMs, setPendingClockMs] = useState(() => Date.now());
 
   const refreshPendingEncounters = useCallback(async (options?: { background?: boolean }) => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) return undefined;
     const isBackground = options?.background ?? false;
     const requestId = ++latestPendingRequestRef.current;
 
@@ -64,45 +64,45 @@ export function useEncounterSites(isAuthenticated: boolean, activeScreen: Screen
         });
         setPendingEncounterFilters({ zones: [], mobs: [] });
         setPendingEncountersError(res.error?.message ?? 'Failed to load encounter sites');
-        return;
+        return [];
       }
 
       if (pendingEncounterPage > res.data.pagination.totalPages) {
         setPendingEncounterPage(res.data.pagination.totalPages);
-        return;
+        return [];
       }
 
-      setPendingEncounters(
-        res.data.encounterSites.map((site) => ({
-          encounterSiteId: site.encounterSiteId,
-          zoneId: site.zoneId,
-          zoneName: site.zoneName,
-          mobFamilyId: site.mobFamilyId,
-          mobFamilyName: site.mobFamilyName,
-          siteName: site.siteName,
-          size: site.size,
-          totalMobs: site.totalMobs,
-          aliveMobs: site.aliveMobs,
-          defeatedMobs: site.defeatedMobs,
-          decayedMobs: site.decayedMobs,
-          nextMobTemplateId: site.nextMobTemplateId,
-          nextMobName: site.nextMobName,
-          nextMobPrefix: site.nextMobPrefix,
-          nextMobDisplayName: site.nextMobDisplayName,
-          discoveredAt: site.discoveredAt,
-          currentRoom: site.currentRoom,
-          totalRooms: site.totalRooms,
-          roomMobCounts: site.roomMobCounts,
-          currentRoomMobs: site.currentRoomMobs ?? [],
-          eventModifiers: site.eventModifiers,
-          totalTurnCost: site.totalTurnCost,
-        }))
-      );
+      const mappedEncounters = res.data.encounterSites.map((site) => ({
+        encounterSiteId: site.encounterSiteId,
+        zoneId: site.zoneId,
+        zoneName: site.zoneName,
+        mobFamilyId: site.mobFamilyId,
+        mobFamilyName: site.mobFamilyName,
+        siteName: site.siteName,
+        size: site.size,
+        totalMobs: site.totalMobs,
+        aliveMobs: site.aliveMobs,
+        defeatedMobs: site.defeatedMobs,
+        decayedMobs: site.decayedMobs,
+        nextMobTemplateId: site.nextMobTemplateId,
+        nextMobName: site.nextMobName,
+        nextMobPrefix: site.nextMobPrefix,
+        nextMobDisplayName: site.nextMobDisplayName,
+        discoveredAt: site.discoveredAt,
+        currentRoom: site.currentRoom,
+        totalRooms: site.totalRooms,
+        roomMobCounts: site.roomMobCounts,
+        currentRoomMobs: site.currentRoomMobs ?? [],
+        eventModifiers: site.eventModifiers,
+        totalTurnCost: site.totalTurnCost,
+      }));
+      setPendingEncounters(mappedEncounters);
       setPendingEncounterPagination(res.data.pagination);
       setPendingEncounterFilters({
         zones: res.data.filters.zones,
         mobs: res.data.filters.mobFamilies,
       });
+      return mappedEncounters;
     } finally {
       if (!isBackground && latestPendingRequestRef.current === requestId) {
         setPendingEncountersLoading(false);

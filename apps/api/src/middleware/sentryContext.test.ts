@@ -43,7 +43,7 @@ describe('sentryContext middleware', () => {
   });
 
   it('does not touch Sentry user (handled by attachSentryUser)', () => {
-    const req = makeReq({ player: { playerId: 'p-1', username: 'hero', role: 'player' } });
+    const req = makeReq({ player: { accountId: 'account-1', playerId: 'p-1', username: 'hero', seasonId: null, role: 'player' } });
     sentryContext(req, {} as Response, vi.fn());
     expect(setUserMock).not.toHaveBeenCalled();
   });
@@ -64,7 +64,7 @@ describe('attachSentryUser', () => {
   });
 
   it('sets Sentry user when req.player is populated', () => {
-    const req = makeReq({ player: { playerId: 'p-1', username: 'hero', role: 'player' } });
+    const req = makeReq({ player: { accountId: 'account-1', playerId: 'p-1', username: 'hero', seasonId: null, role: 'player' } });
     attachSentryUser(req);
     expect(setUserMock).toHaveBeenCalledWith({ id: 'p-1', username: 'hero' });
   });

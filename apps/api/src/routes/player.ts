@@ -31,11 +31,8 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
     select: {
       id: true,
       username: true,
-      email: true,
-      role: true,
-      emailVerified: true,
-      isPremium: true,
-      premiumExpiresAt: true,
+      accountId: true,
+      seasonId: true,
       createdAt: true,
       lastActiveAt: true,
       characterXp: true,
@@ -67,6 +64,15 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
       notifyTurnBankFull: true,
       notifyExpeditionStarted: true,
       notifyExpeditionFinished: true,
+      account: {
+        select: {
+          email: true,
+          role: true,
+          emailVerified: true,
+          isPremium: true,
+          premiumExpiresAt: true,
+        },
+      },
     },
   });
 
@@ -79,6 +85,11 @@ playerRouter.get('/', asyncHandler(async (req, res) => {
   res.json({
     player: {
       ...player,
+      email: player.account.email,
+      role: player.account.role,
+      emailVerified: player.account.emailVerified,
+      isPremium: player.account.isPremium,
+      premiumExpiresAt: player.account.premiumExpiresAt,
       characterXp: Number(player.characterXp),
       attributes: normalizePlayerAttributes(player.attributes),
       activeTitle: titleDisplay.title ?? null,

@@ -7,6 +7,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { getPlayerTaxRate, calculateEffectiveTurns, taxInfoFromResult } from '../services/guildTaxService';
 import { createActivityLog, type ActivityType } from '../services/activityLogService';
 import { buildStateUpdates } from '../services/stateUpdateHelpers';
+import { requireActiveSeason } from '../middleware/seasonGuard';
 
 export const resourcesRouter = Router();
 resourcesRouter.use(authenticate);
@@ -30,7 +31,7 @@ const restSchema = z.object({
  * POST /api/v1/resources/rest
  * Spend turns to recover stamina or mana
  */
-resourcesRouter.post('/rest', asyncHandler(async (req, res) => {
+resourcesRouter.post('/rest', requireActiveSeason, asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   const body = restSchema.parse(req.body);
 

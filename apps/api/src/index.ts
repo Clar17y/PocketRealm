@@ -31,6 +31,7 @@ import { worldEventsRouter } from './routes/worldEvents';
 import { bossRouter } from './routes/boss';
 import { achievementsRouter } from './routes/achievements';
 import { leaderboardRouter } from './routes/leaderboard';
+import { seasonsRouter } from './routes/seasons';
 import { guildRouter } from './routes/guild';
 import { adminRouter } from './routes/admin';
 import { templatesRouter } from './routes/templates';
@@ -56,6 +57,7 @@ import { redis } from './redis';
 import { startMetricsLogger } from './services/metricsLogger';
 import { reconcileExpiredPremium } from './services/premiumReconciliation';
 import { roundTimerRegistry } from './services/roundTimerRegistry';
+import { refreshSeasonCache } from './services/seasonCacheService';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -155,6 +157,7 @@ app.use('/api/v1/events', worldEventsRouter);
 app.use('/api/v1/boss', bossRouter);
 app.use('/api/v1/achievements', achievementsRouter);
 app.use('/api/v1/leaderboard', leaderboardRouter);
+app.use('/api/v1/seasons', seasonsRouter);
 app.use('/api/v1/guild', guildRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/templates', templatesRouter);
@@ -195,6 +198,9 @@ async function runPremiumReconciliation(): Promise<void> {
 function startServer(): void {
   server.listen(PORT, () => {
     logger.info({ port: PORT, version: APP_VERSION }, 'PocketRealm API running');
+    void refreshSeasonCache().catch((err) => {
+      logger.error({ err }, 'Season cache init failed');
+    });
     void roundTimerRegistry.rehydrate(getIo).catch((err) => {
       logger.error({ err }, 'Round timer registry rehydrate failed');
     });

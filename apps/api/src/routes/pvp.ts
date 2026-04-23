@@ -24,6 +24,7 @@ import { trackProgress } from '../services/progressService';
 import { checkActivityLockout } from '../services/expeditionLockoutService';
 import { createEndpointLimiter } from '../middleware/rateLimiter';
 import { RATE_LIMIT_CONSTANTS } from '@pocketrealm/shared';
+import { requireActiveSeason } from '../middleware/seasonGuard';
 
 export const pvpRouter = Router();
 pvpRouter.use(authenticate);
@@ -80,7 +81,7 @@ pvpRouter.get('/rating', asyncHandler(async (req, res) => {
  * POST /api/v1/pvp/scout
  * Scout an opponent for 100 turns.
  */
-pvpRouter.post('/scout', asyncHandler(async (req, res) => {
+pvpRouter.post('/scout', requireActiveSeason, asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   await checkActivityLockout(playerId);
   const body = scoutSchema.parse(req.body);
@@ -102,7 +103,7 @@ pvpRouter.post('/scout', asyncHandler(async (req, res) => {
  * POST /api/v1/pvp/challenge
  * Challenge an opponent. Costs 500 turns (or 250 for revenge).
  */
-pvpRouter.post('/challenge', asyncHandler(async (req, res) => {
+pvpRouter.post('/challenge', requireActiveSeason, asyncHandler(async (req, res) => {
   const playerId = req.player!.playerId;
   await checkActivityLockout(playerId);
   const body = challengeSchema.parse(req.body);

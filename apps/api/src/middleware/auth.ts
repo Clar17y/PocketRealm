@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@pocketrealm/database';
 import { AppError } from './errorHandler';
 import { attachSentryUser } from './sentryContext';
+import { getCachedSeason, type CachedSeason } from '../services/seasonCacheService';
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   throw new Error('JWT_SECRET env var must be set and at least 32 characters');
@@ -55,8 +56,10 @@ function touchPlayerLastActive(playerId: string): void {
 }
 
 export interface AuthPayload {
+  accountId: string;
   playerId: string;
   username: string;
+  seasonId: string | null;
   role: string;
 }
 
@@ -64,6 +67,11 @@ declare global {
   namespace Express {
     interface Request {
       player?: AuthPayload;
+      account?: {
+        id: string;
+        role: string;
+      };
+      season?: CachedSeason;
       requestId?: string;
     }
   }
@@ -85,6 +93,8 @@ export function authenticate(
   try {
     const payload = jwt.verify(token, JWT_SECRET) as AuthPayload;
     req.player = payload;
+    req.account = { id: payload.accountId, role: payload.role };
+    req.season = payload.seasonId ? getCachedSeason(payload.seasonId) : undefined;
     touchPlayerLastActive(payload.playerId);
     attachSentryUser(req);
     next();
@@ -110,6 +120,8 @@ export function optionalAuthenticate(
   try {
     const payload = jwt.verify(token, JWT_SECRET) as AuthPayload;
     req.player = payload;
+    req.account = { id: payload.accountId, role: payload.role };
+    req.season = payload.seasonId ? getCachedSeason(payload.seasonId) : undefined;
     touchPlayerLastActive(payload.playerId);
   } catch {
     // Invalid token — proceed unauthenticated
@@ -137,15 +149,23 @@ export function verifyRefreshToken(token: string): AuthPayload {
     throw new AppError(401, 'Invalid or expired token', 'INVALID_TOKEN');
   }
 
+  const accountId = (decoded as { accountId?: unknown }).accountId;
   const playerId = (decoded as { playerId?: unknown }).playerId;
   const username = (decoded as { username?: unknown }).username;
+  const seasonId = (decoded as { seasonId?: unknown }).seasonId;
   const role = (decoded as { role?: unknown }).role;
 
-  if (typeof playerId !== 'string' || typeof username !== 'string') {
+  if (typeof accountId !== 'string' || typeof playerId !== 'string' || typeof username !== 'string') {
     throw new AppError(401, 'Invalid or expired token', 'INVALID_TOKEN');
   }
 
-  return { playerId, username, role: typeof role === 'string' ? role : 'player' };
+  return {
+    accountId,
+    playerId,
+    username,
+    seasonId: typeof seasonId === 'string' ? seasonId : null,
+    role: typeof role === 'string' ? role : 'player',
+  };
 }
 
 export function refreshTokenExpiresAt(nowMs = Date.now()): Date {

@@ -5,7 +5,7 @@ export interface PremiumReconciliationResult {
 }
 
 export async function reconcileExpiredPremium(now: Date = new Date()): Promise<PremiumReconciliationResult> {
-  const result = await prisma.player.updateMany({
+  const result = await prisma.account.updateMany({
     where: {
       isPremium: true,
       premiumExpiresAt: {

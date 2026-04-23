@@ -41,9 +41,11 @@ import {
 } from './helpers';
 import { checkActivityLockout } from '../../services/expeditionLockoutService';
 import { createEndpointLimiter } from '../../middleware/rateLimiter';
+import { requireActiveSeason } from '../../middleware/seasonGuard';
 
 export const craftRouter = Router();
 craftRouter.use(createEndpointLimiter('crafting', 60_000, 20));
+craftRouter.use(requireActiveSeason);
 
 /**
  * POST /api/v1/crafting/craft

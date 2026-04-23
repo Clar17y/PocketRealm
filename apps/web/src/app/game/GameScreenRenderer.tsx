@@ -42,6 +42,7 @@ import { TalentTree } from '@/components/screens/TalentTree';
 import { Quests } from '@/components/screens/Quests';
 import { CombatScreen } from './screens/CombatScreen';
 import { isMobKnown } from './combatHelpers';
+import type { CharacterSummary, SeasonArchiveSummary } from '@/lib/api';
 import type { Screen } from './gameController.types';
 import { SKILL_META, GATHERING_SKILL_TABS, CRAFTING_SKILL_TABS } from './pageConstants';
 import type { useGameController } from './useGameController';
@@ -58,9 +59,17 @@ interface GameScreenRendererProps {
     role?: string;
     email?: string;
     emailVerified?: boolean;
+    seasonId?: string | null;
     isPremium?: boolean;
     premiumExpiresAt?: string | null;
   } | null;
+  seasonArchives: SeasonArchiveSummary[];
+  realmLabel: string;
+  realmEndsAt: string | Date | null;
+  activePlayerId: string | null;
+  characters: CharacterSummary[];
+  switchingPlayerId: string | null;
+  onSwitchPlayer: (playerId: string) => void;
   casinoSocket: ReturnType<typeof useCasinoSocket>;
   achievementCategory: string | null;
   setAchievementCategory: (cat: string | null) => void;
@@ -78,6 +87,13 @@ interface GameScreenRendererProps {
 
 export function GameScreenRenderer({
   gc, player,
+  seasonArchives,
+  realmLabel,
+  realmEndsAt,
+  activePlayerId,
+  characters,
+  switchingPlayerId,
+  onSwitchPlayer,
   casinoSocket,
   achievementCategory, setAchievementCategory,
   expeditionContext, setExpeditionContext,
@@ -696,6 +712,13 @@ export function GameScreenRenderer({
           emailVerified={player?.emailVerified ?? false}
           isPremium={player?.isPremium ?? false}
           premiumExpiresAt={player?.premiumExpiresAt ?? null}
+          seasonArchives={seasonArchives}
+          realmLabel={realmLabel}
+          realmEndsAt={realmEndsAt}
+          activePlayerId={activePlayerId}
+          characters={characters}
+          switchingPlayerId={switchingPlayerId}
+          onSwitchPlayer={onSwitchPlayer}
           combatLogSpeedMs={combatLogSpeedMs} onCombatLogSpeedChange={setCombatLogSpeedMs}
           onCombatLogSpeedCommit={handleSetCombatLogSpeed}
           autoSkipKnownCombat={autoSkipKnownCombat} onAutoSkipKnownCombatChange={handleSetAutoSkipKnownCombat}
@@ -748,7 +771,7 @@ export function GameScreenRenderer({
         />
       );
     case 'leaderboard':
-      return <Leaderboard playerId={player?.id ?? null} />;
+      return <Leaderboard playerId={player?.id ?? null} currentSeasonId={player?.seasonId ?? null} />;
     case 'guild':
       return (
         <GuildScreen

@@ -21,13 +21,15 @@ import { isBlocked } from './blockService';
 
 const SENDER_ID = 'player-1';
 const RECIPIENT_ID = 'player-2';
+const SENDER_ACCOUNT_ID = 'account-1';
+const RECIPIENT_ACCOUNT_ID = 'account-2';
 const NOW = new Date('2026-03-01T12:00:00Z');
 
 function makeMail(overrides: Record<string, unknown> = {}) {
   return {
     id: 'mail-1',
-    senderId: SENDER_ID,
-    recipientId: RECIPIENT_ID,
+    senderId: SENDER_ACCOUNT_ID,
+    recipientId: RECIPIENT_ACCOUNT_ID,
     subject: 'Hello',
     body: 'How are you?',
     goldCost: 25,
@@ -36,8 +38,8 @@ function makeMail(overrides: Record<string, unknown> = {}) {
     isDeletedBySender: false,
     isDeletedByRecipient: false,
     createdAt: NOW,
-    sender: { username: 'Alice' },
-    recipient: { username: 'Bob' },
+    sender: { activePlayer: { id: SENDER_ID, username: 'Alice' } },
+    recipient: { activePlayer: { id: RECIPIENT_ID, username: 'Bob' } },
     ...overrides,
   };
 }
@@ -46,6 +48,19 @@ describe('friendMailService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (isBlocked as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    mockPrisma.player.findUnique.mockImplementation(({ where }: { where: { id: string } }) => {
+      if (where.id === SENDER_ID) {
+        return Promise.resolve({ id: SENDER_ID, accountId: SENDER_ACCOUNT_ID, username: 'Alice' });
+      }
+      if (where.id === RECIPIENT_ID) {
+        return Promise.resolve({ id: RECIPIENT_ID, accountId: RECIPIENT_ACCOUNT_ID, username: 'Bob' });
+      }
+      return Promise.resolve({
+        id: where.id,
+        accountId: `account:${where.id}`,
+        username: where.id,
+      });
+    });
   });
 
   // ─── sendMail ──────────────────────────────────────────────────────────
@@ -69,16 +84,16 @@ describe('friendMailService', () => {
       });
       expect(mockPrisma.friendMail.create).toHaveBeenCalledWith({
         data: {
-          senderId: SENDER_ID,
-          recipientId: RECIPIENT_ID,
+          senderId: SENDER_ACCOUNT_ID,
+          recipientId: RECIPIENT_ACCOUNT_ID,
           subject: 'Hello',
           body: 'How are you?',
           goldCost: MAIL_CONSTANTS.GOLD_COST,
           isSystem: false,
         },
         include: {
-          sender: { select: { username: true } },
-          recipient: { select: { username: true } },
+          sender: { select: { activePlayer: { select: { id: true, username: true } } } },
+          recipient: { select: { activePlayer: { select: { id: true, username: true } } } },
         },
       });
     });
@@ -199,7 +214,7 @@ describe('friendMailService', () => {
 
       // Should find oldest 3 to prune
       expect(mockPrisma.friendMail.findMany).toHaveBeenCalledWith({
-        where: { recipientId: RECIPIENT_ID, isDeletedByRecipient: false },
+        where: { recipientId: RECIPIENT_ACCOUNT_ID, isDeletedByRecipient: false },
         orderBy: { createdAt: 'asc' },
         take: 3,
         select: { id: true },
@@ -242,7 +257,7 @@ describe('friendMailService', () => {
 
       // Should find oldest 2 sent to prune
       expect(mockPrisma.friendMail.findMany).toHaveBeenCalledWith({
-        where: { senderId: SENDER_ID, isDeletedBySender: false, isSystem: false },
+        where: { senderId: SENDER_ACCOUNT_ID, isDeletedBySender: false, isSystem: false },
         orderBy: { createdAt: 'asc' },
         take: 2,
         select: { id: true },
@@ -337,8 +352,8 @@ describe('friendMailService', () => {
         where: {
           status: 'accepted',
           OR: [
-            { senderId: SENDER_ID, receiverId: RECIPIENT_ID },
-            { senderId: RECIPIENT_ID, receiverId: SENDER_ID },
+            { senderId: SENDER_ACCOUNT_ID, receiverId: RECIPIENT_ACCOUNT_ID },
+            { senderId: RECIPIENT_ACCOUNT_ID, receiverId: SENDER_ACCOUNT_ID },
           ],
         },
         select: { id: true },
@@ -360,16 +375,16 @@ describe('friendMailService', () => {
       expect(result.goldCost).toBe(0);
       expect(mockPrisma.friendMail.create).toHaveBeenCalledWith({
         data: {
-          senderId: SENDER_ID,
-          recipientId: RECIPIENT_ID,
+          senderId: SENDER_ACCOUNT_ID,
+          recipientId: RECIPIENT_ACCOUNT_ID,
           subject: 'System',
           body: 'You have mail',
           goldCost: 0,
           isSystem: true,
         },
         include: {
-          sender: { select: { username: true } },
-          recipient: { select: { username: true } },
+          sender: { select: { activePlayer: { select: { id: true, username: true } } } },
+          recipient: { select: { activePlayer: { select: { id: true, username: true } } } },
         },
       });
     });
@@ -435,10 +450,10 @@ describe('friendMailService', () => {
       expect(result.mails).toHaveLength(2);
       expect(result.total).toBe(2);
       expect(mockPrisma.friendMail.findMany).toHaveBeenCalledWith({
-        where: { recipientId: RECIPIENT_ID, isDeletedByRecipient: false },
+        where: { recipientId: RECIPIENT_ACCOUNT_ID, isDeletedByRecipient: false },
         include: {
-          sender: { select: { username: true } },
-          recipient: { select: { username: true } },
+          sender: { select: { activePlayer: { select: { id: true, username: true } } } },
+          recipient: { select: { activePlayer: { select: { id: true, username: true } } } },
         },
         orderBy: { createdAt: 'desc' },
         skip: 0,
@@ -522,10 +537,10 @@ describe('friendMailService', () => {
       expect(result.mails).toHaveLength(1);
       expect(result.total).toBe(1);
       expect(mockPrisma.friendMail.findMany).toHaveBeenCalledWith({
-        where: { senderId: SENDER_ID, isDeletedBySender: false, isSystem: false },
+        where: { senderId: SENDER_ACCOUNT_ID, isDeletedBySender: false, isSystem: false },
         include: {
-          sender: { select: { username: true } },
-          recipient: { select: { username: true } },
+          sender: { select: { activePlayer: { select: { id: true, username: true } } } },
+          recipient: { select: { activePlayer: { select: { id: true, username: true } } } },
         },
         orderBy: { createdAt: 'desc' },
         skip: 0,
@@ -572,7 +587,7 @@ describe('friendMailService', () => {
       await getSentMail('custom-player');
 
       const whereClause = mockPrisma.friendMail.findMany.mock.calls[0][0].where;
-      expect(whereClause.senderId).toBe('custom-player');
+      expect(whereClause.senderId).toBe('account:custom-player');
     });
   });
 
@@ -630,13 +645,13 @@ describe('friendMailService', () => {
         where: {
           id: 'mail-1',
           OR: [
-            { recipientId: RECIPIENT_ID, isDeletedByRecipient: false },
-            { senderId: RECIPIENT_ID, isDeletedBySender: false },
+            { recipientId: RECIPIENT_ACCOUNT_ID, isDeletedByRecipient: false },
+            { senderId: RECIPIENT_ACCOUNT_ID, isDeletedBySender: false },
           ],
         },
         include: {
-          sender: { select: { username: true } },
-          recipient: { select: { username: true } },
+          sender: { select: { activePlayer: { select: { id: true, username: true } } } },
+          recipient: { select: { activePlayer: { select: { id: true, username: true } } } },
         },
       });
     });
@@ -659,8 +674,8 @@ describe('friendMailService', () => {
     it('soft-deletes for recipient when sender has not deleted', async () => {
       mockPrisma.friendMail.findFirst.mockResolvedValue({
         id: 'mail-1',
-        senderId: SENDER_ID,
-        recipientId: RECIPIENT_ID,
+        senderId: SENDER_ACCOUNT_ID,
+        recipientId: RECIPIENT_ACCOUNT_ID,
         isDeletedBySender: false,
         isDeletedByRecipient: false,
       });
@@ -678,8 +693,8 @@ describe('friendMailService', () => {
     it('soft-deletes for sender when recipient has not deleted', async () => {
       mockPrisma.friendMail.findFirst.mockResolvedValue({
         id: 'mail-1',
-        senderId: SENDER_ID,
-        recipientId: RECIPIENT_ID,
+        senderId: SENDER_ACCOUNT_ID,
+        recipientId: RECIPIENT_ACCOUNT_ID,
         isDeletedBySender: false,
         isDeletedByRecipient: false,
       });
@@ -697,8 +712,8 @@ describe('friendMailService', () => {
     it('hard-deletes when recipient deletes and sender already deleted', async () => {
       mockPrisma.friendMail.findFirst.mockResolvedValue({
         id: 'mail-1',
-        senderId: SENDER_ID,
-        recipientId: RECIPIENT_ID,
+        senderId: SENDER_ACCOUNT_ID,
+        recipientId: RECIPIENT_ACCOUNT_ID,
         isDeletedBySender: true,
         isDeletedByRecipient: false,
       });
@@ -713,8 +728,8 @@ describe('friendMailService', () => {
     it('hard-deletes when sender deletes and recipient already deleted', async () => {
       mockPrisma.friendMail.findFirst.mockResolvedValue({
         id: 'mail-1',
-        senderId: SENDER_ID,
-        recipientId: RECIPIENT_ID,
+        senderId: SENDER_ACCOUNT_ID,
+        recipientId: RECIPIENT_ACCOUNT_ID,
         isDeletedBySender: false,
         isDeletedByRecipient: true,
       });
@@ -744,7 +759,7 @@ describe('friendMailService', () => {
       expect(mockPrisma.friendMail.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'mail-1',
-          OR: [{ senderId: 'some-player' }, { recipientId: 'some-player' }],
+          OR: [{ senderId: 'account:some-player' }, { recipientId: 'account:some-player' }],
         },
         select: {
           id: true,
@@ -761,8 +776,8 @@ describe('friendMailService', () => {
       // even though the code checks isSender first
       mockPrisma.friendMail.findFirst.mockResolvedValue({
         id: 'mail-1',
-        senderId: 'other-player',
-        recipientId: 'my-player',
+        senderId: 'account:other-player',
+        recipientId: 'account:my-player',
         isDeletedBySender: false,
         isDeletedByRecipient: false,
       });
@@ -787,7 +802,7 @@ describe('friendMailService', () => {
 
       expect(count).toBe(7);
       expect(mockPrisma.friendMail.count).toHaveBeenCalledWith({
-        where: { recipientId: RECIPIENT_ID, isRead: false, isDeletedByRecipient: false },
+        where: { recipientId: RECIPIENT_ACCOUNT_ID, isRead: false, isDeletedByRecipient: false },
       });
     });
 
@@ -806,7 +821,7 @@ describe('friendMailService', () => {
 
       expect(mockPrisma.friendMail.count).toHaveBeenCalledWith({
         where: {
-          recipientId: 'custom-player-id',
+          recipientId: 'account:custom-player-id',
           isRead: false,
           isDeletedByRecipient: false,
         },
