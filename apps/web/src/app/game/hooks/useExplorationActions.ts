@@ -33,7 +33,7 @@ interface UseExplorationActionsParams {
   stateSetters: StateSetters;
   advanceTutorial: (fromStep: number) => void | Promise<void>;
   combatLogPrefetchClear: () => void;
-  refreshPendingEncounters: () => Promise<void>;
+  refreshPendingEncounters: () => Promise<unknown>;
   loadGatheringNodes: () => Promise<void>;
   pendingLootQueueRef: React.MutableRefObject<string[]>;
   activatePendingLoot: (sessionId: string) => Promise<void>;
