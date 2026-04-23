@@ -119,6 +119,7 @@ export default function GamePage() {
     confirmAbandonLoot, abandonLootAndTravel, cancelAbandonLoot,
     lootRevealItems, handleDismissLootReveal,
     inventoryCapacity, inventoryUsedSlots,
+    loadAll,
   } = gc;
 
   useEffect(() => {
@@ -233,9 +234,12 @@ export default function GamePage() {
 
   const syncSession = useCallback(async (accessToken: string, refreshToken: string) => {
     storeTokens(accessToken, refreshToken);
-    await refreshPlayer();
-    await loadRealmData();
-  }, [loadRealmData, refreshPlayer, storeTokens]);
+    await Promise.all([
+      refreshPlayer(),
+      loadRealmData(),
+      loadAll(),
+    ]);
+  }, [loadAll, loadRealmData, refreshPlayer, storeTokens]);
 
   const handleSwitchPlayer = useCallback(async (playerId: string) => {
     setRealmActionError(null);
